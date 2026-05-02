@@ -14,7 +14,7 @@
     "@react-email/preview-server": "5.2.10",
     "@repo/email": "*",
     "react": "19.2.5",
-    "react-email": "6.0.0"
+    "react-email": "6.0.5"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
