@@ -84,6 +84,8 @@ export async function POST(request: Request): Promise<Response> {
         case "auth_error":
         case "integration_error":
           return jsonFailure(500, result.error.code, result.error.message);
+        default:
+          return unhandledSupportIssueError(result.error);
       }
     }
 
@@ -235,4 +237,12 @@ function jsonFailure(
   };
 
   return Response.json(response, { status });
+}
+
+function unhandledSupportIssueError(_error: never): Response {
+  return jsonFailure(
+    500,
+    "integration_error",
+    "Failed to create the GitHub issue."
+  );
 }

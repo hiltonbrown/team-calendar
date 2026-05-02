@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getBillingSummaryForDashboard: vi.fn(),
@@ -93,6 +93,8 @@ const baseInput = {
 
 describe("dashboard-service", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-20T00:00:00.000Z"));
     vi.clearAllMocks();
     mocks.personFindFirst.mockResolvedValue({ id: baseInput.personId });
     mocks.personCount.mockResolvedValue(0);
@@ -403,6 +405,10 @@ describe("dashboard-service", () => {
         ],
       },
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it.each([
