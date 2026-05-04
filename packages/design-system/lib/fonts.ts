@@ -1,5 +1,5 @@
 import { cn } from '@repo/design-system/lib/utils';
-import { Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google';
+import { Lora, Plus_Jakarta_Sans } from 'next/font/google';
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -8,14 +8,14 @@ const plusJakartaSans = Plus_Jakarta_Sans({
   weight: ['400', '500', '600', '700'],
 });
 
-const geistMono = Geist_Mono({
+const lora = Lora({
   subsets: ['latin'],
-  variable: '--font-geist-mono',
+  variable: '--font-lora',
   display: 'swap',
 });
 
 export const fonts = cn(
   plusJakartaSans.variable,
-  geistMono.variable,
+  lora.variable,
   'touch-manipulation font-sans antialiased'
 );

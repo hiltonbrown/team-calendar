@@ -1,0 +1,476 @@
+/* Marketing motion layer */
+
+/* Layer 1: Hero entry animations */
+.marketing-hero__title-wrap {
+  display: block;
+  padding-bottom: 0.15em;
+  margin-bottom: -0.15em;
+  overflow: hidden;
+}
+
+.marketing-hero__title-line {
+  display: block;
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: 0.08s;
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(0.4em);
+  }
+}
+
+.marketing-hero__title-line--2 {
+  transition-delay: 0.18s;
+}
+
+.marketing-pill,
+.marketing-hero__copy,
+.marketing-actions,
+.marketing-portrait-wrap {
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.marketing-pill {
+  transition-delay: 0s;
+}
+.marketing-hero__copy {
+  transition-delay: 0.28s;
+}
+.marketing-actions {
+  transition-delay: 0.4s;
+}
+.marketing-portrait-wrap {
+  transition-delay: 0.15s;
+}
+
+/* Layer 3: Scroll-driven section reveals */
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .marketing-workflow,
+  .marketing-calendar-card,
+  .marketing-pricing-heading {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+
+  .marketing-workflow__steps li {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+  }
+
+  .marketing-workflow__steps li:nth-child(1) {
+    animation-range: entry 0% entry 35%;
+  }
+  .marketing-workflow__steps li:nth-child(2) {
+    animation-range: entry 8% entry 43%;
+  }
+  .marketing-workflow__steps li:nth-child(3) {
+    animation-range: entry 16% entry 51%;
+  }
+  .marketing-workflow__steps li:nth-child(4) {
+    animation-range: entry 24% entry 59%;
+  }
+
+  .marketing-feature-grid .marketing-card {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+  }
+
+  .marketing-feature-grid .marketing-card:nth-child(1) {
+    animation-range: entry 0% entry 35%;
+  }
+  .marketing-feature-grid .marketing-card:nth-child(2) {
+    animation-range: entry 5% entry 40%;
+  }
+  .marketing-feature-grid .marketing-card:nth-child(3) {
+    animation-range: entry 10% entry 45%;
+  }
+  .marketing-feature-grid .marketing-card:nth-child(4) {
+    animation-range: entry 15% entry 50%;
+  }
+
+  .marketing-showcase-grid .marketing-image-card:nth-child(1) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+
+  .marketing-showcase-grid .marketing-image-card:nth-child(2) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 8% entry 43%;
+  }
+
+  .marketing-pricing-grid .marketing-price-card {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+  }
+
+  .marketing-pricing-grid .marketing-price-card:nth-child(1) {
+    animation-range: entry 0% entry 35%;
+  }
+  .marketing-pricing-grid .marketing-price-card:nth-child(2) {
+    animation-range: entry 5% entry 40%;
+  }
+  .marketing-pricing-grid .marketing-price-card:nth-child(3) {
+    animation-range: entry 10% entry 45%;
+  }
+}
+
+/* Layer 4: Spring-physics CTA hover */
+.marketing-btn {
+  transition:
+    background 160ms cubic-bezier(0.2, 0, 0, 1),
+    color 160ms cubic-bezier(0.2, 0, 0, 1),
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.marketing-btn--primary:hover {
+  transform: translateY(-2px);
+}
+
+.marketing-btn--primary:active {
+  transform: scale(0.97) translateY(0);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  transition-duration: 80ms;
+}
+
+/* Layer 5: Product snapshot row stagger */
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.marketing-week-row {
+  animation: row-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.marketing-week-row:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.marketing-week-row:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.marketing-week-row:nth-child(3) {
+  animation-delay: 0.15s;
+}
+.marketing-week-row:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.marketing-week-row:nth-child(5) {
+  animation-delay: 0.25s;
+}
+.marketing-week-row:nth-child(6) {
+  animation-delay: 0.3s;
+}
+.marketing-week-row:nth-child(7) {
+  animation-delay: 0.35s;
+}
+.marketing-week-row:nth-child(8) {
+  animation-delay: 0.4s;
+}
+
+@keyframes sync-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.marketing-browser-bar [data-syncing] svg {
+  animation: sync-spin 0.9s linear infinite;
+}
+
+/* Reduced motion: disable everything */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-hero__title-line,
+  .marketing-pill,
+  .marketing-hero__copy,
+  .marketing-actions,
+  .marketing-portrait-wrap,
+  .marketing-week-row,
+  .marketing-week-control,
+  .marketing-event,
+  .marketing-browser-bar [data-syncing] svg {
+    opacity: 1 !important;
+    filter: none !important;
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+.marketing-hero__grid {
+  --cx: 0.5;
+  --cy: 0.5;
+}
+
+/* Workflow step connector arrows — drawn between cards on scroll */
+.marketing-workflow__steps li {
+  overflow: visible;
+}
+
+.marketing-workflow__steps li:not(:last-child)::after {
+  position: absolute;
+  top: 28px;
+  right: -14px;
+  z-index: 2;
+  width: 10px;
+  height: 10px;
+  content: "";
+  border-top: 1.5px solid var(--marketing-ghost-border);
+  border-right: 1.5px solid var(--marketing-ghost-border);
+  opacity: 0;
+  transform: rotate(45deg) scale(0.4);
+}
+
+@supports (animation-timeline: view()) {
+  .marketing-workflow__steps li:not(:last-child)::after {
+    animation: connector-arrive 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-timeline: view(block);
+    animation-range: entry 22% entry 42%;
+  }
+}
+
+@keyframes connector-arrive {
+  from {
+    opacity: 0;
+    transform: rotate(45deg) scale(0.4);
+  }
+  to {
+    opacity: 0.65;
+    transform: rotate(45deg) scale(1);
+  }
+}
+
+/* Feature cards: 3D tilt-in on scroll (replaces reveal-up) */
+@keyframes card-tilt-in {
+  from {
+    opacity: 0;
+    transform: perspective(700px) rotateX(22deg) translateY(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(700px) rotateX(0deg) translateY(0) scale(1);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .marketing-feature-grid .marketing-card {
+    animation: card-tilt-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-timeline: view();
+  }
+
+  .marketing-feature-grid .marketing-card:nth-child(1) {
+    animation-range: entry 0% entry 38%;
+  }
+
+  .marketing-feature-grid .marketing-card:nth-child(2) {
+    animation-range: entry 5% entry 43%;
+  }
+
+  .marketing-feature-grid .marketing-card:nth-child(3) {
+    animation-range: entry 10% entry 48%;
+  }
+
+  .marketing-feature-grid .marketing-card:nth-child(4) {
+    animation-range: entry 15% entry 53%;
+  }
+}
+
+/* Pricing cards: blind reveal on scroll (replaces reveal-up) */
+@keyframes blind-reveal {
+  from {
+    clip-path: inset(0 0 100% 0 round 16px);
+    opacity: 0;
+  }
+  to {
+    clip-path: inset(0 0 0% 0 round 16px);
+    opacity: 1;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .marketing-pricing-grid .marketing-price-card {
+    animation: blind-reveal 0.52s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-timeline: view();
+  }
+
+  .marketing-pricing-grid .marketing-price-card:nth-child(1) {
+    animation-range: entry 0% entry 40%;
+  }
+
+  .marketing-pricing-grid .marketing-price-card:nth-child(2) {
+    animation-range: entry 7% entry 47%;
+  }
+
+  .marketing-pricing-grid .marketing-price-card:nth-child(3) {
+    animation-range: entry 14% entry 54%;
+  }
+}
+
+/* Overdrive: disable all depth/tilt on reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .marketing-product-snapshot .marketing-card--low {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .marketing-product-snapshot .marketing-card--low::before {
+    display: none;
+  }
+
+  .marketing-workflow__steps li:not(:last-child)::after {
+    opacity: 0.5;
+    transform: rotate(45deg) scale(1);
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-story-bg img,
+  .marketing-story-panel,
+  .marketing-product-snapshot .marketing-card--low,
+  .marketing-snapshot-story__state,
+  .marketing-image-card__media img,
+  .marketing-calendar-card__media img {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
+  }
+}
+
+@keyframes pinned-bg-depth {
+  0% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  65% {
+    opacity: 0.72;
+    transform: scale(1.08) translateY(-1.5vh);
+  }
+  100% {
+    opacity: 0.28;
+    transform: scale(1.12) translateY(-3vh);
+  }
+}
+
+@keyframes panel-slide-over {
+  from {
+    opacity: 0.2;
+    transform: translateY(18vh);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes snapshot-scrub {
+  0% {
+    transform: translate3d(0, 18px, 0) rotateX(0deg);
+  }
+  48% {
+    transform: translate3d(0, -6px, 0) rotateX(1.25deg);
+  }
+  100% {
+    transform: translate3d(0, -16px, 0) rotateX(0deg);
+  }
+}
+
+@keyframes snapshot-state-focus {
+  0%,
+  100% {
+    opacity: 0.48;
+    transform: translateX(0);
+  }
+  42%,
+  68% {
+    opacity: 1;
+    transform: translateX(10px);
+  }
+}
+
+@keyframes media-depth {
+  from {
+    transform: scale(1.08) translateY(24px);
+  }
+  to {
+    transform: scale(1.02) translateY(-18px);
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .marketing-story-bg img {
+    animation: pinned-bg-depth linear both;
+    animation-timeline: scroll();
+    animation-range: 0 100%;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .marketing-story-panel {
+    animation: panel-slide-over linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 52%;
+  }
+
+  .marketing-product-snapshot .marketing-card--low {
+    transform-origin: center top;
+    animation: snapshot-scrub linear both;
+    animation-timeline: view();
+    animation-range: entry 0% exit 88%;
+  }
+
+  .marketing-snapshot-story__state {
+    animation: snapshot-state-focus linear both;
+    animation-timeline: view();
+  }
+
+  .marketing-snapshot-story__state:nth-child(1) {
+    animation-range: entry 0% entry 38%;
+  }
+
+  .marketing-snapshot-story__state:nth-child(2) {
+    animation-range: entry 20% cover 54%;
+  }
+
+  .marketing-snapshot-story__state:nth-child(3) {
+    animation-range: entry 42% cover 78%;
+  }
+
+  .marketing-image-card__media img,
+  .marketing-calendar-card__media img {
+    animation: media-depth linear both;
+    animation-timeline: view();
+    animation-range: entry 0% exit 100%;
+  }
+}

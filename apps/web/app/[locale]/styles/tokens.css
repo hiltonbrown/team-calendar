@@ -1,0 +1,150 @@
+:where(
+    .marketing-home,
+    .marketing-site-header,
+    .marketing-footer,
+    .features-prototype
+  ) {
+  --marketing-primary: var(--primary);
+  --marketing-primary-container: var(--primary-container);
+  --marketing-on-primary: var(--primary-foreground);
+  --marketing-on-primary-container: var(--on-primary-container);
+  --marketing-secondary: var(--chart-3);
+  --marketing-secondary-container: var(--secondary);
+  --marketing-on-secondary-container: var(--secondary-foreground);
+  --marketing-tertiary: var(--tertiary);
+  --marketing-surface: var(--background);
+  --marketing-surface-lowest: var(--surface-container-lowest);
+  --marketing-surface-low: var(--surface-container-low);
+  --marketing-surface-container: var(--surface-container);
+  --marketing-surface-high: var(--surface-container-high);
+  --marketing-surface-highest: var(--surface-container-highest);
+  --marketing-surface-variant: var(--surface-variant);
+  --marketing-on-surface: var(--on-surface);
+  --marketing-on-surface-variant: var(--on-surface-variant);
+  --marketing-inverse-surface: var(--inverse-surface);
+  --marketing-inverse-on-surface: var(--inverse-on-surface);
+  --marketing-outline: var(--outline);
+  --marketing-outline-variant: var(--outline-variant);
+  --marketing-error: var(--destructive);
+  --marketing-error-container: var(--error-container);
+  --marketing-success: var(--success);
+  --marketing-warning: color-mix(
+    in oklch,
+    var(--primary-container) 72%,
+    var(--error-container)
+  );
+  --marketing-danger-soft: color-mix(
+    in oklch,
+    var(--marketing-error-container) 72%,
+    var(--marketing-error)
+  );
+  --marketing-ghost-border: color-mix(
+    in srgb,
+    var(--marketing-outline-variant) 15%,
+    transparent
+  );
+  --marketing-shadow-ambient: 0 12px 32px
+    color-mix(in srgb, var(--marketing-inverse-surface) 10%, transparent);
+  --marketing-glass-bg: color-mix(
+    in srgb,
+    var(--marketing-surface) 18%,
+    transparent
+  );
+  --marketing-glass-bg-strong: color-mix(
+    in srgb,
+    var(--marketing-surface-lowest) 33%,
+    transparent
+  );
+  --marketing-gradient-duotone: var(--marketing-secondary-container);
+  --marketing-hero-highlight: var(--marketing-primary);
+  --marketing-on-hero-highlight: var(--marketing-on-primary);
+  --marketing-font:
+    var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
+
+  --marketing-event-leave-bg: color-mix(
+    in oklch,
+    var(--marketing-primary) 88%,
+    var(--marketing-surface-highest)
+  );
+  --marketing-event-leave-fg: var(--marketing-on-primary);
+  --marketing-event-wfh-bg: var(--marketing-secondary-container);
+  --marketing-event-wfh-fg: var(--marketing-on-secondary-container);
+  --marketing-event-training-bg: var(--marketing-surface-highest);
+  --marketing-event-training-fg: var(--marketing-on-surface-variant);
+  --marketing-event-client-bg: var(--marketing-error-container);
+  --marketing-event-client-fg: var(--marketing-error);
+  --marketing-event-travel-bg: var(--marketing-inverse-surface);
+  --marketing-event-travel-fg: var(--marketing-inverse-on-surface);
+
+  --marketing-avatar-sage-bg: var(--marketing-secondary-container);
+  --marketing-avatar-sage-fg: var(--marketing-on-secondary-container);
+  --marketing-avatar-slate-bg: var(--marketing-surface-highest);
+  --marketing-avatar-slate-fg: var(--marketing-on-surface);
+  --marketing-avatar-plum-bg: var(--marketing-surface-container);
+  --marketing-avatar-plum-fg: var(--marketing-inverse-surface);
+  --marketing-avatar-forest-bg: var(--marketing-primary);
+  --marketing-avatar-forest-fg: var(--marketing-on-primary);
+
+  /* Vendor colours are external brand identifiers. */
+  --marketing-xero-cyan: #00b4ce;
+  --marketing-outlook-blue: #0078d4;
+  --marketing-google-blue: #4285f4;
+  --marketing-apple-red: #ff3b30;
+}
+
+:where(.dark, [data-theme="dark"])
+  :where(
+    .marketing-home,
+    .marketing-site-header,
+    .marketing-footer,
+    .features-prototype
+  ) {
+  --marketing-hero-highlight: var(--marketing-primary);
+  --marketing-on-hero-highlight: var(--marketing-on-primary);
+}
+
+.features-prototype {
+  --feature-primary: var(--marketing-primary);
+  --feature-primary-container: var(--marketing-primary-container);
+  --feature-on-primary: var(--marketing-on-primary);
+  --feature-on-primary-container: var(--marketing-on-primary-container);
+  --feature-secondary: var(--marketing-secondary);
+  --feature-secondary-container: var(--marketing-secondary-container);
+  --feature-on-secondary-container: var(--marketing-on-secondary-container);
+  --feature-surface: var(--marketing-surface);
+  --feature-surface-lowest: var(--marketing-surface-lowest);
+  --feature-surface-low: var(--marketing-surface-low);
+  --feature-surface-container: var(--marketing-surface-container);
+  --feature-surface-high: var(--marketing-surface-high);
+  --feature-surface-highest: var(--marketing-surface-highest);
+  --feature-surface-variant: var(--marketing-surface-variant);
+  --feature-on-surface: var(--marketing-on-surface);
+  --feature-on-surface-variant: var(--marketing-on-surface-variant);
+  --feature-inverse-surface: var(--marketing-inverse-surface);
+  --feature-inverse-on-surface: var(--marketing-inverse-on-surface);
+  --feature-outline: var(--marketing-outline);
+  --feature-outline-variant: var(--marketing-outline-variant);
+  --feature-error: var(--marketing-error);
+  --feature-error-container: var(--marketing-error-container);
+  --feature-warning: var(--marketing-warning);
+  --feature-danger-soft: var(--marketing-danger-soft);
+  --feature-ghost-border: var(--marketing-ghost-border);
+  --feature-shadow-ambient: var(--marketing-shadow-ambient);
+  --feature-font: var(--marketing-font);
+  --feature-avatar-sage-bg: var(--marketing-avatar-sage-bg);
+  --feature-avatar-sage-fg: var(--marketing-avatar-sage-fg);
+  --feature-avatar-mauve-bg: var(--marketing-avatar-plum-bg);
+  --feature-avatar-mauve-fg: var(--marketing-avatar-plum-fg);
+  --feature-avatar-cream-bg: var(--marketing-surface-low);
+  --feature-avatar-cream-fg: var(--marketing-on-surface-variant);
+  --feature-avatar-ink-bg: var(--marketing-inverse-surface);
+  --feature-avatar-ink-fg: var(--marketing-inverse-on-surface);
+  --feature-avatar-rose-bg: var(--marketing-error-container);
+  --feature-avatar-rose-fg: var(--marketing-error);
+  --feature-avatar-sky-bg: color-mix(
+    in oklch,
+    var(--marketing-surface-highest) 78%,
+    var(--marketing-primary-container)
+  );
+  --feature-avatar-sky-fg: var(--marketing-on-surface);
+}

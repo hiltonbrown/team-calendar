@@ -547,15 +547,16 @@ const _MockPlans = () => {
 type CalendarTone = "primary" | "sage" | "slate";
 
 const calendarToneBg: Record<CalendarTone, string> = {
-  primary: "color-mix(in oklch, var(--primary-container) 65%, transparent)",
-  sage: "var(--secondary-container)",
-  slate: "var(--surface-container-highest)",
+  primary:
+    "color-mix(in oklch, var(--feature-primary-container) 65%, transparent)",
+  sage: "var(--feature-secondary-container)",
+  slate: "var(--feature-surface-highest)",
 };
 
 const calendarToneFg: Record<CalendarTone, string> = {
-  primary: "var(--on-primary-container)",
-  sage: "var(--on-secondary-container)",
-  slate: "var(--on-surface)",
+  primary: "var(--feature-on-primary-container)",
+  sage: "var(--feature-on-secondary-container)",
+  slate: "var(--feature-on-surface)",
 };
 
 const MockCalendar = () => {
@@ -611,7 +612,7 @@ const MockCalendar = () => {
         </div>
         <div className="feature-row feature-row--tight">
           <span className="feature-pill feature-pill--outline">
-            Folder Creek
+            Harbour Lane Group
           </span>
           <span className="feature-pill feature-pill--outline">All types</span>
         </div>
@@ -1137,7 +1138,7 @@ const _MockSync = () => {
   const tenants = [
     {
       last: "2 min ago",
-      n: "Folder Creek Pty Ltd",
+      n: "Harbour Lane Group",
       runs: 142,
       status: "healthy",
     },
@@ -1285,10 +1286,10 @@ const _MockLeaveReports = () => {
 
 const _MockOOO = () => {
   const breakdown = [
-    { c: "var(--primary)", k: "WFH", v: 188 },
-    { c: "var(--secondary)", k: "Travelling", v: 64 },
-    { c: "var(--primary-container)", k: "Training", v: 28 },
-    { c: "var(--surface-container-highest)", k: "Client site", v: 21 },
+    { c: "var(--feature-primary)", k: "WFH", v: 188 },
+    { c: "var(--feature-secondary)", k: "Travelling", v: 64 },
+    { c: "var(--feature-primary-container)", k: "Training", v: 28 },
+    { c: "var(--feature-surface-highest)", k: "Client site", v: 21 },
   ];
   const total = breakdown.reduce((sum, item) => sum + item.v, 0);
   let accumulatedDash = 0;

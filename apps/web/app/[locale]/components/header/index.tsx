@@ -37,7 +37,7 @@ export const Header = (_properties: HeaderProps) => {
           <Image
             alt=""
             height={28}
-            src="/marketing/features-favicon.svg"
+            src="/marketing/brand-mark.svg"
             width={28}
           />
           <span>LeaveSync</span>
@@ -60,13 +60,13 @@ export const Header = (_properties: HeaderProps) => {
             className="marketing-btn marketing-btn--tertiary"
             href={signInHref}
           >
-            SIGN IN
+            Sign in
           </Link>
           <Link
             className="marketing-btn marketing-btn--primary"
             href={signUpHref}
           >
-            START HERE
+            Start trial
           </Link>
         </div>
 
@@ -92,14 +92,14 @@ export const Header = (_properties: HeaderProps) => {
               </Link>
             ))}
             <Link href={signInHref} onClick={() => setOpen(false)}>
-              SIGN IN
+              Sign in
             </Link>
             <Link
               className="marketing-btn marketing-btn--primary"
               href={signUpHref}
               onClick={() => setOpen(false)}
             >
-              START HERE
+              Start trial
             </Link>
           </div>
         )}

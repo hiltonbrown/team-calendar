@@ -58,7 +58,9 @@ export const Footer = () => (
       ))}
     </div>
     <div className="marketing-footer__bottom">
-      <span>© 2026 LeaveSync. Made in Melbourne.</span>
+      <span>
+        © 2026 LeaveSync. Made with love and coffee on the Gold Coast.
+      </span>
       <span>Privacy · Terms · Data processing</span>
     </div>
   </footer>

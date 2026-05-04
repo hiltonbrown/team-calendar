@@ -4,17 +4,33 @@ This file provides guidance to Claude Code when working in the LeaveSync reposit
 
 ## Project overview
 
-**LeaveSync** is a multi-tenant availability publishing platform. It connects to Xero Payroll (AU, NZ, UK), syncs approved leave data, normalises it into a canonical availability model, and publishes through secure ICS calendar feeds.
+**LeaveSync** is a multi-tenant leave management and availability publishing platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: employees submit and manage leave requests in LeaveSync, approved state is written back to Xero synchronously, and Xero-side leave data is pulled into the canonical availability model on a scheduled basis.
 
-The architecture is: **Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**.
+The architecture is: **Leave submission layer > bidirectional Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**
 
-LeaveSync does not manage payroll, accruals, or leave approvals. Xero is the source of truth for approved leave. LeaveSync adds manual availability entries (WFH, travelling, training, client site) and publishes everything as stable ICS feeds.
+LeaveSync is:
 
-**Reference docs (read before implementing domain logic):**
+- a leave submission and approval workflow system, bidirectionally synced with Xero Payroll
+- a canonical availability publisher
+- a Xero leave visibility and management layer
+- a manual availability entry surface for non-leave events (WFH, travelling, training, client site)
+- a secure ICS feed generator for Outlook, Google Calendar, and Apple Calendar
+- a real-time notification platform (SSE-delivered in-app notifications plus transactional email)
 
-- `PRODUCT.md`: domain model, database schema, Xero sync model, feed rendering, UID strategy, build order, stack decisions.
-- `DESIGN.md`: colour tokens, typography, spacing, elevation rules, component specifications.
-- `.impeccable.md`: brand personality, user context, design principles.
+LeaveSync is not:
+
+- a full HRIS
+- a payroll engine or accrual calculator
+- a multi-connector abstraction layer (Xero only at this stage)
+
+Xero remains the payroll source of truth. Outbound writes (submit, approve, decline, withdraw) are synchronous and user-triggered. Inbound sync is pull-first via scheduled Inngest jobs. Leave balances are always sourced from Xero; never calculated by LeaveSync.
+
+**Reference docs (read before implementing any domain logic):**
+
+- `PRODUCT.md`: authoritative product truth, domain model, database schema, Xero sync model, feed rendering, UID strategy, build order, and stack decisions. Read this first.
+- `final-delivery-plan.md`: current delivery scope, phase sequencing, and open decisions.
+- `DESIGN.md`: colour tokens, typography, spacing, elevation rules, and component specifications.
+- `.impeccable.md`: brand personality, user context, and design principles.
 
 ---
 
@@ -35,6 +51,8 @@ LeaveSync does not manage payroll, accruals, or leave approvals. Xero is the sou
 | Deployment | Vercel (all apps) |
 | Testing | Vitest |
 | Linting | Biome 2 + Ultracite |
+| Real-time notifications | SSE via Vercel streaming |
+| Public holiday data | Nager.Date API |
 
 ---
 
@@ -42,7 +60,7 @@ LeaveSync does not manage payroll, accruals, or leave approvals. Xero is the sou
 
 All commands run from the repo root.
 
-```bash
+```
 bun run dev                # Start all apps (Turbo)
 bun run build              # Build all apps and packages
 bun run check              # Biome/Ultracite lint checks
@@ -140,18 +158,19 @@ async function listPeople(organisationId: OrganisationId) {
 | App | Port | Purpose |
 |---|---|---|
 | `app` | 3000 | Authenticated product UI |
-| `api` | 3002 | Xero OAuth, sync orchestration, feed endpoints (`GET /ical/:token.ics`), Inngest handlers |
+| `api` | 3002 | Xero OAuth, sync orchestration, outbound write-back, feed endpoint (`GET /ical/:token.ics`), SSE stream, Inngest handlers |
 | `web` | 3001 | Public marketing site |
 | `docs` | 3004 | Mintlify documentation |
-| `email` | 3003 | React Email templates |
+| `email` | 3003 | React Email template development (dev preview only; not deployed to production) |
 
 ### Domain packages
 
 | Package | Purpose |
 |---|---|
-| `packages/xero` | Xero OAuth, tenant sync, region-specific API handling, rate limiting |
-| `packages/availability` | Canonical person model, availability records, privacy rules, feed eligibility |
+| `packages/xero` | Xero OAuth, tenant sync, region-specific API handling, outbound write operations, rate limiting |
+| `packages/availability` | Canonical person model, availability records, privacy rules, feed eligibility, approval state machine |
 | `packages/feeds` | ICS generation via ical-generator, UID strategy, feed token validation, caching |
+| `packages/notifications` | In-app notification creation, SSE delivery, notification preferences, email dispatch via Resend |
 | `packages/jobs` | Inngest job definitions: sync scheduling, feed rebuilds, reconciliation |
 | `packages/core` | Result type, branded IDs, shared enums, date/timezone utilities, error types |
 
@@ -181,11 +200,23 @@ async function listPeople(organisationId: OrganisationId) {
 - All database access through `packages/database`. Never import Prisma client directly in apps.
 - All Xero-specific logic in `packages/xero`. Canonical domain logic in `packages/availability` never depends on Xero payload shapes.
 - All ICS generation logic in `packages/feeds`.
+- All notification logic in `packages/notifications`.
 - Shared UI components in `packages/design-system`. Do not redefine base components in apps.
 
 ### Core entity
 
 The primary domain object is `AvailabilityRecord`. It holds both Xero-synced leave and manual availability entries. It is not called a "leave application". See PRODUCT.md for the full schema.
+
+### Xero write-back
+
+Outbound writes are synchronous and user-triggered. The four write operations are:
+
+- **Submit**: employee submits a leave request; write to Xero, transition to `submitted`
+- **Approve**: manager approves; write to Xero, transition to `approved`
+- **Decline**: manager declines with a required reason; write to Xero, transition to `declined`
+- **Withdraw**: employee or admin withdraws; write to Xero, transition to `withdrawn`
+
+Do not queue outbound writes as background jobs. Failures are surfaced inline to the user.
 
 ### Xero connection structure
 
@@ -221,7 +252,8 @@ const tenant = await db.xeroTenant.findFirst({
 - Branded types for domain IDs (`ClerkOrgId`, `OrganisationId`, `PersonId`, `XeroTenantId`, etc.), defined in `packages/core`.
 
 ### MCP Servers
-- Always use Context7 when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
+
+- Always use Context7 when library or API documentation, code generation, or setup steps are needed, without waiting to be asked explicitly.
 
 ### Error handling
 
@@ -266,7 +298,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Vitest as runner. Tests from the first slice. No deferring.
 - Factories or builders for test data, not repeated raw literals.
 - Fixture-based tests for Xero response mappers and region-specific parsers.
-- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroTenant uniqueness invariants.
+- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroTenant uniqueness invariants, approval state transitions, decline-reason enforcement.
 
 ---
 
@@ -274,11 +306,13 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 - All Xero code in `packages/xero`. Region-specific logic in subdirectories (`au/`, `nz/`, `uk/`).
 - Raw Xero responses stored in `source_payload_json` on `availability_records` for audit.
+- Raw Xero write error payloads stored in `xero_write_error_raw` for admin audit only. A plain-language version is stored in `xero_write_error` for display. Never expose raw Xero error codes or payloads to employees.
 - Xero-specific types never leak into `packages/availability` or `packages/feeds`.
 - Rate limiting (60/min per org, 5,000/day per org, five concurrent per org) handled inside `packages/xero`.
 - Token refresh handled proactively before sync runs.
 - All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
 - Resolve XeroTenant via `organisation_id` FK, not bare `clerk_org_id`.
+- Outbound writes return `Result<T, XeroWriteError>`. `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `rate_limit_error`, `unknown_error`.
 
 ---
 
@@ -297,9 +331,10 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 - Job definitions in `packages/jobs`. Handlers registered in `apps/api`.
 - Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`.
-- Inngest handles retries with exponential backoff.
-- Record-level failures do not fail the entire sync run.
-- All upserts must be idempotent.
+- Inngest handles retries with exponential backoff for inbound sync failures.
+- Outbound write failures are not retried automatically; they are surfaced to the user.
+- Record-level inbound failures do not fail the entire sync run.
+- All inbound upserts must be idempotent.
 - Jobs carry both `clerk_org_id` and `organisation_id` in their event payload. Never rely on session context inside a job handler.
 
 ---
@@ -309,11 +344,12 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Clerk Organisation isolation on every query (`clerk_org_id` from `auth().orgId`).
 - Organisation scoping on all data access (`organisation_id` within the Clerk Org).
 - Clerk auth on all authenticated routes.
-- Xero tokens encrypted at rest; never in plaintext.
+- Xero tokens encrypted at rest using AES-256-GCM; never stored in plaintext.
 - Feed tokens signed and revocable; plaintext never persisted.
-- Audit logs for admin actions.
+- Audit logs for all admin actions.
 - No tokens or raw payloads exposed to client.
 - No secrets in client bundles.
+- SSE connections are per-user and per-Clerk-Organisation. Must not leak notifications across `clerk_org_id` boundaries.
 
 ---
 
@@ -331,6 +367,7 @@ Optional variables with format constraints must be absent (commented out), not `
 | `SENTRY_DSN` | `packages/observability` | Sentry error tracking |
 | `XERO_CLIENT_ID` | `packages/xero` | Xero OAuth app ID |
 | `XERO_CLIENT_SECRET` | `packages/xero` | Xero OAuth app secret |
+| `XERO_TOKEN_ENCRYPTION_KEY` | `packages/xero` | AES-256-GCM key for encrypting Xero OAuth tokens at rest; must be 32 bytes, base64-encoded |
 | `INNGEST_EVENT_KEY` | `packages/jobs` | Inngest event key |
 | `INNGEST_SIGNING_KEY` | `packages/jobs` | Inngest signing key |
 | `KV_REST_API_URL` | `packages/feeds` | Vercel KV endpoint |
@@ -352,7 +389,7 @@ Optional variables with format constraints must be absent (commented out), not `
 1. Organisation, people, team, location schema and seed data (keyed by `clerk_org_id`)
 2. Xero OAuth and tenant persistence (XeroConnection + XeroTenant per Organisation)
 3. Xero employee sync (AU, NZ, UK)
-4. Xero leave normalisation into `availability_records`
+4. Xero leave inbound normalisation into `availability_records`
 5. Leave balance sync from Xero
 6. Leave submission workflow: draft, submit, Xero write-back, approval state machine
 7. Leave approval workflow: manager approve/decline, Xero write-back

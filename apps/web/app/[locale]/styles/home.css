@@ -1,0 +1,1775 @@
+.marketing-home {
+  min-height: 100vh;
+  padding-bottom: 48px;
+  font-family: var(--marketing-font);
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface);
+}
+
+.marketing-hero {
+  position: relative;
+  min-height: 92vh;
+  padding: 140px 48px 80px;
+  overflow-x: clip;
+}
+
+.marketing-hero__grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 100px;
+  align-items: center;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.marketing-pill {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 18px;
+  margin-bottom: 32px;
+  font: 600 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--marketing-surface-high);
+  border-radius: 999px;
+}
+
+.marketing-pill span {
+  display: none;
+}
+
+.marketing-hero__title {
+  margin: 0;
+  font: 600 clamp(2rem, 4vw + 1rem, 5rem) / 1.1 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.marketing-hero__title-line--2 {
+  color: var(--marketing-inverse-surface);
+}
+
+.marketing-hero__highlight {
+  position: relative;
+  display: inline-block;
+  color: var(--marketing-primary);
+}
+
+.marketing-hero__copy {
+  max-width: 540px;
+  margin: 32px 0 0;
+  font: 400 1.125rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+/* Hero text card: matches the floating header glass treatment */
+.marketing-hero__text-card {
+  position: relative;
+  max-width: 690px;
+}
+
+.marketing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 56px;
+}
+
+.marketing-hero-features {
+  display: flex;
+  gap: 24px;
+  margin-top: 40px;
+}
+
+.marketing-hero-feature {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  font: 500 0.8125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-hero-feature__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--marketing-primary);
+  background: var(--marketing-surface-lowest);
+  border-radius: 50%;
+}
+
+.marketing-portrait-wrap {
+  position: relative;
+  min-height: 640px;
+}
+
+.marketing-image-card__media img,
+.marketing-calendar-card__media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Floating Cards Layout */
+.marketing-floating-card {
+  position: absolute;
+  z-index: 10;
+  padding: 20px;
+  background: var(--marketing-surface-lowest);
+  border-radius: 16px;
+}
+
+.marketing-floating-card:hover {
+  z-index: 20;
+}
+
+.marketing-floating-card h4 {
+  margin: 0 0 12px;
+  font: 600 0.9375rem / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-floating-card--top {
+  top: 0%;
+  right: -2%;
+  z-index: 3;
+  width: 360px;
+}
+
+.marketing-floating-card--middle {
+  top: 42%;
+  right: -8%;
+  z-index: 2;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 340px;
+}
+
+.marketing-floating-card--bottom {
+  top: 65%;
+  right: -10%;
+  z-index: 1;
+  width: 320px;
+}
+
+/* Top Card: Calendar representation */
+.marketing-fc-calendar {
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 12px;
+}
+
+.marketing-fc-cal-header,
+.marketing-fc-cal-row {
+  display: grid;
+  grid-template-columns: 40px repeat(5, 1fr);
+  gap: 4px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.marketing-fc-cal-row:last-child {
+  border-bottom: none;
+}
+
+.marketing-fc-cal-header span {
+  font: 500 0.6rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+
+.marketing-fc-name {
+  font: 500 0.65rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-fc-event {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.6rem / 1 var(--marketing-font);
+  color: var(--marketing-event-leave-fg);
+  white-space: nowrap;
+  border-radius: 12px;
+}
+
+.marketing-fc-event--leave {
+  color: var(--marketing-event-leave-fg);
+  background: var(--marketing-event-leave-bg);
+}
+.marketing-fc-event--wfh {
+  color: var(--marketing-event-wfh-fg);
+  background: var(--marketing-event-wfh-bg);
+}
+.marketing-fc-event--training {
+  color: var(--marketing-event-training-fg);
+  background: var(--marketing-event-training-bg);
+}
+.marketing-fc-event--client {
+  color: var(--marketing-event-wfh-fg);
+  background: var(--marketing-event-wfh-bg);
+}
+.marketing-fc-event--plum {
+  color: var(--marketing-event-training-fg);
+  background: var(--marketing-event-training-bg);
+}
+
+.marketing-fc-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.marketing-fc-legend > span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font: 500 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-fc-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.marketing-fc-dot--leave {
+  background: var(--marketing-event-leave-bg);
+}
+.marketing-fc-dot--wfh {
+  background: var(--marketing-event-wfh-bg);
+}
+.marketing-fc-dot--other {
+  background: var(--marketing-event-training-bg);
+}
+
+/* Middle Card: Leave approved */
+.marketing-fc-icon--green {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--marketing-primary);
+  background: var(--marketing-secondary-container);
+  border-radius: 50%;
+}
+
+.marketing-fc-content p {
+  margin: 0 0 12px;
+  font: 400 0.8125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-fc-footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font: 500 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-xero-badge {
+  padding: 2px 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--marketing-on-primary);
+  letter-spacing: 0.5px;
+  background: var(--marketing-xero-cyan);
+  border-radius: 999px;
+}
+
+/* Bottom Card: Calendar Feed */
+.marketing-feed-url {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  background: var(--marketing-surface);
+  border-radius: 12px;
+}
+
+.marketing-feed-url span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 400 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  white-space: nowrap;
+}
+
+.marketing-feed-copy {
+  display: flex;
+  padding: 0;
+  color: var(--marketing-on-surface-variant);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.marketing-feed-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--marketing-on-surface-variant);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: color 0.2s ease;
+}
+
+.marketing-feed-copy:hover {
+  color: var(--marketing-primary);
+}
+
+.marketing-copied-text {
+  font: 500 0.65rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+}
+
+.marketing-feed-icons {
+  display: flex;
+  gap: 12px;
+}
+
+.marketing-app-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--marketing-surface-high);
+  border-radius: 12px;
+}
+
+.marketing-app-icon--outlook {
+  color: var(--marketing-outlook-blue);
+}
+.marketing-app-icon--gcal {
+  color: var(--marketing-google-blue);
+}
+.marketing-app-icon--applecal {
+  color: var(--marketing-apple-red);
+}
+
+.marketing-product-snapshot {
+  position: relative;
+  z-index: 1;
+  margin-top: 32px;
+}
+
+.marketing-snapshot-section {
+  max-width: 1240px;
+  padding: 64px 48px 120px;
+  margin: 0 auto;
+}
+
+.marketing-snapshot-intro {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin-bottom: 48px;
+}
+
+.marketing-card {
+  padding: 24px;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-card--low {
+  padding: 0;
+  overflow: hidden;
+  background: var(--marketing-surface-low);
+}
+
+.marketing-browser-bar {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--marketing-surface-low);
+}
+
+.marketing-week-title {
+  min-width: 0;
+}
+
+.marketing-week-title > span {
+  display: block;
+  margin-bottom: 3px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-week-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 600 0.9375rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  white-space: nowrap;
+}
+
+.marketing-week-toolbar {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-week-control {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  transition:
+    color 160ms cubic-bezier(0.2, 0, 0, 1),
+    background 160ms cubic-bezier(0.2, 0, 0, 1),
+    transform 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.marketing-week-control:hover {
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-high);
+}
+
+.marketing-week-control:active {
+  transform: translateY(1px);
+}
+
+.marketing-week-control:focus-visible {
+  outline: 2px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.marketing-week-control:disabled {
+  color: color-mix(
+    in srgb,
+    var(--marketing-on-surface-variant) 52%,
+    transparent
+  );
+  cursor: not-allowed;
+  background: var(--marketing-surface-high);
+  transform: none;
+}
+
+.marketing-week-control--today {
+  min-width: 84px;
+}
+
+.marketing-browser-meta,
+.marketing-week-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.marketing-browser-meta span,
+.marketing-week-summary span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  white-space: nowrap;
+  background: var(--marketing-surface-container);
+  border-radius: 999px;
+}
+
+.marketing-browser-meta svg,
+.marketing-week-summary svg {
+  flex: 0 0 auto;
+  color: var(--marketing-primary);
+}
+
+.marketing-browser-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.marketing-browser-dots span {
+  width: 10px;
+  height: 10px;
+  background: var(--marketing-outline-variant);
+  border-radius: 999px;
+}
+
+.marketing-week-shell {
+  padding: 24px;
+}
+
+.marketing-week-summary {
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.marketing-week-summary span {
+  background: var(--marketing-surface-high);
+}
+
+.marketing-week-card {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-color: var(--marketing-outline-variant) transparent;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.marketing-week-card::after {
+  display: block;
+  height: 8px;
+  content: "";
+}
+
+.marketing-week-header {
+  display: grid;
+  grid-template-columns: 220px repeat(7, minmax(92px, 1fr));
+  align-items: center;
+  min-width: 960px;
+  padding: 18px 24px 14px;
+  background: var(--marketing-surface-high);
+}
+
+.marketing-week-header > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 500 1.375rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-week-header > div span,
+.marketing-week-day {
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-week-header > div span {
+  text-align: left;
+}
+
+.marketing-week-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 8px;
+  white-space: nowrap;
+  border-radius: 12px;
+}
+
+.marketing-week-day.is-today {
+  position: relative;
+  color: var(--marketing-primary);
+  background: var(--marketing-surface-lowest);
+}
+
+.marketing-week-day.is-today::after {
+  position: absolute;
+  right: 8px;
+  bottom: -18px;
+  z-index: 3;
+  padding: 3px 7px;
+  font: 600 0.625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  content: "Now";
+  background: var(--marketing-primary);
+  border-radius: 999px;
+}
+
+.marketing-week-body {
+  min-width: 960px;
+}
+
+.marketing-week-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  align-items: center;
+  min-width: 960px;
+  height: 72px;
+  padding: 0 24px;
+  background: var(--marketing-surface-container);
+}
+
+.marketing-week-row--alt {
+  background: var(--marketing-surface-low);
+}
+
+.marketing-week-person {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.marketing-week-person > div:last-child {
+  min-width: 0;
+}
+
+.marketing-week-person p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.875rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  white-space: nowrap;
+}
+
+.marketing-week-person span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.6875rem / 1.3 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  white-space: nowrap;
+}
+
+.marketing-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font: 500 0.875rem / 1.4 var(--marketing-font);
+  letter-spacing: 0.01em;
+  border-radius: 999px;
+}
+
+.marketing-avatar--sage {
+  color: var(--marketing-avatar-sage-fg);
+  background: var(--marketing-avatar-sage-bg);
+}
+
+.marketing-avatar--slate {
+  color: var(--marketing-avatar-slate-fg);
+  background: var(--marketing-avatar-slate-bg);
+}
+
+.marketing-avatar--plum {
+  color: var(--marketing-avatar-plum-fg);
+  background: var(--marketing-avatar-plum-bg);
+}
+
+.marketing-avatar--forest {
+  color: var(--marketing-avatar-forest-fg);
+  background: var(--marketing-avatar-forest-bg);
+}
+
+.marketing-week-days,
+.marketing-week-events {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(92px, 1fr));
+  grid-row: 1;
+  grid-column: 2;
+  height: 100%;
+}
+
+.marketing-week-days {
+  position: relative;
+  z-index: 0;
+}
+
+.marketing-week-events {
+  position: relative;
+  z-index: 1;
+  align-items: center;
+}
+
+.marketing-week-days span {
+  position: relative;
+  min-width: 0;
+}
+
+.marketing-week-days span.is-today {
+  background: color-mix(
+    in srgb,
+    var(--marketing-primary-container) 34%,
+    transparent
+  );
+}
+
+.marketing-week-days span.is-today::after {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--marketing-primary) 48%, transparent);
+  border-radius: 999px;
+  transform: translateX(-50%);
+}
+
+.marketing-event {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  margin: 0 6px;
+  font: 600 0.8125rem / 1.25 var(--marketing-font);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  transition:
+    filter 160ms cubic-bezier(0.2, 0, 0, 1),
+    outline-color 160ms cubic-bezier(0.2, 0, 0, 1),
+    transform 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.marketing-event span {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.marketing-event em {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.6875rem / 1.2 var(--marketing-font);
+  font-style: normal;
+  white-space: nowrap;
+  opacity: 0.72;
+}
+
+.marketing-event svg {
+  flex: 0 0 auto;
+}
+
+.marketing-event:hover {
+  filter: brightness(0.98) saturate(1.08);
+  transform: translateY(-1px);
+}
+
+.marketing-event:active {
+  transform: translateY(0);
+}
+
+.marketing-event:focus-visible {
+  outline: 2px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.marketing-event[data-selected] {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.marketing-event--annual {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary-container);
+}
+
+.marketing-event--wfh {
+  color: var(--marketing-event-wfh-fg);
+  background: var(--marketing-event-wfh-bg);
+}
+
+.marketing-event--travel {
+  color: var(--marketing-event-travel-fg);
+  background: var(--marketing-event-travel-bg);
+}
+
+.marketing-event--training {
+  color: var(--marketing-event-training-fg);
+  background: var(--marketing-event-training-bg);
+}
+
+.marketing-event--client {
+  color: var(--marketing-event-client-fg);
+  background: var(--marketing-event-client-bg);
+}
+
+.marketing-event--birthday {
+  color: var(--marketing-avatar-slate-fg);
+  background: var(--marketing-avatar-slate-bg);
+}
+
+.marketing-selection-strip {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  background: var(--marketing-surface-high);
+  border-radius: 16px;
+}
+
+.marketing-selection-strip > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.marketing-selection-strip__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.marketing-selection-strip p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 600 0.875rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  white-space: nowrap;
+}
+
+.marketing-selection-strip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.75rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  white-space: nowrap;
+}
+
+.marketing-selection-strip > span {
+  flex: 0 0 auto;
+}
+
+.marketing-section {
+  max-width: 1200px;
+  padding: 0 48px;
+  margin: 96px auto 0;
+}
+
+.marketing-section-intro {
+  max-width: 640px;
+  margin-bottom: 48px;
+}
+
+.marketing-snapshot-intro .marketing-section-intro {
+  margin-bottom: 32px;
+}
+
+.marketing-overline {
+  margin: 0 0 12px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-section-intro h2,
+.marketing-pricing-heading h2 {
+  margin: 0;
+  font: 600 clamp(2.25rem, 4vw, 2.75rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: -0.02em;
+}
+
+.marketing-section-intro > p:last-child {
+  margin: 16px 0 0;
+  font: 400 1.125rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-showcase-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 0.85fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.marketing-image-card {
+  display: grid;
+  min-height: 520px;
+  overflow: hidden;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-image-card--wide {
+  grid-template-rows: auto 1fr;
+}
+
+.marketing-image-card--wide .marketing-image-card__media img {
+  object-fit: contain;
+  object-position: bottom center;
+}
+
+.marketing-image-card--sage {
+  grid-template-rows: 1fr auto;
+  background: var(--marketing-primary-container);
+}
+
+.marketing-image-card__copy {
+  padding: 32px 40px 0;
+}
+
+.marketing-image-card--sage .marketing-image-card__copy {
+  padding: 28px 32px 32px;
+}
+
+.marketing-image-card__copy h3 {
+  margin: 0 0 8px;
+  font: 600 1.75rem / 1.25 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: -0.01em;
+}
+
+.marketing-image-card__copy p:not(.marketing-overline) {
+  max-width: 480px;
+  margin: 0;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-image-card--sage .marketing-overline,
+.marketing-image-card--sage .marketing-image-card__copy h3,
+.marketing-image-card--sage .marketing-image-card__copy p {
+  color: var(--marketing-on-primary-container);
+}
+
+.marketing-image-card--sage .marketing-image-card__copy p {
+  opacity: 0.85;
+}
+
+.marketing-image-card__media {
+  position: relative;
+  overflow: hidden;
+}
+
+.marketing-calendar-card {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 40px;
+  align-items: center;
+  padding: 40px;
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+  border-radius: 16px;
+}
+
+.marketing-calendar-card .marketing-overline {
+  color: var(--marketing-primary-container);
+}
+
+.marketing-calendar-card h3 {
+  margin: 0 0 12px;
+  font: 600 2.25rem / 1.15 var(--marketing-font);
+  letter-spacing: -0.02em;
+}
+
+.marketing-calendar-card p:not(.marketing-overline) {
+  margin: 0 0 20px;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-inverse-on-surface);
+  opacity: 0.85;
+}
+
+.marketing-feed-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.marketing-feed-tags span {
+  padding: 4px 10px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-on-surface);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 10%,
+    transparent
+  );
+  border-radius: 999px;
+}
+
+.marketing-calendar-card__media {
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.marketing-workflow-section {
+  margin-top: 48px;
+}
+
+.marketing-workflow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+  align-items: start;
+  padding: 40px;
+  background: var(--marketing-surface-low);
+  border-radius: 16px;
+}
+
+.marketing-workflow__intro {
+  max-width: none;
+}
+
+.marketing-workflow__intro h2 {
+  margin: 0;
+  font: 600 clamp(2rem, 4vw, 2.5rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: -0.02em;
+}
+
+.marketing-workflow__intro > p:last-child {
+  max-width: 680px;
+  margin: 16px 0 0;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-workflow__steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.marketing-workflow__steps li {
+  min-width: 0;
+  padding: 24px;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-workflow__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 28px;
+  font: 600 0.875rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-primary-container);
+  background: var(--marketing-primary-container);
+  border-radius: 12px;
+}
+
+.marketing-workflow__steps p {
+  margin: 0 0 10px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-workflow__steps h3 {
+  margin: 0 0 10px;
+  font: 600 1.375rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-workflow__steps span {
+  display: block;
+  font: 400 0.9375rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.marketing-feature-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 20px;
+  color: var(--marketing-on-primary-container);
+  background: var(--marketing-primary-container);
+  border-radius: 12px;
+}
+
+.marketing-feature-grid h3 {
+  margin: 0 0 8px;
+  font: 600 1.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-feature-grid p {
+  margin: 0;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-pricing-heading {
+  max-width: 640px;
+  margin: 0 auto 48px;
+  text-align: center;
+}
+
+.marketing-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.marketing-price-card {
+  position: relative;
+  padding: 32px;
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-price-card--featured {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+
+.marketing-price-card:nth-child(3) {
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+}
+
+.marketing-price-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 4px 10px;
+  font: 500 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-on-surface);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--marketing-inverse-surface);
+  border-radius: 999px;
+}
+
+.marketing-price-card h3 {
+  margin: 0 0 16px;
+  font: 500 1.375rem / 1.35 var(--marketing-font);
+}
+
+.marketing-price-card__price {
+  margin: 0;
+  font: 600 3rem / 1 var(--marketing-font);
+  letter-spacing: -0.02em;
+}
+
+.marketing-price-card__sub {
+  margin: 4px 0 28px;
+  font: 400 0.875rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-price-card--featured .marketing-price-card__sub,
+.marketing-price-card:nth-child(3) .marketing-price-card__sub {
+  color: currentColor;
+  opacity: 0.76;
+}
+
+.marketing-price-card__features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.marketing-price-card__features div {
+  display: flex;
+  gap: 10px;
+  font: 400 1rem / 1.6 var(--marketing-font);
+}
+
+.marketing-price-card__features svg {
+  flex: 0 0 auto;
+  color: var(--marketing-primary);
+}
+
+.marketing-price-card--featured .marketing-price-card__features svg {
+  color: var(--marketing-primary);
+}
+
+.marketing-price-card:nth-child(3) .marketing-price-card__features svg {
+  color: var(--marketing-primary-container);
+}
+
+.marketing-price-card--featured .marketing-btn--primary {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.marketing-price-card--featured .marketing-btn--primary:hover {
+  background: color-mix(
+    in oklch,
+    var(--marketing-primary) 88%,
+    var(--marketing-inverse-surface)
+  );
+}
+
+.marketing-price-card:nth-child(3) .marketing-btn--outline {
+  color: var(--marketing-inverse-on-surface);
+  background: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 10%,
+    transparent
+  );
+  box-shadow: none;
+}
+
+.marketing-price-card:nth-child(3) .marketing-btn--outline:hover {
+  background: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 16%,
+    transparent
+  );
+}
+
+.marketing-price-card__button {
+  width: 100%;
+}
+
+/* Pinned Story Homepage */
+.marketing-home {
+  position: relative;
+  overflow-x: clip;
+  background: var(--marketing-surface);
+  isolation: isolate;
+}
+
+.marketing-story-bg,
+.marketing-story-bg__wash {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+}
+
+.marketing-story-bg img {
+  object-fit: cover;
+  object-position: center 16%;
+  transform: scale(1.02);
+}
+
+.marketing-story-bg__wash {
+  z-index: -1;
+  background: color-mix(in srgb, var(--marketing-surface) 56%, transparent);
+}
+
+.marketing-story-content {
+  position: relative;
+  z-index: 1;
+}
+
+.marketing-hero {
+  display: flex;
+  align-items: center;
+  min-height: 100svh;
+  padding-top: 144px;
+  background: transparent;
+}
+
+.marketing-hero__grid {
+  grid-template-columns: minmax(0, 0.96fr) minmax(420px, 0.84fr);
+  gap: clamp(48px, 8vw, 112px);
+  width: 100%;
+}
+
+.marketing-hero__text-card {
+  max-width: 690px;
+}
+
+.marketing-hero__title {
+  letter-spacing: 0;
+}
+
+.marketing-hero__copy {
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-hero-features {
+  max-width: 640px;
+}
+
+.marketing-hero-feature__icon,
+.marketing-floating-card,
+.marketing-fc-calendar,
+.marketing-feed-url {
+  border: 0;
+}
+
+.marketing-floating-card {
+  background: var(--marketing-surface-lowest);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-fc-calendar {
+  background: var(--marketing-surface-lowest);
+}
+
+.marketing-fc-cal-header,
+.marketing-fc-cal-row {
+  border-bottom: 0;
+}
+
+.marketing-fc-cal-row:nth-child(even) {
+  background: var(--marketing-surface-low);
+}
+
+.marketing-fc-event {
+  border-radius: 12px;
+}
+
+.marketing-fc-event--leave,
+.marketing-fc-dot--leave {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.marketing-fc-event--wfh,
+.marketing-fc-event--client,
+.marketing-fc-dot--wfh {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+
+.marketing-fc-event--training,
+.marketing-fc-event--plum,
+.marketing-fc-dot--other {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-highest);
+}
+
+.marketing-fc-icon--green {
+  color: var(--marketing-primary);
+  background: var(--marketing-secondary-container);
+}
+
+.marketing-feed-url {
+  background: var(--marketing-surface-container);
+  border-radius: 12px;
+}
+
+.marketing-app-icon {
+  border-radius: 12px;
+}
+
+.marketing-story-panel {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  width: min(1200px, calc(100% - 96px));
+  max-width: none;
+  padding: clamp(32px, 5vw, 64px);
+  margin: clamp(56px, 12vh, 132px) auto 0;
+  background: var(--marketing-surface-lowest);
+  border-radius: 16px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-story-panel--snapshot {
+  width: min(1240px, calc(100% - 96px));
+  margin-top: clamp(24px, 5vh, 72px);
+  background: var(--marketing-surface-low);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-story-panel--showcase {
+  background: var(--marketing-surface-lowest);
+}
+
+.marketing-story-panel--workflow,
+.marketing-story-panel--showcase,
+.marketing-story-panel--features,
+.marketing-story-panel--pricing {
+  background: var(--marketing-surface-lowest);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-story-panel--features {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.28fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+.marketing-snapshot-section,
+.marketing-section {
+  padding: clamp(32px, 5vw, 64px);
+}
+
+.marketing-snapshot-intro {
+  max-width: 760px;
+}
+
+.marketing-product-snapshot {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: stretch;
+  margin-top: 40px;
+}
+
+.marketing-snapshot-story {
+  display: grid;
+  gap: 12px;
+  align-content: center;
+}
+
+.marketing-snapshot-story__state {
+  padding: 20px;
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-snapshot-story__state span {
+  display: block;
+  margin-bottom: 10px;
+  font: 600 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-snapshot-story__state strong {
+  display: block;
+  font: 600 1.125rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-snapshot-story__state p {
+  margin: 10px 0 0;
+  font: 400 0.875rem / 1.55 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.marketing-card--low {
+  box-shadow: none;
+}
+
+.marketing-week-card,
+.marketing-browser-bar,
+.marketing-week-shell {
+  background: var(--marketing-surface-container);
+}
+
+.marketing-week-header {
+  background: var(--marketing-surface-high);
+}
+
+.marketing-avatar--plum {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-highest);
+}
+
+.marketing-avatar--forest {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.marketing-event--annual {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.marketing-event--training,
+.marketing-event--birthday {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-highest);
+}
+
+.marketing-workflow {
+  padding: 0;
+  background: transparent;
+}
+
+.marketing-workflow__steps {
+  gap: 20px;
+}
+
+.marketing-workflow__steps li {
+  position: relative;
+  background: var(--marketing-surface-lowest);
+}
+
+.marketing-showcase-grid {
+  gap: 28px;
+}
+
+.marketing-image-card,
+.marketing-calendar-card {
+  border-radius: 16px;
+}
+
+.marketing-image-card {
+  background: var(--marketing-surface-container);
+}
+
+.marketing-image-card--sage {
+  background: var(--marketing-secondary-container);
+}
+
+.marketing-image-card__media img {
+  transform: scale(1.03);
+}
+
+.marketing-calendar-card {
+  background: var(--marketing-inverse-surface);
+}
+
+.marketing-feed-tags span {
+  background: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 12%,
+    transparent
+  );
+}
+
+.marketing-feature-editorial {
+  position: sticky;
+  top: 120px;
+}
+
+.marketing-feature-editorial h2 {
+  margin: 0;
+  font: 600 clamp(2rem, 4vw, 2.75rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.marketing-feature-grid {
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.marketing-feature-grid .marketing-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px 18px;
+  align-items: start;
+  padding: 24px;
+  background: var(--marketing-surface-container);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-feature-icon {
+  grid-row: span 3;
+}
+
+.marketing-feature-kicker {
+  margin: 0;
+  font: 600 0.75rem / 1.3 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-pricing-heading {
+  text-align: left;
+}
+
+.marketing-pricing-grid {
+  align-items: stretch;
+}
+
+.marketing-price-card {
+  background: var(--marketing-surface-container);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-price-card--featured {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+
+.marketing-price-card:nth-child(3) {
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+}
+
+.marketing-price-card__features svg {
+  color: currentColor;
+}
+
+@media (max-width: 1024px) {
+  .marketing-story-bg img {
+    object-position: 62% 16%;
+  }
+
+  .marketing-story-bg__wash {
+    background: color-mix(in srgb, var(--marketing-surface) 68%, transparent);
+  }
+
+  .marketing-hero {
+    min-height: auto;
+    padding-top: 124px;
+  }
+
+  .marketing-hero__grid,
+  .marketing-product-snapshot,
+  .marketing-story-panel--features {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-portrait-wrap {
+    min-height: 360px;
+  }
+
+  .marketing-story-panel,
+  .marketing-story-panel--snapshot {
+    width: min(100% - 48px, 960px);
+    border-radius: 16px;
+  }
+
+  .marketing-feature-editorial {
+    position: static;
+  }
+
+  .marketing-snapshot-story {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .marketing-browser-bar {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .marketing-browser-meta {
+    justify-content: flex-start;
+  }
+
+  .marketing-week-card {
+    padding-right: 8px;
+    margin-right: -8px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .marketing-story-bg {
+    opacity: 0.38;
+  }
+
+  .marketing-hero {
+    padding-top: 92px;
+  }
+
+  .marketing-hero__text-card {
+    padding: 0;
+    margin: 0;
+    border-radius: 0;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .marketing-hero-features {
+    flex-direction: column;
+  }
+
+  .marketing-story-panel,
+  .marketing-story-panel--snapshot {
+    width: min(100% - 24px, 640px);
+    padding: 24px;
+  }
+
+  .marketing-snapshot-story {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-week-shell {
+    padding: 16px;
+  }
+
+  .marketing-week-toolbar {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .marketing-week-control {
+    flex: 1 1 0;
+  }
+
+  .marketing-week-control:not(.marketing-week-control--today) {
+    flex: 0 0 44px;
+    padding: 0;
+  }
+
+  .marketing-week-summary {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-selection-strip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .marketing-selection-strip > span {
+    flex: 0 1 auto;
+  }
+
+  .marketing-feature-grid .marketing-card {
+    grid-template-columns: 1fr;
+  }
+
+  .marketing-feature-icon {
+    grid-row: auto;
+  }
+}

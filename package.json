@@ -1,20 +1,6 @@
 {
-  "name": "next-forge",
+  "name": "leavesync",
   "version": "6.0.2",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vercel/next-forge.git"
-  },
-  "publishConfig": {
-    "provenance": true,
-    "access": "public"
-  },
-  "bin": {
-    "next-forge": "dist/index.js"
-  },
-  "files": [
-    "dist/index.js"
-  ],
   "scripts": {
     "build": "turbo build",
     "dev": "turbo dev",
@@ -29,8 +15,7 @@
     "migrate": "cd packages/database && bunx prisma format && bunx prisma generate && bunx prisma migrate dev",
     "migrate:deploy": "cd packages/database && bunx prisma generate && bunx prisma migrate deploy",
     "db:push": "cd packages/database && bunx prisma format && bunx prisma generate && bunx prisma db push",
-    "clean": "git clean -xdf node_modules",
-    "release": "npm publish"
+    "clean": "git clean -xdf node_modules"
   },
   "devDependencies": {
     "@auto-it/first-time-contributor": "^11.3.6",

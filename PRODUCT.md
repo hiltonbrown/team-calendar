@@ -1,5 +1,19 @@
 # LeaveSync Product Specification
 
+## Companion documents
+
+| Document | Purpose |
+|---|---|
+| `PRODUCT.md` | This file. Authoritative product truth, architecture, schema, and non-negotiables. |
+| `final-delivery-plan.md` | Current build scope (Xero-excluded), phase sequencing, open decisions, and acceptance criteria. |
+| `CLAUDE.md` | Coding agent instructions, repo conventions, package boundaries, and environment variables. |
+| `DESIGN.md` | Colour tokens, typography, spacing, elevation, and component specifications. |
+| `.impeccable.md` | Brand personality, user context, and design principles. |
+
+Where this document conflicts with any other, PRODUCT.md takes precedence.
+
+---
+
 ## Product truth
 
 LeaveSync is a multi-tenant availability publishing and leave management platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: syncing approved leave data into LeaveSync, and writing leave submissions and approvals back to Xero via the Xero API.
@@ -47,7 +61,7 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 | Monitoring | Sentry | Error tracking and performance |
 | Feed caching | Vercel KV | Redis-compatible; feed body and ETag caching |
 | ICS generation | ical-generator | Supports VEVENT, UID, SEQUENCE, all-day events |
-| Deployment | Vercel | All apps |
+| Deployment | Vercel | `apps/app`, `apps/api`, `apps/web` only |
 | Testing | Vitest | Co-located test files |
 | Linting | Biome 2 + Ultracite | |
 | Real-time notifications | SSE via Vercel streaming | No WebSocket infrastructure required |
@@ -109,13 +123,13 @@ leavesync/
 │  ├─ api/                    # sync, webhooks, feed endpoints, admin APIs (port 3002)
 │  ├─ web/                    # marketing site (port 3001)
 │  ├─ docs/                   # product and implementation docs (port 3004)
-│  └─ email/                  # notification templates (port 3003)
+│  └─ email/                  # notification templates — dev preview only; not deployed (port 3003)
 ├─ packages/
 │  ├─ database/               # Prisma schema, migrations, queries
 │  ├─ auth/                   # Clerk helpers, requireOrg(), requireRole(), getOrgId()
 │  ├─ design-system/          # shared UI components (shadcn/ui, Tailwind)
 │  ├─ core/                   # shared types, enums, Result pattern, utilities
-│  ├─ xero/                   # Xero OAuth, tenant sync, region mapping
+│  ├─ xero/                   # Xero OAuth, tenant sync, region mapping, write operations
 │  ├─ availability/           # canonical domain logic
 │  ├─ feeds/                  # ICS generation, UID rules, feed filtering
 │  ├─ notifications/          # in-app and email notifications
@@ -131,9 +145,13 @@ leavesync/
    └─ scripts/
 ```
 
-### Packages to remove from stock next-forge
+### Packages not in use
 
-`packages/ai`, `packages/cms`, `packages/collaboration`, `packages/feature-flags`, `packages/internationalization`, `packages/payments`, `packages/rate-limit`, `packages/security`, `packages/storage`, `packages/webhooks`.
+The following next-forge scaffold packages are present in some form but must not be imported or depended upon: `packages/ai`, `packages/cms`, `packages/collaboration`, `packages/feature-flags`, `packages/internationalization`, `packages/payments`, `packages/rate-limit`, `packages/security`, `packages/storage`, `packages/webhooks`.
+
+The scaffold apps `apps/studio` and `apps/storybook` have been removed from the repository.
+
+`apps/email` is retained for React Email template development and Resend integration. It is a dev preview app only and is not deployed to a production Vercel project.
 
 ---
 
@@ -148,7 +166,7 @@ Authenticated UI for team calendar, person profiles, leave submission, leave app
 - Xero OAuth flow and token refresh
 - Xero employee and leave sync endpoints
 - Leave submission, approval, decline, and withdrawal endpoints (outbound Xero writes)
-- SSE notification stream: `GET /notifications/stream`
+- SSE notification stream: `GET /api/notifications/stream`
 - Manual availability CRUD
 - Feed rendering endpoint: `GET /ical/:token.ics`
 - Feed preview APIs
@@ -165,7 +183,7 @@ Xero setup guide, ICS subscription instructions, admin handbook, API integration
 
 ### `apps/email`
 
-Operational messaging only: sync failure alerts, feed token rotated alerts, privacy conflict notifications, missing alternative contact reminders.
+React Email template development environment for transactional notification email. Operational messages include: sync failure alerts, feed token rotation notices, privacy conflict notifications, and missing alternative contact reminders. Not deployed to production; templates are consumed by `packages/email` and dispatched via Resend.
 
 ---
 
@@ -201,13 +219,15 @@ packages/xero/src/
 └─ errors/
 ```
 
-Responsibilities: Xero OAuth token management (acquire, refresh, encrypt at rest), tenant discovery and connection state, employee sync, leave record sync, leave-type mapping to canonical types, source fingerprinting and change detection, normalisation into canonical `AvailabilityRecord` shape, region-specific API differences.
+Responsibilities: Xero OAuth token management (acquire, refresh, encrypt at rest using `XERO_TOKEN_ENCRYPTION_KEY`), tenant discovery and connection state, employee sync, leave record sync, leave-type mapping to canonical types, source fingerprinting and change detection, normalisation into canonical `AvailabilityRecord` shape, region-specific API differences.
 
 #### Write operations
 
 Submit, approve, decline, and withdraw leave applications to Xero Payroll. All write operations return `Result<T, XeroWriteError>`.
 
 `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `rate_limit_error`, `unknown_error`.
+
+Outbound write failures are surfaced synchronously to the user in plain language. The raw Xero error payload is stored in `xero_write_error_raw` for admin audit only; never displayed to employees.
 
 #### Rate limits
 
@@ -220,11 +240,11 @@ Rate limiting, backoff, and retry logic live inside this package.
 
 ### `packages/availability`
 
-Canonical business domain: person model, manual availability model, Xero leave normalisation target, visibility and privacy rules, contactability handling, feed eligibility rules, scope filtering.
+Canonical business domain: person model, manual availability model, Xero leave normalisation target, visibility and privacy rules, contactability handling, feed eligibility rules, scope filtering, leave submission and approval state machine, leave balance CRUD (for admin-managed manual balances).
 
 ### `packages/feeds`
 
-Turns canonical availability into stable ICS output via `ical-generator`. Handles VEVENT rendering, stable UID generation, DTSTART/DTEND, all-day events, privacy masking, DESCRIPTION generation, secure feed token validation, and feed caching via Vercel KV.
+Turns canonical availability into stable ICS output via `ical-generator`. Handles VEVENT rendering, stable UID generation, DTSTART/DTEND, all-day events, privacy masking, DESCRIPTION generation, secure feed token validation, feed scope projection (applies `FeedScope` rows at render time), and feed caching via Vercel KV.
 
 ### `packages/jobs`
 
@@ -232,7 +252,7 @@ Inngest job definitions and scheduling: tenant sync scheduling, feed rebuild sch
 
 ### `packages/notifications`
 
-In-app notification creation, SSE delivery, notification preferences, and email dispatch via Resend.
+In-app notification creation, SSE delivery via `apps/api`, notification preferences, and email dispatch via Resend. Notification rows are owned by the `notifications` table. No external notification service is used for in-app state.
 
 ### `packages/core`
 
@@ -287,6 +307,8 @@ The full Prisma schema is the authoritative reference and lives at `packages/dat
 
 Every tenant-scoped table carries `clerk_org_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. It is the first line of tenant isolation before any Organisation-level filtering.
 
+The following join tables are in the process of having `clerk_org_id` added via migration: `feed_tokens`, `feed_scopes`, `availability_publications`. Until that migration is applied, access to these tables must go through their parent FK join to a table that carries `clerk_org_id`.
+
 ### `organisations`
 
 Legal or payroll entity within a Clerk Organisation. One Clerk Organisation may have multiple rows (e.g. Acme Restaurants, Acme Hotels). `country_code` is uniform across all rows sharing a `clerk_org_id` (app-layer invariant, not a DB constraint).
@@ -309,11 +331,11 @@ Contact alternatives for a person when they are unavailable. Ordered by `priorit
 
 ### `xero_connections`
 
-One row per Organisation. Current-state only (Scenario A): the row is updated in place when a token is refreshed or a connection is revoked. Historical lifecycle is captured in `audit_events`. Unique on `organisation_id`. Tokens stored encrypted; never in plaintext.
+One row per Organisation. Current-state only (Scenario A): the row is updated in place when a token is refreshed or a connection is revoked. Historical lifecycle is captured in `audit_events`. Unique on `organisation_id`. Tokens stored AES-256-GCM encrypted using `XERO_TOKEN_ENCRYPTION_KEY`; never in plaintext.
 
 ### `xero_tenants`
 
-One row per XeroConnection (one per Xero file). Unique on `xero_connection_id`. Carries `payroll_region` (AU, NZ, UK) which determines which Xero Payroll API is used for all sync and write operations.
+One row per XeroConnection (one per Xero file). Unique on `xero_connection_id`. Carries `payroll_region` (AU, NZ, UK) which determines which Xero Payroll API is used for all sync and write operations. Has an explicit FK to `organisations` via `organisation_id` (pending migration to add the Prisma relation declaration).
 
 ### `xero_sync_cursors`
 
@@ -321,15 +343,19 @@ Tracks incremental sync state per entity type per Xero tenant. One row per `(xer
 
 ### `availability_records`
 
-Core table. Holds both Xero-synced leave and manual availability entries. Unique on `(organisation_id, source_type, source_remote_id)` for Xero-sourced records. `source_payload_json` retains the raw Xero response for audit. `derived_uid_key` holds the stable ICS UID.
+Core table. Holds both Xero-synced leave and manual availability entries. Unique on `(organisation_id, source_type, source_remote_id)` for Xero-sourced records.
+
+**Note on the unique constraint:** PostgreSQL treats each NULL value as distinct, so this constraint does not prevent duplicate manual records where `source_remote_id IS NULL`. Application-layer guards in `packages/availability` must prevent duplicate manual records from reaching the database; tests must assert this behaviour.
+
+`source_payload_json` retains the raw Xero response for audit. `xero_write_error_raw` retains the raw Xero write error for admin audit only; never displayed to employees. `derived_uid_key` holds the stable ICS UID.
 
 ### `availability_publications`
 
-Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change.
+Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change. Pending migration to add `clerk_org_id` for direct tenant isolation.
 
 ### `leave_balances`
 
-Fetched from Xero per person per leave type. Never calculated by LeaveSync. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)`.
+Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances (pending migration). Never calculated by LeaveSync. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)`.
 
 ### `public_holidays`
 
@@ -349,11 +375,11 @@ ICS calendar feeds. `organisation_id` is nullable: a null value means the feed s
 
 ### `feed_scopes`
 
-Normalised scope rules per feed. Each row is one include rule.
+Normalised scope rules per feed. Each row is one include rule. Pending migration to add `clerk_org_id` for direct tenant isolation.
 
 ### `feed_tokens`
 
-Signed, revocable tokens. `token_hash` stored; plaintext never persisted. `rotated_from_token_id` provides a rotation trail within this table.
+Signed, revocable tokens. `token_hash` stored; plaintext never persisted. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 410. Pending migration to add `clerk_org_id` for direct tenant isolation.
 
 ### `sync_runs`
 
@@ -383,7 +409,7 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | `xero_tenants` | `xero_connection_id` |
 | `xero_sync_cursors` | `(xero_tenant_id, entity_type)` |
 | `people` | `(organisation_id, source_system, source_person_key)` |
-| `availability_records` | `(organisation_id, source_type, source_remote_id)` |
+| `availability_records` | `(organisation_id, source_type, source_remote_id)` — NULL-distinct; app-layer guard required for manual records |
 | `availability_publications` | `availability_record_id` |
 | `leave_balances` | `(person_id, xero_tenant_id, leave_type_xero_id)` |
 | `public_holidays` | `(organisation_id, location_id, date, source)` |
@@ -455,6 +481,17 @@ Outbound: synchronous API write triggered by user action. No background queue fo
 
 All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Never rely on session context inside a job handler.
 
+### Outbound write operations
+
+| Operation | Trigger | State transition |
+|---|---|---|
+| Submit | Employee submits draft leave | `draft → submitted` |
+| Approve | Manager approves submitted leave | `submitted → approved` |
+| Decline | Manager declines with required reason | `submitted → declined` |
+| Withdraw | Employee or admin withdraws leave | `submitted/approved → withdrawn` |
+
+All write operations are synchronous. Failures are surfaced inline to the acting user. No automatic background retry for outbound writes.
+
 ### Inbound sync flow
 
 1. Load active XeroTenant. Verify `clerk_org_id` matches session context.
@@ -490,6 +527,7 @@ All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Nev
 
 - Precompute publication rows when availability records change.
 - Render ICS from `availability_publications`.
+- Apply `FeedScope` rules at render time to filter records by organisation, team, location, person, or event type.
 - Cache feed body by `feed_id + etag` in Vercel KV.
 - Invalidate only when a relevant record changes.
 
@@ -498,6 +536,8 @@ All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Nev
 ```text
 GET /ical/:token.ics
 ```
+
+Revoked or expired tokens return `410 Gone`.
 
 ### VEVENT output rules
 
@@ -527,11 +567,12 @@ GET /ical/:token.ics
 - Clerk Organisation isolation on every query (filter by `clerk_org_id`).
 - Organisation scoping on all data access (filter by `organisation_id` within the Clerk Org).
 - Clerk auth on all authenticated routes.
-- Xero tokens encrypted at rest; never stored in plaintext.
-- Feed tokens signed and revocable; plaintext never persisted.
-- Audit logs for admin actions.
+- Xero OAuth tokens encrypted at rest using AES-256-GCM. The encryption key is stored in `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded). Tokens are never stored in plaintext.
+- Feed tokens signed and revocable; plaintext never persisted. Revoked and expired tokens return 410.
+- Audit logs for all admin actions.
 - No tokens or raw payloads exposed to client.
-- SSE connections are per-user and per-Clerk-Organisation. Must not leak across `clerk_org_id` boundaries.
+- No secrets in client bundles.
+- SSE connections are per-user and per-Clerk-Organisation. Must not deliver notifications across `clerk_org_id` boundaries.
 
 ---
 
@@ -572,8 +613,11 @@ Each step produces a deployable, testable vertical slice.
 - Result pattern for service-layer errors.
 - Co-located tests from the first slice.
 - Australian English in all UI copy and documentation.
+- No em dashes anywhere.
 - Outbound Xero writes are synchronous. No background queuing of approval state.
 - Leave balances displayed in the UI are always sourced from the `leave_balances` table. Never calculated by LeaveSync.
 - SSE connections are per-user and per-Clerk-Organisation. Must not leak across organisation boundaries.
 - Notification preferences default to in-app enabled, email enabled for all types.
 - Xero write errors are surfaced to the user in plain language. Raw error payloads stored in `xero_write_error_raw` for admin audit only; never displayed to employees.
+- Xero OAuth tokens are encrypted at rest using AES-256-GCM. The `XERO_TOKEN_ENCRYPTION_KEY` environment variable must be present and validated on startup in `packages/xero`. An absent or malformed key must prevent the application from starting, not fail silently at token access time.
+- The `AvailabilityRecord` unique constraint `(organisation_id, source_type, source_remote_id)` is NULL-distinct in PostgreSQL. Application-layer guards in `packages/availability` must prevent duplicate manual records (`source_remote_id IS NULL`). Tests must assert this guard is enforced.

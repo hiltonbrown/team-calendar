@@ -112,32 +112,32 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                     aria-hidden="true"
                     className="h-9 w-9"
                     focusable="false"
-                    viewBox="0 0 150 150"
+                    viewBox="0 0 48 48"
                     xmlns="http://www.w3.org/2000/svg"
                   >
                     <rect
                       fill="#57624F"
-                      height="20"
-                      rx="10"
-                      width="60"
-                      x="30"
-                      y="35"
+                      height="9"
+                      rx="4.5"
+                      width="28"
+                      x="8"
+                      y="8"
                     />
                     <rect
                       fill="#CAE8BC"
-                      height="20"
-                      rx="10"
-                      width="80"
-                      x="50"
-                      y="65"
+                      height="9"
+                      rx="4.5"
+                      width="28"
+                      x="14"
+                      y="20"
                     />
                     <rect
                       fill="#6DA671"
-                      height="20"
-                      rx="10"
-                      width="70"
-                      x="20"
-                      y="95"
+                      height="9"
+                      rx="4.5"
+                      width="25"
+                      x="6"
+                      y="32"
                     />
                   </svg>
                 </div>

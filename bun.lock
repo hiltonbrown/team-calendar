@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "next-forge",
+      "name": "leavesync",
       "dependencies": {
         "@clack/prompts": "^1.2.0",
         "commander": "^14.0.3",
