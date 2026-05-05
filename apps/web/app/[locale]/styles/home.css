@@ -20,7 +20,7 @@
   grid-template-columns: 1.15fr 0.85fr;
   gap: 100px;
   align-items: center;
-  max-width: 1240px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -139,14 +139,14 @@
 
 .marketing-floating-card--top {
   top: 0%;
-  right: -2%;
+  right: 2%;
   z-index: 3;
   width: 360px;
 }
 
 .marketing-floating-card--middle {
   top: 42%;
-  right: -8%;
+  right: -2%;
   z-index: 2;
   display: flex;
   gap: 16px;
@@ -156,7 +156,7 @@
 
 .marketing-floating-card--bottom {
   top: 65%;
-  right: -10%;
+  right: -4%;
   z-index: 1;
   width: 320px;
 }
