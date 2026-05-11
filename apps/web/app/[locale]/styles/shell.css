@@ -307,6 +307,10 @@
     overflow-x: auto;
   }
 
+  .marketing-product-snapshot--hero {
+    overflow-x: clip;
+  }
+
   .marketing-browser-bar {
     grid-template-columns: auto minmax(0, 1fr);
   }

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { env } from "@/env";
-import { MarketingFeedCopy } from "./marketing-feed-copy";
 import { MarketingIcon } from "./marketing-icons";
+import { MarketingProductSnapshot } from "./marketing-product-snapshot";
 
 const signUpHref = env.NEXT_PUBLIC_APP_URL
   ? `${env.NEXT_PUBLIC_APP_URL}/sign-up`
@@ -87,124 +87,8 @@ export const Hero = () => (
             </div>
           </div>
         </div>
-
-        <div className="marketing-portrait-wrap">
-          {/* Height controlled by min-height on portrait-wrap */}
-
-          {/* Floating Cards - Reordered to match example */}
-          <div className="marketing-floating-card marketing-floating-card--top">
-            <div className="marketing-fc-header">
-              <h4>Team availability</h4>
-            </div>
-            <div className="marketing-fc-calendar">
-              <div className="marketing-fc-cal-header">
-                <span />
-                <span>Mon 12</span>
-                <span>Tue 13</span>
-                <span>Wed 14</span>
-                <span>Thu 15</span>
-                <span>Fri 16</span>
-              </div>
-              <div className="marketing-fc-cal-row">
-                <span className="marketing-fc-name">Sarah</span>
-                <div
-                  className="marketing-fc-event marketing-fc-event--leave"
-                  style={{ gridColumn: "2 / span 2" }}
-                >
-                  Annual leave
-                </div>
-                <div
-                  className="marketing-fc-event marketing-fc-event--leave"
-                  style={{ gridColumn: "6 / span 1" }}
-                />
-              </div>
-              <div className="marketing-fc-cal-row">
-                <span className="marketing-fc-name">James</span>
-                <div
-                  className="marketing-fc-event marketing-fc-event--wfh"
-                  style={{ gridColumn: "4 / span 1" }}
-                >
-                  WFH
-                </div>
-              </div>
-              <div className="marketing-fc-cal-row">
-                <span className="marketing-fc-name">Mia</span>
-                <div
-                  className="marketing-fc-event marketing-fc-event--training"
-                  style={{ gridColumn: "2 / span 2" }}
-                >
-                  Training
-                </div>
-                <div
-                  className="marketing-fc-event marketing-fc-event--client"
-                  style={{ gridColumn: "5 / span 1" }}
-                >
-                  Client site
-                </div>
-              </div>
-              <div className="marketing-fc-cal-row">
-                <span className="marketing-fc-name">Tom</span>
-                <div
-                  className="marketing-fc-event marketing-fc-event--plum"
-                  style={{ gridColumn: "4 / span 2" }}
-                >
-                  Annual leave
-                </div>
-              </div>
-            </div>
-            <div className="marketing-fc-legend">
-              <span>
-                <span className="marketing-fc-dot marketing-fc-dot--leave" />{" "}
-                Leave
-              </span>
-              <span>
-                <span className="marketing-fc-dot marketing-fc-dot--wfh" /> WFH
-              </span>
-              <span>
-                <span className="marketing-fc-dot marketing-fc-dot--other" />{" "}
-                Other
-              </span>
-            </div>
-          </div>
-
-          <div className="marketing-floating-card marketing-floating-card--middle">
-            <div className="marketing-fc-icon-wrapper">
-              <div className="marketing-fc-icon marketing-fc-icon--green">
-                <MarketingIcon id="checkCircle" size={20} />
-              </div>
-            </div>
-            <div className="marketing-fc-content">
-              <h4>Leave approved</h4>
-              <p>
-                Annual leave for 18–22 May has been approved and synced to Xero.
-              </p>
-              <div className="marketing-fc-footer">
-                <span className="marketing-xero-badge">xero</span> Synced to
-                Xero Payroll
-              </div>
-            </div>
-          </div>
-
-          <div className="marketing-floating-card marketing-floating-card--bottom">
-            <h4>Calendar feed</h4>
-            <div className="marketing-feed-url">
-              <span>https://leavesync.com/ical/abc123.ics</span>
-              <MarketingFeedCopy url="https://leavesync.com/ical/abc123.ics">
-                <MarketingIcon id="copy" size={14} />
-              </MarketingFeedCopy>
-            </div>
-            <div className="marketing-feed-icons">
-              <div className="marketing-app-icon marketing-app-icon--outlook">
-                <MarketingIcon id="outlook" size={16} />
-              </div>
-              <div className="marketing-app-icon marketing-app-icon--gcal">
-                <MarketingIcon id="gcal" size={16} />
-              </div>
-              <div className="marketing-app-icon marketing-app-icon--applecal">
-                <MarketingIcon id="applecal" size={16} />
-              </div>
-            </div>
-          </div>
+        <div className="marketing-hero__product">
+          <MarketingProductSnapshot placement="hero" />
         </div>
       </div>
     </section>

@@ -17,8 +17,8 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 100px;
+  grid-template-columns: minmax(0, 0.82fr) minmax(420px, 1.18fr);
+  gap: clamp(32px, 6vw, 84px);
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
@@ -73,6 +73,11 @@
   max-width: 690px;
 }
 
+.marketing-hero__content {
+  position: relative;
+  z-index: 2;
+}
+
 .marketing-actions {
   display: flex;
   flex-wrap: wrap;
@@ -103,6 +108,14 @@
   color: var(--marketing-primary);
   background: var(--marketing-surface-lowest);
   border-radius: 50%;
+}
+
+.marketing-hero__product {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 560px;
+  overflow: clip;
 }
 
 .marketing-portrait-wrap {
@@ -1456,22 +1469,201 @@
 
 .marketing-product-snapshot {
   display: grid;
-  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
-  gap: 24px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 48px);
+  align-items: center;
+  justify-items: center;
   margin-top: 40px;
+}
+
+.marketing-product-snapshot--hero {
+  display: block;
+  margin-top: 0;
+  overflow: clip;
+}
+
+.marketing-snapshot-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: min(100%, 1100px);
+  min-width: 0;
+  padding: 0;
+  isolation: isolate;
+  transform-origin: 52% 50%;
+  perspective: 1100px;
+  perspective-origin: 50% 42%;
+}
+
+.marketing-snapshot-stage--hero {
+  width: min(100%, 760px);
+  min-height: clamp(520px, 52vw, 720px);
+  padding: clamp(36px, 6vw, 84px) 0 clamp(64px, 9vw, 128px);
+  transform: rotate(-33deg) skewX(24deg) scaleY(0.62) scale(0.66);
+}
+
+.marketing-snapshot-stage::before,
+.marketing-snapshot-stage::after,
+.marketing-snapshot-depth {
+  position: absolute;
+  pointer-events: none;
+  content: "";
+  border-radius: 16px;
+}
+
+.marketing-snapshot-stage::before,
+.marketing-snapshot-stage::after,
+.marketing-snapshot-depth {
+  display: none;
+}
+
+.marketing-snapshot-stage--hero::before,
+.marketing-snapshot-stage--hero::after,
+.marketing-snapshot-stage--hero .marketing-snapshot-depth {
+  display: block;
+}
+
+.marketing-snapshot-stage--hero::before {
+  inset: 24% 2% 8% 14%;
+  z-index: -3;
+  background:
+    radial-gradient(
+      ellipse at 40% 42%,
+      color-mix(in srgb, var(--marketing-event-training-bg) 68%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse at 72% 62%,
+      color-mix(in srgb, var(--marketing-primary-container) 34%, transparent),
+      transparent 48%
+    );
+  opacity: 0.76;
+  filter: blur(18px);
+  transform: translate(0, 42px) scale(1.06);
+}
+
+.marketing-snapshot-stage--hero::after {
+  right: 4%;
+  bottom: 10%;
+  left: 12%;
+  z-index: -2;
+  height: 72px;
+  background: color-mix(
+    in srgb,
+    var(--marketing-inverse-surface) 12%,
+    transparent
+  );
+  opacity: 0.68;
+  filter: blur(22px);
+  transform: translate(18px, 60px) skewX(12deg) scaleY(0.84);
+}
+
+.marketing-snapshot-stage--hero .marketing-snapshot-depth {
+  inset: 16% 4% 16% 10%;
+  z-index: -1;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--marketing-surface-highest) 96%, transparent),
+      color-mix(in srgb, var(--marketing-surface-high) 92%, transparent)
+    ),
+    var(--marketing-surface-high);
+  opacity: 0.96;
+  transform: translate(34px, 30px);
+  transform-style: preserve-3d;
+}
+
+.marketing-snapshot-slab {
+  --snapshot-glint-x: 50%;
+  --snapshot-glint-y: 38%;
+  --snapshot-lift: 0;
+  --snapshot-rotate-x: 0deg;
+  --snapshot-rotate-y: 0deg;
+
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  box-shadow: 0 28px 90px
+    color-mix(in srgb, var(--marketing-inverse-surface) 10%, transparent);
+  transform: none;
+  transform-origin: 50% 50%;
+  transform-style: preserve-3d;
+  transition:
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 260ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.marketing-snapshot-stage:not(.marketing-snapshot-stage--hero)
+  .marketing-snapshot-slab {
+  width: 100%;
+}
+
+.marketing-snapshot-slab::before {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(
+      circle at var(--snapshot-glint-x) var(--snapshot-glint-y),
+      color-mix(in srgb, var(--marketing-surface-lowest) 38%, transparent),
+      transparent 36%
+    ),
+    linear-gradient(
+      115deg,
+      transparent 0 34%,
+      color-mix(in srgb, var(--marketing-surface-lowest) 18%, transparent) 42%,
+      transparent 50% 100%
+    );
+  border-radius: inherit;
+  mix-blend-mode: soft-light;
+  opacity: 0.56;
+}
+
+.marketing-snapshot-slab:hover {
+  filter: saturate(1.03);
+  transform: translateY(-6px);
+}
+
+.marketing-snapshot-stage:not(.marketing-snapshot-stage--hero)
+  .marketing-snapshot-slab:hover {
+  transform: none;
 }
 
 .marketing-snapshot-story {
   display: grid;
-  gap: 12px;
-  align-content: center;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 2vw, 20px);
+  align-content: start;
+  width: min(100%, 1080px);
 }
 
 .marketing-snapshot-story__state {
   padding: 20px;
   background: var(--marketing-surface-container);
   border-radius: 16px;
+  transform: translateZ(0);
+  transition:
+    background 180ms cubic-bezier(0.2, 0, 0, 1),
+    transform 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.marketing-snapshot-story__state:nth-child(1) {
+  transform: none;
+}
+
+.marketing-snapshot-story__state:nth-child(2) {
+  transform: none;
+}
+
+.marketing-snapshot-story__state:nth-child(3) {
+  transform: none;
+}
+
+.marketing-product-snapshot:hover .marketing-snapshot-story__state {
+  background: var(--marketing-surface-high);
 }
 
 .marketing-snapshot-story__state span {
@@ -1685,6 +1877,31 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .marketing-snapshot-stage--hero {
+    width: min(100%, 680px);
+    min-height: 560px;
+    padding: 42px 0 76px;
+    transform: rotate(-33deg) skewX(24deg) scaleY(0.62) scale(0.58);
+    perspective: 1200px;
+  }
+
+  .marketing-snapshot-stage--hero::before {
+    inset: 24% 0 10% 8%;
+  }
+
+  .marketing-snapshot-stage--hero .marketing-snapshot-depth {
+    inset: 18% 2% 18% 8%;
+    transform: translate(24px, 28px);
+  }
+
+  .marketing-snapshot-slab {
+    transform: none;
+  }
+
+  .marketing-snapshot-slab:hover {
+    transform: translateY(-6px);
+  }
+
   .marketing-browser-bar {
     grid-template-columns: 1fr;
     align-items: start;
@@ -1733,6 +1950,34 @@
     grid-template-columns: 1fr;
   }
 
+  .marketing-snapshot-stage {
+    padding: 0;
+    transform: none !important;
+    perspective: none;
+  }
+
+  .marketing-snapshot-stage::before,
+  .marketing-snapshot-stage::after,
+  .marketing-snapshot-depth {
+    display: none;
+  }
+
+  .marketing-snapshot-slab {
+    transform: none !important;
+    transition: none;
+  }
+
+  .marketing-snapshot-slab::before {
+    display: none;
+  }
+
+  .marketing-snapshot-story__state,
+  .marketing-snapshot-story__state:nth-child(1),
+  .marketing-snapshot-story__state:nth-child(2),
+  .marketing-snapshot-story__state:nth-child(3) {
+    transform: none;
+  }
+
   .marketing-week-shell {
     padding: 16px;
   }
@@ -1771,5 +2016,48 @@
 
   .marketing-feature-icon {
     grid-row: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-snapshot-stage::before,
+  .marketing-snapshot-stage::after,
+  .marketing-snapshot-depth {
+    filter: none;
+  }
+
+  .marketing-snapshot-stage--hero {
+    transform: rotate(-33deg) skewX(24deg) scaleY(0.62) scale(0.66);
+  }
+
+  .marketing-snapshot-slab {
+    transform: none;
+    transition: none;
+    will-change: auto;
+  }
+
+  .marketing-snapshot-slab:hover {
+    transform: none;
+  }
+
+  .marketing-snapshot-slab::before {
+    opacity: 0.18;
+  }
+
+  .marketing-snapshot-story__state,
+  .marketing-snapshot-story__state:nth-child(1),
+  .marketing-snapshot-story__state:nth-child(2),
+  .marketing-snapshot-story__state:nth-child(3) {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  .marketing-snapshot-stage--hero {
+    transform: none !important;
+  }
+
+  .marketing-snapshot-slab {
+    transform: none !important;
   }
 }

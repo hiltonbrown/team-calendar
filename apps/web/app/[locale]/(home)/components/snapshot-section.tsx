@@ -2,7 +2,10 @@ import { MarketingProductSnapshot } from "./marketing-product-snapshot";
 import { SectionIntro } from "./section-intro";
 
 export const SnapshotSection = () => (
-  <section className="marketing-story-panel marketing-story-panel--snapshot marketing-snapshot-section">
+  <section
+    className="marketing-story-panel marketing-story-panel--snapshot marketing-snapshot-section"
+    id="snapshot"
+  >
     <div className="marketing-snapshot-intro">
       <SectionIntro
         copy="No manual data entry in several places, no missed emails or text messages"

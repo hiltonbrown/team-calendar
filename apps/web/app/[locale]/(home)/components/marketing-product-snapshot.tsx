@@ -1,8 +1,12 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import type { ReactNode } from "react";
+import type { PointerEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+interface MarketingProductSnapshotProps {
+  placement?: "hero" | "section";
+}
 
 type TeamTone = "forest" | "plum" | "sage" | "slate";
 type LeaveTypeId =
@@ -303,7 +307,9 @@ const iconPaths: Record<IconId, ReactNode> = {
   ),
 };
 
-export const MarketingProductSnapshot = () => {
+export const MarketingProductSnapshot = ({
+  placement = "section",
+}: MarketingProductSnapshotProps) => {
   const [today, setToday] = useState<Date | null>(null);
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedEntryKey, setSelectedEntryKey] = useState(() =>
@@ -311,6 +317,7 @@ export const MarketingProductSnapshot = () => {
   );
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncMinutes, setSyncMinutes] = useState(0);
+  const slabRef = useRef<HTMLDivElement>(null);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -414,104 +421,178 @@ export const MarketingProductSnapshot = () => {
   const feedCount = new Set(schedule.map((entry) => entry.source)).size + 1;
   const isCurrentWeek = weekOffset === 0;
   const weekLabel = getWeekLabel(weekOffset);
+  const isHeroPlacement = placement === "hero";
+
+  const resetSnapshotTilt = () => {
+    const slab = slabRef.current;
+
+    if (!slab) {
+      return;
+    }
+
+    slab.style.setProperty("--snapshot-rotate-x", "0deg");
+    slab.style.setProperty("--snapshot-rotate-y", "0deg");
+    slab.style.setProperty("--snapshot-lift", "0");
+    slab.style.setProperty("--snapshot-glint-x", "50%");
+    slab.style.setProperty("--snapshot-glint-y", "38%");
+  };
+
+  const handleSnapshotPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "touch") {
+      return;
+    }
+
+    const slab = slabRef.current;
+
+    if (!slab) {
+      return;
+    }
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
+
+    slab.style.setProperty(
+      "--snapshot-rotate-x",
+      `${(-vertical * 5.2).toFixed(2)}deg`
+    );
+    slab.style.setProperty(
+      "--snapshot-rotate-y",
+      `${(horizontal * 6.4).toFixed(2)}deg`
+    );
+    slab.style.setProperty("--snapshot-lift", "10");
+    slab.style.setProperty(
+      "--snapshot-glint-x",
+      `${((horizontal + 0.5) * 100).toFixed(1)}%`
+    );
+    slab.style.setProperty(
+      "--snapshot-glint-y",
+      `${((vertical + 0.5) * 100).toFixed(1)}%`
+    );
+  };
 
   return (
-    <div className="marketing-product-snapshot">
-      <div className="marketing-snapshot-story">
-        {storyStates.map((state) => (
-          <div className="marketing-snapshot-story__state" key={state.eyebrow}>
-            <span>{state.eyebrow}</span>
-            <strong>{state.title}</strong>
-            <p>{state.detail}</p>
-          </div>
-        ))}
-      </div>
-      <div className="marketing-card marketing-card--low">
-        <div className="marketing-browser-bar">
-          <div
-            aria-label="Week controls"
-            className="marketing-week-toolbar"
-            role="toolbar"
-          >
-            <button
-              aria-label="Previous week"
-              className="marketing-week-control"
-              onClick={() => setWeekOffset((offset) => offset - 1)}
-              type="button"
+    <div
+      className={
+        isHeroPlacement
+          ? "marketing-product-snapshot marketing-product-snapshot--hero"
+          : "marketing-product-snapshot"
+      }
+    >
+      <div
+        className={
+          isHeroPlacement
+            ? "marketing-snapshot-stage marketing-snapshot-stage--hero"
+            : "marketing-snapshot-stage"
+        }
+        onPointerLeave={resetSnapshotTilt}
+        onPointerMove={handleSnapshotPointerMove}
+      >
+        <div aria-hidden="true" className="marketing-snapshot-depth" />
+        <div
+          className="marketing-card marketing-card--low marketing-snapshot-slab"
+          ref={slabRef}
+        >
+          <div className="marketing-browser-bar">
+            <div
+              aria-label="Week controls"
+              className="marketing-week-toolbar"
+              role="toolbar"
             >
-              <ChevronLeft aria-hidden="true" size={18} />
-            </button>
-            <button
-              aria-label="Show current week"
-              className="marketing-week-control marketing-week-control--today"
-              disabled={isCurrentWeek}
-              onClick={() => setWeekOffset(0)}
-              type="button"
-            >
-              <RotateCcw aria-hidden="true" size={15} />
-              Today
-            </button>
-            <button
-              aria-label="Next week"
-              className="marketing-week-control"
-              onClick={() => setWeekOffset((offset) => offset + 1)}
-              type="button"
-            >
-              <ChevronRight aria-hidden="true" size={18} />
-            </button>
-          </div>
-          <div className="marketing-week-title">
-            <span>{weekLabel}</span>
-            {week
-              ? `${week.weekOf} · Harbour Lane Group`
-              : "This week · Harbour Lane Group"}
-          </div>
-          <div className="marketing-browser-meta">
-            <span>Week</span>
-            <span data-syncing={syncState === "syncing" ? true : undefined}>
-              <MarketingSnapshotIcon id="sync" size={14} />
-              {syncLabel}
-            </span>
-            <span>
-              <MarketingSnapshotIcon id="shield" size={14} />
-              Private ICS
-            </span>
-          </div>
-        </div>
-        <div className="marketing-week-shell">
-          <div className="marketing-week-summary">
-            <span>
-              <MarketingSnapshotIcon id="calendar" size={14} />
-              {activePeople} people
-            </span>
-            <span>{publishedEvents} published events</span>
-            <span>{feedCount} calendar feeds</span>
-          </div>
-          <WeekGrid
-            days={days}
-            schedule={schedule}
-            selectedEntryKey={selectedEntryKey}
-            setSelectedEntryKey={setSelectedEntryKey}
-            weekOf={week?.weekOf ?? "This week"}
-          />
-          <div aria-live="polite" className="marketing-selection-strip">
-            <div>
-              <span
-                className={`marketing-selection-strip__icon marketing-event--${selectedEntry.type}`}
+              <button
+                aria-label="Previous week"
+                className="marketing-week-control"
+                onClick={() => setWeekOffset((offset) => offset - 1)}
+                type="button"
               >
-                <MarketingSnapshotIcon id={selectedType.icon} size={15} />
-              </span>
-              <div>
-                <p>{selectedPerson?.name ?? "Team member"}</p>
-                <span>
-                  {selectedType.label} · {selectedEntry.detail}
-                </span>
-              </div>
+                <ChevronLeft aria-hidden="true" size={18} />
+              </button>
+              <button
+                aria-label="Show current week"
+                className="marketing-week-control marketing-week-control--today"
+                disabled={isCurrentWeek}
+                onClick={() => setWeekOffset(0)}
+                type="button"
+              >
+                <RotateCcw aria-hidden="true" size={15} />
+                Today
+              </button>
+              <button
+                aria-label="Next week"
+                className="marketing-week-control"
+                onClick={() => setWeekOffset((offset) => offset + 1)}
+                type="button"
+              >
+                <ChevronRight aria-hidden="true" size={18} />
+              </button>
             </div>
-            <span>{selectedDateSpan}</span>
+            <div className="marketing-week-title">
+              <span>{weekLabel}</span>
+              {week
+                ? `${week.weekOf} · Harbour Lane Group`
+                : "This week · Harbour Lane Group"}
+            </div>
+            <div className="marketing-browser-meta">
+              <span>Week</span>
+              <span data-syncing={syncState === "syncing" ? true : undefined}>
+                <MarketingSnapshotIcon id="sync" size={14} />
+                {syncLabel}
+              </span>
+              <span>
+                <MarketingSnapshotIcon id="shield" size={14} />
+                Private ICS
+              </span>
+            </div>
+          </div>
+          <div className="marketing-week-shell">
+            <div className="marketing-week-summary">
+              <span>
+                <MarketingSnapshotIcon id="calendar" size={14} />
+                {activePeople} people
+              </span>
+              <span>{publishedEvents} published events</span>
+              <span>{feedCount} calendar feeds</span>
+            </div>
+            <WeekGrid
+              days={days}
+              schedule={schedule}
+              selectedEntryKey={selectedEntryKey}
+              setSelectedEntryKey={setSelectedEntryKey}
+              weekOf={week?.weekOf ?? "This week"}
+            />
+            <div aria-live="polite" className="marketing-selection-strip">
+              <div>
+                <span
+                  className={`marketing-selection-strip__icon marketing-event--${selectedEntry.type}`}
+                >
+                  <MarketingSnapshotIcon id={selectedType.icon} size={15} />
+                </span>
+                <div>
+                  <p>{selectedPerson?.name ?? "Team member"}</p>
+                  <span>
+                    {selectedType.label} · {selectedEntry.detail}
+                  </span>
+                </div>
+              </div>
+              <span>{selectedDateSpan}</span>
+            </div>
           </div>
         </div>
       </div>
+      {!isHeroPlacement && (
+        <div className="marketing-snapshot-story">
+          {storyStates.map((state) => (
+            <div
+              className="marketing-snapshot-story__state"
+              key={state.eyebrow}
+            >
+              <span>{state.eyebrow}</span>
+              <strong>{state.title}</strong>
+              <p>{state.detail}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
