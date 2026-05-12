@@ -39,7 +39,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
-    "next": "16.2.4",
+    "next": "16.2.6",
     "postcss": "^8.5.10",
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.3"
