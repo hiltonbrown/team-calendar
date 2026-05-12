@@ -5,7 +5,7 @@ const footerColumns = [
   {
     title: "Product",
     items: [
-      { title: "Calendar feeds", href: "/features#ics-feeds" },
+      { title: "Calendar subscriptions", href: "/features#ics-feeds" },
       { title: "Xero integration", href: "/integrations/xero" },
       { title: "Approvals", href: "/features#leave-workflow" },
       { title: "Changelog", href: "/changelog" },
@@ -16,7 +16,7 @@ const footerColumns = [
     items: [
       { title: "About", href: "/contact" },
       { title: "Customers", href: "/features" },
-      { title: "Documentation", href: "/blog" },
+      { title: "Blog", href: "/blog" },
       { title: "Careers", href: "/contact" },
     ],
   },
@@ -42,8 +42,8 @@ export const Footer = () => (
           width={40}
         />
         <p>
-          Team availability, synced from payroll and published to every calendar
-          your people already use.
+          Team availability, synced from Xero Payroll and published to the
+          calendars your people already use.
         </p>
       </div>
       {footerColumns.map((column) => (
@@ -58,9 +58,7 @@ export const Footer = () => (
       ))}
     </div>
     <div className="marketing-footer__bottom">
-      <span>
-        © 2026 LeaveSync. Made with love and coffee on the Gold Coast.
-      </span>
+      <span>© 2026 LeaveSync. Built on the Gold Coast.</span>
       <span>Privacy · Terms · Data processing</span>
     </div>
   </footer>

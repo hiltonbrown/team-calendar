@@ -1,6 +1,5 @@
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
-import Image from "next/image";
 import { FeatureSection } from "./components/feature-section";
 import { Hero } from "./components/hero";
 import { ImageShowcase } from "./components/image-showcase";
@@ -16,10 +15,6 @@ export const metadata: Metadata = createMetadata({
 
 const Home = () => (
   <main className="marketing-home">
-    <div aria-hidden="true" className="marketing-story-bg">
-      <Image alt="" fill priority src="/marketing/team-photo.png" />
-    </div>
-    <div aria-hidden="true" className="marketing-story-bg__wash" />
     <div className="marketing-story-content">
       <Hero />
       <SnapshotSection />

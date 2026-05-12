@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
-import type { PointerEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 interface MarketingProductSnapshotProps {
@@ -215,7 +215,7 @@ const baseSchedule: ScheduleEntry[] = [
     span: 1,
     source: "manual",
     type: "birthday",
-    detail: "Private feed label",
+    detail: "Private calendar label",
   },
 ];
 
@@ -232,7 +232,7 @@ const storyStates = [
   },
   {
     eyebrow: "Publish",
-    title: "Subscribed feeds keep everyone aligned.",
+    title: "Calendar subscriptions keep everyone aligned.",
     detail: "Outlook, Google and Apple calendars update from the same source.",
   },
 ];
@@ -317,7 +317,6 @@ export const MarketingProductSnapshot = ({
   );
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [syncMinutes, setSyncMinutes] = useState(0);
-  const slabRef = useRef<HTMLDivElement>(null);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -423,54 +422,6 @@ export const MarketingProductSnapshot = ({
   const weekLabel = getWeekLabel(weekOffset);
   const isHeroPlacement = placement === "hero";
 
-  const resetSnapshotTilt = () => {
-    const slab = slabRef.current;
-
-    if (!slab) {
-      return;
-    }
-
-    slab.style.setProperty("--snapshot-rotate-x", "0deg");
-    slab.style.setProperty("--snapshot-rotate-y", "0deg");
-    slab.style.setProperty("--snapshot-lift", "0");
-    slab.style.setProperty("--snapshot-glint-x", "50%");
-    slab.style.setProperty("--snapshot-glint-y", "38%");
-  };
-
-  const handleSnapshotPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.pointerType === "touch") {
-      return;
-    }
-
-    const slab = slabRef.current;
-
-    if (!slab) {
-      return;
-    }
-
-    const bounds = event.currentTarget.getBoundingClientRect();
-    const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
-    const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
-
-    slab.style.setProperty(
-      "--snapshot-rotate-x",
-      `${(-vertical * 5.2).toFixed(2)}deg`
-    );
-    slab.style.setProperty(
-      "--snapshot-rotate-y",
-      `${(horizontal * 6.4).toFixed(2)}deg`
-    );
-    slab.style.setProperty("--snapshot-lift", "10");
-    slab.style.setProperty(
-      "--snapshot-glint-x",
-      `${((horizontal + 0.5) * 100).toFixed(1)}%`
-    );
-    slab.style.setProperty(
-      "--snapshot-glint-y",
-      `${((vertical + 0.5) * 100).toFixed(1)}%`
-    );
-  };
-
   return (
     <div
       className={
@@ -485,14 +436,8 @@ export const MarketingProductSnapshot = ({
             ? "marketing-snapshot-stage marketing-snapshot-stage--hero"
             : "marketing-snapshot-stage"
         }
-        onPointerLeave={resetSnapshotTilt}
-        onPointerMove={handleSnapshotPointerMove}
       >
-        <div aria-hidden="true" className="marketing-snapshot-depth" />
-        <div
-          className="marketing-card marketing-card--low marketing-snapshot-slab"
-          ref={slabRef}
-        >
+        <div className="marketing-card marketing-card--low marketing-snapshot-slab">
           <div className="marketing-browser-bar">
             <div
               aria-label="Week controls"
@@ -540,7 +485,7 @@ export const MarketingProductSnapshot = ({
               </span>
               <span>
                 <MarketingSnapshotIcon id="shield" size={14} />
-                Private ICS
+                Private calendar link
               </span>
             </div>
           </div>
@@ -551,7 +496,7 @@ export const MarketingProductSnapshot = ({
                 {activePeople} people
               </span>
               <span>{publishedEvents} published events</span>
-              <span>{feedCount} calendar feeds</span>
+              <span>{feedCount} calendar subscriptions</span>
             </div>
             <WeekGrid
               days={days}

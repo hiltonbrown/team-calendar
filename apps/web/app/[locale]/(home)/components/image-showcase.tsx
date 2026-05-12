@@ -4,13 +4,13 @@ import { SectionIntro } from "./section-intro";
 export const ImageShowcase = () => (
   <section className="marketing-section marketing-story-panel marketing-story-panel--showcase">
     <SectionIntro
-      copy="The boring part is the point. Your calendar stays up to date automatically so you can stop chasing spreadsheets and manual updates."
+      copy="LeaveSync updates calendars automatically, so managers stop chasing spreadsheets and manual updates."
       eyebrow="How it works"
       title={
         <>
-          Staff leave and availability.
+          Staff leave and availability,
           <br />
-          Published to calendars and synchronised to payroll.
+          kept current in calendars and payroll.
         </>
       }
     />
@@ -44,9 +44,7 @@ export const ImageShowcase = () => (
           />
         </div>
         <div className="marketing-image-card__copy">
-          <p className="marketing-overline">
-            02 · APPROVE AND REVIEW LEAVE REQUESTS
-          </p>
+          <p className="marketing-overline">02 · Approve leave requests</p>
           <h3>Already in your calendar.</h3>
           <p>No second system to update, no reminder to send.</p>
         </div>
@@ -55,15 +53,15 @@ export const ImageShowcase = () => (
 
     <article className="marketing-calendar-card">
       <div>
-        <p className="marketing-overline">03 · Subscribed feeds</p>
+        <p className="marketing-overline">03 · Calendar subscriptions</p>
         <h3>Team calendar</h3>
         <p>
-          Outlook, Google, Apple and other iCal calendars.
+          Outlook, Google, Apple and other calendar apps stay current.
           <br />
-          Your team subscribe once and forget about it.
+          Your team subscribes once and gets updates automatically.
         </p>
         <div className="marketing-feed-tags">
-          {["ICS", "Google", "Outlook", "Apple"].map((tag) => (
+          {["Outlook", "Google", "Apple", "Other calendars"].map((tag) => (
             <span key={tag}>{tag}</span>
           ))}
         </div>

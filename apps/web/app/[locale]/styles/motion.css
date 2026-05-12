@@ -91,24 +91,6 @@
     animation-range: entry 24% entry 59%;
   }
 
-  .marketing-feature-grid .marketing-card {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-  }
-
-  .marketing-feature-grid .marketing-card:nth-child(1) {
-    animation-range: entry 0% entry 35%;
-  }
-  .marketing-feature-grid .marketing-card:nth-child(2) {
-    animation-range: entry 5% entry 40%;
-  }
-  .marketing-feature-grid .marketing-card:nth-child(3) {
-    animation-range: entry 10% entry 45%;
-  }
-  .marketing-feature-grid .marketing-card:nth-child(4) {
-    animation-range: entry 15% entry 50%;
-  }
-
   .marketing-showcase-grid .marketing-image-card:nth-child(1) {
     animation: reveal-up linear both;
     animation-timeline: view();
@@ -119,21 +101,6 @@
     animation: reveal-up linear both;
     animation-timeline: view();
     animation-range: entry 8% entry 43%;
-  }
-
-  .marketing-pricing-grid .marketing-price-card {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-  }
-
-  .marketing-pricing-grid .marketing-price-card:nth-child(1) {
-    animation-range: entry 0% entry 35%;
-  }
-  .marketing-pricing-grid .marketing-price-card:nth-child(2) {
-    animation-range: entry 5% entry 40%;
-  }
-  .marketing-pricing-grid .marketing-price-card:nth-child(3) {
-    animation-range: entry 10% entry 45%;
   }
 }
 
@@ -218,7 +185,12 @@
   .marketing-week-row,
   .marketing-week-control,
   .marketing-event,
-  .marketing-browser-bar [data-syncing] svg {
+  .marketing-browser-bar [data-syncing] svg,
+  .marketing-story-panel,
+  .marketing-product-snapshot .marketing-card--low,
+  .marketing-snapshot-story__state,
+  .marketing-image-card__media img,
+  .marketing-calendar-card__media img {
     opacity: 1 !important;
     filter: none !important;
     stroke-dashoffset: 0 !important;
@@ -226,11 +198,16 @@
     transition: none !important;
     animation: none !important;
   }
-}
 
-.marketing-hero__grid {
-  --cx: 0.5;
-  --cy: 0.5;
+  .marketing-product-snapshot .marketing-card--low::before {
+    display: none;
+  }
+
+  .marketing-workflow__steps li:not(:last-child)::after {
+    opacity: 0.5;
+    transform: rotate(45deg) scale(1);
+    animation: none;
+  }
 }
 
 /* Workflow step connector arrows — drawn between cards on scroll */
@@ -334,143 +311,5 @@
 
   .marketing-pricing-grid .marketing-price-card:nth-child(3) {
     animation-range: entry 14% entry 54%;
-  }
-}
-
-/* Overdrive: disable all depth/tilt on reduced motion */
-@media (prefers-reduced-motion: reduce) {
-  .marketing-product-snapshot .marketing-card--low {
-    transform: none !important;
-    transition: none !important;
-  }
-
-  .marketing-product-snapshot .marketing-card--low::before {
-    display: none;
-  }
-
-  .marketing-workflow__steps li:not(:last-child)::after {
-    opacity: 0.5;
-    transform: rotate(45deg) scale(1);
-    animation: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .marketing-story-bg img,
-  .marketing-story-panel,
-  .marketing-product-snapshot .marketing-card--low,
-  .marketing-snapshot-story__state,
-  .marketing-image-card__media img,
-  .marketing-calendar-card__media img {
-    opacity: 1 !important;
-    transform: none !important;
-    animation: none !important;
-  }
-}
-
-@keyframes pinned-bg-depth {
-  0% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-  65% {
-    opacity: 0.72;
-    transform: scale(1.08) translateY(-1.5vh);
-  }
-  100% {
-    opacity: 0.28;
-    transform: scale(1.12) translateY(-3vh);
-  }
-}
-
-@keyframes panel-slide-over {
-  from {
-    opacity: 0.2;
-    transform: translateY(18vh);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes snapshot-scrub {
-  0% {
-    transform: translate3d(0, 18px, 0) rotateX(0deg);
-  }
-  48% {
-    transform: translate3d(0, -6px, 0) rotateX(1.25deg);
-  }
-  100% {
-    transform: translate3d(0, -16px, 0) rotateX(0deg);
-  }
-}
-
-@keyframes snapshot-state-focus {
-  0%,
-  100% {
-    opacity: 0.48;
-    transform: translateX(0);
-  }
-  42%,
-  68% {
-    opacity: 1;
-    transform: translateX(10px);
-  }
-}
-
-@keyframes media-depth {
-  from {
-    transform: scale(1.08) translateY(24px);
-  }
-  to {
-    transform: scale(1.02) translateY(-18px);
-  }
-}
-
-@supports (animation-timeline: scroll()) {
-  .marketing-story-bg img {
-    animation: pinned-bg-depth linear both;
-    animation-timeline: scroll();
-    animation-range: 0 100%;
-  }
-}
-
-@supports (animation-timeline: view()) {
-  .marketing-story-panel {
-    animation: panel-slide-over linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 52%;
-  }
-
-  .marketing-product-snapshot .marketing-card--low {
-    transform-origin: center top;
-    animation: snapshot-scrub linear both;
-    animation-timeline: view();
-    animation-range: entry 0% exit 88%;
-  }
-
-  .marketing-snapshot-story__state {
-    animation: snapshot-state-focus linear both;
-    animation-timeline: view();
-  }
-
-  .marketing-snapshot-story__state:nth-child(1) {
-    animation-range: entry 0% entry 38%;
-  }
-
-  .marketing-snapshot-story__state:nth-child(2) {
-    animation-range: entry 20% cover 54%;
-  }
-
-  .marketing-snapshot-story__state:nth-child(3) {
-    animation-range: entry 42% cover 78%;
-  }
-
-  .marketing-image-card__media img,
-  .marketing-calendar-card__media img {
-    animation: media-depth linear both;
-    animation-timeline: view();
-    animation-range: entry 0% exit 100%;
   }
 }

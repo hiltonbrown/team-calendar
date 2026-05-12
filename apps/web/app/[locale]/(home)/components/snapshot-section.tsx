@@ -8,9 +8,9 @@ export const SnapshotSection = () => (
   >
     <div className="marketing-snapshot-intro">
       <SectionIntro
-        copy="No manual data entry in several places, no missed emails or text messages"
+        copy="Approved leave, WFH and travel stay visible without duplicate calendar admin."
         eyebrow="The day to day"
-        title="Better than a shared calendar."
+        title="One shared view, kept current."
       />
     </div>
     <MarketingProductSnapshot />

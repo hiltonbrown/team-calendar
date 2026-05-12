@@ -7,7 +7,7 @@ import Link from "next/link";
 export const metadata: Metadata = createMetadata({
   title: "Pricing",
   description:
-    "LeaveSync pricing. Commercial model coming soon. Register your interest to be notified.",
+    "LeaveSync pricing. Commercial model coming soon, with early access available while pricing is finalised.",
 });
 
 const Pricing = () => (
@@ -75,7 +75,7 @@ const Pricing = () => (
             <div className="flex flex-col gap-2">
               <Mail className="h-6 w-6 text-primary" strokeWidth={1.5} />
               <h2 className="font-semibold text-2xl tracking-tight">
-                Register your interest
+                Get pricing updates
               </h2>
               <p className="text-base text-muted-foreground leading-relaxed">
                 We will notify you when pricing is published. In the meantime,
@@ -87,7 +87,7 @@ const Pricing = () => (
               <Button asChild className="w-full gap-2">
                 <Link href="/contact">
                   <Mail className="h-4 w-4" />
-                  Get in touch
+                  Contact us
                 </Link>
               </Button>
               <p className="text-center text-muted-foreground text-xs">
