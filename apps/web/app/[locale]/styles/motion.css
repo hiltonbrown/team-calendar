@@ -28,7 +28,8 @@
 .marketing-pill,
 .marketing-hero__copy,
 .marketing-actions,
-.marketing-portrait-wrap {
+.marketing-portrait-wrap,
+.marketing-product-snapshot--hero {
   transition:
     opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
@@ -50,6 +51,58 @@
 }
 .marketing-portrait-wrap {
   transition-delay: 0.15s;
+}
+.marketing-product-snapshot--hero {
+  transition-delay: 0.14s;
+}
+
+.fmkt-hero__copy {
+  animation: fmkt-hero-copy-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fmkt-hero__visual {
+  animation: fmkt-hero-visual-arrive 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.12s
+    both;
+}
+
+.fmkt-sync-diagram {
+  animation: fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+}
+
+@keyframes fmkt-hero-copy-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fmkt-hero-visual-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fmkt-diagram-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Layer 3: Scroll-driven section reveals */
@@ -102,14 +155,106 @@
     animation-timeline: view();
     animation-range: entry 8% entry 43%;
   }
+
+  /* fmkt-* homepage section reveals */
+
+  .fmkt-pathway__card {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 32%;
+  }
+
+  .fmkt-card:nth-child(1) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+
+  .fmkt-card:nth-child(2) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 6% entry 41%;
+  }
+
+  .fmkt-card:nth-child(3) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 12% entry 47%;
+  }
+
+  .fmkt-calvis__copy {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+
+  .fmkt-bigcal {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 6% entry 41%;
+  }
+
+  .fmkt-how__item:nth-child(1) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 36%;
+  }
+
+  .fmkt-how__item:nth-child(2) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 5% entry 41%;
+  }
+
+  .fmkt-how__item:nth-child(3) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 10% entry 46%;
+  }
+
+  .fmkt-how__item:nth-child(4) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 15% entry 51%;
+  }
+
+  .fmkt-benefit:nth-child(1) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 36%;
+  }
+
+  .fmkt-benefit:nth-child(2) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 5% entry 41%;
+  }
+
+  .fmkt-benefit:nth-child(3) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 10% entry 46%;
+  }
+
+  .fmkt-benefit:nth-child(4) {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 15% entry 51%;
+  }
+
+  .fmkt-cta__panel {
+    animation: reveal-up linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 40%;
+  }
 }
 
-/* Layer 4: Spring-physics CTA hover */
+/* Layer 4: CTA feedback */
 .marketing-btn {
   transition:
     background 160ms cubic-bezier(0.2, 0, 0, 1),
     color 160ms cubic-bezier(0.2, 0, 0, 1),
-    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .marketing-btn--primary:hover {
@@ -175,6 +320,76 @@
   animation: sync-spin 0.9s linear infinite;
 }
 
+/* Sync diagram keyframes */
+@keyframes fmkt-packet-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+
+  8% {
+    opacity: 0.82;
+  }
+
+  76% {
+    opacity: 0.82;
+  }
+
+  88%,
+  100% {
+    opacity: 0;
+    offset-distance: 100%;
+  }
+}
+
+/* Scroll-driven path draw: animates CSS custom properties on the HTML container
+   which cascade down to SVG paths via stroke-dashoffset: var(--fmkt-sync-draw-*) */
+@supports (animation-timeline: view()) {
+  .fmkt-sync-diagram {
+    animation:
+      fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both,
+      fmkt-draw-path-1 linear both,
+      fmkt-draw-path-2 linear both,
+      fmkt-draw-path-3 linear both;
+    animation-timeline: auto, view(), view(), view();
+    animation-range:
+      normal,
+      entry 0% entry 40%,
+      entry 16% entry 56%,
+      entry 24% entry 60%;
+  }
+
+  @keyframes fmkt-draw-path-1 {
+    from {
+      --fmkt-sync-draw-1: 700;
+    }
+
+    to {
+      --fmkt-sync-draw-1: 0;
+    }
+  }
+
+  @keyframes fmkt-draw-path-2 {
+    from {
+      --fmkt-sync-draw-2: 700;
+    }
+
+    to {
+      --fmkt-sync-draw-2: 0;
+    }
+  }
+
+  @keyframes fmkt-draw-path-3 {
+    from {
+      --fmkt-sync-draw-3: 300;
+    }
+
+    to {
+      --fmkt-sync-draw-3: 0;
+    }
+  }
+}
+
 /* Reduced motion: disable everything */
 @media (prefers-reduced-motion: reduce) {
   .marketing-hero__title-line,
@@ -182,6 +397,7 @@
   .marketing-hero__copy,
   .marketing-actions,
   .marketing-portrait-wrap,
+  .marketing-product-snapshot--hero,
   .marketing-week-row,
   .marketing-week-control,
   .marketing-event,
@@ -190,13 +406,39 @@
   .marketing-product-snapshot .marketing-card--low,
   .marketing-snapshot-story__state,
   .marketing-image-card__media img,
-  .marketing-calendar-card__media img {
+  .marketing-calendar-card__media img,
+  .fmkt-hero__copy,
+  .fmkt-hero__visual,
+  .fmkt-sync-diagram,
+  .fmkt-pathway__card,
+  .fmkt-card,
+  .fmkt-calvis__copy,
+  .fmkt-bigcal,
+  .fmkt-how__item,
+  .fmkt-benefit,
+  .fmkt-cta__panel {
     opacity: 1 !important;
     filter: none !important;
     stroke-dashoffset: 0 !important;
     transform: none !important;
     transition: none !important;
     animation: none !important;
+  }
+
+  /* Sync diagram: stop all motion, keep static shapes visible */
+  .fmkt-sync-path--team,
+  .fmkt-sync-path--xero,
+  .fmkt-sync-path--xero-cal,
+  .fmkt-sync-path--return {
+    stroke-dashoffset: 0 !important;
+    animation: none !important;
+  }
+
+  .fmkt-sync-packet--team,
+  .fmkt-sync-packet--xero,
+  .fmkt-sync-packet--return,
+  .fmkt-sync-packet--xero-cal {
+    display: none;
   }
 
   .marketing-product-snapshot .marketing-card--low::before {

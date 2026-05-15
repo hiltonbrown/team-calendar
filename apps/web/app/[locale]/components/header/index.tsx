@@ -66,7 +66,7 @@ export const Header = (_properties: HeaderProps) => {
             className="marketing-btn marketing-btn--primary"
             href={signUpHref}
           >
-            Start early access
+            Sign up
           </Link>
         </div>
 
@@ -99,7 +99,7 @@ export const Header = (_properties: HeaderProps) => {
               href={signUpHref}
               onClick={() => setOpen(false)}
             >
-              Start early access
+              Sign up
             </Link>
           </div>
         )}

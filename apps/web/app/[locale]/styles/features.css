@@ -1376,3 +1376,1338 @@
     padding: 36px 24px;
   }
 }
+
+/* ============================================================
+   Features Marketing Page — fmkt-* namespace
+   ============================================================ */
+
+.fmkt-page {
+  min-height: 100vh;
+  overflow-x: clip;
+  font-family: var(--marketing-font);
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface);
+}
+
+.fmkt-container {
+  width: min(calc(100% - 48px), 1280px);
+  margin: 0 auto;
+}
+
+.fmkt-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 16px;
+  margin-bottom: 28px;
+  font: 600 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background: var(--marketing-surface-high);
+  border-radius: 999px;
+}
+
+.fmkt-overline {
+  margin: 0;
+  font: 600 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.fmkt-section-header {
+  max-width: 640px;
+  margin: 0 auto 56px;
+  text-align: center;
+}
+
+.fmkt-section-title {
+  margin: 14px 0 0;
+  font: 600 clamp(2rem, 3.5vw, 2.5rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* ---- Hero ---- */
+
+.fmkt-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.44fr) minmax(420px, 0.56fr);
+  gap: clamp(40px, 5vw, 72px);
+  align-items: center;
+  max-width: 1280px;
+  padding: clamp(96px, 12vh, 132px) 24px clamp(44px, 7vh, 76px);
+  margin: 0 auto;
+}
+
+.fmkt-hero__title {
+  margin: 0;
+  font: 600 clamp(2.75rem, 5vw, 4.25rem) / 1.08 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.fmkt-hero__title em {
+  display: block;
+  font-style: italic;
+  font-weight: 500;
+  color: var(--marketing-primary);
+}
+
+.fmkt-hero__body {
+  max-width: 52ch;
+  margin: 24px 0 0;
+  font: 400 1.0625rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 40px;
+}
+
+.fmkt-hero__visual {
+  position: relative;
+  aspect-ratio: 1.16 / 1;
+  overflow: hidden;
+  background: var(--marketing-surface-low);
+  border-radius: 20px;
+}
+
+.fmkt-hero__photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 54% 48%;
+}
+
+/* ---- Sync Pathway Strip ---- */
+
+.fmkt-pathway {
+  padding: 0 24px clamp(64px, 8vw, 88px);
+}
+
+.fmkt-pathway__card {
+  display: flex;
+  align-items: stretch;
+  padding: 28px 36px;
+  background: var(--marketing-surface-lowest);
+  border-radius: 20px;
+  box-shadow: var(--marketing-shadow-ambient);
+}
+
+.fmkt-pathway__item {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  align-items: center;
+}
+
+.fmkt-pathway__item:last-child {
+  flex: 1;
+}
+
+.fmkt-pathway__step {
+  display: flex;
+  flex: 1;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.fmkt-pathway__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.fmkt-pathway__icon--primary {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.fmkt-pathway__icon--team {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-google-blue);
+}
+
+.fmkt-pathway__icon--xero {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-xero-cyan);
+}
+
+.fmkt-pathway__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fmkt-pathway__label {
+  font: 600 0.9375rem / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-pathway__copy {
+  font: 400 0.8125rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pathway__arrow {
+  flex-shrink: 0;
+  color: var(--marketing-outline-variant);
+}
+
+/* ---- Sync Diagram (Desktop Animated) ---- */
+
+/* Animatable custom properties for scroll-driven path draw-in */
+@property --fmkt-sync-draw-1 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --fmkt-sync-draw-2 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --fmkt-sync-draw-3 {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.fmkt-sync-diagram {
+  display: none;
+  padding: clamp(24px, 3vw, 36px) clamp(28px, 4vw, 48px);
+  overflow: hidden;
+  background: color-mix(
+    in oklch,
+    var(--marketing-surface-lowest) 84%,
+    var(--marketing-primary-container)
+  );
+  border-radius: 20px;
+  box-shadow: var(--marketing-shadow-ambient);
+}
+
+.fmkt-sync-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.fmkt-sync-path {
+  opacity: 0.62;
+  fill: none;
+  stroke: color-mix(in oklch, var(--marketing-primary) 28%, transparent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.fmkt-sync-path--team {
+  stroke-dasharray: 700;
+  stroke-dashoffset: var(--fmkt-sync-draw-1);
+}
+
+.fmkt-sync-path--xero {
+  stroke-dasharray: 700;
+  stroke-dashoffset: var(--fmkt-sync-draw-2);
+}
+
+.fmkt-sync-path--xero-cal {
+  opacity: 0.52;
+  stroke: var(--marketing-xero-cyan);
+  stroke-dasharray: 300;
+  stroke-dashoffset: var(--fmkt-sync-draw-3);
+}
+
+.fmkt-sync-path--return {
+  opacity: 0.42;
+  stroke: color-mix(in oklch, var(--marketing-xero-cyan) 48%, transparent);
+  stroke-dasharray: 620;
+  stroke-dashoffset: var(--fmkt-sync-draw-2);
+}
+
+.fmkt-sync-node > rect {
+  fill: var(--marketing-surface-lowest);
+}
+
+.fmkt-sync-node--source > rect {
+  fill: color-mix(
+    in oklch,
+    var(--marketing-surface-lowest) 82%,
+    var(--marketing-primary-container)
+  );
+}
+
+.fmkt-sync-node--xero > rect {
+  fill: color-mix(
+    in oklch,
+    var(--marketing-surface-lowest) 80%,
+    var(--marketing-xero-cyan)
+  );
+}
+
+.fmkt-sync-node--team > rect {
+  fill: color-mix(
+    in oklch,
+    var(--marketing-surface-lowest) 82%,
+    var(--marketing-google-blue)
+  );
+}
+
+.fmkt-sync-node__icon {
+  fill: var(--marketing-primary);
+}
+
+.fmkt-sync-node--xero .fmkt-sync-node__icon {
+  fill: var(--marketing-xero-cyan);
+}
+
+.fmkt-sync-node--team .fmkt-sync-node__icon {
+  fill: var(--marketing-google-blue);
+}
+
+.fmkt-sync-node g {
+  color: var(--marketing-on-primary);
+  stroke: currentColor;
+}
+
+.fmkt-sync-node-letter {
+  font: 700 0.875rem / 1 var(--marketing-font);
+  text-anchor: middle;
+  fill: var(--marketing-on-primary);
+}
+
+.fmkt-sync-label {
+  font: 700 0.75rem / 1.25 var(--marketing-font);
+  fill: var(--marketing-on-surface);
+}
+
+.fmkt-sync-meta {
+  font: 500 0.625rem / 1.25 var(--marketing-font);
+  fill: var(--marketing-on-surface-variant);
+}
+
+.fmkt-sync-node--source .fmkt-sync-label,
+.fmkt-sync-node--source .fmkt-sync-meta {
+  text-anchor: middle;
+}
+
+.fmkt-sync-packet {
+  opacity: 0;
+  fill: var(--marketing-primary);
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.fmkt-sync-packet--team {
+  animation: fmkt-packet-travel 5.8s cubic-bezier(0.16, 1, 0.3, 1) 0.8s infinite;
+  offset-path: url(#sync-path-team);
+}
+
+.fmkt-sync-packet--xero {
+  animation: fmkt-packet-travel 5.8s cubic-bezier(0.16, 1, 0.3, 1) 0s infinite;
+  offset-path: url(#sync-path-xero);
+}
+
+.fmkt-sync-packet--return {
+  fill: var(--marketing-xero-cyan);
+  animation: fmkt-packet-travel 5.8s cubic-bezier(0.16, 1, 0.3, 1) 1.7s infinite;
+  offset-path: url(#sync-path-return);
+}
+
+.fmkt-sync-packet--xero-cal {
+  fill: var(--marketing-xero-cyan);
+  animation: fmkt-packet-travel 5.8s cubic-bezier(0.16, 1, 0.3, 1) 2.4s infinite;
+  offset-path: url(#sync-path-xero-cal);
+}
+
+/* Desktop: show diagram, visually-hide text list (still DOM-accessible for screen readers) */
+@media (min-width: 768px) {
+  .fmkt-sync-diagram {
+    display: block;
+  }
+
+  .fmkt-pathway__card--list {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    white-space: nowrap;
+    border-width: 0;
+    clip: rect(0, 0, 0, 0);
+  }
+}
+
+@media (max-width: 1024px) {
+  .fmkt-sync-diagram {
+    padding: 28px 32px;
+  }
+}
+
+/* ---- Feature Cards ---- */
+
+.fmkt-cards-section {
+  padding: 80px 0;
+}
+
+.fmkt-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.fmkt-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 20px;
+}
+
+.fmkt-card__mock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  padding: 28px 20px;
+  overflow: hidden;
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-card__body {
+  flex: 1;
+  padding: 24px 28px 28px;
+}
+
+.fmkt-card__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-bottom: 12px;
+  font: 700 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.fmkt-card__title {
+  margin: 0 0 8px;
+  font: 600 1.0625rem / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-card__copy {
+  margin: 0;
+  font: 400 0.9375rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+/* Leave form mock */
+
+.fmkt-mock-form {
+  width: 100%;
+  max-width: 260px;
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-mock-form__header {
+  padding: 12px 14px 10px;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  border-bottom: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-mock-form__rows {
+  padding: 4px 0;
+}
+
+.fmkt-mock-form__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--marketing-surface-low);
+}
+
+.fmkt-mock-form__label {
+  font: 400 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  white-space: nowrap;
+}
+
+.fmkt-mock-form__value {
+  font: 500 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  text-align: right;
+}
+
+.fmkt-mock-form__saved {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  margin: 10px 12px 12px;
+  background: color-mix(
+    in oklch,
+    var(--marketing-primary) 10%,
+    var(--marketing-surface-lowest)
+  );
+  border-radius: 10px;
+}
+
+.fmkt-mock-form__saved-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.fmkt-mock-form__saved-title {
+  display: block;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+}
+
+.fmkt-mock-form__saved-sub {
+  display: block;
+  margin-top: 2px;
+  font: 400 0.625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+/* Calendar mock */
+
+.fmkt-mock-cal {
+  width: 100%;
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-mock-cal__header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 10px 8px;
+  background: var(--marketing-surface-lowest);
+  border-bottom: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-mock-cal__corner {
+  font: 600 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-mock-cal__days {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  padding-left: 30px;
+}
+
+.fmkt-mock-cal__day {
+  font: 500 0.5625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+
+.fmkt-mock-cal__row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+}
+
+.fmkt-mock-cal__row:nth-child(even) {
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-mock-cal__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font: 600 0.5625rem / 1 var(--marketing-font);
+  border-radius: 50%;
+}
+
+.fmkt-mock-cal__avatar--sage {
+  color: var(--marketing-avatar-sage-fg);
+  background: var(--marketing-avatar-sage-bg);
+}
+
+.fmkt-mock-cal__avatar--mauve {
+  color: var(--marketing-avatar-plum-fg);
+  background: var(--marketing-avatar-plum-bg);
+}
+
+.fmkt-mock-cal__avatar--cream {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-mock-cal__avatar--ink {
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+}
+
+.fmkt-mock-cal__grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+
+.fmkt-mock-cal__cell {
+  height: 18px;
+  border-radius: 4px;
+}
+
+.fmkt-mock-cal__cell--filled {
+  /* base filled state — colour from modifier class */
+}
+
+.fmkt-mock-cal__bar--leave {
+  background: var(--marketing-event-leave-bg);
+}
+
+.fmkt-mock-cal__bar--wfh {
+  background: var(--marketing-event-wfh-bg);
+}
+
+.fmkt-mock-cal__bar--sick {
+  background: var(--marketing-event-training-bg);
+}
+
+.fmkt-mock-cal__bar--training {
+  background: var(--marketing-surface-high);
+}
+
+/* Payroll sync mock */
+
+.fmkt-mock-payroll {
+  width: 100%;
+  max-width: 260px;
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-mock-payroll__header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 14px 16px;
+  font: 600 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  border-bottom: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-mock-payroll__check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.fmkt-mock-payroll__status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  font: 500 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+  background: color-mix(
+    in oklch,
+    var(--marketing-primary) 8%,
+    var(--marketing-surface-lowest)
+  );
+  border-bottom: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-mock-payroll__status-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.fmkt-mock-payroll__rows {
+  padding: 4px 0;
+}
+
+.fmkt-mock-payroll__row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--marketing-surface-low);
+}
+
+.fmkt-mock-payroll__row:last-child {
+  border-bottom: none;
+}
+
+.fmkt-mock-payroll__row-label {
+  font: 400 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-mock-payroll__row-value {
+  font: 500 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+/* ---- Calendar Visibility Section ---- */
+
+.fmkt-calvis {
+  padding: 96px 0;
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-calvis__inner {
+  display: grid;
+  grid-template-columns: 320px 1fr 1.3fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.fmkt-calvis__image {
+  overflow: hidden;
+  border-radius: 20px;
+}
+
+.fmkt-calvis__photo {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+.fmkt-calvis__copy .fmkt-section-title {
+  margin-top: 14px;
+  text-align: left;
+}
+
+.fmkt-calvis__body {
+  max-width: 44ch;
+  margin: 20px 0 0;
+  font: 400 1rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-calvis__checklist {
+  padding: 0;
+  margin: 24px 0 0;
+  list-style: none;
+}
+
+.fmkt-calvis__check-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 7px 0;
+  font: 500 0.9375rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-calvis__check-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+/* Big calendar mock */
+
+.fmkt-bigcal {
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-bigcal__header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px 10px;
+  background: var(--marketing-surface-lowest);
+  border-bottom: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-bigcal__month {
+  flex-shrink: 0;
+  min-width: 52px;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-bigcal__days {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+}
+
+.fmkt-bigcal__day {
+  font: 500 0.5625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+
+.fmkt-bigcal__rows {
+  padding: 4px 0;
+}
+
+.fmkt-bigcal__row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 5px 16px;
+}
+
+.fmkt-bigcal__row:nth-child(even) {
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-bigcal__avatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font: 600 0.625rem / 1 var(--marketing-font);
+  border-radius: 50%;
+}
+
+.fmkt-bigcal__avatar--sage {
+  color: var(--marketing-avatar-sage-fg);
+  background: var(--marketing-avatar-sage-bg);
+}
+
+.fmkt-bigcal__avatar--mauve {
+  color: var(--marketing-avatar-plum-fg);
+  background: var(--marketing-avatar-plum-bg);
+}
+
+.fmkt-bigcal__avatar--cream {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-container);
+}
+
+.fmkt-bigcal__avatar--ink {
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+}
+
+.fmkt-bigcal__avatar--sky {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-high);
+}
+
+.fmkt-bigcal__grid {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+}
+
+.fmkt-bigcal__cell {
+  position: relative;
+  height: 26px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.fmkt-bigcal__cell--start {
+  border-radius: 6px 0 0 6px;
+}
+
+.fmkt-bigcal__event-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.5625rem / 1 var(--marketing-font);
+  white-space: nowrap;
+}
+
+.fmkt-bigcal__bar--leave {
+  background: var(--marketing-event-leave-bg);
+}
+
+.fmkt-bigcal__bar--leave .fmkt-bigcal__event-label {
+  color: var(--marketing-event-leave-fg);
+}
+
+.fmkt-bigcal__bar--wfh {
+  background: var(--marketing-event-wfh-bg);
+}
+
+.fmkt-bigcal__bar--wfh .fmkt-bigcal__event-label {
+  color: var(--marketing-event-wfh-fg);
+}
+
+.fmkt-bigcal__bar--sick {
+  background: var(--marketing-event-training-bg);
+}
+
+.fmkt-bigcal__bar--sick .fmkt-bigcal__event-label {
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-bigcal__bar--training {
+  background: var(--marketing-surface-high);
+}
+
+.fmkt-bigcal__bar--training .fmkt-bigcal__event-label {
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-bigcal__bar--holiday {
+  background: var(--marketing-surface-highest);
+}
+
+.fmkt-bigcal__bar--holiday .fmkt-bigcal__event-label {
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-bigcal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--marketing-surface-container);
+}
+
+.fmkt-bigcal__badge {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 10px;
+  font: 500 0.6875rem / 1 var(--marketing-font);
+  border-radius: 999px;
+}
+
+.fmkt-bigcal__badge--outlook {
+  color: var(--marketing-outlook-blue);
+  background: color-mix(
+    in srgb,
+    var(--marketing-outlook-blue) 10%,
+    transparent
+  );
+}
+
+.fmkt-bigcal__badge--google {
+  color: var(--marketing-google-blue);
+  background: color-mix(in srgb, var(--marketing-google-blue) 10%, transparent);
+}
+
+/* ---- How It Works ---- */
+
+.fmkt-how {
+  padding: 96px 0;
+}
+
+.fmkt-how__steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2px;
+}
+
+.fmkt-how__item {
+  padding: 40px;
+  background: var(--marketing-surface-lowest);
+}
+
+.fmkt-how__item:nth-child(1) {
+  border-radius: 20px 0 0 0;
+}
+
+.fmkt-how__item:nth-child(2) {
+  border-radius: 0 20px 0 0;
+}
+
+.fmkt-how__item:nth-child(3) {
+  border-radius: 0 0 0 20px;
+}
+
+.fmkt-how__item:nth-child(4) {
+  border-radius: 0 0 20px 0;
+}
+
+.fmkt-how__num {
+  display: block;
+  margin-bottom: 20px;
+  font: 700 4rem / 1 var(--marketing-font);
+  color: color-mix(
+    in oklch,
+    var(--marketing-primary) 22%,
+    var(--marketing-surface-lowest)
+  );
+  letter-spacing: -0.04em;
+}
+
+.fmkt-how__title {
+  margin: 0 0 8px;
+  font: 600 1.125rem / 1.35 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-how__copy {
+  margin: 0;
+  font: 400 0.9375rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+/* ---- Benefits Strip ---- */
+
+.fmkt-benefits {
+  padding: 0;
+  background: var(--marketing-surface-low);
+}
+
+.fmkt-benefits__overline {
+  padding: 64px 0 0;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.fmkt-benefits__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+}
+
+.fmkt-benefit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 40px 48px;
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-benefit:nth-child(odd) {
+  border-right: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-benefit__icon {
+  display: none;
+}
+
+.fmkt-benefit__title {
+  margin: 0 0 2px;
+  font: 600 1.25rem / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-benefit__copy {
+  max-width: 44ch;
+  margin: 0;
+  font: 400 1rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+/* ---- Final CTA ---- */
+
+.fmkt-cta {
+  padding: 80px 0 96px;
+}
+
+.fmkt-cta__panel {
+  position: relative;
+  padding: 72px 48px;
+  overflow: hidden;
+  text-align: center;
+  background: color-mix(
+    in oklch,
+    var(--marketing-secondary-container) 45%,
+    var(--marketing-surface-low)
+  );
+  border-radius: 28px;
+}
+
+.fmkt-cta__content {
+  position: relative;
+  z-index: 1;
+}
+
+.fmkt-cta__heading {
+  max-width: 20ch;
+  margin: 0 auto 16px;
+  font: 600 clamp(1.75rem, 3.5vw, 2.5rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.fmkt-cta__copy {
+  max-width: 52ch;
+  margin: 0 auto 40px;
+  font: 400 1.0625rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+.fmkt-cta__trust {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.fmkt-cta__trust-item {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font: 400 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-cta__trust-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.fmkt-cta__leaf {
+  position: absolute;
+  color: var(--marketing-primary);
+  opacity: 0.06;
+}
+
+.fmkt-cta__leaf--left {
+  bottom: -20px;
+  left: -20px;
+  width: 180px;
+  height: 220px;
+  transform: rotate(15deg);
+}
+
+.fmkt-cta__leaf--right {
+  right: -20px;
+  bottom: -20px;
+  width: 180px;
+  height: 220px;
+  transform: rotate(-15deg) scaleX(-1);
+}
+
+/* ---- Responsive: tablet ---- */
+
+@media (max-width: 1024px) {
+  .fmkt-hero {
+    grid-template-columns: 1fr;
+    padding-top: 100px;
+  }
+
+  .fmkt-hero__visual {
+    max-height: 400px;
+    overflow: hidden;
+  }
+
+  .fmkt-pathway__card {
+    flex-wrap: wrap;
+    gap: 24px;
+    padding: 24px;
+  }
+
+  .fmkt-pathway__item {
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 40%;
+  }
+
+  .fmkt-pathway__arrow {
+    display: none;
+  }
+
+  .fmkt-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fmkt-calvis__inner {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fmkt-calvis__image {
+    display: none;
+  }
+
+  .fmkt-how__item {
+    padding: 32px;
+  }
+
+  .fmkt-cta__panel {
+    padding: 56px 36px;
+  }
+}
+
+/* ---- Responsive: mobile ---- */
+
+@media (max-width: 640px) {
+  .fmkt-container {
+    width: min(calc(100% - 32px), 640px);
+  }
+
+  .fmkt-hero {
+    padding: 80px 0 56px;
+  }
+
+  .fmkt-pathway {
+    padding-bottom: 56px;
+  }
+
+  .fmkt-pathway__card {
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+  }
+
+  .fmkt-pathway__item {
+    flex-direction: row;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .fmkt-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fmkt-calvis {
+    padding: 64px 0;
+  }
+
+  .fmkt-calvis__inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .fmkt-how {
+    padding: 64px 0;
+  }
+
+  .fmkt-how__steps {
+    grid-template-columns: 1fr;
+  }
+
+  .fmkt-how__item {
+    padding: 28px 24px;
+  }
+
+  .fmkt-how__item:nth-child(1) {
+    border-radius: 20px 20px 0 0;
+  }
+
+  .fmkt-how__item:nth-child(2) {
+    border-radius: 0;
+  }
+
+  .fmkt-how__item:nth-child(3) {
+    border-radius: 0;
+  }
+
+  .fmkt-how__item:nth-child(4) {
+    border-radius: 0 0 20px 20px;
+  }
+
+  .fmkt-how__num {
+    margin-bottom: 14px;
+    font-size: 3rem;
+  }
+
+  .fmkt-benefits {
+    padding: 0;
+  }
+
+  .fmkt-benefits__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fmkt-benefit {
+    padding: 28px 24px;
+    border-right: none !important;
+  }
+
+  .fmkt-cta {
+    padding: 56px 0 64px;
+  }
+
+  .fmkt-cta__panel {
+    padding: 48px 24px;
+    border-radius: 20px;
+  }
+
+  .fmkt-cta__leaf {
+    display: none;
+  }
+
+  .fmkt-cta__actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fmkt-page * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

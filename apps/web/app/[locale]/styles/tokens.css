@@ -2,7 +2,8 @@
     .marketing-home,
     .marketing-site-header,
     .marketing-footer,
-    .features-prototype
+    .features-prototype,
+    .fmkt-page
   ) {
   --marketing-primary: var(--primary);
   --marketing-primary-container: var(--primary-container);

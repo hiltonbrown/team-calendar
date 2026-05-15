@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { env } from "@/env";
+import { SnapshotSection } from "../(home)/components/snapshot-section";
 
 export const metadata: Metadata = createMetadata({
   title: "LeaveSync — Features",
@@ -232,6 +233,7 @@ const FeaturesPage = () => (
   <main className="features-prototype">
     <FeaturesHero />
     <OutcomeProofStrip />
+    <SnapshotSection />
     {featureSections.map((section) => (
       <div key={section.eyebrow}>
         <div className="feat-divider-rule" />
