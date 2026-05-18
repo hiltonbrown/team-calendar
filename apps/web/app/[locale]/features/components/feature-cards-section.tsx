@@ -44,7 +44,7 @@ const LeaveFormMock = () => (
   </div>
 );
 
-const days = ["Mon 12", "Tue 13", "Wed 14", "Thu 15", "Fri 16"];
+const days = ["Mon 11", "Tue 12", "Wed 13", "Thu 14", "Fri 15"];
 
 interface CalRow {
   barClass: string;
@@ -174,10 +174,8 @@ export const FeatureCardsSection = () => (
   <section className="fmkt-cards-section">
     <div className="fmkt-container">
       <div className="fmkt-section-header">
-        <p className="fmkt-overline">Powerful features. Simply delivered.</p>
-        <h2 className="fmkt-section-title">
-          Everything you need, in one simple flow.
-        </h2>
+        <p className="fmkt-overline">Leave. Calendars. Payroll.</p>
+        <h2 className="fmkt-section-title">One entry. Synced everywhere.</h2>
       </div>
       <div className="fmkt-card-grid">
         {cards.map((card) => (

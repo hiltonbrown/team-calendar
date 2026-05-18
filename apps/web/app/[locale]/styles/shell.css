@@ -198,6 +198,10 @@
   isolation: isolate;
 }
 
+.fmkt-page ~ .marketing-footer {
+  margin-top: 0;
+}
+
 .marketing-footer__grid {
   display: grid;
   grid-template-columns: 1.4fr 1fr 1fr 1fr;

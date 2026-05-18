@@ -99,7 +99,7 @@ export const BenefitsStrip = () => (
   <section className="fmkt-benefits">
     <div className="fmkt-container">
       <p className="fmkt-overline fmkt-benefits__overline">
-        Better for teams. Better for business.
+        Less admin. More visibility.
       </p>
       <div className="fmkt-benefits__grid">
         {benefits.map((benefit) => (

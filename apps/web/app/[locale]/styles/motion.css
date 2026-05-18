@@ -60,13 +60,8 @@
   animation: fmkt-hero-copy-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.fmkt-hero__visual {
-  animation: fmkt-hero-visual-arrive 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.12s
-    both;
-}
-
 .fmkt-sync-diagram {
-  animation: fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both;
+  animation: fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both;
 }
 
 @keyframes fmkt-hero-copy-arrive {
@@ -78,18 +73,6 @@
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes fmkt-hero-visual-arrive {
-  from {
-    opacity: 0;
-    transform: translateY(24px) scale(0.985);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -105,6 +88,110 @@
   }
 }
 
+@keyframes fmkt-hero-copy-parallax {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0.78;
+    transform: translate3d(0, -42px, 0);
+  }
+}
+
+@keyframes fmkt-hero-panel-parallax {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0.9;
+    transform: translate3d(0, 52px, 0) scale(0.982);
+  }
+}
+
+@keyframes fmkt-feature-header-overlay {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 42px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes fmkt-sync-node-parallax-soft {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+@keyframes fmkt-sync-node-parallax-deep {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(0, 14px, 0);
+  }
+}
+
+@keyframes fmkt-section-copy-parallax {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0.84;
+    transform: translate3d(0, -96px, 0);
+  }
+}
+
+@keyframes fmkt-section-visual-parallax {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0.94;
+    transform: translate3d(0, 86px, 0) scale(0.985);
+  }
+}
+
+@keyframes fmkt-section-item-depth-soft {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    opacity: 0.9;
+    transform: translate3d(0, -56px, 0);
+  }
+}
+
+@keyframes fmkt-section-item-depth-deep {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0.92;
+    transform: translate3d(0, 68px, 0) scale(0.99);
+  }
+}
+
 /* Layer 3: Scroll-driven section reveals */
 @keyframes reveal-up {
   from {
@@ -117,7 +204,81 @@
   }
 }
 
+/* Fade reveal fallback for non-parallax marketing content */
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes section-cover-darken {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @supports (animation-timeline: view()) {
+  /* Darken each sticky layer as the next panel covers it. */
+  .fmkt-cards-section::after,
+  .fmkt-calvis::after,
+  .fmkt-how::after,
+  .fmkt-benefits::after,
+  .fmkt-pricing-slide::after,
+  .fmkt-cta::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    background: oklch(0% 0 0 / 0.18);
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    animation: section-cover-darken linear both;
+    animation-timeline: --fmkt-slide;
+    animation-range: exit 0% exit 65%;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (min-width: 1025px) {
+    .fmkt-hero__copy-inner {
+      animation: fmkt-hero-copy-parallax linear both;
+      animation-range: exit 0% exit 70%;
+      animation-timeline: view();
+    }
+
+    .fmkt-hero .fmkt-pathway {
+      animation: fmkt-hero-panel-parallax linear both;
+      animation-range: exit 0% exit 82%;
+      animation-timeline: view();
+    }
+
+    .fmkt-sync-node--source,
+    .fmkt-sync-node--team {
+      animation: fmkt-sync-node-parallax-soft linear both;
+      animation-range: exit 8% exit 86%;
+      animation-timeline: view();
+    }
+
+    .fmkt-sync-node--xero {
+      animation: fmkt-sync-node-parallax-deep linear both;
+      animation-range: exit 8% exit 86%;
+      animation-timeline: view();
+    }
+
+    .fmkt-cards-section .fmkt-section-header {
+      animation: fmkt-feature-header-overlay linear both;
+      animation-range: entry -12% entry 42%;
+      animation-timeline: view();
+    }
+  }
+
   .marketing-workflow,
   .marketing-calendar-card,
   .marketing-pricing-heading {
@@ -165,87 +326,214 @@
   }
 
   .fmkt-card:nth-child(1) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 35%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 0% exit 70%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-card:nth-child(2) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 6% entry 41%;
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 4% exit 74%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-card:nth-child(3) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 12% entry 47%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 8% exit 78%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-card:nth-child(1) .fmkt-card__mock,
+  .fmkt-card:nth-child(3) .fmkt-card__mock {
+    animation: fmkt-section-visual-parallax linear both;
+    animation-range: entry 8% exit 82%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-card:nth-child(2) .fmkt-card__mock {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 8% exit 78%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  /* Sticky homepage sections: text and visuals move at different depths. */
+  .fmkt-cards-section .fmkt-section-header {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 62%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-calvis__copy {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 35%;
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 64%;
+    animation-timeline: --fmkt-slide;
   }
 
+  .fmkt-calvis__image,
   .fmkt-bigcal {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 6% entry 41%;
+    animation: fmkt-section-visual-parallax linear both;
+    animation-range: entry 6% exit 78%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-how .fmkt-section-header {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 64%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-how__item:nth-child(1) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 36%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 0% exit 68%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-how__item:nth-child(2) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 5% entry 41%;
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 4% exit 72%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-how__item:nth-child(3) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 10% entry 46%;
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 8% exit 76%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-how__item:nth-child(4) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 15% entry 51%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 12% exit 80%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-benefits__overline {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 64%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-benefit:nth-child(1) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 36%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 0% exit 68%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-benefit:nth-child(2) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 5% entry 41%;
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 4% exit 72%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-benefit:nth-child(3) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 10% entry 46%;
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 8% exit 76%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-benefit:nth-child(4) {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 15% entry 51%;
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 12% exit 80%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .marketing-pricing-heading {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 64%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .marketing-price-card:nth-child(1) {
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 0% exit 68%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .marketing-price-card:nth-child(2) {
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 4% exit 72%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .marketing-price-card:nth-child(3) {
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 8% exit 76%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-cta__content {
+    animation: fmkt-section-copy-parallax linear both;
+    animation-range: entry 0% exit 64%;
+    animation-timeline: --fmkt-slide;
   }
 
   .fmkt-cta__panel {
-    animation: reveal-up linear both;
-    animation-timeline: view();
-    animation-range: entry 0% entry 40%;
+    animation: fmkt-section-visual-parallax linear both;
+    animation-range: entry 6% exit 78%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-cta__leaf--left {
+    animation: fmkt-section-item-depth-soft linear both;
+    animation-range: entry 0% exit 68%;
+    animation-timeline: --fmkt-slide;
+  }
+
+  .fmkt-cta__leaf--right {
+    animation: fmkt-section-item-depth-deep linear both;
+    animation-range: entry 8% exit 76%;
+    animation-timeline: --fmkt-slide;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (max-width: 640px) {
+    @keyframes fmkt-section-copy-parallax {
+      from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+
+      to {
+        opacity: 0.9;
+        transform: translate3d(0, -16px, 0);
+      }
+    }
+
+    @keyframes fmkt-section-visual-parallax {
+      from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      to {
+        opacity: 0.96;
+        transform: translate3d(0, 14px, 0) scale(0.992);
+      }
+    }
+
+    @keyframes fmkt-section-item-depth-soft {
+      from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+      }
+
+      to {
+        opacity: 0.94;
+        transform: translate3d(0, -10px, 0);
+      }
+    }
+
+    @keyframes fmkt-section-item-depth-deep {
+      from {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+
+      to {
+        opacity: 0.95;
+        transform: translate3d(0, 18px, 0) scale(0.995);
+      }
+    }
   }
 }
 
@@ -347,7 +635,7 @@
 @supports (animation-timeline: view()) {
   .fmkt-sync-diagram {
     animation:
-      fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both,
+      fmkt-diagram-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both,
       fmkt-draw-path-1 linear both,
       fmkt-draw-path-2 linear both,
       fmkt-draw-path-3 linear both;
@@ -361,7 +649,7 @@
 
   @keyframes fmkt-draw-path-1 {
     from {
-      --fmkt-sync-draw-1: 700;
+      --fmkt-sync-draw-1: 320;
     }
 
     to {
@@ -371,7 +659,7 @@
 
   @keyframes fmkt-draw-path-2 {
     from {
-      --fmkt-sync-draw-2: 700;
+      --fmkt-sync-draw-2: 300;
     }
 
     to {
@@ -381,7 +669,7 @@
 
   @keyframes fmkt-draw-path-3 {
     from {
-      --fmkt-sync-draw-3: 300;
+      --fmkt-sync-draw-3: 420;
     }
 
     to {
@@ -407,16 +695,29 @@
   .marketing-snapshot-story__state,
   .marketing-image-card__media img,
   .marketing-calendar-card__media img,
+  .fmkt-hero .fmkt-pathway,
   .fmkt-hero__copy,
-  .fmkt-hero__visual,
+  .fmkt-hero__copy-inner,
+  .fmkt-cards-section .fmkt-section-header,
   .fmkt-sync-diagram,
+  .fmkt-sync-node,
   .fmkt-pathway__card,
   .fmkt-card,
+  .fmkt-card:nth-child(1) .fmkt-card__mock,
+  .fmkt-card:nth-child(2) .fmkt-card__mock,
+  .fmkt-card:nth-child(3) .fmkt-card__mock,
+  .fmkt-calvis__image,
   .fmkt-calvis__copy,
   .fmkt-bigcal,
+  .fmkt-how .fmkt-section-header,
   .fmkt-how__item,
+  .fmkt-benefits__overline,
   .fmkt-benefit,
-  .fmkt-cta__panel {
+  .marketing-pricing-heading,
+  .marketing-price-card,
+  .fmkt-cta__content,
+  .fmkt-cta__panel,
+  .fmkt-cta__leaf {
     opacity: 1 !important;
     filter: none !important;
     stroke-dashoffset: 0 !important;
@@ -426,9 +727,8 @@
   }
 
   /* Sync diagram: stop all motion, keep static shapes visible */
+  .fmkt-sync-path--primary,
   .fmkt-sync-path--team,
-  .fmkt-sync-path--xero,
-  .fmkt-sync-path--xero-cal,
   .fmkt-sync-path--return {
     stroke-dashoffset: 0 !important;
     animation: none !important;
@@ -436,8 +736,7 @@
 
   .fmkt-sync-packet--team,
   .fmkt-sync-packet--xero,
-  .fmkt-sync-packet--return,
-  .fmkt-sync-packet--xero-cal {
+  .fmkt-sync-packet--return {
     display: none;
   }
 
@@ -449,6 +748,15 @@
     opacity: 0.5;
     transform: rotate(45deg) scale(1);
     animation: none;
+  }
+
+  .fmkt-cards-section::after,
+  .fmkt-calvis::after,
+  .fmkt-how::after,
+  .fmkt-benefits::after,
+  .fmkt-pricing-slide::after,
+  .fmkt-cta::after {
+    display: none;
   }
 }
 

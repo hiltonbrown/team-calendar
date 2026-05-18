@@ -106,98 +106,89 @@ export const SyncPathwayStrip = () => (
           aria-hidden="true"
           className="fmkt-sync-svg"
           fill="none"
-          viewBox="0 0 860 260"
+          viewBox="0 0 420 540"
           xmlns="http://www.w3.org/2000/svg"
         >
           <path
-            className="fmkt-sync-path fmkt-sync-path--team"
-            d="M 174,136 C 330,176 510,176 652,136"
-            id="sync-path-team"
-          />
-          <path
-            className="fmkt-sync-path fmkt-sync-path--xero"
-            d="M 172,116 C 270,50 414,44 520,82"
+            className="fmkt-sync-path fmkt-sync-path--primary"
+            d="M 168,138 C 188,176 280,190 282,228"
             id="sync-path-xero"
           />
           <path
-            className="fmkt-sync-path fmkt-sync-path--xero-cal"
-            d="M 552,92 C 614,92 632,112 652,126"
-            id="sync-path-xero-cal"
+            className="fmkt-sync-path fmkt-sync-path--team"
+            d="M 270,318 C 266,356 194,372 188,402"
+            id="sync-path-team"
           />
           <path
             className="fmkt-sync-path fmkt-sync-path--return"
-            d="M 518,106 C 410,148 286,158 174,132"
+            d="M 120,138 C 50,218 54,330 142,402"
             id="sync-path-return"
           />
 
           <g className="fmkt-sync-node fmkt-sync-node--source">
-            <rect height="96" rx="24" width="128" x="48" y="82" />
-            <circle className="fmkt-sync-node__icon" cx="112" cy="116" r="18" />
+            <rect height="104" rx="26" width="332" x="22" y="34" />
+            <circle className="fmkt-sync-node__icon" cx="76" cy="86" r="22" />
             <g
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.65}
-              transform="translate(102, 106)"
+              strokeWidth={1.85}
+              transform="translate(64, 74)"
             >
-              <path d="M18 10a7.5 7.5 0 0 0-12.8-5.3L3 7" />
-              <path d="M3 3v4h4" />
-              <path d="M2 10a7.5 7.5 0 0 0 12.8 5.3L17 13" />
-              <path d="M13 13h4v4" />
+              <path d="M22 12a9 9 0 0 0-15.3-6.4L4 8.4" />
+              <path d="M4 4v4.4h4.4" />
+              <path d="M2 12a9 9 0 0 0 15.3 6.4L20 15.6" />
+              <path d="M15.6 15.6H20V20" />
             </g>
-            <text className="fmkt-sync-label" x="112" y="150">
+            <text className="fmkt-sync-label" x="120" y="79">
               LeaveSync
             </text>
-            <text className="fmkt-sync-meta" x="112" y="166">
-              submits and publishes
+            <text className="fmkt-sync-meta" x="120" y="105">
+              submit once
             </text>
           </g>
 
           <g className="fmkt-sync-node fmkt-sync-node--xero">
-            <rect height="72" rx="20" width="120" x="500" y="52" />
-            <circle className="fmkt-sync-node__icon" cx="532" cy="88" r="17" />
-            <text className="fmkt-sync-node-letter" x="532" y="94">
+            <rect height="92" rx="24" width="300" x="122" y="228" />
+            <circle className="fmkt-sync-node__icon" cx="154" cy="274" r="21" />
+            <text className="fmkt-sync-node-letter" x="154" y="282">
               X
             </text>
-            <text className="fmkt-sync-label" x="562" y="83">
+            <text className="fmkt-sync-label" x="196" y="268">
               Xero
             </text>
-            <text className="fmkt-sync-meta" x="562" y="100">
+            <text className="fmkt-sync-meta" x="196" y="294">
               approved leave
             </text>
           </g>
 
           <g className="fmkt-sync-node fmkt-sync-node--team">
-            <rect height="96" rx="24" width="148" x="652" y="82" />
-            <circle className="fmkt-sync-node__icon" cx="690" cy="118" r="18" />
+            <rect height="104" rx="26" width="340" x="18" y="402" />
+            <circle className="fmkt-sync-node__icon" cx="72" cy="454" r="22" />
             <g
               fill="none"
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.65}
-              transform="translate(680, 108)"
+              strokeWidth={1.85}
+              transform="translate(60, 442)"
             >
-              <rect height="15" rx="2.5" width="18" x="1" y="3" />
-              <path d="M1 8h18M6 1v4M14 1v4" />
-              <path d="M6 12h3M12 12h3" />
+              <rect height="18" rx="3" width="22" x="1" y="4" />
+              <path d="M1 10h22M7 1.5v5M17 1.5v5" />
+              <path d="M7 15h4M15 15h4" />
             </g>
-            <text className="fmkt-sync-label" x="722" y="113">
+            <text className="fmkt-sync-label" x="116" y="448">
               Team calendar
             </text>
-            <text className="fmkt-sync-meta" x="722" y="131">
+            <text className="fmkt-sync-meta" x="116" y="474">
               Outlook, Google, Apple
             </text>
           </g>
 
-          <circle className="fmkt-sync-packet fmkt-sync-packet--team" r="4.5" />
-          <circle className="fmkt-sync-packet fmkt-sync-packet--xero" r="4" />
+          <circle className="fmkt-sync-packet fmkt-sync-packet--xero" r="5.5" />
+          <circle className="fmkt-sync-packet fmkt-sync-packet--team" r="5.5" />
           <circle
             className="fmkt-sync-packet fmkt-sync-packet--return"
-            r="3.5"
-          />
-          <circle
-            className="fmkt-sync-packet fmkt-sync-packet--xero-cal"
-            r="3.5"
+            r="4.5"
           />
         </svg>
       </div>

@@ -22,7 +22,7 @@ const calChecklist = [
   "One source of truth for availability",
 ];
 
-const days = ["Mon 12", "Tue 13", "Wed 14", "Thu 15", "Fri 16"];
+const days = ["Mon 11", "Tue 12", "Wed 13", "Thu 14", "Fri 15"];
 
 interface BigCalRow {
   barClass: string;
@@ -113,7 +113,7 @@ const GoogleBadge = () => (
 const BigCalendarMock = () => (
   <div className="fmkt-bigcal">
     <div className="fmkt-bigcal__header">
-      <span className="fmkt-bigcal__month">May 2025</span>
+      <span className="fmkt-bigcal__month">May 2026</span>
       <div className="fmkt-bigcal__days">
         {days.map((d) => (
           <span className="fmkt-bigcal__day" key={d}>
