@@ -1417,9 +1417,18 @@
   letter-spacing: 0.1em;
 }
 
+.fmkt-page {
+  --fmkt-sticky-content-offset: clamp(132px, 14svh, 164px);
+  --fmkt-section-header-gap: 48px;
+  --fmkt-card-grid-gap: 24px;
+  --fmkt-card-body-pad-block-start: 28px;
+  --fmkt-card-body-pad-inline: 32px;
+  --fmkt-card-body-pad-block-end: 32px;
+}
+
 .fmkt-section-header {
   max-width: 640px;
-  margin: 0 auto 56px;
+  margin: 0 auto var(--fmkt-section-header-gap);
   text-align: center;
 }
 
@@ -1816,7 +1825,7 @@
   top: 0;
   z-index: 2;
   min-height: var(--fmkt-slide-h);
-  padding: 96px 0 clamp(64px, 8vw, 88px);
+  padding: var(--fmkt-sticky-content-offset) 0 clamp(64px, 8vw, 88px);
   background: var(--marketing-surface);
   border-radius: 28px 28px 0 0;
   box-shadow:
@@ -1833,7 +1842,7 @@
 .fmkt-card-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
+  gap: var(--fmkt-card-grid-gap);
 }
 
 .fmkt-card {
@@ -1849,14 +1858,15 @@
   align-items: center;
   justify-content: center;
   min-height: 240px;
-  padding: 28px 20px;
+  padding: 32px 24px;
   overflow: hidden;
   background: var(--marketing-surface-low);
 }
 
 .fmkt-card__body {
   flex: 1;
-  padding: 24px 28px 28px;
+  padding: var(--fmkt-card-body-pad-block-start)
+    var(--fmkt-card-body-pad-inline) var(--fmkt-card-body-pad-block-end);
 }
 
 .fmkt-card__number {
@@ -1865,7 +1875,7 @@
   justify-content: center;
   width: 26px;
   height: 26px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   font: 700 0.75rem / 1 var(--marketing-font);
   color: var(--marketing-on-primary);
   background: var(--marketing-primary);
@@ -1873,7 +1883,7 @@
 }
 
 .fmkt-card__title {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font: 600 1.0625rem / 1.3 var(--marketing-font);
   color: var(--marketing-inverse-surface);
 }
@@ -2173,7 +2183,13 @@
 }
 
 .fmkt-slide:last-child {
-  min-height: var(--fmkt-slide-h);
+  min-height: calc(
+    var(--fmkt-slide-h) + var(--fmkt-sticky-content-offset) + 96px
+  );
+}
+
+.fmkt-page ~ .marketing-footer {
+  margin-top: clamp(360px, 28svh, 480px);
 }
 
 .fmkt-cards-section,
@@ -2215,7 +2231,7 @@
   top: 0;
   z-index: 3;
   min-height: var(--fmkt-slide-h);
-  padding: 96px 0;
+  padding: var(--fmkt-sticky-content-offset) 0 80px;
   background: var(--marketing-surface-low);
   border-radius: 28px 28px 0 0;
   box-shadow:
@@ -2227,7 +2243,7 @@
 .fmkt-calvis__inner {
   display: grid;
   grid-template-columns: 320px 1fr 1.3fr;
-  gap: 48px;
+  gap: 56px;
   align-items: center;
 }
 
@@ -2250,14 +2266,14 @@
 
 .fmkt-calvis__body {
   max-width: 44ch;
-  margin: 20px 0 0;
+  margin: 18px 0 0;
   font: 400 1rem / 1.65 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
 
 .fmkt-calvis__checklist {
   padding: 0;
-  margin: 24px 0 0;
+  margin: 22px 0 0;
   list-style: none;
 }
 
@@ -2265,7 +2281,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 7px 0;
+  padding: 6px 0;
   font: 500 0.9375rem / 1.4 var(--marketing-font);
   color: var(--marketing-on-surface);
 }
@@ -2296,7 +2312,7 @@
   display: flex;
   gap: 16px;
   align-items: center;
-  padding: 14px 16px 10px;
+  padding: 16px 18px 12px;
   background: var(--marketing-surface-lowest);
   border-bottom: 1px solid var(--marketing-surface-container);
 }
@@ -2329,7 +2345,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 5px 16px;
+  padding: 6px 18px;
 }
 
 .fmkt-bigcal__row:nth-child(even) {
@@ -2446,7 +2462,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-top: 1px solid var(--marketing-surface-container);
 }
 
@@ -2480,7 +2496,7 @@
   top: 0;
   z-index: 4;
   min-height: var(--fmkt-slide-h);
-  padding: 96px 0;
+  padding: var(--fmkt-sticky-content-offset) 0 80px;
   background: var(--marketing-surface);
   border-radius: 28px 28px 0 0;
   box-shadow:
@@ -2492,11 +2508,11 @@
 .fmkt-how__steps {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
 .fmkt-how__item {
-  padding: 40px;
+  padding: 44px;
   background: var(--marketing-surface-lowest);
 }
 
@@ -2518,7 +2534,7 @@
 
 .fmkt-how__num {
   display: block;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
   font: 700 4rem / 1 var(--marketing-font);
   color: color-mix(
     in oklch,
@@ -2529,7 +2545,7 @@
 }
 
 .fmkt-how__title {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font: 600 1.125rem / 1.35 var(--marketing-font);
   color: var(--marketing-inverse-surface);
 }
@@ -2557,8 +2573,8 @@
 }
 
 .fmkt-benefits__overline {
-  padding: 64px 0 0;
-  margin-bottom: 32px;
+  padding: var(--fmkt-sticky-content-offset) 0 0;
+  margin-bottom: 36px;
   text-align: center;
 }
 
@@ -2571,8 +2587,8 @@
 .fmkt-benefit {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 40px 48px;
+  gap: 12px;
+  padding: 44px 48px;
   border-bottom: 1px solid var(--marketing-ghost-border);
 }
 
@@ -2591,14 +2607,14 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: var(--marketing-on-primary);
   background: var(--marketing-primary);
   border-radius: 12px;
 }
 
 .fmkt-benefit__title {
-  margin: 0 0 2px;
+  margin: 0;
   font: 600 1.25rem / 1.3 var(--marketing-font);
   color: var(--marketing-inverse-surface);
 }
@@ -2617,6 +2633,7 @@
   top: 0;
   z-index: 6;
   min-height: var(--fmkt-slide-h);
+  padding: var(--fmkt-sticky-content-offset) 0 80px;
   background: var(--marketing-surface);
   border-radius: 28px 28px 0 0;
   box-shadow:
@@ -2625,14 +2642,18 @@
     0 -64px 112px oklch(0% 0 0 / 0.08);
 }
 
+.fmkt-pricing-slide .marketing-story-panel {
+  padding-top: 0;
+}
+
 /* ---- Final CTA ---- */
 
 .fmkt-cta {
   position: sticky;
-  top: 0;
+  top: var(--fmkt-sticky-content-offset);
   z-index: 7;
-  min-height: var(--fmkt-slide-h);
-  padding: 80px 0 96px;
+  min-height: calc(var(--fmkt-slide-h) - var(--fmkt-sticky-content-offset));
+  padding: 0 0 96px;
   background: var(--marketing-surface);
   border-radius: 28px 28px 0 0;
   box-shadow:
@@ -2643,7 +2664,7 @@
 
 .fmkt-cta__panel {
   position: relative;
-  padding: 72px 48px;
+  padding: 76px 56px;
   overflow: hidden;
   text-align: center;
   background: color-mix(
@@ -2670,7 +2691,7 @@
 
 .fmkt-cta__copy {
   max-width: 52ch;
-  margin: 0 auto 40px;
+  margin: 0 auto 36px;
   font: 400 1.0625rem / 1.65 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
@@ -2685,9 +2706,9 @@
 .fmkt-cta__trust {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
+  gap: 20px 28px;
   justify-content: center;
-  margin-top: 24px;
+  margin-top: 28px;
 }
 
 .fmkt-cta__trust-item {
@@ -2734,6 +2755,10 @@
 /* ---- Responsive: tablet ---- */
 
 @media (max-width: 1024px) {
+  .fmkt-page {
+    --fmkt-card-grid-gap: 20px;
+  }
+
   .fmkt-hero {
     grid-template-columns: 1fr;
     gap: 32px;
@@ -2758,7 +2783,7 @@
 
   .fmkt-pathway__card {
     flex-wrap: wrap;
-    gap: 24px;
+    gap: 22px 24px;
     padding: 24px;
   }
 
@@ -2785,8 +2810,34 @@
     border-radius: 20px 20px 0 0;
   }
 
+  .fmkt-cards-section {
+    padding: 96px 0 clamp(64px, 8vw, 88px);
+  }
+
+  .fmkt-calvis,
+  .fmkt-how {
+    padding: 96px 0;
+  }
+
+  .fmkt-benefits__overline {
+    padding-top: 64px;
+  }
+
+  .fmkt-pricing-slide {
+    padding: 0;
+  }
+
+  .fmkt-pricing-slide .marketing-story-panel {
+    padding-top: clamp(56px, 9vw, 88px);
+  }
+
+  .fmkt-cta {
+    padding: 84px 0 96px;
+  }
+
   .fmkt-calvis__inner {
     grid-template-columns: 1fr 1fr;
+    gap: 40px;
   }
 
   .fmkt-calvis__image {
@@ -2794,17 +2845,25 @@
   }
 
   .fmkt-how__item {
-    padding: 32px;
+    padding: 36px;
   }
 
   .fmkt-cta__panel {
-    padding: 56px 36px;
+    padding: 60px 40px;
   }
 }
 
 /* ---- Responsive: mobile ---- */
 
 @media (max-width: 640px) {
+  .fmkt-page {
+    --fmkt-section-header-gap: 40px;
+    --fmkt-card-grid-gap: 20px;
+    --fmkt-card-body-pad-block-start: 24px;
+    --fmkt-card-body-pad-inline: 24px;
+    --fmkt-card-body-pad-block-end: 28px;
+  }
+
   .fmkt-container {
     width: min(calc(100% - 32px), 640px);
   }
@@ -2832,14 +2891,23 @@
 
   .fmkt-pathway__card {
     flex-direction: column;
-    gap: 20px;
-    padding: 20px;
+    gap: 22px;
+    padding: 22px 20px;
   }
 
   .fmkt-pathway__item {
     flex-direction: row;
+    align-items: flex-start;
     width: 100%;
     min-width: 0;
+  }
+
+  .fmkt-pathway__step {
+    gap: 16px;
+  }
+
+  .fmkt-pathway__text {
+    gap: 5px;
   }
 
   .fmkt-card-grid {
@@ -2852,7 +2920,15 @@
 
   .fmkt-cards-section .fmkt-section-header {
     padding: 0;
-    margin-bottom: 40px;
+  }
+
+  .fmkt-card__mock {
+    min-height: 220px;
+    padding: 28px 20px;
+  }
+
+  .fmkt-card__number {
+    margin-bottom: 14px;
   }
 
   .fmkt-calvis {
@@ -2861,7 +2937,32 @@
 
   .fmkt-calvis__inner {
     grid-template-columns: 1fr;
-    gap: 32px;
+    gap: 36px;
+  }
+
+  .fmkt-calvis__copy .fmkt-section-title {
+    margin-top: 12px;
+  }
+
+  .fmkt-calvis__body {
+    margin-top: 16px;
+  }
+
+  .fmkt-calvis__checklist {
+    margin-top: 20px;
+  }
+
+  .fmkt-bigcal__header {
+    padding: 14px 14px 10px;
+  }
+
+  .fmkt-bigcal__row {
+    gap: 8px;
+    padding: 6px 14px;
+  }
+
+  .fmkt-bigcal__footer {
+    padding: 12px 14px 14px;
   }
 
   .fmkt-how {
@@ -2873,7 +2974,7 @@
   }
 
   .fmkt-how__item {
-    padding: 28px 24px;
+    padding: 30px 24px;
   }
 
   .fmkt-how__item:nth-child(1) {
@@ -2893,8 +2994,8 @@
   }
 
   .fmkt-how__num {
-    margin-bottom: 14px;
-    font-size: 3rem;
+    margin-bottom: 12px;
+    font-size: 2.75rem;
   }
 
   .fmkt-benefits {
@@ -2906,9 +3007,13 @@
   }
 
   .fmkt-benefit {
-    padding: 28px 24px;
+    padding: 32px 24px;
     border-right: none !important;
     border-bottom: 1px solid var(--marketing-ghost-border);
+  }
+
+  .fmkt-benefit__icon {
+    margin-bottom: 6px;
   }
 
   .fmkt-benefit:last-child {
@@ -2916,12 +3021,27 @@
   }
 
   .fmkt-cta {
-    padding: 56px 0 64px;
+    padding: 56px 0 68px;
+  }
+
+  .fmkt-pricing-slide .marketing-story-panel {
+    padding-top: 56px;
   }
 
   .fmkt-cta__panel {
-    padding: 48px 24px;
+    padding: 44px 24px;
     border-radius: 20px;
+  }
+
+  .fmkt-cta__copy {
+    margin-bottom: 28px;
+  }
+
+  .fmkt-cta__trust {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    margin-top: 24px;
   }
 
   .fmkt-cta__leaf {

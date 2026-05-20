@@ -79,19 +79,19 @@ const XeroIcon = () => (
 const steps: PathwayStep[] = [
   {
     label: "Enter leave",
-    copy: "Submitted in LeaveSync, synced to Xero instantly.",
+    copy: "Submitted once in LeaveSync.",
     icon: <PencilIcon />,
     iconClass: "fmkt-pathway__icon--primary",
   },
   {
     label: "Xero syncs back",
-    copy: "Approved leave flows back to keep records current.",
+    copy: "Approved leave keeps payroll records current.",
     icon: <XeroIcon />,
     iconClass: "fmkt-pathway__icon--xero",
   },
   {
     label: "Team calendar",
-    copy: "All leave, from any source, publishes to your calendar.",
+    copy: "Availability publishes to the calendars people check.",
     icon: <TeamCalendarIcon />,
     iconClass: "fmkt-pathway__icon--team",
   },

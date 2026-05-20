@@ -12,20 +12,20 @@ export const HeroSection = () => (
       <div className="fmkt-hero__copy-inner">
         <div className="fmkt-pill">Now in early access</div>
         <h1 className="fmkt-hero__title">
-          Enter leave once.
-          <em>Stay synchronised everywhere.</em>
+          Simple leave requests.
+          <em>Clear calendars for everyone.</em>
         </h1>
         <p className="fmkt-hero__body">
-          LeaveSync makes leave simple. Enter it once and we&rsquo;ll
-          automatically sync to Outlook, Google Calendar and Xero, so your team,
-          your calendars and your payroll are always in sync.
+          Employees request leave once in LeaveSync. Managers approve in
+          context, Xero stays current, and Outlook, Google Calendar and Apple
+          Calendar show who is available.
         </p>
         <div className="fmkt-hero__actions">
           <Link
             className="marketing-btn marketing-btn--primary"
             href={signUpHref}
           >
-            Book a demo
+            Sign up
           </Link>
           <Link
             className="marketing-btn marketing-btn--outline"

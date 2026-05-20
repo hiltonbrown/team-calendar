@@ -28,7 +28,6 @@ Xero remains the payroll source of truth. Outbound writes (submit, approve, decl
 **Reference docs (read before implementing any domain logic):**
 
 - `PRODUCT.md`: authoritative product truth, domain model, database schema, Xero sync model, feed rendering, UID strategy, build order, and stack decisions. Read this first.
-- `final-delivery-plan.md`: current delivery scope, phase sequencing, and open decisions.
 - `DESIGN.md`: colour tokens, typography, spacing, elevation rules, and component specifications.
 - `.impeccable.md`: brand personality, user context, and design principles.
 

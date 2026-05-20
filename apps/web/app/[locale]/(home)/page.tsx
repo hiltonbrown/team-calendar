@@ -9,9 +9,9 @@ import { HowItWorksSection } from "../features/components/how-it-works-section";
 import { PricingSection } from "./components/pricing-section";
 
 export const metadata: Metadata = createMetadata({
-  title: "LeaveSync: Enter leave once. Stay synchronised everywhere.",
+  title: "LeaveSync: Simple leave requests, clear team calendars.",
   description:
-    "LeaveSync makes leave simple. Enter it once and we'll automatically sync to Outlook, Google Calendar and Xero, so your team, your calendars and your payroll are always in sync.",
+    "LeaveSync gives employees one easy place to request leave and working patterns, then keeps Xero Payroll and shared calendars current automatically.",
 });
 
 const Home = () => (

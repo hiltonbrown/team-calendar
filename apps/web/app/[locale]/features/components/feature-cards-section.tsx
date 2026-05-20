@@ -152,20 +152,20 @@ interface FeatureCard {
 const cards: FeatureCard[] = [
   {
     number: 1,
-    title: "Enter leave in seconds",
-    copy: "Create leave requests quickly with an intuitive form. It's easy for everyone.",
+    title: "Request leave without chasing forms",
+    copy: "Employees add dates, leave type and notes in one place, with fewer follow-up questions.",
     mock: <LeaveFormMock />,
   },
   {
     number: 2,
-    title: "Synchronise to Outlook and Google Calendar",
-    copy: "LeaveSync updates team calendars in real time, so everyone stays informed and clashes are avoided.",
+    title: "Make availability visible",
+    copy: "Approved leave, WFH and training appear in team calendars, so managers can plan cover before clashes happen.",
     mock: <TeamCalendarMock />,
   },
   {
     number: 3,
-    title: "Keep payroll aligned with Xero",
-    copy: "Leave data flows to Xero, keeping your payroll accurate and saving hours of manual work.",
+    title: "Keep Xero aligned",
+    copy: "Approved requests write back to Xero Payroll, reducing duplicate entry and reconciliation.",
     mock: <PayrollSyncMock />,
   },
 ];
@@ -175,7 +175,9 @@ export const FeatureCardsSection = () => (
     <div className="fmkt-container">
       <div className="fmkt-section-header">
         <p className="fmkt-overline">Leave. Calendars. Payroll.</p>
-        <h2 className="fmkt-section-title">One entry. Synced everywhere.</h2>
+        <h2 className="fmkt-section-title">
+          One simple flow from request to calendar.
+        </h2>
       </div>
       <div className="fmkt-card-grid">
         {cards.map((card) => (

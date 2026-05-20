@@ -74,23 +74,23 @@ const HeartIcon = () => (
 
 const benefits: Benefit[] = [
   {
-    title: "Less admin, more time",
-    copy: "Automate updates and approvals so you can focus on what matters.",
+    title: "Easy for employees",
+    copy: "Request leave and working patterns without chasing forms or side messages.",
     icon: <ClockIcon />,
   },
   {
-    title: "Fewer clashes, smoother days",
-    copy: "See who's away, when, across the calendars your team uses.",
+    title: "Clear for managers",
+    copy: "See who is away, who is working differently, and where cover is needed.",
     icon: <UsersIcon />,
   },
   {
-    title: "One trusted source of availability",
-    copy: "Everyone works from the same real-time information.",
+    title: "Accurate for payroll",
+    copy: "Approved leave writes back to Xero Payroll, reducing duplicate entry.",
     icon: <ShieldIcon />,
   },
   {
-    title: "A better experience for your team",
-    copy: "Simple to request, easy to see, great for productivity and morale.",
+    title: "Respectful by default",
+    copy: "Privacy controls keep sensitive leave details visible only where needed.",
     icon: <HeartIcon />,
   },
 ];

@@ -17,7 +17,7 @@ const CheckIcon = () => (
 );
 
 const calChecklist = [
-  "Real-time calendar updates",
+  "Current calendar visibility",
   "Fewer clashes and surprises",
   "One source of truth for availability",
 ];
@@ -172,13 +172,14 @@ export const CalendarVisibilitySection = () => (
           />
         </div>
         <div className="fmkt-calvis__copy">
-          <p className="fmkt-overline">Visible where your team works</p>
+          <p className="fmkt-overline">Visible where work is planned</p>
           <h2 className="fmkt-section-title">
-            Leave and availability in the calendars you already use
+            Availability appears in the calendars people already check
           </h2>
           <p className="fmkt-calvis__body">
-            Once approved, leave shows up in Outlook and Google Calendar, so
-            everyone knows who&rsquo;s away, when.
+            Once leave is approved, Outlook, Google Calendar and Apple Calendar
+            show who is away and when, without another spreadsheet or calendar
+            to maintain.
           </p>
           <ul aria-label="Key benefits" className="fmkt-calvis__checklist">
             {calChecklist.map((item) => (

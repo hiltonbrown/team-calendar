@@ -53,18 +53,18 @@ export const FinalCtaSection = () => (
         <LeafArt className="fmkt-cta__leaf fmkt-cta__leaf--right" />
         <div className="fmkt-cta__content">
           <h2 className="fmkt-cta__heading">
-            Ready to simplify leave and stay synchronised?
+            Give your team an easier way to manage leave.
           </h2>
           <p className="fmkt-cta__copy">
-            Join modern teams who trust LeaveSync to keep their people,
-            calendars and payroll in sync.
+            LeaveSync keeps requests simple for employees, approvals clear for
+            managers, and Xero Payroll aligned behind the scenes.
           </p>
           <div className="fmkt-cta__actions">
             <Link
               className="marketing-btn marketing-btn--primary"
               href={signUpHref}
             >
-              Book a demo
+              Sign up
             </Link>
             <Link
               className="marketing-btn marketing-btn--outline"

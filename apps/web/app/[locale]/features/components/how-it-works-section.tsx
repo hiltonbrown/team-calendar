@@ -7,23 +7,23 @@ interface ProcessStep {
 const steps: ProcessStep[] = [
   {
     number: 1,
-    title: "Enter leave",
-    copy: "Add leave in seconds with a simple form.",
+    title: "Request leave",
+    copy: "Employees add dates, leave type and notes in one place.",
   },
   {
     number: 2,
-    title: "Review and approve",
-    copy: "Managers review and approve in one place.",
+    title: "Review with context",
+    copy: "Managers approve requests with team availability in view.",
   },
   {
     number: 3,
-    title: "Publish automatically",
-    copy: "We update Outlook, Google Calendar and Xero.",
+    title: "Update the source of truth",
+    copy: "Approved requests write back to Xero Payroll.",
   },
   {
     number: 4,
-    title: "Stay visible everywhere",
-    copy: "Your team stays informed and business keeps moving.",
+    title: "Publish to calendars",
+    copy: "Shared calendars show who is available and when.",
   },
 ];
 
@@ -32,7 +32,7 @@ export const HowItWorksSection = () => (
     <div className="fmkt-container">
       <div className="fmkt-section-header">
         <p className="fmkt-overline">How it works</p>
-        <h2 className="fmkt-section-title">Four steps. No manual work.</h2>
+        <h2 className="fmkt-section-title">Four steps. One calm workflow.</h2>
       </div>
       <div className="fmkt-how__steps">
         {steps.map((step) => (

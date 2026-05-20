@@ -20,13 +20,13 @@ const pricingTiers: PricingTier[] = [
   {
     name: "Early access",
     price: "No credit card",
-    sub: "Use LeaveSync while pricing is finalised",
+    sub: "Try leave requests early",
     features: [
       "Connect Xero Payroll",
       "Publish team calendar subscriptions",
-      "Give feedback before general release",
+      "Share feedback before general release",
     ],
-    cta: "Start early access",
+    cta: "Sign up",
     href: signUpHref,
     featured: true,
   },
@@ -51,7 +51,7 @@ const pricingTiers: PricingTier[] = [
       "Volume pricing discussion",
       "Tailored support",
     ],
-    cta: "Contact sales",
+    cta: "Contact us",
     href: "/contact",
   },
 ];
@@ -63,7 +63,7 @@ export const PricingSection = () => (
       <h2>Pricing is being finalised.</h2>
       <p>
         Early access is open while we finish the commercial model. Pricing will
-        be based on the active employees synced from Xero Payroll.
+        be based on active employees synced from Xero Payroll.
       </p>
     </div>
     <div className="marketing-pricing-grid">
