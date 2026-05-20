@@ -1,33 +1,24 @@
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
-import Image from "next/image";
-import { FeatureSection } from "./components/feature-section";
-import { Hero } from "./components/hero";
-import { ImageShowcase } from "./components/image-showcase";
+import { FeatureCardsSection } from "../features/components/feature-cards-section";
+import { FinalCtaSection } from "../features/components/final-cta-section";
+import { HeroSection } from "../features/components/hero-section";
+import { HowItWorksSection } from "../features/components/how-it-works-section";
 import { PricingSection } from "./components/pricing-section";
-import { SnapshotSection } from "./components/snapshot-section";
-import { WorkflowSection } from "./components/workflow-section";
 
 export const metadata: Metadata = createMetadata({
-  title: "LeaveSync: Team availability, synchronised with Xero",
+  title: "LeaveSync: Simple leave requests, clear team calendars.",
   description:
-    "Streamlined calendar and leave management. Publish staff leave, travel and team availability to every Outlook, Google, and Apple calendar your organisation already uses.",
+    "LeaveSync gives employees one easy place to request leave and working patterns, then keeps Xero Payroll and shared calendars current automatically.",
 });
 
 const Home = () => (
-  <main className="marketing-home">
-    <div aria-hidden="true" className="marketing-story-bg">
-      <Image alt="" fill priority src="/marketing/team-photo.png" />
-    </div>
-    <div aria-hidden="true" className="marketing-story-bg__wash" />
-    <div className="marketing-story-content">
-      <Hero />
-      <SnapshotSection />
-      <WorkflowSection />
-      <ImageShowcase />
-      <FeatureSection />
-      <PricingSection />
-    </div>
+  <main className="fmkt-page">
+    <HeroSection />
+    <FeatureCardsSection />
+    <HowItWorksSection />
+    <PricingSection />
+    <FinalCtaSection />
   </main>
 );
 

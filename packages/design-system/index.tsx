@@ -5,6 +5,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { ThemeProvider } from "./providers/theme";
 
 type DesignSystemProviderProperties = ThemeProviderProps & {
+  auth?: boolean;
   privacyUrl?: string;
   termsUrl?: string;
   helpUrl?: string;
@@ -12,22 +13,35 @@ type DesignSystemProviderProperties = ThemeProviderProps & {
 };
 
 export const DesignSystemProvider = ({
+  auth = true,
   children,
   privacyUrl,
   termsUrl,
   helpUrl,
   afterSignOutUrl,
   ...properties
-}: DesignSystemProviderProperties) => (
-  <ThemeProvider {...properties}>
-    <AuthProvider
-      afterSignOutUrl={afterSignOutUrl}
-      helpUrl={helpUrl}
-      privacyUrl={privacyUrl}
-      termsUrl={termsUrl}
-    >
+}: DesignSystemProviderProperties) => {
+  const content = (
+    <>
       <TooltipProvider>{children}</TooltipProvider>
       <Toaster />
-    </AuthProvider>
-  </ThemeProvider>
-);
+    </>
+  );
+
+  return (
+    <ThemeProvider {...properties}>
+      {auth ? (
+        <AuthProvider
+          afterSignOutUrl={afterSignOutUrl}
+          helpUrl={helpUrl}
+          privacyUrl={privacyUrl}
+          termsUrl={termsUrl}
+        >
+          {content}
+        </AuthProvider>
+      ) : (
+        content
+      )}
+    </ThemeProvider>
+  );
+};

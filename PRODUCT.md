@@ -5,7 +5,6 @@
 | Document | Purpose |
 |---|---|
 | `PRODUCT.md` | This file. Authoritative product truth, architecture, schema, and non-negotiables. |
-| `final-delivery-plan.md` | Current build scope (Xero-excluded), phase sequencing, open decisions, and acceptance criteria. |
 | `CLAUDE.md` | Coding agent instructions, repo conventions, package boundaries, and environment variables. |
 | `DESIGN.md` | Colour tokens, typography, spacing, elevation, and component specifications. |
 | `.impeccable.md` | Brand personality, user context, and design principles. |
@@ -16,34 +15,43 @@ Where this document conflicts with any other, PRODUCT.md takes precedence.
 
 ## Product truth
 
-LeaveSync is a multi-tenant availability publishing and leave management platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: syncing approved leave data into LeaveSync, and writing leave submissions and approvals back to Xero via the Xero API.
+LeaveSync is a multi-tenant leave management and availability publishing platform for organisations running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside LeaveSync; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which LeaveSync reads but never calculates.
+
+Alongside Xero leave, LeaveSync captures manual availability entries (WFH, travelling, training, client site) that are not written to Xero, then publishes a combined, privacy-controlled view as secure ICS feeds.
 
 The architecture is:
 
 **Leave submission layer > bidirectional Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**
 
-Xero remains the payroll source of truth. LeaveSync is the employee-facing interface for submitting and managing leave requests, with all approved state written back to Xero synchronously. LeaveSync also manages manual availability entries (WFH, travelling, training, client site) that are not submitted to Xero.
+### Sync direction (authoritative)
+
+| Direction | Mechanism | Scope |
+|---|---|---|
+| Inbound | Pull-first, scheduled Inngest jobs | Employees, leave records, leave balances. Xero provides no leave webhooks. |
+| Outbound | Synchronous, user-triggered API write | Submit, approve, decline, withdraw. No background queue. Failures surfaced inline. |
+
+Bidirectional leave management is a shipped capability of the initial build, not a future item. The build order (steps 6 and 7) implements submission and approval write-back as core slices.
 
 ### Product boundaries
 
-LeaveSync is not:
-
-- a full HRIS
-- a payroll engine or accrual calculator
-- a multi-connector abstraction layer (Xero only at this stage)
-
 LeaveSync is:
 
+- a leave submission and approval workflow system, bidirectionally synced with Xero Payroll
 - a canonical availability publisher
-- a leave submission and approval workflow system (bidirectionally synced with Xero Payroll)
 - a Xero leave visibility and management layer
 - a manual availability entry surface for non-leave events (WFH, travelling, training, client site)
 - a secure ICS feed generator for Outlook, Google Calendar, and Apple Calendar
 - a real-time notification platform (SSE-delivered in-app notifications, plus transactional email)
 
+LeaveSync is not:
+
+- a full HRIS
+- a payroll engine or accrual calculator (balances are read from Xero, never computed)
+- a multi-connector abstraction layer (Xero only at this stage)
+
 ### Product boundaries (future)
 
-Slack notifications, Teams integration, HTML calendar views, and additional provider connectors (MYOB, Zoho People, QuickBooks) are out of scope for the initial build. The architecture accommodates these without requiring structural changes.
+Slack notifications, Teams integration, HTML calendar views, and additional provider connectors (MYOB, Employment Hero, QuickBooks) are out of scope for the initial build. The architecture accommodates these without requiring structural changes.
 
 ---
 
@@ -123,7 +131,7 @@ leavesync/
 │  ├─ api/                    # sync, webhooks, feed endpoints, admin APIs (port 3002)
 │  ├─ web/                    # marketing site (port 3001)
 │  ├─ docs/                   # product and implementation docs (port 3004)
-│  └─ email/                  # notification templates — dev preview only; not deployed (port 3003)
+│  └─ email/                  # notification templates (dev preview only; not deployed) (port 3003)
 ├─ packages/
 │  ├─ database/               # Prisma schema, migrations, queries
 │  ├─ auth/                   # Clerk helpers, requireOrg(), requireRole(), getOrgId()
@@ -409,7 +417,7 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | `xero_tenants` | `xero_connection_id` |
 | `xero_sync_cursors` | `(xero_tenant_id, entity_type)` |
 | `people` | `(organisation_id, source_system, source_person_key)` |
-| `availability_records` | `(organisation_id, source_type, source_remote_id)` — NULL-distinct; app-layer guard required for manual records |
+| `availability_records` | `(organisation_id, source_type, source_remote_id)`; NULL-distinct, app-layer guard required for manual records |
 | `availability_publications` | `availability_record_id` |
 | `leave_balances` | `(person_id, xero_tenant_id, leave_type_xero_id)` |
 | `public_holidays` | `(organisation_id, location_id, date, source)` |

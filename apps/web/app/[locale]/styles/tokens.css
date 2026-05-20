@@ -2,7 +2,8 @@
     .marketing-home,
     .marketing-site-header,
     .marketing-footer,
-    .features-prototype
+    .features-prototype,
+    .fmkt-page
   ) {
   --marketing-primary: var(--primary);
   --marketing-primary-container: var(--primary-container);
@@ -43,18 +44,8 @@
     var(--marketing-outline-variant) 15%,
     transparent
   );
-  --marketing-shadow-ambient: 0 12px 32px
-    color-mix(in srgb, var(--marketing-inverse-surface) 10%, transparent);
-  --marketing-glass-bg: color-mix(
-    in srgb,
-    var(--marketing-surface) 18%,
-    transparent
-  );
-  --marketing-glass-bg-strong: color-mix(
-    in srgb,
-    var(--marketing-surface-lowest) 33%,
-    transparent
-  );
+  --marketing-shadow-ambient: 0 8px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
   --marketing-gradient-duotone: var(--marketing-secondary-container);
   --marketing-hero-highlight: var(--marketing-primary);
   --marketing-on-hero-highlight: var(--marketing-on-primary);

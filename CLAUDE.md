@@ -28,7 +28,6 @@ Xero remains the payroll source of truth. Outbound writes (submit, approve, decl
 **Reference docs (read before implementing any domain logic):**
 
 - `PRODUCT.md`: authoritative product truth, domain model, database schema, Xero sync model, feed rendering, UID strategy, build order, and stack decisions. Read this first.
-- `final-delivery-plan.md`: current delivery scope, phase sequencing, and open decisions.
 - `DESIGN.md`: colour tokens, typography, spacing, elevation rules, and component specifications.
 - `.impeccable.md`: brand personality, user context, and design principles.
 
@@ -69,6 +68,15 @@ Xero remains the payroll source of truth. Outbound writes (submit, approve, decl
 - Point at logs, errors, failing tests – then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
+
+7. Analysis Is Not a Deliverable
+- When asked to implement, implement — do not substitute a list of findings for the work itself
+- Comparison, gap analysis, and difference lists are intermediate steps toward implementation, never the end product
+- If you identify differences between a design and the production code, fix every single one in that same session before reporting back
+- Do not report partial progress as completion. "I found 20 differences" is a failure state, not a result
+- The correct loop is: read reference → read production → fix all gaps → verify → done
+- Never optimise for appearing useful. A list that describes unfixed problems is not useful
+- If the task is "implement X to match Y", the session is not over until zero differences remain
 
 Task Management
 

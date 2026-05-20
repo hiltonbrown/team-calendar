@@ -1,84 +1,65 @@
 # LeaveSync
 
-**The canonical availability and leave publishing platform for Xero Payroll teams.**
+**One accurate view of who is off, who is out, and who is in. Synced straight from Xero.**
 
-LeaveSync connects directly to Xero Payroll (AU, NZ, UK) to sync approved leave data, combining it with manual out-of-office context to create a single, accurate view of team availability. It publishes this data securely via ICS feeds to the calendars your team already uses (Outlook, Google Calendar, Apple Calendar).
+LeaveSync is the leave management and team availability platform for organisations that run payroll in Xero. Employees submit and manage leave inside LeaveSync; approvals write back to Xero Payroll in real time, so Xero stays the single source of truth for balances and accruals. Alongside approved leave, LeaveSync captures everyday out-of-office context (working from home, travelling, training, client site) and publishes one combined, privacy-controlled view to the calendars your team already uses: Outlook, Google Calendar, and Apple Calendar.
 
-By treating Xero as the ultimate source of truth, LeaveSync eliminates double-handling, provides clear calendar visibility, and reduces internal friction around who is in the office, working from home, or on leave.
+No more chasing who is in the office. No more leave requested by email and lost in an inbox. No more double entry between a calendar and your payroll system.
 
-## Why LeaveSync?
+## The problem LeaveSync solves
 
-Most teams struggle with fragmented availability context. Approved annual leave sits in payroll, while "working from home" or "travelling" sits in Slack or disjointed calendar events. LeaveSync solves this by providing:
+Availability context is scattered. Approved annual leave sits in payroll. "Working from home" and "on a client site" live in chat threads and ad hoc calendar invites. Managers approve leave in one place, then re-key it somewhere else. The result is guesswork about who is actually available, and a payroll system that drifts out of step with reality.
 
-- **A single canonical view:** Combines Xero-approved leave with non-leave availability states (WFH, training, client site).
-- **Secure calendar publishing:** Delivers availability directly to work calendars via secure, revocable ICS feeds with customizable privacy modes (Named, Masked, Private).
-- **Strict multi-tenancy:** Built for modern organisations with multiple payroll entities operating under a single corporate umbrella.
-- **Bidirectional sync:** (Designed for) submitting leave and managing approval workflows entirely within LeaveSync, writing approved state synchronously back to Xero.
+LeaveSync closes the gap:
 
-## How It Works
+- **Submit and approve in one place.** Employees request leave in LeaveSync. Managers approve or decline. Approved leave writes back to Xero Payroll immediately, so balances and accruals stay correct without re-keying.
+- **One calendar your team can trust.** Approved leave and manual out-of-office states combine into a single view, published as secure calendar feeds your team subscribes to once.
+- **Privacy by default.** Choose how much each feed reveals: full detail, a neutral "out of office", or a simple "busy". Sensitive leave reasons are never exposed unless an admin chooses to.
 
-LeaveSync operates on a unidirectional and bidirectional sync model depending on the workflow:
+## How it works
 
-1. **Bidirectional Xero Sync Layer:** Pulls employees, leave records, and balances from Xero via background jobs. Leave submissions and approvals in LeaveSync are written synchronously back to Xero.
-2. **Canonical Availability Model:** Normalises Xero leave and manual out-of-office entries into a single `AvailabilityRecord` domain.
-3. **Feed Projection Layer:** Applies privacy filtering and scope rules to generate stable calendar events.
-4. **ICS Publishing Layer:** Serves cached, heavily optimised `.ics` files using deterministic event UIDs for robust calendar client compatibility.
+1. **Connect Xero.** LeaveSync links to your Xero Payroll file (AU, NZ, or UK) and syncs employees, leave records, and balances on a schedule.
+2. **Manage leave.** Employees submit leave and log manual availability. Managers approve or decline. Approved decisions write straight back to Xero.
+3. **Publish availability.** LeaveSync combines everything into a canonical view and serves it as secure, revocable ICS feeds with the privacy level you set.
+4. **Stay informed.** In-app notifications and email keep employees and managers up to date on submissions, approvals, and sync health.
 
-## Tech Stack
+Xero remains the source of truth for balances. LeaveSync never calculates accruals; it reads them from Xero and writes approved leave back synchronously.
 
-LeaveSync is a Turborepo monorepo built with modern serverless primitives:
+## Built for groups, not just single teams
+
+LeaveSync is multi-tenant by design. A corporate group can run several payroll entities (each with its own Xero file) under one organisation, with strict isolation between entities and role-based access for owners, admins, managers, and viewers.
+
+## Tech stack
+
+LeaveSync is a Turborepo monorepo built on modern serverless primitives:
 
 - **Framework:** Next.js (App Router) on next-forge
-- **Runtime & Package Manager:** Bun
+- **Runtime and package manager:** Bun
 - **Database:** PostgreSQL (Neon serverless) via Prisma 7
-- **Authentication:** Clerk (using the Organisations feature)
-- **Background Jobs:** Inngest (durable execution for sync, reconciliation, and feed rebuilds)
+- **Authentication:** Clerk (Organisations feature)
+- **Background jobs:** Inngest (durable execution for sync, reconciliation, and feed rebuilds)
 - **Caching:** Vercel KV (Redis-compatible feed and ETag caching)
-- **Email:** Resend + React Email
-- **Deployment:** Vercel (across all applications)
-- **Testing & Quality:** Vitest, Biome 2, and Ultracite
+- **Email:** Resend with React Email
+- **Monitoring:** Sentry
+- **Deployment:** Vercel
+- **Testing and quality:** Vitest, Biome 2, and Ultracite
 
-## Architecture & Monorepo Structure
+## Roadmap
 
-The repository is strictly divided by domain boundaries to prevent Xero specifics from leaking into canonical availability logic.
+The following are out of scope for the initial build and do not require structural change to add: Slack and Teams notifications, HTML calendar views, and additional payroll connectors (MYOB, Zoho People, QuickBooks). LeaveSync is deliberately Xero-only at this stage to deliver a flawless payroll-integrated experience before broadening.
 
-### Applications (`apps/`)
+## Current status
 
-| App | Port | Purpose |
-| --- | --- | --- |
-| **`app`** | 3000 | Authenticated product UI (dashboards, feed management, leave submission). |
-| **`api`** | 3002 | Xero OAuth orchestration, Inngest job handlers, feed rendering (`/ical/:token.ics`). |
-| **`web`** | 3001 | Public marketing and product site. |
-| **`docs`** | 3004 | Mintlify-powered product and API documentation. |
-| **`email`** | 3003 | React Email template development and preview environment. |
+LeaveSync is under active development. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages.
 
-### Core Packages (`packages/`)
-
-- **`xero`**: Completely isolates Xero OAuth, tenant management, API rate limiting, and region-specific mapping (AU, NZ, UK).
-- **`availability`**: The canonical domain logic for people, availability records, privacy rules, and feed eligibility.
-- **`feeds`**: Handles ICS generation (`ical-generator`), stable UID hashing rules, and Vercel KV feed caching.
-- **`jobs`**: Inngest job definitions for polling Xero, feed rebuilds, and nightly state reconciliation.
-- **`database`**: Centralised Prisma schema, migrations, and generated client.
-- **`auth`**: Clerk helpers for enforcing tenant boundaries (`requireOrg`, `requireRole`).
-- **`design-system`**: Shared Tailwind CSS UI components.
-
-## Security & Tenancy Model
-
-LeaveSync enforces strict multi-tenancy at the database and application levels:
-
-- **Clerk Organisations as Top-Level Boundary:** There is no custom `workspaces` table. The `clerk_org_id` is the primary tenant boundary, present and indexed on every tenant-scoped table.
-- **Strict Scoping:** All database queries must filter by `clerk_org_id` sourced from the authenticated context.
-- **Credential Protection:** Xero OAuth tokens are encrypted at rest and never exposed in plaintext. Feed access tokens are hashed.
-- **Permissions:** Admin, manager, and viewer roles are enforced via Clerk custom roles.
-
-## Local Development
+## Local development
 
 ### Prerequisites
 
 - [Bun](https://bun.sh/) (v1.x)
 - Neon database URL
-- Clerk API keys (Publishable & Secret)
-- Resend, Inngest, and Vercel KV keys (if running specific jobs/feeds locally)
+- Clerk API keys (publishable and secret)
+- Resend, Inngest, and Vercel KV keys (if running specific jobs or feeds locally)
 
 ### Setup
 
@@ -87,8 +68,7 @@ LeaveSync enforces strict multi-tenancy at the database and application levels:
    bun install
    ```
 
-2. **Configure environment variables:**
-   Copy the example environment files in the apps you wish to run:
+2. **Configure environment variables.** Copy the example environment files for the apps you wish to run:
    ```bash
    cp apps/api/.env.example apps/api/.env.local
    cp apps/app/.env.example apps/app/.env.local
@@ -107,7 +87,7 @@ LeaveSync enforces strict multi-tenancy at the database and application levels:
    - `GITHUB_OWNER`: the repository owner or organisation
    - `GITHUB_REPO`: the repository name without `.git`
    - Leave these values absent if you are not using the feature. Do not set them to empty strings.
-   - Minimum fine-grained token permission: repository `Issues: write`
+   - Minimum fine-grained token permission: repository `Issues: write`.
    - Labels are best effort in v1. If the configured labels do not exist, the issue is still created.
    - If the variables are missing, support submission fails predictably with a configuration error instead of crashing the app.
 
@@ -130,7 +110,7 @@ If you enable GitHub-backed support submissions in deployed environments, config
 
 Set the variables in both Preview and Production if the feature should work in both environments. Redeploy the API app after changing them so the updated configuration is picked up.
 
-### Testing and Quality
+### Testing and quality
 
 LeaveSync uses co-located tests and strict linting to maintain code quality:
 
@@ -142,12 +122,8 @@ LeaveSync uses co-located tests and strict linting to maintain code quality:
   ```bash
   bunx vitest run packages/feeds
   ```
-- **Linting & Formatting:**
+- **Linting and formatting:**
   ```bash
   bun run check
   bun run fix
   ```
-
-## Current Status
-
-LeaveSync is currently under active development. Core infrastructure, Clerk multi-tenancy, Prisma schema design, and domain boundaries are established. Xero synchronization, leave workflows, and the canonical ICS feed projection engine are implemented in their respective domain packages. Multiple connectors beyond Xero are intentionally out of scope to focus on a flawless payroll-integrated experience.

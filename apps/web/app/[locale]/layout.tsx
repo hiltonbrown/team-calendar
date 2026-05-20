@@ -1,10 +1,8 @@
 import "./styles.css";
 import { AnalyticsProvider } from "@repo/analytics/provider";
-import { Toolbar as CMSToolbar } from "@repo/cms/components/toolbar";
 import { DesignSystemProvider } from "@repo/design-system";
 import { fonts } from "@repo/design-system/lib/fonts";
 import { cn } from "@repo/design-system/lib/utils";
-import { Toolbar } from "@repo/feature-flags/components/toolbar";
 import { getDictionary } from "@repo/internationalization";
 import type { ReactNode } from "react";
 import { Footer } from "./components/footer";
@@ -20,6 +18,13 @@ interface RootLayoutProperties {
 const RootLayout = async ({ children, params }: RootLayoutProperties) => {
   const { locale } = await params;
   const dictionary = await getDictionary(locale);
+  const FeatureToolbar = process.env.FLAGS_SECRET
+    ? (await import("@repo/feature-flags/components/toolbar")).Toolbar
+    : null;
+  const shouldRenderCMSToolbar = process.env.NODE_ENV === "production";
+  const CMSToolbar = shouldRenderCMSToolbar
+    ? (await import("@repo/cms/components/toolbar")).Toolbar
+    : null;
 
   return (
     <html
@@ -29,13 +34,13 @@ const RootLayout = async ({ children, params }: RootLayoutProperties) => {
     >
       <body>
         <AnalyticsProvider>
-          <DesignSystemProvider>
+          <DesignSystemProvider auth={false}>
             <Header dictionary={dictionary} />
             {children}
             <Footer />
           </DesignSystemProvider>
-          <Toolbar />
-          <CMSToolbar />
+          {FeatureToolbar ? <FeatureToolbar /> : null}
+          {CMSToolbar ? <CMSToolbar /> : null}
         </AnalyticsProvider>
       </body>
     </html>

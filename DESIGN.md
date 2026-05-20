@@ -2,9 +2,9 @@
 
 ## Creative North Star
 
-**"The Botanical Editorial."**
+**"Clarity at a glance."**
 
-A premium digital journal aesthetic: Modern Calm blended with Organic Minimalism. Grounded authority via sage and slate tones. No template energy; instead, intentional whitespace, tonal layering (not borders), and asymmetrical balance.
+A high-legibility operational palette where colour carries meaning: sage for Xero-synced leave, purple for manual entries, red for errors. The buyer's job is knowing who is in, who is out, and why, on sight. The interface earns trust through legibility and restraint: type-led hierarchy, tonal layering instead of borders, intentional whitespace, and asymmetrical balance. Signal leads; surface recedes.
 
 ---
 
@@ -45,7 +45,7 @@ A premium digital journal aesthetic: Modern Calm blended with Organic Minimalism
 
 ### Dark Mode
 
-Dark mode inverts the surface and text layers while preserving the botanical character. Greens shift to lighter, desaturated tones for comfortable contrast on dark backgrounds. The accent palette follows the same lightening pattern.
+Dark mode inverts the surface and text layers while preserving the functional colour system. Greens shift to lighter, desaturated tones for comfortable contrast on dark backgrounds. The accent palette follows the same lightening pattern.
 
 | Token                        | Hex       | Notes                                                    |
 |------------------------------|-----------|----------------------------------------------------------|
@@ -87,7 +87,7 @@ The accent palette is a complementary slate-purple that harmonises with the sage
 1. **Manual availability provenance.** `AvailabilityRecord` rows that originated as manual entries (WFH, travelling, training, client site, conference) use `accent-container` for chip backgrounds and `accent` for icon strokes. Xero-synced leave continues to use the sage primary palette. The colour split makes the source of truth scannable at a glance on team calendars and person profiles.
 2. **Informational state.** Notice banners, "New" / "Beta" / "Updated" badges, neutral tips and callouts. Fills the gap where today there is only success (sage) or error (red).
 
-**Default usage pattern.** Most surfaces use `accent-container` as the background and `on-accent-container` as the text colour, producing a calm lavender chip. Saturated `accent` is reserved for icon strokes, focus rings on accent surfaces, and small accent moments.
+**Default usage pattern.** Most surfaces use `accent-container` as the background and `on-accent-container` as the text colour, producing a low-saturation lavender chip that reads clearly without competing with the sage primary. Saturated `accent` is reserved for icon strokes, focus rings on accent surfaces, and small accent moments.
 
 **Pairing.** `accent-container` (`#E5DFFF`) sits naturally on `surface-container-low` (`#F6F1FF`) or `surface-container` (`#F1EBFD`). It must not sit on `primary-container` sage, which produces an unbalanced hue clash.
 
@@ -152,7 +152,7 @@ Elevated surfaces are transient or floating UI rendered above the page. They are
 
 **Forbidden on:** cards, list rows, table cells, calendar cells, form inputs, dashboard tiles, kanban columns, and any persistent content surface. These continue to use tonal layering only.
 
-The aesthetic goal is calm modernity: a soft "layer above the page" cue that feels tactile and refined without becoming decoration. Frost is a structural signal, not a flourish.
+The aesthetic goal is clear layering: a soft "layer above the page" cue that feels tactile and refined without becoming decoration. Frost is a structural signal, not a flourish.
 
 ### Frosted fill
 
@@ -172,7 +172,7 @@ Dark mode:
 | Strong    | `rgba(19, 18, 24, 0.88)`           | Modals, sheets, toasts                  |
 | Opaque    | `surface-container-highest`        | Fallback when blur unsupported or reduced |
 
-The fill colour is the `surface` token at varying alpha. This keeps the botanical palette consistent and avoids tinted frosts that would clash with content beneath.
+The fill colour is the `surface` token at varying alpha. This keeps the palette consistent and avoids tinted frosts that would clash with content beneath.
 
 ### Backdrop blur
 

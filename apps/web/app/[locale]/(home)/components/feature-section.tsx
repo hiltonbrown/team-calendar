@@ -11,27 +11,27 @@ export interface Feature {
 const features: Feature[] = [
   {
     icon: "sync",
-    kicker: "Feeds",
-    title: "Secure calendar feed",
-    body: "Calendar subscriptions per team, tag, or the whole organisation. View staff from Outlook, Google or Apple calendars.",
+    kicker: "Calendars",
+    title: "Secure calendar subscriptions",
+    body: "Create subscriptions for a team, location, or the whole organisation. Staff can view availability in the calendar app they already use.",
   },
   {
     icon: "leaf",
     kicker: "Availability",
-    title: "Next generation shared calendar",
-    body: "Annual leave, working from home, travelling, training, on-site. Standardised into one availability layer your whole org can read.",
+    title: "One availability layer",
+    body: "Annual leave, working from home, travelling, training, and on-site work are standardised into one shared view.",
   },
   {
     icon: "link",
     kicker: "People",
-    title: "Staff, contractors & others included",
-    body: "Customisable and extensible to cover staff, external contractors and others beyond payroll.",
+    title: "Staff and contractors included",
+    body: "Include employees, contractors and people outside payroll when they need to appear in availability views.",
   },
   {
     icon: "shield",
     kicker: "Privacy",
     title: "Privacy by design",
-    body: "Feeds are revocable, never guessable and never indexed.",
+    body: "Calendar links are revocable, hard to guess, and not indexed.",
   },
 ];
 

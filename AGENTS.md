@@ -57,6 +57,15 @@ Read before implementing or changing domain entities, sync logic, feed rendering
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
 
+7. Analysis Is Not a Deliverable
+- When asked to implement, implement — do not substitute a list of findings for the work itself
+- Comparison, gap analysis, and difference lists are intermediate steps toward implementation, never the end product
+- If you identify differences between a design and the production code, fix every single one in that same session before reporting back
+- Do not report partial progress as completion. "I found 20 differences" is a failure state, not a result
+- The correct loop is: read reference → read production → fix all gaps → verify → done
+- Never optimise for appearing useful. A list that describes unfixed problems is not useful
+- If the task is "implement X to match Y", the session is not over until zero differences remain
+
 Task Management
 
 1. **Plan First**: Write plan to `tasks/todo.md` with checkable items

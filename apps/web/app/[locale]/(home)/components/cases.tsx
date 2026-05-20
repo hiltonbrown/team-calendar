@@ -10,7 +10,7 @@ const personas = [
     icon: Settings,
     role: "HR admins and ops managers",
     description:
-      "Configure Xero connections, manage ICS feeds, and review sync status. Full data density with control and confidence.",
+      "Configure Xero connections, manage calendar subscriptions, and review sync status. Full data density with control and confidence.",
   },
   {
     icon: Users,
@@ -22,7 +22,7 @@ const personas = [
     icon: Calendar,
     role: "Employees",
     description:
-      "Submit leave, record WFH and manual availability, and share a personal ICS feed with your calendar app of choice.",
+      "Submit leave, record WFH and manual availability, and share a private calendar subscription with your calendar app of choice.",
   },
   {
     icon: Clock,

@@ -3,8 +3,10 @@ import { env } from "@/env";
 import { MarketingIcon } from "./marketing-icons";
 
 export interface PricingTier {
+  cta: string;
   featured?: boolean;
   features: string[];
+  href: string;
   name: string;
   price: string;
   sub: string;
@@ -16,44 +18,52 @@ const signUpHref = env.NEXT_PUBLIC_APP_URL
 
 const pricingTiers: PricingTier[] = [
   {
-    name: "Basic",
-    price: "$9/month",
-    sub: "Up to 10 people",
+    name: "Early access",
+    price: "No credit card",
+    sub: "Try leave requests early",
     features: [
-      "Xero Payroll sync",
-      "Single team calendar feed",
-      "30-day history",
+      "Connect Xero Payroll",
+      "Publish team calendar subscriptions",
+      "Share feedback before general release",
     ],
-  },
-  {
-    name: "Premium",
-    price: "$19/month",
-    sub: "Up to 50 people",
-    features: [
-      "Everything in Basic",
-      "Unlimited team calendar feeds",
-      "1-year calendar history",
-    ],
+    cta: "Sign up",
+    href: signUpHref,
     featured: true,
   },
   {
-    name: "Custom",
-    price: "Talk to us",
-    sub: "For 50+ people",
+    name: "Pricing model",
+    price: "Coming soon",
+    sub: "Simple per-employee pricing",
     features: [
-      "Everything in Premium",
-      "Dedicated environment",
-      "Priority support",
+      "Based on active employees synced from Xero",
+      "No setup fee",
+      "AU, NZ and UK Payroll included",
     ],
+    cta: "View pricing notes",
+    href: "/pricing",
+  },
+  {
+    name: "Enterprise",
+    price: "Talk to us",
+    sub: "For larger or multi-organisation teams",
+    features: [
+      "Multiple Xero organisations",
+      "Volume pricing discussion",
+      "Tailored support",
+    ],
+    cta: "Contact us",
+    href: "/contact",
   },
 ];
 
 export const PricingSection = () => (
   <section className="marketing-section marketing-story-panel marketing-story-panel--pricing">
-    <div className="marketing-pricing-heading">
-      <p className="marketing-overline">Pricing</p>
-      <h2>Fair and affordable pricing.</h2>
-    </div>
+    <p className="marketing-overline">Pricing</p>
+    <h2>Pricing is being finalised.</h2>
+    <p className="marketing-pricing-lead">
+      Early access is open while we finish the commercial model. Pricing will be
+      based on active employees synced from Xero Payroll.
+    </p>
     <div className="marketing-pricing-grid">
       {pricingTiers.map((tier) => (
         <article
@@ -65,7 +75,7 @@ export const PricingSection = () => (
           key={tier.name}
         >
           {tier.featured && (
-            <span className="marketing-price-badge">MOST TEAMS</span>
+            <span className="marketing-price-badge">EARLY ACCESS</span>
           )}
           <h3>{tier.name}</h3>
           <p className="marketing-price-card__price">{tier.price}</p>
@@ -73,7 +83,12 @@ export const PricingSection = () => (
           <div className="marketing-price-card__features">
             {tier.features.map((feature) => (
               <div key={feature}>
-                <MarketingIcon id="check" size={18} />
+                <span
+                  aria-hidden="true"
+                  className="marketing-price-card__check"
+                >
+                  <MarketingIcon id="check" size={12} />
+                </span>
                 {feature}
               </div>
             ))}
@@ -84,9 +99,9 @@ export const PricingSection = () => (
                 ? "marketing-btn marketing-btn--primary marketing-price-card__button"
                 : "marketing-btn marketing-btn--outline marketing-price-card__button"
             }
-            href={tier.price === "Talk to us" ? "/contact" : signUpHref}
+            href={tier.href}
           >
-            {tier.price === "Talk to us" ? "Contact sales" : "Start trial"}
+            {tier.cta}
           </Link>
         </article>
       ))}

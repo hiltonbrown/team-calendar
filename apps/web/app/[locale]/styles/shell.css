@@ -47,10 +47,14 @@
 }
 
 .marketing-glass {
-  background: var(--marketing-glass-bg);
-  box-shadow: var(--marketing-shadow-ambient);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+  background: color-mix(
+    in srgb,
+    var(--marketing-surface-lowest) 92%,
+    transparent
+  );
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .marketing-site-header__inner {
@@ -124,7 +128,8 @@
   padding: 24px;
   background: var(--marketing-surface-lowest);
   border-radius: 16px;
-  box-shadow: var(--marketing-shadow-ambient);
+  box-shadow: 0 8px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
 }
 
 .marketing-btn {
@@ -183,25 +188,6 @@
     color-mix(in oklch, var(--marketing-outline-variant) 40%, transparent);
 }
 
-.marketing-btn--green {
-  color: var(--marketing-on-primary);
-  background: var(--marketing-primary);
-}
-
-.marketing-btn--green:hover {
-  background: color-mix(
-    in oklch,
-    var(--marketing-primary) 88%,
-    var(--marketing-inverse-surface)
-  );
-  transform: translateY(-2px);
-}
-
-.marketing-btn--green:active {
-  box-shadow: none;
-  transform: scale(0.97) translateY(0);
-}
-
 .marketing-footer {
   position: relative;
   z-index: 40;
@@ -210,6 +196,10 @@
   color: var(--marketing-inverse-on-surface);
   background: var(--marketing-inverse-surface);
   isolation: isolate;
+}
+
+.fmkt-page ~ .marketing-footer {
+  margin-top: 0;
 }
 
 .marketing-footer__grid {
@@ -305,6 +295,10 @@
 
   .marketing-product-snapshot {
     overflow-x: auto;
+  }
+
+  .marketing-product-snapshot--hero {
+    overflow-x: clip;
   }
 
   .marketing-browser-bar {
