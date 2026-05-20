@@ -1502,6 +1502,37 @@
   margin-top: 40px;
 }
 
+/* ---- Hero stat row ---- */
+
+.fmkt-hero__stat-row {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-top: 40px;
+}
+
+.fmkt-hero__stat {
+  font: 400 0.8125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-hero__stat strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--marketing-inverse-surface);
+  font: 500 1.375rem / 1.2 var(--marketing-font);
+  letter-spacing: -0.01em;
+}
+
+/* ---- Hero visual collage ---- */
+
+.fmkt-hero__visual {
+  position: relative;
+  aspect-ratio: 1.05 / 1;
+  min-height: 460px;
+  align-self: center;
+}
+
 /* ---- Sync Pathway Strip ---- */
 
 .fmkt-pathway {
