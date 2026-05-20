@@ -941,7 +941,8 @@
 }
 
 .marketing-section-intro h2,
-.marketing-pricing-heading h2 {
+.marketing-pricing-heading h2,
+.marketing-story-panel--pricing > h2 {
   margin: 0;
   font: 600 clamp(2.25rem, 4vw, 2.75rem) / 1.15 var(--marketing-font);
   color: var(--marketing-on-surface);
@@ -949,7 +950,8 @@
 }
 
 .marketing-section-intro > p:last-child,
-.marketing-pricing-heading > p:last-child {
+.marketing-pricing-heading > p:last-child,
+.marketing-pricing-lead {
   margin: 16px 0 0;
   font: 400 1.125rem / 1.6 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
@@ -1197,60 +1199,71 @@
 }
 
 .marketing-pricing-heading {
-  max-width: 520px;
+  max-width: 620px;
   margin: 0 0 48px;
   text-align: left;
 }
 
+.marketing-pricing-lead {
+  max-width: 620px;
+}
+
 .marketing-pricing-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.12fr) minmax(0, 0.9fr);
-  gap: 24px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
   align-items: stretch;
+  margin-top: 48px;
 }
 
 .marketing-price-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 32px;
+  padding: 28px;
   color: var(--marketing-on-surface);
   background: var(--marketing-surface-container);
-  border-radius: 16px;
+  border-radius: 20px;
 }
 
 .marketing-price-card--featured {
-  color: var(--marketing-on-secondary-container);
-  background: var(--marketing-secondary-container);
-  transform: translateY(-24px);
+  color: #fff;
+  background: linear-gradient(165deg, #336a3b 0%, #2a5a30 100%);
 }
 
 .marketing-price-card:nth-child(3) {
-  color: var(--marketing-inverse-on-surface);
-  background: var(--marketing-inverse-surface);
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-container);
 }
 
 .marketing-price-badge {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 16px;
+  right: 16px;
   padding: 4px 10px;
-  font: 500 0.75rem / 1.3 var(--marketing-font);
-  color: var(--marketing-inverse-on-surface);
+  font: 500 0.6875rem / 1 var(--marketing-font);
+  color: #fff;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: var(--marketing-inverse-surface);
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.16);
   border-radius: 999px;
 }
 
 .marketing-price-card h3 {
   margin: 0 0 18px;
-  font: 500 1.375rem / 1.35 var(--marketing-font);
+  font: 500 14px / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.marketing-price-card--featured h3 {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .marketing-price-card__price {
-  margin: 0;
-  font: 600 3rem / 1 var(--marketing-font);
+  margin: 4px 0 2px;
+  font: 600 2.25rem / 1.1 var(--marketing-font);
   letter-spacing: -0.02em;
 }
 
@@ -1260,10 +1273,9 @@
   color: var(--marketing-on-surface-variant);
 }
 
-.marketing-price-card--featured .marketing-price-card__sub,
-.marketing-price-card:nth-child(3) .marketing-price-card__sub {
-  color: currentColor;
-  opacity: 0.76;
+.marketing-price-card--featured .marketing-price-card__sub {
+  color: rgba(255, 255, 255, 0.82);
+  opacity: 1;
 }
 
 .marketing-price-card__features {
@@ -1280,17 +1292,30 @@
   font: 400 1rem / 1.6 var(--marketing-font);
 }
 
-.marketing-price-card__features svg {
+.marketing-price-card__check {
+  display: inline-flex;
   flex: 0 0 auto;
-  color: currentColor;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 4px;
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+  border-radius: 9px;
 }
 
-.marketing-price-card--featured .marketing-price-card__features svg {
-  color: var(--marketing-primary);
+.marketing-price-card__check svg {
+  flex: 0 0 auto;
 }
 
-.marketing-price-card:nth-child(3) .marketing-price-card__features svg {
-  color: var(--marketing-primary-container);
+.marketing-price-card--featured .marketing-price-card__features {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.marketing-price-card--featured .marketing-price-card__check {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .marketing-price-card--featured .marketing-btn--primary {
@@ -1306,23 +1331,7 @@
   );
 }
 
-.marketing-price-card:nth-child(3) .marketing-btn--outline {
-  color: var(--marketing-inverse-on-surface);
-  background: color-mix(
-    in srgb,
-    var(--marketing-inverse-on-surface) 10%,
-    transparent
-  );
-  box-shadow: none;
-}
-
-.marketing-price-card:nth-child(3) .marketing-btn--outline:hover {
-  background: color-mix(
-    in srgb,
-    var(--marketing-inverse-on-surface) 16%,
-    transparent
-  );
-}
+/* Third card is now lavender — no special button override needed */
 
 .marketing-price-card__button {
   width: 100%;
@@ -1365,9 +1374,14 @@
 
 .marketing-story-panel--workflow,
 .marketing-story-panel--showcase,
-.marketing-story-panel--features,
-.marketing-story-panel--pricing {
+.marketing-story-panel--features {
   background: var(--marketing-surface-lowest);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.marketing-story-panel--pricing {
+  background: transparent;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
@@ -1746,6 +1760,10 @@
     transform: none;
   }
 
+  .marketing-pricing-grid {
+    margin-top: 40px;
+  }
+
   .marketing-pricing-heading {
     margin-bottom: 40px;
   }
@@ -1846,12 +1864,14 @@
     margin-bottom: 32px;
   }
 
-  .marketing-pricing-heading > p:last-child {
+  .marketing-pricing-heading > p:last-child,
+  .marketing-pricing-lead {
     margin-top: 14px;
   }
 
   .marketing-pricing-grid {
     gap: 20px;
+    margin-top: 32px;
   }
 
   .marketing-price-card {
@@ -1861,10 +1881,6 @@
   .marketing-price-badge {
     top: 18px;
     right: 18px;
-  }
-
-  .marketing-price-card h3 {
-    margin-bottom: 14px;
   }
 
   .marketing-price-card__price {
@@ -1883,6 +1899,10 @@
   .marketing-price-card__features div {
     gap: 10px;
     line-height: 1.55;
+  }
+
+  .marketing-price-card h3 {
+    margin-bottom: 14px;
   }
 
   .marketing-workflow {

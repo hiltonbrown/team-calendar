@@ -281,7 +281,9 @@
 
   .marketing-workflow,
   .marketing-calendar-card,
-  .marketing-pricing-heading {
+  .marketing-story-panel--pricing > .marketing-overline,
+  .marketing-story-panel--pricing > h2,
+  .marketing-pricing-lead {
     animation: reveal-up linear both;
     animation-timeline: view();
     animation-range: entry 0% entry 35%;
@@ -436,7 +438,9 @@
     animation-timeline: --fmkt-slide;
   }
 
-  .marketing-pricing-heading {
+  .marketing-story-panel--pricing > .marketing-overline,
+  .marketing-story-panel--pricing > h2,
+  .marketing-pricing-lead {
     animation: fmkt-section-copy-parallax linear both;
     animation-range: entry 0% exit 64%;
     animation-timeline: --fmkt-slide;
@@ -713,7 +717,9 @@
   .fmkt-how__item,
   .fmkt-benefits__overline,
   .fmkt-benefit,
-  .marketing-pricing-heading,
+  .marketing-story-panel--pricing > .marketing-overline,
+  .marketing-story-panel--pricing > h2,
+  .marketing-pricing-lead,
   .marketing-price-card,
   .fmkt-cta__content,
   .fmkt-cta__panel,
@@ -861,5 +867,31 @@
 
   .marketing-pricing-grid .marketing-price-card:nth-child(3) {
     animation-range: entry 14% entry 54%;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  .fmkt-page > .fmkt-cards-section::after,
+  .fmkt-page > .fmkt-how::after,
+  .fmkt-page > .marketing-story-panel--pricing::after,
+  .fmkt-page > .fmkt-cta::after {
+    content: none;
+    animation: none;
+  }
+
+  .fmkt-page > .fmkt-cards-section .fmkt-section-header,
+  .fmkt-page > .fmkt-cards-section .fmkt-card,
+  .fmkt-page > .fmkt-cards-section .fmkt-card__mock,
+  .fmkt-page > .fmkt-how .fmkt-section-header,
+  .fmkt-page > .fmkt-how .fmkt-how__item,
+  .fmkt-page > .marketing-story-panel--pricing > .marketing-overline,
+  .fmkt-page > .marketing-story-panel--pricing > h2,
+  .fmkt-page > .marketing-story-panel--pricing .marketing-pricing-lead,
+  .fmkt-page > .marketing-story-panel--pricing .marketing-price-card,
+  .fmkt-page > .fmkt-cta .fmkt-cta__content,
+  .fmkt-page > .fmkt-cta .fmkt-cta__panel {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 }

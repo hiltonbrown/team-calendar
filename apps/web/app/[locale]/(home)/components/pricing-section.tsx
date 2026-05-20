@@ -58,14 +58,12 @@ const pricingTiers: PricingTier[] = [
 
 export const PricingSection = () => (
   <section className="marketing-section marketing-story-panel marketing-story-panel--pricing">
-    <div className="marketing-pricing-heading">
-      <p className="marketing-overline">Pricing</p>
-      <h2>Pricing is being finalised.</h2>
-      <p>
-        Early access is open while we finish the commercial model. Pricing will
-        be based on active employees synced from Xero Payroll.
-      </p>
-    </div>
+    <p className="marketing-overline">Pricing</p>
+    <h2>Pricing is being finalised.</h2>
+    <p className="marketing-pricing-lead">
+      Early access is open while we finish the commercial model. Pricing will be
+      based on active employees synced from Xero Payroll.
+    </p>
     <div className="marketing-pricing-grid">
       {pricingTiers.map((tier) => (
         <article
@@ -85,7 +83,12 @@ export const PricingSection = () => (
           <div className="marketing-price-card__features">
             {tier.features.map((feature) => (
               <div key={feature}>
-                <MarketingIcon id="check" size={18} />
+                <span
+                  aria-hidden="true"
+                  className="marketing-price-card__check"
+                >
+                  <MarketingIcon id="check" size={12} />
+                </span>
                 {feature}
               </div>
             ))}

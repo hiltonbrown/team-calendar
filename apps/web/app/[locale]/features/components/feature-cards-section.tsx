@@ -178,6 +178,10 @@ export const FeatureCardsSection = () => (
         <h2 className="fmkt-section-title">
           One simple flow from request to calendar.
         </h2>
+        <p className="fmkt-cards-section__lead">
+          Sage means the record came from Xero. Purple means someone added it
+          manually. The split is scannable at a glance, on every calendar.
+        </p>
       </div>
       <div className="fmkt-card-grid">
         {cards.map((card) => (
