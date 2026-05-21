@@ -4,7 +4,8 @@ import { FeatureCardsSection } from "../features/components/feature-cards-sectio
 import { FinalCtaSection } from "../features/components/final-cta-section";
 import { HeroSection } from "../features/components/hero-section";
 import { HowItWorksSection } from "../features/components/how-it-works-section";
-import { PricingSection } from "./components/pricing-section";
+import { CalendarIntegrationSection } from "./components/calendar-integration-section";
+import { TeamTimelineSection } from "./components/team-timeline-section";
 
 export const metadata: Metadata = createMetadata({
   title: "LeaveSync: Simple leave requests, clear team calendars.",
@@ -16,8 +17,9 @@ const Home = () => (
   <main className="fmkt-page">
     <HeroSection />
     <FeatureCardsSection />
+    <TeamTimelineSection />
+    <CalendarIntegrationSection />
     <HowItWorksSection />
-    <PricingSection />
     <FinalCtaSection />
   </main>
 );

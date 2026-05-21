@@ -1,10 +1,10 @@
 :where(
-    .marketing-home,
-    .marketing-site-header,
-    .marketing-footer,
-    .features-prototype,
-    .fmkt-page
-  ) {
+  .marketing-home,
+  .marketing-site-header,
+  .marketing-footer,
+  .features-prototype,
+  .fmkt-page
+) {
   --marketing-primary: var(--primary);
   --marketing-primary-container: var(--primary-container);
   --marketing-on-primary: var(--primary-foreground);

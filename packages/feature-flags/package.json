@@ -11,18 +11,18 @@
     "@repo/auth": "*",
     "@repo/design-system": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "@vercel/toolbar": "^0.2.2",
+    "@vercel/toolbar": "^0.2.6",
     "flags": "^4.0.6",
-    "react": "19.2.5",
-    "zod": "^4.3.6"
+    "react": "19.2.6",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
-    "next": "16.2.4"
+    "next": "16.2.6"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "25.6.0",
-    "@types/react": "19.2.14",
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",
     "typescript": "^6.0.3"
   }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { env } from "@/env";
 import { MarketingIcon } from "../../(home)/components/marketing-icons";
 
@@ -231,9 +232,8 @@ const HeroVisual = () => (
           </div>
         ))}
         {calendarRows.map((row) => (
-          <>
+          <Fragment key={row.who}>
             <div
-              key={`${row.who}-label`}
               style={{
                 font: "400 11px/1 var(--marketing-font)",
                 color: "var(--marketing-inverse-surface)",
@@ -244,7 +244,6 @@ const HeroVisual = () => (
               {row.who}
             </div>
             <div
-              key={`${row.who}-bar`}
               style={{
                 gridColumn: "2 / span 5",
                 position: "relative",
@@ -264,7 +263,7 @@ const HeroVisual = () => (
                 }}
               />
             </div>
-          </>
+          </Fragment>
         ))}
       </div>
     </div>

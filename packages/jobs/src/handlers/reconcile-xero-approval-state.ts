@@ -15,6 +15,7 @@ import {
   type XeroLeaveApplicationStatus,
   type XeroWriteError,
 } from "@repo/xero";
+import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
 
@@ -82,22 +83,23 @@ interface ReconciliationRecord {
   source_remote_id: string | null;
 }
 
-export const reconcileXeroApprovalStateFunction = inngest.createFunction(
-  {
-    cancelOn: [
-      {
-        event: "cancel-sync-run",
-        if: "async.data.runId == event.data.runId",
-      },
-    ],
-    id: "reconcile-xero-approval-state",
-    triggers: { event: "reconcile-xero-approval-state" },
-  },
-  async ({ event, step }) =>
-    await step.run("reconcile-approval-state", async () =>
-      reconcileXeroApprovalState(event.data)
-    )
-);
+export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
+  inngest.createFunction(
+    {
+      cancelOn: [
+        {
+          event: "cancel-sync-run",
+          if: "async.data.runId == event.data.runId",
+        },
+      ],
+      id: "reconcile-xero-approval-state",
+      triggers: { event: "reconcile-xero-approval-state" },
+    },
+    async ({ event, step }) =>
+      await step.run("reconcile-approval-state", async () =>
+        reconcileXeroApprovalState(event.data)
+      )
+  );
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, batching, per-record outcomes and finalisation.
 export async function reconcileXeroApprovalState(input: unknown): Promise<

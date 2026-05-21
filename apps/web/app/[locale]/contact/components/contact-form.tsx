@@ -79,7 +79,7 @@ export const ContactForm = ({ dictionary }: ContactFormProps) => {
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
                     <Calendar
-                      initialFocus
+                      autoFocus
                       mode="single"
                       onSelect={setDate}
                       selected={date}

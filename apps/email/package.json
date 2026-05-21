@@ -12,15 +12,17 @@
   "dependencies": {
     "@react-email/components": "1.0.12",
     "@react-email/preview-server": "5.2.10",
+    "@react-email/render": "^2.0.8",
+    "@react-email/ui": "^6.1.5",
     "@repo/email": "*",
-    "react": "19.2.5",
-    "react-email": "6.0.5"
+    "react": "19.2.6",
+    "react-email": "6.1.5"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "25.6.0",
-    "@types/react": "19.2.14",
-    "next": "16.2.4",
+    "@types/node": "25.9.1",
+    "@types/react": "19.2.15",
+    "next": "16.2.6",
     "typescript": "^6.0.3"
   }
 }
