@@ -52,7 +52,7 @@ interface SelectedState {
 const WEEKS: Week[] = [
   {
     id: "w-last",
-    label: "Mon 11 to Fri 15 May",
+    label: "Mon 11 to Sun 17 May",
     sub: "Last week",
     days: [
       { dow: "Mon", num: 11, monthName: "May" },
@@ -60,12 +60,14 @@ const WEEKS: Week[] = [
       { dow: "Wed", num: 13, monthName: "May" },
       { dow: "Thu", num: 14, monthName: "May" },
       { dow: "Fri", num: 15, monthName: "May" },
+      { dow: "Sat", num: 16, monthName: "May" },
+      { dow: "Sun", num: 17, monthName: "May" },
     ],
     todayIdx: -1,
   },
   {
     id: "w-this",
-    label: "Mon 18 to Fri 22 May",
+    label: "Mon 18 to Sun 24 May",
     sub: "This week",
     days: [
       { dow: "Mon", num: 18, monthName: "May" },
@@ -73,12 +75,14 @@ const WEEKS: Week[] = [
       { dow: "Wed", num: 20, monthName: "May" },
       { dow: "Thu", num: 21, monthName: "May" },
       { dow: "Fri", num: 22, monthName: "May" },
+      { dow: "Sat", num: 23, monthName: "May" },
+      { dow: "Sun", num: 24, monthName: "May" },
     ],
     todayIdx: 3,
   },
   {
     id: "w-next",
-    label: "Mon 25 to Fri 29 May",
+    label: "Mon 25 to Sun 31 May",
     sub: "Next week",
     days: [
       { dow: "Mon", num: 25, monthName: "May" },
@@ -86,6 +90,8 @@ const WEEKS: Week[] = [
       { dow: "Wed", num: 27, monthName: "May" },
       { dow: "Thu", num: 28, monthName: "May" },
       { dow: "Fri", num: 29, monthName: "May" },
+      { dow: "Sat", num: 30, monthName: "May" },
+      { dow: "Sun", num: 31, monthName: "May" },
     ],
     todayIdx: -1,
   },
@@ -94,7 +100,7 @@ const WEEKS: Week[] = [
 const STAFF: Staff[] = [
   { id: "sm", name: "Sarah Mitchell", role: "HR lead", initials: "SM" },
   { id: "dc", name: "Daniel Chen", role: "Engineering", initials: "DC" },
-  { id: "pn", name: "Priya Naidu", role: "Sales", initials: "PN" },
+  { id: "pn", name: "Patrick Nolan", role: "Sales", initials: "PN" },
   { id: "jo", name: "James O'Connor", role: "Operations", initials: "JO" },
   { id: "mt", name: "Mia Tanaka", role: "Design", initials: "MT" },
   { id: "rp", name: "Ruben Park", role: "Support", initials: "RP" },
@@ -393,7 +399,7 @@ export const TeamTimelineSection = () => {
     const mondayNextWeek = addWeeks(mondayThisWeek, 1);
 
     const getWeekDays = (monday: Date) =>
-      [0, 1, 2, 3, 4].map((offset) => {
+      [0, 1, 2, 3, 4, 5, 6].map((offset) => {
         const date = addDays(monday, offset);
         return {
           date,
@@ -409,11 +415,11 @@ export const TeamTimelineSection = () => {
 
     const getWeekLabel = (days: ReturnType<typeof getWeekDays>) => {
       const mon = days[0];
-      const fri = days[4];
-      if (mon.monthName === fri.monthName) {
-        return `Mon ${mon.num} to Fri ${fri.num} ${mon.monthName}`;
+      const sun = days[6];
+      if (mon.monthName === sun.monthName) {
+        return `Mon ${mon.num} to Sun ${sun.num} ${mon.monthName}`;
       }
-      return `Mon ${mon.num} ${mon.monthName} to Fri ${fri.num} ${fri.monthName}`;
+      return `Mon ${mon.num} ${mon.monthName} to Sun ${sun.num} ${sun.monthName}`;
     };
 
     const updatedWeeks: Week[] = [
@@ -473,8 +479,8 @@ export const TeamTimelineSection = () => {
     [selected, week.id]
   );
 
-  // Today tint position (as 0..5 left offset)
-  const todayLeftPct = week.todayIdx >= 0 ? (week.todayIdx / 5) * 100 : null;
+  // Today tint position (as 0..7 left offset)
+  const todayLeftPct = week.todayIdx >= 0 ? (week.todayIdx / 7) * 100 : null;
 
   return (
     <section className="fmkt-timeline" id="team-timeline">
@@ -586,12 +592,16 @@ export const TeamTimelineSection = () => {
             <div className="tl-corner" role="columnheader">
               Team
             </div>
-            <div className="tl-days-header" role="row">
+            <div
+              className="tl-days-header"
+              role="row"
+              style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+            >
               {todayLeftPct !== null && (
                 <span
                   aria-hidden="true"
                   className="tl-today-tint tl-today-tint--header"
-                  style={{ left: `${todayLeftPct}%` }}
+                  style={{ left: `${todayLeftPct}%`, width: "calc(100% / 7)" }}
                 />
               )}
               {week.days.map((d, i) => (
@@ -622,20 +632,27 @@ export const TeamTimelineSection = () => {
                     <div className="tl-staff-role">{staff.role}</div>
                   </div>
                 </div>
-                <div className="tl-row-track" role="row">
+                <div
+                  className="tl-row-track"
+                  role="row"
+                  style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+                >
                   {todayLeftPct !== null && (
                     <span
                       aria-hidden="true"
                       className="tl-today-tint"
-                      style={{ left: `${todayLeftPct}%` }}
+                      style={{
+                        left: `${todayLeftPct}%`,
+                        width: "calc(100% / 7)",
+                      }}
                     />
                   )}
-                  {[1, 2, 3, 4].map((i) => (
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
                     <span
                       aria-hidden="true"
                       className="tl-day-guide"
                       key={i}
-                      style={{ left: `${i * 20}%` }}
+                      style={{ left: `${(i / 7) * 100}%` }}
                     />
                   ))}
                   {(entries[staff.id] || []).map((entry) => (

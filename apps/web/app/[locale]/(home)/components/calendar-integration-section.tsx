@@ -1,5 +1,6 @@
 "use client";
 
+import { addDays, format, isToday, startOfWeek } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { MarketingIcon } from "./marketing-icons";
 
@@ -22,6 +23,7 @@ interface DayData {
   dow: string;
   events: EventItem[];
   meetings: number;
+  monthName?: string;
   num: number;
   today: boolean;
 }
@@ -57,6 +59,7 @@ const DAYS: DayData[] = [
   {
     dow: "Mon",
     num: 18,
+    monthName: "May",
     today: false,
     meetings: 2,
     events: [
@@ -64,7 +67,7 @@ const DAYS: DayData[] = [
       {
         tone: "purple",
         icon: "briefcase",
-        title: "Priya · Client visit",
+        title: "Patrick · Client visit",
         sub: "Sydney",
       },
       { tone: "purple", icon: "home", title: "Sarah · Working from home" },
@@ -74,6 +77,7 @@ const DAYS: DayData[] = [
   {
     dow: "Tue",
     num: 19,
+    monthName: "May",
     today: false,
     meetings: 3,
     events: [
@@ -81,7 +85,7 @@ const DAYS: DayData[] = [
       {
         tone: "purple",
         icon: "briefcase",
-        title: "Priya · Client visit",
+        title: "Patrick · Client visit",
         sub: "Sydney",
       },
       { tone: "purple", icon: "home", title: "Sarah · Working from home" },
@@ -91,6 +95,7 @@ const DAYS: DayData[] = [
   {
     dow: "Wed",
     num: 20,
+    monthName: "May",
     today: false,
     meetings: 2,
     events: [
@@ -108,6 +113,7 @@ const DAYS: DayData[] = [
   {
     dow: "Thu",
     num: 21,
+    monthName: "May",
     today: true,
     meetings: 1,
     events: [
@@ -125,6 +131,7 @@ const DAYS: DayData[] = [
   {
     dow: "Fri",
     num: 22,
+    monthName: "May",
     today: false,
     meetings: 2,
     events: [
@@ -134,9 +141,26 @@ const DAYS: DayData[] = [
       { tone: "purple", icon: "home", title: "Mia · Working from home" },
     ],
   },
+  {
+    dow: "Sat",
+    num: 23,
+    monthName: "May",
+    today: false,
+    meetings: 0,
+    events: [],
+  },
+  {
+    dow: "Sun",
+    num: 24,
+    monthName: "May",
+    today: false,
+    meetings: 0,
+    events: [],
+  },
 ];
 
 export const CalendarIntegrationSection = () => {
+  const [days, setDays] = useState<DayData[]>(DAYS);
   const [activeId, setActiveId] = useState<string>("outlook");
   const [copied, setCopied] = useState<boolean>(false);
 
@@ -166,6 +190,32 @@ export const CalendarIntegrationSection = () => {
     const t = setTimeout(() => setCopied(false), 1800);
     return () => clearTimeout(t);
   }, [copied]);
+
+  useEffect(() => {
+    const today = new Date();
+    const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+
+    const updatedDays = DAYS.map((d, index) => {
+      const date = addDays(mondayThisWeek, index);
+      return {
+        ...d,
+        num: date.getDate(),
+        monthName: format(date, "MMM"),
+        today: isToday(date),
+      };
+    });
+
+    setDays(updatedDays);
+  }, []);
+
+  const mon = days[0];
+  const sun = days[6];
+  const dateRangeLabel =
+    mon && sun
+      ? mon.monthName === sun.monthName
+        ? `${mon.num} to ${sun.num} ${mon.monthName}`
+        : `${mon.num} ${mon.monthName} to ${sun.num} ${sun.monthName}`
+      : "18 to 24 May";
 
   return (
     <section className="fmkt-integration" id="calendar-integrations">
@@ -222,11 +272,12 @@ export const CalendarIntegrationSection = () => {
           </div>
 
           <div
-            aria-label={`Week 18 to 22 May in ${active.name}`}
+            aria-label={`Week ${dateRangeLabel} in ${active.name}`}
             className="ci-week"
             role="grid"
+            style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
           >
-            {DAYS.map((d) => (
+            {days.map((d) => (
               <div
                 className={`ci-day${d.today ? "ci-day--today" : ""}`}
                 key={d.dow}
