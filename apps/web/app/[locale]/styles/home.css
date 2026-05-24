@@ -2737,6 +2737,39 @@
   color: var(--on-surface-variant);
 }
 
+/* Card-nested instructions */
+.ci-card__instruction {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding: 14px 24px;
+  background: var(--surface-container-lowest);
+  border-top: 1px solid
+    color-mix(in srgb, var(--outline-variant) 10%, transparent);
+}
+.ci-instruction__label {
+  font: 500 11px / 1.3 var(--font-sans);
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+.ci-instruction__copy {
+  font: 400 13px / 1.5 var(--font-sans);
+  color: var(--on-surface-variant);
+}
+
+/* Focus visible styles for accessibility */
+.ci-tab:focus-visible,
+.ci-copy-btn:focus-visible,
+.tl-nav-btn:focus-visible,
+.tl-today-btn:focus-visible,
+.tl-detail-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .ci-week {
@@ -2764,5 +2797,9 @@
   }
   .ci-hint {
     grid-template-columns: 1fr;
+  }
+  .ci-card__instruction {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 }

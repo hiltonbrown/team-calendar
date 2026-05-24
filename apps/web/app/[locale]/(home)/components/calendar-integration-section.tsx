@@ -158,15 +158,16 @@ const DAYS: DayData[] = [
     events: [],
   },
 ];
+const feedUrl =
+  "https://leavesync.app/feeds/teams/8a3f4d2c-9b71-44e2/team-availability.ics";
 
 export const CalendarIntegrationSection = () => {
   const [days, setDays] = useState<DayData[]>(DAYS);
   const [activeId, setActiveId] = useState<string>("outlook");
   const [copied, setCopied] = useState<boolean>(false);
+  const [mounted, setMounted] = useState(false);
 
   const active = DESTINATIONS.find((d) => d.id === activeId) ?? DESTINATIONS[0];
-  const feedUrl =
-    "https://leavesync.app/feeds/teams/8a3f4d2c-9b71-44e2/team-availability.ics";
 
   const handleCopy = useCallback(async () => {
     try {
@@ -177,11 +178,11 @@ export const CalendarIntegrationSection = () => {
       ) {
         await navigator.clipboard.writeText(feedUrl);
       }
-    } catch (e) {
+    } catch {
       // Clipboard may be unavailable in some environments, that is ok
     }
     setCopied(true);
-  }, [feedUrl]);
+  }, []);
 
   useEffect(() => {
     if (!copied) {
@@ -192,6 +193,7 @@ export const CalendarIntegrationSection = () => {
   }, [copied]);
 
   useEffect(() => {
+    setMounted(true);
     const today = new Date();
     const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
 
@@ -208,14 +210,177 @@ export const CalendarIntegrationSection = () => {
     setDays(updatedDays);
   }, []);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextIndex = (index + 1) % DESTINATIONS.length;
+        const nextDest = DESTINATIONS[nextIndex];
+        if (nextDest) {
+          setActiveId(nextDest.id);
+          const buttons =
+            document.querySelectorAll<HTMLButtonElement>(".ci-tabs .ci-tab");
+          buttons[nextIndex]?.focus();
+        }
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const prevIndex =
+          (index - 1 + DESTINATIONS.length) % DESTINATIONS.length;
+        const prevDest = DESTINATIONS[prevIndex];
+        if (prevDest) {
+          setActiveId(prevDest.id);
+          const buttons =
+            document.querySelectorAll<HTMLButtonElement>(".ci-tabs .ci-tab");
+          buttons[prevIndex]?.focus();
+        }
+      }
+    },
+    []
+  );
+
   const mon = days[0];
   const sun = days[6];
-  const dateRangeLabel =
-    mon && sun
-      ? mon.monthName === sun.monthName
-        ? `${mon.num} to ${sun.num} ${mon.monthName}`
-        : `${mon.num} ${mon.monthName} to ${sun.num} ${sun.monthName}`
-      : "18 to 24 May";
+  let dateRangeLabel = "18 to 24 May";
+  if (mon && sun) {
+    if (mon.monthName === sun.monthName) {
+      dateRangeLabel = `${mon.num} to ${sun.num} ${mon.monthName}`;
+    } else {
+      dateRangeLabel = `${mon.num} ${mon.monthName} to ${sun.num} ${sun.monthName}`;
+    }
+  }
+
+  if (!mounted) {
+    return (
+      <section className="fmkt-integration" id="calendar-integrations">
+        <div className="fmkt-container">
+          <p className="fmkt-overline">Calendar subscriptions</p>
+          <h2 className="fmkt-section-title">
+            The same feed, inside the calendar app your team already uses.
+          </h2>
+          <p className="fmkt-timeline__lead">
+            Approved leave from Xero and manual entries publish to a single
+            secure feed. Subscribe once in Outlook, Google Calendar or Apple
+            Calendar. Every change re-flows on the next refresh, with nothing to
+            install.
+          </p>
+
+          <div
+            aria-label="Calendar destination"
+            className="ci-tabs"
+            role="tablist"
+          >
+            {DESTINATIONS.map((d) => (
+              <button
+                className={`ci-tab ${activeId === d.id ? "is-active" : ""}`}
+                disabled
+                key={d.id}
+                type="button"
+              >
+                <MarketingIcon id={d.iconId} size={16} />
+                {d.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="ci-card ci-card--skeleton">
+            <div className="ci-card__head">
+              <div className="ci-card__head-l">
+                <div
+                  aria-hidden="true"
+                  className="ci-card__head-icon"
+                  style={{ background: "var(--surface-container-high)" }}
+                />
+                <div>
+                  <div
+                    style={{
+                      width: 150,
+                      height: 14,
+                      background: "var(--surface-container-high)",
+                      borderRadius: 4,
+                      animation: "pulse 1.5s infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 100,
+                      height: 10,
+                      background: "var(--surface-container-high)",
+                      borderRadius: 4,
+                      marginTop: 6,
+                      animation: "pulse 1.5s infinite",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div
+              className="ci-week"
+              style={{ gridTemplateColumns: "repeat(7, 1fr)", opacity: 0.5 }}
+            >
+              {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                <div className="ci-day" key={i}>
+                  <div className="ci-day__head">
+                    <span
+                      style={{
+                        width: 25,
+                        height: 10,
+                        background: "var(--surface-container-high)",
+                        borderRadius: 2,
+                        display: "inline-block",
+                        animation: "pulse 1.5s infinite",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="ci-card__foot">
+              <div
+                aria-hidden="true"
+                className="ci-foot-icon"
+                style={{ background: "var(--surface-container-high)" }}
+              />
+              <div className="ci-feed">
+                <div
+                  style={{
+                    width: 120,
+                    height: 10,
+                    background: "var(--surface-container-high)",
+                    borderRadius: 2,
+                    animation: "pulse 1.5s infinite",
+                  }}
+                />
+                <div
+                  style={{
+                    width: 240,
+                    height: 12,
+                    background: "var(--surface-container-high)",
+                    borderRadius: 2,
+                    marginTop: 6,
+                    animation: "pulse 1.5s infinite",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="ci-card__instruction" style={{ opacity: 0.6 }}>
+              <span className="ci-instruction__label">
+                To subscribe in {active.name}:
+              </span>
+              <div
+                style={{
+                  width: 220,
+                  height: 12,
+                  background: "var(--surface-container-high)",
+                  borderRadius: 4,
+                  animation: "pulse 1.5s infinite",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="fmkt-integration" id="calendar-integrations">
@@ -235,12 +400,13 @@ export const CalendarIntegrationSection = () => {
           className="ci-tabs"
           role="tablist"
         >
-          {DESTINATIONS.map((d) => (
+          {DESTINATIONS.map((d, index) => (
             <button
               aria-selected={activeId === d.id}
-              className={`ci-tab${activeId === d.id ? "is-active" : ""}`}
+              className={`ci-tab ${activeId === d.id ? "is-active" : ""}`}
               key={d.id}
               onClick={() => setActiveId(d.id)}
+              onKeyDown={(e) => handleKeyDown(e, index)}
               role="tab"
               type="button"
             >
@@ -271,6 +437,7 @@ export const CalendarIntegrationSection = () => {
             </div>
           </div>
 
+          {/* biome-ignore lint/a11y/useSemanticElements: custom grid used for calendar view */}
           <div
             aria-label={`Week ${dateRangeLabel} in ${active.name}`}
             className="ci-week"
@@ -278,8 +445,11 @@ export const CalendarIntegrationSection = () => {
             style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
           >
             {days.map((d) => (
+              /* biome-ignore lint/a11y/useFocusableInteractive: day cell is non-interactive container */
+              /* biome-ignore lint/a11y/useSemanticElements: day cells use gridcell role in layout */
               <div
-                className={`ci-day${d.today ? "ci-day--today" : ""}`}
+                /* biome-ignore lint/nursery/useSortedClasses: ignore dynamic class order check */
+                className={`ci-day${d.today ? " ci-day--today" : ""}`}
                 key={d.dow}
                 role="gridcell"
               >
@@ -289,23 +459,26 @@ export const CalendarIntegrationSection = () => {
                   {d.today && <span className="ci-day__today-pill">Today</span>}
                 </div>
                 <div className="ci-day__events">
-                  {d.events.map((e, i) => (
-                    <div
-                      className={`ci-event ci-event--${e.tone}`}
-                      key={i}
-                      title={e.title + (e.sub ? " - " + e.sub : "")}
-                    >
-                      <span aria-hidden="true" className="ci-event__icon">
-                        <MarketingIcon id={e.icon} size={12} />
-                      </span>
-                      <span className="ci-event__label">
-                        {e.title}
-                        {e.sub && (
-                          <span className="ci-event__sub"> · {e.sub}</span>
-                        )}
-                      </span>
-                    </div>
-                  ))}
+                  {d.events.map((e, i) => {
+                    return (
+                      <div
+                        className={`ci-event ci-event--${e.tone}`}
+                        /* biome-ignore lint/suspicious/noArrayIndexKey: order of events is static */
+                        key={i}
+                        title={e.sub ? `${e.title} - ${e.sub}` : e.title}
+                      >
+                        <span aria-hidden="true" className="ci-event__icon">
+                          <MarketingIcon id={e.icon} size={12} />
+                        </span>
+                        <span className="ci-event__label">
+                          {e.title}
+                          {e.sub && (
+                            <span className="ci-event__sub"> · {e.sub}</span>
+                          )}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
                 <div className="ci-day__more">
                   + {d.meetings} meeting{d.meetings === 1 ? "" : "s"} on this
@@ -335,11 +508,14 @@ export const CalendarIntegrationSection = () => {
               {copied ? "Copied" : "Copy URL"}
             </button>
           </div>
-        </div>
 
-        <div className="ci-hint">
-          <span className="ci-hint__label">To subscribe in {active.name}</span>
-          <span className="ci-hint__copy">{active.steps}</span>
+          {/* Colocated subscription instructions inside the card */}
+          <div className="ci-card__instruction">
+            <span className="ci-instruction__label">
+              To subscribe in {active.name}:
+            </span>
+            <span className="ci-instruction__copy">{active.steps}</span>
+          </div>
         </div>
       </div>
     </section>

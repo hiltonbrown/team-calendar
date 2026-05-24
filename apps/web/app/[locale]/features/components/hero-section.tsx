@@ -37,39 +37,11 @@ const calendarRows = [
 const HeroVisual = () => (
   <div aria-hidden="true" className="fmkt-hero__visual">
     {/* Sage radial glow */}
-    <div
-      style={{
-        position: "absolute",
-        inset: "-20px -40px 40px 40px",
-        background:
-          "radial-gradient(60% 70% at 40% 50%, rgba(109,166,113,0.18), transparent 70%)",
-      }}
-    />
+    <div className="fmkt-hero__glow" />
 
     {/* Card 1: leave form, back left */}
-    <div
-      style={{
-        position: "absolute",
-        top: "8%",
-        left: 0,
-        width: "60%",
-        background: "var(--marketing-surface-lowest)",
-        borderRadius: 16,
-        padding: 18,
-        boxShadow: "0 8px 24px rgba(53,51,64,0.06)",
-        transform: "rotate(-2deg)",
-      }}
-    >
-      <div
-        style={{
-          font: "500 11px/1.3 var(--marketing-font)",
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-          color: "var(--marketing-on-surface-variant)",
-        }}
-      >
-        New leave request
-      </div>
+    <div className="fmkt-hero__card fmkt-hero__card--request">
+      <div className="fmkt-hero__card-title">New leave request</div>
       {(
         [
           ["Type", "Annual leave"],
@@ -77,69 +49,18 @@ const HeroVisual = () => (
           ["Days", "5 days"],
         ] as [string, string][]
       ).map(([k, v]) => (
-        <div
-          key={k}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "8px 0",
-            borderTop:
-              "1px solid color-mix(in srgb, var(--border) 12%, transparent)",
-            marginTop: 8,
-          }}
-        >
-          <span
-            style={{
-              font: "400 12px/1.4 var(--marketing-font)",
-              color: "var(--marketing-on-surface-variant)",
-            }}
-          >
-            {k}
-          </span>
-          <span
-            style={{
-              font: "500 13px/1.4 var(--marketing-font)",
-              color: "var(--marketing-inverse-surface)",
-            }}
-          >
-            {v}
-          </span>
+        <div className="fmkt-hero__card-row" key={k}>
+          <span className="fmkt-hero__card-label">{k}</span>
+          <span className="fmkt-hero__card-value">{v}</span>
         </div>
       ))}
-      <div
-        style={{
-          marginTop: 12,
-          padding: "10px 12px",
-          background: "var(--marketing-secondary-container)",
-          color: "var(--marketing-on-secondary-container)",
-          borderRadius: 12,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
-        <span
-          style={{
-            width: 18,
-            height: 18,
-            borderRadius: 9,
-            background: "rgba(42,61,36,0.15)",
-            display: "grid",
-            placeItems: "center",
-          }}
-        >
+      <div className="fmkt-hero__status-banner">
+        <span className="fmkt-hero__status-icon-wrapper">
           <MarketingIcon id="check" size={12} />
         </span>
         <div>
-          <div style={{ font: "500 12px/1.2 var(--marketing-font)" }}>
-            Submitted to manager
-          </div>
-          <div
-            style={{
-              font: "400 11px/1.3 var(--marketing-font)",
-              opacity: 0.8,
-            }}
-          >
+          <div className="fmkt-hero__status-text">Submitted to manager</div>
+          <div className="fmkt-hero__status-subtext">
             Sam Aboud · today, 9:14 am
           </div>
         </div>
@@ -147,70 +68,18 @@ const HeroVisual = () => (
     </div>
 
     {/* Card 2: team calendar, front right */}
-    <div
-      style={{
-        position: "absolute",
-        top: "30%",
-        right: 0,
-        width: "70%",
-        background: "var(--marketing-surface-lowest)",
-        borderRadius: 16,
-        padding: 18,
-        boxShadow:
-          "0 24px 48px rgba(53,51,64,0.08), 0 4px 12px rgba(53,51,64,0.04)",
-        transform: "rotate(2deg)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 14,
-        }}
-      >
+    <div className="fmkt-hero__card fmkt-hero__card--calendar">
+      <div className="fmkt-hero__calendar-header">
         <div>
-          <div
-            style={{
-              font: "500 11px/1.3 var(--marketing-font)",
-              letterSpacing: "0.05em",
-              textTransform: "uppercase",
-              color: "var(--marketing-on-surface-variant)",
-            }}
-          >
-            Team · Operations
-          </div>
-          <div
-            style={{ font: "500 16px/1.3 var(--marketing-font)", marginTop: 2 }}
-          >
-            Mon 12 to Fri 16 May
-          </div>
+          <div className="fmkt-hero__card-title">Team · Operations</div>
+          <div className="fmkt-hero__calendar-title">Mon 12 to Fri 16 May</div>
         </div>
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "3px 8px",
-            borderRadius: 9999,
-            background: "var(--marketing-secondary-container)",
-            color: "var(--marketing-on-secondary-container)",
-            font: "500 10px/1.2 var(--marketing-font)",
-            letterSpacing: "0.04em",
-            textTransform: "uppercase",
-          }}
-        >
+        <span className="fmkt-hero__badge">
           <MarketingIcon id="leaf" size={10} /> Xero
         </span>
       </div>
       {/* Week grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "60px repeat(5, 1fr)",
-          gap: 6,
-        }}
-      >
+      <div className="fmkt-hero__calendar-grid">
         {[
           { id: "name-col", label: "", align: "left" as const },
           { id: "mon", label: "M", align: "center" as const },
@@ -220,45 +89,22 @@ const HeroVisual = () => (
           { id: "fri", label: "F", align: "center" as const },
         ].map((col) => (
           <div
+            className={`fmkt-hero__calendar-dayhead fmkt-hero__calendar-dayhead--${col.align}`}
             key={col.id}
-            style={{
-              font: "500 10px/1 var(--marketing-font)",
-              color: "var(--marketing-on-surface-variant)",
-              textAlign: col.align,
-              padding: "0 0 6px",
-            }}
           >
             {col.label}
           </div>
         ))}
         {calendarRows.map((row) => (
           <Fragment key={row.who}>
-            <div
-              style={{
-                font: "400 11px/1 var(--marketing-font)",
-                color: "var(--marketing-inverse-surface)",
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              {row.who}
-            </div>
-            <div
-              style={{
-                gridColumn: "2 / span 5",
-                position: "relative",
-                height: 18,
-              }}
-            >
+            <div className="fmkt-hero__calendar-row-name">{row.who}</div>
+            <div className="fmkt-hero__calendar-bar-cell">
               <div
+                className="fmkt-hero__calendar-bar"
                 style={{
-                  position: "absolute",
-                  top: 0,
-                  bottom: 0,
                   left: `${(row.span[0] / 5) * 100}%`,
                   width: `${((row.span[1] - row.span[0]) / 5) * 100}%`,
                   background: row.bg,
-                  borderRadius: 4,
                   boxShadow: `inset 2px 0 0 ${row.fg}`,
                 }}
               />
@@ -269,31 +115,9 @@ const HeroVisual = () => (
     </div>
 
     {/* Card 3: calendar subscription chips, bottom left */}
-    <div
-      style={{
-        position: "absolute",
-        bottom: 0,
-        left: "10%",
-        width: "55%",
-        background: "var(--marketing-surface-lowest)",
-        borderRadius: 16,
-        padding: 16,
-        boxShadow: "0 8px 24px rgba(53,51,64,0.06)",
-        transform: "rotate(-1deg)",
-      }}
-    >
-      <div
-        style={{
-          font: "500 11px/1.3 var(--marketing-font)",
-          letterSpacing: "0.05em",
-          textTransform: "uppercase",
-          color: "var(--marketing-on-surface-variant)",
-          marginBottom: 10,
-        }}
-      >
-        Published to
-      </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div className="fmkt-hero__card fmkt-hero__card--subscriptions">
+      <div className="fmkt-hero__subs-title">Published to</div>
+      <div className="fmkt-hero__subs-list">
         {(
           [
             ["outlook", "Outlook"],
@@ -301,19 +125,7 @@ const HeroVisual = () => (
             ["applecal", "Apple Calendar"],
           ] as [string, string][]
         ).map(([id, name]) => (
-          <span
-            key={id}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "6px 10px",
-              background: "var(--marketing-surface-high)",
-              borderRadius: 10,
-              font: "500 12px/1.3 var(--marketing-font)",
-              color: "var(--marketing-inverse-surface)",
-            }}
-          >
+          <span className="fmkt-hero__sub-chip" key={id}>
             <MarketingIcon
               id={id as Parameters<typeof MarketingIcon>[0]["id"]}
               size={14}
@@ -355,7 +167,8 @@ export const HeroSection = () => (
         </div>
         <div className="fmkt-hero__stat-row">
           <div className="fmkt-hero__stat">
-            <strong>A better Team calendar</strong>AU, NZ and UK Xero Payroll
+            <strong>A better Team calendar</strong>
+            <span>AU, NZ and UK Xero Payroll</span>
           </div>
         </div>
       </div>

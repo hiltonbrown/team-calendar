@@ -8,8 +8,7 @@ import {
   startOfWeek,
   subWeeks,
 } from "date-fns";
-import * as React from "react";
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { MarketingIcon } from "./marketing-icons";
 
 interface Day {
@@ -280,17 +279,46 @@ const Block = ({ entry, staff, week, isSelected, onSelect }: BlockProps) => {
   }
   const ariaLabel =
     `${staff.name}: ${kind.label}, ${startLabel.dow} ${startLabel.num} ${
-      entry.span > 1 ? "to " + endLabel.dow + " " + endLabel.num : ""
+      entry.span > 1 ? `to ${endLabel.dow} ${endLabel.num}` : ""
     }`.trim();
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    const blocks = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".tl-block")
+    );
+    const currentIndex = blocks.indexOf(e.currentTarget);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      const nextBlock = blocks[currentIndex + 1];
+      nextBlock?.focus();
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      const prevBlock = blocks[currentIndex - 1];
+      prevBlock?.focus();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextBlock = blocks[currentIndex + 1] || blocks[0];
+      nextBlock?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevBlock = blocks[currentIndex - 1] || blocks.at(-1);
+      prevBlock?.focus();
+    }
+  };
 
   return (
     <button
       aria-label={ariaLabel}
       aria-pressed={isSelected}
-      className={`tl-block tl-block--${kind.tone}${
+      className={`tl-block tl-block--${kind.tone} ${
         isSelected ? "is-selected" : ""
       }`}
       onClick={() => onSelect({ entry, staff, week })}
+      onKeyDown={handleKeyDown}
       style={{ gridColumn: `${entry.start} / span ${entry.span}` }}
       type="button"
     >
@@ -391,8 +419,10 @@ export const TeamTimelineSection = () => {
   const [weeks, setWeeks] = useState<Week[]>(WEEKS);
   const [weekIdx, setWeekIdx] = useState(1); // current week (This week)
   const [selected, setSelected] = useState<SelectedState | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const today = new Date();
     const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
     const mondayLastWeek = subWeeks(mondayThisWeek, 1);
@@ -450,10 +480,6 @@ export const TeamTimelineSection = () => {
   }, []);
 
   const week = weeks[weekIdx];
-  if (!week) {
-    return null;
-  }
-  const entries = ENTRIES[week.id] || {};
 
   const handlePrev = useCallback(() => {
     setWeekIdx((i) => Math.max(0, i - 1));
@@ -478,6 +504,133 @@ export const TeamTimelineSection = () => {
       selected.week.id === week.id,
     [selected, week.id]
   );
+
+  if (!(mounted && week)) {
+    return (
+      <section className="fmkt-timeline" id="team-timeline">
+        <div className="fmkt-container">
+          <p className="fmkt-overline">Team availability, live</p>
+          <h2 className="fmkt-section-title">
+            See who is in, who is out and where they are.
+          </h2>
+          <p className="fmkt-timeline__lead">
+            Sage entries arrive from Xero Payroll the moment they are approved.
+            Purple entries are manual: working from home, client site, training.
+            Click any block for details.
+          </p>
+
+          <div className="tl-card tl-card--skeleton">
+            <div className="tl-toolbar" style={{ opacity: 0.6 }}>
+              <div className="tl-week-nav">
+                <button className="tl-nav-btn" disabled type="button">
+                  <svg
+                    aria-hidden="true"
+                    fill="none"
+                    height="16"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    viewBox="0 0 24 24"
+                    width="16"
+                  >
+                    <path d="M15 18l-6-6 6-6" />
+                  </svg>
+                </button>
+                <button className="tl-nav-btn" disabled type="button">
+                  <svg
+                    aria-hidden="true"
+                    fill="none"
+                    height="16"
+                    stroke="currentColor"
+                    strokeWidth="1.75"
+                    viewBox="0 0 24 24"
+                    width="16"
+                  >
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+                <button className="tl-today-btn" disabled type="button">
+                  Today
+                </button>
+                <div className="tl-week-meta">
+                  <div
+                    style={{
+                      width: 140,
+                      height: 16,
+                      background: "var(--surface-container-high)",
+                      borderRadius: 4,
+                      animation: "pulse 1.5s infinite",
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: 90,
+                      height: 12,
+                      background: "var(--surface-container-high)",
+                      borderRadius: 4,
+                      marginTop: 4,
+                      animation: "pulse 1.5s infinite",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="tl-grid" style={{ opacity: 0.5 }}>
+              <div className="tl-corner">Team</div>
+              <div
+                className="tl-days-header"
+                style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+              >
+                {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+                  <div className="tl-day-head" key={i}>
+                    <span className="tl-day-head__dow">...</span>
+                    <span
+                      style={{
+                        width: 30,
+                        height: 10,
+                        background: "var(--surface-container-high)",
+                        borderRadius: 2,
+                        display: "inline-block",
+                        animation: "pulse 1.5s infinite",
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              {STAFF.map((staff) => (
+                <Fragment key={staff.id}>
+                  <div className="tl-row-staff">
+                    <div
+                      className="tl-avatar"
+                      style={{ background: "var(--surface-container-high)" }}
+                    >
+                      {staff.initials}
+                    </div>
+                    <div className="tl-staff-meta">
+                      <div className="tl-staff-name">{staff.name}</div>
+                      <div className="tl-staff-role">{staff.role}</div>
+                    </div>
+                  </div>
+                  <div
+                    className="tl-row-track"
+                    style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <span
+                        className="tl-day-guide"
+                        key={i}
+                        style={{ left: `${(i / 7) * 100}%` }}
+                      />
+                    ))}
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+  const entries = ENTRIES[week.id] || {};
 
   // Today tint position (as 0..7 left offset)
   const todayLeftPct = week.todayIdx >= 0 ? (week.todayIdx / 7) * 100 : null;
@@ -557,6 +710,7 @@ export const TeamTimelineSection = () => {
                 </div>
               </div>
             </div>
+            {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Legend wrapper doesn't need native role */}
             <div aria-label="Legend" className="tl-legend">
               <span className="tl-legend-item">
                 <span
@@ -584,14 +738,19 @@ export const TeamTimelineSection = () => {
             </div>
           </div>
 
+          {/* biome-ignore lint/a11y/useSemanticElements: Grid layout used for timeline table representation */}
           <div
             aria-label="Team availability timeline"
             className="tl-grid"
             role="table"
           >
+            {/* biome-ignore lint/a11y/useSemanticElements: corner element in layout */}
+            {/* biome-ignore lint/a11y/useFocusableInteractive: non-interactive header cell */}
             <div className="tl-corner" role="columnheader">
               Team
             </div>
+            {/* biome-ignore lint/a11y/useSemanticElements: Grid header row */}
+            {/* biome-ignore lint/a11y/useFocusableInteractive: non-interactive header row */}
             <div
               className="tl-days-header"
               role="row"
@@ -605,6 +764,8 @@ export const TeamTimelineSection = () => {
                 />
               )}
               {week.days.map((d, i) => (
+                /* biome-ignore lint/a11y/useSemanticElements: Day head cell */
+                /* biome-ignore lint/a11y/useFocusableInteractive: non-interactive day header */
                 <div
                   className={`tl-day-head${
                     i === week.todayIdx ? "tl-day-head--today" : ""
@@ -624,7 +785,9 @@ export const TeamTimelineSection = () => {
             </div>
 
             {STAFF.map((staff) => (
-              <React.Fragment key={staff.id}>
+              <Fragment key={staff.id}>
+                {/* biome-ignore lint/a11y/useSemanticElements: Rowheader in grid timeline */}
+                {/* biome-ignore lint/a11y/useFocusableInteractive: rowheader is not interactive */}
                 <div className="tl-row-staff" role="rowheader">
                   <Avatar initials={staff.initials} />
                   <div className="tl-staff-meta">
@@ -632,6 +795,8 @@ export const TeamTimelineSection = () => {
                     <div className="tl-staff-role">{staff.role}</div>
                   </div>
                 </div>
+                {/* biome-ignore lint/a11y/useSemanticElements: Track row in grid timeline */}
+                {/* biome-ignore lint/a11y/useFocusableInteractive: track row is non-interactive container */}
                 <div
                   className="tl-row-track"
                   role="row"
@@ -666,7 +831,7 @@ export const TeamTimelineSection = () => {
                     />
                   ))}
                 </div>
-              </React.Fragment>
+              </Fragment>
             ))}
           </div>
 
