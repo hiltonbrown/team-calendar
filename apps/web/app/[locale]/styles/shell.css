@@ -47,14 +47,15 @@
 }
 
 .marketing-glass {
-  background: color-mix(
-    in srgb,
-    var(--marketing-surface-lowest) 92%,
-    transparent
-  );
-  box-shadow: none;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  background: var(--frost-default, rgba(252, 248, 255, 0.72));
+  border: 1px solid color-mix(in srgb, var(--outline-variant) 15%, transparent);
+  box-shadow: var(--elev-popover);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+:where(.dark, [data-theme="dark"]) .marketing-glass {
+  border-color: color-mix(in srgb, var(--outline-variant) 55%, transparent);
 }
 
 .marketing-site-header__inner {
@@ -64,7 +65,7 @@
   gap: 24px;
   align-items: center;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 16px;
 }
 
 .marketing-site-header__brand {
@@ -128,8 +129,7 @@
   padding: 24px;
   background: var(--marketing-surface-lowest);
   border-radius: 16px;
-  box-shadow: 0 8px 24px
-    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
+  box-shadow: var(--elev-popover);
 }
 
 .marketing-btn {

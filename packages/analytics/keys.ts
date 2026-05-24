@@ -5,7 +5,7 @@ export const keys = () =>
   createEnv({
     client: {
       NEXT_PUBLIC_POSTHOG_KEY: z.string().startsWith("phc_").optional(),
-      NEXT_PUBLIC_POSTHOG_HOST: z.url().optional(),
+      NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
       NEXT_PUBLIC_GA_MEASUREMENT_ID: z.string().startsWith("G-").optional(),
     },
     runtimeEnv: {

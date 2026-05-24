@@ -766,7 +766,7 @@
   }
 }
 
-/* Workflow step connector arrows — drawn between cards on scroll */
+/* Workflow step connector arrows: drawn between cards on scroll */
 .marketing-workflow__steps li {
   overflow: visible;
 }

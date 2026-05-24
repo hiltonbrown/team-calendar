@@ -13,6 +13,7 @@ export const metadata: Metadata = createMetadata({
     "LeaveSync gives employees one easy place to request leave and working patterns, then keeps Xero Payroll and shared calendars current automatically.",
 });
 
+// Trigger recompilation after CSS syntax fixes
 const Home = () => (
   <main className="fmkt-page">
     <HeroSection />

@@ -15,7 +15,7 @@ import { keys } from "./keys";
 const GITHUB_API_ORIGIN = "https://api.github.com";
 
 const GitHubIssueResponseSchema = z.object({
-  html_url: z.url(),
+  html_url: z.string().url(),
   number: z.number().int().positive(),
   title: z.string().min(1),
 });

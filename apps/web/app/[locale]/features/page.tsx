@@ -8,9 +8,9 @@ import { MarketingIcon } from "../(home)/components/marketing-icons";
 import { FinalCtaSection } from "./components/final-cta-section";
 
 export const metadata: Metadata = createMetadata({
-  title: "LeaveSync — Features",
+  title: "LeaveSync: Features",
   description:
-    "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once — LeaveSync publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
+    "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once. LeaveSync publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
 });
 
 const signUpHref = env.NEXT_PUBLIC_APP_URL
@@ -50,7 +50,7 @@ const FeaturesHeroArt = () => (
       </g>
     </svg>
 
-    {/* Input cards — left column */}
+    {/* Input cards: left column */}
     <div
       className="ft-input-card"
       style={{ left: "0%", top: "10%", width: "58%" }}
@@ -60,7 +60,7 @@ const FeaturesHeroArt = () => (
       </div>
       <div>
         <div>Sam · Annual leave</div>
-        <span className="ft-input-card__sub">Mon 12 — Fri 16 May</span>
+        <span className="ft-input-card__sub">Mon 12 to Fri 16 May</span>
       </div>
       <span className="ft-input-card__badge ft-badge--sage">Xero</span>
     </div>
@@ -86,7 +86,7 @@ const FeaturesHeroArt = () => (
       </div>
       <div>
         <div>Dee · Out of office</div>
-        <span className="ft-input-card__sub">Director · 22 — 24 May</span>
+        <span className="ft-input-card__sub">Director · 22 to 24 May</span>
       </div>
       <span className="ft-input-card__badge ft-badge--purple">Manual</span>
     </div>
@@ -100,7 +100,7 @@ const FeaturesHeroArt = () => (
       </span>
     </div>
 
-    {/* Output chips — right column */}
+    {/* Output chips: right column */}
     <div className="ft-out-chip" style={{ right: "0%", top: "12%" }}>
       <MarketingIcon id="outlook" size={16} /> Outlook
     </div>
@@ -125,7 +125,7 @@ const FeaturesHero = () => (
         Employees, contractors and directors enter leave or out-of-office once.
         LeaveSync pulls the leave already sitting in Xero Payroll, layers in the
         people who aren't on payroll, and publishes the combined view to
-        Outlook, Google Calendar and Apple Calendar — without re-keying.
+        Outlook, Google Calendar and Apple Calendar, without re-keying.
       </p>
       <div className="ft-hero__actions">
         <Link
@@ -173,14 +173,14 @@ const personas: Persona[] = [
     mod: "contractor",
     role: "Contractor · off payroll",
     title: "Unavailable days, WFH, deep work.",
-    copy: "Contractors don't need a Xero record. Add them as a non-payroll teammate and they can mark unavailable days, project work and out-of-office — visible to everyone they collaborate with.",
+    copy: "Contractors don't need a Xero record. Add them as a non-payroll teammate and they can mark unavailable days, project work and out-of-office, visible to everyone they collaborate with.",
     source: { mod: "purple", label: "Added in LeaveSync", sub: "Manual entry" },
   },
   {
     mod: "director",
     role: "Director · off payroll",
     title: "Board days, travel, out of office.",
-    copy: "Directors who draw fees rather than wages stay invisible to payroll-only tools. In LeaveSync they get the same calendar presence as the rest of the team — without showing up in pay runs.",
+    copy: "Directors who draw fees rather than wages stay invisible to payroll-only tools. In LeaveSync they get the same calendar presence as the rest of the team, without showing up in pay runs.",
     source: {
       mod: "purple",
       label: "Added in LeaveSync",
@@ -196,7 +196,7 @@ const FeaturesPersonas = () => (
       <h2>Three kinds of people. One availability view.</h2>
       <p className="ft-section__lead">
         Most leave tools only see the payroll list. LeaveSync covers the whole
-        team — and keeps the source of each entry obvious. Sage came from Xero.
+        team, and keeps the source of each entry obvious. Sage came from Xero.
         Purple was added by hand.
       </p>
       <div className="ft-personas">
@@ -249,7 +249,7 @@ const caps: Cap[] = [
   {
     icon: "leaf",
     title: "Covers off-payroll people",
-    copy: "Contractors, directors, board members, advisors. Anyone whose availability affects the team can sit on the calendar — without showing up in pay runs.",
+    copy: "Contractors, directors, board members, advisors. Anyone whose availability affects the team can sit on the calendar, without showing up in pay runs.",
     accent: true,
   },
   {
@@ -260,7 +260,7 @@ const caps: Cap[] = [
   {
     icon: "shield",
     title: "Source-of-record, visible",
-    copy: "Every entry is colour-coded by where it came from — synced from Xero or added manually — so you always know what's authoritative.",
+    copy: "Every entry is colour-coded by where it came from, synced from Xero or added manually, so you always know what's authoritative.",
   },
 ];
 

@@ -46,7 +46,7 @@ const HeroVisual = () => (
       }}
     />
 
-    {/* Card 1 — leave form, back left */}
+    {/* Card 1: leave form, back left */}
     <div
       style={{
         position: "absolute",
@@ -146,7 +146,7 @@ const HeroVisual = () => (
       </div>
     </div>
 
-    {/* Card 2 — team calendar, front right */}
+    {/* Card 2: team calendar, front right */}
     <div
       style={{
         position: "absolute",
@@ -183,7 +183,7 @@ const HeroVisual = () => (
           <div
             style={{ font: "500 16px/1.3 var(--marketing-font)", marginTop: 2 }}
           >
-            Mon 12 — Fri 16 May
+            Mon 12 to Fri 16 May
           </div>
         </div>
         <span
@@ -268,7 +268,7 @@ const HeroVisual = () => (
       </div>
     </div>
 
-    {/* Card 3 — calendar subscription chips, bottom left */}
+    {/* Card 3: calendar subscription chips, bottom left */}
     <div
       style={{
         position: "absolute",
@@ -336,9 +336,8 @@ export const HeroSection = () => (
           <em>Clear calendars for everyone.</em>
         </h1>
         <p className="fmkt-hero__body">
-          Employees request leave once in LeaveSync. Managers approve in
-          context, Xero stays current, and Outlook, Google Calendar and Apple
-          Calendar show who is available.
+          Sync your Outlook Calendar to Xero. Manage leave requests.
+          Automatically publish availability to Outlook or Google Calendar.{" "}
         </p>
         <div className="fmkt-hero__actions">
           <Link
@@ -356,13 +355,7 @@ export const HeroSection = () => (
         </div>
         <div className="fmkt-hero__stat-row">
           <div className="fmkt-hero__stat">
-            <strong>Xero only</strong>AU, NZ and UK Payroll
-          </div>
-          <div className="fmkt-hero__stat">
-            <strong>One feed</strong>Outlook, Google, Apple
-          </div>
-          <div className="fmkt-hero__stat">
-            <strong>WCAG 2.2 AA</strong>across the product
+            <strong>A better Team calendar</strong>AU, NZ and UK Xero Payroll
           </div>
         </div>
       </div>

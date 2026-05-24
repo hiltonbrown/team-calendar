@@ -72,7 +72,7 @@ const SUCCESS_MESSAGE = "Your message has been sent to support.";
 
 const SupportGitHubIssueSuccessSchema = z.object({
   issueNumber: z.number().int().positive(),
-  issueUrl: z.url(),
+  issueUrl: z.string().url(),
   ok: z.literal(true),
 });
 

@@ -12,7 +12,7 @@ import { scopedQuery } from "../tenant-query";
 const SupportSubmissionAuditPayloadSchema = z.object({
   category: SupportSubmissionCategorySchema,
   issueNumber: z.number().int().positive(),
-  issueUrl: z.url(),
+  issueUrl: z.string().url(),
   labelAssignmentSucceeded: z.boolean().optional(),
   labelsAttempted: z.array(z.string()).optional(),
   status: z.string().min(1),

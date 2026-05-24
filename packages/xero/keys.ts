@@ -6,7 +6,7 @@ const ENCRYPTION_KEY_PATTERN = /^[0-9a-fA-F]{64}$/;
 export const keys = () =>
   createEnv({
     server: {
-      XERO_API_BASE_URL: z.url().optional(),
+      XERO_API_BASE_URL: z.string().url().optional(),
       XERO_CLIENT_ID: z.string().optional(),
       XERO_CLIENT_SECRET: z.string().optional(),
       XERO_TOKEN_ENCRYPTION_KEY: z

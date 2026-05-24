@@ -31,7 +31,7 @@ export const SupportSubmissionPayloadSchema = z.object({
     .min(1, "Message is required.")
     .max(10_000, "Message must be 10000 characters or fewer."),
   priority: SupportSubmissionPrioritySchema,
-  page_url: z.url(),
+  page_url: z.string().url(),
   email_override: z.preprocess((value) => {
     if (typeof value !== "string") {
       return value;
@@ -39,7 +39,7 @@ export const SupportSubmissionPayloadSchema = z.object({
 
     const trimmed = value.trim();
     return trimmed === "" ? undefined : trimmed;
-  }, z.email().optional()),
+  }, z.string().email().optional()),
   reproduction_steps: optionalTrimmedString(),
   expected_outcome: optionalTrimmedString(),
   actual_outcome: optionalTrimmedString(),
