@@ -18,9 +18,6 @@ interface RootLayoutProperties {
 const RootLayout = async ({ children, params }: RootLayoutProperties) => {
   const { locale } = await params;
   const dictionary = await getDictionary(locale);
-  const FeatureToolbar = process.env.FLAGS_SECRET
-    ? (await import("@repo/feature-flags/components/toolbar")).Toolbar
-    : null;
   const shouldRenderCMSToolbar = process.env.NODE_ENV === "production";
   const CMSToolbar = shouldRenderCMSToolbar
     ? (await import("@repo/cms/components/toolbar")).Toolbar
@@ -39,7 +36,6 @@ const RootLayout = async ({ children, params }: RootLayoutProperties) => {
             {children}
             <Footer />
           </DesignSystemProvider>
-          {FeatureToolbar ? <FeatureToolbar /> : null}
           {CMSToolbar ? <CMSToolbar /> : null}
         </AnalyticsProvider>
       </body>

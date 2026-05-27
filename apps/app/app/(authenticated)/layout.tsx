@@ -6,10 +6,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@repo/design-system/components/ui/sidebar";
-import { showBetaFeature } from "@repo/feature-flags";
-import { secure } from "@repo/security";
 import type { ReactNode } from "react";
-import { env } from "@/env";
 import { NotificationsProvider } from "./components/notifications-provider";
 import { GlobalSidebar } from "./components/sidebar";
 
@@ -18,13 +15,9 @@ interface AppLayoutProperties {
 }
 
 const AppLayout = async ({ children }: AppLayoutProperties) => {
-  if (env.ARCJET_KEY) {
-    await secure(["CATEGORY:PREVIEW"]);
-  }
-
   const user = await currentUser();
   const { redirectToSignIn } = await auth();
-  const betaFeature = await showBetaFeature();
+  const betaFeature = process.env.SHOW_BETA_FEATURE === "true";
 
   if (!user) {
     return redirectToSignIn();
