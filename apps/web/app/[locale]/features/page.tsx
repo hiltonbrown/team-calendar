@@ -1,147 +1,17 @@
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { env } from "@/env";
 import { MarketingIcon } from "../(home)/components/marketing-icons";
 import { FinalCtaSection } from "./components/final-cta-section";
+import { InteractiveHeroSection } from "./components/interactive-hero";
+import { ScrollReveal } from "./components/scroll-reveal";
 
 export const metadata: Metadata = createMetadata({
   title: "LeaveSync: Features",
   description:
     "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once. LeaveSync publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
 });
-
-const signUpHref = env.NEXT_PUBLIC_APP_URL
-  ? `${env.NEXT_PUBLIC_APP_URL}/sign-up`
-  : "/";
-
-// ---- Hero art ----------------------------------------------------------------
-
-const FeaturesHeroArt = () => (
-  <div aria-hidden="true" className="ft-hero__art">
-    <svg
-      aria-hidden="true"
-      className="ft-hero__wires"
-      fill="none"
-      preserveAspectRatio="none"
-      viewBox="0 0 400 400"
-    >
-      <g
-        opacity="0.55"
-        stroke="#6da671"
-        strokeDasharray="3 5"
-        strokeWidth="1.25"
-      >
-        <path d="M 70 80 C 150 80 160 180 200 200" />
-        <path d="M 70 200 C 140 200 150 200 200 200" />
-        <path d="M 70 320 C 150 320 160 220 200 200" />
-      </g>
-      <g
-        opacity="0.55"
-        stroke="#5e4f99"
-        strokeDasharray="3 5"
-        strokeWidth="1.25"
-      >
-        <path d="M 200 200 C 260 200 280 80 360 80" />
-        <path d="M 200 200 C 280 200 290 200 360 200" />
-        <path d="M 200 200 C 260 200 280 320 360 320" />
-      </g>
-    </svg>
-
-    {/* Input cards: left column */}
-    <div
-      className="ft-input-card"
-      style={{ left: "0%", top: "10%", width: "58%" }}
-    >
-      <div className="ft-input-card__icon">
-        <MarketingIcon id="leaf" size={16} />
-      </div>
-      <div>
-        <div>Sam · Annual leave</div>
-        <span className="ft-input-card__sub">Mon 12 to Fri 16 May</span>
-      </div>
-      <span className="ft-input-card__badge ft-badge--sage">Xero</span>
-    </div>
-    <div
-      className="ft-input-card"
-      style={{ left: "-4%", top: "44%", width: "60%" }}
-    >
-      <div className="ft-input-card__icon">
-        <MarketingIcon id="calendar" size={16} />
-      </div>
-      <div>
-        <div>Priya · WFH</div>
-        <span className="ft-input-card__sub">Contractor · Wed only</span>
-      </div>
-      <span className="ft-input-card__badge ft-badge--purple">Manual</span>
-    </div>
-    <div
-      className="ft-input-card"
-      style={{ left: "2%", top: "78%", width: "56%" }}
-    >
-      <div className="ft-input-card__icon">
-        <MarketingIcon id="shield" size={16} />
-      </div>
-      <div>
-        <div>Dee · Out of office</div>
-        <span className="ft-input-card__sub">Director · 22 to 24 May</span>
-      </div>
-      <span className="ft-input-card__badge ft-badge--purple">Manual</span>
-    </div>
-
-    {/* Central hub */}
-    <div className="ft-hero__hub">
-      <span className="ft-hero__hub__label">LeaveSync</span>
-      <div className="ft-hero__hub__title">One source of availability</div>
-      <span className="ft-hero__hub__sub">
-        Pulls from Xero · publishes to every calendar
-      </span>
-    </div>
-
-    {/* Output chips: right column */}
-    <div className="ft-out-chip" style={{ right: "0%", top: "12%" }}>
-      <MarketingIcon id="outlook" size={16} /> Outlook
-    </div>
-    <div className="ft-out-chip" style={{ right: "-2%", top: "46%" }}>
-      <MarketingIcon id="gcal" size={16} /> Google Calendar
-    </div>
-    <div className="ft-out-chip" style={{ right: "2%", top: "80%" }}>
-      <MarketingIcon id="applecal" size={16} /> Apple Calendar
-    </div>
-  </div>
-);
-
-const FeaturesHero = () => (
-  <section className="ft-hero">
-    <div>
-      <div className="fmkt-pill">Features</div>
-      <h1 className="ft-hero__title">
-        Every absence.
-        <em>Every person on the calendar.</em>
-      </h1>
-      <p className="ft-hero__body">
-        Employees, contractors and directors enter leave or out-of-office once.
-        LeaveSync pulls the leave already sitting in Xero Payroll, layers in the
-        people who aren't on payroll, and publishes the combined view to
-        Outlook, Google Calendar and Apple Calendar, without re-keying.
-      </p>
-      <div className="ft-hero__actions">
-        <Link
-          className="marketing-btn marketing-btn--primary"
-          href={signUpHref}
-        >
-          Start free trial
-        </Link>
-        <Link className="marketing-btn marketing-btn--outline" href="#coverage">
-          See who&apos;s covered
-        </Link>
-      </div>
-    </div>
-    <FeaturesHeroArt />
-  </section>
-);
 
 // ---- Personas ----------------------------------------------------------------
 
@@ -577,13 +447,23 @@ const FeaturesFAQ = () => (
 const FeaturesPage = () => (
   <main className="fmkt-page">
     <div className="fmkt-container">
-      <FeaturesHero />
+      <InteractiveHeroSection />
     </div>
-    <FeaturesPersonas />
-    <FeaturesCaps />
-    <FeaturesFlow />
-    <FeaturesMatrix />
-    <FeaturesFAQ />
+    <ScrollReveal>
+      <FeaturesPersonas />
+    </ScrollReveal>
+    <ScrollReveal delayMs={100}>
+      <FeaturesCaps />
+    </ScrollReveal>
+    <ScrollReveal>
+      <FeaturesFlow />
+    </ScrollReveal>
+    <ScrollReveal>
+      <FeaturesMatrix />
+    </ScrollReveal>
+    <ScrollReveal>
+      <FeaturesFAQ />
+    </ScrollReveal>
     <FinalCtaSection />
   </main>
 );
