@@ -15,6 +15,7 @@ import {
 } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
+import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -61,7 +62,7 @@ export async function approveAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await approve(context.value);
+  const result = await approve(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }
@@ -82,11 +83,14 @@ export async function declineAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await decline({
-    ...context.value,
-    reason: parsed.data.reason,
-    recordId: parsed.data.recordId,
-  });
+  const result = await decline(
+    {
+      ...context.value,
+      reason: parsed.data.reason,
+      recordId: parsed.data.recordId,
+    },
+    XeroWriteAdapter
+  );
   if (!result.ok) {
     return result;
   }
@@ -128,7 +132,7 @@ export async function retryApprovalAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await retryApproval(context.value);
+  const result = await retryApproval(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }
@@ -144,7 +148,7 @@ export async function retryDeclineAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await retryDecline(context.value);
+  const result = await retryDecline(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }

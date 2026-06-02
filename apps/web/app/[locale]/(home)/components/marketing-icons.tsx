@@ -126,12 +126,15 @@ export const iconPaths = {
 export const MarketingIcon = ({
   id,
   size = 20,
+  className,
 }: {
   id: keyof typeof iconPaths;
   size?: number;
+  className?: string;
 }) => (
   <svg
     aria-hidden="true"
+    className={className}
     fill="none"
     height={size}
     stroke="currentColor"

@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { Result } from "@repo/core";
+import type {
+  ExternalWritePort,
+  ProviderResolutionError,
+  ProviderWriteError,
+  Result,
+} from "@repo/core";
 import { database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
@@ -13,14 +18,6 @@ import {
   dispatchNotification,
   type NotificationDispatchDatabase,
 } from "@repo/notifications";
-import {
-  approveLeaveApplicationForRegion,
-  declineLeaveApplicationForRegion,
-  type ResolutionError,
-  resolveXeroEmployeeId,
-  toPlainLanguageMessage,
-  type XeroWriteError,
-} from "@repo/xero";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
@@ -43,7 +40,7 @@ export type ApprovalServiceError =
   | {
       code: "approval_blocked_resolution";
       message: string;
-      resolutionError: ResolutionError;
+      resolutionError: ProviderResolutionError;
     }
   | { code: "cross_org_leak"; message: string }
   | { code: "dispatch_failed"; message: string }
@@ -59,7 +56,11 @@ export type ApprovalServiceError =
   | { code: "unknown_error"; message: string }
   | { code: "validation_error"; message: string }
   | { code: "xero_not_connected"; message: string }
-  | { code: "xero_write_failed"; message: string; xeroError: XeroWriteError };
+  | {
+      code: "xero_write_failed";
+      message: string;
+      xeroError: ProviderWriteError;
+    };
 
 export interface ApprovalListItem {
   allDay: boolean;
@@ -380,9 +381,10 @@ export async function getApprovalSummaryCounts(input: {
 }
 
 export async function approve(
-  input: CommandInput
+  input: CommandInput,
+  externalWritePort: ExternalWritePort
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
-  return await performApproval(input, {
+  return await performApproval(input, externalWritePort, {
     failureAuditAction: "availability_records.approval_failed",
     failureAction: "approve",
     successAuditAction: "availability_records.approved",
@@ -390,9 +392,10 @@ export async function approve(
 }
 
 export async function retryApproval(
-  input: CommandInput
+  input: CommandInput,
+  externalWritePort: ExternalWritePort
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
-  return await performApproval(input, {
+  return await performApproval(input, externalWritePort, {
     failureAuditAction: "availability_records.approval_retry_failed",
     failureAction: "approve",
     retry: true,
@@ -401,7 +404,8 @@ export async function retryApproval(
 }
 
 export async function decline(
-  input: DeclineInput
+  input: DeclineInput,
+  externalWritePort: ExternalWritePort
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   const parsed = DeclineSchema.safeParse(input);
   if (!parsed.success) {
@@ -424,7 +428,7 @@ export async function decline(
       },
     };
   }
-  return await performDecline(parsed.data, {
+  return await performDecline(parsed.data, externalWritePort, {
     failureAuditAction: "availability_records.decline_failed",
     reason: parsed.data.reason.trim(),
     successAuditAction: "availability_records.declined",
@@ -432,7 +436,8 @@ export async function decline(
 }
 
 export async function retryDecline(
-  input: CommandInput
+  input: CommandInput,
+  externalWritePort: ExternalWritePort
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   const parsed = CommandSchema.safeParse(input);
   if (!parsed.success) {
@@ -462,15 +467,12 @@ export async function retryDecline(
       };
     }
 
-    return await performDecline(
-      { ...parsed.data, reason },
-      {
-        failureAuditAction: "availability_records.decline_retry_failed",
-        reason,
-        retry: true,
-        successAuditAction: "availability_records.decline_retry_succeeded",
-      }
-    );
+    return await performDecline({ ...parsed.data, reason }, externalWritePort, {
+      failureAuditAction: "availability_records.decline_retry_failed",
+      reason,
+      retry: true,
+      successAuditAction: "availability_records.decline_retry_succeeded",
+    });
   } catch {
     return unknownError("Failed to retry this decline.");
   }
@@ -634,6 +636,7 @@ async function dispatchApprovalReconciliationInternal(
 
 async function performApproval(
   input: CommandInput,
+  externalWritePort: ExternalWritePort,
   options: {
     failureAction: "approve";
     failureAuditAction: string;
@@ -647,17 +650,21 @@ async function performApproval(
   }
 
   try {
-    const prepared = await prepareApprovalWrite(parsed.data, {
-      expectedFailedAction: options.retry ? "approve" : null,
-      expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
-      invalidStateCode: options.retry
-        ? "invalid_state_for_retry"
-        : "invalid_state_for_approve",
-    });
+    const prepared = await prepareApprovalWrite(
+      parsed.data,
+      externalWritePort,
+      {
+        expectedFailedAction: options.retry ? "approve" : null,
+        expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+        invalidStateCode: options.retry
+          ? "invalid_state_for_retry"
+          : "invalid_state_for_approve",
+      }
+    );
     if (!prepared.ok) {
       return prepared;
     }
-    const { record, xeroEmployeeId, xeroTenant } = prepared.value;
+    const { record, xeroEmployeeId } = prepared.value;
     const xeroLeaveApplicationId = record.source_remote_id;
     if (!xeroLeaveApplicationId) {
       return resolutionBlocked({
@@ -666,17 +673,19 @@ async function performApproval(
       });
     }
 
-    const response = await approveLeaveApplicationForRegion(
-      xeroTenant.payroll_region,
-      { xeroEmployeeId, xeroLeaveApplicationId, xeroTenant }
-    );
+    const response = await externalWritePort.approveLeaveApplication({
+      employeeId: xeroEmployeeId,
+      remoteId: xeroLeaveApplicationId,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    });
     if (!response.ok) {
       return await persistApprovalFailure({
         auditAction: options.failureAuditAction,
         failedAction: "approve",
         input: parsed.data,
         record,
-        xeroError: response.error,
+        error: response.error,
       });
     }
 
@@ -730,6 +739,7 @@ async function performApproval(
 
 async function performDecline(
   input: DeclineInput,
+  externalWritePort: ExternalWritePort,
   options: {
     failureAuditAction: string;
     reason: string;
@@ -738,7 +748,7 @@ async function performDecline(
   }
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   try {
-    const prepared = await prepareApprovalWrite(input, {
+    const prepared = await prepareApprovalWrite(input, externalWritePort, {
       expectedFailedAction: options.retry ? "decline" : null,
       expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
       invalidStateCode: options.retry
@@ -748,7 +758,7 @@ async function performDecline(
     if (!prepared.ok) {
       return prepared;
     }
-    const { record, xeroEmployeeId, xeroTenant } = prepared.value;
+    const { record, xeroEmployeeId } = prepared.value;
     const xeroLeaveApplicationId = record.source_remote_id;
     if (!xeroLeaveApplicationId) {
       return resolutionBlocked({
@@ -757,15 +767,13 @@ async function performDecline(
       });
     }
 
-    const response = await declineLeaveApplicationForRegion(
-      xeroTenant.payroll_region,
-      {
-        reason: options.reason,
-        xeroEmployeeId,
-        xeroLeaveApplicationId,
-        xeroTenant,
-      }
-    );
+    const response = await externalWritePort.declineLeaveApplication({
+      reason: options.reason,
+      employeeId: xeroEmployeeId,
+      remoteId: xeroLeaveApplicationId,
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+    });
     if (!response.ok) {
       return await persistApprovalFailure({
         approvalNote: options.reason,
@@ -773,7 +781,7 @@ async function performDecline(
         failedAction: "decline",
         input,
         record,
-        xeroError: response.error,
+        error: response.error,
       });
     }
 
@@ -830,6 +838,7 @@ async function performDecline(
 
 async function prepareApprovalWrite(
   input: CommandInput,
+  externalWritePort: ExternalWritePort,
   options: {
     expectedFailedAction: availability_failed_action | null;
     expectedStatus: availability_approval_status;
@@ -843,7 +852,6 @@ async function prepareApprovalWrite(
     {
       record: LoadedApprovalRecord;
       xeroEmployeeId: string;
-      xeroTenant: NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
     },
     ApprovalServiceError
   >
@@ -874,13 +882,10 @@ async function prepareApprovalWrite(
   if (!hasXero) {
     return xeroNotConnected();
   }
-  const xeroTenant = await loadXeroTenant(input);
-  if (!xeroTenant) {
-    return xeroNotConnected();
-  }
-  const employee = await resolveXeroEmployeeId({
+  const employee = await externalWritePort.resolveEmployeeId({
     personId: record.person_id,
-    xeroTenant,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
   });
   if (!employee.ok) {
     return resolutionBlocked(employee.error);
@@ -888,7 +893,7 @@ async function prepareApprovalWrite(
 
   return {
     ok: true,
-    value: { record, xeroEmployeeId: employee.value, xeroTenant },
+    value: { record, xeroEmployeeId: employee.value },
   };
 }
 
@@ -898,9 +903,9 @@ async function persistApprovalFailure(input: {
   failedAction: "approve" | "decline";
   input: CommandInput;
   record: LoadedApprovalRecord;
-  xeroError: XeroWriteError;
+  error: ProviderWriteError;
 }): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
-  const plainMessage = toPlainLanguageMessage(input.xeroError);
+  const plainMessage = input.error.userMessage;
   await database.$transaction(async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
@@ -911,11 +916,11 @@ async function persistApprovalFailure(input: {
         xero_write_error: plainMessage,
         xero_write_error_raw: {
           attemptedAction: input.failedAction,
-          code: input.xeroError.code,
-          correlationId: input.xeroError.correlationId ?? null,
-          httpStatus: input.xeroError.httpStatus ?? null,
-          message: input.xeroError.message,
-          rawPayload: toJsonValue(input.xeroError.rawPayload),
+          code: input.error.code,
+          correlationId: input.error.correlationId ?? null,
+          httpStatus: input.error.httpStatus ?? null,
+          message: input.error.message,
+          rawPayload: toJsonValue(input.error.rawPayload),
           timestamp: new Date().toISOString(),
         },
       },
@@ -930,7 +935,7 @@ async function persistApprovalFailure(input: {
     });
     await tx.auditEvent.create({
       data: auditData(input.input, input.auditAction, {
-        errorCode: input.xeroError.code,
+        errorCode: input.error.code,
       }),
     });
   });
@@ -955,24 +960,7 @@ function loadRecord(input: {
   });
 }
 
-function loadXeroTenant(input: { clerkOrgId: string; organisationId: string }) {
-  return database.xeroTenant.findFirst({
-    include: {
-      xero_connection: {
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          revoked_at: true,
-        },
-      },
-    },
-    where: {
-      ...scoped(input),
-      organisation_id: input.organisationId,
-    },
-  });
-}
+// removed loadXeroTenant
 
 async function loadAndAuthorise(
   input: CommandInput
@@ -1399,7 +1387,7 @@ function xeroNotConnected(): Result<never, ApprovalServiceError> {
 }
 
 function resolutionBlocked(
-  resolutionError: ResolutionError
+  resolutionError: ProviderResolutionError
 ): Result<never, ApprovalServiceError> {
   return {
     ok: false,

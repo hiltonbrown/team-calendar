@@ -48,16 +48,18 @@ vi.mock("../settings/organisation-settings-service", () => ({
 vi.mock("../settings/manager-scope", () => ({
   managerScopePersonIds: mocks.managerScopePersonIds,
 }));
-vi.mock("@repo/xero", () => ({
-  approveLeaveApplicationForRegion: mocks.approveLeaveApplicationForRegion,
-  declineLeaveApplicationForRegion: mocks.declineLeaveApplicationForRegion,
-  resolveXeroEmployeeId: mocks.resolveXeroEmployeeId,
-  toPlainLanguageMessage: () =>
-    "This leave overlaps an existing record in Xero. Review the dates and try again.",
-}));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
 }));
+
+const mockPort = {
+  resolveEmployeeId: mocks.resolveXeroEmployeeId,
+  resolveLeaveTypeId: vi.fn(),
+  submitLeaveApplication: vi.fn(),
+  withdrawLeaveApplication: vi.fn(),
+  approveLeaveApplication: mocks.approveLeaveApplicationForRegion,
+  declineLeaveApplication: mocks.declineLeaveApplicationForRegion,
+};
 
 const {
   approve,
@@ -169,15 +171,14 @@ describe("approval-service", () => {
       .mockResolvedValueOnce({ ...record, approval_status: "approved" });
     mocks.approveLeaveApplicationForRegion.mockResolvedValue({
       ok: true,
-      value: { rawResponse: {} },
+      value: undefined,
     });
 
-    const result = await approve(input);
+    const result = await approve(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledWith(
-      "AU",
-      expect.objectContaining({ xeroLeaveApplicationId: "xero-leave-1" })
+      expect.objectContaining({ remoteId: "xero-leave-1" })
     );
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -221,11 +222,13 @@ describe("approval-service", () => {
       error: {
         code: "conflict_error",
         message: "Overlap",
+        userMessage:
+          "This leave overlaps an existing record in Xero. Review the dates and try again.",
         rawPayload: { Message: "Overlap" },
       },
     });
 
-    const result = await approve(input);
+    const result = await approve(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -258,10 +261,18 @@ describe("approval-service", () => {
       });
     mocks.declineLeaveApplicationForRegion.mockResolvedValue({
       ok: false,
-      error: { code: "network_error", message: "offline" },
+      error: {
+        code: "network_error",
+        message: "offline",
+        userMessage:
+          "Could not reach Xero. Check your internet connection and try again.",
+      },
     });
 
-    const result = await decline({ ...input, reason: "Too much overlap" });
+    const result = await decline(
+      { ...input, reason: "Too much overlap" },
+      mockPort
+    );
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -282,7 +293,7 @@ describe("approval-service", () => {
       failed_action: "decline",
     });
 
-    const result = await retryDecline(input);
+    const result = await retryDecline(input, mockPort);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {

@@ -1,9 +1,8 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { keys } from "../../keys";
+import { keys, validateEncryptionKey } from "../../keys";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
-const KEY_BYTES = 32;
 
 export interface EncryptedToken {
   authTag: string;
@@ -56,18 +55,9 @@ export function decryptXeroToken(input: {
 
 function readKey(): Buffer {
   const raw = keys().XERO_TOKEN_ENCRYPTION_KEY;
+  validateEncryptionKey(raw);
   if (!raw) {
-    throw new Error("XERO_TOKEN_ENCRYPTION_KEY must be configured.");
+    throw new Error("XERO_TOKEN_ENCRYPTION_KEY is required.");
   }
-
-  if (raw.length !== KEY_BYTES * 2) {
-    throw new Error("XERO_TOKEN_ENCRYPTION_KEY must be 64 hex characters.");
-  }
-
-  const key = Buffer.from(raw, "hex");
-  if (key.length !== KEY_BYTES) {
-    throw new Error("XERO_TOKEN_ENCRYPTION_KEY must decode to 32 bytes.");
-  }
-
-  return key;
+  return Buffer.from(raw, "base64");
 }

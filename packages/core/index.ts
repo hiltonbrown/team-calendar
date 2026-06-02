@@ -50,13 +50,21 @@ export const formatDateRangeLabel = (startsAt: Date, endsAt: Date): string => {
 };
 
 export type {
+  ApproveLeaveInput,
+  DeclineLeaveInput,
+  ExternalWritePort,
+  ProviderResolutionError,
+  ProviderWriteError,
+  SubmitLeaveInput,
+  WithdrawLeaveInput,
+} from "./src/ports/external-write-port";
+export type {
   SupportSubmissionCategory,
   SupportSubmissionContext,
   SupportSubmissionIssueInput,
   SupportSubmissionPayload,
   SupportSubmissionPriority,
 } from "./src/support-submission";
-
 export {
   buildSupportIssueMarkdownBody,
   buildSupportIssueTitle,

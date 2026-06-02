@@ -762,6 +762,15 @@ export const archiveManualAvailability = async (
   return { ok: true, value: undefined };
 };
 
+export type {
+  ApproveLeaveInput,
+  DeclineLeaveInput,
+  ExternalWritePort,
+  ProviderResolutionError,
+  ProviderWriteError,
+  SubmitLeaveInput,
+  WithdrawLeaveInput,
+} from "@repo/core";
 export * from "./src/approvals/approval-service";
 export * from "./src/calendar/calendar-service";
 export * from "./src/duration/working-days";

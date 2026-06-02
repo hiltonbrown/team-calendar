@@ -34,17 +34,18 @@ vi.mock("../duration/working-days", () => ({
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
 }));
-vi.mock("@repo/xero", () => ({
-  resolveXeroEmployeeId: mocks.resolveXeroEmployeeId,
-  resolveXeroLeaveTypeId: mocks.resolveXeroLeaveTypeId,
-  submitLeaveApplicationForRegion: mocks.submitLeaveApplicationForRegion,
-  toPlainLanguageMessage: () =>
-    "This leave overlaps an existing record in Xero. Review the dates and try again.",
-  withdrawLeaveApplicationForRegion: mocks.withdrawLeaveApplicationForRegion,
-}));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
 }));
+
+const mockPort = {
+  resolveEmployeeId: mocks.resolveXeroEmployeeId,
+  resolveLeaveTypeId: mocks.resolveXeroLeaveTypeId,
+  submitLeaveApplication: mocks.submitLeaveApplicationForRegion,
+  withdrawLeaveApplication: mocks.withdrawLeaveApplicationForRegion,
+  approveLeaveApplication: vi.fn(),
+  declineLeaveApplication: vi.fn(),
+};
 
 const {
   retrySubmission,
@@ -140,11 +141,11 @@ describe("submit-service", () => {
         rawResponse: {
           LeaveApplications: [{ LeaveApplicationID: "xero-leave-1" }],
         },
-        xeroLeaveApplicationId: "xero-leave-1",
+        remoteId: "xero-leave-1",
       },
     });
 
-    const result = await submitDraftRecord(input);
+    const result = await submitDraftRecord(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -189,11 +190,13 @@ describe("submit-service", () => {
       error: {
         code: "conflict_error",
         message: "Overlap",
+        userMessage:
+          "This leave overlaps an existing record in Xero. Review the dates and try again.",
         rawPayload: { Message: "Overlap" },
       },
     });
 
-    const result = await submitDraftRecord(input);
+    const result = await submitDraftRecord(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -224,7 +227,7 @@ describe("submit-service", () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce(record);
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
 
-    const result = await submitDraftRecord(input);
+    const result = await submitDraftRecord(input, mockPort);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -272,7 +275,7 @@ describe("submit-service", () => {
       value: { rawResponse: {} },
     });
 
-    const result = await withdrawSubmission(input);
+    const result = await withdrawSubmission(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalled();
@@ -298,10 +301,15 @@ describe("submit-service", () => {
       });
     mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
       ok: false,
-      error: { code: "network_error", message: "offline" },
+      error: {
+        code: "network_error",
+        message: "offline",
+        userMessage:
+          "Could not reach Xero. Check your internet connection and try again.",
+      },
     });
 
-    const failedWithdraw = await withdrawSubmission(input);
+    const failedWithdraw = await withdrawSubmission(input, mockPort);
 
     expect(failedWithdraw.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -349,11 +357,11 @@ describe("submit-service", () => {
         rawResponse: {
           LeaveApplications: [{ LeaveApplicationID: "xero-leave-1" }],
         },
-        xeroLeaveApplicationId: "xero-leave-1",
+        remoteId: "xero-leave-1",
       },
     });
 
-    const retried = await retrySubmission(input);
+    const retried = await retrySubmission(input, mockPort);
 
     expect(retried.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(

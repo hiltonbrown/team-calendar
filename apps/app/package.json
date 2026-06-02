@@ -23,6 +23,7 @@
     "@repo/notifications": "*",
     "@repo/observability": "*",
     "@repo/seo": "*",
+    "@repo/xero": "*",
     "@hookform/resolvers": "^5.2.2",
     "@sentry/nextjs": "^10.53.1",
     "@t3-oss/env-nextjs": "^0.13.11",

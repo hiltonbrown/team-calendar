@@ -15,6 +15,7 @@ import {
   withdrawSubmission,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
@@ -227,7 +228,7 @@ export async function submitForApprovalAction(
     return context;
   }
 
-  const result = await submitDraftRecord(context.value);
+  const result = await submitDraftRecord(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }
@@ -244,7 +245,7 @@ export async function withdrawSubmissionAction(
     return context;
   }
 
-  const result = await withdrawSubmission(context.value);
+  const result = await withdrawSubmission(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }
@@ -264,7 +265,7 @@ export async function retrySubmissionAction(
     return context;
   }
 
-  const result = await retrySubmission(context.value);
+  const result = await retrySubmission(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
   }

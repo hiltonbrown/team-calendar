@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   withdrawSubmission: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("@repo/xero", () => ({
+  XeroWriteAdapter: {},
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -149,7 +153,8 @@ describe("plans actions", () => {
         actingOrgRole: "org:viewer",
         actingUserId: "user_1",
         clerkOrgId: "org_1",
-      })
+      }),
+      expect.anything()
     );
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/plans");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/calendar");

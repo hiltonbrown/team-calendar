@@ -15,7 +15,6 @@
     "@repo/jobs": "*",
     "@repo/notifications": "*",
     "@repo/observability": "*",
-    "@repo/xero": "*",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },

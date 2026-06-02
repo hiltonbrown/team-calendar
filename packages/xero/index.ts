@@ -1,3 +1,6 @@
+import "./keys";
+
+export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
