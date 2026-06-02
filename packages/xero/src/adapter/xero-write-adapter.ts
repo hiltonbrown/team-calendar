@@ -9,6 +9,7 @@ import type {
   WithdrawLeaveInput,
 } from "@repo/core";
 import { database } from "@repo/database";
+import { availability_record_type } from "@repo/database/generated/enums";
 import { resolveXeroEmployeeId } from "../resolution/resolve-employee";
 import { resolveXeroLeaveTypeId } from "../resolution/resolve-leave-type";
 import {
@@ -18,6 +19,12 @@ import {
   withdrawLeaveApplicationForRegion,
 } from "../write/dispatch";
 import { toPlainLanguageMessage } from "../write/types";
+
+function isAvailabilityRecordType(
+  val: string
+): val is availability_record_type {
+  return Object.values(availability_record_type).some((v) => v === val);
+}
 
 async function getTenant(clerkOrgId: string, organisationId: string) {
   return await database.xeroTenant.findFirst({
@@ -77,9 +84,18 @@ export const XeroWriteAdapter: ExternalWritePort = {
         error: { code: "unknown_error", message: "Xero tenant not found." },
       };
     }
+    if (!isAvailabilityRecordType(input.recordType)) {
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: `Invalid record type: ${input.recordType}`,
+        },
+      };
+    }
     const res = await resolveXeroLeaveTypeId({
       personId: input.personId,
-      recordType: input.recordType as any,
+      recordType: input.recordType,
       xeroTenant: tenant,
     });
     if (!res.ok) {

@@ -1,7 +1,15 @@
-import { fetchLeaveApplicationStatus as fetchAuLeaveApplicationStatus } from "../au/read";
+import {
+  fetchEmployees as fetchAuEmployees,
+  fetchLeaveApplicationStatus as fetchAuLeaveApplicationStatus,
+} from "../au/read";
 import { fetchLeaveApplicationStatus as fetchNzLeaveApplicationStatus } from "../nz/read";
 import { fetchLeaveApplicationStatus as fetchUkLeaveApplicationStatus } from "../uk/read";
-import type { PayrollRegion, XeroWriteResult } from "../write/types";
+import type {
+  PayrollRegion,
+  XeroTenantForWrite,
+  XeroWriteResult,
+} from "../write/types";
+import type { XeroEmployee } from "./employees";
 import type {
   FetchLeaveApplicationStatusInput,
   XeroLeaveApplicationStatusResult,
@@ -18,6 +26,42 @@ export async function fetchLeaveApplicationStatusForRegion(
       return await fetchNzLeaveApplicationStatus(input);
     case "UK":
       return await fetchUkLeaveApplicationStatus(input);
+    default:
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: "Unsupported payroll region.",
+        },
+      };
+  }
+}
+
+export async function fetchEmployeesForRegion(
+  payrollRegion: PayrollRegion | string,
+  input: { xeroTenant: XeroTenantForWrite }
+): Promise<
+  XeroWriteResult<{ rawResponse: unknown; employees: XeroEmployee[] }>
+> {
+  switch (payrollRegion) {
+    case "AU":
+      return await fetchAuEmployees(input);
+    case "NZ":
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: "NZ payroll employee reads are not yet available.",
+        },
+      };
+    case "UK":
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: "UK payroll employee reads are not yet available.",
+        },
+      };
     default:
       return {
         ok: false,

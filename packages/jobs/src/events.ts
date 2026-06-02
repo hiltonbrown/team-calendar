@@ -13,6 +13,7 @@ export type RegisteredSyncRunType = keyof typeof syncEventNames;
 
 const registeredHandlers = new Set<RegisteredSyncRunType>([
   "approval_state_reconciliation",
+  "people",
 ]);
 
 const SyncEventSchema = z.object({

@@ -218,36 +218,15 @@ const getSelectedDatesLabel = (
   )}`;
 };
 
-export const InteractiveHeroSection = () => {
-  // Calendar states: [teammateId-dayIndex]: approved | pending | undefined
-  const [calendarState, setCalendarState] = useState<
-    Record<string, "approved" | "pending">
-  >({
-    "sam-0": "approved",
-    "sam-1": "approved",
-    "sam-2": "pending",
-    "priya-2": "approved",
-    "dee-3": "pending",
-    "dee-4": "approved",
-  });
+const BLOCK_KIND_ICONS = {
+  annual: "leaf",
+  wfh: "home",
+  client: "briefcase",
+} as const;
 
-  const [selectedBlock, setSelectedBlock] = useState<SelectedBlockState | null>(
-    null
-  );
-
-  const [lastSyncTime, setLastSyncTime] = useState<Record<string, number>>({
-    outlook: Date.now() - 5000,
-    gcal: Date.now() - 5000,
-    applecal: Date.now() - 5000,
-  });
-
-  const [activeTab, setActiveTab] = useState<"visual" | "ics">("visual");
-  const [copyStatus, setCopyStatus] = useState("Copy Link");
-  const [mounted, setMounted] = useState(false);
-  const [weekDays, setWeekDays] = useState<
-    { date: Date; dow: string; num: number }[]
-  >([]);
-
+const useSyncParticles = (
+  setLastSyncTime: React.Dispatch<React.SetStateAction<Record<string, number>>>
+) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const particlesRef = useRef<Particle[]>([]);
@@ -256,25 +235,6 @@ export const InteractiveHeroSection = () => {
   // Targets coordinates mapped for sync spark paths
   const targetsRef = useRef<Record<string, { x: number; y: number }>>({});
   const cellsRef = useRef<Record<string, HTMLButtonElement | null>>({});
-
-  const signUpHref = "/sign-up"; // fallback standard path
-  const mockFeedUrl = "https://api.leavesync.com/v1/ical/feed_5f2d7a9b.ics";
-
-  // Hydration-safe dynamic dates
-  useEffect(() => {
-    setMounted(true);
-    const today = new Date();
-    const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
-    const days = [0, 1, 2, 3, 4].map((offset) => {
-      const date = addDays(mondayThisWeek, offset);
-      return {
-        date,
-        dow: format(date, "eee"),
-        num: date.getDate(),
-      };
-    });
-    setWeekDays(days);
-  }, []);
 
   // Particle emission helper
   const emitParticles = (fromKey: string, leaveType: "sage" | "purple") => {
@@ -432,6 +392,340 @@ export const InteractiveHeroSection = () => {
     };
   }, []);
 
+  // Emit spark burst directly from legend buttons
+  const emitLegendSpark = (leaveType: "sage" | "purple", targetId: string) => {
+    const el = document.getElementById(targetId);
+    const container = containerRef.current;
+    if (!(el && container)) {
+      return;
+    }
+
+    const rect = el.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    const startX = rect.left - containerRect.left + rect.width / 2;
+    const startY = rect.top - containerRect.top + containerRect.height / 2;
+
+    const color = leaveType === "sage" ? "#6DA671" : "#5E4F99";
+    const targetKeys = ["outlook", "gcal", "applecal"];
+
+    for (const key of targetKeys) {
+      const targetPos = targetsRef.current[key];
+      if (targetPos) {
+        for (let i = 0; i < 4; i++) {
+          particlesRef.current.push({
+            x: startX,
+            y: startY,
+            targetX: targetPos.x,
+            targetY: targetPos.y,
+            color,
+            progress: 0,
+            speed: 0.02 + Math.random() * 0.015 - i * 0.003,
+            curveY: (Math.random() - 0.5) * 160,
+          });
+        }
+      }
+    }
+
+    if (!animationFrameRef.current) {
+      tick();
+    }
+  };
+
+  return {
+    canvasRef,
+    containerRef,
+    cellsRef,
+    emitParticles,
+    emitLegendSpark,
+  };
+};
+
+interface TeammateTrackRowProps {
+  calendarState: Record<string, "approved" | "pending">;
+  cellsRef: React.MutableRefObject<Record<string, HTMLButtonElement | null>>;
+  selectedBlock: SelectedBlockState | null;
+  setSelectedBlock: React.Dispatch<
+    React.SetStateAction<SelectedBlockState | null>
+  >;
+  tm: Teammate;
+  toggleCell: (teammateId: string, dayIdx: number) => void;
+}
+
+const TeammateTrackRow = ({
+  tm,
+  calendarState,
+  selectedBlock,
+  setSelectedBlock,
+  toggleCell,
+  cellsRef,
+}: TeammateTrackRowProps) => {
+  return (
+    <div className="contents">
+      <div className="tl-row-staff">
+        <div className="tl-avatar">{tm.initials}</div>
+        <div className="tl-staff-meta">
+          <div className="tl-staff-name">{tm.name}</div>
+          <div className="tl-staff-role">{tm.role}</div>
+        </div>
+      </div>
+
+      <div
+        className="tl-row-track"
+        style={{ gridTemplateColumns: "repeat(5, 1fr)" }}
+      >
+        {/* Day vertical guidelines */}
+        {[1, 2, 3, 4].map((i) => (
+          <span
+            className="tl-day-guide"
+            key={i}
+            style={{ left: `${(i / 5) * 100}%` }}
+          />
+        ))}
+
+        {/* Interactive overlay cell buttons */}
+        {[0, 1, 2, 3, 4].map((dayIdx) => {
+          const key = `${tm.id}-${dayIdx}`;
+          return (
+            <button
+              aria-label={`Toggle ${tm.name} leave on day ${dayIdx + 1}`}
+              className="ft-sandbox-cell-btn"
+              key={dayIdx}
+              onClick={() => toggleCell(tm.id, dayIdx)}
+              ref={(el) => {
+                cellsRef.current[key] = el;
+              }}
+              style={{
+                left: `${(dayIdx / 5) * 100}%`,
+                width: "20%",
+                height: "100%",
+                position: "absolute",
+                zIndex: 1,
+              }}
+              type="button"
+            />
+          );
+        })}
+
+        {/* Visual Leave Span Blocks */}
+        {getBlocksForTeammate(tm.id, calendarState).map((block) => {
+          const tone = block.kind === "annual" ? "sage" : "purple";
+          const iconId = (
+            {
+              annual: "leaf",
+              wfh: "home",
+              client: "briefcase",
+            } as const
+          )[block.kind];
+          const blockKey = `${tm.id}-${block.start}-${block.span}`;
+          const isSelected =
+            selectedBlock &&
+            selectedBlock.teammateId === tm.id &&
+            selectedBlock.start === block.start &&
+            selectedBlock.span === block.span;
+
+          return (
+            <button
+              className={`tl-block tl-block--${tone} ${
+                block.state === "pending" ? "tl-block--pending" : ""
+              } ${isSelected ? "is-selected" : ""}`}
+              key={blockKey}
+              onClick={() => {
+                setSelectedBlock({
+                  teammateId: tm.id,
+                  start: block.start,
+                  span: block.span,
+                  kind: block.kind,
+                  label: block.label,
+                  state: block.state,
+                });
+              }}
+              style={{
+                gridColumn: `${block.start} / span ${block.span}`,
+                zIndex: 2,
+              }}
+              type="button"
+            >
+              <span className="tl-block__icon">
+                <MarketingIcon id={iconId} size={14} />
+              </span>
+              {block.span >= 2 && (
+                <span className="tl-block__label">{block.label}</span>
+              )}
+              {block.span >= 3 && (
+                <span className="tl-block__days">{block.span}d</span>
+              )}
+              {block.state === "pending" && (
+                <span className="ml-auto rounded bg-amber-500/90 px-1 py-0.5 font-bold text-[9px] text-white uppercase leading-none tracking-tight">
+                  Pending
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+interface TimelineDetailStripProps {
+  handleApprove: () => void;
+  handleDecline: () => void;
+  selectedBlock: SelectedBlockState | null;
+  weekDays: { date: Date; dow: string; num: number }[];
+}
+
+const TimelineDetailStrip = ({
+  selectedBlock,
+  weekDays,
+  handleApprove,
+  handleDecline,
+}: TimelineDetailStripProps) => {
+  if (!selectedBlock) {
+    return (
+      <div className="tl-detail tl-detail--empty" style={{ marginTop: "12px" }}>
+        <span aria-hidden="true" className="tl-detail-hint-icon">
+          <MarketingIcon id="arrowUpRight" size={14} />
+        </span>
+        Click any leave block to view details, approve pending requests, or
+        revoke synced leave.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="tl-detail"
+      style={{
+        marginTop: "12px",
+        border: "1px solid var(--marketing-ghost-border)",
+      }}
+    >
+      <div
+        className={`tl-detail-icon tl-detail-icon--${
+          selectedBlock.kind === "annual" ? "sage" : "purple"
+        }`}
+      >
+        <MarketingIcon id={BLOCK_KIND_ICONS[selectedBlock.kind]} size={20} />
+      </div>
+      <div className="tl-detail-content">
+        <div className="tl-detail-title">
+          {TEAMMATES.find((t) => t.id === selectedBlock.teammateId)?.name} ·{" "}
+          {selectedBlock.label}{" "}
+          <span
+            className={`ml-1.5 rounded px-1.5 py-0.5 font-semibold text-[10px] ${
+              selectedBlock.state === "pending"
+                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+            }`}
+          >
+            {selectedBlock.state === "pending"
+              ? "Pending Approval"
+              : "Approved & Synced"}
+          </span>
+        </div>
+        <div className="tl-detail-meta mt-0.5 text-muted-foreground text-xs">
+          <span>{getSelectedDatesLabel(selectedBlock, weekDays)}</span>
+          <span aria-hidden="true" className="mx-1">
+            ·
+          </span>
+          <span>
+            {selectedBlock.span === 1 ? "1 day" : `${selectedBlock.span} days`}
+          </span>
+          <span aria-hidden="true" className="mx-1">
+            ·
+          </span>
+          <span>
+            {selectedBlock.state === "pending"
+              ? "Sync writes back to Xero Payroll"
+              : "Two-way Xero synchronization active"}
+          </span>
+        </div>
+      </div>
+      <div className="tl-detail-side flex items-center gap-2">
+        {selectedBlock.state === "pending" ? (
+          <>
+            <button
+              className="cursor-pointer rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white text-xs transition-colors hover:bg-emerald-700"
+              onClick={handleApprove}
+              type="button"
+            >
+              Approve Sync
+            </button>
+            <button
+              className="cursor-pointer rounded-lg border border-border/10 bg-transparent px-3.5 py-1.5 font-medium text-muted-foreground text-xs transition-colors hover:bg-muted"
+              onClick={handleDecline}
+              type="button"
+            >
+              Decline
+            </button>
+          </>
+        ) : (
+          <button
+            className="cursor-pointer border-none bg-transparent font-medium text-rose-600 text-xs hover:text-rose-700"
+            onClick={handleDecline}
+            type="button"
+          >
+            Revoke Leave
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export const InteractiveHeroSection = () => {
+  // Calendar states: [teammateId-dayIndex]: approved | pending | undefined
+  const [calendarState, setCalendarState] = useState<
+    Record<string, "approved" | "pending">
+  >({
+    "sam-0": "approved",
+    "sam-1": "approved",
+    "sam-2": "pending",
+    "priya-2": "approved",
+    "dee-3": "pending",
+    "dee-4": "approved",
+  });
+
+  const [selectedBlock, setSelectedBlock] = useState<SelectedBlockState | null>(
+    null
+  );
+
+  const [lastSyncTime, setLastSyncTime] = useState<Record<string, number>>({
+    outlook: Date.now() - 5000,
+    gcal: Date.now() - 5000,
+    applecal: Date.now() - 5000,
+  });
+
+  const [activeTab, setActiveTab] = useState<"visual" | "ics">("visual");
+  const [copyStatus, setCopyStatus] = useState("Copy Link");
+  const [mounted, setMounted] = useState(false);
+  const [weekDays, setWeekDays] = useState<
+    { date: Date; dow: string; num: number }[]
+  >([]);
+
+  const { canvasRef, containerRef, cellsRef, emitParticles, emitLegendSpark } =
+    useSyncParticles(setLastSyncTime);
+
+  const signUpHref = "/sign-up"; // fallback standard path
+  const mockFeedUrl = "https://api.leavesync.com/v1/ical/feed_5f2d7a9b.ics";
+
+  // Hydration-safe dynamic dates
+  useEffect(() => {
+    setMounted(true);
+    const today = new Date();
+    const mondayThisWeek = startOfWeek(today, { weekStartsOn: 1 });
+    const days = [0, 1, 2, 3, 4].map((offset) => {
+      const date = addDays(mondayThisWeek, offset);
+      return {
+        date,
+        dow: format(date, "eee"),
+        num: date.getDate(),
+      };
+    });
+    setWeekDays(days);
+  }, []);
+
   // Click on grid cell: Managers register a Staff request (marked Pending)
   const toggleCell = (teammateId: string, dayIdx: number) => {
     const key = `${teammateId}-${dayIdx}`;
@@ -504,46 +798,6 @@ export const InteractiveHeroSection = () => {
     }
     setCalendarState(nextState);
     setSelectedBlock(null);
-  };
-
-  // Emit spark burst directly from legend buttons
-  const emitLegendSpark = (leaveType: "sage" | "purple", targetId: string) => {
-    const el = document.getElementById(targetId);
-    const container = containerRef.current;
-    if (!(el && container)) {
-      return;
-    }
-
-    const rect = el.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-
-    const startX = rect.left - containerRect.left + rect.width / 2;
-    const startY = rect.top - containerRect.top + rect.height / 2;
-
-    const color = leaveType === "sage" ? "#6DA671" : "#5E4F99";
-    const targetKeys = ["outlook", "gcal", "applecal"];
-
-    for (const key of targetKeys) {
-      const targetPos = targetsRef.current[key];
-      if (targetPos) {
-        for (let i = 0; i < 4; i++) {
-          particlesRef.current.push({
-            x: startX,
-            y: startY,
-            targetX: targetPos.x,
-            targetY: targetPos.y,
-            color,
-            progress: 0,
-            speed: 0.02 + Math.random() * 0.015 - i * 0.003,
-            curveY: (Math.random() - 0.5) * 160,
-          });
-        }
-      }
-    }
-
-    if (!animationFrameRef.current) {
-      tick();
-    }
   };
 
   // Copy mock url to clipboard helper
@@ -647,10 +901,15 @@ export const InteractiveHeroSection = () => {
                     </div>
                   </div>
                   {/* Interactive Legend that shoots sparks when clicked */}
-                  <div
+                  <fieldset
                     aria-label="Legend"
                     className="tl-legend"
-                    style={{ gap: "8px" }}
+                    style={{
+                      border: "none",
+                      padding: 0,
+                      margin: 0,
+                      gap: "8px",
+                    }}
                   >
                     <button
                       className="tl-legend-item flex cursor-pointer items-center border-none bg-transparent transition-all hover:opacity-80 active:scale-95"
@@ -690,7 +949,7 @@ export const InteractiveHeroSection = () => {
                       </span>
                       Client visit
                     </button>
-                  </div>
+                  </fieldset>
                 </div>
 
                 <div
@@ -715,230 +974,25 @@ export const InteractiveHeroSection = () => {
 
                   {/* Teammate tracks */}
                   {TEAMMATES.map((tm) => (
-                    <div className="contents" key={tm.id}>
-                      <div className="tl-row-staff">
-                        <div className="tl-avatar">{tm.initials}</div>
-                        <div className="tl-staff-meta">
-                          <div className="tl-staff-name">{tm.name}</div>
-                          <div className="tl-staff-role">{tm.role}</div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="tl-row-track"
-                        style={{ gridTemplateColumns: "repeat(5, 1fr)" }}
-                      >
-                        {/* Day vertical guidelines */}
-                        {[1, 2, 3, 4].map((i) => (
-                          <span
-                            className="tl-day-guide"
-                            key={i}
-                            style={{ left: `${(i / 5) * 100}%` }}
-                          />
-                        ))}
-
-                        {/* Interactive overlay cell buttons */}
-                        {[0, 1, 2, 3, 4].map((dayIdx) => {
-                          const key = `${tm.id}-${dayIdx}`;
-                          return (
-                            <button
-                              aria-label={`Toggle ${tm.name} leave on day ${dayIdx + 1}`}
-                              className="ft-sandbox-cell-btn"
-                              key={dayIdx}
-                              onClick={() => toggleCell(tm.id, dayIdx)}
-                              ref={(el) => {
-                                cellsRef.current[key] = el;
-                              }}
-                              style={{
-                                left: `${(dayIdx / 5) * 100}%`,
-                                width: "20%",
-                                height: "100%",
-                                position: "absolute",
-                                zIndex: 1,
-                              }}
-                              type="button"
-                            />
-                          );
-                        })}
-
-                        {/* Visual Leave Span Blocks */}
-                        {getBlocksForTeammate(tm.id, calendarState).map(
-                          (block) => {
-                            const tone =
-                              block.kind === "annual" ? "sage" : "purple";
-                            const iconId = (
-                              {
-                                annual: "leaf",
-                                wfh: "home",
-                                client: "briefcase",
-                              } as const
-                            )[block.kind];
-                            const blockKey = `${tm.id}-${block.start}-${block.span}`;
-                            const isSelected =
-                              selectedBlock &&
-                              selectedBlock.teammateId === tm.id &&
-                              selectedBlock.start === block.start &&
-                              selectedBlock.span === block.span;
-
-                            return (
-                              <button
-                                className={`tl-block tl-block--${tone} ${
-                                  block.state === "pending"
-                                    ? "tl-block--pending"
-                                    : ""
-                                } ${isSelected ? "is-selected" : ""}`}
-                                key={blockKey}
-                                onClick={() => {
-                                  setSelectedBlock({
-                                    teammateId: tm.id,
-                                    start: block.start,
-                                    span: block.span,
-                                    kind: block.kind,
-                                    label: block.label,
-                                    state: block.state,
-                                  });
-                                }}
-                                style={{
-                                  gridColumn: `${block.start} / span ${block.span}`,
-                                  zIndex: 2,
-                                }}
-                                type="button"
-                              >
-                                <span className="tl-block__icon">
-                                  <MarketingIcon id={iconId} size={14} />
-                                </span>
-                                {block.span >= 2 && (
-                                  <span className="tl-block__label">
-                                    {block.label}
-                                  </span>
-                                )}
-                                {block.span >= 3 && (
-                                  <span className="tl-block__days">
-                                    {block.span}d
-                                  </span>
-                                )}
-                                {block.state === "pending" && (
-                                  <span className="ml-auto rounded bg-amber-500/90 px-1 py-0.5 font-bold text-[9px] text-white uppercase leading-none tracking-tight">
-                                    Pending
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          }
-                        )}
-                      </div>
-                    </div>
+                    <TeammateTrackRow
+                      calendarState={calendarState}
+                      cellsRef={cellsRef}
+                      key={tm.id}
+                      selectedBlock={selectedBlock}
+                      setSelectedBlock={setSelectedBlock}
+                      tm={tm}
+                      toggleCell={toggleCell}
+                    />
                   ))}
                 </div>
 
                 {/* Homepage-style Detail Strip */}
-                {selectedBlock ? (
-                  <div
-                    className="tl-detail"
-                    style={{
-                      marginTop: "12px",
-                      border: "1px solid var(--marketing-ghost-border)",
-                    }}
-                  >
-                    <div
-                      className={`tl-detail-icon tl-detail-icon--${
-                        selectedBlock.kind === "annual" ? "sage" : "purple"
-                      }`}
-                    >
-                      <MarketingIcon
-                        id={
-                          selectedBlock.kind === "annual"
-                            ? "leaf"
-                            : selectedBlock.kind === "wfh"
-                              ? "home"
-                              : "briefcase"
-                        }
-                        size={20}
-                      />
-                    </div>
-                    <div className="tl-detail-content">
-                      <div className="tl-detail-title">
-                        {
-                          TEAMMATES.find(
-                            (t) => t.id === selectedBlock.teammateId
-                          )?.name
-                        }{" "}
-                        · {selectedBlock.label}{" "}
-                        <span
-                          className={`ml-1.5 rounded px-1.5 py-0.5 font-semibold text-[10px] ${
-                            selectedBlock.state === "pending"
-                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
-                          }`}
-                        >
-                          {selectedBlock.state === "pending"
-                            ? "Pending Approval"
-                            : "Approved & Synced"}
-                        </span>
-                      </div>
-                      <div className="tl-detail-meta mt-0.5 text-muted-foreground text-xs">
-                        <span>
-                          {getSelectedDatesLabel(selectedBlock, weekDays)}
-                        </span>
-                        <span aria-hidden="true" className="mx-1">
-                          ·
-                        </span>
-                        <span>
-                          {selectedBlock.span === 1
-                            ? "1 day"
-                            : `${selectedBlock.span} days`}
-                        </span>
-                        <span aria-hidden="true" className="mx-1">
-                          ·
-                        </span>
-                        <span>
-                          {selectedBlock.state === "pending"
-                            ? "Sync writes back to Xero Payroll"
-                            : "Two-way Xero synchronization active"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="tl-detail-side flex items-center gap-2">
-                      {selectedBlock.state === "pending" ? (
-                        <>
-                          <button
-                            className="cursor-pointer rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white text-xs transition-colors hover:bg-emerald-700"
-                            onClick={handleApprove}
-                            type="button"
-                          >
-                            Approve Sync
-                          </button>
-                          <button
-                            className="cursor-pointer rounded-lg border border-border/10 bg-transparent px-3.5 py-1.5 font-medium text-muted-foreground text-xs transition-colors hover:bg-muted"
-                            onClick={handleDecline}
-                            type="button"
-                          >
-                            Decline
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="cursor-pointer border-none bg-transparent font-medium text-rose-600 text-xs hover:text-rose-700"
-                          onClick={handleDecline}
-                          type="button"
-                        >
-                          Revoke Leave
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div
-                    className="tl-detail tl-detail--empty"
-                    style={{ marginTop: "12px" }}
-                  >
-                    <span aria-hidden="true" className="tl-detail-hint-icon">
-                      <MarketingIcon id="arrowUpRight" size={14} />
-                    </span>
-                    Click any leave block to view details, approve pending
-                    requests, or revoke synced leave.
-                  </div>
-                )}
+                <TimelineDetailStrip
+                  handleApprove={handleApprove}
+                  handleDecline={handleDecline}
+                  selectedBlock={selectedBlock}
+                  weekDays={weekDays}
+                />
               </div>
 
               {/* Feeds status */}

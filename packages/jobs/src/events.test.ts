@@ -14,7 +14,7 @@ describe("jobs events", () => {
     expect(getRegisteredSyncEventName("approval_state_reconciliation")).toBe(
       "reconcile-xero-approval-state"
     );
-    expect(getRegisteredSyncEventName("people")).toBeNull();
+    expect(getRegisteredSyncEventName("people")).toBe("sync-xero-people");
   });
 
   it("dispatches approval reconciliation with full tenant payload", async () => {

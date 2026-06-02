@@ -13,7 +13,11 @@ export {
   refreshXeroOAuthConnection,
   type XeroOAuthError,
 } from "./src/oauth/service";
-export { fetchLeaveApplicationStatusForRegion } from "./src/read/dispatch";
+export {
+  fetchEmployeesForRegion,
+  fetchLeaveApplicationStatusForRegion,
+} from "./src/read/dispatch";
+export type { XeroEmployee } from "./src/read/employees";
 export type {
   XeroLeaveApplicationStatus,
   XeroLeaveApplicationStatusResult,
