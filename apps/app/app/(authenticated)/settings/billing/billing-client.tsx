@@ -29,13 +29,13 @@ export const BillingClient = ({
 
     {summary.isOverLimit && (
       <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-sm">
-        This organisation is over one or more plan limits.
+        This account is over one or more plan limits.
       </div>
     )}
 
     {locked && (
       <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
-        Billing actions are managed by the organisation owner.
+        Billing actions are managed by the account owner.
       </div>
     )}
 

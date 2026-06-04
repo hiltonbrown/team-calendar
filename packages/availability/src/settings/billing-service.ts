@@ -77,7 +77,7 @@ export async function getBillingSummary(
       ok: false,
       error: {
         code: "not_authorised",
-        message: "Billing is managed by the workspace owner.",
+        message: "Billing is managed by the account owner.",
       },
     };
   }
@@ -112,7 +112,7 @@ export async function getBillingSummaryForDashboard(
       ok: false,
       error: {
         code: "not_authorised",
-        message: "Billing is managed by the workspace owner.",
+        message: "Billing is managed by the account owner.",
       },
     };
   }
@@ -152,7 +152,7 @@ async function loadBillingSummary(
         ok: false,
         error: {
           code: "subscription_not_found",
-          message: "No billing subscription is configured for this workspace.",
+          message: "No billing subscription is configured for this account.",
         },
       };
     }
