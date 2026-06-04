@@ -35,7 +35,7 @@ export const BillingClient = ({
 
     {locked && (
       <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
-        Billing actions are managed by the organisation owner.
+        Billing actions are managed by the account owner.
       </div>
     )}
 

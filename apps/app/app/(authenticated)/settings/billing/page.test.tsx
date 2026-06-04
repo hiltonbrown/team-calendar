@@ -77,7 +77,7 @@ describe("BillingPage", () => {
       expect.objectContaining({ actingRole: "admin" })
     );
     expect(
-      screen.getByText("Billing actions are managed by the organisation owner.")
+      screen.getByText("Billing actions are managed by the account owner.")
     ).toBeDefined();
   });
 
@@ -90,9 +90,7 @@ describe("BillingPage", () => {
       expect.objectContaining({ actingRole: "owner" })
     );
     expect(
-      screen.queryByText(
-        "Billing actions are managed by the organisation owner."
-      )
+      screen.queryByText("Billing actions are managed by the account owner.")
     ).toBeNull();
   });
 });
