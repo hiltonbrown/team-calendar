@@ -131,8 +131,6 @@ function revalidatePaths() {
   revalidatePath("/leave-approvals");
   revalidatePath("/people");
   revalidatePath("/plans");
-  revalidatePath("/analytics/leave-reports");
-  revalidatePath("/analytics/out-of-office");
 }
 
 function notAuthorised(): ActionResult<never> {

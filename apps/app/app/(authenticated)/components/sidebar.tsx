@@ -17,13 +17,11 @@ import {
 import { cn } from "@repo/design-system/lib/utils";
 import {
   ActivityIcon,
-  BarChart2Icon,
   BellIcon,
   CalendarDaysIcon,
   ClipboardListIcon,
   FlagIcon,
   LayoutDashboardIcon,
-  LifeBuoyIcon,
   LinkIcon,
   Settings2Icon,
   UsersIcon,
@@ -67,21 +65,6 @@ const navGroups = [
       },
       { title: "Public Holidays", href: "/public-holidays", icon: FlagIcon },
       { title: "Sync Health", href: "/sync", icon: ActivityIcon },
-    ],
-  },
-  {
-    label: "Reports",
-    items: [
-      {
-        title: "Leave Reports",
-        href: "/analytics/leave-reports",
-        icon: BarChart2Icon,
-      },
-      {
-        title: "Out of Office",
-        href: "/analytics/out-of-office",
-        icon: BarChart2Icon,
-      },
     ],
   },
 ] as const;
@@ -200,25 +183,6 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                     strokeWidth={1.75}
                   />
                   <span className="font-medium text-[0.8125rem]">Settings</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                className="h-9 gap-3"
-                isActive={pathname.startsWith("/support")}
-                tooltip="Support & Feedback"
-              >
-                <Link href={withOrg("/support", orgId)}>
-                  <LifeBuoyIcon
-                    className="h-4 w-4 shrink-0"
-                    strokeWidth={1.75}
-                  />
-                  <span className="font-medium text-[0.8125rem]">
-                    Support & Feedback
-                  </span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

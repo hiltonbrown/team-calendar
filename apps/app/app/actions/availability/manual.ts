@@ -165,15 +165,7 @@ function emptyToUndefined(value?: string): string | undefined {
 }
 
 function revalidateAvailabilityPaths(): void {
-  for (const path of [
-    "/",
-    "/plans",
-    "/availability",
-    "/calendar",
-    "/people",
-    "/analytics/leave-reports",
-    "/analytics/out-of-office",
-  ]) {
+  for (const path of ["/", "/plans", "/availability", "/calendar", "/people"]) {
     revalidatePath(path);
   }
 }
