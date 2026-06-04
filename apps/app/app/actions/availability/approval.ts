@@ -43,14 +43,7 @@ export async function updateAvailabilityApprovalAction(
     return { ok: false, error: result.error.message };
   }
 
-  for (const path of [
-    "/",
-    "/leave-approvals",
-    "/calendar",
-    "/people",
-    "/analytics/leave-reports",
-    "/analytics/out-of-office",
-  ]) {
+  for (const path of ["/", "/leave-approvals", "/calendar", "/people"]) {
     revalidatePath(path);
   }
 

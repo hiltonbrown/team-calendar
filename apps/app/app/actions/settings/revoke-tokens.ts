@@ -30,7 +30,7 @@ export const revokeAllTokens = async (
     return { ok: false, error: result.error.message };
   }
 
-  for (const path of ["/", "/feed", "/calendar", "/settings/feeds"]) {
+  for (const path of ["/", "/feeds", "/calendar", "/settings/feeds"]) {
     revalidatePath(path);
   }
 

@@ -297,10 +297,7 @@ export function PeopleClient({
                   <TableCell>
                     <Link
                       className="flex items-center gap-3"
-                      href={withOrg(
-                        `/people/person/${person.id}`,
-                        orgQueryValue
-                      )}
+                      href={withOrg(`/people/${person.id}`, orgQueryValue)}
                     >
                       <Avatar person={person} />
                       <span className="min-w-0">

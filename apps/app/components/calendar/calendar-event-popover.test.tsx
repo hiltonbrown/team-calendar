@@ -20,7 +20,7 @@ describe("CalendarEventPopover", () => {
     expect(await screen.findByText("Ari Report")).toBeDefined();
     expect(screen.getByText("Annual Leave")).toBeDefined();
     expect(screen.getByText("Note")).toBeDefined();
-    expect(screen.getByRole("link", { name: "View record" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "View plan" })).toBeDefined();
   });
 
   it("shows plain Xero errors without raw details", async () => {

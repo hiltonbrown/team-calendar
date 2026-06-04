@@ -7,8 +7,8 @@ import { Switch } from "@repo/design-system/components/ui/switch";
 import { Textarea } from "@repo/design-system/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { createFeedAction } from "@/app/(authenticated)/feed/_actions";
-import { useFeedTokenSession } from "@/app/(authenticated)/feed/feed-token-session";
+import { createFeedAction } from "@/app/(authenticated)/feeds/_actions";
+import { useFeedTokenSession } from "@/app/(authenticated)/feeds/feed-token-session";
 import { OneTimeTokenPanel } from "./one-time-token-panel";
 
 type ScopeChoice = "manager_team" | "org" | "person" | "self" | "team";
@@ -72,7 +72,7 @@ export function FeedCreateForm({
         feedId={created.feedId}
         onDone={() => {
           tokenSession.clearToken(created.feedId);
-          router.push(`/feed/feed/${created.feedId}`);
+          router.push(`/feeds/${created.feedId}`);
         }}
         origin={tokenSession.origin}
         plaintext={created.plaintext}

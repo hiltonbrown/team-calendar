@@ -122,7 +122,7 @@ export const FeedsClient = ({
           <div className="flex items-center justify-between gap-4">
             <CardTitle>All feeds</CardTitle>
             <Button asChild>
-              <Link href="/feed/feed/new">Create new feed</Link>
+              <Link href="/feeds/new">Create new feed</Link>
             </Button>
           </div>
         </CardHeader>
@@ -139,7 +139,7 @@ export const FeedsClient = ({
                 </p>
               </div>
               <Button asChild variant="outline">
-                <Link href={`/feed/${feed.id}`}>Open</Link>
+                <Link href={`/feeds/${feed.id}`}>Open</Link>
               </Button>
             </div>
           ))}

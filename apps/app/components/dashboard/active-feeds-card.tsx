@@ -15,7 +15,7 @@ export function ActiveFeedsCard({
   if (state.status === "error") {
     return (
       <DashboardCardShell
-        ctaHref="/feed"
+        ctaHref="/feeds"
         ctaLabel="Open feeds"
         description="Calendar publishing health"
         orgQueryValue={orgQueryValue}
@@ -30,7 +30,7 @@ export function ActiveFeedsCard({
 
   return (
     <DashboardCardShell
-      ctaHref="/feed"
+      ctaHref="/feeds"
       ctaLabel="Open feeds"
       description="Calendar publishing health"
       orgQueryValue={orgQueryValue}

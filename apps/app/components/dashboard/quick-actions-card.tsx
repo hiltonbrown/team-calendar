@@ -16,7 +16,7 @@ export function QuickActionsCard({ orgQueryValue }: QuickActionsCardProps) {
       <div className="grid gap-3 text-sm">
         <Link
           className="rounded-xl bg-muted px-4 py-3 font-medium"
-          href={withOrg("/plans/records/new", orgQueryValue)}
+          href={withOrg("/plans/new", orgQueryValue)}
         >
           Create a new plan
         </Link>

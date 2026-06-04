@@ -150,7 +150,7 @@ export function CalendarToolbar({
               params.set("personId", selectedPersonId);
             }
             router.push(
-              withOrg(`/plans/records/new?${params.toString()}`, orgQueryValue)
+              withOrg(`/plans/new?${params.toString()}`, orgQueryValue)
             );
           }}
           type="button"

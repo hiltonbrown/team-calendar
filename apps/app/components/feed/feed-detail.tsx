@@ -15,8 +15,8 @@ import {
   pauseFeedAction,
   resumeFeedAction,
   rotateTokenAction,
-} from "@/app/(authenticated)/feed/_actions";
-import { useFeedTokenSession } from "@/app/(authenticated)/feed/feed-token-session";
+} from "@/app/(authenticated)/feeds/_actions";
+import { useFeedTokenSession } from "@/app/(authenticated)/feeds/feed-token-session";
 import { OneTimeTokenPanel } from "./one-time-token-panel";
 
 interface PreviewEvent {

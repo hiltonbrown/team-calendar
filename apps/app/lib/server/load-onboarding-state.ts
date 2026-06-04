@@ -183,7 +183,7 @@ export async function loadOnboardingState({
       title: "Review public holidays",
     },
     {
-      ctaHref: "/feed",
+      ctaHref: "/feeds",
       ctaLabel: hasFeeds ? "View feeds" : "Create feed",
       description:
         "Create an ICS feed when you are ready to publish availability to team calendars.",
