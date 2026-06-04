@@ -9,7 +9,7 @@ const LegacyNewAvailabilityPage = async ({
   searchParams,
 }: LegacyNewAvailabilityPageProps) => {
   const { org } = await searchParams;
-  redirect(withOrg("/plans/records/new", org));
+  redirect(withOrg("/plans/new", org));
 };
 
 export default LegacyNewAvailabilityPage;

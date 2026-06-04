@@ -17,11 +17,11 @@ import {
   pauseFeedAction,
   resumeFeedAction,
   rotateTokenAction,
-} from "@/app/(authenticated)/feed/_actions";
+} from "@/app/(authenticated)/feeds/_actions";
 import {
   buildSubscribeUrl,
   useFeedTokenSession,
-} from "@/app/(authenticated)/feed/feed-token-session";
+} from "@/app/(authenticated)/feeds/feed-token-session";
 
 export interface FeedTableItem {
   activeTokenHint: { hint: string; lastUsedAt: Date | null } | null;
@@ -57,7 +57,7 @@ export function FeedTable({
   const copy = async (feedId: string) => {
     const plaintext = tokenSession.tokenForFeed(feedId);
     if (!plaintext) {
-      window.location.href = `/feed/feed/${feedId}?panel=rotate`;
+      window.location.href = `/feeds/${feedId}?panel=rotate`;
       return;
     }
     await navigator.clipboard.writeText(
@@ -146,7 +146,7 @@ export function FeedTable({
               <div>
                 <Link
                   className="font-semibold text-foreground hover:text-primary"
-                  href={`/feed/feed/${feed.id}`}
+                  href={`/feeds/${feed.id}`}
                 >
                   {feed.name}
                 </Link>

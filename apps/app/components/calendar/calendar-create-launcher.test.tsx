@@ -30,7 +30,7 @@ describe("CalendarCreateLauncher", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     expect(mocks.push).toHaveBeenCalledWith(
-      "/plans/records/new?startsAt=2026-04-15&personId=00000000-0000-4000-8000-000000000011&org=org_1"
+      "/plans/new?startsAt=2026-04-15&personId=00000000-0000-4000-8000-000000000011&org=org_1"
     );
   });
 });

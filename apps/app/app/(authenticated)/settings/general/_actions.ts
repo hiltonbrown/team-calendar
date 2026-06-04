@@ -10,7 +10,7 @@ import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const OrganisationIdSchema = z.string().uuid();
 
-const WorkspaceNameSchema = z.object({
+const AccountNameSchema = z.object({
   name: z.string().trim().min(1).max(128),
   organisationId: OrganisationIdSchema,
 });
@@ -31,11 +31,11 @@ type ActionError =
 
 type ActionResult<T> = Result<T, ActionError>;
 
-export async function updateWorkspaceNameAction(input: {
+export async function updateAccountNameAction(input: {
   name: string;
   organisationId: string;
 }): Promise<ActionResult<{ name: string }>> {
-  const parsed = WorkspaceNameSchema.safeParse(input);
+  const parsed = AccountNameSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
@@ -57,7 +57,7 @@ export async function updateWorkspaceNameAction(input: {
 
     await database.auditEvent.create({
       data: {
-        action: "organisation.workspace_name_changed",
+        action: "account.name_changed",
         actor_display: context.value.actorDisplay,
         actor_user_id: context.value.actingUserId,
         after_value: { name: parsed.data.name },
@@ -79,7 +79,7 @@ export async function updateWorkspaceNameAction(input: {
 
     return { ok: true, value: { name: parsed.data.name } };
   } catch {
-    return unknownError("Failed to update workspace name.");
+    return unknownError("Failed to update account name.");
   }
 }
 

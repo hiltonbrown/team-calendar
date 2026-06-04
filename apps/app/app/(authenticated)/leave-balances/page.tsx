@@ -10,7 +10,7 @@ const LegacyLeaveBalancesPage = async ({
 }: LegacyLeaveBalancesPageProps) => {
   const { org, personId } = await searchParams;
   if (personId) {
-    redirect(withOrg(`/people/person/${personId}`, org));
+    redirect(withOrg(`/people/${personId}`, org));
   }
   redirect(withOrg("/people", org));
 };

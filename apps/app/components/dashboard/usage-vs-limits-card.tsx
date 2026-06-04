@@ -60,7 +60,7 @@ export function UsageVsLimitsCard({
           ))}
           {state.data.visibleToAdmin ? null : (
             <p className="text-muted-foreground">
-              Billing is managed by the workspace owner.
+              Billing is managed by the account owner.
             </p>
           )}
         </div>

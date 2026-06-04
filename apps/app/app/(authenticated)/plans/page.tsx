@@ -194,7 +194,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
 
         {records.length === 0 && (
           <EmptyState
-            description="No records match the current filters."
+            description="No plans match the current filters."
             title="No plans found"
           />
         )}

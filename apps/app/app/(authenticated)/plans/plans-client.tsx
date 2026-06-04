@@ -122,7 +122,7 @@ export function PlansClient({
     record: PlansClientRecord;
   } | null>(null);
 
-  const newRecordHref = withOrg("/plans/records/new", orgQueryValue);
+  const newRecordHref = withOrg("/plans/new", orgQueryValue);
 
   const runAction = (recordId: string, action: RunnableAction) => {
     const record = records.find((candidate) => candidate.id === recordId);
@@ -224,7 +224,7 @@ export function PlansClient({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All records</SelectItem>
+              <SelectItem value="all">All plans</SelectItem>
               <SelectItem value="xero_leave">Leave types</SelectItem>
               <SelectItem value="local_only">Availability</SelectItem>
             </SelectContent>
@@ -268,7 +268,7 @@ export function PlansClient({
             <TableHeader>
               <TableRow>
                 {filters.tab === "team" && <TableHead>Person</TableHead>}
-                <TableHead>Record</TableHead>
+                <TableHead>Plan</TableHead>
                 <TableHead>Dates</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Status</TableHead>
@@ -332,7 +332,7 @@ export function PlansClient({
                             >
                               <Link
                                 href={withOrg(
-                                  `/plans/records/${record.id}/edit`,
+                                  `/plans/${record.id}/edit`,
                                   orgQueryValue
                                 )}
                               >

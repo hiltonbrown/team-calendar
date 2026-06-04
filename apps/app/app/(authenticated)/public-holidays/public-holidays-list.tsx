@@ -166,11 +166,6 @@ export function PublicHolidaysList({
           actionSlot={
             <div className="flex flex-wrap justify-center gap-3">
               <Button asChild>
-                <Link href="/public-holidays/import">
-                  <PlusIcon className="mr-2 h-4 w-4" /> Import holidays
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
                 <Link href="/public-holidays/holidays/new">
                   <PlusIcon className="mr-2 h-4 w-4" /> Add custom holiday
                 </Link>
@@ -193,11 +188,6 @@ export function PublicHolidaysList({
       />
 
       <div className="flex justify-end gap-4">
-        <Button asChild variant="outline">
-          <Link href="/public-holidays/import">
-            <PlusIcon className="mr-2 h-4 w-4" /> Import holidays
-          </Link>
-        </Button>
         <Button asChild>
           <Link href="/public-holidays/holidays/new">
             <PlusIcon className="mr-2 h-4 w-4" /> Add custom holiday

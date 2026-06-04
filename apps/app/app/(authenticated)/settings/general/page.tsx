@@ -6,7 +6,7 @@ import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-pag
 import { GeneralClient } from "./general-client";
 
 export const metadata: Metadata = {
-  description: "Manage your workspace and organisation settings.",
+  description: "Manage your account and payroll entity settings.",
   title: "General - Settings - LeaveSync",
 };
 
@@ -26,7 +26,7 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
   ]);
 
   if (!orgId) {
-    throw new Error("No active workspace selected.");
+    throw new Error("No active account selected.");
   }
 
   const [clerk, organisation] = await Promise.all([
@@ -49,22 +49,22 @@ const GeneralPage = async ({ searchParams }: GeneralPageProps) => {
     throw new Error("Organisation not found.");
   }
 
-  const workspace = await clerk.organizations.getOrganization({
+  const account = await clerk.organizations.getOrganization({
     organizationId: orgId,
   });
 
   return (
     <GeneralClient
+      account={{
+        name: account.name,
+        slug: account.slug ?? null,
+      }}
       organisation={{
         countryCode: organisation.country_code as "AU" | "NZ" | "UK",
         id: organisationId,
         name: organisation.name,
         regionCode: organisation.region_code,
         timezone: organisation.timezone ?? "Australia/Brisbane",
-      }}
-      workspace={{
-        name: workspace.name,
-        slug: workspace.slug ?? null,
       }}
     />
   );

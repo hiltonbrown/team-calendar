@@ -61,11 +61,6 @@ export const HolidaysClient = ({
 
       <div className="flex gap-3">
         <Button asChild>
-          <Link href={`/public-holidays/import?org=${organisationId}`}>
-            Import holidays
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
           <Link href={`/public-holidays/holidays/new?org=${organisationId}`}>
             Add custom holiday
           </Link>

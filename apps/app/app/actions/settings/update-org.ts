@@ -77,12 +77,7 @@ export const updateOrg = async (
       },
     });
 
-    for (const path of [
-      "/settings/general",
-      "/analytics/leave-reports",
-      "/analytics/out-of-office",
-      "/leave-approvals",
-    ]) {
+    for (const path of ["/settings/general", "/leave-approvals"]) {
       revalidatePath(path);
     }
 

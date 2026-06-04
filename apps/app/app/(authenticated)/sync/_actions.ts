@@ -81,7 +81,6 @@ export async function cancelRunAction(input: {
   });
   if (result.ok) {
     revalidatePath("/sync");
-    revalidatePath(`/sync/${parsed.data.runId}`);
   }
   return result;
 }

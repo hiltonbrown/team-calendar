@@ -6,7 +6,7 @@ export function ViewerView() {
       <DashboardHeader
         name="Welcome"
         roleLabel="Viewer"
-        subtitle="Your account does not have a person profile in this organisation yet. Contact the workspace owner if this looks wrong."
+        subtitle="Your account does not have a person profile in this organisation yet. Contact the account owner if this looks wrong."
         xeroConnected={false}
       />
     </div>

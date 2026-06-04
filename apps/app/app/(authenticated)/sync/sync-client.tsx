@@ -147,7 +147,6 @@ export function SyncClient({
                     <th className="p-4 font-medium">Duration</th>
                     <th className="p-4 font-medium">Records</th>
                     <th className="p-4 font-medium">Triggered by</th>
-                    <th className="p-4 font-medium">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-background">
@@ -170,11 +169,6 @@ export function SyncClient({
                         failed
                       </td>
                       <td className="p-4">{run.triggeredByUserDisplay}</td>
-                      <td className="p-4">
-                        <Button asChild size="sm" variant="secondary">
-                          <Link href={`/sync/${run.id}`}>View</Link>
-                        </Button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
