@@ -66,7 +66,7 @@ export function CalendarEventPopover({
           {event.isEditableByActor ? (
             <Button asChild size="sm" variant="secondary">
               <Link href={withOrg(`/plans/${event.id}/edit`, orgQueryValue)}>
-                View record
+                View plan
               </Link>
             </Button>
           ) : (
