@@ -41,15 +41,21 @@ created are the Markdown deliverables under `launch-plan/`.
 
 1. **ICS UID and SEQUENCE are incorrect (step 12).** The renderer emits the raw
    `availability_records.id` as the VEVENT UID and hardcodes `SEQUENCE: 0`
-   (`packages/feeds/src/render/render-feed.ts:91,93`). The stable `derived_uid_key`
-   (correctly derived in `packages/availability/src/plans/plan-service.ts:1087-1101`) is
-   never selected or emitted. This violates a PRODUCT non-negotiable ("Stable ICS UIDs
-   derived from business identity, not provider IDs alone") and will cause calendar clients
-   to duplicate or orphan events whenever a record changes. `availability_publications` is
-   never materialised at runtime, so `published_sequence` never increments.
+   (`packages/feeds/src/render/render-feed.ts:91,93`). The `derived_uid_key` column is never
+   selected or emitted by the renderer, and its derivation is itself incomplete and
+   inconsistent: the submit/plan path hashes per the PRODUCT formula
+   (`packages/availability/src/plans/plan-service.ts:1087-1101`) but always uses the record id
+   as the source key, while manual availability writes a plain, non-hashed value
+   (`packages/availability/index.ts:636`, `leavesync:manual:<organisationId>:<id>`), and the
+   PRODUCT Xero `stable_source_key` branch is implemented nowhere. This violates a PRODUCT
+   non-negotiable ("Stable ICS UIDs derived from business identity, not provider IDs alone")
+   and will cause calendar clients to duplicate or orphan events whenever a record changes.
+   `availability_publications` is never materialised at runtime, so `published_sequence` never
+   increments.
 2. **The inbound half of the bidirectional loop is incomplete.** Step 4 (Xero leave inbound
-   normalisation) has no handler at all (`packages/jobs/src/handlers/` holds only
-   `sync-xero-people.ts` and `reconcile-xero-approval-state.ts`), and step 5 (leave balance
+   normalisation) has no handler at all (`packages/jobs/src/handlers/` contains
+   `sync-xero-people.ts`, `reconcile-xero-approval-state.ts` and `setup-env.ts`, but no
+   leave or balance handler), and step 5 (leave balance
    sync) is a dispatcher scaffold that never writes `leave_balances`
    (`packages/availability/src/people/balance-refresh.ts`). Four of the six required Inngest
    jobs are missing. Without inbound sync, Xero-side leave never appears in LeaveSync.
@@ -105,13 +111,18 @@ Status legend: not started / scaffolded / partial / implemented-no-tests / compl
 - **Why it matters:** PRODUCT non-negotiable. Emitting `availability_records.id` as the UID
   and `SEQUENCE: 0` for every event means a record edit that produces a new row, or any
   re-key, creates a brand new calendar event rather than updating the existing one;
-  subscribers see duplicates and stale entries. The deterministic UID exists but is unused.
+  subscribers see duplicates and stale entries. A `derived_uid_key` column exists, but the
+  renderer never reads it and the derivation is incomplete and inconsistent, so even wiring it
+  through would not yet be PRODUCT-correct.
 - **Affected files:** `packages/feeds/src/render/render-feed.ts:91` (`id: event.sourceRecordId`),
   `:93` (`sequence: 0`); projection sets `sourceRecordId` from `record.id`
-  (`packages/feeds/src/projection/feed-projection.ts:183`) and `holiday.id` (`:281`); the
-  derived UID lives in `packages/availability/src/plans/plan-service.ts:1087-1101` and is
-  stored on `availability_records.derived_uid_key:401` but never read by the renderer. The
-  Xero `stable_source_key` branch (`PRODUCT.md:463-466`) is not implemented.
+  (`packages/feeds/src/projection/feed-projection.ts:183`) and `holiday.id` (`:281`).
+  `derived_uid_key` is written in at least two formats: the submit/plan path hashes per the
+  PRODUCT formula (`packages/availability/src/plans/plan-service.ts:1087-1101`, stored at
+  `:401`) but always uses the record id as the source key, while manual availability writes a
+  plain, non-hashed value (`packages/availability/index.ts:636`,
+  `leavesync:manual:<organisationId>:<id>`). The Xero `stable_source_key` branch
+  (`PRODUCT.md:463-466`) is implemented nowhere. None of these values is read by the renderer.
 - **Exact fix:** project `derived_uid_key` into the preview event and use it as the VEVENT
   UID; materialise `availability_publications` and read `published_sequence` for SEQUENCE,
   incrementing it on material change; implement the Xero-record `stable_source_key`.
@@ -123,8 +134,9 @@ Status legend: not started / scaffolded / partial / implemented-no-tests / compl
 - **Why it matters:** LeaveSync is bidirectional; without inbound sync the canonical model
   never reflects Xero-side leave or balances, and `availability_publications` has nothing to
   reconcile.
-- **Affected files:** step 4 has no handler (`packages/jobs/src/handlers/` holds only
-  `sync-xero-people.ts`, `reconcile-xero-approval-state.ts`); `packages/jobs/src/events.ts:7-8`
+- **Affected files:** step 4 has no handler (`packages/jobs/src/handlers/` contains
+  `sync-xero-people.ts`, `reconcile-xero-approval-state.ts` and `setup-env.ts`, none for
+  leave or balances); `packages/jobs/src/events.ts:7-8`
   maps `sync-xero-leave-records` and `sync-xero-leave-balances` but neither is in
   `registeredHandlers`; `packages/jobs/src/functions.ts:5-8` registers only two functions;
   `packages/availability/src/people/balance-refresh.ts` never sets its dispatcher;
