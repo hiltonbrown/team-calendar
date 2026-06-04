@@ -25,10 +25,7 @@ import {
 import { toast } from "@repo/design-system/components/ui/sonner";
 import { useMemo, useState, useTransition } from "react";
 import { SettingsSectionHeader } from "../components/settings-section-header";
-import {
-  updateOrganisationAction,
-  updateWorkspaceNameAction,
-} from "./_actions";
+import { updateAccountNameAction, updateOrganisationAction } from "./_actions";
 
 const COUNTRY_OPTIONS = [
   { label: "Australia", value: "AU" },
@@ -74,6 +71,10 @@ const TIMEZONE_OPTIONS = [
 ];
 
 interface GeneralClientProps {
+  account: {
+    name: string;
+    slug: null | string;
+  };
   organisation: {
     countryCode: "AU" | "NZ" | "UK";
     id: string;
@@ -81,23 +82,19 @@ interface GeneralClientProps {
     regionCode: null | string;
     timezone: string;
   };
-  workspace: {
-    name: string;
-    slug: null | string;
-  };
 }
 
 export const GeneralClient = ({
   organisation,
-  workspace,
+  account,
 }: GeneralClientProps) => {
-  const [workspaceName, setWorkspaceName] = useState(workspace.name);
+  const [accountName, setAccountName] = useState(account.name);
   const [organisationName, setOrganisationName] = useState(organisation.name);
   const [confirmCountryChange, setConfirmCountryChange] = useState(false);
   const [countryCode, setCountryCode] = useState(organisation.countryCode);
   const [regionCode, setRegionCode] = useState(organisation.regionCode ?? "");
   const [timezone, setTimezone] = useState(organisation.timezone);
-  const [savingWorkspace, startWorkspaceTransition] = useTransition();
+  const [savingAccount, startAccountTransition] = useTransition();
   const [savingOrganisation, startOrganisationTransition] = useTransition();
 
   const regionOptions = useMemo(
@@ -106,10 +103,10 @@ export const GeneralClient = ({
   );
   const countryChanged = countryCode !== organisation.countryCode;
 
-  const saveWorkspace = () => {
-    startWorkspaceTransition(async () => {
-      const result = await updateWorkspaceNameAction({
-        name: workspaceName,
+  const saveAccount = () => {
+    startAccountTransition(async () => {
+      const result = await updateAccountNameAction({
+        name: accountName,
         organisationId: organisation.id,
       });
 
@@ -118,7 +115,7 @@ export const GeneralClient = ({
         return;
       }
 
-      toast.success("Workspace name updated.");
+      toast.success("Account name updated.");
     });
   };
 
@@ -145,41 +142,41 @@ export const GeneralClient = ({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Manage workspace identity and organisation-level defaults."
+        description="Manage account identity and payroll entity defaults."
         title="General"
       />
 
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Workspace</CardTitle>
+          <CardTitle>Account</CardTitle>
           <CardDescription>
-            Workspace name is managed in Clerk. The slug is fixed when the
-            workspace is created.
+            Account name is managed in Clerk. The slug is fixed when the account
+            is created.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="workspace-name">Workspace name</Label>
+            <Label htmlFor="account-name">Account name</Label>
             <Input
-              id="workspace-name"
-              onChange={(event) => setWorkspaceName(event.target.value)}
-              value={workspaceName}
+              id="account-name"
+              onChange={(event) => setAccountName(event.target.value)}
+              value={accountName}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="workspace-slug">Workspace slug</Label>
+            <Label htmlFor="account-slug">Account slug</Label>
             <Input
               disabled
-              id="workspace-slug"
-              value={workspace.slug ?? "Not available"}
+              id="account-slug"
+              value={account.slug ?? "Not available"}
             />
             <p className="text-muted-foreground text-xs">
-              Workspace slug is set when the workspace is created.
+              Account slug is set when the account is created.
             </p>
           </div>
           <div className="flex justify-end">
-            <Button disabled={savingWorkspace} onClick={saveWorkspace}>
-              {savingWorkspace ? "Saving..." : "Save"}
+            <Button disabled={savingAccount} onClick={saveAccount}>
+              {savingAccount ? "Saving..." : "Save"}
             </Button>
           </div>
         </CardContent>
@@ -187,7 +184,7 @@ export const GeneralClient = ({
 
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Organisation</CardTitle>
+          <CardTitle>Payroll entity</CardTitle>
           <CardDescription>
             Country, region, and timezone affect future public holiday imports
             and Xero payroll region selection.
