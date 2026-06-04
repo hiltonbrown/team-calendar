@@ -224,7 +224,7 @@ export function PlansClient({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All records</SelectItem>
+              <SelectItem value="all">All plans</SelectItem>
               <SelectItem value="xero_leave">Leave types</SelectItem>
               <SelectItem value="local_only">Availability</SelectItem>
             </SelectContent>
@@ -268,7 +268,7 @@ export function PlansClient({
             <TableHeader>
               <TableRow>
                 {filters.tab === "team" && <TableHead>Person</TableHead>}
-                <TableHead>Record</TableHead>
+                <TableHead>Plan</TableHead>
                 <TableHead>Dates</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Status</TableHead>

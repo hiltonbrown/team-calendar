@@ -125,7 +125,7 @@ export function RecordForm({
       return "Saves as approved and appears on your calendar immediately.";
     }
     if (!hasActiveXeroConnection) {
-      return "Saves as approved. Xero is not connected, so this record will not sync to payroll.";
+      return "Saves as approved. Xero is not connected, so this plan will not sync to payroll.";
     }
     return "Saves as draft. Next step: submit for approval.";
   }, [hasActiveXeroConnection, isLocalOnly]);
@@ -231,7 +231,7 @@ export function RecordForm({
           )}
         </Field>
 
-        <Field label="Record type">
+        <Field label="Plan type">
           <Select
             onValueChange={(value) =>
               setRecordType(value as PlanRecordFormInput["recordType"])

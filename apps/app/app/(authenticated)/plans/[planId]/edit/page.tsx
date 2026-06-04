@@ -17,7 +17,7 @@ const EditRecordPage = async ({
 
   return (
     <>
-      <Header page="Edit record" />
+      <Header page="Edit plan" />
       <main className="flex flex-1 flex-col p-6 pt-0">
         <div className="max-w-2xl rounded-2xl bg-muted p-6">
           <RecordForm mode="edit" {...data} />

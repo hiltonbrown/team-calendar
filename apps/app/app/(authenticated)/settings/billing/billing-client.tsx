@@ -29,7 +29,7 @@ export const BillingClient = ({
 
     {summary.isOverLimit && (
       <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-sm">
-        This workspace is over one or more plan limits.
+        This organisation is over one or more plan limits.
       </div>
     )}
 

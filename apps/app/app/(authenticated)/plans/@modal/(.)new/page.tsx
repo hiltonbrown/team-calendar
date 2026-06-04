@@ -13,7 +13,7 @@ const NewRecordModalPage = async ({
   const data = await loadPlanFormData({ org, personId, startsAt });
 
   return (
-    <InterceptingModalShell size="default" title="New record">
+    <InterceptingModalShell size="default" title="New plan">
       <RecordForm mode="create" {...data} />
     </InterceptingModalShell>
   );

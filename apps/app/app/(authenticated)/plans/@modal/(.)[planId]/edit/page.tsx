@@ -16,7 +16,7 @@ const EditRecordModalPage = async ({
   const data = await loadPlanFormData({ org, recordId: planId });
 
   return (
-    <InterceptingModalShell size="default" title="Edit record">
+    <InterceptingModalShell size="default" title="Edit plan">
       <RecordForm mode="edit" {...data} />
     </InterceptingModalShell>
   );
