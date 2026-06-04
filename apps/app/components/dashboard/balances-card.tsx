@@ -18,7 +18,7 @@ export function BalancesCard({
   if (state.status === "error") {
     return (
       <DashboardCardShell
-        ctaHref={`/people/person/${personId}`}
+        ctaHref={`/people/${personId}`}
         ctaLabel="View profile"
         description="Current leave balances"
         orgQueryValue={orgQueryValue}
@@ -74,7 +74,7 @@ export function BalancesCard({
 
   return (
     <DashboardCardShell
-      ctaHref={`/people/person/${personId}`}
+      ctaHref={`/people/${personId}`}
       ctaLabel="View profile"
       description="Current leave balances"
       orgQueryValue={orgQueryValue}

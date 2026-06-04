@@ -297,7 +297,7 @@ export function PersonProfileContent({
               <Button asChild variant="secondary">
                 <Link
                   href={withOrg(
-                    `/people/person/${profile.header.id}?tab=history&historyCursor=${history.nextCursor}`,
+                    `/people/${profile.header.id}?tab=history&historyCursor=${history.nextCursor}`,
                     orgQueryValue
                   )}
                 >

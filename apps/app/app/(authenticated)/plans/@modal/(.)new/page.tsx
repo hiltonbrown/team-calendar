@@ -1,6 +1,6 @@
 import { InterceptingModalShell } from "@/components/modals/intercepting-modal-shell";
-import { RecordForm } from "../../../record-form";
-import { loadPlanFormData } from "../../../record-form-data";
+import { RecordForm } from "../../record-form";
+import { loadPlanFormData } from "../../record-form-data";
 
 interface NewRecordModalPageProps {
   searchParams: Promise<{ org?: string; personId?: string; startsAt?: string }>;

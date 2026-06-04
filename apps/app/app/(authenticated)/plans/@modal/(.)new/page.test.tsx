@@ -6,7 +6,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RecordForm } from "../../../record-form";
+import { RecordForm } from "../../record-form";
 
 const WILL_NOT_SYNC_COPY = /will not sync to payroll/;
 const CURRENT_BALANCE_COPY = /Current balance/;
@@ -42,7 +42,7 @@ vi.mock("next/navigation", () => ({
     refresh: mocks.refresh,
   }),
 }));
-vi.mock("../../../_actions", () => ({
+vi.mock("../../_actions", () => ({
   createRecordAction: mocks.createRecordAction,
   retrySubmissionAction: mocks.retrySubmissionAction,
   revertToDraftAction: mocks.revertToDraftAction,

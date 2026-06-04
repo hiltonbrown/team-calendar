@@ -66,7 +66,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
         actionSlot={
           canManage ? (
             <Button asChild>
-              <Link href="/feed/feed/new">Create feed</Link>
+              <Link href="/feeds/new">Create feed</Link>
             </Button>
           ) : null
         }
@@ -103,7 +103,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
           </div>
           {canManage && (
             <Button asChild>
-              <Link href="/feed/feed/new">New feed</Link>
+              <Link href="/feeds/new">New feed</Link>
             </Button>
           )}
         </section>

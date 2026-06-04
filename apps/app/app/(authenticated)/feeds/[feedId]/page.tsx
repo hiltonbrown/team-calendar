@@ -3,7 +3,7 @@ import { getFeedDetail, normaliseRole, previewFeed } from "@repo/feeds";
 import { notFound } from "next/navigation";
 import { FeedDetail } from "@/components/feed/feed-detail";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
-import { Header } from "../../../components/header";
+import { Header } from "../../components/header";
 
 interface FeedDetailPageProps {
   params: Promise<{ feedId: string }>;

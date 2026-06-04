@@ -187,7 +187,7 @@ export async function refreshBalancesAction(
     return result;
   }
 
-  revalidatePath(`/people/person/${parsed.data.personId}`);
+  revalidatePath(`/people/${parsed.data.personId}`);
   return result;
 }
 
@@ -267,7 +267,7 @@ function effectiveRole(role: string | null | undefined): PeopleRole | null {
 
 function revalidatePeoplePaths(personId: string) {
   revalidatePath("/people");
-  revalidatePath(`/people/person/${personId}`);
+  revalidatePath(`/people/${personId}`);
 }
 
 function notAuthorised(message?: string): PeopleActionResult<never> {

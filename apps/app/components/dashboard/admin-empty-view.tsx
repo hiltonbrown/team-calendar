@@ -56,7 +56,7 @@ export function AdminEmptyView({
           </p>
         </DashboardCardShell>
         <DashboardCardShell
-          ctaHref="/feed"
+          ctaHref="/feeds"
           ctaLabel="Manage feeds"
           description="Publish secure ICS feeds for subscribed calendars."
           orgQueryValue={orgQueryValue}

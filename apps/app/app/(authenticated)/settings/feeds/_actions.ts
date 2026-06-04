@@ -63,7 +63,7 @@ export async function updateFeedDefaultsAction(input: {
   }
 
   revalidatePath("/settings/feeds");
-  revalidatePath("/feed");
+  revalidatePath("/feeds");
 
   return { ok: true, value: { updated: true } };
 }

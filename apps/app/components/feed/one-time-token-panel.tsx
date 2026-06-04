@@ -4,7 +4,7 @@ import { Button } from "@repo/design-system/components/ui/button";
 import { Input } from "@repo/design-system/components/ui/input";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import { useState } from "react";
-import { buildSubscribeUrl } from "@/app/(authenticated)/feed/feed-token-session";
+import { buildSubscribeUrl } from "@/app/(authenticated)/feeds/feed-token-session";
 
 export function OneTimeTokenPanel({
   feedId,

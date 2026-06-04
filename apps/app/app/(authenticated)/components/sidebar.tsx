@@ -54,7 +54,7 @@ const navGroups = [
     label: "Team",
     items: [
       { title: "People", href: "/people", icon: UsersIcon },
-      { title: "Calendar Feeds", href: "/feed", icon: LinkIcon },
+      { title: "Calendar Feeds", href: "/feeds", icon: LinkIcon },
     ],
   },
   {

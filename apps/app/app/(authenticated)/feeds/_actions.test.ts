@@ -82,8 +82,8 @@ describe("feed actions", () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/feed");
-    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feed/feed/${feedId}`);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feeds/${feedId}`);
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/settings/feeds");
   });
 
@@ -101,8 +101,8 @@ describe("feed actions", () => {
   it("does not revalidate settings after token rotation", async () => {
     await rotateTokenAction({ feedId, organisationId });
 
-    expect(mocks.revalidatePath).toHaveBeenCalledWith("/feed");
-    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feed/feed/${feedId}`);
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
+    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feeds/${feedId}`);
     expect(mocks.revalidatePath).not.toHaveBeenCalledWith("/settings/feeds");
   });
 });

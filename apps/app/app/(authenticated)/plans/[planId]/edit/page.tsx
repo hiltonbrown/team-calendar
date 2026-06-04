@@ -1,9 +1,9 @@
-import { Header } from "../../../../components/header";
-import { RecordForm } from "../../../record-form";
-import { loadPlanFormData } from "../../../record-form-data";
+import { Header } from "../../../components/header";
+import { RecordForm } from "../../record-form";
+import { loadPlanFormData } from "../../record-form-data";
 
 interface EditRecordPageProps {
-  params: Promise<{ recordId: string }>;
+  params: Promise<{ planId: string }>;
   searchParams: Promise<{ org?: string }>;
 }
 
@@ -11,9 +11,9 @@ const EditRecordPage = async ({
   params,
   searchParams,
 }: EditRecordPageProps) => {
-  const { recordId } = await params;
+  const { planId } = await params;
   const { org } = await searchParams;
-  const data = await loadPlanFormData({ org, recordId });
+  const data = await loadPlanFormData({ org, recordId: planId });
 
   return (
     <>

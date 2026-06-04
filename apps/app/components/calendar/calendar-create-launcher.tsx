@@ -27,7 +27,7 @@ export function CalendarCreateLauncher({
     if (personId) {
       params.set("personId", personId);
     }
-    router.push(withOrg(`/plans/records/new?${params.toString()}`, org));
+    router.push(withOrg(`/plans/new?${params.toString()}`, org));
   };
 
   return (

@@ -3,7 +3,7 @@ import { database } from "@repo/database";
 import { normaliseRole } from "@repo/feeds";
 import { FeedCreateForm } from "@/components/feed/feed-create-form";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
-import { Header } from "../../../components/header";
+import { Header } from "../../components/header";
 
 interface NewFeedPageProps {
   searchParams: Promise<{ org?: string }>;

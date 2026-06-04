@@ -12,7 +12,7 @@ const LegacyEditAvailabilityPage = async ({
 }: LegacyEditAvailabilityPageProps) => {
   const { recordId } = await params;
   const { org } = await searchParams;
-  redirect(withOrg(`/plans/records/${recordId}/edit`, org));
+  redirect(withOrg(`/plans/${recordId}/edit`, org));
 };
 
 export default LegacyEditAvailabilityPage;

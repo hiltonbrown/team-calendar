@@ -259,9 +259,9 @@ function revalidateFeedPaths(
   feedId?: string,
   options: { includeSettings?: boolean } = {}
 ): void {
-  revalidatePath("/feed");
+  revalidatePath("/feeds");
   if (feedId) {
-    revalidatePath(`/feed/feed/${feedId}`);
+    revalidatePath(`/feeds/${feedId}`);
   }
   if (options.includeSettings) {
     revalidatePath("/settings/feeds");

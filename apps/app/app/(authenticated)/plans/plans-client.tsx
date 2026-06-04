@@ -122,7 +122,7 @@ export function PlansClient({
     record: PlansClientRecord;
   } | null>(null);
 
-  const newRecordHref = withOrg("/plans/records/new", orgQueryValue);
+  const newRecordHref = withOrg("/plans/new", orgQueryValue);
 
   const runAction = (recordId: string, action: RunnableAction) => {
     const record = records.find((candidate) => candidate.id === recordId);
@@ -332,7 +332,7 @@ export function PlansClient({
                             >
                               <Link
                                 href={withOrg(
-                                  `/plans/records/${record.id}/edit`,
+                                  `/plans/${record.id}/edit`,
                                   orgQueryValue
                                 )}
                               >

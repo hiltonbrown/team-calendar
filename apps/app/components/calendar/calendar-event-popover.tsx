@@ -65,9 +65,7 @@ export function CalendarEventPopover({
         <div className="mt-4 flex justify-end">
           {event.isEditableByActor ? (
             <Button asChild size="sm" variant="secondary">
-              <Link
-                href={withOrg(`/plans/records/${event.id}/edit`, orgQueryValue)}
-              >
+              <Link href={withOrg(`/plans/${event.id}/edit`, orgQueryValue)}>
                 View record
               </Link>
             </Button>
