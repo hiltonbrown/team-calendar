@@ -51,5 +51,3 @@ These baseline failures (cms build, boundaries, database env tests) pre-date thi
 ## Screen Catalogue
 
 No standalone Screen Catalogue file is present in the repository (searched `*.md`, `*.mdx`, and content for "Screen Catalogue"). Decisions therefore rely on `PRODUCT.md` (authoritative) and the explicit canonical-route and deletion lists given in the task.
-</content>
-</invoke>
