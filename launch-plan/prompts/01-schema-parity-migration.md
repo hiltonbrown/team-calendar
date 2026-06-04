@@ -45,10 +45,19 @@ and migrations.
    `(plan_id, limit_type)`; both carry `id`, `created_at`, `updated_at`. Relate
    `clerk_org_subscriptions` to `plans` as PRODUCT implies. Generate a migration
    `bunx prisma migrate dev --name add_plans_and_plan_limits` (run from `packages/database`).
-3. **Make `leave_balances.xero_tenant_id` nullable.** Change `xero_tenant_id String @db.Uuid`
-   to optional (`String? @db.Uuid`) on the `LeaveBalance` model (~schema:635), keep the
-   existing unique `(person_id, xero_tenant_id, leave_type_xero_id)`. Generate a migration
-   `--name leave_balances_nullable_tenant`.
+3. **Make `leave_balances.xero_tenant_id` nullable, with null-safe uniqueness.** Change
+   `xero_tenant_id String @db.Uuid` to optional (`String? @db.Uuid`) on the `LeaveBalance`
+   model (~schema:635), keeping the existing unique `(person_id, xero_tenant_id,
+   leave_type_xero_id)` for Xero-sourced rows. Because PostgreSQL treats `NULL` as distinct
+   in a normal unique constraint (the same trap PRODUCT calls out for `availability_records`),
+   that key will NOT prevent duplicate manual balances once `xero_tenant_id` is null. Add a
+   partial unique index for the manual case so prompt 05's create-or-update can target a
+   single row: a unique index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS
+   NULL`. Prisma's `@@unique` cannot express a `WHERE` clause, so add this partial index with
+   raw SQL inside the migration (`CREATE UNIQUE INDEX ... WHERE xero_tenant_id IS NULL`) and
+   document it with a schema-reference comment on the model. Generate a migration
+   `--name leave_balances_nullable_tenant` (edit the generated SQL to append the partial
+   index in the same migration, since it is part of the same logical change).
 4. **Reconcile constraint-drift prose.** For the three constraints where the live schema and
    PRODUCT prose disagree (`notification_preferences` unique on `organisation_id` not
    `clerk_org_id`; `usage_counters` on `metric_key/period_*` not `counter_type`;
@@ -81,7 +90,9 @@ live schema`. Push the branch and open a PR titled "Schema parity migration".
 
 - [ ] Root `/schema.prisma` deleted; build still resolves the canonical schema.
 - [ ] `Plan` and `PlanLimit` models present with the `(plan_id, limit_type)` unique, backed by a migration.
-- [ ] `leave_balances.xero_tenant_id` nullable, backed by a migration.
+- [ ] `leave_balances.xero_tenant_id` nullable, backed by a migration, with a partial unique
+      index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` so manual
+      balances cannot duplicate.
 - [ ] PRODUCT prose matches the live schema for the three drifted constraints and the formerly-pending items.
 - [ ] `bunx prisma validate` passes; `packages/database` constraint tests updated.
 - [ ] One migration per change; no hand-edited migrations.

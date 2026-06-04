@@ -53,7 +53,11 @@ edit path for the disconnected case.
    `xero_tenant_id = null`, gated so it is available only when the Organisation has no active
    Xero connection. Reuse the existing connection-state check
    (`packages/availability/src/xero-connection-state.ts`). Surface the edit in the person
-   profile balances panel, disabled while connected.
+   profile balances panel, disabled while connected. Target create-or-update on the manual
+   partial unique key `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` delivered
+   by prompt 01 (a normal unique over the nullable `xero_tenant_id` is NULL-distinct and would
+   let duplicates through); the service must resolve the existing manual row by that key, not
+   by the Xero-tenant composite.
 5. **Tests**: balance upsert idempotency; manual edit blocked while Xero connected; manual
    edit allowed and persisted when disconnected; both scope keys present.
 
@@ -75,5 +79,7 @@ and manual balances".
 - [ ] `sync-xero-leave-balances` handler exists, registered, served, dispatcher wired.
 - [ ] `leave_balances` is written from Xero idempotently per person per leave type.
 - [ ] Admin can set manual balances only when Xero is disconnected; blocked when connected.
+- [ ] Manual balance create-or-update targets the partial unique key from prompt 01; duplicate
+      manual balances for the same person and leave type are not possible.
 - [ ] Balances are never computed; read or set, never derived.
 - [ ] Both scope keys on every query; tenant resolved via FK; tests cover the gating.

@@ -366,8 +366,11 @@ Ordered by build-order step then severity. Each item is a thin vertical slice. D
 are marked `[after: N]`. Items map to the prompts in `launch-plan/prompts/`.
 
 - [ ] **T1 (schema, prompt 01).** Delete root `schema.prisma`; add `Plan` and `PlanLimit`
-      tables; migration to make `leave_balances.xero_tenant_id` nullable; reconcile the three
-      constraint-drift items and the stale "pending migration" prose in `PRODUCT.md`.
+      tables; migration to make `leave_balances.xero_tenant_id` nullable, adding a partial
+      unique index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` so manual
+      balances cannot duplicate (the nullable column is NULL-distinct under the existing
+      composite unique); reconcile the three constraint-drift items and the stale "pending
+      migration" prose in `PRODUCT.md`.
       Packages: `packages/database`. Acceptance: one migration per change; `bunx prisma
       validate` passes; PRODUCT prose matches schema.
 - [ ] **T2 (CI/build, prompt 02).** Split unit vs DB-integration tests; remove the
