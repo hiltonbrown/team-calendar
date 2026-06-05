@@ -17,6 +17,9 @@ describe("jobs events", () => {
     expect(getRegisteredSyncEventName("leave_records")).toBe(
       "sync-xero-leave-records"
     );
+    expect(getRegisteredSyncEventName("leave_balances")).toBe(
+      "sync-xero-leave-balances"
+    );
     expect(getRegisteredSyncEventName("people")).toBe("sync-xero-people");
   });
 
