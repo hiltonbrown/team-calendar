@@ -1,4 +1,4 @@
-// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is leave_balances.test.ts.
+// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is leave_balances.integration.test.ts.
 import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 

@@ -1,4 +1,4 @@
-// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is plan_limits.test.ts.
+// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is plan_limits.integration.test.ts.
 import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
