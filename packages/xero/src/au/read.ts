@@ -9,6 +9,8 @@ import {
   readXeroPayload,
   type XeroLeaveApplicationStatusResult,
 } from "../read/leave-application-status";
+import type { XeroLeaveBalance } from "../read/leave-balances";
+import { mapXeroLeaveBalances } from "../read/leave-balances";
 import type { XeroLeaveRecord } from "../read/leave-records";
 import { mapXeroLeaveRecords } from "../read/leave-records";
 import type { XeroTenantForWrite, XeroWriteResult } from "../write/types";
@@ -122,6 +124,80 @@ export async function fetchLeaveRecords(input: {
       value: {
         leaveRecords: mapXeroLeaveRecords(rawPayload),
         rawResponse: rawPayload,
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: "network_error",
+        message:
+          error instanceof Error ? error.message : "Failed to reach Xero.",
+      },
+    };
+  }
+}
+
+export async function fetchLeaveBalances(input: {
+  employeeIds: string[];
+  xeroTenant: XeroTenantForWrite;
+}): Promise<
+  XeroWriteResult<{
+    leaveBalances: XeroLeaveBalance[];
+    rawResponses: unknown[];
+  }>
+> {
+  const accessToken = input.xeroTenant.xero_connection.access_token_encrypted;
+  const decryptedAccessToken = decryptXeroToken({
+    authTag: input.xeroTenant.xero_connection.access_token_auth_tag ?? null,
+    encrypted: accessToken,
+    iv: input.xeroTenant.xero_connection.access_token_iv ?? null,
+  });
+
+  if (!decryptedAccessToken || input.xeroTenant.xero_connection.revoked_at) {
+    return {
+      ok: false,
+      error: {
+        code: "auth_error",
+        message: "Xero credentials are missing or revoked.",
+      },
+    };
+  }
+
+  const leaveBalances: XeroLeaveBalance[] = [];
+  const rawResponses: unknown[] = [];
+
+  try {
+    for (const employeeId of input.employeeIds) {
+      const response = await fetch(
+        `${baseUrl()}/payroll.xro/1.0/Employees/${encodeURIComponent(employeeId)}`,
+        {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${decryptedAccessToken}`,
+            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          },
+          method: "GET",
+        }
+      );
+      const rawPayload = await readXeroPayload(response);
+      rawResponses.push(rawPayload);
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: mapXeroReadHttpError(response, rawPayload),
+        };
+      }
+
+      leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    }
+
+    return {
+      ok: true,
+      value: {
+        leaveBalances,
+        rawResponses,
       },
     };
   } catch (error) {
