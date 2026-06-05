@@ -77,6 +77,8 @@ export const ModelName = {
   SyncRun: 'SyncRun',
   FailedRecord: 'FailedRecord',
   AuditEvent: 'AuditEvent',
+  Plan: 'Plan',
+  PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
   UsageCounter: 'UsageCounter'
 } as const
@@ -662,6 +664,30 @@ export const AuditEventScalarFieldEnum = {
 } as const
 
 export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof typeof AuditEventScalarFieldEnum]
+
+
+export const PlanScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  name: 'name',
+  is_active: 'is_active',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type PlanScalarFieldEnum = (typeof PlanScalarFieldEnum)[keyof typeof PlanScalarFieldEnum]
+
+
+export const PlanLimitScalarFieldEnum = {
+  id: 'id',
+  plan_id: 'plan_id',
+  limit_type: 'limit_type',
+  limit_value: 'limit_value',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type PlanLimitScalarFieldEnum = (typeof PlanLimitScalarFieldEnum)[keyof typeof PlanLimitScalarFieldEnum]
 
 
 export const ClerkOrgSubscriptionScalarFieldEnum = {

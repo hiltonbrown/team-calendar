@@ -172,6 +172,16 @@ export type FailedRecord = Prisma.FailedRecordModel
  */
 export type AuditEvent = Prisma.AuditEventModel
 /**
+ * Model Plan
+ * 
+ */
+export type Plan = Prisma.PlanModel
+/**
+ * Model PlanLimit
+ * 
+ */
+export type PlanLimit = Prisma.PlanLimitModel
+/**
  * Model ClerkOrgSubscription
  * 
  */

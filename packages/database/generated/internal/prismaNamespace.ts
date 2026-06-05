@@ -410,6 +410,8 @@ export const ModelName = {
   SyncRun: 'SyncRun',
   FailedRecord: 'FailedRecord',
   AuditEvent: 'AuditEvent',
+  Plan: 'Plan',
+  PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
   UsageCounter: 'UsageCounter'
 } as const
@@ -427,7 +429,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "clerkOrgSubscription" | "usageCounter"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2355,6 +2357,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    Plan: {
+      payload: Prisma.$PlanPayload<ExtArgs>
+      fields: Prisma.PlanFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlanFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlanFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        findFirst: {
+          args: Prisma.PlanFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlanFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        findMany: {
+          args: Prisma.PlanFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>[]
+        }
+        create: {
+          args: Prisma.PlanCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        createMany: {
+          args: Prisma.PlanCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlanCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>[]
+        }
+        delete: {
+          args: Prisma.PlanDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        update: {
+          args: Prisma.PlanUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        deleteMany: {
+          args: Prisma.PlanDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlanUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlanUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>[]
+        }
+        upsert: {
+          args: Prisma.PlanUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanPayload>
+        }
+        aggregate: {
+          args: Prisma.PlanAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlan>
+        }
+        groupBy: {
+          args: Prisma.PlanGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlanGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlanCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlanCountAggregateOutputType> | number
+        }
+      }
+    }
+    PlanLimit: {
+      payload: Prisma.$PlanLimitPayload<ExtArgs>
+      fields: Prisma.PlanLimitFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlanLimitFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlanLimitFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        findFirst: {
+          args: Prisma.PlanLimitFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlanLimitFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        findMany: {
+          args: Prisma.PlanLimitFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>[]
+        }
+        create: {
+          args: Prisma.PlanLimitCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        createMany: {
+          args: Prisma.PlanLimitCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlanLimitCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>[]
+        }
+        delete: {
+          args: Prisma.PlanLimitDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        update: {
+          args: Prisma.PlanLimitUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        deleteMany: {
+          args: Prisma.PlanLimitDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlanLimitUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlanLimitUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>[]
+        }
+        upsert: {
+          args: Prisma.PlanLimitUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlanLimitPayload>
+        }
+        aggregate: {
+          args: Prisma.PlanLimitAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlanLimit>
+        }
+        groupBy: {
+          args: Prisma.PlanLimitGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlanLimitGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlanLimitCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlanLimitCountAggregateOutputType> | number
+        }
+      }
+    }
     ClerkOrgSubscription: {
       payload: Prisma.$ClerkOrgSubscriptionPayload<ExtArgs>
       fields: Prisma.ClerkOrgSubscriptionFieldRefs
@@ -3109,6 +3259,30 @@ export const AuditEventScalarFieldEnum = {
 export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof typeof AuditEventScalarFieldEnum]
 
 
+export const PlanScalarFieldEnum = {
+  id: 'id',
+  key: 'key',
+  name: 'name',
+  is_active: 'is_active',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type PlanScalarFieldEnum = (typeof PlanScalarFieldEnum)[keyof typeof PlanScalarFieldEnum]
+
+
+export const PlanLimitScalarFieldEnum = {
+  id: 'id',
+  plan_id: 'plan_id',
+  limit_type: 'limit_type',
+  limit_value: 'limit_value',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type PlanLimitScalarFieldEnum = (typeof PlanLimitScalarFieldEnum)[keyof typeof PlanLimitScalarFieldEnum]
+
+
 export const ClerkOrgSubscriptionScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
@@ -3675,6 +3849,20 @@ export type ListEnumsync_failed_record_typeFieldRefInput<$PrismaModel> = FieldRe
 
 
 /**
+ * Reference to a field of type 'plan_limit_type'
+ */
+export type Enumplan_limit_typeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'plan_limit_type'>
+    
+
+
+/**
+ * Reference to a field of type 'plan_limit_type[]'
+ */
+export type ListEnumplan_limit_typeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'plan_limit_type[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -3823,6 +4011,8 @@ export type GlobalOmitConfig = {
   syncRun?: Prisma.SyncRunOmit
   failedRecord?: Prisma.FailedRecordOmit
   auditEvent?: Prisma.AuditEventOmit
+  plan?: Prisma.PlanOmit
+  planLimit?: Prisma.PlanLimitOmit
   clerkOrgSubscription?: Prisma.ClerkOrgSubscriptionOmit
   usageCounter?: Prisma.UsageCounterOmit
 }

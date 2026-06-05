@@ -240,6 +240,7 @@ export type ClerkOrgSubscriptionWhereInput = {
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
+  plan?: Prisma.XOR<Prisma.PlanScalarRelationFilter, Prisma.PlanWhereInput>
 }
 
 export type ClerkOrgSubscriptionOrderByWithRelationInput = {
@@ -251,6 +252,7 @@ export type ClerkOrgSubscriptionOrderByWithRelationInput = {
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
+  plan?: Prisma.PlanOrderByWithRelationInput
 }
 
 export type ClerkOrgSubscriptionWhereUniqueInput = Prisma.AtLeast<{
@@ -265,6 +267,7 @@ export type ClerkOrgSubscriptionWhereUniqueInput = Prisma.AtLeast<{
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
+  plan?: Prisma.XOR<Prisma.PlanScalarRelationFilter, Prisma.PlanWhereInput>
 }, "id" | "clerk_org_id">
 
 export type ClerkOrgSubscriptionOrderByWithAggregationInput = {
@@ -300,12 +303,12 @@ export type ClerkOrgSubscriptionScalarWhereWithAggregatesInput = {
 export type ClerkOrgSubscriptionCreateInput = {
   id?: string
   clerk_org_id: string
-  plan_key: string
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
+  plan: Prisma.PlanCreateNestedOneWithoutClerk_org_subscriptionsInput
 }
 
 export type ClerkOrgSubscriptionUncheckedCreateInput = {
@@ -322,12 +325,12 @@ export type ClerkOrgSubscriptionUncheckedCreateInput = {
 export type ClerkOrgSubscriptionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  plan_key?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  plan?: Prisma.PlanUpdateOneRequiredWithoutClerk_org_subscriptionsNestedInput
 }
 
 export type ClerkOrgSubscriptionUncheckedUpdateInput = {
@@ -355,7 +358,6 @@ export type ClerkOrgSubscriptionCreateManyInput = {
 export type ClerkOrgSubscriptionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
-  plan_key?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
@@ -372,6 +374,16 @@ export type ClerkOrgSubscriptionUncheckedUpdateManyInput = {
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ClerkOrgSubscriptionListRelationFilter = {
+  every?: Prisma.ClerkOrgSubscriptionWhereInput
+  some?: Prisma.ClerkOrgSubscriptionWhereInput
+  none?: Prisma.ClerkOrgSubscriptionWhereInput
+}
+
+export type ClerkOrgSubscriptionOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type ClerkOrgSubscriptionCountOrderByAggregateInput = {
@@ -415,6 +427,148 @@ export type ClerkOrgSubscriptionSumOrderByAggregateInput = {
   seats_purchased?: Prisma.SortOrder
 }
 
+export type ClerkOrgSubscriptionCreateNestedManyWithoutPlanInput = {
+  create?: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput> | Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput[] | Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput[]
+  connectOrCreate?: Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput | Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput[]
+  createMany?: Prisma.ClerkOrgSubscriptionCreateManyPlanInputEnvelope
+  connect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+}
+
+export type ClerkOrgSubscriptionUncheckedCreateNestedManyWithoutPlanInput = {
+  create?: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput> | Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput[] | Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput[]
+  connectOrCreate?: Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput | Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput[]
+  createMany?: Prisma.ClerkOrgSubscriptionCreateManyPlanInputEnvelope
+  connect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+}
+
+export type ClerkOrgSubscriptionUpdateManyWithoutPlanNestedInput = {
+  create?: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput> | Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput[] | Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput[]
+  connectOrCreate?: Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput | Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput[]
+  upsert?: Prisma.ClerkOrgSubscriptionUpsertWithWhereUniqueWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpsertWithWhereUniqueWithoutPlanInput[]
+  createMany?: Prisma.ClerkOrgSubscriptionCreateManyPlanInputEnvelope
+  set?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  disconnect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  delete?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  connect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  update?: Prisma.ClerkOrgSubscriptionUpdateWithWhereUniqueWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpdateWithWhereUniqueWithoutPlanInput[]
+  updateMany?: Prisma.ClerkOrgSubscriptionUpdateManyWithWhereWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpdateManyWithWhereWithoutPlanInput[]
+  deleteMany?: Prisma.ClerkOrgSubscriptionScalarWhereInput | Prisma.ClerkOrgSubscriptionScalarWhereInput[]
+}
+
+export type ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanNestedInput = {
+  create?: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput> | Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput[] | Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput[]
+  connectOrCreate?: Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput | Prisma.ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput[]
+  upsert?: Prisma.ClerkOrgSubscriptionUpsertWithWhereUniqueWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpsertWithWhereUniqueWithoutPlanInput[]
+  createMany?: Prisma.ClerkOrgSubscriptionCreateManyPlanInputEnvelope
+  set?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  disconnect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  delete?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  connect?: Prisma.ClerkOrgSubscriptionWhereUniqueInput | Prisma.ClerkOrgSubscriptionWhereUniqueInput[]
+  update?: Prisma.ClerkOrgSubscriptionUpdateWithWhereUniqueWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpdateWithWhereUniqueWithoutPlanInput[]
+  updateMany?: Prisma.ClerkOrgSubscriptionUpdateManyWithWhereWithoutPlanInput | Prisma.ClerkOrgSubscriptionUpdateManyWithWhereWithoutPlanInput[]
+  deleteMany?: Prisma.ClerkOrgSubscriptionScalarWhereInput | Prisma.ClerkOrgSubscriptionScalarWhereInput[]
+}
+
+export type ClerkOrgSubscriptionCreateWithoutPlanInput = {
+  id?: string
+  clerk_org_id: string
+  status: string
+  current_period_end?: Date | string | null
+  seats_purchased?: number
+  created_at?: Date | string
+  updated_at?: Date | string
+}
+
+export type ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput = {
+  id?: string
+  clerk_org_id: string
+  status: string
+  current_period_end?: Date | string | null
+  seats_purchased?: number
+  created_at?: Date | string
+  updated_at?: Date | string
+}
+
+export type ClerkOrgSubscriptionCreateOrConnectWithoutPlanInput = {
+  where: Prisma.ClerkOrgSubscriptionWhereUniqueInput
+  create: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput>
+}
+
+export type ClerkOrgSubscriptionCreateManyPlanInputEnvelope = {
+  data: Prisma.ClerkOrgSubscriptionCreateManyPlanInput | Prisma.ClerkOrgSubscriptionCreateManyPlanInput[]
+  skipDuplicates?: boolean
+}
+
+export type ClerkOrgSubscriptionUpsertWithWhereUniqueWithoutPlanInput = {
+  where: Prisma.ClerkOrgSubscriptionWhereUniqueInput
+  update: Prisma.XOR<Prisma.ClerkOrgSubscriptionUpdateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput>
+  create: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput>
+}
+
+export type ClerkOrgSubscriptionUpdateWithWhereUniqueWithoutPlanInput = {
+  where: Prisma.ClerkOrgSubscriptionWhereUniqueInput
+  data: Prisma.XOR<Prisma.ClerkOrgSubscriptionUpdateWithoutPlanInput, Prisma.ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput>
+}
+
+export type ClerkOrgSubscriptionUpdateManyWithWhereWithoutPlanInput = {
+  where: Prisma.ClerkOrgSubscriptionScalarWhereInput
+  data: Prisma.XOR<Prisma.ClerkOrgSubscriptionUpdateManyMutationInput, Prisma.ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanInput>
+}
+
+export type ClerkOrgSubscriptionScalarWhereInput = {
+  AND?: Prisma.ClerkOrgSubscriptionScalarWhereInput | Prisma.ClerkOrgSubscriptionScalarWhereInput[]
+  OR?: Prisma.ClerkOrgSubscriptionScalarWhereInput[]
+  NOT?: Prisma.ClerkOrgSubscriptionScalarWhereInput | Prisma.ClerkOrgSubscriptionScalarWhereInput[]
+  id?: Prisma.UuidFilter<"ClerkOrgSubscription"> | string
+  clerk_org_id?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  plan_key?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
+  seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
+  created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
+  updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
+}
+
+export type ClerkOrgSubscriptionCreateManyPlanInput = {
+  id?: string
+  clerk_org_id: string
+  status: string
+  current_period_end?: Date | string | null
+  seats_purchased?: number
+  created_at?: Date | string
+  updated_at?: Date | string
+}
+
+export type ClerkOrgSubscriptionUpdateWithoutPlanInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.StringFieldUpdateOperationsInput | string
+  current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 
 
 export type ClerkOrgSubscriptionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -426,6 +580,7 @@ export type ClerkOrgSubscriptionSelect<ExtArgs extends runtime.Types.Extensions.
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["clerkOrgSubscription"]>
 
 export type ClerkOrgSubscriptionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -437,6 +592,7 @@ export type ClerkOrgSubscriptionSelectCreateManyAndReturn<ExtArgs extends runtim
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["clerkOrgSubscription"]>
 
 export type ClerkOrgSubscriptionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -448,6 +604,7 @@ export type ClerkOrgSubscriptionSelectUpdateManyAndReturn<ExtArgs extends runtim
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["clerkOrgSubscription"]>
 
 export type ClerkOrgSubscriptionSelectScalar = {
@@ -462,10 +619,21 @@ export type ClerkOrgSubscriptionSelectScalar = {
 }
 
 export type ClerkOrgSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "plan_key" | "status" | "current_period_end" | "seats_purchased" | "created_at" | "updated_at", ExtArgs["result"]["clerkOrgSubscription"]>
+export type ClerkOrgSubscriptionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
+}
+export type ClerkOrgSubscriptionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
+}
+export type ClerkOrgSubscriptionIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
+}
 
 export type $ClerkOrgSubscriptionPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ClerkOrgSubscription"
-  objects: {}
+  objects: {
+    plan: Prisma.$PlanPayload<ExtArgs>
+  }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
@@ -869,6 +1037,7 @@ readonly fields: ClerkOrgSubscriptionFieldRefs;
  */
 export interface Prisma__ClerkOrgSubscriptionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
+  plan<T extends Prisma.PlanDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PlanDefaultArgs<ExtArgs>>): Prisma.Prisma__PlanClient<runtime.Types.Result.GetResult<Prisma.$PlanPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -923,6 +1092,10 @@ export type ClerkOrgSubscriptionFindUniqueArgs<ExtArgs extends runtime.Types.Ext
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
+  /**
    * Filter, which ClerkOrgSubscription to fetch.
    */
   where: Prisma.ClerkOrgSubscriptionWhereUniqueInput
@@ -941,6 +1114,10 @@ export type ClerkOrgSubscriptionFindUniqueOrThrowArgs<ExtArgs extends runtime.Ty
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
+  /**
    * Filter, which ClerkOrgSubscription to fetch.
    */
   where: Prisma.ClerkOrgSubscriptionWhereUniqueInput
@@ -958,6 +1135,10 @@ export type ClerkOrgSubscriptionFindFirstArgs<ExtArgs extends runtime.Types.Exte
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
   /**
    * Filter, which ClerkOrgSubscription to fetch.
    */
@@ -1007,6 +1188,10 @@ export type ClerkOrgSubscriptionFindFirstOrThrowArgs<ExtArgs extends runtime.Typ
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
+  /**
    * Filter, which ClerkOrgSubscription to fetch.
    */
   where?: Prisma.ClerkOrgSubscriptionWhereInput
@@ -1054,6 +1239,10 @@ export type ClerkOrgSubscriptionFindManyArgs<ExtArgs extends runtime.Types.Exten
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
   /**
    * Filter, which ClerkOrgSubscriptions to fetch.
    */
@@ -1103,6 +1292,10 @@ export type ClerkOrgSubscriptionCreateArgs<ExtArgs extends runtime.Types.Extensi
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
   /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
+  /**
    * The data needed to create a ClerkOrgSubscription.
    */
   data: Prisma.XOR<Prisma.ClerkOrgSubscriptionCreateInput, Prisma.ClerkOrgSubscriptionUncheckedCreateInput>
@@ -1136,6 +1329,10 @@ export type ClerkOrgSubscriptionCreateManyAndReturnArgs<ExtArgs extends runtime.
    */
   data: Prisma.ClerkOrgSubscriptionCreateManyInput | Prisma.ClerkOrgSubscriptionCreateManyInput[]
   skipDuplicates?: boolean
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionIncludeCreateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1150,6 +1347,10 @@ export type ClerkOrgSubscriptionUpdateArgs<ExtArgs extends runtime.Types.Extensi
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
   /**
    * The data needed to update a ClerkOrgSubscription.
    */
@@ -1202,6 +1403,10 @@ export type ClerkOrgSubscriptionUpdateManyAndReturnArgs<ExtArgs extends runtime.
    * Limit how many ClerkOrgSubscriptions to update.
    */
   limit?: number
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionIncludeUpdateManyAndReturn<ExtArgs> | null
 }
 
 /**
@@ -1216,6 +1421,10 @@ export type ClerkOrgSubscriptionUpsertArgs<ExtArgs extends runtime.Types.Extensi
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
   /**
    * The filter to search for the ClerkOrgSubscription to update in case it exists.
    */
@@ -1242,6 +1451,10 @@ export type ClerkOrgSubscriptionDeleteArgs<ExtArgs extends runtime.Types.Extensi
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
   /**
    * Filter which ClerkOrgSubscription to delete.
    */
@@ -1274,4 +1487,8 @@ export type ClerkOrgSubscriptionDefaultArgs<ExtArgs extends runtime.Types.Extens
    * Omit specific fields from the ClerkOrgSubscription
    */
   omit?: Prisma.ClerkOrgSubscriptionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ClerkOrgSubscriptionInclude<ExtArgs> | null
 }

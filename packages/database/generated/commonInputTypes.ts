@@ -956,6 +956,23 @@ export type Enumsync_failed_record_typeWithAggregatesFilter<$PrismaModel = never
   _max?: Prisma.NestedEnumsync_failed_record_typeFilter<$PrismaModel>
 }
 
+export type Enumplan_limit_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.plan_limit_type | Prisma.Enumplan_limit_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel> | $Enums.plan_limit_type
+}
+
+export type Enumplan_limit_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.plan_limit_type | Prisma.Enumplan_limit_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumplan_limit_typeWithAggregatesFilter<$PrismaModel> | $Enums.plan_limit_type
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
+}
+
 export type NestedUuidFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -1851,6 +1868,23 @@ export type NestedEnumsync_failed_record_typeWithAggregatesFilter<$PrismaModel =
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumsync_failed_record_typeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumsync_failed_record_typeFilter<$PrismaModel>
+}
+
+export type NestedEnumplan_limit_typeFilter<$PrismaModel = never> = {
+  equals?: $Enums.plan_limit_type | Prisma.Enumplan_limit_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel> | $Enums.plan_limit_type
+}
+
+export type NestedEnumplan_limit_typeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.plan_limit_type | Prisma.Enumplan_limit_typeFieldRefInput<$PrismaModel>
+  in?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.plan_limit_type[] | Prisma.ListEnumplan_limit_typeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumplan_limit_typeWithAggregatesFilter<$PrismaModel> | $Enums.plan_limit_type
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
 }
 
 

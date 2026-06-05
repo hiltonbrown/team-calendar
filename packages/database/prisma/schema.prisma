@@ -248,6 +248,13 @@ enum public_holiday_day_classification {
   working
 }
 
+enum plan_limit_type {
+  active_people
+  connections
+  feeds
+  organisations
+}
+
 model Organisation {
   id                    String    @id @default(uuid()) @db.Uuid
   clerk_org_id          String
@@ -1013,6 +1020,35 @@ model AuditEvent {
   @@map("audit_events")
 }
 
+model Plan {
+  id         String   @id @default(uuid()) @db.Uuid
+  key        String   @unique // free, pro, enterprise
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  limits                  PlanLimit[]
+  clerk_org_subscriptions ClerkOrgSubscription[]
+
+  @@map("plans")
+}
+
+model PlanLimit {
+  id          String          @id @default(uuid()) @db.Uuid
+  plan_id     String          @db.Uuid
+  limit_type  plan_limit_type
+  limit_value Int
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  plan Plan @relation(fields: [plan_id], references: [id])
+
+  @@unique([plan_id, limit_type])
+  @@index([plan_id])
+  @@map("plan_limits")
+}
+
 model ClerkOrgSubscription {
   id                 String    @id @default(uuid()) @db.Uuid
   clerk_org_id       String    @unique
@@ -1022,6 +1058,10 @@ model ClerkOrgSubscription {
   seats_purchased    Int       @default(1)
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
+
+  // Relation keyed on plan_key -> plans.key to avoid changing the existing column or
+  // breaking billing-service.ts, which reads subscription.plan_key directly.
+  plan Plan @relation(fields: [plan_key], references: [key])
 
   @@index([clerk_org_id])
   @@map("clerk_org_subscriptions")
