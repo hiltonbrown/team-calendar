@@ -639,7 +639,8 @@ model LeaveBalance {
   clerk_org_id       String
   organisation_id    String                    @db.Uuid
   person_id          String                    @db.Uuid
-  xero_tenant_id     String                    @db.Uuid
+  // Nullable to support admin-managed manual balances when Xero is not connected.
+  xero_tenant_id     String?                   @db.Uuid
   leave_type_xero_id String
   leave_type_name    String?
   record_type        availability_record_type?
@@ -652,8 +653,16 @@ model LeaveBalance {
 
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   person       Person       @relation(fields: [person_id], references: [id])
-  xero_tenant  XeroTenant   @relation(fields: [xero_tenant_id], references: [id])
+  // Keep the existing Restrict behaviour so the nullable migration is just DROP NOT NULL,
+  // rather than Prisma's optional-relation default of SetNull (which would force an FK rewrite).
+  xero_tenant  XeroTenant?  @relation(fields: [xero_tenant_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  // This composite unique guards Xero-sourced rows. Because PostgreSQL treats NULL as
+  // distinct, it does NOT prevent duplicate manual balances once xero_tenant_id is null.
+  // A partial unique index on (person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL
+  // covers the manual case; it is added via raw SQL in migration
+  // 20260605001000_leave_balances_nullable_tenant because Prisma @@unique cannot express a
+  // WHERE clause. Keep both in sync; see that migration for the index definition.
   @@unique([person_id, xero_tenant_id, leave_type_xero_id])
   @@index([clerk_org_id])
   @@index([organisation_id])

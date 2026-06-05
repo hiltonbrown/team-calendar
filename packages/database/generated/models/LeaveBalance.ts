@@ -238,7 +238,7 @@ export type LeaveBalanceGroupByOutputType = {
   clerk_org_id: string
   organisation_id: string
   person_id: string
-  xero_tenant_id: string
+  xero_tenant_id: string | null
   leave_type_xero_id: string
   leave_type_name: string | null
   record_type: $Enums.availability_record_type | null
@@ -278,7 +278,7 @@ export type LeaveBalanceWhereInput = {
   clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"LeaveBalance"> | string
+  xero_tenant_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
   leave_type_xero_id?: Prisma.StringFilter<"LeaveBalance"> | string
   leave_type_name?: Prisma.StringNullableFilter<"LeaveBalance"> | string | null
   record_type?: Prisma.Enumavailability_record_typeNullableFilter<"LeaveBalance"> | $Enums.availability_record_type | null
@@ -290,7 +290,7 @@ export type LeaveBalanceWhereInput = {
   updated_at?: Prisma.DateTimeFilter<"LeaveBalance"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   person?: Prisma.XOR<Prisma.PersonScalarRelationFilter, Prisma.PersonWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantScalarRelationFilter, Prisma.XeroTenantWhereInput>
+  xero_tenant?: Prisma.XOR<Prisma.XeroTenantNullableScalarRelationFilter, Prisma.XeroTenantWhereInput> | null
 }
 
 export type LeaveBalanceOrderByWithRelationInput = {
@@ -298,7 +298,7 @@ export type LeaveBalanceOrderByWithRelationInput = {
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   leave_type_xero_id?: Prisma.SortOrder
   leave_type_name?: Prisma.SortOrderInput | Prisma.SortOrder
   record_type?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -322,7 +322,7 @@ export type LeaveBalanceWhereUniqueInput = Prisma.AtLeast<{
   clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"LeaveBalance"> | string
+  xero_tenant_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
   leave_type_xero_id?: Prisma.StringFilter<"LeaveBalance"> | string
   leave_type_name?: Prisma.StringNullableFilter<"LeaveBalance"> | string | null
   record_type?: Prisma.Enumavailability_record_typeNullableFilter<"LeaveBalance"> | $Enums.availability_record_type | null
@@ -334,7 +334,7 @@ export type LeaveBalanceWhereUniqueInput = Prisma.AtLeast<{
   updated_at?: Prisma.DateTimeFilter<"LeaveBalance"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   person?: Prisma.XOR<Prisma.PersonScalarRelationFilter, Prisma.PersonWhereInput>
-  xero_tenant?: Prisma.XOR<Prisma.XeroTenantScalarRelationFilter, Prisma.XeroTenantWhereInput>
+  xero_tenant?: Prisma.XOR<Prisma.XeroTenantNullableScalarRelationFilter, Prisma.XeroTenantWhereInput> | null
 }, "id" | "person_id_xero_tenant_id_leave_type_xero_id">
 
 export type LeaveBalanceOrderByWithAggregationInput = {
@@ -342,7 +342,7 @@ export type LeaveBalanceOrderByWithAggregationInput = {
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
   person_id?: Prisma.SortOrder
-  xero_tenant_id?: Prisma.SortOrder
+  xero_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   leave_type_xero_id?: Prisma.SortOrder
   leave_type_name?: Prisma.SortOrderInput | Prisma.SortOrder
   record_type?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -367,7 +367,7 @@ export type LeaveBalanceScalarWhereWithAggregatesInput = {
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
-  xero_tenant_id?: Prisma.UuidWithAggregatesFilter<"LeaveBalance"> | string
+  xero_tenant_id?: Prisma.UuidNullableWithAggregatesFilter<"LeaveBalance"> | string | null
   leave_type_xero_id?: Prisma.StringWithAggregatesFilter<"LeaveBalance"> | string
   leave_type_name?: Prisma.StringNullableWithAggregatesFilter<"LeaveBalance"> | string | null
   record_type?: Prisma.Enumavailability_record_typeNullableWithAggregatesFilter<"LeaveBalance"> | $Enums.availability_record_type | null
@@ -393,7 +393,7 @@ export type LeaveBalanceCreateInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutLeave_balancesInput
   person: Prisma.PersonCreateNestedOneWithoutLeave_balancesInput
-  xero_tenant: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
+  xero_tenant?: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
 }
 
 export type LeaveBalanceUncheckedCreateInput = {
@@ -401,7 +401,7 @@ export type LeaveBalanceUncheckedCreateInput = {
   clerk_org_id: string
   organisation_id: string
   person_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -427,7 +427,7 @@ export type LeaveBalanceUpdateInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutLeave_balancesNestedInput
   person?: Prisma.PersonUpdateOneRequiredWithoutLeave_balancesNestedInput
-  xero_tenant?: Prisma.XeroTenantUpdateOneRequiredWithoutLeave_balancesNestedInput
+  xero_tenant?: Prisma.XeroTenantUpdateOneWithoutLeave_balancesNestedInput
 }
 
 export type LeaveBalanceUncheckedUpdateInput = {
@@ -435,7 +435,7 @@ export type LeaveBalanceUncheckedUpdateInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -452,7 +452,7 @@ export type LeaveBalanceCreateManyInput = {
   clerk_org_id: string
   organisation_id: string
   person_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -483,7 +483,7 @@ export type LeaveBalanceUncheckedUpdateManyInput = {
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -725,14 +725,14 @@ export type LeaveBalanceCreateWithoutOrganisationInput = {
   created_at?: Date | string
   updated_at?: Date | string
   person: Prisma.PersonCreateNestedOneWithoutLeave_balancesInput
-  xero_tenant: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
+  xero_tenant?: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
 }
 
 export type LeaveBalanceUncheckedCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
   person_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -778,7 +778,7 @@ export type LeaveBalanceScalarWhereInput = {
   clerk_org_id?: Prisma.StringFilter<"LeaveBalance"> | string
   organisation_id?: Prisma.UuidFilter<"LeaveBalance"> | string
   person_id?: Prisma.UuidFilter<"LeaveBalance"> | string
-  xero_tenant_id?: Prisma.UuidFilter<"LeaveBalance"> | string
+  xero_tenant_id?: Prisma.UuidNullableFilter<"LeaveBalance"> | string | null
   leave_type_xero_id?: Prisma.StringFilter<"LeaveBalance"> | string
   leave_type_name?: Prisma.StringNullableFilter<"LeaveBalance"> | string | null
   record_type?: Prisma.Enumavailability_record_typeNullableFilter<"LeaveBalance"> | $Enums.availability_record_type | null
@@ -803,14 +803,14 @@ export type LeaveBalanceCreateWithoutPersonInput = {
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutLeave_balancesInput
-  xero_tenant: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
+  xero_tenant?: Prisma.XeroTenantCreateNestedOneWithoutLeave_balancesInput
 }
 
 export type LeaveBalanceUncheckedCreateWithoutPersonInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -910,7 +910,7 @@ export type LeaveBalanceCreateManyOrganisationInput = {
   id?: string
   clerk_org_id: string
   person_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -935,14 +935,14 @@ export type LeaveBalanceUpdateWithoutOrganisationInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   person?: Prisma.PersonUpdateOneRequiredWithoutLeave_balancesNestedInput
-  xero_tenant?: Prisma.XeroTenantUpdateOneRequiredWithoutLeave_balancesNestedInput
+  xero_tenant?: Prisma.XeroTenantUpdateOneWithoutLeave_balancesNestedInput
 }
 
 export type LeaveBalanceUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -958,7 +958,7 @@ export type LeaveBalanceUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   person_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -974,7 +974,7 @@ export type LeaveBalanceCreateManyPersonInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
-  xero_tenant_id: string
+  xero_tenant_id?: string | null
   leave_type_xero_id: string
   leave_type_name?: string | null
   record_type?: $Enums.availability_record_type | null
@@ -999,14 +999,14 @@ export type LeaveBalanceUpdateWithoutPersonInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutLeave_balancesNestedInput
-  xero_tenant?: Prisma.XeroTenantUpdateOneRequiredWithoutLeave_balancesNestedInput
+  xero_tenant?: Prisma.XeroTenantUpdateOneWithoutLeave_balancesNestedInput
 }
 
 export type LeaveBalanceUncheckedUpdateWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -1022,7 +1022,7 @@ export type LeaveBalanceUncheckedUpdateManyWithoutPersonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
-  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   leave_type_xero_id?: Prisma.StringFieldUpdateOperationsInput | string
   leave_type_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   record_type?: Prisma.NullableEnumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type | null
@@ -1117,7 +1117,7 @@ export type LeaveBalanceSelect<ExtArgs extends runtime.Types.Extensions.Internal
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }, ExtArgs["result"]["leaveBalance"]>
 
 export type LeaveBalanceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1137,7 +1137,7 @@ export type LeaveBalanceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }, ExtArgs["result"]["leaveBalance"]>
 
 export type LeaveBalanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1157,7 +1157,7 @@ export type LeaveBalanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }, ExtArgs["result"]["leaveBalance"]>
 
 export type LeaveBalanceSelectScalar = {
@@ -1181,17 +1181,17 @@ export type LeaveBalanceOmit<ExtArgs extends runtime.Types.Extensions.InternalAr
 export type LeaveBalanceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }
 export type LeaveBalanceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }
 export type LeaveBalanceIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
-  xero_tenant?: boolean | Prisma.XeroTenantDefaultArgs<ExtArgs>
+  xero_tenant?: boolean | Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>
 }
 
 export type $LeaveBalancePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1199,14 +1199,14 @@ export type $LeaveBalancePayload<ExtArgs extends runtime.Types.Extensions.Intern
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
     person: Prisma.$PersonPayload<ExtArgs>
-    xero_tenant: Prisma.$XeroTenantPayload<ExtArgs>
+    xero_tenant: Prisma.$XeroTenantPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     clerk_org_id: string
     organisation_id: string
     person_id: string
-    xero_tenant_id: string
+    xero_tenant_id: string | null
     leave_type_xero_id: string
     leave_type_name: string | null
     record_type: $Enums.availability_record_type | null
@@ -1612,7 +1612,7 @@ export interface Prisma__LeaveBalanceClient<T, Null = never, ExtArgs extends run
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   person<T extends Prisma.PersonDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PersonDefaultArgs<ExtArgs>>): Prisma.Prisma__PersonClient<runtime.Types.Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  xero_tenant<T extends Prisma.XeroTenantDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenantDefaultArgs<ExtArgs>>): Prisma.Prisma__XeroTenantClient<runtime.Types.Result.GetResult<Prisma.$XeroTenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  xero_tenant<T extends Prisma.LeaveBalance$xero_tenantArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.LeaveBalance$xero_tenantArgs<ExtArgs>>): Prisma.Prisma__XeroTenantClient<runtime.Types.Result.GetResult<Prisma.$XeroTenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2054,6 +2054,25 @@ export type LeaveBalanceDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many LeaveBalances to delete.
    */
   limit?: number
+}
+
+/**
+ * LeaveBalance.xero_tenant
+ */
+export type LeaveBalance$xero_tenantArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroTenant
+   */
+  select?: Prisma.XeroTenantSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroTenant
+   */
+  omit?: Prisma.XeroTenantOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroTenantInclude<ExtArgs> | null
+  where?: Prisma.XeroTenantWhereInput
 }
 
 /**
