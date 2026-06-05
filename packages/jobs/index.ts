@@ -12,3 +12,8 @@ export {
   reconcileXeroApprovalState,
   reconcileXeroApprovalStateFunction,
 } from "./src/handlers/reconcile-xero-approval-state";
+export {
+  type SyncXeroLeaveBalancesInput,
+  syncXeroLeaveBalances,
+  syncXeroLeaveBalancesFunction,
+} from "./src/handlers/sync-xero-leave-balances";

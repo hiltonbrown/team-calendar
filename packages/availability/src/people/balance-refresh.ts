@@ -3,6 +3,7 @@ import "server-only";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { z } from "zod";
+import { dispatchSyncEvent } from "../sync/sync-events";
 import { hasActiveXeroConnection } from "../xero-connection-state";
 import type { PeopleRole } from "./people-service";
 
@@ -24,6 +25,7 @@ export type BalanceRefreshDispatcher = (payload: {
   dispatchedBy: string;
   organisationId: string;
   personId: string;
+  xeroTenantId: string;
 }) => Promise<Result<void, { message: string }>>;
 
 let balanceRefreshDispatcher: BalanceRefreshDispatcher | null = null;
@@ -99,6 +101,25 @@ export async function dispatchBalanceRefresh(input: {
       return { ok: true, value };
     }
 
+    const xeroTenant = await database.xeroTenant.findFirst({
+      where: {
+        ...scoped,
+        organisation_id: parsed.data.organisationId,
+        xero_connection: {
+          disconnected_at: null,
+          refresh_token_encrypted: { not: "" },
+          revoked_at: null,
+          status: "active",
+        },
+      },
+      select: { id: true },
+    });
+    if (!xeroTenant) {
+      const value = { queued: false, reason: "xero_not_connected" as const };
+      await auditDispatch(parsed.data, value);
+      return { ok: true, value };
+    }
+
     if (!balanceRefreshDispatcher) {
       const value = { queued: false, reason: "job_not_registered" as const };
       await auditDispatch(parsed.data, value);
@@ -110,6 +131,7 @@ export async function dispatchBalanceRefresh(input: {
       dispatchedBy: parsed.data.actingUserId,
       organisationId: parsed.data.organisationId,
       personId: parsed.data.personId,
+      xeroTenantId: xeroTenant.id,
     });
     if (!dispatched.ok) {
       const value = { queued: false, reason: "dispatch_failed" as const };
@@ -202,3 +224,22 @@ function notAuthorised(): Result<never, BalanceRefreshError> {
     },
   };
 }
+
+setBalanceRefreshDispatcher(async (payload) => {
+  const result = await dispatchSyncEvent({
+    clerkOrgId: payload.clerkOrgId,
+    organisationId: payload.organisationId,
+    personId: payload.personId,
+    runType: "leave_balances",
+    triggerType: "manual",
+    triggeredByUserId: payload.dispatchedBy,
+    xeroTenantId: payload.xeroTenantId,
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: { message: result.error.message },
+    };
+  }
+  return { ok: true, value: undefined };
+});
