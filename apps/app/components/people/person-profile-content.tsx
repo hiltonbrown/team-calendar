@@ -17,7 +17,10 @@ import {
 import { AlertTriangleIcon, LockIcon, RefreshCwIcon } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { refreshBalancesAction } from "@/app/(authenticated)/people/_actions";
+import {
+  refreshBalancesAction,
+  setManualBalanceAction,
+} from "@/app/(authenticated)/people/_actions";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 import { withOrg } from "@/lib/navigation/org-url";
 import { AlternativeContactsPanel } from "./alternative-contacts-panel";
@@ -307,7 +310,13 @@ export function PersonProfileContent({
             )}
           </div>
         )}
-        {tab === "balances" && <BalancesPanel profile={profile} />}
+        {tab === "balances" && (
+          <BalancesPanel
+            canEditManual={canRefreshBalances}
+            organisationId={organisationId}
+            profile={profile}
+          />
+        )}
         {tab === "alternative_contacts" && (
           <AlternativeContactsPanel
             canManage={canManageAlternativeContacts}
@@ -415,10 +424,47 @@ function RecordList({
   );
 }
 
-function BalancesPanel({ profile }: { profile: PersonProfile }) {
-  if (
-    !(profile.balances.xeroLinked && profile.balances.hasActiveXeroConnection)
-  ) {
+function BalancesPanel({
+  canEditManual,
+  organisationId,
+  profile,
+}: {
+  canEditManual: boolean;
+  organisationId: string;
+  profile: PersonProfile;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<string | null>(null);
+  const [balance, setBalance] = useState("");
+  const [balanceUnit, setBalanceUnit] = useState<"days" | "hours">("hours");
+  const [leaveTypeName, setLeaveTypeName] = useState("");
+  const [leaveTypeXeroId, setLeaveTypeXeroId] = useState("");
+  const showXeroBalances =
+    profile.balances.xeroLinked && profile.balances.hasActiveXeroConnection;
+  const showManualEditor = !profile.balances.hasActiveXeroConnection;
+
+  const saveManualBalance = () => {
+    if (!(canEditManual && showManualEditor)) {
+      return;
+    }
+    startTransition(async () => {
+      const result = await setManualBalanceAction({
+        balance: Number(balance),
+        balanceUnit,
+        leaveTypeName: leaveTypeName || null,
+        leaveTypeXeroId,
+        organisationId,
+        personId: profile.header.id,
+      });
+      if (!result.ok) {
+        setMessage(result.error.message);
+        return;
+      }
+      setMessage("Manual balance saved.");
+    });
+  };
+
+  if (!(showXeroBalances || showManualEditor)) {
     return (
       <div className="rounded-2xl bg-surface-container-high p-6 text-muted-foreground text-sm">
         Balances available only when Xero is connected and this person is
@@ -433,6 +479,7 @@ function BalancesPanel({ profile }: { profile: PersonProfile }) {
           <TableRow>
             <TableHead>Leave type</TableHead>
             <TableHead className="text-right">Balance</TableHead>
+            {showManualEditor && <TableHead className="text-right" />}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -442,16 +489,96 @@ function BalancesPanel({ profile }: { profile: PersonProfile }) {
               <TableCell className="text-right">
                 {row.balanceUnits.toLocaleString("en-AU")} {row.unitType ?? ""}
               </TableCell>
+              {showManualEditor && (
+                <TableCell className="text-right">
+                  <Button
+                    onClick={() => {
+                      setBalance(String(row.balanceUnits));
+                      setBalanceUnit(row.unitType ?? "hours");
+                      setLeaveTypeName(row.leaveTypeName);
+                      setLeaveTypeXeroId(row.leaveTypeXeroId);
+                    }}
+                    size="sm"
+                    type="button"
+                    variant="secondary"
+                  >
+                    Edit
+                  </Button>
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>
       </Table>
-      <p className="text-muted-foreground text-xs">
-        Last refreshed:{" "}
-        {profile.balances.balancesLastFetchedAt
-          ? formatDateTime(profile.balances.balancesLastFetchedAt)
-          : "Never refreshed"}
-      </p>
+      {showXeroBalances && (
+        <p className="text-muted-foreground text-xs">
+          Last refreshed:{" "}
+          {profile.balances.balancesLastFetchedAt
+            ? formatDateTime(profile.balances.balancesLastFetchedAt)
+            : "Never refreshed"}
+        </p>
+      )}
+      {showManualEditor && canEditManual && (
+        <div className="grid gap-3 rounded-2xl bg-surface-container-high p-4 sm:grid-cols-[1fr_1fr_120px_120px_auto]">
+          <label className="flex flex-col gap-1 text-xs">
+            Leave type id
+            <input
+              className="rounded-xl bg-background px-3 py-2 text-sm"
+              onChange={(event) => setLeaveTypeXeroId(event.target.value)}
+              value={leaveTypeXeroId}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Leave type name
+            <input
+              className="rounded-xl bg-background px-3 py-2 text-sm"
+              onChange={(event) => setLeaveTypeName(event.target.value)}
+              value={leaveTypeName}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Balance
+            <input
+              className="rounded-xl bg-background px-3 py-2 text-sm"
+              inputMode="decimal"
+              onChange={(event) => setBalance(event.target.value)}
+              type="number"
+              value={balance}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs">
+            Unit
+            <select
+              className="rounded-xl bg-background px-3 py-2 text-sm"
+              onChange={(event) =>
+                setBalanceUnit(event.target.value === "days" ? "days" : "hours")
+              }
+              value={balanceUnit}
+            >
+              <option value="hours">Hours</option>
+              <option value="days">Days</option>
+            </select>
+          </label>
+          <Button
+            className="self-end"
+            disabled={
+              isPending ||
+              !leaveTypeXeroId.trim() ||
+              !Number.isFinite(Number(balance))
+            }
+            onClick={saveManualBalance}
+            type="button"
+          >
+            Save
+          </Button>
+        </div>
+      )}
+      {showManualEditor && !canEditManual && (
+        <p className="text-muted-foreground text-xs">
+          Only admins and owners can edit manual balances.
+        </p>
+      )}
+      {message && <p className="text-muted-foreground text-xs">{message}</p>}
     </div>
   );
 }

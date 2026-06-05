@@ -100,7 +100,7 @@ async function loadProfileViewModel(
   });
 
   return {
-    balanceRefreshEnabled: false,
+    balanceRefreshEnabled: true,
     canManageAlternativeContacts: canManageContacts(
       profileResult.value,
       actingPerson?.id ?? null,

@@ -7,8 +7,10 @@ import {
   type BalanceRefreshError,
   deleteAlternativeContact,
   dispatchBalanceRefresh,
+  type ManualBalanceServiceError,
   type PeopleRole,
   reorderAlternativeContacts,
+  setManualLeaveBalance,
   updateAlternativeContact,
 } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
@@ -24,6 +26,8 @@ import {
   RefreshBalancesActionSchema,
   type ReorderAlternativeContactsActionInput,
   ReorderAlternativeContactsActionSchema,
+  type SetManualBalanceActionInput,
+  SetManualBalanceActionSchema,
   type UpdateAlternativeContactActionInput,
   UpdateAlternativeContactActionSchema,
 } from "./_schemas";
@@ -31,6 +35,7 @@ import {
 export type PeopleActionError =
   | AlternativeContactServiceError
   | BalanceRefreshError
+  | ManualBalanceServiceError
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string };
 
@@ -188,6 +193,38 @@ export async function refreshBalancesAction(
   }
 
   revalidatePath(`/people/${parsed.data.personId}`);
+  return result;
+}
+
+export async function setManualBalanceAction(
+  input: SetManualBalanceActionInput
+): Promise<PeopleActionResult<{ id: string }>> {
+  const parsed = SetManualBalanceActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await resolveActionContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+
+  const result = await setManualLeaveBalance({
+    actingRole: context.value.role,
+    actingUserId: context.value.actingUserId,
+    balance: parsed.data.balance,
+    balanceUnit: parsed.data.balanceUnit ?? null,
+    clerkOrgId: context.value.clerkOrgId,
+    leaveTypeName: parsed.data.leaveTypeName ?? null,
+    leaveTypeXeroId: parsed.data.leaveTypeXeroId,
+    organisationId: context.value.organisationId,
+    personId: parsed.data.personId,
+    recordType: parsed.data.recordType ?? null,
+  });
+  if (!result.ok) {
+    return result;
+  }
+
+  revalidatePeoplePaths(parsed.data.personId);
   return result;
 }
 

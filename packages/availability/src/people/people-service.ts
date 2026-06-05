@@ -91,8 +91,10 @@ export interface BalanceRow {
   balanceUnits: number;
   id: string;
   leaveTypeName: string;
+  leaveTypeXeroId: string;
   recordType: availability_record_type | null;
   unitType: leave_balance_unit | null;
+  xeroTenantId: string | null;
 }
 
 export interface AlternativeContactSnapshot {
@@ -400,6 +402,7 @@ export async function getPersonProfile(input: {
           leave_type_name: true,
           leave_type_xero_id: true,
           record_type: true,
+          xero_tenant_id: true,
         },
       }),
       database.availabilityRecord.count({
@@ -424,20 +427,25 @@ export async function getPersonProfile(input: {
     ]);
 
     const xeroLinked = Boolean(person.xero_employee_id);
+    const visibleBalances = hasXero
+      ? balances.filter((balance) => balance.xero_tenant_id !== null)
+      : balances.filter((balance) => balance.xero_tenant_id === null);
     const balanceRows =
-      xeroLinked && hasXero
-        ? balances.map((balance) => ({
+      (xeroLinked && hasXero) || !hasXero
+        ? visibleBalances.map((balance) => ({
             balanceUnits: Number(balance.balance),
             id: balance.id,
+            leaveTypeXeroId: balance.leave_type_xero_id,
             leaveTypeName:
               balance.leave_type_name ?? balance.leave_type_xero_id,
             recordType: balance.record_type,
             unitType: balance.balance_unit,
+            xeroTenantId: balance.xero_tenant_id,
           }))
         : [];
     const balancesLastFetchedAt =
       xeroLinked && hasXero
-        ? maxDate(balances.map((row) => row.last_fetched_at))
+        ? maxDate(visibleBalances.map((row) => row.last_fetched_at))
         : null;
 
     return {
