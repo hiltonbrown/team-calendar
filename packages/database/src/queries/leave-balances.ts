@@ -12,7 +12,7 @@ export interface LeaveBalanceData {
   organisationId: OrganisationId;
   personId: PersonId;
   updatedAt: Date;
-  xeroTenantId: string;
+  xeroTenantId: null | string;
 }
 
 export interface LeaveBalanceSummaryData {
@@ -23,7 +23,7 @@ export interface LeaveBalanceSummaryData {
   personId: PersonId;
   personLastName: string;
   updatedAt: Date;
-  xeroTenantId: string;
+  xeroTenantId: null | string;
 }
 
 export async function listLeaveBalancesForPerson(

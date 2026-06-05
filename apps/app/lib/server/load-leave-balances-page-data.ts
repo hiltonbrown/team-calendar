@@ -23,7 +23,7 @@ export async function loadLeaveBalancesPageData(
       personId: string;
       personFirstName: string;
       personLastName: string;
-      xeroTenantId: string;
+      xeroTenantId: null | string;
       leaveTypeXeroId: string;
       balance: number;
       updatedAt: Date;
