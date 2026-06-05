@@ -20,12 +20,6 @@
       "dependsOn": ["^test:integration"],
       "cache": false
     },
-    "check": {
-      "dependsOn": ["^check"]
-    },
-    "boundaries": {
-      "dependsOn": ["^boundaries"]
-    },
     "analyze": {
       "dependsOn": ["^analyze"]
     },
