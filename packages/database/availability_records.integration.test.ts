@@ -1,4 +1,4 @@
-// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is availability_records.test.ts.
+// biome-ignore-all lint/style/useFilenamingConvention: The requested test file is availability_records.integration.test.ts.
 import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { log } from "@repo/observability/log";
 import { useState } from "react";
 
 interface MarketingFeedCopyProps {
@@ -19,7 +20,7 @@ export const MarketingFeedCopy = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      log.error("Failed to copy feed URL to clipboard", { error: err });
     }
   };
 

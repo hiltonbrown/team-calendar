@@ -2,10 +2,8 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import {
-  listManualAvailability,
-  listPeopleForOrganisation,
-} from "@repo/database/src/queries";
+import { listManualAvailability } from "@repo/database/src/queries/availability-records";
+import { listPeopleForOrganisation } from "@repo/database/src/queries/people";
 
 /**
  * Loads manual availability records and people for the manual availability list page.

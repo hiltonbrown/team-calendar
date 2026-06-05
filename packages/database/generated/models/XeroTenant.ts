@@ -778,10 +778,12 @@ export type XeroTenantCreateNestedOneWithoutLeave_balancesInput = {
   connect?: Prisma.XeroTenantWhereUniqueInput
 }
 
-export type XeroTenantUpdateOneRequiredWithoutLeave_balancesNestedInput = {
+export type XeroTenantUpdateOneWithoutLeave_balancesNestedInput = {
   create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutLeave_balancesInput, Prisma.XeroTenantUncheckedCreateWithoutLeave_balancesInput>
   connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutLeave_balancesInput
   upsert?: Prisma.XeroTenantUpsertWithoutLeave_balancesInput
+  disconnect?: Prisma.XeroTenantWhereInput | boolean
+  delete?: Prisma.XeroTenantWhereInput | boolean
   connect?: Prisma.XeroTenantWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.XeroTenantUpdateToOneWithWhereWithoutLeave_balancesInput, Prisma.XeroTenantUpdateWithoutLeave_balancesInput>, Prisma.XeroTenantUncheckedUpdateWithoutLeave_balancesInput>
 }

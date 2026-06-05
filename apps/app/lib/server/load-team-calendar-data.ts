@@ -2,10 +2,8 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import {
-  listAvailabilityForCalendar,
-  listPeopleForOrganisation,
-} from "@repo/database/src/queries";
+import { listAvailabilityForCalendar } from "@repo/database/src/queries/availability-records";
+import { listPeopleForOrganisation } from "@repo/database/src/queries/people";
 
 /**
  * Loads team calendar data for a date range.

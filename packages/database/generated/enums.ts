@@ -334,3 +334,13 @@ export const public_holiday_day_classification = {
 } as const
 
 export type public_holiday_day_classification = (typeof public_holiday_day_classification)[keyof typeof public_holiday_day_classification]
+
+
+export const plan_limit_type = {
+  active_people: 'active_people',
+  connections: 'connections',
+  feeds: 'feeds',
+  organisations: 'organisations'
+} as const
+
+export type plan_limit_type = (typeof plan_limit_type)[keyof typeof plan_limit_type]

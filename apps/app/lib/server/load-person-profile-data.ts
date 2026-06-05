@@ -2,11 +2,9 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import {
-  getPersonProfile,
-  listAvailabilityForPerson,
-  listLeaveBalancesForPerson,
-} from "@repo/database/src/queries";
+import { listAvailabilityForPerson } from "@repo/database/src/queries/availability-records";
+import { listLeaveBalancesForPerson } from "@repo/database/src/queries/leave-balances";
+import { getPersonProfile } from "@repo/database/src/queries/people";
 
 /**
  * Loads complete person profile data including profile, availability, and leave balances.

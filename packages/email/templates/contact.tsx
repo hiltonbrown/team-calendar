@@ -51,4 +51,6 @@ ContactTemplate.PreviewProps = {
   message: "I need help with availability publishing.",
 };
 
+// React Email's CLI discovers templates via the default export, so keep one
+// alongside the named export used by application code.
 export default ContactTemplate;

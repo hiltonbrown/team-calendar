@@ -1,7 +1,7 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { SupportSubmissionPayloadSchema } from "@repo/core";
-import { getOrganisationById } from "@repo/database/src/queries";
+import { getOrganisationById } from "@repo/database/src/queries/organisations";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { createSupportGitHubIssue } from "@/lib/github/create-support-issue-service";

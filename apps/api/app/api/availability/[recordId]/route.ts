@@ -8,10 +8,9 @@ import type {
   ClerkOrgId,
   OrganisationId,
 } from "@repo/core";
-import {
-  getAvailabilityRecordById,
-  getOrganisationById,
-} from "@repo/database/src/queries";
+import { getAvailabilityRecordById } from "@repo/database/src/queries/availability-records";
+import { getOrganisationById } from "@repo/database/src/queries/organisations";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 
 const UpdateAvailabilitySchema = z.object({
@@ -166,7 +165,7 @@ export async function PATCH(
 
     return Response.json({ ok: true, value: updateResult.value });
   } catch (error) {
-    console.error("Error updating availability record:", error);
+    log.error("Error updating availability record", { error });
     return Response.json(
       {
         ok: false,
@@ -289,7 +288,7 @@ export async function DELETE(
 
     return new Response(null, { status: 204 });
   } catch (error) {
-    console.error("Error deleting availability record:", error);
+    log.error("Error deleting availability record", { error });
     return Response.json(
       {
         ok: false,

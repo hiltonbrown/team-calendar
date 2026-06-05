@@ -248,6 +248,13 @@ enum public_holiday_day_classification {
   working
 }
 
+enum plan_limit_type {
+  active_people
+  connections
+  feeds
+  organisations
+}
+
 model Organisation {
   id                    String    @id @default(uuid()) @db.Uuid
   clerk_org_id          String
@@ -632,7 +639,8 @@ model LeaveBalance {
   clerk_org_id       String
   organisation_id    String                    @db.Uuid
   person_id          String                    @db.Uuid
-  xero_tenant_id     String                    @db.Uuid
+  // Nullable to support admin-managed manual balances when Xero is not connected.
+  xero_tenant_id     String?                   @db.Uuid
   leave_type_xero_id String
   leave_type_name    String?
   record_type        availability_record_type?
@@ -645,8 +653,16 @@ model LeaveBalance {
 
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   person       Person       @relation(fields: [person_id], references: [id])
-  xero_tenant  XeroTenant   @relation(fields: [xero_tenant_id], references: [id])
+  // Keep the existing Restrict behaviour so the nullable migration is just DROP NOT NULL,
+  // rather than Prisma's optional-relation default of SetNull (which would force an FK rewrite).
+  xero_tenant  XeroTenant?  @relation(fields: [xero_tenant_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  // This composite unique guards Xero-sourced rows. Because PostgreSQL treats NULL as
+  // distinct, it does NOT prevent duplicate manual balances once xero_tenant_id is null.
+  // A partial unique index on (person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL
+  // covers the manual case; it is added via raw SQL in migration
+  // 20260605001000_leave_balances_nullable_tenant because Prisma @@unique cannot express a
+  // WHERE clause. Keep both in sync; see that migration for the index definition.
   @@unique([person_id, xero_tenant_id, leave_type_xero_id])
   @@index([clerk_org_id])
   @@index([organisation_id])
@@ -1013,6 +1029,35 @@ model AuditEvent {
   @@map("audit_events")
 }
 
+model Plan {
+  id         String   @id @default(uuid()) @db.Uuid
+  key        String   @unique // free, pro, enterprise
+  name       String
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  limits                  PlanLimit[]
+  clerk_org_subscriptions ClerkOrgSubscription[]
+
+  @@map("plans")
+}
+
+model PlanLimit {
+  id          String          @id @default(uuid()) @db.Uuid
+  plan_id     String          @db.Uuid
+  limit_type  plan_limit_type
+  limit_value Int
+  created_at  DateTime        @default(now())
+  updated_at  DateTime        @updatedAt
+
+  plan Plan @relation(fields: [plan_id], references: [id])
+
+  @@unique([plan_id, limit_type])
+  @@index([plan_id])
+  @@map("plan_limits")
+}
+
 model ClerkOrgSubscription {
   id                 String    @id @default(uuid()) @db.Uuid
   clerk_org_id       String    @unique
@@ -1022,6 +1067,10 @@ model ClerkOrgSubscription {
   seats_purchased    Int       @default(1)
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
+
+  // Relation keyed on plan_key -> plans.key to avoid changing the existing column or
+  // breaking billing-service.ts, which reads subscription.plan_key directly.
+  plan Plan @relation(fields: [plan_key], references: [key])
 
   @@index([clerk_org_id])
   @@map("clerk_org_subscriptions")

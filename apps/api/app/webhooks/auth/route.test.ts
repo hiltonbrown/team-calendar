@@ -3,17 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
   analyticsGroupIdentify: vi.fn(),
+  analyticsIdentify: vi.fn(),
   analyticsShutdown: vi.fn(),
   ensureCurrentUserPerson: vi.fn(),
   organisationFindMany: vi.fn(),
   personUpdateMany: vi.fn(),
+  verify: vi.fn(),
 }));
 
 vi.mock("@repo/analytics/server", () => ({
   analytics: {
     capture: mocks.analyticsCapture,
     groupIdentify: mocks.analyticsGroupIdentify,
-    identify: vi.fn(),
+    identify: mocks.analyticsIdentify,
     shutdown: mocks.analyticsShutdown,
   },
 }));
@@ -35,8 +37,17 @@ vi.mock("@repo/observability/log", () => ({
 vi.mock("@/env", () => ({
   env: { CLERK_WEBHOOK_SECRET: "secret" },
 }));
+vi.mock("svix", () => ({
+  Webhook: class {
+    verify = mocks.verify;
+  },
+}));
+vi.mock("next/headers", () => ({
+  headers: () => ({ get: () => "svix-header-value" }),
+}));
 
 const {
+  POST,
   handleOrganizationMembershipCreated,
   handleOrganizationMembershipDeleted,
 } = await import("./route");
@@ -122,5 +133,53 @@ describe("Clerk organisation membership webhook handling", () => {
         clerk_user_id: null,
       },
     });
+  });
+});
+
+describe("Clerk webhook payload validation", () => {
+  function webhookRequest() {
+    return new Request("http://localhost/webhooks/auth", {
+      body: JSON.stringify({}),
+      method: "POST",
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns 400 when a consumed event has a malformed payload", async () => {
+    // user.created without the required created_at field.
+    mocks.verify.mockReturnValue({
+      data: { id: "user_1" },
+      type: "user.created",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(400);
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+  });
+
+  it("accepts a valid consumed event payload", async () => {
+    mocks.verify.mockReturnValue({
+      data: { created_by: "user_1", id: "org_1", name: "Acme" },
+      type: "organization.created",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(201);
+  });
+
+  it("ignores unhandled event types without validation", async () => {
+    mocks.verify.mockReturnValue({
+      data: { id: "sess_1" },
+      type: "session.created",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(201);
   });
 });
