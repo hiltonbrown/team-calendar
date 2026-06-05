@@ -88,12 +88,12 @@ const handleOrganizationCreated = (data: OrganizationJSON) => {
 
   if (data.created_by) {
     analytics?.capture({
-      event: "Organization Created",
+      event: "Organisation Created",
       distinctId: data.created_by,
     });
   }
 
-  return new Response("Organization created", { status: 201 });
+  return new Response("Organisation created", { status: 201 });
 };
 
 const handleOrganizationUpdated = (data: OrganizationJSON) => {
@@ -109,12 +109,12 @@ const handleOrganizationUpdated = (data: OrganizationJSON) => {
 
   if (data.created_by) {
     analytics?.capture({
-      event: "Organization Updated",
+      event: "Organisation Updated",
       distinctId: data.created_by,
     });
   }
 
-  return new Response("Organization updated", { status: 201 });
+  return new Response("Organisation updated", { status: 201 });
 };
 
 export const handleOrganizationMembershipCreated = async (
@@ -127,20 +127,20 @@ export const handleOrganizationMembershipCreated = async (
   });
 
   analytics?.capture({
-    event: "Organization Member Created",
+    event: "Organisation Member Created",
     distinctId: data.public_user_data.user_id,
   });
 
   await ensurePeopleForMembership(data);
 
-  return new Response("Organization membership created", { status: 201 });
+  return new Response("Organisation membership created", { status: 201 });
 };
 
 export const handleOrganizationMembershipDeleted = async (
   data: OrganizationMembershipJSON
 ): Promise<Response> => {
   analytics?.capture({
-    event: "Organization Member Deleted",
+    event: "Organisation Member Deleted",
     distinctId: data.public_user_data.user_id,
   });
 
@@ -154,7 +154,7 @@ export const handleOrganizationMembershipDeleted = async (
     },
   });
 
-  return new Response("Organization membership deleted", { status: 201 });
+  return new Response("Organisation membership deleted", { status: 201 });
 };
 
 async function ensurePeopleForMembership(data: OrganizationMembershipJSON) {
