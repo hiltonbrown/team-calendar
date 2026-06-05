@@ -5,7 +5,7 @@
   "envMode": "loose",
   "tasks": {
     "build": {
-      "dependsOn": ["^build", "test"],
+      "dependsOn": ["^build"],
       "outputs": [
         ".next/**",
         "!.next/cache/**",
@@ -15,6 +15,16 @@
     },
     "test": {
       "dependsOn": ["^test"]
+    },
+    "test:integration": {
+      "dependsOn": ["^test:integration"],
+      "cache": false
+    },
+    "check": {
+      "dependsOn": ["^check"]
+    },
+    "boundaries": {
+      "dependsOn": ["^boundaries"]
     },
     "analyze": {
       "dependsOn": ["^analyze"]
