@@ -67,5 +67,3 @@ NotificationEmailTemplate.PreviewProps = {
   unsubscribeUrl:
     "https://app.leavesync.test/notifications?tab=preferences&focus=leave_submitted",
 };
-
-export default NotificationEmailTemplate;

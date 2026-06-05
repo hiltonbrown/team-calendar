@@ -50,5 +50,3 @@ ContactTemplate.PreviewProps = {
   email: "contact@leavesync.test",
   message: "I need help with availability publishing.",
 };
-
-export default ContactTemplate;
