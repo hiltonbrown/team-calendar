@@ -3,7 +3,7 @@
   "version": "6.0.2",
   "scripts": {
     "build": "turbo build --filter=!email",
-    "dev": "turbo dev --filter=app --filter=api --filter=web --filter=docs --filter=email",
+    "dev": "turbo dev --filter=app --filter=api --filter=web --filter=email",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "test": "turbo test",
