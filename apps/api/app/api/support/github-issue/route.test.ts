@@ -14,7 +14,7 @@ vi.mock("@repo/auth/helpers", () => ({
   requireOrg: mocks.requireOrg,
 }));
 
-vi.mock("@repo/database/src/queries", () => ({
+vi.mock("@repo/database/src/queries/organisations", () => ({
   getOrganisationById: mocks.getOrganisationById,
 }));
 

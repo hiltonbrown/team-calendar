@@ -2,7 +2,7 @@ import "server-only";
 
 import type { ClerkOrgId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import { listOrganisationsByClerkOrg } from "@repo/database/src/queries";
+import { listOrganisationsByClerkOrg } from "@repo/database/src/queries/organisations";
 
 /**
  * Loads organisations for the authenticated user's Clerk Org.

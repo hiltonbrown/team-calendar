@@ -7,7 +7,7 @@ import type {
   Result,
 } from "@repo/core";
 import { appError } from "@repo/core";
-import { getAvailabilityRecordById } from "@repo/database/src/queries";
+import { getAvailabilityRecordById } from "@repo/database/src/queries/availability-records";
 
 /**
  * Loads a single availability record by ID for the detail page.

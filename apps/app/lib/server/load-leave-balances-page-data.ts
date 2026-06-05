@@ -2,10 +2,8 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import {
-  listLeaveBalancesForOrganisation,
-  listPeopleForOrganisation,
-} from "@repo/database/src/queries";
+import { listLeaveBalancesForOrganisation } from "@repo/database/src/queries/leave-balances";
+import { listPeopleForOrganisation } from "@repo/database/src/queries/people";
 
 /**
  * Loads leave balances and people for the leave balances page.

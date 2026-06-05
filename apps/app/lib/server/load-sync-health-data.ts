@@ -2,12 +2,12 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
+import { hasXeroConnection } from "@repo/database/src/queries/organisations";
 import {
   getLatestSyncRunSummary,
-  hasXeroConnection,
   listRecentAuditEvents,
   listRecentSyncRuns,
-} from "@repo/database/src/queries";
+} from "@repo/database/src/queries/sync-runs";
 
 /**
  * Loads sync health data including latest run, recent runs, and connection status.

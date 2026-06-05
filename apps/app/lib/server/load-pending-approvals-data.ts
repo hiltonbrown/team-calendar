@@ -2,10 +2,8 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
-import {
-  listPendingApprovalRecords,
-  listPeopleForOrganisation,
-} from "@repo/database/src/queries";
+import { listPendingApprovalRecords } from "@repo/database/src/queries/availability-records";
+import { listPeopleForOrganisation } from "@repo/database/src/queries/people";
 
 /**
  * Loads pending approval records and people for the leave approvals page.
