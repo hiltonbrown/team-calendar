@@ -12,9 +12,6 @@ leave into the canonical `availability_records` model, and registers the Inngest
 
 ## Hard rules
 
-- Branch first off the latest `main`: `git checkout main && git pull origin main && git
-  checkout -b launch/04-inbound-leave-sync`. Depends on prompt 01 (schema parity) being
-  merged.
 - Australian English. No em dashes.
 - This slice owns `packages/xero` (AU read of leave), `packages/jobs` (the handler and
   registration), and the Inngest registration in `apps/api`. Do not change `schema.prisma`,
