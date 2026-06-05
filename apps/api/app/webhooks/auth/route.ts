@@ -13,7 +13,79 @@ import { log } from "@repo/observability/log";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
+import { z } from "zod";
 import { env } from "@/env";
+
+// Validates only the Clerk fields the handlers below consume. Unknown keys are
+// stripped rather than rejected so future Clerk additions do not break delivery.
+const ClerkUserDataSchema = z.object({
+  id: z.string(),
+  email_addresses: z.array(z.object({ email_address: z.string() })).default([]),
+  first_name: z.string().nullish(),
+  last_name: z.string().nullish(),
+  created_at: z.number(),
+  image_url: z.string().nullish(),
+  phone_numbers: z.array(z.object({ phone_number: z.string() })).default([]),
+});
+
+const ClerkDeletedObjectDataSchema = z.object({
+  id: z.string().optional(),
+});
+
+const ClerkOrganizationDataSchema = z.object({
+  id: z.string(),
+  created_by: z.string().nullish(),
+  name: z.string(),
+  image_url: z.string().nullish(),
+});
+
+const ClerkOrganizationMembershipDataSchema = z.object({
+  organization: z.object({ id: z.string() }),
+  public_user_data: z.object({
+    user_id: z.string(),
+    image_url: z.string().nullish(),
+    first_name: z.string().nullish(),
+    last_name: z.string().nullish(),
+    identifier: z.string().nullish(),
+  }),
+});
+
+// Discriminated over the event types LeaveSync acts on. Any other event type is
+// not validated here because the switch below ignores it.
+const ClerkWebhookEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("user.created"), data: ClerkUserDataSchema }),
+  z.object({ type: z.literal("user.updated"), data: ClerkUserDataSchema }),
+  z.object({
+    type: z.literal("user.deleted"),
+    data: ClerkDeletedObjectDataSchema,
+  }),
+  z.object({
+    type: z.literal("organization.created"),
+    data: ClerkOrganizationDataSchema,
+  }),
+  z.object({
+    type: z.literal("organization.updated"),
+    data: ClerkOrganizationDataSchema,
+  }),
+  z.object({
+    type: z.literal("organizationMembership.created"),
+    data: ClerkOrganizationMembershipDataSchema,
+  }),
+  z.object({
+    type: z.literal("organizationMembership.deleted"),
+    data: ClerkOrganizationMembershipDataSchema,
+  }),
+]);
+
+const CONSUMED_EVENT_TYPES = new Set<string>([
+  "user.created",
+  "user.updated",
+  "user.deleted",
+  "organization.created",
+  "organization.updated",
+  "organizationMembership.created",
+  "organizationMembership.deleted",
+]);
 
 const handleUserCreated = (data: UserJSON) => {
   analytics?.identify({
@@ -244,9 +316,22 @@ export const POST = async (request: Request): Promise<Response> => {
     });
   }
 
+  const eventType = event.type;
+
+  // Validate the payload shape for events we act on before consuming event.data.
+  if (CONSUMED_EVENT_TYPES.has(eventType)) {
+    const parsed = ClerkWebhookEventSchema.safeParse(event);
+    if (!parsed.success) {
+      log.error("Invalid Clerk webhook payload", {
+        eventType,
+        issues: parsed.error.issues,
+      });
+      return new Response("Invalid webhook payload", { status: 400 });
+    }
+  }
+
   // Get the ID and type
   const { id } = event.data;
-  const eventType = event.type;
 
   log.info("Webhook", { id, eventType, body });
 
