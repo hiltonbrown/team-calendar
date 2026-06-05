@@ -315,7 +315,7 @@ The full Prisma schema is the authoritative reference and lives at `packages/dat
 
 Every tenant-scoped table carries `clerk_org_id` (text, not null, indexed). This is the Clerk `org_id` string (e.g. `org_2abc...`). All queries must filter by this column. It is the first line of tenant isolation before any Organisation-level filtering.
 
-The following join tables are in the process of having `clerk_org_id` added via migration: `feed_tokens`, `feed_scopes`, `availability_publications`. Until that migration is applied, access to these tables must go through their parent FK join to a table that carries `clerk_org_id`.
+The join tables `feed_tokens`, `feed_scopes`, and `availability_publications` now carry their own `clerk_org_id` column for direct tenant isolation.
 
 ### `organisations`
 
@@ -343,7 +343,7 @@ One row per Organisation. Current-state only (Scenario A): the row is updated in
 
 ### `xero_tenants`
 
-One row per XeroConnection (one per Xero file). Unique on `xero_connection_id`. Carries `payroll_region` (AU, NZ, UK) which determines which Xero Payroll API is used for all sync and write operations. Has an explicit FK to `organisations` via `organisation_id` (pending migration to add the Prisma relation declaration).
+One row per XeroConnection (one per Xero file). Unique on `xero_connection_id`. Carries `payroll_region` (AU, NZ, UK) which determines which Xero Payroll API is used for all sync and write operations. Has an explicit FK to `organisations` via `organisation_id`, declared as a Prisma relation.
 
 ### `xero_sync_cursors`
 
@@ -359,15 +359,17 @@ Core table. Holds both Xero-synced leave and manual availability entries. Unique
 
 ### `availability_publications`
 
-Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change. Pending migration to add `clerk_org_id` for direct tenant isolation.
+Materialised publishing state per AvailabilityRecord. Decouples raw data from what was actually emitted in a feed. `published_sequence` increments on material change. Carries `clerk_org_id` for direct tenant isolation.
 
 ### `leave_balances`
 
-Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances (pending migration). Never calculated by LeaveSync. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)`.
+Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances. Never calculated by LeaveSync. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows.
+
+**Note on the unique constraint:** PostgreSQL treats each NULL value as distinct, so the composite unique above does not prevent duplicate manual balances where `xero_tenant_id IS NULL`. A partial unique index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` guards the manual case so create-or-update can target a single row.
 
 ### `public_holidays`
 
-Sourced from Nager.Date API or entered manually. `location_id = null` means the holiday applies to all locations in the Organisation. Unique on `(organisation_id, location_id, date, source)`.
+Sourced from Nager.Date API or entered manually. `location_id = null` means the holiday applies to all locations in the Organisation. Unique on `(organisation_id, source, source_remote_id)`.
 
 ### `notifications`
 
@@ -375,7 +377,7 @@ In-app notifications delivered via SSE. Per-user, per-Clerk-Organisation. SSE co
 
 ### `notification_preferences`
 
-Per-user, per-Clerk-Organisation opt-in settings. Defaults: `in_app_enabled = true`, `email_enabled = true`. Unique on `(user_id, clerk_org_id, notification_type)`.
+Per-user, per-Organisation opt-in settings. Defaults: `in_app_enabled = true`, `email_enabled = true`. Unique on `(user_id, organisation_id, notification_type)`.
 
 ### `feeds`
 
@@ -383,11 +385,11 @@ ICS calendar feeds. `organisation_id` is nullable: a null value means the feed s
 
 ### `feed_scopes`
 
-Normalised scope rules per feed. Each row is one include rule. Pending migration to add `clerk_org_id` for direct tenant isolation.
+Normalised scope rules per feed. Each row is one include rule. Carries `clerk_org_id` for direct tenant isolation.
 
 ### `feed_tokens`
 
-Signed, revocable tokens. `token_hash` stored; plaintext never persisted. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 410. Pending migration to add `clerk_org_id` for direct tenant isolation.
+Signed, revocable tokens. `token_hash` stored; plaintext never persisted. `rotated_from_token_id` provides a rotation trail within this table. Revoked and expired tokens return 410. Carries `clerk_org_id` for direct tenant isolation.
 
 ### `sync_runs`
 
@@ -403,7 +405,7 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 
 ### Billing tables
 
-`plans`, `plan_limits`, `clerk_org_subscriptions` (unique on `clerk_org_id`), `usage_counters` (unique on `(clerk_org_id, counter_type)`).
+`plans` (unique on `key`), `plan_limits` (unique on `(plan_id, limit_type)`), `clerk_org_subscriptions` (unique on `clerk_org_id`; relates to `plans` via `plan_key` to `plans.key`), `usage_counters` (unique on `(clerk_org_id, metric_key, period_start, period_end)`).
 
 ---
 
@@ -419,13 +421,14 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | `people` | `(organisation_id, source_system, source_person_key)` |
 | `availability_records` | `(organisation_id, source_type, source_remote_id)`; NULL-distinct, app-layer guard required for manual records |
 | `availability_publications` | `availability_record_id` |
-| `leave_balances` | `(person_id, xero_tenant_id, leave_type_xero_id)` |
-| `public_holidays` | `(organisation_id, location_id, date, source)` |
-| `notification_preferences` | `(user_id, clerk_org_id, notification_type)` |
+| `leave_balances` | `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows; partial unique on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` for manual balances |
+| `public_holidays` | `(organisation_id, source, source_remote_id)` |
+| `notification_preferences` | `(user_id, organisation_id, notification_type)` |
 | `feeds` | `(clerk_org_id, slug)` |
+| `plans` | `key` |
 | `plan_limits` | `(plan_id, limit_type)` |
 | `clerk_org_subscriptions` | `clerk_org_id` |
-| `usage_counters` | `(clerk_org_id, counter_type)` |
+| `usage_counters` | `(clerk_org_id, metric_key, period_start, period_end)` |
 
 ### Key indexes
 
