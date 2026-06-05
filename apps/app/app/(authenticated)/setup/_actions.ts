@@ -41,7 +41,7 @@ export async function createOrganisationAction(input: {
     return notAuthorised();
   }
 
-  // ensureOrganisationForClerk throws on DB failure — redirect must be outside try/catch
+  // ensureOrganisationForClerk throws on DB failure, so redirect must be outside try/catch
   try {
     const payload: OrganisationSettingsInput = {
       clerkOrgId: orgId,

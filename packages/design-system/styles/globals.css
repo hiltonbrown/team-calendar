@@ -9,7 +9,7 @@
 
 :root,
 [data-theme="light"] {
-  /* LeaveSync light mode — botanical editorial */
+  /* LeaveSync light mode: botanical editorial */
   --background: #fcf8ff;
   --foreground: #1c1a26;
   --card: #ffffff;
@@ -177,7 +177,7 @@
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 
-  /* Typography scale — Plus Jakarta Sans */
+  /* Typography scale: Plus Jakarta Sans */
   --text-display-lg: 3.5rem;
   --text-display-md: 2.75rem;
   --text-display-sm: 2.25rem;

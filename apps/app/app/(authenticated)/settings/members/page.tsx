@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { MembersClient } from "./members-client";
 
 export const metadata: Metadata = {
-  title: "Members — Settings — LeaveSync",
+  title: "Members - Settings - LeaveSync",
   description: "Manage team members and their roles in your organisation.",
 };
 
