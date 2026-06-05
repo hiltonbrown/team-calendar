@@ -16,12 +16,17 @@ export {
 export {
   fetchEmployeesForRegion,
   fetchLeaveApplicationStatusForRegion,
+  fetchLeaveRecordsForRegion,
 } from "./src/read/dispatch";
 export type { XeroEmployee } from "./src/read/employees";
 export type {
   XeroLeaveApplicationStatus,
   XeroLeaveApplicationStatusResult,
 } from "./src/read/leave-application-status";
+export type {
+  XeroLeaveRecord,
+  XeroLeaveRecordStatus,
+} from "./src/read/leave-records";
 export {
   type ResolutionError,
   resolveXeroEmployeeId,

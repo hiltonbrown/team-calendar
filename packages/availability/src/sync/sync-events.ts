@@ -1,6 +1,8 @@
 import type { Result } from "@repo/core";
+import { Inngest } from "inngest";
 import { z } from "zod";
-import { inngest } from "./client";
+
+const inngest = new Inngest({ id: "leavesync" });
 
 export const syncEventNames = {
   approval_state_reconciliation: "reconcile-xero-approval-state",
@@ -77,7 +79,6 @@ export async function dispatchSyncEvent(
 
   try {
     const sent = await inngest.send({
-      name: eventName,
       data: {
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
@@ -85,6 +86,7 @@ export async function dispatchSyncEvent(
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         xeroTenantId: parsed.data.xeroTenantId,
       },
+      name: eventName,
     });
     return { ok: true, value: { eventName, ids: sent.ids, queued: true } };
   } catch {
@@ -120,8 +122,8 @@ export async function dispatchCancelSyncRun(
 
   try {
     await inngest.send({
-      name: "cancel-sync-run",
       data: parsed.data,
+      name: "cancel-sync-run",
     });
     return { ok: true, value: { queued: true } };
   } catch {

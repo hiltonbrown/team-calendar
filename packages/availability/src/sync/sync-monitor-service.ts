@@ -3,13 +3,13 @@ import "server-only";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
+import { z } from "zod";
 import {
   dispatchCancelSyncRun,
   dispatchSyncEvent,
   getRegisteredSyncEventName,
   syncEventNames,
-} from "@repo/jobs";
-import { z } from "zod";
+} from "./sync-events";
 
 export type SyncMonitorError =
   | { code: "connection_not_active"; message: string }

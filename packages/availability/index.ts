@@ -166,6 +166,13 @@ export type {
   OrganisationSettingsPatch,
 } from "./src/settings/shared";
 export {
+  deriveXeroStableSourceKey,
+  type InboundLeaveApprovalStatus,
+  type InboundLeaveRecordInput,
+  type NormalisedInboundLeaveRecord,
+  normaliseInboundLeaveRecord,
+} from "./src/sync/inbound-leave-normaliser";
+export {
   cancelRun,
   dispatchManualSync,
   exportFailedRecordsCsv,

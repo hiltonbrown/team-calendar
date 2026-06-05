@@ -13,9 +13,9 @@
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/feeds": "*",
-    "@repo/jobs": "*",
     "@repo/notifications": "*",
     "@repo/observability": "*",
+    "inngest": "latest",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },

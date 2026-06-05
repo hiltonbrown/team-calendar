@@ -13,7 +13,6 @@ import type {
   availability_failed_action,
   availability_record_type,
 } from "@repo/database/generated/enums";
-import { dispatchSyncEvent } from "@repo/jobs";
 import {
   dispatchNotification,
   type NotificationDispatchDatabase,
@@ -23,6 +22,7 @@ import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
+import { dispatchSyncEvent } from "../sync/sync-events";
 import { hasActiveXeroConnection } from "../xero-connection-state";
 
 export type ApprovalRole = "admin" | "manager" | "owner";

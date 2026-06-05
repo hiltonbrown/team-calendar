@@ -221,9 +221,9 @@
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/feeds": "*",
-        "@repo/jobs": "*",
         "@repo/notifications": "*",
         "@repo/observability": "*",
+        "inngest": "latest",
         "server-only": "^0.0.1",
         "zod": "^4.4.3",
       },
@@ -356,6 +356,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/auth": "*",
+        "@repo/availability": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/notifications": "*",
