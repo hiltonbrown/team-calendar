@@ -67,3 +67,7 @@ NotificationEmailTemplate.PreviewProps = {
   unsubscribeUrl:
     "https://app.leavesync.test/notifications?tab=preferences&focus=leave_submitted",
 };
+
+// React Email's CLI discovers templates via the default export, so keep one
+// alongside the named export used by application code.
+export default NotificationEmailTemplate;
