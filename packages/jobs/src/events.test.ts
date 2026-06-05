@@ -14,6 +14,9 @@ describe("jobs events", () => {
     expect(getRegisteredSyncEventName("approval_state_reconciliation")).toBe(
       "reconcile-xero-approval-state"
     );
+    expect(getRegisteredSyncEventName("leave_records")).toBe(
+      "sync-xero-leave-records"
+    );
     expect(getRegisteredSyncEventName("people")).toBe("sync-xero-people");
   });
 

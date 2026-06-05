@@ -22,7 +22,7 @@ vi.mock("@repo/database", () => ({
     },
   },
 }));
-vi.mock("@repo/jobs", () => ({
+vi.mock("./sync-events", () => ({
   dispatchCancelSyncRun: vi.fn(),
   dispatchSyncEvent: mocks.dispatchSyncEvent,
   getRegisteredSyncEventName: mocks.getRegisteredSyncEventName,

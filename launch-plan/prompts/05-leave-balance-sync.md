@@ -13,9 +13,6 @@ edit path for the disconnected case.
 
 ## Hard rules
 
-- Branch first off the latest `main`: `git checkout main && git pull origin main && git
-  checkout -b launch/05-leave-balance-sync`. Depends on prompt 01 (the
-  `leave_balances.xero_tenant_id` nullable migration) being merged.
 - Australian English. No em dashes.
 - This slice owns `packages/xero` (AU balance read), `packages/jobs` (the handler),
   `packages/availability` (balance service and dispatcher wiring), and the admin balance UI in

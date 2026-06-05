@@ -11,8 +11,6 @@ build on a clean baseline.
 
 ## Hard rules
 
-- Branch first off the latest `main`: `git checkout main && git pull origin main && git
-  checkout -b launch/03-standards-hygiene`.
 - Australian English. No em dashes anywhere (this slice removes the two that exist).
 - Do not touch `schema.prisma`, migrations, tenancy or Clerk integration logic. You may edit
   the specific files listed below across several packages.
