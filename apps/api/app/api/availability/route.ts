@@ -1,10 +1,9 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
 import { createManualAvailability } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import {
-  getOrganisationById,
-  listPeopleForOrganisation,
-} from "@repo/database/src/queries";
+import { getOrganisationById } from "@repo/database/src/queries/organisations";
+import { listPeopleForOrganisation } from "@repo/database/src/queries/people";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 
 const CreateAvailabilitySchema = z.object({
@@ -150,7 +149,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error creating availability record:", error);
+    log.error("Error creating availability record", { error });
     return Response.json(
       {
         ok: false,
