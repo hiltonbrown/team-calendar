@@ -13,6 +13,7 @@ export type RegisteredSyncRunType = keyof typeof syncEventNames;
 
 const registeredHandlers = new Set<RegisteredSyncRunType>([
   "approval_state_reconciliation",
+  "leave_balances",
   "leave_records",
   "people",
 ]);
@@ -20,6 +21,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
 const SyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
+  personId: z.string().uuid().optional(),
   runType: z.enum([
     "people",
     "leave_records",
@@ -81,6 +83,7 @@ export async function dispatchSyncEvent(
       data: {
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
+        personId: parsed.data.personId,
         triggerType: parsed.data.triggerType,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         xeroTenantId: parsed.data.xeroTenantId,

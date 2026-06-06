@@ -33,7 +33,7 @@ const runTypeOptions: Array<{
 }> = [
   { label: "Sync people", value: "people", wired: false },
   { label: "Sync leave records", value: "leave_records", wired: false },
-  { label: "Sync balances", value: "leave_balances", wired: false },
+  { label: "Sync balances", value: "leave_balances", wired: true },
   {
     label: "Reconcile approvals",
     value: "approval_state_reconciliation",

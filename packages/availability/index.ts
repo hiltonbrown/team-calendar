@@ -105,6 +105,10 @@ export {
   fieldOwnershipForPerson,
 } from "./src/people/field-ownership";
 export {
+  type ManualBalanceServiceError,
+  setManualLeaveBalance,
+} from "./src/people/manual-balance-service";
+export {
   type AlternativeContactSnapshot,
   type AvailabilityRecordSummary,
   type BalanceRow,
@@ -787,6 +791,7 @@ export * from "./src/people/alternative-contact-service";
 export * from "./src/people/balance-refresh";
 export * from "./src/people/current-status";
 export * from "./src/people/field-ownership";
+export * from "./src/people/manual-balance-service";
 export * from "./src/people/people-service";
 export * from "./src/plans/plan-service";
 export * from "./src/plans/submit-service";

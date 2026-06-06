@@ -104,6 +104,40 @@ export const RefreshBalancesActionSchema = z.object({
   personId: z.string().uuid(),
 });
 
+export const SetManualBalanceActionSchema = z.object({
+  balance: z.coerce.number().finite(),
+  balanceUnit: z.enum(["days", "hours"]).nullable().optional(),
+  leaveTypeName: z.string().trim().max(200).nullable().optional(),
+  leaveTypeXeroId: z.string().trim().min(1).max(200),
+  organisationId: z.string().uuid(),
+  personId: z.string().uuid(),
+  recordType: z
+    .enum([
+      "leave",
+      "annual_leave",
+      "personal_leave",
+      "holiday",
+      "sick_leave",
+      "long_service_leave",
+      "unpaid_leave",
+      "public_holiday",
+      "wfh",
+      "travel",
+      "travelling",
+      "training",
+      "client_site",
+      "another_office",
+      "offsite_meeting",
+      "contractor_unavailable",
+      "limited_availability",
+      "alternative_contact",
+      "other",
+      "leave_request",
+    ])
+    .nullable()
+    .optional(),
+});
+
 export type AddAlternativeContactActionInput = z.infer<
   typeof AddAlternativeContactActionSchema
 >;
@@ -118,4 +152,7 @@ export type ReorderAlternativeContactsActionInput = z.infer<
 >;
 export type RefreshBalancesActionInput = z.infer<
   typeof RefreshBalancesActionSchema
+>;
+export type SetManualBalanceActionInput = z.infer<
+  typeof SetManualBalanceActionSchema
 >;
