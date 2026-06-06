@@ -624,6 +624,29 @@ export const createManualAvailability = async (
     return { ok: false, error: appError("not_found", "Person not found") };
   }
 
+  const duplicate = await database.availabilityRecord.findFirst({
+    where: {
+      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+      ends_at: parsed.data.endsAt,
+      person_id: parsed.data.personId,
+      record_type: parsed.data.recordType,
+      source_remote_id: null,
+      source_type: "manual",
+      starts_at: parsed.data.startsAt,
+    },
+    select: { id: true },
+  });
+
+  if (duplicate) {
+    return {
+      ok: false,
+      error: appError(
+        "conflict",
+        "A matching manual availability record already exists."
+      ),
+    };
+  }
+
   const id = randomUUID();
   const record = await database.availabilityRecord.create({
     data: {
