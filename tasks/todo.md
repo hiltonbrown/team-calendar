@@ -27,3 +27,23 @@
   - `bun run check`: blocked because `ultracite` is not installed in `node_modules/.bin` after the failed install.
   - `bun run boundaries`: blocked because `turbo` is not installed in `node_modules/.bin` after the failed install.
   - `bun run test`: blocked because `turbo` is not installed in `node_modules/.bin` after the failed install.
+
+## PR #47 Review Fixes
+
+Reviewing PR #47 in an environment where dependencies could be installed, so the verification the original task could not run was completed here.
+
+- [x] (Bug) Duplicate guard ignored soft deletes: the pre-insert check omitted `archived_at: null`, so an archived (deleted) manual record would wrongly block re-creating an identical one, even though archived records never reach the feed. Added `archived_at: null` to the duplicate query, matching every other scoped query in `packages/availability/index.ts`.
+- [x] (Regression test) Added `ignores archived manual records when guarding duplicates` to `packages/availability/index.test.ts`, which fails without the fix.
+- [x] (Lint) Resolved `lint/suspicious/useAwait` errors in the new test mocks by dropping the unnecessary `async` modifier (the helpers never `await`), aligning with the existing non-async `vi.fn` mock style in the package.
+
+### Verification (run in this environment)
+
+- `bunx ultracite check` on the three changed files: passed.
+- `bun run --cwd packages/availability test` (excludes integration tests per the package script): 27 files, 129 tests passed.
+- `bun run --cwd packages/availability typecheck` (`tsc --noEmit`): passed.
+- `apps/api` `tsc --noEmit`: `app/api/availability/route.ts` is clean; the only errors are pre-existing in the unrelated `lib/support/persist-support-submission-audit.test.ts` and are not introduced by this PR.
+- `packages/availability/index.integration.test.ts` fails to load because `DATABASE_URL` is unset; this is environmental and reproduces on the base commit. It is excluded from the package `test` script.
+
+### Follow-up recommendation (not changed here)
+
+- The guard is a check-then-insert, so two concurrent identical submissions can still race past it. A partial unique index (`... WHERE source_type = 'manual' AND source_remote_id IS NULL`) would close that window at the database level, but that needs a migration and was deliberately out of scope for this PR.

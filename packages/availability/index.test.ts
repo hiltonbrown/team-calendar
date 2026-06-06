@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   interface ScopedWhere {
+    archived_at?: Date | null;
     clerk_org_id?: string;
     ends_at?: Date;
     id?: string;
@@ -24,6 +25,7 @@ const mocks = vi.hoisted(() => {
 
   interface AvailabilityRecordFixture {
     all_day: boolean;
+    archived_at: Date | null;
     clerk_org_id: string;
     contactability: string | null;
     ends_at: Date;
@@ -52,6 +54,8 @@ const mocks = vi.hoisted(() => {
     record: AvailabilityRecordFixture,
     where: ScopedWhere
   ) =>
+    (where.archived_at === undefined ||
+      record.archived_at === where.archived_at) &&
     record.clerk_org_id === where.clerk_org_id &&
     record.organisation_id === where.organisation_id &&
     record.person_id === where.person_id &&
@@ -62,50 +66,48 @@ const mocks = vi.hoisted(() => {
     datesEqual(where.ends_at, record.ends_at);
 
   return {
-    availabilityCreate: vi.fn(
-      async ({ data }: { data: Record<string, unknown> }) => {
-        const person = people.find((entry) => entry.id === data.person_id);
-        if (!person) {
-          throw new Error("Person fixture missing for availability record");
-        }
-
-        const record: AvailabilityRecordFixture = {
-          all_day: data.all_day === true,
-          clerk_org_id: String(data.clerk_org_id),
-          contactability:
-            typeof data.contactability === "string" ? data.contactability : null,
-          ends_at: data.ends_at instanceof Date ? data.ends_at : new Date(),
-          id: String(data.id),
-          include_in_feed: data.include_in_feed === true,
-          notes_internal:
-            typeof data.notes_internal === "string" ? data.notes_internal : null,
-          organisation_id: String(data.organisation_id),
-          person,
-          person_id: String(data.person_id),
-          privacy_mode:
-            typeof data.privacy_mode === "string" ? data.privacy_mode : null,
-          record_type: String(data.record_type),
-          source_remote_id: null,
-          source_type: String(data.source_type),
-          starts_at:
-            data.starts_at instanceof Date ? data.starts_at : new Date(),
-          title: typeof data.title === "string" ? data.title : null,
-          working_location:
-            typeof data.working_location === "string"
-              ? data.working_location
-              : null,
-        };
-
-        records.push(record);
-        return record;
+    availabilityCreate: vi.fn(({ data }: { data: Record<string, unknown> }) => {
+      const person = people.find((entry) => entry.id === data.person_id);
+      if (!person) {
+        throw new Error("Person fixture missing for availability record");
       }
-    ),
+
+      const record: AvailabilityRecordFixture = {
+        all_day: data.all_day === true,
+        archived_at: null,
+        clerk_org_id: String(data.clerk_org_id),
+        contactability:
+          typeof data.contactability === "string" ? data.contactability : null,
+        ends_at: data.ends_at instanceof Date ? data.ends_at : new Date(),
+        id: String(data.id),
+        include_in_feed: data.include_in_feed === true,
+        notes_internal:
+          typeof data.notes_internal === "string" ? data.notes_internal : null,
+        organisation_id: String(data.organisation_id),
+        person,
+        person_id: String(data.person_id),
+        privacy_mode:
+          typeof data.privacy_mode === "string" ? data.privacy_mode : null,
+        record_type: String(data.record_type),
+        source_remote_id: null,
+        source_type: String(data.source_type),
+        starts_at: data.starts_at instanceof Date ? data.starts_at : new Date(),
+        title: typeof data.title === "string" ? data.title : null,
+        working_location:
+          typeof data.working_location === "string"
+            ? data.working_location
+            : null,
+      };
+
+      records.push(record);
+      return record;
+    }),
     availabilityFindFirst: vi.fn(
-      async ({ where }: { where: ScopedWhere }) =>
+      ({ where }: { where: ScopedWhere }) =>
         records.find((record) => matchesDuplicateWhere(record, where)) ?? null
     ),
     people,
-    personFindFirst: vi.fn(async ({ where }: { where: ScopedWhere }) => {
+    personFindFirst: vi.fn(({ where }: { where: ScopedWhere }) => {
       const person = people.find((entry) => entry.id === where.id);
       if (!person) {
         return null;
@@ -268,6 +270,36 @@ describe("createManualAvailability duplicate guard", () => {
           person_id: basePersonId,
           source_remote_id: null,
         }),
+      })
+    );
+  });
+
+  it("ignores archived manual records when guarding duplicates", async () => {
+    const first = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+    expect(first.ok).toBe(true);
+
+    // Soft-delete the stored record, mirroring archiveManualAvailability.
+    const created = mocks.records.at(0);
+    if (!created) {
+      throw new Error("Expected a created record fixture");
+    }
+    created.archived_at = new Date("2026-05-09T00:00:00.000Z");
+
+    const recreated = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+
+    expect(recreated.ok).toBe(true);
+    expect(mocks.records).toHaveLength(2);
+    expect(mocks.availabilityFindFirst).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ archived_at: null }),
       })
     );
   });

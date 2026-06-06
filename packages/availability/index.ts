@@ -627,6 +627,7 @@ export const createManualAvailability = async (
   const duplicate = await database.availabilityRecord.findFirst({
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+      archived_at: null,
       ends_at: parsed.data.endsAt,
       person_id: parsed.data.personId,
       record_type: parsed.data.recordType,
