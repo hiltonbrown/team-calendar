@@ -1,3 +1,4 @@
+import type { XeroLeaveBalanceFetchFailure } from "../au/read";
 import {
   fetchEmployees as fetchAuEmployees,
   fetchLeaveApplicationStatus as fetchAuLeaveApplicationStatus,
@@ -118,6 +119,7 @@ export async function fetchLeaveBalancesForRegion(
   input: { employeeIds: string[]; xeroTenant: XeroTenantForWrite }
 ): Promise<
   XeroWriteResult<{
+    failures: XeroLeaveBalanceFetchFailure[];
     leaveBalances: XeroLeaveBalance[];
     rawResponses: unknown[];
   }>

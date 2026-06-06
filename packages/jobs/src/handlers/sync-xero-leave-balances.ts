@@ -9,6 +9,7 @@ import {
   fetchLeaveBalancesForRegion,
   toPlainLanguageMessage,
   type XeroLeaveBalance,
+  type XeroLeaveBalanceFetchFailure,
   type XeroWriteError,
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
@@ -58,6 +59,7 @@ type SyncXeroLeaveBalancesResult = Result<
 type XeroTenant = NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
 
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
+const BALANCE_BATCH_SIZE = 50;
 
 export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
   inngest.createFunction(
@@ -146,18 +148,26 @@ export async function syncXeroLeaveBalances(
     }
 
     counts.fetched = balancesResult.value.leaveBalances.length;
-    for (const balance of balancesResult.value.leaveBalances) {
-      const result = await processBalance(
-        context,
-        run.id,
-        xeroTenant.id,
-        balance
-      );
-      if (result) {
-        counts.upserted += 1;
-      } else {
-        counts.failed += 1;
-      }
+    await recordFetchFailures(
+      context,
+      run.id,
+      balancesResult.value.failures,
+      counts
+    );
+
+    const cancelled = await processBalances(
+      context,
+      run.id,
+      xeroTenant.id,
+      balancesResult.value.leaveBalances,
+      counts
+    );
+    if (cancelled) {
+      await completeRun(context, run.id, { counts, status: "cancelled" });
+      return {
+        ok: true,
+        value: { ...counts, runId: run.id, status: "cancelled" },
+      };
     }
 
     await database.xeroTenant.updateMany({
@@ -269,6 +279,65 @@ async function processBalance(
       sourceId: balance.leaveTypeId || "unknown",
     });
     return false;
+  }
+}
+
+async function processBalances(
+  context: SyncXeroLeaveBalancesInput,
+  runId: string,
+  xeroTenantId: string,
+  balances: XeroLeaveBalance[],
+  counts: Counts
+): Promise<boolean> {
+  for (let index = 0; index < balances.length; index += BALANCE_BATCH_SIZE) {
+    if (await cancellationRequested(context, runId)) {
+      return true;
+    }
+
+    const batch = balances.slice(index, index + BALANCE_BATCH_SIZE);
+    for (const balance of batch) {
+      const result = await processBalance(
+        context,
+        runId,
+        xeroTenantId,
+        balance
+      );
+      if (result) {
+        counts.upserted += 1;
+      } else {
+        counts.failed += 1;
+      }
+    }
+  }
+  return false;
+}
+
+async function cancellationRequested(
+  context: SyncXeroLeaveBalancesInput,
+  runId: string
+): Promise<boolean> {
+  const runState = await database.syncRun.findFirst({
+    where: { ...scoped(context), id: runId },
+    select: { cancel_requested_at: true },
+  });
+  return Boolean(runState?.cancel_requested_at);
+}
+
+async function recordFetchFailures(
+  context: SyncXeroLeaveBalancesInput,
+  runId: string,
+  failures: XeroLeaveBalanceFetchFailure[],
+  counts: Counts
+): Promise<void> {
+  for (const failure of failures) {
+    await recordFailure(context, {
+      errorCode: failure.error.code,
+      errorMessage: failure.error.message,
+      rawPayload: failure.error.rawPayload ?? null,
+      runId,
+      sourceId: failure.employeeId,
+    });
+    counts.failed += 1;
   }
 }
 

@@ -80,6 +80,7 @@ describeWithDatabase("sync-xero-leave-balances database flow", () => {
     mockFetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
+        failures: [],
         leaveBalances: [xeroBalance(tenantA, 76)],
         rawResponses: [],
       },
@@ -122,6 +123,7 @@ describeWithDatabase("sync-xero-leave-balances database flow", () => {
     mockFetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: {
+        failures: [],
         leaveBalances: [xeroBalance(tenantA, 76)],
         rawResponses: [],
       },
@@ -145,6 +147,52 @@ describeWithDatabase("sync-xero-leave-balances database flow", () => {
       },
     });
     expect(tenantBRecords).toHaveLength(0);
+  });
+
+  it("records per-employee fetch failures without failing the whole run", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    mockFetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [
+          {
+            employeeId: "99999999-9999-4999-8999-999999999999",
+            error: {
+              code: "not_found_error",
+              httpStatus: 404,
+              message: "Employee not found",
+            },
+          },
+        ],
+        leaveBalances: [xeroBalance(tenantA, 76)],
+        rawResponses: [],
+      },
+    });
+
+    const result = await syncXeroLeaveBalances(syncInput(tenantA));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        failed: 1,
+        fetched: 1,
+        status: "partial_success",
+        upserted: 1,
+      });
+    }
+
+    const failedRecords = await database.failedRecord.findMany({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(failedRecords).toHaveLength(1);
+    expect(failedRecords[0]).toMatchObject({
+      error_code: "not_found_error",
+      source_id: "99999999-9999-4999-8999-999999999999",
+    });
   });
 });
 

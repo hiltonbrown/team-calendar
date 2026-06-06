@@ -1,6 +1,7 @@
 import "./keys";
 
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
+export type { XeroLeaveBalanceFetchFailure } from "./src/au/read";
 export {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,

@@ -447,6 +447,10 @@ function BalancesPanel({
     if (!(canEditManual && showManualEditor)) {
       return;
     }
+    if (!hasValidBalanceInput(balance)) {
+      setMessage("Enter a numeric balance before saving.");
+      return;
+    }
     startTransition(async () => {
       const result = await setManualBalanceAction({
         balance: Number(balance),
@@ -564,7 +568,7 @@ function BalancesPanel({
             disabled={
               isPending ||
               !leaveTypeXeroId.trim() ||
-              !Number.isFinite(Number(balance))
+              !hasValidBalanceInput(balance)
             }
             onClick={saveManualBalance}
             type="button"
@@ -602,6 +606,10 @@ function StatusChip({
       {label}
     </span>
   );
+}
+
+function hasValidBalanceInput(value: string): boolean {
+  return value.trim() !== "" && Number.isFinite(Number(value));
 }
 
 function balanceRefreshDisabledReason(input: {
