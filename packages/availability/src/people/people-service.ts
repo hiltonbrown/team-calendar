@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
   availability_contactability,
@@ -90,7 +91,7 @@ export interface AvailabilityRecordSummary {
 export interface BalanceRow {
   balanceUnits: number;
   id: string;
-  leaveTypeName: string;
+  leaveTypeName: string | null;
   leaveTypeXeroId: string;
   recordType: availability_record_type | null;
   unitType: leave_balance_unit | null;
@@ -394,16 +395,7 @@ export async function getPersonProfile(input: {
           person_id: person.id,
         },
         orderBy: [{ leave_type_name: "asc" }, { leave_type_xero_id: "asc" }],
-        select: {
-          balance: true,
-          balance_unit: true,
-          id: true,
-          last_fetched_at: true,
-          leave_type_name: true,
-          leave_type_xero_id: true,
-          record_type: true,
-          xero_tenant_id: true,
-        },
+        select: leaveBalanceProfileSelect,
       }),
       database.availabilityRecord.count({
         where: {
@@ -432,16 +424,7 @@ export async function getPersonProfile(input: {
       : balances.filter((balance) => balance.xero_tenant_id === null);
     const balanceRows =
       (xeroLinked && hasXero) || !hasXero
-        ? visibleBalances.map((balance) => ({
-            balanceUnits: Number(balance.balance),
-            id: balance.id,
-            leaveTypeXeroId: balance.leave_type_xero_id,
-            leaveTypeName:
-              balance.leave_type_name ?? balance.leave_type_xero_id,
-            recordType: balance.record_type,
-            unitType: balance.balance_unit,
-            xeroTenantId: balance.xero_tenant_id,
-          }))
+        ? visibleBalances.map(toBalanceRow)
         : [];
     const balancesLastFetchedAt =
       xeroLinked && hasXero
@@ -682,6 +665,36 @@ const availabilityRecordSelect = {
   title: true,
   xero_write_error: true,
 } as const;
+
+const leaveBalanceProfileSelect = {
+  balance: true,
+  balance_unit: true,
+  id: true,
+  last_fetched_at: true,
+  leave_type_name: true,
+  leave_type_xero_id: true,
+  record_type: true,
+  xero_tenant_id: true,
+} satisfies Prisma.LeaveBalanceSelect;
+
+type LeaveBalanceProfileRow = Prisma.LeaveBalanceGetPayload<{
+  select: typeof leaveBalanceProfileSelect;
+}>;
+
+// Carry the raw stored leave type name (nullable). The fallback to the Xero id
+// is a display concern applied in the UI and is never persisted, so opening the
+// manual balance editor cannot silently turn a missing name into the id.
+export function toBalanceRow(balance: LeaveBalanceProfileRow): BalanceRow {
+  return {
+    balanceUnits: Number(balance.balance),
+    id: balance.id,
+    leaveTypeName: balance.leave_type_name,
+    leaveTypeXeroId: balance.leave_type_xero_id,
+    recordType: balance.record_type,
+    unitType: balance.balance_unit,
+    xeroTenantId: balance.xero_tenant_id,
+  };
+}
 
 async function toPersonListItem(
   person: {

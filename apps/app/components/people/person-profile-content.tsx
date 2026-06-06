@@ -489,7 +489,7 @@ function BalancesPanel({
         <TableBody>
           {profile.balances.rows.map((row) => (
             <TableRow key={row.id}>
-              <TableCell>{row.leaveTypeName}</TableCell>
+              <TableCell>{row.leaveTypeName ?? row.leaveTypeXeroId}</TableCell>
               <TableCell className="text-right">
                 {row.balanceUnits.toLocaleString("en-AU")} {row.unitType ?? ""}
               </TableCell>
@@ -499,7 +499,7 @@ function BalancesPanel({
                     onClick={() => {
                       setBalance(String(row.balanceUnits));
                       setBalanceUnit(row.unitType ?? "hours");
-                      setLeaveTypeName(row.leaveTypeName);
+                      setLeaveTypeName(row.leaveTypeName ?? "");
                       setLeaveTypeXeroId(row.leaveTypeXeroId);
                     }}
                     size="sm"
