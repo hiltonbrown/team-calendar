@@ -9,6 +9,11 @@ interface RootLayoutProperties {
   readonly children: ReactNode;
 }
 
+const webUrl = (path: string): string =>
+  env.NEXT_PUBLIC_WEB_URL
+    ? new URL(path, env.NEXT_PUBLIC_WEB_URL).toString()
+    : path;
+
 const RootLayout = ({ children }: RootLayoutProperties) => (
   <html className={fonts} lang="en" suppressHydrationWarning>
     <body suppressHydrationWarning>
@@ -16,11 +21,8 @@ const RootLayout = ({ children }: RootLayoutProperties) => (
         <DesignSystemProvider
           afterSignOutUrl={env.NEXT_PUBLIC_WEB_URL}
           helpUrl={env.NEXT_PUBLIC_DOCS_URL}
-          privacyUrl={new URL(
-            "/legal/privacy",
-            env.NEXT_PUBLIC_WEB_URL
-          ).toString()}
-          termsUrl={new URL("/legal/terms", env.NEXT_PUBLIC_WEB_URL).toString()}
+          privacyUrl={webUrl("/legal/privacy")}
+          termsUrl={webUrl("/legal/terms")}
         >
           {children}
         </DesignSystemProvider>
