@@ -367,6 +367,7 @@ export const AvailabilityPublicationScalarFieldEnum = {
   published_uid: 'published_uid',
   published_summary: 'published_summary',
   published_description: 'published_description',
+  published_all_day: 'published_all_day',
   published_sequence: 'published_sequence',
   published_at: 'published_at',
   privacy_mode: 'privacy_mode',

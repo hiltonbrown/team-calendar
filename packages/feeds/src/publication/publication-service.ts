@@ -66,6 +66,7 @@ async function upsertPublication(client: PublicationClient, record: RecordRow) {
         clerk_org_id: record.clerk_org_id,
         organisation_id: record.organisation_id,
         privacy_mode: published.privacyMode,
+        published_all_day: published.allDay,
         published_at: publishedAt,
         published_description: published.description,
         published_sequence: 0,
@@ -80,11 +81,13 @@ async function upsertPublication(client: PublicationClient, record: RecordRow) {
     existing.published_uid !== published.uid ||
     existing.published_summary !== published.summary ||
     existing.published_description !== published.description ||
+    existing.published_all_day !== published.allDay ||
     existing.privacy_mode !== published.privacyMode;
 
   return await client.availabilityPublication.update({
     data: {
       privacy_mode: published.privacyMode,
+      published_all_day: published.allDay,
       published_at: materiallyChanged ? publishedAt : existing.published_at,
       published_description: published.description,
       published_sequence: materiallyChanged
@@ -99,6 +102,7 @@ async function upsertPublication(client: PublicationClient, record: RecordRow) {
 }
 
 function projectPublishedRecord(record: RecordRow): {
+  allDay: boolean;
   description: string | null;
   privacyMode: availability_privacy_mode;
   summary: string;
@@ -111,6 +115,7 @@ function projectPublishedRecord(record: RecordRow): {
   const recordTypeLabel = labelForRecordType(record.record_type, record.title);
 
   return {
+    allDay: record.all_day,
     description: record.privacy_mode === "named" ? record.notes_internal : null,
     privacyMode: record.privacy_mode,
     summary: projectSummaryLine({
@@ -172,6 +177,7 @@ const publicationSelect = {
 } satisfies Prisma.AvailabilityPublicationSelect;
 
 const recordPublicationSelect = {
+  all_day: true,
   clerk_org_id: true,
   derived_uid_key: true,
   id: true,
@@ -191,6 +197,7 @@ const recordPublicationSelect = {
     select: {
       id: true,
       privacy_mode: true,
+      published_all_day: true,
       published_at: true,
       published_description: true,
       published_sequence: true,

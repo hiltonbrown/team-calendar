@@ -32,3 +32,10 @@
   - `bun run test`: passed.
   - `bun run build`: passed with approved network access for Google Fonts.
   - `git diff --check`: passed.
+
+## Review feedback fixes (PR #48)
+
+- All-day SEQUENCE correctness: the publication materialiser only bumped `published_sequence` on UID, summary, description, or privacy changes, so toggling a record between all-day and timed (without changing dates) shipped a materially different `DTSTART`/`DTEND` with a stale SEQUENCE. Added `published_all_day` to `availability_publications` (migration `20260607000000_add_published_all_day`, backfilled from the source record) and included it in the material-change check. Start/end changes were already covered transitively because the derived UID encodes both.
+- Stale-archive resilience: `archiveStaleRecords` materialised publications with `Promise.all`, so one publication failure rejected the whole batch and failed the entire sync run, contradicting the record-level failure tolerance rule. It now materialises one record at a time and logs and continues on per-record failure; the record is already archived and `reconcile-feed-publications` repairs any drift.
+- Package boundary (availability to feeds): left as-is. The `@repo/feeds` dependency predates this PR (declared in `packages/availability/package.json` and already consumed by `dashboard-service.ts` on `main`), `turbo boundaries` passes, and the publication orchestration follows that established pattern. Inverting the layering is a broader refactor outside this PR's scope.
+- Verification after fixes: `bun run test` (9/9 tasks, all suites green), `packages/feeds` + `packages/jobs` typecheck of touched code, Biome check on changed files, and `bun run boundaries` all passed.

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => {
     availability_record_id: "10000000-0000-4000-8000-000000000001",
     id: "20000000-0000-4000-8000-000000000001",
     privacy_mode: "named",
+    published_all_day: true,
     published_at: new Date("2026-05-01T00:00:00.000Z"),
     published_description: "Initial note",
     published_sequence: 0,
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => {
     published_uid: "stable@ical.leavesync.app",
   };
   const record = {
+    all_day: true,
     clerk_org_id: "org_publication",
     derived_uid_key: "stable@ical.leavesync.app",
     id: "10000000-0000-4000-8000-000000000001",
@@ -35,6 +37,7 @@ const mocks = vi.hoisted(() => {
           availability_record_id: String(data.availability_record_id),
           id: publication.id,
           privacy_mode: String(data.privacy_mode),
+          published_all_day: Boolean(data.published_all_day),
           published_at:
             data.published_at instanceof Date
               ? data.published_at
@@ -62,6 +65,7 @@ const mocks = vi.hoisted(() => {
         record.publication = {
           ...record.publication,
           privacy_mode: String(data.privacy_mode),
+          published_all_day: Boolean(data.published_all_day),
           published_at:
             data.published_at instanceof Date
               ? data.published_at
@@ -86,6 +90,7 @@ const mocks = vi.hoisted(() => {
     availabilityRecordFindFirst: vi.fn(() => record),
     record,
     reset: () => {
+      record.all_day = true;
       record.derived_uid_key = "stable@ical.leavesync.app";
       record.notes_internal = "Initial note";
       record.privacy_mode = "named";
@@ -149,6 +154,22 @@ describe("materialiseAvailabilityPublication", () => {
       ok: true,
       value: {
         publishedDescription: "Updated note",
+        publishedSequence: 1,
+        publishedUid: "stable@ical.leavesync.app",
+      },
+    });
+  });
+
+  it("increments sequence when only the all-day flag changes", async () => {
+    const first = await materialiseAvailabilityPublication(input);
+    expect(first.ok && first.value.publishedSequence).toBe(0);
+
+    mocks.record.all_day = false;
+    const second = await materialiseAvailabilityPublication(input);
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: {
         publishedSequence: 1,
         publishedUid: "stable@ical.leavesync.app",
       },
