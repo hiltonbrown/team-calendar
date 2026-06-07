@@ -1,4 +1,5 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -6,7 +7,7 @@ const mocks = vi.hoisted(() => {
     archived_at?: Date | null;
     clerk_org_id?: string;
     ends_at?: Date;
-    id?: string;
+    id?: string | { not: string };
     organisation_id?: string;
     person_id?: string;
     record_type?: string;
@@ -50,20 +51,36 @@ const mocks = vi.hoisted(() => {
   const datesEqual = (left: Date | undefined, right: Date) =>
     left instanceof Date && left.getTime() === right.getTime();
 
-  const matchesDuplicateWhere = (
+  const idMatches = (record: AvailabilityRecordFixture, where: ScopedWhere) => {
+    if (where.id === undefined) {
+      return true;
+    }
+    return typeof where.id === "string"
+      ? record.id === where.id
+      : record.id !== where.id.not;
+  };
+
+  const matchesWhere = (
     record: AvailabilityRecordFixture,
     where: ScopedWhere
   ) =>
+    idMatches(record, where) &&
     (where.archived_at === undefined ||
       record.archived_at === where.archived_at) &&
-    record.clerk_org_id === where.clerk_org_id &&
-    record.organisation_id === where.organisation_id &&
-    record.person_id === where.person_id &&
-    record.record_type === where.record_type &&
-    record.source_remote_id === where.source_remote_id &&
-    record.source_type === where.source_type &&
-    datesEqual(where.starts_at, record.starts_at) &&
-    datesEqual(where.ends_at, record.ends_at);
+    (where.clerk_org_id === undefined ||
+      record.clerk_org_id === where.clerk_org_id) &&
+    (where.organisation_id === undefined ||
+      record.organisation_id === where.organisation_id) &&
+    (where.person_id === undefined || record.person_id === where.person_id) &&
+    (where.record_type === undefined ||
+      record.record_type === where.record_type) &&
+    (where.source_remote_id === undefined ||
+      record.source_remote_id === where.source_remote_id) &&
+    (where.source_type === undefined ||
+      record.source_type === where.source_type) &&
+    (where.starts_at === undefined ||
+      datesEqual(where.starts_at, record.starts_at)) &&
+    (where.ends_at === undefined || datesEqual(where.ends_at, record.ends_at));
 
   return {
     availabilityCreate: vi.fn(({ data }: { data: Record<string, unknown> }) => {
@@ -104,7 +121,36 @@ const mocks = vi.hoisted(() => {
     }),
     availabilityFindFirst: vi.fn(
       ({ where }: { where: ScopedWhere }) =>
-        records.find((record) => matchesDuplicateWhere(record, where)) ?? null
+        records.find((record) => matchesWhere(record, where)) ?? null
+    ),
+    availabilityUpdate: vi.fn(
+      ({
+        data,
+        where,
+      }: {
+        data: Record<string, unknown>;
+        where: { id: string };
+      }) => {
+        const record = records.find((entry) => entry.id === where.id);
+        if (!record) {
+          throw new Error("Record fixture missing for update");
+        }
+
+        if (typeof data.record_type === "string") {
+          record.record_type = data.record_type;
+        }
+        if (data.starts_at instanceof Date) {
+          record.starts_at = data.starts_at;
+        }
+        if (data.ends_at instanceof Date) {
+          record.ends_at = data.ends_at;
+        }
+        if (typeof data.title === "string") {
+          record.title = data.title;
+        }
+
+        return record;
+      }
     ),
     people,
     personFindFirst: vi.fn(({ where }: { where: ScopedWhere }) => {
@@ -133,13 +179,16 @@ vi.mock("@repo/database", () => ({
     availabilityRecord: {
       create: mocks.availabilityCreate,
       findFirst: mocks.availabilityFindFirst,
+      update: mocks.availabilityUpdate,
     },
     person: { findFirst: mocks.personFindFirst },
   },
   scopedQuery: mocks.scopedQuery,
 }));
 
-const { createManualAvailability } = await import("./index");
+const { createManualAvailability, updateManualAvailability } = await import(
+  "./index"
+);
 
 const baseTenant = {
   // Test fixture IDs are fixed strings that match the branded runtime shape.
@@ -302,5 +351,127 @@ describe("createManualAvailability duplicate guard", () => {
         where: expect.objectContaining({ archived_at: null }),
       })
     );
+  });
+
+  it("rejects updating a record to match another active record", async () => {
+    const first = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+    const second = await createManualAvailability(
+      baseTenant,
+      {
+        ...baseInput,
+        endsAt: new Date("2026-05-22T00:00:00.000Z"),
+        startsAt: new Date("2026-05-20T00:00:00.000Z"),
+      },
+      "user_test"
+    );
+    expect(first.ok).toBe(true);
+    if (!second.ok) {
+      throw new Error("Expected the second record to be created");
+    }
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      second.value.id,
+      baseInput,
+      "user_test"
+    );
+
+    expect(result).toMatchObject({
+      error: {
+        code: "conflict",
+        message: "A matching manual availability record already exists.",
+      },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+    expect(mocks.records).toHaveLength(2);
+  });
+
+  it("allows updating a record to a window no active record uses", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      {
+        ...baseInput,
+        endsAt: new Date("2026-05-13T00:00:00.000Z"),
+        startsAt: new Date("2026-05-11T00:00:00.000Z"),
+      },
+      "user_test"
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdate).toHaveBeenCalledTimes(1);
+    expect(mocks.records).toHaveLength(1);
+  });
+
+  it("ignores archived records when guarding updates", async () => {
+    const first = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+    const second = await createManualAvailability(
+      baseTenant,
+      {
+        ...baseInput,
+        endsAt: new Date("2026-05-22T00:00:00.000Z"),
+        startsAt: new Date("2026-05-20T00:00:00.000Z"),
+      },
+      "user_test"
+    );
+    expect(first.ok).toBe(true);
+    if (!second.ok) {
+      throw new Error("Expected the second record to be created");
+    }
+
+    // Soft-delete the first record so its window is free to reuse.
+    const archived = mocks.records.at(0);
+    if (!archived) {
+      throw new Error("Expected a created record fixture");
+    }
+    archived.archived_at = new Date("2026-05-09T00:00:00.000Z");
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      second.value.id,
+      baseInput,
+      "user_test"
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdate).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps a concurrent unique-constraint violation to a conflict", async () => {
+    mocks.availabilityCreate.mockImplementationOnce(() => {
+      throw new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+        clientVersion: "test",
+        code: "P2002",
+      });
+    });
+
+    const result = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "conflict" },
+      ok: false,
+    });
   });
 });

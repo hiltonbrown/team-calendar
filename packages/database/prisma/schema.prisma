@@ -600,6 +600,14 @@ model AvailabilityRecord {
   approved_by  Person?                  @relation("ApprovedBy", fields: [approved_by_person_id], references: [id])
   publication  AvailabilityPublication?
 
+  // Manual records have source_remote_id = NULL, which the composite unique above cannot
+  // guard because PostgreSQL treats NULL as distinct. A partial unique index on
+  // (organisation_id, person_id, record_type, starts_at, ends_at)
+  // WHERE source_type = 'manual' AND source_remote_id IS NULL AND archived_at IS NULL
+  // prevents duplicate manual entries (and the duplicate ICS events they would produce);
+  // it is added via raw SQL in migration 20260606000000_manual_availability_partial_unique
+  // because Prisma @@unique cannot express a WHERE clause. Keep both in sync; see that
+  // migration for the index definition.
   @@unique([organisation_id, source_type, source_remote_id], map: "availability_records_source_identity_key")
   @@index([clerk_org_id])
   @@index([organisation_id])

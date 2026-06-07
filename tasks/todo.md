@@ -47,3 +47,18 @@ Reviewing PR #47 in an environment where dependencies could be installed, so the
 ### Follow-up recommendation (not changed here)
 
 - The guard is a check-then-insert, so two concurrent identical submissions can still race past it. A partial unique index (`... WHERE source_type = 'manual' AND source_remote_id IS NULL`) would close that window at the database level, but that needs a migration and was deliberately out of scope for this PR.
+
+## PR #47 Conversation Resolution
+
+Addressed the open review threads from codex and copilot.
+
+- [x] (Update path) Applied the same duplicate guard to `updateManualAvailability`, excluding the record being edited (`id: { not: recordId }`) and scoping to the record's own person, so a record can no longer be edited to collide with another active manual record.
+- [x] (Atomicity) Added the partial unique index `availability_records_manual_identity_key` via raw-SQL migration `20260606000000_manual_availability_partial_unique` (mirrors the existing `availability_records_xero_remote_unique_idx` and the leave-balance precedent), documented it on `AvailabilityRecord` in `schema.prisma`, and added a `Prisma` P2002 guard in create/update that returns `conflict`. The pre-insert checks remain as friendly fast paths; the index is the atomic backstop for races.
+- [x] (Archived records) Confirmed archived rows are excluded from both the create and update guards and from the index predicate, so a record can be recreated after soft delete.
+
+### Verification
+
+- `bunx ultracite check` on the changed TS files: passed.
+- `packages/availability` tests: 27 files, 133 tests passed (4 new: update-duplicate rejection, update to a free window, update ignores archived, and P2002 mapped to conflict).
+- `packages/availability` typecheck (`tsc --noEmit`): passed.
+- `bunx prisma validate`: schema valid. The migration mirrors the existing partial-index SQL; it could not be executed here (no `DATABASE_URL`), and note that `CREATE UNIQUE INDEX` fails at deploy if active duplicate manual rows already exist.
