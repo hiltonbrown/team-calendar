@@ -10,7 +10,7 @@
 - [x] Add mandatory feed and UID tests.
 - [x] Run verification: `bun install`, `bun run build`, `bun run check`, `bun run boundaries`, `bun run test`.
 - [x] Review elegance and document results.
-- [ ] Commit, push, and open PR titled "ICS UID and SEQUENCE correctness".
+- [x] Commit, push, and open PR titled "ICS UID and SEQUENCE correctness".
 
 ## Review
 
