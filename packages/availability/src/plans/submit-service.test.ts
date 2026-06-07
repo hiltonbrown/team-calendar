@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   computeWorkingDays: vi.fn(),
   dispatchNotification: vi.fn(),
   hasActiveXeroConnection: vi.fn(),
+  materialiseAvailabilityPublication: vi.fn(() =>
+    Promise.resolve({ ok: true, value: undefined })
+  ),
   personFindFirst: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
@@ -36,6 +39,9 @@ vi.mock("../xero-connection-state", () => ({
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
+}));
+vi.mock("@repo/feeds", () => ({
+  materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
 
 const mockPort = {

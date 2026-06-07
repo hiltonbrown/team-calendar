@@ -12,6 +12,7 @@ import {
   Prisma,
 } from "@repo/database/generated/client";
 import type { availability_approval_status } from "@repo/database/generated/enums";
+import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
   dispatchNotification,
   type NotificationDispatchDatabase,
@@ -139,7 +140,14 @@ export async function revertToDraft(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseSubmitPublication(parsed.data);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_revert");
@@ -234,7 +242,14 @@ export async function withdrawSubmission(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseSubmitPublication(parsed.data);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_withdraw");
@@ -350,7 +365,14 @@ async function performSubmission(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseSubmitPublication(parsed.data);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState(options.invalidStateCode);
@@ -478,7 +500,14 @@ async function persistXeroFailure(input: {
   });
 
   const updated = await loadBareRecord(input.input);
-  return updated ? { ok: true, value: updated } : recordNotFound();
+  if (!updated) {
+    return recordNotFound();
+  }
+  const publication = await materialiseSubmitPublication(input.input);
+  if (!publication.ok) {
+    return publication;
+  }
+  return { ok: true, value: updated };
 }
 
 function loadScopedRecord(input: RecordActionInput) {
@@ -516,6 +545,20 @@ function loadBareRecord(input: RecordActionInput) {
       id: input.recordId,
     },
   });
+}
+
+async function materialiseSubmitPublication(
+  input: RecordActionInput
+): Promise<Result<void, SubmitServiceError>> {
+  const publication = await materialiseAvailabilityPublication({
+    availabilityRecordId: input.recordId,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+  });
+  if (!publication.ok) {
+    return unknownError("Failed to materialise this publication.");
+  }
+  return { ok: true, value: undefined };
 }
 
 // removed loadXeroTenant

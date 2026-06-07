@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   getSettings: vi.fn(),
   hasActiveXeroConnection: vi.fn(),
   leaveBalanceFindFirst: vi.fn(),
+  materialiseAvailabilityPublication: vi.fn(() =>
+    Promise.resolve({ ok: true, value: undefined })
+  ),
   managerScopePersonIds: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
@@ -50,6 +53,9 @@ vi.mock("../settings/manager-scope", () => ({
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
+}));
+vi.mock("@repo/feeds", () => ({
+  materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
 
 const mockPort = {

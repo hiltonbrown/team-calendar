@@ -13,6 +13,7 @@ import type {
   availability_failed_action,
   availability_record_type,
 } from "@repo/database/generated/enums";
+import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
   dispatchNotification,
   type NotificationDispatchDatabase,
@@ -566,9 +567,14 @@ export async function revertApprovalAttempt(
     });
 
     const updated = await loadRecord(parsed.data);
-    return updated
-      ? { ok: true, value: await toApprovalListItem(updated) }
-      : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseApprovalPublication(parsed.data);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_revert");
@@ -724,9 +730,14 @@ async function performApproval(
     });
 
     const updated = await loadRecord(parsed.data);
-    return updated
-      ? { ok: true, value: await toApprovalListItem(updated) }
-      : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseApprovalPublication(parsed.data);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState(
@@ -823,9 +834,14 @@ async function performDecline(
     });
 
     const updated = await loadRecord(input);
-    return updated
-      ? { ok: true, value: await toApprovalListItem(updated) }
-      : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    const publication = await materialiseApprovalPublication(input);
+    if (!publication.ok) {
+      return publication;
+    }
+    return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState(
@@ -941,9 +957,14 @@ async function persistApprovalFailure(input: {
   });
 
   const updated = await loadRecord(input.input);
-  return updated
-    ? { ok: true, value: await toApprovalListItem(updated) }
-    : recordNotFound();
+  if (!updated) {
+    return recordNotFound();
+  }
+  const publication = await materialiseApprovalPublication(input.input);
+  if (!publication.ok) {
+    return publication;
+  }
+  return { ok: true, value: await toApprovalListItem(updated) };
 }
 
 function loadRecord(input: {
@@ -958,6 +979,22 @@ function loadRecord(input: {
     },
     include: recordInclude,
   });
+}
+
+async function materialiseApprovalPublication(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  recordId: string;
+}): Promise<Result<void, ApprovalServiceError>> {
+  const publication = await materialiseAvailabilityPublication({
+    availabilityRecordId: input.recordId,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+  });
+  if (!publication.ok) {
+    return unknownError("Failed to materialise this publication.");
+  }
+  return { ok: true, value: undefined };
 }
 
 // removed loadXeroTenant

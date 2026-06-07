@@ -161,6 +161,9 @@ const mocks = vi.hoisted(() => {
 
       return person;
     }),
+    materialiseAvailabilityPublication: vi.fn(() =>
+      Promise.resolve({ ok: true, value: undefined })
+    ),
     records,
     reset: () => {
       people.splice(0, people.length);
@@ -184,6 +187,9 @@ vi.mock("@repo/database", () => ({
     person: { findFirst: mocks.personFindFirst },
   },
   scopedQuery: mocks.scopedQuery,
+}));
+vi.mock("@repo/feeds", () => ({
+  materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
 
 const { createManualAvailability, updateManualAvailability } = await import(

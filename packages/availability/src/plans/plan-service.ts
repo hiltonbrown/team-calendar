@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type {
@@ -11,6 +11,7 @@ import type {
   availability_record_type,
   availability_source_type,
 } from "@repo/database/generated/enums";
+import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { z } from "zod";
 import {
   isLocalOnlyType,
@@ -19,6 +20,7 @@ import {
   USER_CREATABLE_RECORD_TYPES,
 } from "../records/record-type-categories";
 import { getSettings } from "../settings/organisation-settings-service";
+import { deriveAvailabilityUidKey } from "../sync/availability-uid";
 import { hasActiveXeroConnection } from "../xero-connection-state";
 
 export type EditableAction =
@@ -376,14 +378,14 @@ export async function createRecord(
       parsed.data.privacyMode ??
       (settingsResult.ok ? settingsResult.value.defaultPrivacyMode : "named");
     const id = randomUUID();
-    const derivedUidKey = deriveUidKey({
+    const derivedUidKey = deriveAvailabilityUidKey({
       clerkOrgId: parsed.data.clerkOrgId,
       endsAt: parsed.data.endsAt,
-      id,
       organisationId: parsed.data.organisationId,
       personId: parsed.data.personId,
       recordType: parsed.data.recordType,
       sourceType: routing.sourceType,
+      stableSourceKey: id,
       startsAt: parsed.data.startsAt,
     });
 
@@ -433,6 +435,15 @@ export async function createRecord(
 
       return created;
     });
+
+    const publication = await materialisePlanPublication({
+      availabilityRecordId: record.id,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    });
+    if (!publication.ok) {
+      return publication;
+    }
 
     return {
       ok: true,
@@ -506,6 +517,16 @@ export async function updateRecord(
             sourceType: existing.source_type,
           };
     const materialChange = hasMaterialChange(existing, patch, routing);
+    const derivedUidKey = deriveAvailabilityUidKey({
+      clerkOrgId: parsed.data.clerkOrgId,
+      endsAt: nextEndsAt,
+      organisationId: parsed.data.organisationId,
+      personId: existing.person_id,
+      recordType: nextRecordType,
+      sourceType: routing.sourceType,
+      stableSourceKey: existing.id,
+      startsAt: nextStartsAt,
+    });
 
     await database.$transaction(async (tx) => {
       await tx.availabilityRecord.updateMany({
@@ -533,6 +554,7 @@ export async function updateRecord(
           derived_sequence: materialChange
             ? { increment: 1 }
             : existing.derived_sequence,
+          derived_uid_key: derivedUidKey,
           record_type: nextRecordType,
           source_type: routing.sourceType,
           title: labelForRecordType(nextRecordType),
@@ -568,6 +590,14 @@ export async function updateRecord(
     );
     if (!updated) {
       return recordNotFound();
+    }
+    const publication = await materialisePlanPublication({
+      availabilityRecordId: updated.id,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    });
+    if (!publication.ok) {
+      return publication;
     }
 
     return {
@@ -679,6 +709,15 @@ export async function archiveRecord(
       });
     });
 
+    const publication = await materialisePlanPublication({
+      availabilityRecordId: parsed.data.recordId,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    });
+    if (!publication.ok) {
+      return publication;
+    }
+
     return { ok: true, value: undefined };
   } catch {
     return unknownError();
@@ -727,6 +766,15 @@ export async function restoreRecord(
         data: auditData(parsed.data, "availability_records.restored"),
       });
     });
+
+    const publication = await materialisePlanPublication({
+      availabilityRecordId: parsed.data.recordId,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    });
+    if (!publication.ok) {
+      return publication;
+    }
 
     return { ok: true, value: undefined };
   } catch {
@@ -1074,31 +1122,16 @@ function routeRecord(
   return { approvalStatus: "approved", sourceType: "leavesync_leave" };
 }
 
-function deriveUidKey(input: {
+async function materialisePlanPublication(input: {
+  availabilityRecordId: string;
   clerkOrgId: string;
-  endsAt: Date;
-  id: string;
   organisationId: string;
-  personId: string;
-  recordType: string;
-  sourceType: string;
-  startsAt: Date;
-}): string {
-  const digest = createHash("sha256")
-    .update(
-      [
-        input.clerkOrgId,
-        input.organisationId,
-        input.personId,
-        input.sourceType,
-        input.id,
-        input.startsAt.toISOString(),
-        input.endsAt.toISOString(),
-        input.recordType,
-      ].join("|")
-    )
-    .digest("hex");
-  return `${digest}@ical.leavesync.app`;
+}): Promise<Result<void, PlanServiceError>> {
+  const result = await materialiseAvailabilityPublication(input);
+  if (!result.ok) {
+    return unknownError();
+  }
+  return { ok: true, value: undefined };
 }
 
 function hasMaterialChange(
