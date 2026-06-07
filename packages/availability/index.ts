@@ -204,6 +204,7 @@ import {
   type Result,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import { Prisma } from "@repo/database/generated/client";
 import { z } from "zod";
 
 const WHITESPACE_PATTERN = /\s+/;
@@ -596,6 +597,16 @@ export const listAvailabilityRecords = async (
   return records.map(mapRecord);
 };
 
+const DUPLICATE_MANUAL_MESSAGE =
+  "A matching manual availability record already exists.";
+
+// The partial unique index `availability_records_manual_identity_key` (see the
+// migration of the same name) is the atomic backstop for the pre-insert checks
+// below; a concurrent insert that races past them surfaces here as P2002.
+const isUniqueConflict = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === "P2002";
+
 export const createManualAvailability = async (
   tenant: TenantContext,
   input: unknown,
@@ -624,35 +635,66 @@ export const createManualAvailability = async (
     return { ok: false, error: appError("not_found", "Person not found") };
   }
 
-  const id = randomUUID();
-  const record = await database.availabilityRecord.create({
-    data: {
-      id,
+  const duplicate = await database.availabilityRecord.findFirst({
+    where: {
+      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+      archived_at: null,
+      ends_at: parsed.data.endsAt,
       person_id: parsed.data.personId,
       record_type: parsed.data.recordType,
-      title: parsed.data.title,
-      starts_at: parsed.data.startsAt,
-      ends_at: parsed.data.endsAt,
-      all_day: parsed.data.allDay,
-      working_location: parsed.data.workingLocation,
-      contactability: parsed.data.contactability,
-      preferred_contact_method: parsed.data.preferredContactMethod,
-      notes_internal: parsed.data.notesInternal,
-      include_in_feed: parsed.data.includeInFeed,
-      privacy_mode: parsed.data.privacyMode,
-      approval_status: "approved",
-      approved_at: new Date(),
-      clerk_org_id: tenant.clerkOrgId,
-      created_by_user_id: userId,
-      derived_uid_key: `leavesync:manual:${tenant.organisationId}:${id}`,
-      organisation_id: tenant.organisationId,
+      source_remote_id: null,
       source_type: "manual",
-      updated_by_user_id: userId,
+      starts_at: parsed.data.startsAt,
     },
-    include: { person: true },
+    select: { id: true },
   });
 
-  return { ok: true, value: mapRecord(record) };
+  if (duplicate) {
+    return {
+      ok: false,
+      error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+    };
+  }
+
+  const id = randomUUID();
+  try {
+    const record = await database.availabilityRecord.create({
+      data: {
+        id,
+        person_id: parsed.data.personId,
+        record_type: parsed.data.recordType,
+        title: parsed.data.title,
+        starts_at: parsed.data.startsAt,
+        ends_at: parsed.data.endsAt,
+        all_day: parsed.data.allDay,
+        working_location: parsed.data.workingLocation,
+        contactability: parsed.data.contactability,
+        preferred_contact_method: parsed.data.preferredContactMethod,
+        notes_internal: parsed.data.notesInternal,
+        include_in_feed: parsed.data.includeInFeed,
+        privacy_mode: parsed.data.privacyMode,
+        approval_status: "approved",
+        approved_at: new Date(),
+        clerk_org_id: tenant.clerkOrgId,
+        created_by_user_id: userId,
+        derived_uid_key: `leavesync:manual:${tenant.organisationId}:${id}`,
+        organisation_id: tenant.organisationId,
+        source_type: "manual",
+        updated_by_user_id: userId,
+      },
+      include: { person: true },
+    });
+
+    return { ok: true, value: mapRecord(record) };
+  } catch (error) {
+    if (isUniqueConflict(error)) {
+      return {
+        ok: false,
+        error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+      };
+    }
+    throw error;
+  }
 };
 
 export const updateManualAvailability = async (
@@ -685,26 +727,58 @@ export const updateManualAvailability = async (
     return { ok: false, error: appError("not_found", "Record not found") };
   }
 
-  const record = await database.availabilityRecord.update({
-    where: { id: recordId },
-    data: {
-      record_type: parsed.data.recordType,
-      title: parsed.data.title,
-      starts_at: parsed.data.startsAt,
+  const duplicate = await database.availabilityRecord.findFirst({
+    where: {
+      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+      archived_at: null,
       ends_at: parsed.data.endsAt,
-      all_day: parsed.data.allDay,
-      working_location: parsed.data.workingLocation,
-      contactability: parsed.data.contactability,
-      preferred_contact_method: parsed.data.preferredContactMethod,
-      notes_internal: parsed.data.notesInternal,
-      include_in_feed: parsed.data.includeInFeed,
-      privacy_mode: parsed.data.privacyMode,
-      updated_by_user_id: userId,
+      id: { not: recordId },
+      person_id: existing.person_id,
+      record_type: parsed.data.recordType,
+      source_remote_id: null,
+      source_type: "manual",
+      starts_at: parsed.data.startsAt,
     },
-    include: { person: true },
+    select: { id: true },
   });
 
-  return { ok: true, value: mapRecord(record) };
+  if (duplicate) {
+    return {
+      ok: false,
+      error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+    };
+  }
+
+  try {
+    const record = await database.availabilityRecord.update({
+      where: { id: recordId },
+      data: {
+        record_type: parsed.data.recordType,
+        title: parsed.data.title,
+        starts_at: parsed.data.startsAt,
+        ends_at: parsed.data.endsAt,
+        all_day: parsed.data.allDay,
+        working_location: parsed.data.workingLocation,
+        contactability: parsed.data.contactability,
+        preferred_contact_method: parsed.data.preferredContactMethod,
+        notes_internal: parsed.data.notesInternal,
+        include_in_feed: parsed.data.includeInFeed,
+        privacy_mode: parsed.data.privacyMode,
+        updated_by_user_id: userId,
+      },
+      include: { person: true },
+    });
+
+    return { ok: true, value: mapRecord(record) };
+  } catch (error) {
+    if (isUniqueConflict(error)) {
+      return {
+        ok: false,
+        error: appError("conflict", DUPLICATE_MANUAL_MESSAGE),
+      };
+    }
+    throw error;
+  }
 };
 
 export const updateAvailabilityApprovalStatus = async (

@@ -140,7 +140,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!createResult.ok) {
       return Response.json(
         { ok: false, error: createResult.error },
-        { status: 500 }
+        { status: statusForCreateError(createResult.error.code) }
       );
     }
 
@@ -161,4 +161,20 @@ export async function POST(request: Request): Promise<Response> {
       { status: 500 }
     );
   }
+}
+
+function statusForCreateError(code: string): number {
+  if (code === "bad_request") {
+    return 400;
+  }
+
+  if (code === "not_found") {
+    return 404;
+  }
+
+  if (code === "conflict") {
+    return 409;
+  }
+
+  return 500;
 }
