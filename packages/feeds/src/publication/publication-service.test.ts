@@ -1,3 +1,4 @@
+import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -87,6 +88,7 @@ const mocks = vi.hoisted(() => {
         return record.publication;
       }
     ),
+    availabilityPublicationFindUnique: vi.fn(() => ({ ...publication })),
     availabilityRecordFindFirst: vi.fn(() => record),
     record,
     reset: () => {
@@ -105,6 +107,7 @@ vi.mock("@repo/database", () => ({
   database: {
     availabilityPublication: {
       create: mocks.availabilityPublicationCreate,
+      findUnique: mocks.availabilityPublicationFindUnique,
       update: mocks.availabilityPublicationUpdate,
     },
     availabilityRecord: {
@@ -174,5 +177,42 @@ describe("materialiseAvailabilityPublication", () => {
         publishedUid: "stable@ical.leavesync.app",
       },
     });
+  });
+
+  it("skips the write and keeps the sequence when nothing materially changed", async () => {
+    const first = await materialiseAvailabilityPublication(input);
+    expect(first.ok && first.value.publishedSequence).toBe(0);
+
+    const second = await materialiseAvailabilityPublication(input);
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: {
+        publishedSequence: 0,
+        publishedUid: "stable@ical.leavesync.app",
+      },
+    });
+    expect(mocks.availabilityPublicationUpdate).not.toHaveBeenCalled();
+  });
+
+  it("recovers from a concurrent create conflict by reloading the winning row", async () => {
+    mocks.availabilityPublicationCreate.mockImplementationOnce(() => {
+      throw new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+        clientVersion: "test",
+        code: "P2002",
+      });
+    });
+
+    const result = await materialiseAvailabilityPublication(input);
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        publishedSequence: 0,
+        publishedUid: "stable@ical.leavesync.app",
+      },
+    });
+    expect(mocks.availabilityPublicationFindUnique).toHaveBeenCalledTimes(1);
+    expect(mocks.availabilityPublicationUpdate).not.toHaveBeenCalled();
   });
 });

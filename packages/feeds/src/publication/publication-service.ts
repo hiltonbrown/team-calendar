@@ -2,7 +2,7 @@ import "server-only";
 
 import { appError, type Result } from "@repo/core";
 import { database } from "@repo/database";
-import type { Prisma } from "@repo/database/generated/client";
+import { Prisma } from "@repo/database/generated/client";
 import type {
   availability_privacy_mode,
   availability_record_type,
@@ -54,27 +54,46 @@ export async function materialiseAvailabilityPublication(input: {
   }
 }
 
-async function upsertPublication(client: PublicationClient, record: RecordRow) {
+async function upsertPublication(
+  client: PublicationClient,
+  record: RecordRow
+): Promise<PublicationRow> {
   const published = projectPublishedRecord(record);
-  const existing = record.publication;
   const publishedAt = new Date();
 
+  let existing = record.publication;
   if (!existing) {
-    return await client.availabilityPublication.create({
-      data: {
-        availability_record_id: record.id,
-        clerk_org_id: record.clerk_org_id,
-        organisation_id: record.organisation_id,
-        privacy_mode: published.privacyMode,
-        published_all_day: published.allDay,
-        published_at: publishedAt,
-        published_description: published.description,
-        published_sequence: 0,
-        published_summary: published.summary,
-        published_uid: published.uid,
-      },
-      select: publicationSelect,
-    });
+    try {
+      return await client.availabilityPublication.create({
+        data: {
+          availability_record_id: record.id,
+          clerk_org_id: record.clerk_org_id,
+          organisation_id: record.organisation_id,
+          privacy_mode: published.privacyMode,
+          published_all_day: published.allDay,
+          published_at: publishedAt,
+          published_description: published.description,
+          published_sequence: 0,
+          published_summary: published.summary,
+          published_uid: published.uid,
+        },
+        select: publicationSelect,
+      });
+    } catch (error) {
+      if (!isUniqueConflict(error)) {
+        throw error;
+      }
+      // A concurrent caller materialised the same record between our read and
+      // this insert. Reload the winning row and fall through to the update
+      // path so materialisation stays idempotent under concurrency.
+      existing = await client.availabilityPublication.findUnique({
+        select: existingPublicationSelect,
+        where: { availability_record_id: record.id },
+      });
+      if (!existing) {
+        throw error;
+      }
+    }
   }
 
   const materiallyChanged =
@@ -84,15 +103,26 @@ async function upsertPublication(client: PublicationClient, record: RecordRow) {
     existing.published_all_day !== published.allDay ||
     existing.privacy_mode !== published.privacyMode;
 
+  if (!materiallyChanged) {
+    // Nothing in the published representation changed; skip the write so we do
+    // not churn updated_at or add load for reconcile/materialisation jobs.
+    return {
+      availability_record_id: record.id,
+      published_at: existing.published_at,
+      published_description: existing.published_description,
+      published_sequence: existing.published_sequence,
+      published_summary: existing.published_summary,
+      published_uid: existing.published_uid,
+    };
+  }
+
   return await client.availabilityPublication.update({
     data: {
       privacy_mode: published.privacyMode,
       published_all_day: published.allDay,
-      published_at: materiallyChanged ? publishedAt : existing.published_at,
+      published_at: publishedAt,
       published_description: published.description,
-      published_sequence: materiallyChanged
-        ? { increment: 1 }
-        : existing.published_sequence,
+      published_sequence: { increment: 1 },
       published_summary: published.summary,
       published_uid: published.uid,
     },
@@ -100,6 +130,13 @@ async function upsertPublication(client: PublicationClient, record: RecordRow) {
     where: { id: existing.id },
   });
 }
+
+// The 1:1 `availability_record_id` unique index is the atomic backstop: when two
+// callers materialise the same record concurrently, the losing insert surfaces
+// here as P2002 so we can reload and take the update path instead of failing.
+const isUniqueConflict = (error: unknown): boolean =>
+  error instanceof Prisma.PrismaClientKnownRequestError &&
+  error.code === "P2002";
 
 function projectPublishedRecord(record: RecordRow): {
   allDay: boolean;
@@ -176,6 +213,17 @@ const publicationSelect = {
   published_uid: true,
 } satisfies Prisma.AvailabilityPublicationSelect;
 
+const existingPublicationSelect = {
+  id: true,
+  privacy_mode: true,
+  published_all_day: true,
+  published_at: true,
+  published_description: true,
+  published_sequence: true,
+  published_summary: true,
+  published_uid: true,
+} satisfies Prisma.AvailabilityPublicationSelect;
+
 const recordPublicationSelect = {
   all_day: true,
   clerk_org_id: true,
@@ -194,16 +242,7 @@ const recordPublicationSelect = {
     },
   },
   publication: {
-    select: {
-      id: true,
-      privacy_mode: true,
-      published_all_day: true,
-      published_at: true,
-      published_description: true,
-      published_sequence: true,
-      published_summary: true,
-      published_uid: true,
-    },
+    select: existingPublicationSelect,
   },
 } satisfies Prisma.AvailabilityRecordSelect;
 
