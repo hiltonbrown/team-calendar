@@ -1,4 +1,5 @@
 export * from "./src/cache/feed-cache";
+export * from "./src/cache/feed-invalidation";
 export * from "./src/feed-service";
 export * from "./src/preview/preview-service";
 export * from "./src/projection/feed-projection";
