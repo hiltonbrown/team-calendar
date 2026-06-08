@@ -64,9 +64,8 @@ export async function renderFeedBody(input: {
       sequence: event.publishedSequence,
       start: event.startsAt,
       summary: event.summary,
-      transparency: event.isPublicHoliday
-        ? ICalEventTransparency.OPAQUE
-        : ICalEventTransparency.OPAQUE,
+      // All published events mark the subscriber as busy.
+      transparency: ICalEventTransparency.OPAQUE,
     });
   }
 

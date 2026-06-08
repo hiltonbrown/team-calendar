@@ -92,6 +92,7 @@ export async function rebuildFeedCache(
     if (!rendered.ok) {
       log.error("Failed to render feed body during rebuild", {
         clerkOrgId: context.clerkOrgId,
+        error: rendered.error,
         feedId: feed.id,
         organisationId: context.organisationId,
       });
