@@ -7,10 +7,13 @@ import type {
   availability_privacy_mode,
   availability_record_type,
 } from "@repo/database/generated/enums";
+import { invalidateFeedCachesForPerson } from "../cache/feed-invalidation";
 import { projectSummaryLine } from "../projection/feed-projection";
 
 export interface MaterialisedPublication {
   availabilityRecordId: string;
+  changed: boolean;
+  personId: string;
   publishedAt: Date;
   publishedDescription: string | null;
   publishedSequence: number;
@@ -26,6 +29,11 @@ type PublicationClient = Pick<
 export async function materialiseAvailabilityPublication(input: {
   availabilityRecordId: string;
   clerkOrgId: string;
+  // Invalidate the caches of feeds whose scope includes this record's person. Defaults to
+  // true so single-record callers (manual edits, approval transitions) reflect changes
+  // immediately. Bulk callers (inbound sync, reconcile) pass false and batch their own
+  // rebuilds to avoid per-record cache churn.
+  invalidateCache?: boolean;
   organisationId: string;
 }): Promise<Result<MaterialisedPublication>> {
   try {
@@ -44,8 +52,23 @@ export async function materialiseAvailabilityPublication(input: {
       };
     }
 
-    const publication = await upsertPublication(database, record);
-    return { ok: true, value: toMaterialisedPublication(publication) };
+    const { changed, publication } = await upsertPublication(database, record);
+
+    if (input.invalidateCache !== false) {
+      await invalidateRecordFeedCaches({
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+        personId: record.person_id,
+      });
+    }
+
+    return {
+      ok: true,
+      value: toMaterialisedPublication(publication, {
+        changed,
+        personId: record.person_id,
+      }),
+    };
   } catch {
     return {
       ok: false,
@@ -54,17 +77,31 @@ export async function materialiseAvailabilityPublication(input: {
   }
 }
 
+// Cache invalidation is best-effort: the record write has already succeeded and the TTL is
+// the backstop, so a failure here must never turn a successful materialisation into an error.
+async function invalidateRecordFeedCaches(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  personId: string;
+}): Promise<void> {
+  try {
+    await invalidateFeedCachesForPerson(input);
+  } catch {
+    // Swallow: see note above. Stale bodies expire via TTL or the next rebuild.
+  }
+}
+
 async function upsertPublication(
   client: PublicationClient,
   record: RecordRow
-): Promise<PublicationRow> {
+): Promise<{ changed: boolean; publication: PublicationRow }> {
   const published = projectPublishedRecord(record);
   const publishedAt = new Date();
 
   let existing = record.publication;
   if (!existing) {
     try {
-      return await client.availabilityPublication.create({
+      const created = await client.availabilityPublication.create({
         data: {
           availability_record_id: record.id,
           clerk_org_id: record.clerk_org_id,
@@ -79,6 +116,7 @@ async function upsertPublication(
         },
         select: publicationSelect,
       });
+      return { changed: true, publication: created };
     } catch (error) {
       if (!isUniqueConflict(error)) {
         throw error;
@@ -107,16 +145,19 @@ async function upsertPublication(
     // Nothing in the published representation changed; skip the write so we do
     // not churn updated_at or add load for reconcile/materialisation jobs.
     return {
-      availability_record_id: record.id,
-      published_at: existing.published_at,
-      published_description: existing.published_description,
-      published_sequence: existing.published_sequence,
-      published_summary: existing.published_summary,
-      published_uid: existing.published_uid,
+      changed: false,
+      publication: {
+        availability_record_id: record.id,
+        published_at: existing.published_at,
+        published_description: existing.published_description,
+        published_sequence: existing.published_sequence,
+        published_summary: existing.published_summary,
+        published_uid: existing.published_uid,
+      },
     };
   }
 
-  return await client.availabilityPublication.update({
+  const updated = await client.availabilityPublication.update({
     data: {
       privacy_mode: published.privacyMode,
       published_all_day: published.allDay,
@@ -129,6 +170,7 @@ async function upsertPublication(
     select: publicationSelect,
     where: { id: existing.id },
   });
+  return { changed: true, publication: updated };
 }
 
 // The 1:1 `availability_record_id` unique index is the atomic backstop: when two
@@ -192,10 +234,13 @@ function labelForRecordType(
 }
 
 function toMaterialisedPublication(
-  publication: PublicationRow
+  publication: PublicationRow,
+  meta: { changed: boolean; personId: string }
 ): MaterialisedPublication {
   return {
     availabilityRecordId: publication.availability_record_id,
+    changed: meta.changed,
+    personId: meta.personId,
     publishedAt: publication.published_at,
     publishedDescription: publication.published_description,
     publishedSequence: publication.published_sequence,
@@ -231,6 +276,7 @@ const recordPublicationSelect = {
   id: true,
   notes_internal: true,
   organisation_id: true,
+  person_id: true,
   privacy_mode: true,
   record_type: true,
   title: true,
