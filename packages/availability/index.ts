@@ -1,5 +1,6 @@
 import "server-only";
 
+export { materialiseAvailabilityPublication } from "@repo/feeds";
 export {
   DATE_RANGE_PRESET_OPTIONS,
   type DateRangeError,
@@ -169,6 +170,7 @@ export type {
   OrganisationSettings,
   OrganisationSettingsPatch,
 } from "./src/settings/shared";
+export { deriveAvailabilityUidKey } from "./src/sync/availability-uid";
 export {
   deriveXeroStableSourceKey,
   type InboundLeaveApprovalStatus,
@@ -205,7 +207,10 @@ import {
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
+import { materialiseAvailabilityPublication } from "@repo/feeds";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
+import { deriveAvailabilityUidKey } from "./src/sync/availability-uid";
 
 const WHITESPACE_PATTERN = /\s+/;
 
@@ -677,13 +682,24 @@ export const createManualAvailability = async (
         approved_at: new Date(),
         clerk_org_id: tenant.clerkOrgId,
         created_by_user_id: userId,
-        derived_uid_key: `leavesync:manual:${tenant.organisationId}:${id}`,
+        derived_uid_key: deriveAvailabilityUidKey({
+          clerkOrgId: tenant.clerkOrgId,
+          endsAt: parsed.data.endsAt,
+          organisationId: tenant.organisationId,
+          personId: parsed.data.personId,
+          recordType: parsed.data.recordType,
+          sourceType: "manual",
+          stableSourceKey: id,
+          startsAt: parsed.data.startsAt,
+        }),
         organisation_id: tenant.organisationId,
         source_type: "manual",
         updated_by_user_id: userId,
       },
       include: { person: true },
     });
+
+    await materialisePublication(tenant, record.id);
 
     return { ok: true, value: mapRecord(record) };
   } catch (error) {
@@ -750,6 +766,16 @@ export const updateManualAvailability = async (
   }
 
   try {
+    const derivedUidKey = deriveAvailabilityUidKey({
+      clerkOrgId: tenant.clerkOrgId,
+      endsAt: parsed.data.endsAt,
+      organisationId: tenant.organisationId,
+      personId: existing.person_id,
+      recordType: parsed.data.recordType,
+      sourceType: "manual",
+      stableSourceKey: recordId,
+      startsAt: parsed.data.startsAt,
+    });
     const record = await database.availabilityRecord.update({
       where: { id: recordId },
       data: {
@@ -764,10 +790,13 @@ export const updateManualAvailability = async (
         notes_internal: parsed.data.notesInternal,
         include_in_feed: parsed.data.includeInFeed,
         privacy_mode: parsed.data.privacyMode,
+        derived_uid_key: derivedUidKey,
         updated_by_user_id: userId,
       },
       include: { person: true },
     });
+
+    await materialisePublication(tenant, record.id);
 
     return { ok: true, value: mapRecord(record) };
   } catch (error) {
@@ -814,6 +843,8 @@ export const updateAvailabilityApprovalStatus = async (
     },
   });
 
+  await materialisePublication(tenant, recordId);
+
   return { ok: true, value: undefined };
 };
 
@@ -844,8 +875,32 @@ export const archiveManualAvailability = async (
     },
   });
 
+  await materialisePublication(tenant, recordId);
+
   return { ok: true, value: undefined };
 };
+
+async function materialisePublication(
+  tenant: TenantContext,
+  availabilityRecordId: string
+): Promise<void> {
+  const result = await materialiseAvailabilityPublication({
+    availabilityRecordId,
+    clerkOrgId: tenant.clerkOrgId,
+    organisationId: tenant.organisationId,
+  });
+  if (!result.ok) {
+    // Best-effort: the availability record is already persisted. Log the failed
+    // feed projection rather than failing the write; it is corrected on the next
+    // successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId,
+      clerkOrgId: tenant.clerkOrgId,
+      error: result.error.message,
+      organisationId: tenant.organisationId,
+    });
+  }
+}
 
 export type {
   ApproveLeaveInput,

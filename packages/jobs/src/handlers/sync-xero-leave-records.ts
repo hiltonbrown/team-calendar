@@ -3,6 +3,7 @@ import "server-only";
 import {
   deriveXeroStableSourceKey,
   type InboundLeaveApprovalStatus,
+  materialiseAvailabilityPublication,
   normaliseInboundLeaveRecord,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
@@ -493,13 +494,14 @@ async function processLeaveRecord(
       updated_at: new Date(),
     };
 
-    if (existing) {
+    const recordId = existing?.id;
+    if (recordId) {
       await database.availabilityRecord.updateMany({
         data,
-        where: { ...scoped(context), id: existing.id },
+        where: { ...scoped(context), id: recordId },
       });
     } else {
-      await database.availabilityRecord.create({
+      const created = await database.availabilityRecord.create({
         data: {
           ...data,
           clerk_org_id: context.clerkOrgId,
@@ -507,7 +509,12 @@ async function processLeaveRecord(
           source_remote_id: normalised.sourceRemoteId,
           source_type: normalised.sourceType,
         },
+        select: { id: true },
       });
+      await materialiseSyncedPublication(context, created.id);
+    }
+    if (recordId) {
+      await materialiseSyncedPublication(context, recordId);
     }
     return {
       changed,
@@ -563,10 +570,41 @@ async function archiveStaleRecords(
     },
   });
 
+  // Materialise publications one record at a time. A single failure here must not
+  // abort the whole sync run (record-level inbound failures are tolerated); the
+  // record is already archived, the failure is logged below, and the publication
+  // is corrected on the next successful materialisation for the record.
+  for (const record of stale) {
+    try {
+      await materialiseSyncedPublication(context, record.id);
+    } catch (error) {
+      log.error("Failed to materialise publication for archived leave record", {
+        availabilityRecordId: record.id,
+        clerkOrgId: context.clerkOrgId,
+        error,
+        organisationId: context.organisationId,
+      });
+    }
+  }
+
   return {
     archived: stale.length,
     personIds: [...new Set(stale.map((record) => record.person_id))],
   };
+}
+
+async function materialiseSyncedPublication(
+  context: SyncXeroLeaveRecordsInput,
+  availabilityRecordId: string
+): Promise<void> {
+  const publication = await materialiseAvailabilityPublication({
+    availabilityRecordId,
+    clerkOrgId: context.clerkOrgId,
+    organisationId: context.organisationId,
+  });
+  if (!publication.ok) {
+    throw new Error(publication.error.message);
+  }
 }
 
 async function enqueueFeedRebuilds(

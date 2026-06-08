@@ -627,6 +627,7 @@ model AvailabilityPublication {
   published_uid          String
   published_summary      String
   published_description  String?
+  published_all_day      Boolean                   @default(false)
   published_sequence     Int                       @default(0)
   published_at           DateTime
   privacy_mode           availability_privacy_mode

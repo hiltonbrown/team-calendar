@@ -88,9 +88,9 @@ export async function renderFeedForToken(
       allDay: event.allDay,
       description: event.description ?? undefined,
       end: event.endsAt,
-      id: event.sourceRecordId,
+      id: event.publishedUid,
       location: event.location ?? undefined,
-      sequence: 0,
+      sequence: event.publishedSequence,
       start: event.startsAt,
       summary: event.summary,
       transparency: event.isPublicHoliday

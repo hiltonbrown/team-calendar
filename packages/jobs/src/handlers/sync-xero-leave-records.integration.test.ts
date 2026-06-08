@@ -135,6 +135,18 @@ describeWithDatabase("sync-xero-leave-records database flow", () => {
       records.find((record) => record.source_remote_id === staleLeaveId())
         ?.publish_status
     ).toBe("archived");
+    const publications = await database.availabilityPublication.findMany({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(publications).toHaveLength(2);
+    expect(
+      publications.find((publication) =>
+        publication.published_uid.endsWith("@ical.leavesync.app")
+      )?.published_sequence
+    ).toBe(0);
 
     expect(mockInngestSend).toHaveBeenCalledWith({
       data: {
@@ -323,6 +335,7 @@ async function cleanTestData() {
   const scope = { clerk_org_id: { in: [...testClerkOrgIds] } };
   await database.failedRecord.deleteMany({ where: scope });
   await database.syncRun.deleteMany({ where: scope });
+  await database.availabilityPublication.deleteMany({ where: scope });
   await database.availabilityRecord.deleteMany({ where: scope });
   await database.feedScope.deleteMany({ where: scope });
   await database.feed.deleteMany({ where: scope });

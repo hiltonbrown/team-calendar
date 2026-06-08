@@ -3,6 +3,7 @@ import type {
   availability_approval_status,
   availability_record_type,
 } from "@repo/database/generated/enums";
+import { deriveAvailabilityUidKey } from "./availability-uid";
 
 export type InboundLeaveApprovalStatus =
   | "approved"
@@ -58,7 +59,7 @@ export function normaliseInboundLeaveRecord(
     allDay: true,
     approvalStatus,
     contactability: "unavailable",
-    derivedUidKey: deriveUidKey({
+    derivedUidKey: deriveAvailabilityUidKey({
       clerkOrgId: input.clerkOrgId,
       endsAt: input.endsAt,
       organisationId: input.organisationId,
@@ -100,33 +101,6 @@ export function deriveXeroStableSourceKey(input: {
     input.endsAt.toISOString(),
     normaliseUnits(input.units),
   ].join("|");
-}
-
-function deriveUidKey(input: {
-  clerkOrgId: string;
-  endsAt: Date;
-  organisationId: string;
-  personId: string;
-  recordType: availability_record_type;
-  sourceType: "xero_leave";
-  stableSourceKey: string;
-  startsAt: Date;
-}): string {
-  const digest = createHash("sha256")
-    .update(
-      [
-        input.clerkOrgId,
-        input.organisationId,
-        input.personId,
-        input.sourceType,
-        input.stableSourceKey,
-        input.startsAt.toISOString(),
-        input.endsAt.toISOString(),
-        input.recordType,
-      ].join("|")
-    )
-    .digest("hex");
-  return `${digest}@ical.leavesync.app`;
 }
 
 function mapApprovalStatus(

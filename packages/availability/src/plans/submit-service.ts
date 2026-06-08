@@ -12,10 +12,12 @@ import {
   Prisma,
 } from "@repo/database/generated/client";
 import type { availability_approval_status } from "@repo/database/generated/enums";
+import { materialiseAvailabilityPublication } from "@repo/feeds";
 import {
   dispatchNotification,
   type NotificationDispatchDatabase,
 } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
@@ -139,7 +141,11 @@ export async function revertToDraft(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    await materialiseSubmitPublication(parsed.data);
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_revert");
@@ -234,7 +240,11 @@ export async function withdrawSubmission(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    await materialiseSubmitPublication(parsed.data);
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_withdraw");
@@ -350,7 +360,11 @@ async function performSubmission(
     });
 
     const updated = await loadBareRecord(parsed.data);
-    return updated ? { ok: true, value: updated } : recordNotFound();
+    if (!updated) {
+      return recordNotFound();
+    }
+    await materialiseSubmitPublication(parsed.data);
+    return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
       return invalidState(options.invalidStateCode);
@@ -478,7 +492,11 @@ async function persistXeroFailure(input: {
   });
 
   const updated = await loadBareRecord(input.input);
-  return updated ? { ok: true, value: updated } : recordNotFound();
+  if (!updated) {
+    return recordNotFound();
+  }
+  await materialiseSubmitPublication(input.input);
+  return { ok: true, value: updated };
 }
 
 function loadScopedRecord(input: RecordActionInput) {
@@ -516,6 +534,27 @@ function loadBareRecord(input: RecordActionInput) {
       id: input.recordId,
     },
   });
+}
+
+async function materialiseSubmitPublication(
+  input: RecordActionInput
+): Promise<void> {
+  const publication = await materialiseAvailabilityPublication({
+    availabilityRecordId: input.recordId,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+  });
+  if (!publication.ok) {
+    // Best-effort: the submit/withdraw transition is already persisted. Log the
+    // failed feed projection rather than failing the write; it is corrected on
+    // the next successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId: input.recordId,
+      clerkOrgId: input.clerkOrgId,
+      error: publication.error.message,
+      organisationId: input.organisationId,
+    });
+  }
 }
 
 // removed loadXeroTenant

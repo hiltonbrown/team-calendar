@@ -25,6 +25,8 @@ export interface PreviewEvent {
   endsAt: Date;
   isPublicHoliday: boolean;
   location: string | null;
+  publishedSequence: number;
+  publishedUid: string;
   recordType: availability_record_type | "public_holiday";
   sourceRecordId: string;
   startsAt: Date;
@@ -180,6 +182,9 @@ function projectAvailabilityRecord(
     location:
       privacyMode === "private" ? null : (record.person.location?.name ?? null),
     recordType: record.record_type,
+    publishedSequence:
+      record.publication?.published_sequence ?? record.derived_sequence,
+    publishedUid: record.publication?.published_uid ?? record.derived_uid_key,
     sourceRecordId: record.id,
     startsAt: record.starts_at,
     summary: projectSummaryLine({
@@ -278,6 +283,8 @@ async function projectPublicHolidays(input: {
         isPublicHoliday: true,
         location: null,
         recordType: "public_holiday",
+        publishedSequence: 0,
+        publishedUid: `${holiday.id}@ical.leavesync.app`,
         sourceRecordId: holiday.id,
         startsAt: holiday.holiday_date,
         summary,
@@ -361,11 +368,19 @@ const recordSelect = {
   all_day: true,
   contactability: true,
   ends_at: true,
+  derived_sequence: true,
+  derived_uid_key: true,
   id: true,
   notes_internal: true,
   record_type: true,
   starts_at: true,
   title: true,
+  publication: {
+    select: {
+      published_sequence: true,
+      published_uid: true,
+    },
+  },
   person: {
     select: {
       display_name: true,

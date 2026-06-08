@@ -26,6 +26,9 @@ const mocks = vi.hoisted(() => {
     auditCreate,
     availabilityCreate,
     hasActiveXeroConnection: vi.fn(),
+    materialiseAvailabilityPublication: vi.fn(() =>
+      Promise.resolve({ ok: true, value: undefined })
+    ),
     personFindFirst: vi.fn(),
     scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
       clerk_org_id: clerkOrgId,
@@ -48,6 +51,9 @@ vi.mock("@repo/database", () => ({
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+}));
+vi.mock("@repo/feeds", () => ({
+  materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
 
 const { createRecord } = await import("./plan-service");
