@@ -164,6 +164,7 @@ const mocks = vi.hoisted(() => {
     materialiseAvailabilityPublication: vi.fn(() =>
       Promise.resolve({ ok: true, value: undefined })
     ),
+    logError: vi.fn(),
     records,
     reset: () => {
       people.splice(0, people.length);
@@ -190,6 +191,9 @@ vi.mock("@repo/database", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
+}));
+vi.mock("@repo/observability/log", () => ({
+  log: { error: mocks.logError },
 }));
 
 const { createManualAvailability, updateManualAvailability } = await import(
@@ -267,6 +271,26 @@ describe("createManualAvailability duplicate guard", () => {
     });
     expect(mocks.records).toHaveLength(1);
     expect(mocks.availabilityCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the record even when publication materialisation fails", async () => {
+    mocks.materialiseAvailabilityPublication.mockResolvedValueOnce({
+      error: { code: "internal", message: "projection boom" },
+      ok: false,
+    });
+
+    const result = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      "user_test"
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.logError).toHaveBeenCalledWith(
+      "Failed to materialise availability publication",
+      expect.objectContaining({ error: "projection boom" })
+    );
   });
 
   it("accepts non-duplicates with a different person, type, or window", async () => {

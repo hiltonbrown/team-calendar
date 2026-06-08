@@ -572,7 +572,8 @@ async function archiveStaleRecords(
 
   // Materialise publications one record at a time. A single failure here must not
   // abort the whole sync run (record-level inbound failures are tolerated); the
-  // record is already archived, and reconcile-feed-publications repairs any drift.
+  // record is already archived, the failure is logged below, and the publication
+  // is corrected on the next successful materialisation for the record.
   for (const record of stale) {
     try {
       await materialiseSyncedPublication(context, record.id);

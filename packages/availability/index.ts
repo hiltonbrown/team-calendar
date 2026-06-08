@@ -208,6 +208,7 @@ import {
 import { database, scopedQuery } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { deriveAvailabilityUidKey } from "./src/sync/availability-uid";
 
@@ -698,10 +699,7 @@ export const createManualAvailability = async (
       include: { person: true },
     });
 
-    const publication = await materialisePublication(tenant, record.id);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialisePublication(tenant, record.id);
 
     return { ok: true, value: mapRecord(record) };
   } catch (error) {
@@ -798,10 +796,7 @@ export const updateManualAvailability = async (
       include: { person: true },
     });
 
-    const publication = await materialisePublication(tenant, record.id);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialisePublication(tenant, record.id);
 
     return { ok: true, value: mapRecord(record) };
   } catch (error) {
@@ -848,10 +843,7 @@ export const updateAvailabilityApprovalStatus = async (
     },
   });
 
-  const publication = await materialisePublication(tenant, recordId);
-  if (!publication.ok) {
-    return publication;
-  }
+  await materialisePublication(tenant, recordId);
 
   return { ok: true, value: undefined };
 };
@@ -883,10 +875,7 @@ export const archiveManualAvailability = async (
     },
   });
 
-  const publication = await materialisePublication(tenant, recordId);
-  if (!publication.ok) {
-    return publication;
-  }
+  await materialisePublication(tenant, recordId);
 
   return { ok: true, value: undefined };
 };
@@ -894,19 +883,23 @@ export const archiveManualAvailability = async (
 async function materialisePublication(
   tenant: TenantContext,
   availabilityRecordId: string
-): Promise<Result<void>> {
+): Promise<void> {
   const result = await materialiseAvailabilityPublication({
     availabilityRecordId,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
   });
   if (!result.ok) {
-    return {
-      ok: false,
-      error: appError("internal", result.error.message),
-    };
+    // Best-effort: the availability record is already persisted. Log the failed
+    // feed projection rather than failing the write; it is corrected on the next
+    // successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId,
+      clerkOrgId: tenant.clerkOrgId,
+      error: result.error.message,
+      organisationId: tenant.organisationId,
+    });
   }
-  return { ok: true, value: undefined };
 }
 
 export type {

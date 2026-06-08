@@ -18,6 +18,7 @@ import {
   dispatchNotification,
   type NotificationDispatchDatabase,
 } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
@@ -570,10 +571,7 @@ export async function revertApprovalAttempt(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseApprovalPublication(parsed.data);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseApprovalPublication(parsed.data);
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -733,10 +731,7 @@ async function performApproval(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseApprovalPublication(parsed.data);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseApprovalPublication(parsed.data);
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -837,10 +832,7 @@ async function performDecline(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseApprovalPublication(input);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseApprovalPublication(input);
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -960,10 +952,7 @@ async function persistApprovalFailure(input: {
   if (!updated) {
     return recordNotFound();
   }
-  const publication = await materialiseApprovalPublication(input.input);
-  if (!publication.ok) {
-    return publication;
-  }
+  await materialiseApprovalPublication(input.input);
   return { ok: true, value: await toApprovalListItem(updated) };
 }
 
@@ -985,16 +974,23 @@ async function materialiseApprovalPublication(input: {
   clerkOrgId: string;
   organisationId: string;
   recordId: string;
-}): Promise<Result<void, ApprovalServiceError>> {
+}): Promise<void> {
   const publication = await materialiseAvailabilityPublication({
     availabilityRecordId: input.recordId,
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   });
   if (!publication.ok) {
-    return unknownError("Failed to materialise this publication.");
+    // Best-effort: the approval transition is already persisted. Log the failed
+    // feed projection rather than failing the write; it is corrected on the next
+    // successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId: input.recordId,
+      clerkOrgId: input.clerkOrgId,
+      error: publication.error.message,
+      organisationId: input.organisationId,
+    });
   }
-  return { ok: true, value: undefined };
 }
 
 // removed loadXeroTenant

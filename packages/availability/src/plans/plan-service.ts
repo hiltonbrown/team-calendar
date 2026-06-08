@@ -12,6 +12,7 @@ import type {
   availability_source_type,
 } from "@repo/database/generated/enums";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 import {
   isLocalOnlyType,
@@ -436,14 +437,11 @@ export async function createRecord(
       return created;
     });
 
-    const publication = await materialisePlanPublication({
+    await materialisePlanPublication({
       availabilityRecordId: record.id,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    if (!publication.ok) {
-      return publication;
-    }
 
     return {
       ok: true,
@@ -591,14 +589,11 @@ export async function updateRecord(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialisePlanPublication({
+    await materialisePlanPublication({
       availabilityRecordId: updated.id,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    if (!publication.ok) {
-      return publication;
-    }
 
     return {
       ok: true,
@@ -709,14 +704,11 @@ export async function archiveRecord(
       });
     });
 
-    const publication = await materialisePlanPublication({
+    await materialisePlanPublication({
       availabilityRecordId: parsed.data.recordId,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    if (!publication.ok) {
-      return publication;
-    }
 
     return { ok: true, value: undefined };
   } catch {
@@ -767,14 +759,11 @@ export async function restoreRecord(
       });
     });
 
-    const publication = await materialisePlanPublication({
+    await materialisePlanPublication({
       availabilityRecordId: parsed.data.recordId,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    if (!publication.ok) {
-      return publication;
-    }
 
     return { ok: true, value: undefined };
   } catch {
@@ -1126,12 +1115,19 @@ async function materialisePlanPublication(input: {
   availabilityRecordId: string;
   clerkOrgId: string;
   organisationId: string;
-}): Promise<Result<void, PlanServiceError>> {
+}): Promise<void> {
   const result = await materialiseAvailabilityPublication(input);
   if (!result.ok) {
-    return unknownError();
+    // Best-effort: the record is already persisted. Log the failed feed
+    // projection rather than failing the write; it is corrected on the next
+    // successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId: input.availabilityRecordId,
+      clerkOrgId: input.clerkOrgId,
+      error: result.error.message,
+      organisationId: input.organisationId,
+    });
   }
-  return { ok: true, value: undefined };
 }
 
 function hasMaterialChange(

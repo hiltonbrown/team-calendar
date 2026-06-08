@@ -17,6 +17,7 @@ import {
   dispatchNotification,
   type NotificationDispatchDatabase,
 } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
@@ -143,10 +144,7 @@ export async function revertToDraft(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseSubmitPublication(parsed.data);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -245,10 +243,7 @@ export async function withdrawSubmission(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseSubmitPublication(parsed.data);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -368,10 +363,7 @@ async function performSubmission(
     if (!updated) {
       return recordNotFound();
     }
-    const publication = await materialiseSubmitPublication(parsed.data);
-    if (!publication.ok) {
-      return publication;
-    }
+    await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
     if (error instanceof OptimisticConflictError) {
@@ -503,10 +495,7 @@ async function persistXeroFailure(input: {
   if (!updated) {
     return recordNotFound();
   }
-  const publication = await materialiseSubmitPublication(input.input);
-  if (!publication.ok) {
-    return publication;
-  }
+  await materialiseSubmitPublication(input.input);
   return { ok: true, value: updated };
 }
 
@@ -549,16 +538,23 @@ function loadBareRecord(input: RecordActionInput) {
 
 async function materialiseSubmitPublication(
   input: RecordActionInput
-): Promise<Result<void, SubmitServiceError>> {
+): Promise<void> {
   const publication = await materialiseAvailabilityPublication({
     availabilityRecordId: input.recordId,
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   });
   if (!publication.ok) {
-    return unknownError("Failed to materialise this publication.");
+    // Best-effort: the submit/withdraw transition is already persisted. Log the
+    // failed feed projection rather than failing the write; it is corrected on
+    // the next successful materialisation for the record.
+    log.error("Failed to materialise availability publication", {
+      availabilityRecordId: input.recordId,
+      clerkOrgId: input.clerkOrgId,
+      error: publication.error.message,
+      organisationId: input.organisationId,
+    });
   }
-  return { ok: true, value: undefined };
 }
 
 // removed loadXeroTenant
