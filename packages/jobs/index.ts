@@ -8,6 +8,18 @@ export {
 } from "./src/events";
 export { functions } from "./src/functions";
 export {
+  type RebuildFeedCacheError,
+  type RebuildFeedCacheInput,
+  rebuildFeedCache,
+  rebuildFeedCacheFunction,
+} from "./src/handlers/rebuild-feed-cache";
+export {
+  type ReconcileFeedPublicationsError,
+  type ReconcileFeedPublicationsInput,
+  reconcileFeedPublications,
+  reconcileFeedPublicationsFunction,
+} from "./src/handlers/reconcile-feed-publications";
+export {
   type ReconcileApprovalStateInput,
   reconcileXeroApprovalState,
   reconcileXeroApprovalStateFunction,

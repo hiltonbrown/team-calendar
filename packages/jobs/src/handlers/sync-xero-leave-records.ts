@@ -600,6 +600,9 @@ async function materialiseSyncedPublication(
   const publication = await materialiseAvailabilityPublication({
     availabilityRecordId,
     clerkOrgId: context.clerkOrgId,
+    // Sync batches its own rebuilds via enqueueFeedRebuilds, so skip per-record cache
+    // invalidation here to avoid churn across a full sync run.
+    invalidateCache: false,
     organisationId: context.organisationId,
   });
   if (!publication.ok) {
