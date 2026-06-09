@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
+import { keys } from "../../keys";
 
 export interface FeedCacheError {
   code: "unknown_error";
@@ -112,15 +113,30 @@ function getFeedCacheClient(): FeedCacheClient | null {
   if (cacheClientResolved) {
     return cacheClient;
   }
-  cacheClientResolved = true;
-  if (!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)) {
-    cacheClient = null;
-    return cacheClient;
+  // keys() validates the format of KV_REST_API_URL before this point. Caching
+  // is optional: with neither value set we degrade gracefully to no cache. A
+  // partially configured pair is a misconfiguration, so fail fast rather than
+  // silently disable caching with one half of the credentials. The validation
+  // runs before memoisation so a misconfiguration keeps failing on every call.
+  const { KV_REST_API_TOKEN, KV_REST_API_URL } = keys();
+  if (KV_REST_API_URL && !KV_REST_API_TOKEN) {
+    throw new Error(
+      "KV_REST_API_URL is set but KV_REST_API_TOKEN is missing. Both are required to enable feed caching."
+    );
   }
-  cacheClient = createRestCacheClient({
-    token: process.env.KV_REST_API_TOKEN,
-    url: process.env.KV_REST_API_URL,
-  });
+  if (KV_REST_API_TOKEN && !KV_REST_API_URL) {
+    throw new Error(
+      "KV_REST_API_TOKEN is set but KV_REST_API_URL is missing. Both are required to enable feed caching."
+    );
+  }
+  cacheClient =
+    KV_REST_API_URL && KV_REST_API_TOKEN
+      ? createRestCacheClient({
+          token: KV_REST_API_TOKEN,
+          url: KV_REST_API_URL,
+        })
+      : null;
+  cacheClientResolved = true;
   return cacheClient;
 }
 
