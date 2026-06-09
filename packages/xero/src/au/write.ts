@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { keys } from "../../keys";
 import { decryptXeroToken } from "../crypto/tokens";
+import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   ApproveLeaveApplicationInput,
   DeclineLeaveApplicationInput,
@@ -163,15 +164,22 @@ async function xeroRequest(
   }
 
   try {
-    const response = await fetch(`${baseUrl()}${request.path}`, {
-      body: request.body ? JSON.stringify(request.body) : undefined,
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${decryptedAccessToken}`,
-        "Content-Type": "application/json",
-        "Xero-Tenant-Id": xeroTenant.xero_tenant_id,
+    const response = await xeroFetch({
+      init: {
+        body: request.body ? JSON.stringify(request.body) : undefined,
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${decryptedAccessToken}`,
+          "Content-Type": "application/json",
+          "Xero-Tenant-Id": xeroTenant.xero_tenant_id,
+        },
+        method: request.method,
       },
-      method: request.method,
+      orgKey: orgRateLimitKey({
+        clerkOrgId: xeroTenant.clerk_org_id,
+        organisationId: xeroTenant.organisation_id,
+      }),
+      url: `${baseUrl()}${request.path}`,
     });
     const rawPayload = await readPayload(response);
 

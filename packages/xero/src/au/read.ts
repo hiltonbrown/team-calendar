@@ -1,5 +1,6 @@
 import { keys } from "../../keys";
 import { decryptXeroToken } from "../crypto/tokens";
+import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
 import type { XeroEmployee } from "../read/employees";
 import { mapXeroEmployees } from "../read/employees";
 import {
@@ -57,13 +58,20 @@ export async function fetchEmployees(input: {
   }
 
   try {
-    const response = await fetch(`${baseUrl()}/payroll.xro/1.0/Employees`, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${decryptedAccessToken}`,
-        "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+    const response = await xeroFetch({
+      init: {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${decryptedAccessToken}`,
+          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+        },
+        method: "GET",
       },
-      method: "GET",
+      orgKey: orgRateLimitKey({
+        clerkOrgId: input.xeroTenant.clerk_org_id,
+        organisationId: input.xeroTenant.organisation_id,
+      }),
+      url: `${baseUrl()}/payroll.xro/1.0/Employees`,
     });
     const rawPayload = await readXeroPayload(response);
 
@@ -116,17 +124,21 @@ export async function fetchLeaveRecords(input: {
   }
 
   try {
-    const response = await fetch(
-      `${baseUrl()}/payroll.xro/1.0/LeaveApplications`,
-      {
+    const response = await xeroFetch({
+      init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
           "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
         },
         method: "GET",
-      }
-    );
+      },
+      orgKey: orgRateLimitKey({
+        clerkOrgId: input.xeroTenant.clerk_org_id,
+        organisationId: input.xeroTenant.organisation_id,
+      }),
+      url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications`,
+    });
     const rawPayload = await readXeroPayload(response);
 
     if (!response.ok) {
@@ -197,17 +209,24 @@ export async function fetchLeaveBalances(input: {
 
     let response: Response;
     try {
-      response = await fetch(
-        `${baseUrl()}/payroll.xro/1.0/Employees/${encodeURIComponent(employeeId)}`,
-        {
+      response = await xeroFetch({
+        init: {
           headers: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
             "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
           },
           method: "GET",
-        }
-      );
+        },
+        // The loop aborts the whole run on a rate-limit so the Inngest job can
+        // retry later; no inline retry here.
+        maxAttempts: 1,
+        orgKey: orgRateLimitKey({
+          clerkOrgId: input.xeroTenant.clerk_org_id,
+          organisationId: input.xeroTenant.organisation_id,
+        }),
+        url: `${baseUrl()}/payroll.xro/1.0/Employees/${encodeURIComponent(employeeId)}`,
+      });
     } catch (error) {
       // A transport failure is environmental rather than employee-specific, so
       // abort and let the run retry instead of flagging every employee.
@@ -273,19 +292,23 @@ export async function fetchLeaveApplicationStatus(
   }
 
   try {
-    const response = await fetch(
-      `${baseUrl()}/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
-        input.xeroLeaveApplicationId
-      )}`,
-      {
+    const response = await xeroFetch({
+      init: {
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${decryptedAccessToken}`,
           "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
         },
         method: "GET",
-      }
-    );
+      },
+      orgKey: orgRateLimitKey({
+        clerkOrgId: input.xeroTenant.clerk_org_id,
+        organisationId: input.xeroTenant.organisation_id,
+      }),
+      url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
+        input.xeroLeaveApplicationId
+      )}`,
+    });
     const rawPayload = await readXeroPayload(response);
 
     if (!response.ok) {

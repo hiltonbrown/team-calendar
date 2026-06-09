@@ -5,6 +5,7 @@ import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
+import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
 
 const XERO_AUTHORISE_URL = "https://login.xero.com/identity/connect/authorize";
 const XERO_CONNECTIONS_URL = "https://api.xero.com/connections";
@@ -107,15 +108,20 @@ export async function completeXeroOAuth(input: {
     return state;
   }
 
+  const orgKey = orgRateLimitKey({
+    clerkOrgId: state.value.clerkOrgId,
+    organisationId: state.value.organisationId,
+  });
   const token = await exchangeToken({
     code: input.code,
     grantType: "authorization_code",
+    orgKey,
   });
   if (!token.ok) {
     return token;
   }
 
-  const connections = await fetchConnections(token.value.access_token);
+  const connections = await fetchConnections(token.value.access_token, orgKey);
   if (!connections.ok) {
     return connections;
   }
@@ -265,6 +271,10 @@ export async function completeXeroTenantSelection(input: {
 
   const payrollRegionResult = await inferPayrollRegionForTenant({
     accessToken,
+    orgKey: orgRateLimitKey({
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId ?? session.organisation_id,
+    }),
     tenantId: selectedTenant.tenantId,
   });
   if (!payrollRegionResult.ok) {
@@ -408,6 +418,10 @@ export async function refreshXeroOAuthConnection(input: {
 
   const token = await exchangeToken({
     grantType: "refresh_token",
+    orgKey: orgRateLimitKey({
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+    }),
     refreshToken: decryptXeroToken({
       authTag: connection.refresh_token_auth_tag,
       encrypted: connection.refresh_token_encrypted,
@@ -668,6 +682,7 @@ async function resolveOrganisationForTenantSelection(input: {
 
 async function inferPayrollRegionForTenant(input: {
   accessToken: string;
+  orgKey: string;
   tenantId: string;
 }): Promise<
   Result<
@@ -678,13 +693,17 @@ async function inferPayrollRegionForTenant(input: {
     XeroOAuthError
   >
 > {
-  const response = await fetch(XERO_ORGANISATION_URL, {
-    headers: {
-      Accept: "application/json",
-      Authorization: `Bearer ${input.accessToken}`,
-      "Xero-Tenant-Id": input.tenantId,
+  const response = await xeroFetch({
+    init: {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${input.accessToken}`,
+        "Xero-Tenant-Id": input.tenantId,
+      },
+      method: "GET",
     },
-    method: "GET",
+    orgKey: input.orgKey,
+    url: XERO_ORGANISATION_URL,
   });
 
   if (!response.ok) {
@@ -810,6 +829,7 @@ function readAvailableTenants(payload: unknown): PendingXeroSessionTenant[] {
 async function exchangeToken(input: {
   code?: string;
   grantType: "authorization_code" | "refresh_token";
+  orgKey: string;
   refreshToken?: string;
 }): Promise<Result<TokenResponse, XeroOAuthError>> {
   const clientId = keys().XERO_CLIENT_ID;
@@ -827,13 +847,17 @@ async function exchangeToken(input: {
     body.set("refresh_token", input.refreshToken ?? "");
   }
 
-  const response = await fetch(XERO_TOKEN_URL, {
-    body,
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-      "Content-Type": "application/x-www-form-urlencoded",
+  const response = await xeroFetch({
+    init: {
+      body,
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      method: "POST",
     },
-    method: "POST",
+    orgKey: input.orgKey,
+    url: XERO_TOKEN_URL,
   });
   if (!response.ok) {
     return {
@@ -870,13 +894,18 @@ async function exchangeToken(input: {
 }
 
 async function fetchConnections(
-  accessToken: string
+  accessToken: string,
+  orgKey: string
 ): Promise<Result<ConnectionResponse[], XeroOAuthError>> {
-  const response = await fetch(XERO_CONNECTIONS_URL, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+  const response = await xeroFetch({
+    init: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      method: "GET",
     },
-    method: "GET",
+    orgKey,
+    url: XERO_CONNECTIONS_URL,
   });
   if (!response.ok) {
     return {

@@ -1,55 +1,38 @@
-# Prompt 08: Feed publication jobs and cache invalidation
+# Prompt 09: Xero rate limiting
 
 ## Plan
 
-- [ ] 1. `packages/feeds`: add `feed-invalidation.ts` with `feedIdsForPeople` and
-  `invalidateFeedCachesForPerson` (canonical scope resolution via `resolvePeopleForFeed`).
-- [ ] 2. `packages/feeds`: extract `renderFeedBody` from `render-feed.ts` so the renderer and
-  the rebuild job build the ICS body the same way (consistent cache key).
-- [ ] 3. `packages/feeds`: `materialiseAvailabilityPublication` invalidates affected feed caches
-  on record change (default on), with an `invalidateCache` opt-out for bulk callers; return
-  `changed`/`personId` for batch callers.
-- [ ] 4. `packages/jobs`: `rebuild-feed-cache` handler (invalidate + regenerate KV body).
-- [ ] 5. `packages/jobs`: `reconcile-feed-publications` handler (materialise per record,
-  idempotent, record-level isolation, enqueue rebuilds for changed feeds).
-- [ ] 6. Register both in `functions.ts`; export from `index.ts`; serve via `apps/api`.
-- [ ] 7. `sync-xero-leave-records`: opt out of inline invalidation (`invalidateCache: false`);
-  rebuilds already enqueued.
-- [ ] 8. Tests: invalidation in/out of scope; reconcile idempotency; both scope keys present.
-
-## Decisions
-
-- No schema change: publications are upserted, never deleted, so no historical-feed retention
-  question and no `BLOCKED.md` entry is required.
-- Cache invalidation reuses the existing `invalidateFeedCache(feedId)` (deletes `feed:{id}:*`),
-  driven by canonical scope resolution so out-of-scope records never invalidate.
-- All record-change paths funnel through `materialiseAvailabilityPublication`, so inline
-  invalidation there covers manual create/update/archive and approval transitions without
-  touching `@repo/availability`. Bulk callers (sync, reconcile) opt out and batch rebuilds.
+- [x] Add a per-org token-bucket limiter in `packages/xero/src/rate-limit` enforcing
+      60/min, 5,000/day, five concurrent per org, plus a 10,000/min app-wide ceiling.
+- [x] Add a single Xero HTTP choke point (`xeroFetch`) that honours `Retry-After` on 429
+      and applies exponential backoff to transient failures, returning a synthetic 429
+      (mapped to `rate_limit_error`) only when the budget is genuinely exhausted.
+- [x] Route every read, write, and OAuth/token call through `xeroFetch`, keyed per org.
+- [x] Tests: per-minute, daily, concurrency and app-wide caps; per-org isolation;
+      Retry-After honoured; backoff; budget-exhausted passthrough.
+- [x] Record the in-process vs KV daily-cap design choice in `BLOCKED.md` (item D).
 
 ## Review
 
-- [x] 1. `feed-invalidation.ts`: `feedIdsForPeople` + `invalidateFeedCachesForPerson` resolve
-  in-scope feeds via the canonical `resolvePeopleForFeed`, so out-of-scope records never match.
-- [x] 2. `renderFeedBody` extracted from `render-feed.ts` and shared with the rebuild job.
-- [x] 3. `materialiseAvailabilityPublication` invalidates affected caches by default (covers
-  manual create/update/archive and approval transitions through the shared funnel) and exposes
-  `invalidateCache: false` for bulk callers; returns `changed`/`personId`.
-- [x] 4. `rebuild-feed-cache` handler: invalidates then regenerates the KV body under the
-  renderer's cache key; treats paused/archived/out-of-scope feeds as a cache-dropping no-op.
-- [x] 5. `reconcile-feed-publications` handler: materialises every scoped record idempotently
-  with record-level isolation, then enqueues one rebuild per affected feed.
-- [x] 6. Both registered in `functions.ts` (six jobs total) and exported; served via the
-  existing `apps/api` inngest route (serves the `functions` array).
-- [x] 7. `sync-xero-leave-records` passes `invalidateCache: false` (rebuilds already enqueued).
-- [x] 8. Tests added for invalidation in/out of scope, scope-key presence, reconcile
-  idempotency, failure isolation, and rebuild behaviour.
+- Limiter lives entirely in `packages/xero`; no rate-limiting logic leaks into
+  `availability`, `feeds`, or the apps. The forbidden `@repo/rate-limit` package is not
+  reintroduced.
+- Call sites wired: `au/read.ts` (employees, leave records, per-employee balances,
+  leave-application status), `au/write.ts` (submit/approve/decline/withdraw), and
+  `oauth/service.ts` (token exchange, connections, organisation region probe). NZ/UK
+  read/write are scaffolds that make no HTTP calls, so nothing to wire there.
+- The per-employee balance loop passes `maxAttempts: 1` to preserve its existing
+  abort-on-rate-limit behaviour (the Inngest job retries the run); single reads, writes
+  and token calls use the default inline retry with Retry-After.
+- Daily cap is in-process per the recorded BLOCKED.md decision; a durable KV-backed
+  counter is deferred pending a human call on adding KV to `packages/xero`.
 
-### Verification
-- `bun install`, `bun run check` (only pre-existing `.claude/skills` broken-symlink
-  internalErrors remain; all changed files lint clean), `bun run boundaries`, `bun run test`
-  (9 packages), and `bun run build` (4 apps) all pass.
+## Verification
 
-### Notes
-- No schema change and no publication deletion, so the historical-feed retention question does
-  not arise and no `BLOCKED.md` entry is required.
+- `bun install`: ok.
+- `bun run check`: 0 errors (pre-existing warnings only).
+- `bun run boundaries`: no issues.
+- `bun run test`: all suites pass (xero: 76 tests including the new rate-limit suites).
+- `bun run build`: blocked by missing env vars (`XERO_TOKEN_ENCRYPTION_KEY`,
+  `DATABASE_URL`, ...) in the sandbox; pre-existing and unrelated to this change.
+  `tsc --noEmit` for `packages/xero` passes, confirming the code compiles.
