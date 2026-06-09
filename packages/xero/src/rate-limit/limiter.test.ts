@@ -93,6 +93,33 @@ describe("XeroRateLimiter", () => {
     expect(clock.sleepCalls).toEqual([]);
   });
 
+  it("fails fast on a spent daily budget without taking a concurrency slot", async () => {
+    const clock = createTestClock();
+    const limiter = new XeroRateLimiter(
+      {
+        callsPerMinutePerOrg: 1000,
+        callsPerDayPerOrg: 1,
+        appCallsPerMinute: 1000,
+        concurrentRequestsPerOrg: 1,
+        maxWaitMs: 65_000,
+      },
+      clock
+    );
+
+    // Spend the only daily token and hold the only concurrency slot.
+    const held = await limiter.acquire("org-a");
+    expect(held.ok).toBe(true);
+
+    // Daily is checked before concurrency, so this returns "daily" immediately
+    // rather than blocking behind the in-flight request.
+    const denied = await limiter.acquire("org-a");
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(denied.reason).toBe("daily");
+    }
+    expect(clock.sleepCalls).toEqual([]);
+  });
+
   it("enforces the app-wide per-minute ceiling across orgs", async () => {
     const clock = createTestClock();
     const limiter = new XeroRateLimiter(
@@ -116,17 +143,18 @@ describe("XeroRateLimiter", () => {
     }
   });
 
-  it("enforces the concurrency cap and releases waiters", async () => {
-    const clock = createTestClock();
+  it("transfers a freed concurrency slot to a waiting acquire", async () => {
+    // A sleep that never resolves keeps the waiter's deadline timer pending, so
+    // the only way it resolves is via a released slot.
     const limiter = new XeroRateLimiter(
       {
         callsPerMinutePerOrg: 1000,
         callsPerDayPerOrg: 1000,
         appCallsPerMinute: 1000,
         concurrentRequestsPerOrg: 2,
-        maxWaitMs: 0,
+        maxWaitMs: 65_000,
       },
-      clock
+      { now: () => 0, sleep: () => new Promise<void>(() => undefined) }
     );
 
     const first = await limiter.acquire("org-a");
@@ -150,6 +178,37 @@ describe("XeroRateLimiter", () => {
 
     const thirdResult = await third;
     expect(thirdResult.ok).toBe(true);
+  });
+
+  it("denies a concurrency slot once the wait budget is exhausted", async () => {
+    const clock = createTestClock();
+    const limiter = new XeroRateLimiter(
+      {
+        callsPerMinutePerOrg: 1000,
+        callsPerDayPerOrg: 1000,
+        appCallsPerMinute: 1000,
+        concurrentRequestsPerOrg: 1,
+        maxWaitMs: 0,
+      },
+      clock
+    );
+
+    const first = await limiter.acquire("org-a");
+    expect(first.ok).toBe(true);
+
+    // The single slot is held and maxWaitMs is 0, so this must fail fast.
+    const denied = await limiter.acquire("org-a");
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) {
+      expect(denied.reason).toBe("concurrency");
+    }
+
+    // Releasing the slot must not leak it: a fresh acquire then succeeds.
+    if (first.ok) {
+      first.release();
+    }
+    const reacquired = await limiter.acquire("org-a");
+    expect(reacquired.ok).toBe(true);
   });
 
   it("keeps budgets separate per org", async () => {

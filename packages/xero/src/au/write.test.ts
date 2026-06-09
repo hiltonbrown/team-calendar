@@ -64,11 +64,15 @@ describe("AU payroll write path", () => {
   ] as const)("maps HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ Message: "Xero error" }), {
-          status,
-          statusText: "Failed",
-        })
+      // Return a fresh Response per call so retried transient statuses do not
+      // reuse a body that an earlier attempt already cancelled.
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ Message: "Xero error" }), {
+            status,
+            statusText: "Failed",
+          })
+        )
       )
     );
 
@@ -137,11 +141,15 @@ describe("AU payroll write path", () => {
   ] as const)("maps approve HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ Message: "Xero error" }), {
-          status,
-          statusText: "Failed",
-        })
+      // Return a fresh Response per call so retried transient statuses do not
+      // reuse a body that an earlier attempt already cancelled.
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ Message: "Xero error" }), {
+            status,
+            statusText: "Failed",
+          })
+        )
       )
     );
 
@@ -198,11 +206,15 @@ describe("AU payroll write path", () => {
   ] as const)("maps decline HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ Message: "Xero error" }), {
-          status,
-          statusText: "Failed",
-        })
+      // Return a fresh Response per call so retried transient statuses do not
+      // reuse a body that an earlier attempt already cancelled.
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ Message: "Xero error" }), {
+            status,
+            statusText: "Failed",
+          })
+        )
       )
     );
 

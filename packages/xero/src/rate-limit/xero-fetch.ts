@@ -95,6 +95,9 @@ export async function xeroFetch(
         response.status === 429
           ? parseRetryAfter(response.headers.get("Retry-After"))
           : null;
+      // Drain the discarded response so the underlying connection can be reused
+      // rather than leaked while we back off.
+      await cancelBody(response);
       await sleep(retryAfterMs ?? backoffMs(attempt));
       continue;
     }
@@ -105,6 +108,14 @@ export async function xeroFetch(
   // Unreachable: the loop returns on the final attempt. Present for exhaustive
   // typing only.
   return rateLimitedResponse("minute");
+}
+
+async function cancelBody(response: Response): Promise<void> {
+  try {
+    await response.body?.cancel();
+  } catch {
+    // The body may already be consumed or unsupported; nothing to clean up.
+  }
 }
 
 function isTransientStatus(status: number): boolean {
