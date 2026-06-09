@@ -34,6 +34,11 @@ export const keys = () =>
       XERO_API_BASE_URL: z.string().url().optional(),
       XERO_CLIENT_ID: z.string().optional(),
       XERO_CLIENT_SECRET: z.string().optional(),
+      // The OAuth redirect URI Xero returns the authorisation code to. It must
+      // exactly match a URI pre-registered on the Xero app. When set it pins
+      // the callback to the registered production URL regardless of the
+      // per-deployment public URLs.
+      XERO_REDIRECT_URI: z.string().url().optional(),
       XERO_TOKEN_ENCRYPTION_KEY: z.string().refine(
         (val) => {
           try {
@@ -53,6 +58,7 @@ export const keys = () =>
       XERO_API_BASE_URL: process.env.XERO_API_BASE_URL,
       XERO_CLIENT_ID: process.env.XERO_CLIENT_ID,
       XERO_CLIENT_SECRET: process.env.XERO_CLIENT_SECRET,
+      XERO_REDIRECT_URI: process.env.XERO_REDIRECT_URI,
       XERO_TOKEN_ENCRYPTION_KEY: process.env.XERO_TOKEN_ENCRYPTION_KEY,
     },
   });
