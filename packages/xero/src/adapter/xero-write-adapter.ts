@@ -10,6 +10,7 @@ import type {
 } from "@repo/core";
 import { database } from "@repo/database";
 import { availability_record_type } from "@repo/database/generated/enums";
+import { ensureFreshXeroConnection } from "../oauth/service";
 import { resolveXeroEmployeeId } from "../resolution/resolve-employee";
 import { resolveXeroLeaveTypeId } from "../resolution/resolve-leave-type";
 import {
@@ -26,8 +27,8 @@ function isAvailabilityRecordType(
   return Object.values(availability_record_type).some((v) => v === val);
 }
 
-async function getTenant(clerkOrgId: string, organisationId: string) {
-  return await database.xeroTenant.findFirst({
+function loadTenant(clerkOrgId: string, organisationId: string) {
+  return database.xeroTenant.findFirst({
     include: {
       xero_connection: {
         select: {
@@ -43,6 +44,29 @@ async function getTenant(clerkOrgId: string, organisationId: string) {
       organisation_id: organisationId,
     },
   });
+}
+
+// Resolve the tenant for a synchronous, user-triggered write, refreshing the access token
+// proactively first so a write does not fail on a token that lapsed since the last sync.
+// Returns null when the tenant is missing or the connection cannot be made usable; callers
+// surface this as "Xero is not connected".
+async function getTenant(clerkOrgId: string, organisationId: string) {
+  const tenant = await loadTenant(clerkOrgId, organisationId);
+  if (!tenant) {
+    return null;
+  }
+  const freshness = await ensureFreshXeroConnection({
+    clerkOrgId,
+    connectionId: tenant.xero_connection_id,
+    organisationId,
+  });
+  if (!freshness.ok) {
+    return null;
+  }
+  if (!freshness.value.refreshed) {
+    return tenant;
+  }
+  return await loadTenant(clerkOrgId, organisationId);
 }
 
 export const XeroWriteAdapter: ExternalWritePort = {

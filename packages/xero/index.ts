@@ -7,13 +7,16 @@ export {
   completeXeroOAuth,
   completeXeroTenantSelection,
   disconnectXeroOAuthConnection,
+  ensureFreshXeroConnection,
   getPendingXeroOAuthSession,
   isPreviewDeployment,
   markXeroConnectionStale,
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,
   refreshXeroOAuthConnection,
+  type XeroConnectionRefreshDecision,
   type XeroOAuthError,
+  xeroConnectionRefreshDecision,
 } from "./src/oauth/service";
 export {
   fetchEmployeesForRegion,

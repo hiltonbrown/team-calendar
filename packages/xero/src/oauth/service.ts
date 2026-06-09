@@ -61,6 +61,7 @@ export interface PendingXeroSessionTenant {
 
 export type XeroOAuthError =
   | { code: "connect_disabled"; message: string }
+  | { code: "connection_inactive"; message: string }
   | { code: "invalid_country"; message: string }
   | { code: "invalid_organisation_selection"; message: string }
   | { code: "invalid_state"; message: string }
@@ -467,6 +468,124 @@ export async function refreshXeroOAuthConnection(input: {
   });
 
   return { ok: true, value: { refreshedAt } };
+}
+
+// Xero access tokens live for 30 minutes. Refresh proactively when the token is within this
+// window of expiry so a sync or write never fails on a token that lapsed mid-run.
+export const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
+export type XeroConnectionRefreshDecision = "active" | "refresh" | "inactive";
+
+// Pure decision: given a connection's current token state, should we use it as-is, refresh
+// it first, or treat it as unusable? Kept side-effect free so the window logic is unit
+// testable without a database or HTTP.
+export function xeroConnectionRefreshDecision(
+  input: {
+    expiresAt: Date;
+    hasRefreshToken: boolean;
+    revokedAt: Date | null;
+    status: string | null;
+  },
+  now: Date
+): XeroConnectionRefreshDecision {
+  if (
+    input.revokedAt !== null ||
+    input.status === "disconnected" ||
+    input.status === "stale"
+  ) {
+    return "inactive";
+  }
+  const expiresWithinBuffer =
+    input.expiresAt.getTime() - now.getTime() <= TOKEN_REFRESH_BUFFER_MS;
+  if (!expiresWithinBuffer) {
+    return "active";
+  }
+  // Token has lapsed or is about to; only a stored refresh token can recover it.
+  return input.hasRefreshToken ? "refresh" : "inactive";
+}
+
+// Ensure the connection has a usable access token before a background sync or a write,
+// refreshing proactively when it is at or near expiry. Returns the resulting expiry and
+// whether a refresh occurred so callers can reload the freshly persisted tokens.
+export async function ensureFreshXeroConnection(input: {
+  clerkOrgId: string;
+  connectionId: string;
+  organisationId: string;
+  now?: Date;
+}): Promise<Result<{ expiresAt: Date; refreshed: boolean }, XeroOAuthError>> {
+  const now = input.now ?? new Date();
+  const connection = await database.xeroConnection.findFirst({
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      id: input.connectionId,
+      organisation_id: input.organisationId,
+    },
+    select: {
+      expires_at: true,
+      refresh_token_encrypted: true,
+      revoked_at: true,
+      status: true,
+    },
+  });
+  if (!connection) {
+    return {
+      ok: false,
+      error: {
+        code: "organisation_not_found",
+        message: "Xero connection not found.",
+      },
+    };
+  }
+
+  const decision = xeroConnectionRefreshDecision(
+    {
+      expiresAt: connection.expires_at,
+      hasRefreshToken: connection.refresh_token_encrypted.length > 0,
+      revokedAt: connection.revoked_at,
+      status: connection.status,
+    },
+    now
+  );
+  if (decision === "inactive") {
+    return {
+      ok: false,
+      error: {
+        code: "connection_inactive",
+        message: "Xero connection is not active; reconnect required.",
+      },
+    };
+  }
+  if (decision === "active") {
+    return {
+      ok: true,
+      value: { expiresAt: connection.expires_at, refreshed: false },
+    };
+  }
+
+  const refreshed = await refreshXeroOAuthConnection({
+    clerkOrgId: input.clerkOrgId,
+    connectionId: input.connectionId,
+    organisationId: input.organisationId,
+  });
+  if (!refreshed.ok) {
+    return refreshed;
+  }
+
+  const updated = await database.xeroConnection.findFirst({
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      id: input.connectionId,
+      organisation_id: input.organisationId,
+    },
+    select: { expires_at: true },
+  });
+  return {
+    ok: true,
+    value: {
+      expiresAt: updated?.expires_at ?? connection.expires_at,
+      refreshed: true,
+    },
+  };
 }
 
 export async function disconnectXeroOAuthConnection(input: {

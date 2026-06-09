@@ -6,6 +6,7 @@ import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
+  ensureFreshXeroConnection,
   fetchLeaveBalancesForRegion,
   toPlainLanguageMessage,
   type XeroLeaveBalance,
@@ -397,8 +398,8 @@ async function ensureTenantReady(
   | { ready: true; xeroTenant: XeroTenant }
   | { ready: false; result: SyncXeroLeaveBalancesResult }
 > {
-  const xeroTenant = await loadXeroTenant(context);
-  if (xeroTenant?.sync_paused_at) {
+  const loadedTenant = await loadXeroTenant(context);
+  if (loadedTenant?.sync_paused_at) {
     await completeRun(context, runId, {
       counts: emptyCounts(),
       errorSummary: "Tenant sync is paused for this Xero connection",
@@ -409,7 +410,10 @@ async function ensureTenantReady(
       result: { ok: true, value: emptyResult(runId, "cancelled") },
     };
   }
-  if (!(xeroTenant && connectionActive(xeroTenant.xero_connection))) {
+  const notActive = async (): Promise<{
+    ready: false;
+    result: SyncXeroLeaveBalancesResult;
+  }> => {
     await completeRun(context, runId, {
       counts: emptyCounts(),
       errorSummary: "Xero connection not active",
@@ -419,6 +423,24 @@ async function ensureTenantReady(
       ready: false,
       result: { ok: true, value: emptyResult(runId, "failed") },
     };
+  };
+  if (!loadedTenant) {
+    return await notActive();
+  }
+  // Refresh the access token proactively before any Xero read.
+  const freshness = await ensureFreshXeroConnection({
+    clerkOrgId: context.clerkOrgId,
+    connectionId: loadedTenant.xero_connection_id,
+    organisationId: context.organisationId,
+  });
+  if (!freshness.ok) {
+    return await notActive();
+  }
+  const xeroTenant = freshness.value.refreshed
+    ? await loadXeroTenant(context)
+    : loadedTenant;
+  if (!xeroTenant) {
+    return await notActive();
   }
   return { ready: true, xeroTenant };
 }
@@ -536,18 +558,6 @@ function loadXeroTenant(context: SyncXeroLeaveBalancesInput) {
       organisation_id: context.organisationId,
     },
   });
-}
-
-function connectionActive(connection: {
-  expires_at: Date;
-  revoked_at: Date | null;
-  status: string;
-}): boolean {
-  return (
-    connection.status === "active" &&
-    !connection.revoked_at &&
-    connection.expires_at > new Date()
-  );
 }
 
 function scoped(context: { clerkOrgId: string; organisationId: string }): {
