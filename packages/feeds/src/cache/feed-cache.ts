@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Result } from "@repo/core";
+import { keys } from "../../keys";
 
 export interface FeedCacheError {
   code: "unknown_error";
@@ -112,15 +113,18 @@ function getFeedCacheClient(): FeedCacheClient | null {
   if (cacheClientResolved) {
     return cacheClient;
   }
+  // keys() validates the KV credential format and enforces both-or-neither,
+  // throwing on a partial pair. So here either both values are present (enable
+  // caching) or both are absent (degrade gracefully to no cache).
+  const { KV_REST_API_TOKEN, KV_REST_API_URL } = keys();
+  cacheClient =
+    KV_REST_API_URL && KV_REST_API_TOKEN
+      ? createRestCacheClient({
+          token: KV_REST_API_TOKEN,
+          url: KV_REST_API_URL,
+        })
+      : null;
   cacheClientResolved = true;
-  if (!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)) {
-    cacheClient = null;
-    return cacheClient;
-  }
-  cacheClient = createRestCacheClient({
-    token: process.env.KV_REST_API_TOKEN,
-    url: process.env.KV_REST_API_URL,
-  });
   return cacheClient;
 }
 

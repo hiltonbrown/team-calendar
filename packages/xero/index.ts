@@ -8,6 +8,7 @@ export {
   completeXeroTenantSelection,
   disconnectXeroOAuthConnection,
   getPendingXeroOAuthSession,
+  isPreviewDeployment,
   markXeroConnectionStale,
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,

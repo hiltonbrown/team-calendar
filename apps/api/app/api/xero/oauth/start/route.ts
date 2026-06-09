@@ -22,7 +22,8 @@ export function GET(request: Request) {
     userId,
   });
   if (!result.ok) {
-    return NextResponse.json({ error: result.error.message }, { status: 400 });
+    const status = result.error.code === "connect_disabled" ? 403 : 400;
+    return NextResponse.json({ error: result.error.message }, { status });
   }
 
   return NextResponse.redirect(result.value.redirectUrl);

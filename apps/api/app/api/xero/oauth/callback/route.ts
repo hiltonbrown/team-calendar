@@ -1,7 +1,21 @@
-import { completeXeroOAuth } from "@repo/xero";
+import { completeXeroOAuth, isPreviewDeployment } from "@repo/xero";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
+  // Xero connect is disabled on preview deployments because their callback URL
+  // is not pre-registered on the Xero app. Reject any callback that reaches a
+  // preview deployment rather than attempting a token exchange that cannot
+  // succeed.
+  if (isPreviewDeployment()) {
+    return NextResponse.json(
+      {
+        error:
+          "Connecting Xero is disabled on preview deployments. Use the production deployment to connect Xero.",
+      },
+      { status: 403 }
+    );
+  }
+
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

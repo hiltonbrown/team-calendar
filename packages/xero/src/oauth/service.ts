@@ -60,6 +60,7 @@ export interface PendingXeroSessionTenant {
 }
 
 export type XeroOAuthError =
+  | { code: "connect_disabled"; message: string }
   | { code: "invalid_country"; message: string }
   | { code: "invalid_organisation_selection"; message: string }
   | { code: "invalid_state"; message: string }
@@ -75,6 +76,10 @@ export function buildXeroOAuthStartUrl(input: {
   returnTo?: string;
   userId?: null | string;
 }): Result<{ redirectUrl: string }, XeroOAuthError> {
+  if (isPreviewDeployment()) {
+    return xeroConnectDisabled();
+  }
+
   const clientId = keys().XERO_CLIENT_ID;
   const clientSecret = keys().XERO_CLIENT_SECRET;
   if (!(clientId && clientSecret)) {
@@ -958,15 +963,33 @@ function organisationDefaultsForRegion(payrollRegion: "AU" | "NZ" | "UK") {
   };
 }
 
+// Xero requires every redirect URI to be pre-registered on the app, so the
+// callback must resolve to a single fixed URL. XERO_REDIRECT_URI pins it
+// explicitly to the registered production callback; otherwise it is derived
+// from the API (or app) public URL. Preview deployments do not register their
+// own callback: Xero connect is gated off on preview, so this only ever runs
+// in production or local development.
 function callbackUrl(): string {
+  const registeredUri = keys().XERO_REDIRECT_URI;
+  if (registeredUri) {
+    return registeredUri;
+  }
   const baseUrl =
     process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (!baseUrl) {
     throw new Error(
-      "NEXT_PUBLIC_API_URL or NEXT_PUBLIC_APP_URL is required for Xero OAuth."
+      "XERO_REDIRECT_URI, NEXT_PUBLIC_API_URL or NEXT_PUBLIC_APP_URL is required for Xero OAuth."
     );
   }
   return `${baseUrl}/api/xero/oauth/callback`;
+}
+
+// Preview deployments get a fresh, unregistered Vercel URL, so the Xero OAuth
+// redirect would never match a pre-registered callback. The launch strategy is
+// to register a single production callback and disable Xero connect on preview
+// deployments. Production and local development remain enabled.
+export function isPreviewDeployment(): boolean {
+  return process.env.VERCEL_ENV === "preview";
 }
 
 function payrollRegionForCountry(
@@ -1051,6 +1074,17 @@ function oauthNotConfigured(): Result<never, XeroOAuthError> {
     error: {
       code: "oauth_not_configured",
       message: "Xero OAuth is not configured for this environment.",
+    },
+  };
+}
+
+function xeroConnectDisabled(): Result<never, XeroOAuthError> {
+  return {
+    ok: false,
+    error: {
+      code: "connect_disabled",
+      message:
+        "Connecting Xero is disabled on preview deployments. Use the production deployment to connect Xero.",
     },
   };
 }
