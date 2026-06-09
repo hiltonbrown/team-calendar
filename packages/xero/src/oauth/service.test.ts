@@ -90,6 +90,7 @@ describe("buildXeroOAuthStartUrl", () => {
 describe("xeroConnectionRefreshDecision", () => {
   const now = new Date("2026-06-09T12:00:00.000Z");
   const base = {
+    hasAccessToken: true,
     hasRefreshToken: true,
     revokedAt: null as Date | null,
     status: "active" as string | null,
@@ -121,6 +122,26 @@ describe("xeroConnectionRefreshDecision", () => {
     expect(
       xeroConnectionRefreshDecision(
         { ...base, expiresAt, hasRefreshToken: false },
+        now
+      )
+    ).toBe("inactive");
+  });
+
+  it("refreshes when the access token is missing but a refresh token exists", () => {
+    const expiresAt = new Date(now.getTime() + 20 * 60 * 1000);
+    expect(
+      xeroConnectionRefreshDecision(
+        { ...base, expiresAt, hasAccessToken: false },
+        now
+      )
+    ).toBe("refresh");
+  });
+
+  it("is inactive when both the access and refresh tokens are missing", () => {
+    const expiresAt = new Date(now.getTime() + 20 * 60 * 1000);
+    expect(
+      xeroConnectionRefreshDecision(
+        { ...base, expiresAt, hasAccessToken: false, hasRefreshToken: false },
         now
       )
     ).toBe("inactive");
@@ -168,6 +189,7 @@ describe("ensureFreshXeroConnection", () => {
 
   it("does not refresh a token that is valid beyond the buffer", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
+      access_token_encrypted: "access-token",
       expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
       refresh_token_encrypted: "refresh-token",
       revoked_at: null,
@@ -188,6 +210,7 @@ describe("ensureFreshXeroConnection", () => {
 
   it("returns connection_inactive for a revoked connection", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
+      access_token_encrypted: "access-token",
       expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
       refresh_token_encrypted: "refresh-token",
       revoked_at: input.now,
@@ -207,6 +230,7 @@ describe("ensureFreshXeroConnection", () => {
     dbMock.xeroConnection.findFirst
       // ensureFreshXeroConnection: initial connection state (near expiry)
       .mockResolvedValueOnce({
+        access_token_encrypted: "access-token",
         expires_at: new Date(input.now.getTime() + 60 * 1000),
         refresh_token_encrypted: "refresh-token",
         revoked_at: null,

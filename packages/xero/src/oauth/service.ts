@@ -482,6 +482,7 @@ export type XeroConnectionRefreshDecision = "active" | "refresh" | "inactive";
 export function xeroConnectionRefreshDecision(
   input: {
     expiresAt: Date;
+    hasAccessToken: boolean;
     hasRefreshToken: boolean;
     revokedAt: Date | null;
     status: string | null;
@@ -497,10 +498,11 @@ export function xeroConnectionRefreshDecision(
   }
   const expiresWithinBuffer =
     input.expiresAt.getTime() - now.getTime() <= TOKEN_REFRESH_BUFFER_MS;
-  if (!expiresWithinBuffer) {
+  // A missing access token cannot be used either, so treat it like an expired one.
+  if (input.hasAccessToken && !expiresWithinBuffer) {
     return "active";
   }
-  // Token has lapsed or is about to; only a stored refresh token can recover it.
+  // Token is missing, lapsed, or about to; only a stored refresh token can recover it.
   return input.hasRefreshToken ? "refresh" : "inactive";
 }
 
@@ -521,6 +523,7 @@ export async function ensureFreshXeroConnection(input: {
       organisation_id: input.organisationId,
     },
     select: {
+      access_token_encrypted: true,
       expires_at: true,
       refresh_token_encrypted: true,
       revoked_at: true,
@@ -540,6 +543,7 @@ export async function ensureFreshXeroConnection(input: {
   const decision = xeroConnectionRefreshDecision(
     {
       expiresAt: connection.expires_at,
+      hasAccessToken: connection.access_token_encrypted.length > 0,
       hasRefreshToken: connection.refresh_token_encrypted.length > 0,
       revokedAt: connection.revoked_at,
       status: connection.status,
