@@ -2,6 +2,34 @@
 
 ## Open
 
+### D. Xero daily rate-limit cap is per-instance, not cross-instance (design choice)
+
+Recorded while implementing slice 09 (Xero rate limiting). The limiter in
+`packages/xero/src/rate-limit` enforces the per-org 60/min, 5,000/day, five-concurrent
+and app-wide 10,000/min ceilings with an in-process token bucket plus concurrency gate.
+This is correct within a single warm runtime, but `apps/api` runs on Vercel serverless,
+where each invocation can land on a fresh instance with its own process memory. The
+per-minute and concurrency gates degrade gracefully (each instance simply stays well
+under the ceiling), but the 5,000/day cap cannot be enforced exactly across instances
+without shared, durable state.
+
+Strictly, a cross-instance daily cap needs a durable store (for example Vercel KV, which
+`packages/feeds` already uses) holding a per-org rolling daily counter. Per the slice's
+hard rule, that design decision is recorded here before building a KV-backed limiter
+rather than silently shipping an in-process daily cap as if it were authoritative.
+
+Decision shipped for now: the limiter is built with a clean separation between its
+bucket/concurrency logic and the runtime it runs in, so a durable counter can be slotted
+in without touching the call sites. The in-process limiter is the per-instance enforcement
+layer and the inbound sync jobs run single-flight per org, so the practical daily exposure
+is bounded. The KV-backed daily counter is deferred pending a human decision on whether to
+add `@repo/feeds`-style KV access into `packages/xero` (currently KV is not an `@repo/xero`
+dependency).
+
+Decision needed: add a durable KV-backed per-org daily counter to make the 5,000/day cap
+exact across serverless invocations, or accept the in-process per-instance cap as
+sufficient given single-flight sync scheduling.
+
 ### A. Pre-existing xero_connections / xero_tenants migration drift
 
 Discovered while adding the slice 01 schema-parity work and the slice 02 integration
