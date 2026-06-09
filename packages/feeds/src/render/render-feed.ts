@@ -115,7 +115,7 @@ export async function renderFeedForToken(
   });
   const cached = await getCachedFeedBody(key);
   if (cached.ok && cached.value) {
-    await markTokenUsed(feedToken.id);
+    await markTokenUsed(feedToken);
     return { ok: true, value: { ...cached.value, status: "active" } };
   }
 
@@ -135,13 +135,19 @@ export async function renderFeedForToken(
   const { body, etag } = rendered.value;
 
   await Promise.all([
-    markTokenUsed(feedToken.id),
+    markTokenUsed(feedToken),
     database.feed.update({
       data: {
         last_etag: etag,
         last_rendered_at: new Date(),
       },
-      where: { id: feedToken.feed_id },
+      // Scope the write by clerk_org_id and organisation_id as well as the unique id,
+      // per the tenant-isolation rule that every tenant-data query filters by clerk_org_id.
+      where: {
+        id: feedToken.feed_id,
+        clerk_org_id: feedToken.clerk_org_id,
+        organisation_id: feedToken.organisation_id,
+      },
     }),
     setCachedFeedBody({ body, etag, key, ttlSeconds: 3600 }),
   ]);
@@ -149,9 +155,18 @@ export async function renderFeedForToken(
   return { ok: true, value: { body, etag, status: "active" } };
 }
 
-function markTokenUsed(tokenId: string): Promise<unknown> {
+function markTokenUsed(token: {
+  id: string;
+  clerk_org_id: string;
+  organisation_id: string;
+}): Promise<unknown> {
   return database.feedToken.update({
     data: { last_used_at: new Date() },
-    where: { id: tokenId },
+    // Scope the write by clerk_org_id and organisation_id as well as the unique id.
+    where: {
+      id: token.id,
+      clerk_org_id: token.clerk_org_id,
+      organisation_id: token.organisation_id,
+    },
   });
 }
