@@ -131,6 +131,37 @@ If you enable GitHub-backed support submissions in deployed environments, config
 
 Set the variables in both Preview and Production if the feature should work in both environments. Redeploy the API app after changing them so the updated configuration is picked up.
 
+## Deploying to Vercel (Hobby)
+
+LeaveSync deploys as three Vercel projects, one per deployable app. This fits the Vercel Hobby three-project limit, so `docs` and `email` are not deployed (`email` is a dev-only preview surface and `docs` is published separately). Each app already carries its own `vercel.json`.
+
+| Vercel project | Root directory | Notes |
+|---|---|---|
+| `app` | `apps/app` | Authenticated product UI |
+| `api` | `apps/api` | Xero OAuth, sync, feeds (`/ical/:token.ics`), SSE, Inngest handler. Runs a daily cron on `/cron/keep-alive` (see `apps/api/vercel.json`). |
+| `web` | `apps/web` | Public marketing site |
+| `docs` | not deployed | Mintlify docs, published outside Vercel |
+| `email` | not deployed | React Email dev preview only |
+
+Set the Root Directory for each project to the relevant `apps/*` folder. Turborepo builds the dependent packages automatically.
+
+### Required environment per project
+
+Copy each app's `.env.example` for the full, annotated list. Optional variables that carry a format constraint (a URL, an email, or a required prefix) are commented out in the examples: an empty string fails validation, so leave them absent rather than set to `""`. The minimum each project needs in production:
+
+- **`app`**: `DATABASE_URL`, `XERO_TOKEN_ENCRYPTION_KEY`, Clerk keys (`CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`), the public URLs (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WEB_URL`), and, to enable feed caching, both `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+- **`api`**: everything `app` needs plus the Xero OAuth credentials (`XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`), the Inngest keys (`INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`, required together), and the KV pair for feed caching. `GITHUB_TOKEN`/`GITHUB_OWNER`/`GITHUB_REPO` are api-only and optional.
+- **`web`**: the public URLs plus optional Resend and observability values. It does not need the database, Clerk, Xero, Inngest, or KV variables.
+
+`KV_REST_API_URL`/`KV_REST_API_TOKEN` and `INNGEST_EVENT_KEY`/`INNGEST_SIGNING_KEY` are validated as pairs: setting one without the other fails fast at boot rather than silently disabling caching or leaving jobs unsigned.
+
+### Xero OAuth callback on preview deployments
+
+Xero requires every OAuth redirect URI to be pre-registered on the Xero app, and preview deployments get a fresh, unregistered URL. LeaveSync therefore registers a single production callback and disables Xero connect on preview deployments:
+
+- Register `https://<your-api-domain>/api/xero/oauth/callback` as the redirect URI on the Xero app and set `XERO_REDIRECT_URI` to that exact URL on the `api` (and `app`) projects for every environment. If `XERO_REDIRECT_URI` is unset, the callback is derived from `NEXT_PUBLIC_API_URL` instead.
+- On preview deployments (`VERCEL_ENV=preview`) the Xero connect flow and the callback route are gated off and return a clear message. Connect Xero from the production deployment.
+
 ### Testing and quality
 
 LeaveSync uses co-located tests and strict linting to maintain code quality:
