@@ -26,17 +26,22 @@ const expectedTeams = teamIds.length;
 const expectedLocations = locationIds.length;
 const expectedOrganisations = organisationIds.length;
 
+// Clean by the test clerk_org_id scope (as the other database integration tests
+// do) so any row the seed touched is removed, even one matched by the people
+// natural key rather than its fixed id. Deletes run in FK-safe order.
 const cleanSeedData = async () => {
-  await database.person.deleteMany({ where: { id: { in: personIds } } });
-  await database.location.deleteMany({ where: { id: { in: locationIds } } });
-  await database.team.deleteMany({ where: { id: { in: teamIds } } });
-  await database.organisation.deleteMany({
-    where: { id: { in: organisationIds } },
-  });
+  const scope = { clerk_org_id: TEST_CLERK_ORG_ID };
+  await database.person.deleteMany({ where: scope });
+  await database.location.deleteMany({ where: scope });
+  await database.team.deleteMany({ where: scope });
+  await database.organisation.deleteMany({ where: scope });
 };
 
 beforeEach(cleanSeedData);
-afterAll(cleanSeedData);
+afterAll(async () => {
+  await cleanSeedData();
+  await database.$disconnect();
+});
 
 describe("seedDevelopmentData", () => {
   test("is idempotent and scopes every row to clerk_org_id", async () => {

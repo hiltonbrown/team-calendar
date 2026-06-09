@@ -21,16 +21,16 @@ import {
 
 export interface PersonSeed {
   email: string;
-  employment_type: (typeof employment_type)[keyof typeof employment_type];
+  employment_type: employment_type;
   first_name: string;
   id: string;
   job_title: string;
   last_name: string;
   location_id: string;
   manager_person_id: string | null;
-  person_type: (typeof person_type)[keyof typeof person_type];
+  person_type: person_type;
   source_person_key: string;
-  source_system: (typeof source_system)[keyof typeof source_system];
+  source_system: source_system;
   team_id: string;
   xero_employee_id: string | null;
 }
