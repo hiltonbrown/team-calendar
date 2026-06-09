@@ -98,7 +98,28 @@ LeaveSync is under active development. Core infrastructure, Clerk multi-tenancy,
    bun run migrate
    ```
 
-4. **Start the development servers:**
+4. **Seed development data (optional):**
+   ```bash
+   cd packages/database && bun run seed
+   ```
+   This idempotently upserts a sample Australian Clerk Organisation: two payroll
+   entities (organisations), their teams and locations, and a handful of people
+   with a mix of Xero-sourced and manual records. Re-running creates no
+   duplicates. The seed writes canonical data only; it never seeds Xero tokens or
+   any other secret.
+
+   Every seeded row is scoped to a `clerk_org_id`. By default this is the
+   placeholder `org_dev_leavesync`. For the authenticated app to render the
+   seeded tenant, the rows must be scoped to a **real** Clerk Organisation id.
+   Set `SEED_CLERK_ORG_ID` to your Clerk org id (visible in the Clerk dashboard,
+   in the form `org_...`) before seeding:
+   ```bash
+   SEED_CLERK_ORG_ID=org_yourrealid bun run seed
+   ```
+   `DATABASE_URL` must be available, either in `packages/database/.env` or the
+   shell environment.
+
+5. **Start the development servers:**
    ```bash
    bun run dev
    ```
