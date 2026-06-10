@@ -1,6 +1,7 @@
 "use server";
 
 import { auth, currentUser } from "@repo/auth/server";
+import { dispatchManualSync } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { completeXeroTenantSelection } from "@repo/xero";
@@ -85,6 +86,18 @@ export async function completeTenantSelectionAction(input: {
       resource_id: result.value.connectionId,
       resource_type: "xero_connection",
     },
+  });
+
+  // Kick off an initial people sync so the directory populates without a manual click.
+  // Best effort: the connection is already persisted and scheduled syncs will catch up if
+  // this enqueue does not land, so a failure here must not fail the connect.
+  await dispatchManualSync({
+    actingRole: orgRole === "org:owner" ? "owner" : "admin",
+    actingUserId: user.id,
+    clerkOrgId: orgId,
+    organisationId: result.value.organisationId,
+    runType: "people",
+    xeroTenantId: result.value.xeroTenantId,
   });
 
   revalidatePath("/");

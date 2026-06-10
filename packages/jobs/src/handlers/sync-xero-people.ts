@@ -6,6 +6,7 @@ import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
+  ensureFreshXeroConnection,
   fetchEmployeesForRegion,
   toPlainLanguageMessage,
   type XeroEmployee,
@@ -124,23 +125,11 @@ export async function syncXeroPeople(input: unknown): Promise<
 
     publishRunStatusChanged(context, run.id, "running");
 
-    const xeroTenant = await loadXeroTenant(context);
-    if (xeroTenant?.sync_paused_at) {
-      await completeRun(context, run.id, {
-        counts: emptyCounts(),
-        errorSummary: "Tenant sync is paused for this Xero connection",
-        status: "cancelled",
-      });
-      return { ok: true, value: emptyResult(run.id, "cancelled") };
+    const prepared = await prepareTenant(context, run.id);
+    if (!prepared.ready) {
+      return prepared.result;
     }
-    if (!(xeroTenant && connectionActive(xeroTenant.xero_connection))) {
-      await completeRun(context, run.id, {
-        counts: emptyCounts(),
-        errorSummary: "Xero connection not active",
-        status: "failed",
-      });
-      return { ok: true, value: emptyResult(run.id, "failed") };
-    }
+    const xeroTenant = prepared.xeroTenant;
 
     const counts = emptyCounts();
 
@@ -405,6 +394,72 @@ async function completeRun(
   publishRunStatusChanged(context, runId, input.status);
 }
 
+// Load the tenant, confirm the connection is usable, and refresh its access token
+// proactively before any Xero read so a token that lapsed since the last sync does not fail
+// the run. Terminal cases complete the run and are returned as a ready:false result.
+async function prepareTenant(
+  context: SyncXeroPeopleInput,
+  runId: string
+): Promise<
+  | {
+      ready: false;
+      result: {
+        ok: true;
+        value: ReturnType<typeof emptyResult>;
+      };
+    }
+  | {
+      ready: true;
+      xeroTenant: NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
+    }
+> {
+  const loadedTenant = await loadXeroTenant(context);
+  if (loadedTenant?.sync_paused_at) {
+    await completeRun(context, runId, {
+      counts: emptyCounts(),
+      errorSummary: "Tenant sync is paused for this Xero connection",
+      status: "cancelled",
+    });
+    return {
+      ready: false,
+      result: { ok: true, value: emptyResult(runId, "cancelled") },
+    };
+  }
+  const notActive = async (): Promise<{
+    ready: false;
+    result: { ok: true; value: ReturnType<typeof emptyResult> };
+  }> => {
+    await completeRun(context, runId, {
+      counts: emptyCounts(),
+      errorSummary: "Xero connection not active",
+      status: "failed",
+    });
+    return {
+      ready: false,
+      result: { ok: true, value: emptyResult(runId, "failed") },
+    };
+  };
+  if (!loadedTenant) {
+    return await notActive();
+  }
+  const freshness = await ensureFreshXeroConnection({
+    clerkOrgId: context.clerkOrgId,
+    connectionId: loadedTenant.xero_connection_id,
+    organisationId: context.organisationId,
+  });
+  if (!freshness.ok) {
+    return await notActive();
+  }
+  // Reload so the run uses the freshly persisted access token, not the stale one.
+  const xeroTenant = freshness.value.refreshed
+    ? await loadXeroTenant(context)
+    : loadedTenant;
+  if (!xeroTenant) {
+    return await notActive();
+  }
+  return { ready: true, xeroTenant };
+}
+
 function loadXeroTenant(context: SyncXeroPeopleInput) {
   return database.xeroTenant.findFirst({
     include: {
@@ -426,22 +481,6 @@ function loadXeroTenant(context: SyncXeroPeopleInput) {
       id: context.xeroTenantId,
     },
   });
-}
-
-function connectionActive(connection: {
-  access_token_encrypted: string;
-  expires_at: Date;
-  last_refreshed_at: Date | null;
-  status?: string;
-  revoked_at: Date | null;
-}) {
-  return (
-    connection.status !== "stale" &&
-    connection.status !== "disconnected" &&
-    connection.revoked_at === null &&
-    connection.access_token_encrypted.length > 0 &&
-    connection.expires_at.getTime() > Date.now()
-  );
 }
 
 function isBlanketFailure(error: XeroWriteError): boolean {

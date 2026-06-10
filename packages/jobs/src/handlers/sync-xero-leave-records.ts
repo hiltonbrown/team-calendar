@@ -12,6 +12,7 @@ import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
+  ensureFreshXeroConnection,
   fetchLeaveRecordsForRegion,
   toPlainLanguageMessage,
   type XeroLeaveRecord,
@@ -316,8 +317,8 @@ async function ensureTenantReady(
   | { ready: true; xeroTenant: XeroTenant }
   | { ready: false; result: SyncXeroLeaveRecordsResult }
 > {
-  const xeroTenant = await loadXeroTenant(context);
-  if (xeroTenant?.sync_paused_at) {
+  const loadedTenant = await loadXeroTenant(context);
+  if (loadedTenant?.sync_paused_at) {
     await completeRun(context, runId, {
       counts: emptyCounts(),
       errorSummary: "Tenant sync is paused for this Xero connection",
@@ -328,7 +329,10 @@ async function ensureTenantReady(
       result: { ok: true, value: emptyResult(runId, "cancelled") },
     };
   }
-  if (!(xeroTenant && connectionActive(xeroTenant.xero_connection))) {
+  const notActive = async (): Promise<{
+    ready: false;
+    result: SyncXeroLeaveRecordsResult;
+  }> => {
     await completeRun(context, runId, {
       counts: emptyCounts(),
       errorSummary: "Xero connection not active",
@@ -338,6 +342,24 @@ async function ensureTenantReady(
       ready: false,
       result: { ok: true, value: emptyResult(runId, "failed") },
     };
+  };
+  if (!loadedTenant) {
+    return await notActive();
+  }
+  // Refresh the access token proactively before any Xero read.
+  const freshness = await ensureFreshXeroConnection({
+    clerkOrgId: context.clerkOrgId,
+    connectionId: loadedTenant.xero_connection_id,
+    organisationId: context.organisationId,
+  });
+  if (!freshness.ok) {
+    return await notActive();
+  }
+  const xeroTenant = freshness.value.refreshed
+    ? await loadXeroTenant(context)
+    : loadedTenant;
+  if (!xeroTenant) {
+    return await notActive();
   }
   return { ready: true, xeroTenant };
 }
@@ -797,22 +819,6 @@ function loadXeroTenant(context: SyncXeroLeaveRecordsInput) {
       organisation_id: context.organisationId,
     },
   });
-}
-
-function connectionActive(connection: {
-  access_token_encrypted: string;
-  expires_at: Date;
-  last_refreshed_at: Date | null;
-  status?: string;
-  revoked_at: Date | null;
-}) {
-  return (
-    connection.status !== "stale" &&
-    connection.status !== "disconnected" &&
-    connection.revoked_at === null &&
-    connection.access_token_encrypted.length > 0 &&
-    connection.expires_at.getTime() > Date.now()
-  );
 }
 
 function isBlanketFailure(error: XeroWriteError): boolean {
