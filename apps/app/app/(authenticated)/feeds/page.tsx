@@ -24,6 +24,11 @@ interface FeedPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+// S-13 Feeds is the member-view surface for calendar feeds: read access from
+// viewer upward, with management controls (new, pause, activate) gated behind
+// `canManage` for admins and owners. The admin-config counterpart that creates
+// and configures feeds is S-21 at `/settings/feeds` (admin and owner only).
+// This split is intentional per ScreenCatalogue v4.1; keep the two in sync.
 const FeedPage = async ({ searchParams }: FeedPageProps) => {
   await requirePageRole("org:viewer");
   const params = await searchParams;

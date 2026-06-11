@@ -18,6 +18,12 @@ interface PublicHolidaysPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+// S-11 Public holidays is the member-view surface: read access from viewer
+// upward, with the admin action column and suppressed rows shown only to
+// admins and owners. The admin-config counterpart that suppresses, restores,
+// adds custom days, and refreshes from source is S-23 at `/settings/holidays`
+// (admin and owner only). This split is intentional per ScreenCatalogue v4.1;
+// keep the two in sync.
 const PublicHolidaysPage = async ({
   searchParams,
 }: PublicHolidaysPageProps) => {

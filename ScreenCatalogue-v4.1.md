@@ -456,7 +456,9 @@ Australian English throughout. No em dashes. Direct, professional tone. No hype,
 ### S-13: Feeds
 
 **Route:** `/feeds`
-**Access:** Manager (read), Admin, Owner
+**Access:** All roles (read); Admin, Owner (manage)
+
+**[v4.1 correction]** Read access is open to all roles from viewer upward, matching the `requirePageRole("org:viewer")` guard in `apps/app/app/(authenticated)/feeds/page.tsx`; management controls (new, pause, activate) are gated to admins and owners. Subscribe URLs are only shown when a token is created or rotated, so read access exposes no secrets. The admin-config counterpart is S-21 at `/settings/feeds`.
 
 **Purpose:** List all ICS feeds with subscription URLs and setup instructions for Outlook, Google Calendar, Apple Calendar, and generic CalDAV.
 
@@ -668,6 +670,8 @@ Settings screens share a left sub-navigation within the settings section, separa
 **Route:** `/settings/billing`
 **Access:** Owner only
 
+**[v4.1 correction]** Enforced as Owner only in code via `requirePageRole("org:owner")` (`apps/app/app/(authenticated)/settings/billing/page.tsx`). Admins and below are denied; the page renders the read-only owner billing view (plan, status, usage). No in-app upgrade or checkout flow is wired in the initial build: the owner billing service returns `hasUpgradeFlow: false`, so the page shows a "contact support" note rather than upgrade actions.
+
 **Purpose:** View plan, status, and usage. No checkout in the initial build.
 
 **[v4 correction]** Billing, plan limits, and usage are enforced at the Clerk Organisation level via `clerk_org_subscriptions` and `usage_counters`.
@@ -800,7 +804,7 @@ Not a full screen. An inline state on records in `/plans`, `/leave-approvals`, `
 | S-10 | Leave approvals | `/leave-approvals` | Manager, Admin, Owner |
 | S-11 | Public holidays | `/public-holidays` | All (read), Admin/Owner (manage) |
 | S-12 | Notifications | `/notifications` | All |
-| S-13 | Feeds | `/feeds` | Manager (read), Admin, Owner |
+| S-13 | Feeds | `/feeds` | All (read), Admin/Owner (manage) |
 | S-14 | Feed detail | `/feeds/[feedId]` | Manager (read), Admin, Owner |
 | S-15 | Leave reports | `/analytics/leave-reports` | Manager, Admin, Owner |
 | S-16 | Out-of-office analytics | `/analytics/out-of-office` | Manager, Admin, Owner |

@@ -44,7 +44,9 @@ const NAV_ITEMS = [
   },
   { label: "Billing", href: "/settings/billing", icon: CreditCardIcon },
   {
-    label: "Public Holidays",
+    // "Holidays" (not "Public Holidays") distinguishes this admin-config surface
+    // (S-23) from the main-sidebar member view "Public Holidays" (S-11).
+    label: "Holidays",
     href: "/settings/holidays",
     icon: CalendarCheckIcon,
   },

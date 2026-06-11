@@ -13,14 +13,10 @@ import {
 import { SettingsSectionHeader } from "../components/settings-section-header";
 
 interface BillingClientProps {
-  locked?: boolean;
   summary: BillingSummary;
 }
 
-export const BillingClient = ({
-  locked = false,
-  summary,
-}: BillingClientProps) => (
+export const BillingClient = ({ summary }: BillingClientProps) => (
   <div className="space-y-6">
     <SettingsSectionHeader
       description="Billing is read-only here. Plan changes are handled outside LeaveSync."
@@ -30,12 +26,6 @@ export const BillingClient = ({
     {summary.isOverLimit && (
       <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-sm">
         This account is over one or more plan limits.
-      </div>
-    )}
-
-    {locked && (
-      <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
-        Billing actions are managed by the account owner.
       </div>
     )}
 
@@ -98,11 +88,9 @@ export const BillingClient = ({
         To change your plan, contact support.
       </p>
     )}
-    {summary.hasUpgradeFlow && <Button disabled={locked}>Upgrade plan</Button>}
+    {summary.hasUpgradeFlow && <Button>Upgrade plan</Button>}
     {summary.hasContactFlow && (
-      <Button disabled={locked} variant="outline">
-        Contact support
-      </Button>
+      <Button variant="outline">Contact support</Button>
     )}
   </div>
 );
