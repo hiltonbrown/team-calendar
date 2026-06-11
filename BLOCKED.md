@@ -68,6 +68,24 @@ build is ever required in CI.
 
 ## Resolved
 
+### A. Pre-existing xero_connections / xero_tenants migration drift (RESOLVED)
+
+Resolved by the Slice 1 baseline squash migration (`00000000000000_init`). The migration
+history was replaced with a single baseline that builds the full schema from empty,
+including all `xero_connections`/`xero_tenants` columns and the eight tables that were
+previously absent from the history. `prisma migrate deploy` against a clean database
+succeeds; `prisma migrate diff --from-config-datasource` confirms zero drift.
+
+Note: this is a pre-production squash migration. Historical data-transform SQL in the old
+incremental migrations was intentionally discarded; there is no production data to preserve.
+
+### B. Integration test database must be migrated out of band (RESOLVED)
+
+Resolved by `.github/workflows/ci.yml`, which spins up an ephemeral PostgreSQL 16 service,
+runs `bun run migrate:deploy` before any test suite, then runs both unit and integration
+tests against the migrate-deployed schema. The drift-check step confirms schema.prisma
+matches the deployed migrations on every CI run.
+
 ## 1. "Workspace" vs "Organisation" labelling in `settings/general` (RESOLVED)
 
 This was the one item left for a human decision during the pre-launch cleanup

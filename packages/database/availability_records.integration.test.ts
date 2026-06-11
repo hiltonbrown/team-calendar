@@ -296,16 +296,13 @@ describe("availability_records", () => {
       id: availabilityRecordIds.manualOriginal,
       tenant: tenantA,
     });
-    await expect(
+    await expectPrismaErrorCode(
       createAvailabilityRecord({
         id: availabilityRecordIds.manualDuplicate,
         tenant: tenantA,
-      })
-    ).resolves.toMatchObject({
-      id: availabilityRecordIds.manualDuplicate,
-      source_type: availability_source_type.manual,
-      source_remote_id: null,
-    });
+      }),
+      "P2002"
+    );
   });
 
   test("enforces foreign keys", async () => {
