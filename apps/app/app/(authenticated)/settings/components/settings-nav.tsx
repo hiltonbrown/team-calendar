@@ -12,6 +12,7 @@ import {
   ListChecksIcon,
   PlugIcon,
   RssIcon,
+  ScrollTextIcon,
   Settings2Icon,
   UsersIcon,
 } from "lucide-react";
@@ -48,6 +49,11 @@ const NAV_ITEMS = [
     label: "Holidays",
     href: "/settings/holidays",
     icon: CalendarCheckIcon,
+  },
+  {
+    label: "Audit Log",
+    href: "/settings/audit-log",
+    icon: ScrollTextIcon,
   },
 ] as const;
 
