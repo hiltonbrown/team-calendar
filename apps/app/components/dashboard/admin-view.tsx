@@ -3,6 +3,7 @@ import { ActiveFeedsCard } from "./active-feeds-card";
 import { EmployeeView } from "./employee-view";
 import { OrgPendingApprovalsCard } from "./org-pending-approvals-card";
 import { OrgXeroSyncFailedCard } from "./org-xero-sync-failed-card";
+import { RecentAuditEventsCard } from "./recent-audit-events-card";
 import { SyncHealthCard } from "./sync-health-card";
 import { UsageVsLimitsCard } from "./usage-vs-limits-card";
 import { XeroDisconnectedBanner } from "./xero-disconnected-banner";
@@ -52,6 +53,10 @@ export function AdminView({ view, orgQueryValue, personId }: AdminViewProps) {
         <OrgXeroSyncFailedCard
           orgQueryValue={orgQueryValue}
           state={view.orgWideXeroSyncFailed}
+        />
+        <RecentAuditEventsCard
+          orgQueryValue={orgQueryValue}
+          state={view.recentAuditEvents}
         />
       </div>
     </div>
