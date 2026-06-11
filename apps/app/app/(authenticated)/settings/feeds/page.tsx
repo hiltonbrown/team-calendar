@@ -15,6 +15,11 @@ interface FeedsPageProps {
   searchParams: Promise<{ org?: string }>;
 }
 
+// S-21 Settings > Feeds is the admin-config counterpart to the S-13 member view
+// at `/feeds`. It creates and configures feeds and edits organisation feed
+// defaults, so it is restricted to admins and owners. The read-oriented member
+// surface lives at `/feeds`. This split is intentional per ScreenCatalogue
+// v4.1; keep the two in sync.
 const FeedsPage = async ({ searchParams }: FeedsPageProps) => {
   await requirePageRole("org:admin");
 

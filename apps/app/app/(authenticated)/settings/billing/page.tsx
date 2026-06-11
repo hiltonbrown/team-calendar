@@ -1,8 +1,5 @@
-import { auth, currentUser } from "@repo/auth/server";
-import {
-  getBillingSummary,
-  getBillingSummaryForDashboard,
-} from "@repo/availability";
+import { currentUser } from "@repo/auth/server";
+import { getBillingSummary } from "@repo/availability";
 import { database } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -20,33 +17,25 @@ interface BillingPageProps {
   searchParams: Promise<{ org?: string }>;
 }
 
+// S-22 Settings > Billing is Owner only. Billing, plan limits, and usage are
+// enforced at the Clerk Organisation level, and the catalogue reserves this
+// surface for the account owner. requirePageRole below denies admins and below,
+// so only owners reach the owner billing service and its upgrade flow.
 const BillingPage = async ({ searchParams }: BillingPageProps) => {
-  await requirePageRole("org:admin");
-  const [{ orgRole }, user, { org }] = await Promise.all([
-    auth(),
-    currentUser(),
-    searchParams,
-  ]);
+  await requirePageRole("org:owner");
+  const [user, { org }] = await Promise.all([currentUser(), searchParams]);
   const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
 
   if (!user) {
     return <PermissionDeniedState />;
   }
 
-  const isOwner = orgRole === "org:owner";
-  const summary = isOwner
-    ? await getBillingSummary({
-        actingRole: "owner",
-        actingUserId: user.id,
-        clerkOrgId,
-        organisationId,
-      })
-    : await getBillingSummaryForDashboard({
-        actingRole: "admin",
-        actingUserId: user.id,
-        clerkOrgId,
-        organisationId,
-      });
+  const summary = await getBillingSummary({
+    actingRole: "owner",
+    actingUserId: user.id,
+    clerkOrgId,
+    organisationId,
+  });
 
   if (!summary.ok) {
     return <FetchErrorState entityName="billing" />;
@@ -72,10 +61,9 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
 
   return (
     <BillingClient
-      locked={!isOwner}
       summary={{
         hasContactFlow: summary.value.hasContactFlow,
-        hasUpgradeFlow: isOwner && summary.value.hasUpgradeFlow,
+        hasUpgradeFlow: summary.value.hasUpgradeFlow,
         isOverLimit: summary.value.isOverLimit,
         plan: summary.value.plan,
         usage: summary.value.usage,

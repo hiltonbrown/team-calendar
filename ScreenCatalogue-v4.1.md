@@ -668,6 +668,8 @@ Settings screens share a left sub-navigation within the settings section, separa
 **Route:** `/settings/billing`
 **Access:** Owner only
 
+**[v4.1 correction]** Enforced as Owner only in code via `requirePageRole("org:owner")` (`apps/app/app/(authenticated)/settings/billing/page.tsx`). Admins and below are denied; the page renders the owner billing view with the upgrade flow.
+
 **Purpose:** View plan, status, and usage. No checkout in the initial build.
 
 **[v4 correction]** Billing, plan limits, and usage are enforced at the Clerk Organisation level via `clerk_org_subscriptions` and `usage_counters`.
