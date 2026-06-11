@@ -20,7 +20,10 @@ interface BillingPageProps {
 // S-22 Settings > Billing is Owner only. Billing, plan limits, and usage are
 // enforced at the Clerk Organisation level, and the catalogue reserves this
 // surface for the account owner. requirePageRole below denies admins and below,
-// so only owners reach the owner billing service and its upgrade flow.
+// so only owners reach the read-only owner billing view (plan, status, usage).
+// No in-app upgrade or checkout flow is wired: getBillingSummary returns
+// hasUpgradeFlow and hasContactFlow as false, so the page shows a "contact
+// support to change your plan" note instead of action buttons.
 const BillingPage = async ({ searchParams }: BillingPageProps) => {
   await requirePageRole("org:owner");
   const [user, { org }] = await Promise.all([currentUser(), searchParams]);

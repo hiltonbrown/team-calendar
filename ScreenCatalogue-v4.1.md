@@ -670,7 +670,7 @@ Settings screens share a left sub-navigation within the settings section, separa
 **Route:** `/settings/billing`
 **Access:** Owner only
 
-**[v4.1 correction]** Enforced as Owner only in code via `requirePageRole("org:owner")` (`apps/app/app/(authenticated)/settings/billing/page.tsx`). Admins and below are denied; the page renders the owner billing view with the upgrade flow.
+**[v4.1 correction]** Enforced as Owner only in code via `requirePageRole("org:owner")` (`apps/app/app/(authenticated)/settings/billing/page.tsx`). Admins and below are denied; the page renders the read-only owner billing view (plan, status, usage). No in-app upgrade or checkout flow is wired in the initial build: the owner billing service returns `hasUpgradeFlow: false`, so the page shows a "contact support" note rather than upgrade actions.
 
 **Purpose:** View plan, status, and usage. No checkout in the initial build.
 
