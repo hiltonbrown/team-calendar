@@ -248,9 +248,10 @@ async function processBatch(
     }
 
     try {
-      const email =
-        (employee.email || "").toLowerCase() ||
+      const raw =
+        employee.email ||
         `${employee.firstName}.${employee.lastName}@noemail.leavesync.app`;
+      const email = raw.toLowerCase();
       await database.person.upsert({
         where: {
           organisation_id_source_system_source_person_key: {

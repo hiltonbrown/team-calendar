@@ -113,9 +113,11 @@ export class XeroRateLimiter {
       return { ok: false, reason: "concurrency" };
     }
 
-    // The loop only ever sleeps for a wait that fits inside the deadline, so it
-    // exits by returning; the condition keeps it lint-safe and bounded.
-    while (this.now() <= deadline) {
+    // Run at least once unconditionally so that maxWaitMs: 0 still attempts the
+    // token check on the current tick. Any async sleeps inside only happen when
+    // there is budget left in the deadline, so the post-body condition uses a
+    // strict less-than to avoid re-entering once the window has closed.
+    do {
       const now = this.now();
       this.refill(org.minute, now);
       this.refill(org.day, now);
@@ -142,7 +144,7 @@ export class XeroRateLimiter {
         return { ok: false, reason: "minute" };
       }
       await this.sleep(waitMs);
-    }
+    } while (this.now() < deadline);
 
     this.releaseConcurrencySlot(orgKey);
     return { ok: false, reason: "minute" };
