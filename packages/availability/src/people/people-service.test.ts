@@ -1,3 +1,4 @@
+import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -23,6 +24,19 @@ vi.mock("@repo/database", () => ({
   },
   scopedQuery: mocks.scopedQuery,
 }));
+vi.mock("@repo/database/generated/client", () => ({
+  Prisma: {
+    Decimal: class {
+      readonly #value: number;
+      constructor(value: number | string) {
+        this.#value = Number(value);
+      }
+      valueOf(): number {
+        return this.#value;
+      }
+    },
+  },
+}));
 vi.mock("../settings/manager-scope", () => ({
   managerScopePersonIds: mocks.managerScopePersonIds,
 }));
@@ -33,7 +47,7 @@ vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: vi.fn(),
 }));
 
-const { listPeople } = await import("./people-service");
+const { listPeople, toBalanceRow } = await import("./people-service");
 
 const managerId = "00000000-0000-4000-8000-000000000010";
 const directReportId = "00000000-0000-4000-8000-000000000011";
@@ -98,5 +112,39 @@ describe("people-service", () => {
         }),
       })
     );
+  });
+});
+
+function balanceRowInput(
+  overrides: Partial<Parameters<typeof toBalanceRow>[0]>
+): Parameters<typeof toBalanceRow>[0] {
+  return {
+    balance: new Prisma.Decimal("12.5"),
+    balance_unit: "hours",
+    id: "00000000-0000-4000-8000-0000000000aa",
+    last_fetched_at: new Date("2026-01-01T00:00:00.000Z"),
+    leave_type_name: "Annual Leave",
+    leave_type_xero_id: "annual-leave-id",
+    record_type: "leave",
+    xero_tenant_id: "00000000-0000-4000-8000-0000000000bb",
+    ...overrides,
+  };
+}
+
+describe("toBalanceRow", () => {
+  it("keeps a missing leave type name null rather than using the Xero id", () => {
+    const row = toBalanceRow(balanceRowInput({ leave_type_name: null }));
+
+    expect(row.leaveTypeName).toBeNull();
+    expect(row.leaveTypeXeroId).toBe("annual-leave-id");
+    expect(row.balanceUnits).toBe(12.5);
+  });
+
+  it("preserves a stored leave type name", () => {
+    const row = toBalanceRow(
+      balanceRowInput({ leave_type_name: "Annual Leave" })
+    );
+
+    expect(row.leaveTypeName).toBe("Annual Leave");
   });
 });
