@@ -27,6 +27,8 @@
   --muted-foreground: #46454e;
   --accent: #ebe5f7;
   --accent-foreground: #1c1a26;
+  --accent-container: #e5dfff;
+  --on-accent-container: #1f1551;
   --surface-variant: #e0dde6;
   --inverse-surface: #312f3c;
   --inverse-on-surface: #f3eff8;
@@ -84,6 +86,8 @@
   --muted-foreground: #c8c5d0;
   --accent: #2b2931;
   --accent-foreground: #e6e1ec;
+  --accent-container: #46398b;
+  --on-accent-container: #e5dfff;
   --surface-variant: #46454e;
   --inverse-surface: #e6e1ec;
   --inverse-on-surface: #312f3c;
@@ -144,6 +148,8 @@
   --color-error-container: var(--error-container);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-container: var(--accent-container);
+  --color-on-accent-container: var(--on-accent-container);
   --color-surface-container-lowest: var(--surface-container-lowest);
   --color-surface-container-low: var(--surface-container-low);
   --color-surface-container: var(--surface-container);

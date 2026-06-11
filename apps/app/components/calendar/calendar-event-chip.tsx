@@ -9,12 +9,11 @@ interface CalendarEventChipProps {
 }
 
 const categoryStyles = {
-  // Calendar colours stay in the UI: leave uses green, local availability uses blue, private blocks use neutral, and failed sync overrides with amber.
+  // Provenance-based: Xero-synced leave uses sage (secondary), manual entries use lavender (accent-container).
   local_only:
-    "bg-sky-100 text-sky-950 ring-sky-200 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-800",
+    "bg-accent-container text-on-accent-container ring-accent-container/50",
   private: "bg-muted text-muted-foreground ring-muted-foreground/15",
-  xero_leave:
-    "bg-emerald-100 text-emerald-950 ring-emerald-200 dark:bg-emerald-950 dark:text-emerald-100 dark:ring-emerald-800",
+  xero_leave: "bg-secondary text-secondary-foreground ring-secondary/50",
 };
 
 export function CalendarEventChip({
@@ -37,7 +36,7 @@ export function CalendarEventChip({
             "border border-dashed opacity-85",
           event.renderTreatment === "draft" && "opacity-65",
           event.renderTreatment === "failed" &&
-            "bg-amber-100 text-amber-950 ring-amber-300 dark:bg-amber-950 dark:text-amber-100"
+            "bg-error-container text-destructive ring-destructive/30"
         )}
         onClick={(event) => event.stopPropagation()}
         type="button"

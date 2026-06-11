@@ -30,6 +30,14 @@ export const AuthProvider = ({
       normal: "var(--font-weight-normal)",
       medium: "var(--font-weight-medium)",
     },
+    colorPrimary: "var(--primary)",
+    colorDanger: "var(--destructive)",
+    colorText: "var(--foreground)",
+    colorTextSecondary: "var(--muted-foreground)",
+    colorBackground: "var(--background)",
+    colorInputBackground: "var(--input)",
+    colorInputText: "var(--foreground)",
+    borderRadius: "var(--radius)",
   };
 
   const elements: Theme["elements"] = {
@@ -41,6 +49,13 @@ export const AuthProvider = ({
     organizationSwitcherTriggerIcon: "text-muted-foreground",
     organizationPreview__organizationSwitcherTrigger: "gap-2",
     organizationPreviewAvatarContainer: "shrink-0",
+    card: "shadow-none",
+    headerTitle: "text-foreground",
+    headerSubtitle: "text-muted-foreground",
+    formFieldLabel: "text-foreground",
+    formFieldInput: "rounded-xl",
+    footerActionLink: "text-primary hover:text-primary/80",
+    formButtonPrimary: "rounded-2xl",
   };
 
   const layout: Theme["layout"] = {

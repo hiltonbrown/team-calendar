@@ -339,7 +339,7 @@ export const RecurrenceFields = ({
                 <div className="flex flex-wrap gap-1.5">
                   {preview.occurrences.slice(0, 5).map((occurrence) => (
                     <span
-                      className="rounded-md bg-muted px-2 py-1 font-bold text-[10px] text-muted-foreground uppercase tracking-wider"
+                      className="rounded-sm bg-muted px-2 py-1 font-bold text-[10px] text-muted-foreground uppercase tracking-wider"
                       key={occurrence.startDate}
                     >
                       {formatPreviewDate(occurrence.startDate)}

@@ -126,7 +126,6 @@ export function ApproveConfirmationModal({
             Cancel
           </Button>
           <Button
-            className="bg-[#336A3B] text-white hover:bg-[#2b5a32]"
             disabled={isPending}
             onClick={() => submit(false)}
             type="button"
