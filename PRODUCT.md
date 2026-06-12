@@ -13,6 +13,55 @@ Where this document conflicts with any other, PRODUCT.md takes precedence.
 
 ---
 
+## Register
+
+product
+
+## Users
+
+Three overlapping user types, each with different needs and contexts:
+
+- **HR admins and ops managers**: configure Xero connections, manage feeds, review sync health and audit logs. High data density is acceptable; they need control and confidence.
+- **Team managers**: see who is out or working remotely across their team on any given day. Scannability and calendar views are the primary surface. They visit frequently, often briefly.
+- **Employees**: self-service visibility into their own leave, balances, and availability. Their surfaces should be lighter, less dense, and more approachable.
+
+The interface must serve all three without making any group feel like a second-class citizen.
+
+## Product Purpose
+
+LeaveSync exists so that teams can see who is in, who is out, and why, without hunting through email or Xero. Employees submit and manage leave; managers approve or decline; the resulting state writes back to Xero synchronously and publishes as secure ICS feeds for calendar subscriptions.
+
+Success: a team manager arrives, scans their calendar, and is back to work in under 30 seconds.
+
+## Brand Personality
+
+**Modern. Calm. Precise.**
+
+LeaveSync is a tool people trust with real business data. It should feel like a well-made instrument: composed, reliable, purposeful. It does not try to entertain. It does not overwhelm. Every screen should lower cognitive load, not raise it.
+
+The emotional goal is **quiet confidence**: the user arrives, sees what they need, acts, and leaves. No friction, no noise.
+
+## Anti-references
+
+- **Notion**: flat document aesthetic, undifferentiated text-heavy layout, absent visual hierarchy, low-contrast chrome.
+- Generic SaaS-cream palettes (warm-tinted near-white backgrounds).
+- Hero-metric card grids and numbered section scaffolding (01 / 02 / 03).
+- Any tool that prioritises decoration over density.
+
+## Design Principles
+
+1. **Clarity over cleverness**: calendar and availability data must be immediately scannable. Visual hierarchy is non-negotiable. When in doubt, simplify.
+2. **Green as signal, not wallpaper**: the primary green earns its place on screen. Use it for primary actions, success states, and brand anchors. Resist applying it broadly as background colour or decoration.
+3. **Density is role-appropriate**: admin and manager views can be denser. Employee-facing surfaces should breathe. Never sacrifice readability for compactness.
+4. **Calm confidence through space**: whitespace is load-bearing. Crowded layouts erode trust. Generous padding and clear separation between sections are defaults, not luxuries.
+5. **Frosted touch, used sparingly**: translucent backdrop-blurred surfaces are reserved for elevated transient UI only (modals, popovers, toasts, sticky chrome). Never beneath primary content, dense data, or calendars.
+
+## Accessibility & Inclusion
+
+WCAG 2.2 AA is the floor for all text, interactive elements, and status indicators. Colour is never the sole differentiator for status. `prefers-reduced-motion` and `prefers-reduced-transparency` are respected throughout. Australian English only.
+
+---
+
 ## Product truth
 
 LeaveSync is a multi-tenant leave management and availability publishing platform for organisations running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside LeaveSync; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which LeaveSync reads but never calculates.

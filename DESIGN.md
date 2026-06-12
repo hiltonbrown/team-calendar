@@ -105,6 +105,33 @@ The accent palette is a complementary slate-purple that harmonises with the sage
 
 Implement via CSS custom properties scoped to `[data-theme="light"]` and `[data-theme="dark"]` on the root element. Default to the user's system preference via `prefers-color-scheme`, with a manual toggle that persists to the database (not localStorage).
 
+### CSS Variable Mapping
+
+The design tokens above use semantic names. The CSS implementation in `packages/design-system/styles/globals.css` uses shadcn/ui-compatible variable names. Key mapping differences:
+
+| Design token | CSS variable | Notes |
+|---|---|---|
+| `surface` | `--background` | Page background |
+| `surface-container-lowest` | `--card` | Card and popover base |
+| `on-surface` | `--foreground`, `--card-foreground`, `--on-surface` | All three are the same value |
+| `secondary-container` | `--secondary` | shadcn flattens container into base name |
+| `on-secondary-container` | `--secondary-foreground` | |
+| `surface-container` | `--muted` | Muted surface (e.g. table striping) |
+| `on-surface-variant` | `--muted-foreground` | Supporting text |
+| `surface-container-high` | `--accent` | shadcn uses `accent` for neutral hover surfaces |
+| `on-surface` | `--accent-foreground` | Text on neutral hover |
+| `accent-container` | `--accent-container` | Lavender wash; manual availability chips |
+| `on-accent-container` | `--on-accent-container` | Text on lavender wash |
+| `error` | `--destructive` | |
+| `on-primary` | `--destructive-foreground` | White on destructive fills |
+| `surface-container-highest` | `--input` | Input field fill |
+| `primary` | `--ring` | Focus ring colour |
+| `primary` | `--border` applied at 15% opacity | Ghost border via `color-mix` |
+
+**Note on the editorial purple**: the `accent` semantic colour (`#5E4F99` light / `#C8BFFF` dark) does not have a direct CSS variable. Purple surfaces use `--accent-container` (lavender wash) with `--on-accent-container` text. When a saturated purple stroke or icon colour is needed, apply `var(--on-accent-container)` or `var(--accent-container)` at full opacity depending on context.
+
+**Note on fonts**: `--font-sans` maps to Plus Jakarta Sans. `--font-mono` maps to Lora (a serif), used intentionally for editorial text contexts rather than code display.
+
 ---
 
 ## Typography
@@ -281,24 +308,24 @@ background: linear-gradient(135deg, var(--primary), var(--primary-container));
 
 ### Buttons
 
-| Variant   | Background                | Text colour                | Border          | Hover                                      |
-|-----------|---------------------------|----------------------------|-----------------|---------------------------------------------|
-| Primary   | `primary`                 | `on-primary`               | None            | Darken 8%                                   |
-| Secondary | `secondary-container`     | `on-secondary-container`   | None            | Darken 5%                                   |
-| Tertiary  | Transparent               | `primary`                  | None            | `surface-variant` background                |
-| Danger    | `error`                   | `#FFFFFF`                  | None            | Darken 8%                                   |
+| Variant     | CSS class       | Background            | Text colour               | Hover                    |
+|-------------|-----------------|----------------------|---------------------------|--------------------------|
+| `default`   | bg-primary      | `primary` (#336A3B)  | `on-primary` (white)      | 90% opacity              |
+| `secondary` | bg-secondary    | `secondary-container` (#CAE8BC) | `on-secondary-container` | 80% opacity   |
+| `destructive` | bg-destructive | `error` (#BA1A1A)   | white                     | 90% opacity              |
+| `outline`   | border bg-background | transparent     | `on-surface`              | `--accent` surface fill  |
+| `ghost`     | (none)          | transparent          | `on-surface`              | `--accent` surface fill  |
+| `link`      | (none)          | transparent          | `primary`                 | underline                |
 
-All buttons: `border-radius: 16px`, `label-md` uppercase text, `padding: 10px 24px`.
-
-There is no accent button variant. Accent is a signal colour for chips, badges, and informational surfaces, not for action.
+All buttons: `border-radius: --radius-md` (calc(1rem - 2px) ≈ 14px), `text-sm font-medium`. There is no accent purple button variant. Accent is a signal colour for chips, badges, and informational surfaces, not for action.
 
 ### Cards
 
-No divider lines. Separation via whitespace or tonal shifts. Inner (nested) cards use one surface tier higher than their parent. `border-radius: 16px`. Cards are persistent surfaces and must not use frost, blur, or shadow.
+Use `bg-card` fill (white in light / `#0e0d13` in dark). `border-radius: rounded-xl` (calc(1rem + 4px) ≈ 20px). Ghost border via `--border` (15% opacity `outline-variant`). `shadow-sm` applies a very subtle 1px diffused shadow for depth. No nested cards.
 
 ### Input Fields
 
-Fill: `surface-container-highest`, no border. On focus: ghost border using `primary` at 20% opacity. Label: `label-md`, positioned above the field (never as placeholder text). `border-radius: 12px`. Inputs are persistent surfaces and must not use frost, blur, or shadow.
+`border-input` border colour with `bg-transparent` base. On focus: `ring-ring/50` with `ring-[3px]`. Label: `label-md`, positioned above the field (never as placeholder text). `border-radius: rounded-md` (≈ 14px). Dark mode adds `bg-input/30` fill. Inputs are persistent surfaces and must not use frost, blur, or additional shadow.
 
 ### Data/Metric Highlights
 
