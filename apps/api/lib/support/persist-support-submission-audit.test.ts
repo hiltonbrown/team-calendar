@@ -1,4 +1,8 @@
+import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const clerkOrgId = "org_clerk_123" as ClerkOrgId;
+const organisationId = "00000000-0000-4000-8000-000000000001" as OrganisationId;
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -28,12 +32,12 @@ describe("persistSupportSubmissionAudit", () => {
 
     const result = await persistSupportSubmissionAudit({
       category: "support",
-      clerkOrgId: "org_clerk_123",
+      clerkOrgId,
       issueNumber: 42,
       issueUrl: "https://github.com/hiltonbrown/leavesync/issues/42",
       labelAssignmentSucceeded: true,
       labelsAttempted: ["support", "priority:normal"],
-      organisationId: "00000000-0000-4000-8000-000000000001",
+      organisationId,
       status: "created",
       subject: "Missing leave entry",
       userId: "user_123",
@@ -71,12 +75,12 @@ describe("persistSupportSubmissionAudit", () => {
 
     const result = await persistSupportSubmissionAudit({
       category: "feedback",
-      clerkOrgId: "org_clerk_123",
+      clerkOrgId,
       issueNumber: 9,
       issueUrl: "https://github.com/hiltonbrown/leavesync/issues/9",
       labelAssignmentSucceeded: false,
       labelsAttempted: ["feedback", "priority:high"],
-      organisationId: "00000000-0000-4000-8000-000000000001",
+      organisationId,
       status: "created",
       subject: "Clarify save feedback",
       userId: "user_123",
