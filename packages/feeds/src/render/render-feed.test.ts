@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   feedTokenUpdate: vi.fn(() => Promise.resolve({})),
   feedUpdate: vi.fn(() => Promise.resolve({})),
   getCachedFeedBody: vi.fn(() => Promise.resolve({ ok: true, value: null })),
+  logWarn: vi.fn(),
   projectFeedEvents: vi.fn(() =>
     Promise.resolve({
       ok: true,
@@ -42,6 +43,9 @@ vi.mock("@repo/database", () => ({
     },
   },
 }));
+vi.mock("@repo/observability/log", () => ({
+  log: { warn: mocks.logWarn },
+}));
 vi.mock("../cache/feed-cache", () => ({
   feedCacheKey: () => "feed:cache:key",
   getCachedFeedBody: mocks.getCachedFeedBody,
@@ -76,6 +80,30 @@ describe("renderFeedForToken", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.feedTokenFindUnique.mockResolvedValue(feedTokenFixture());
+    mocks.feedTokenUpdate.mockResolvedValue({});
+    mocks.feedUpdate.mockResolvedValue({});
+    mocks.getCachedFeedBody.mockResolvedValue({ ok: true, value: null });
+    mocks.projectFeedEvents.mockResolvedValue({
+      ok: true,
+      value: [
+        {
+          allDay: true,
+          contactabilityStatus: "unavailable",
+          description: "Internal note",
+          displayName: "Jane Smith",
+          endsAt: new Date("2026-05-08T00:00:00.000Z"),
+          isPublicHoliday: false,
+          location: "Brisbane",
+          publishedSequence: 2,
+          publishedUid: "stable@ical.leavesync.app",
+          recordType: "annual_leave",
+          sourceRecordId: "10000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-05-07T00:00:00.000Z"),
+          summary: "Jane Smith: Annual Leave",
+        },
+      ],
+    });
+    mocks.setCachedFeedBody.mockResolvedValue({ ok: true, value: undefined });
   });
 
   it("serialises ICS with publication UID and SEQUENCE", async () => {
@@ -127,5 +155,24 @@ describe("renderFeedForToken", () => {
       where: { id: "30000000-0000-4000-8000-000000000001" },
     });
     expect(mocks.projectFeedEvents).not.toHaveBeenCalled();
+  });
+
+  it("returns the rendered feed when the cache write fails", async () => {
+    mocks.setCachedFeedBody.mockRejectedValue(new Error("KV unavailable"));
+
+    const result = await renderFeedForToken("plaintext-token");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.status).toBe("active");
+    expect(result.value.body).toContain("BEGIN:VCALENDAR");
+    expect(result.value.body).toContain("SUMMARY:Jane Smith: Annual Leave");
+    expect(mocks.feedTokenUpdate).toHaveBeenCalled();
+    expect(mocks.feedUpdate).toHaveBeenCalled();
+    expect(mocks.logWarn).toHaveBeenCalledWith(
+      "Feed cache write failed for feed 20000000-0000-4000-8000-000000000001: Error: KV unavailable"
+    );
   });
 });

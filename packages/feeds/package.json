@@ -12,6 +12,7 @@
   "dependencies": {
     "@repo/core": "*",
     "@repo/database": "*",
+    "@repo/observability": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "ical-generator": "^10.2.0",
     "server-only": "^0.0.1",

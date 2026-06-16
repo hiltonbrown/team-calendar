@@ -1,5 +1,7 @@
 import { renderFeedForToken } from "@repo/feeds";
 
+const weakEtagPrefixPattern = /^W\//;
+
 /**
  * GET /ical/:token.ics
  *
@@ -11,7 +13,7 @@ import { renderFeedForToken } from "@repo/feeds";
  * - 404 Not Found: Token not found or feed inactive
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
   const { token: tokenParam } = await params;
@@ -27,11 +29,28 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const { body, status } = feedResult.value;
+  const { body, etag, status } = feedResult.value;
 
   // Handle expired or revoked tokens
   if (status === "expired" || status === "revoked") {
     return new Response("Gone", { status: 410 });
+  }
+
+  const quotedEtag = `"${etag}"`;
+  const ifNoneMatch = request.headers.get("if-none-match");
+  const matches = ifNoneMatch
+    ?.split(",")
+    .map((candidate) => candidate.trim().replace(weakEtagPrefixPattern, ""))
+    .includes(quotedEtag);
+
+  if (matches) {
+    return new Response(null, {
+      status: 304,
+      headers: {
+        ETag: quotedEtag,
+        "Cache-Control": "max-age=3600, must-revalidate",
+      },
+    });
   }
 
   // Return the active feed
@@ -40,6 +59,7 @@ export async function GET(
     headers: {
       "Content-Type": "text/calendar;charset=utf-8",
       "Cache-Control": "max-age=3600, must-revalidate",
+      ETag: quotedEtag,
     },
   });
 }

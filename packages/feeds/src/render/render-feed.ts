@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { availability_privacy_mode } from "@repo/database/generated/enums";
+import { log } from "@repo/observability/log";
 import ical, { ICalEventTransparency } from "ical-generator";
 import {
   feedCacheKey,
@@ -149,8 +150,16 @@ export async function renderFeedForToken(
         organisation_id: feedToken.organisation_id,
       },
     }),
-    setCachedFeedBody({ body, etag, key, ttlSeconds: 3600 }),
   ]);
+
+  // The KV cache is a performance layer; a write failure must not fail the response.
+  try {
+    await setCachedFeedBody({ body, etag, key, ttlSeconds: 3600 });
+  } catch (error) {
+    log.warn(
+      `Feed cache write failed for feed ${feedToken.feed_id}: ${String(error)}`
+    );
+  }
 
   return { ok: true, value: { body, etag, status: "active" } };
 }
