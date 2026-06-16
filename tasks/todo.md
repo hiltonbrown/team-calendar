@@ -1,38 +1,31 @@
-# Prompt 09: Xero rate limiting
+# Plan 002: Feed ETag and 304 Responses
 
 ## Plan
 
-- [x] Add a per-org token-bucket limiter in `packages/xero/src/rate-limit` enforcing
-      60/min, 5,000/day, five concurrent per org, plus a 10,000/min app-wide ceiling.
-- [x] Add a single Xero HTTP choke point (`xeroFetch`) that honours `Retry-After` on 429
-      and applies exponential backoff to transient failures, returning a synthetic 429
-      (mapped to `rate_limit_error`) only when the budget is genuinely exhausted.
-- [x] Route every read, write, and OAuth/token call through `xeroFetch`, keyed per org.
-- [x] Tests: per-minute, daily, concurrency and app-wide caps; per-org isolation;
-      Retry-After honoured; backoff; budget-exhausted passthrough.
-- [x] Record the in-process vs KV daily-cap design choice in `BLOCKED.md` (item D).
+- [x] Read `plans/002-feed-etag-304.md`, `PRODUCT.md`, current task notes, and relevant source files.
+- [x] Run the required drift check for the feed route and render service.
+- [x] Decouple the feed cache write from the render response path.
+- [x] Add `ETag` headers and `If-None-Match` handling to the ICS route.
+- [x] Add route tests for 200, 304, 404, 410, weak/list validators, mismatches, and `.ics` token stripping.
+- [x] Add render-service coverage proving cache write failures do not fail a rendered response.
+- [x] Run targeted tests and verification checks.
+- [x] Run full `bun run check`, app typecheck, and `bun run test`.
+- [x] Update `plans/README.md` status for plan 002.
 
 ## Review
 
-- Limiter lives entirely in `packages/xero`; no rate-limiting logic leaks into
-  `availability`, `feeds`, or the apps. The forbidden `@repo/rate-limit` package is not
-  reintroduced.
-- Call sites wired: `au/read.ts` (employees, leave records, per-employee balances,
-  leave-application status), `au/write.ts` (submit/approve/decline/withdraw), and
-  `oauth/service.ts` (token exchange, connections, organisation region probe). NZ/UK
-  read/write are scaffolds that make no HTTP calls, so nothing to wire there.
-- The per-employee balance loop passes `maxAttempts: 1` to preserve its existing
-  abort-on-rate-limit behaviour (the Inngest job retries the run); single reads, writes
-  and token calls use the default inline retry with Retry-After.
-- Daily cap is in-process per the recorded BLOCKED.md decision; a durable KV-backed
-  counter is deferred pending a human call on adding KV to `packages/xero`.
+- `GET /ical/:token.ics` now returns quoted `ETag` headers on 200 responses and serves 304 responses for matching strong, weak, or listed `If-None-Match` validators.
+- Expired and revoked feed tokens still return 410 before ETag comparison, so empty service etags never participate in cache validation.
+- `renderFeedForToken` still awaits the token/feed database writes, then attempts the KV cache write separately and logs a warning if that performance-layer write fails.
+- `packages/feeds` now declares its `@repo/observability` dependency for the render-service warning log.
 
 ## Verification
 
-- `bun install`: ok.
-- `bun run check`: 0 errors (pre-existing warnings only).
-- `bun run boundaries`: no issues.
-- `bun run test`: all suites pass (xero: 76 tests including the new rate-limit suites).
-- `bun run build`: blocked by missing env vars (`XERO_TOKEN_ENCRYPTION_KEY`,
-  `DATABASE_URL`, ...) in the sandbox; pre-existing and unrelated to this change.
-  `tsc --noEmit` for `packages/xero` passes, confirming the code compiles.
+- `bun install --frozen-lockfile`: passed.
+- `bunx vitest run apps/api/app/ical/[token]/route.test.ts`: 9 tests passed.
+- `bunx vitest run packages/feeds/src/render/render-feed.test.ts`: 4 tests passed.
+- `grep -n "_request" apps/api/app/ical/[token]/route.ts`: no matches.
+- `grep -n "setCachedFeedBody" packages/feeds/src/render/render-feed.ts`: cache write is outside the persistence `Promise.all`.
+- `cd apps/api && bun run typecheck`: passed.
+- `bun run check`: passed.
+- `bun run test`: passed.

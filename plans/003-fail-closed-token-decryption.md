@@ -16,7 +16,7 @@
 
 - **Priority**: P1
 - **Effort**: S
-- **Risk**: MED (could surface legacy rows — see Step 1 and STOP conditions)
+- **Risk**: MED (could surface legacy rows; first execution also showed test fixtures need encrypted-token setup)
 - **Depends on**: none
 - **Category**: security
 - **Planned at**: commit `d9da765`, 2026-06-12
@@ -64,6 +64,11 @@ export function decryptXeroToken(input: {
 - Important: callers in `read.ts`/`write.ts` run inside functions that return `Result<…>`; `oauth/service.ts` likewise wraps expected failures. However `readKey()` in this same module **already throws** (`throw new Error("XERO_TOKEN_ENCRYPTION_KEY is required.")`), so throwing from this module on an invariant violation is the established pattern — an unexpected-state throw, not an expected failure.
 - Empty-string special case: a never-connected/disconnected row stores `""` for `access_token_encrypted` (see `oauth/service.ts:546` checking `connection.access_token_encrypted.length > 0` before use). `decryptXeroToken("")` currently returns `""` via the fail-open branch. Callers gate on emptiness before decrypting in the refresh path, but the status-check path at `service.ts:267-272` may pass empty strings. The fix must keep `""` → `""` (empty input means "no token", not "corrupt token").
 - Existing tests: `packages/xero/src/crypto/tokens.test.ts` — co-located, Vitest.
+- First execution note, 2026-06-16: after implementing the guard and crypto tests, `bunx vitest run packages/xero` failed because several caller tests used plaintext fixture tokens with null/omitted IV/auth-tag fields. Production write sites still persist the token triple correctly; the failing shapes are test shortcuts, not supported persisted states. The plan scope now includes repairing those fixtures so package tests prove the new invariant instead of bypassing it.
+- Fixture files that must be repaired:
+  - `packages/xero/src/au/read.test.ts` has a top-level `xeroTenant` fixture with `access_token_encrypted: "access-token"` and no IV/auth tag.
+  - `packages/xero/src/au/write.test.ts` has the same shortcut fixture.
+  - `packages/xero/src/oauth/service.test.ts` has `ensureFreshXeroConnection` mocks with plaintext `access_token_encrypted` / `refresh_token_encrypted`; the refresh test specifically mocks `refresh_token_iv: null` and `refresh_token_auth_tag: null` as a plaintext shortcut.
 
 ## Commands you will need
 
@@ -79,10 +84,13 @@ export function decryptXeroToken(input: {
 **In scope**:
 - `packages/xero/src/crypto/tokens.ts`
 - `packages/xero/src/crypto/tokens.test.ts`
+- `packages/xero/src/au/read.test.ts`
+- `packages/xero/src/au/write.test.ts`
+- `packages/xero/src/oauth/service.test.ts`
 
 **Out of scope** (do NOT touch):
 - The Prisma schema / migrations (making the columns non-nullable is a separate decision involving production data).
-- All callers (`au/read.ts`, `au/write.ts`, `oauth/service.ts`) — the throw propagates through their existing try/catch or error paths; do not restructure them.
+- Production callers (`au/read.ts`, `au/write.ts`, `oauth/service.ts`) — the throw propagates through their existing try/catch or error paths; do not restructure them.
 - `encryptXeroToken` and `readKey` — unchanged.
 
 ## Git workflow
@@ -139,7 +147,26 @@ In `packages/xero/src/crypto/tokens.test.ts`, add:
 
 **Verify**: `bunx vitest run packages/xero/src/crypto/tokens.test.ts` → all pass including 3–4 new tests.
 
-### Step 4: Confirm callers degrade safely
+### Step 4: Repair caller test fixtures so they use real encrypted token triples
+
+The fail-closed guard is expected to break tests that were using plaintext token shortcuts. Do not weaken `decryptXeroToken` to satisfy those tests. Update the fixtures instead.
+
+Recommended approach:
+
+1. In `packages/xero/src/au/read.test.ts` and `packages/xero/src/au/write.test.ts`, import `encryptXeroToken` from `../crypto/tokens`, set `process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32).toString("base64")` before building the fixture, and build `xero_connection` from `encryptXeroToken("access-token")` so it includes `access_token_encrypted`, `access_token_iv`, and `access_token_auth_tag`.
+2. Keep the existing fetch assertions meaningful: after decryption, the production code should still send `Authorization: Bearer access-token`. If an assertion does not already check the header, add one on the existing `fetchMock` call rather than adding a new production hook.
+3. In `packages/xero/src/oauth/service.test.ts`, add a small local helper after the environment setup, for example `function encryptedToken(value: string) { const encrypted = encryptXeroToken(value); return { encrypted: encrypted.encrypted, iv: encrypted.iv, authTag: encrypted.authTag }; }`. Import `encryptXeroToken` from `../crypto/tokens`.
+4. Replace only the mocked token fields in the `ensureFreshXeroConnection` tests:
+   - For non-refresh decision tests, provide encrypted access/refresh token triples even if the test only needs `.length > 0`.
+   - For the refresh flow mock currently labelled `iv/auth_tag null -> plaintext`, replace it with encrypted refresh-token material. The refreshed HTTP request should still use the cleartext `"refresh-token"` after decryption.
+5. Do not change the production service or AU read/write modules.
+
+**Verify**:
+
+- `bunx vitest run packages/xero/src/au/read.test.ts packages/xero/src/au/write.test.ts packages/xero/src/oauth/service.test.ts` → all pass.
+- The tests still assert the observable cleartext behaviour at the network boundary where appropriate, especially `Authorization: Bearer access-token` and refresh-token exchange payloads.
+
+### Step 5: Confirm callers degrade safely
 
 Run the full xero package suite, then the whole suite. The throw inside callers' flows should surface as their existing `auth_error`/`unknown_error` handling; no caller change is expected.
 
@@ -155,6 +182,7 @@ ALL must hold:
 
 - [ ] `grep -n "return input.encrypted" packages/xero/src/crypto/tokens.ts` returns no matches
 - [ ] `bunx vitest run packages/xero/src/crypto/tokens.test.ts` exits 0 with the new cases
+- [ ] `bunx vitest run packages/xero/src/au/read.test.ts packages/xero/src/au/write.test.ts packages/xero/src/oauth/service.test.ts` exits 0 with encrypted fixture tokens
 - [ ] `bunx vitest run packages/xero` exits 0
 - [ ] `bun run test` exits 0; `bun run check` exits 0
 - [ ] No files outside the in-scope list modified (`git status`)
@@ -165,7 +193,7 @@ ALL must hold:
 Stop and report back (do not improvise) if:
 
 - Step 1 finds a write path that stores non-empty tokens without IV/auth-tag (legacy plaintext population — needs a migration decision first).
-- Any test in `packages/xero` fails after Step 2 in a way that shows a caller **relies** on receiving the raw stored value (e.g. a fixture with plaintext tokens and null IVs that represents a supported state rather than a test shortcut). Report the test and fixture; do not weaken the fix to accommodate it.
+- Any test in `packages/xero` fails after Step 4 in a way that shows a production caller **relies** on receiving the raw stored value. Test fixtures with plaintext token shortcuts should be repaired; production reliance should be reported.
 - You feel the need to change the function signature to return `Result` — that ripples into nine call sites and is explicitly out of scope.
 
 ## Maintenance notes
