@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { validateEncryptionKey } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "./tokens";
 
+const MISSING_TOKEN_COMPONENTS_ERROR = /missing its IV or auth tag/;
+
 describe("validateEncryptionKey", () => {
   it("throws an error if key is absent (undefined)", () => {
     expect(() => validateEncryptionKey(undefined)).toThrowError(
@@ -77,5 +79,54 @@ describe("encryptXeroToken and decryptXeroToken", () => {
         authTag: "abc",
       })
     ).toThrowError("Invalid environment variables");
+  });
+
+  it("returns an empty string for an empty stored token", () => {
+    expect(
+      decryptXeroToken({
+        authTag: null,
+        encrypted: "",
+        iv: null,
+      })
+    ).toBe("");
+  });
+
+  it("throws an error when a non-empty token is missing its IV", () => {
+    expect(() =>
+      decryptXeroToken({
+        authTag: "auth-tag",
+        encrypted: "encrypted-token",
+        iv: null,
+      })
+    ).toThrowError(MISSING_TOKEN_COMPONENTS_ERROR);
+  });
+
+  it("throws an error when a non-empty token is missing its auth tag", () => {
+    expect(() =>
+      decryptXeroToken({
+        authTag: null,
+        encrypted: "encrypted-token",
+        iv: "iv",
+      })
+    ).toThrowError(MISSING_TOKEN_COMPONENTS_ERROR);
+  });
+
+  it("throws an error when the auth tag has been tampered with", () => {
+    process.env.XERO_TOKEN_ENCRYPTION_KEY =
+      "dGhpcyBpcyBhIDMyLWJ5dGUga2V5IGZvciB4ZXJvITE=";
+    const encrypted = encryptXeroToken("my-secret-xero-oauth-token");
+    const tamperedAuthTag = Buffer.from(encrypted.authTag, "base64");
+    const firstByte = tamperedAuthTag.at(0);
+    expect(firstByte).toBeDefined();
+    if (firstByte !== undefined) {
+      tamperedAuthTag[0] = firstByte === 0 ? 1 : firstByte - 1;
+    }
+
+    expect(() =>
+      decryptXeroToken({
+        ...encrypted,
+        authTag: tamperedAuthTag.toString("base64"),
+      })
+    ).toThrow();
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { encryptXeroToken } from "../crypto/tokens";
 
 vi.mock("server-only", () => ({}));
 
@@ -20,6 +21,20 @@ const {
 } = await import("./service");
 
 const ORIGINAL_ENV = { ...process.env };
+
+function buildStoredTokenFields() {
+  const accessToken = encryptXeroToken("access-token");
+  const refreshToken = encryptXeroToken("refresh-token");
+
+  return {
+    access_token_auth_tag: accessToken.authTag,
+    access_token_encrypted: accessToken.encrypted,
+    access_token_iv: accessToken.iv,
+    refresh_token_auth_tag: refreshToken.authTag,
+    refresh_token_encrypted: refreshToken.encrypted,
+    refresh_token_iv: refreshToken.iv,
+  };
+}
 
 beforeEach(() => {
   process.env.XERO_CLIENT_ID = "client-id";
@@ -189,9 +204,8 @@ describe("ensureFreshXeroConnection", () => {
 
   it("does not refresh a token that is valid beyond the buffer", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
-      access_token_encrypted: "access-token",
+      ...buildStoredTokenFields(),
       expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
-      refresh_token_encrypted: "refresh-token",
       revoked_at: null,
       status: "active",
     });
@@ -210,9 +224,8 @@ describe("ensureFreshXeroConnection", () => {
 
   it("returns connection_inactive for a revoked connection", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
-      access_token_encrypted: "access-token",
+      ...buildStoredTokenFields(),
       expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
-      refresh_token_encrypted: "refresh-token",
       revoked_at: input.now,
       status: "active",
     });
@@ -227,21 +240,21 @@ describe("ensureFreshXeroConnection", () => {
   });
 
   it("refreshes and re-persists the token before returning when near expiry", async () => {
+    const storedTokens = buildStoredTokenFields();
     dbMock.xeroConnection.findFirst
       // ensureFreshXeroConnection: initial connection state (near expiry)
       .mockResolvedValueOnce({
-        access_token_encrypted: "access-token",
+        ...storedTokens,
         expires_at: new Date(input.now.getTime() + 60 * 1000),
-        refresh_token_encrypted: "refresh-token",
         revoked_at: null,
         status: "active",
       })
-      // refreshXeroOAuthConnection: refresh-token material (iv/auth_tag null -> plaintext)
+      // refreshXeroOAuthConnection: encrypted refresh-token material.
       .mockResolvedValueOnce({
         id: input.connectionId,
-        refresh_token_auth_tag: null,
-        refresh_token_encrypted: "refresh-token",
-        refresh_token_iv: null,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
       })
       // ensureFreshXeroConnection: re-read expiry after refresh
       .mockResolvedValueOnce({
@@ -268,6 +281,15 @@ describe("ensureFreshXeroConnection", () => {
     }
     // The token exchange happened and the new tokens were persisted before returning.
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://identity.xero.com/connect/token",
+      expect.objectContaining({ method: "POST" })
+    );
+    const requestBody = fetchSpy.mock.calls[0]?.[1]?.body;
+    expect(requestBody).toBeInstanceOf(URLSearchParams);
+    if (requestBody instanceof URLSearchParams) {
+      expect(requestBody.get("refresh_token")).toBe("refresh-token");
+    }
     expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
     const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
     expect(updateArg.data.status).toBe("active");

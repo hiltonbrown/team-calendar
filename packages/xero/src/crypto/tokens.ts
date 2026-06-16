@@ -35,8 +35,13 @@ export function decryptXeroToken(input: {
   encrypted: string;
   iv: null | string;
 }): string {
-  if (!(input.encrypted && input.iv && input.authTag)) {
-    return input.encrypted;
+  if (!input.encrypted) {
+    return "";
+  }
+  if (!(input.iv && input.authTag)) {
+    throw new Error(
+      "Encrypted Xero token is missing its IV or auth tag; refusing to use the stored value. Reconnect Xero to repair this connection."
+    );
   }
 
   const key = readKey();

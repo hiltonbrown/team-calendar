@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { encryptXeroToken } from "../crypto/tokens";
 import {
   approveLeaveApplication,
   declineLeaveApplication,
@@ -6,21 +7,54 @@ import {
   withdrawLeaveApplication,
 } from "./write";
 
-const xeroTenant = {
-  clerk_org_id: "org_1",
-  id: "tenant_1",
-  organisation_id: "00000000-0000-4000-8000-000000000001",
-  payroll_region: "AU" as const,
-  xero_connection: {
-    access_token_encrypted: "access-token",
-    revoked_at: null,
-  },
-  xero_tenant_id: "xero-tenant-1",
-};
+const ORIGINAL_ENV = process.env.XERO_TOKEN_ENCRYPTION_KEY;
+const TEST_ENCRYPTION_KEY = Buffer.alloc(32).toString("base64");
+
+function restoreEncryptionKey() {
+  if (ORIGINAL_ENV === undefined) {
+    delete process.env.XERO_TOKEN_ENCRYPTION_KEY;
+    return;
+  }
+  process.env.XERO_TOKEN_ENCRYPTION_KEY = ORIGINAL_ENV;
+}
+
+function buildXeroTenant() {
+  const accessToken = encryptXeroToken("access-token");
+
+  return {
+    clerk_org_id: "org_1",
+    id: "tenant_1",
+    organisation_id: "00000000-0000-4000-8000-000000000001",
+    payroll_region: "AU" as const,
+    xero_connection: {
+      access_token_auth_tag: accessToken.authTag,
+      access_token_encrypted: accessToken.encrypted,
+      access_token_iv: accessToken.iv,
+      revoked_at: null,
+    },
+    xero_tenant_id: "xero-tenant-1",
+  };
+}
+
+function expectBearerAccessToken(fetchMock: ReturnType<typeof vi.fn>) {
+  expect(fetchMock).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.objectContaining({
+      headers: expect.objectContaining({
+        Authorization: "Bearer access-token",
+      }),
+    })
+  );
+}
 
 describe("AU payroll write path", () => {
   beforeEach(() => {
+    process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    restoreEncryptionKey();
   });
 
   it("submits leave and returns the Xero leave application ID", async () => {
@@ -40,7 +74,7 @@ describe("AU payroll write path", () => {
       units: 2,
       xeroEmployeeId: "employee-1",
       xeroLeaveTypeId: "type-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(true);
@@ -51,6 +85,7 @@ describe("AU payroll write path", () => {
       "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
       expect.objectContaining({ method: "POST" })
     );
+    expectBearerAccessToken(fetchMock);
   });
 
   it.each([
@@ -82,7 +117,7 @@ describe("AU payroll write path", () => {
       units: 2,
       xeroEmployeeId: "employee-1",
       xeroLeaveTypeId: "type-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(false);
@@ -100,7 +135,7 @@ describe("AU payroll write path", () => {
       units: 2,
       xeroEmployeeId: "employee-1",
       xeroLeaveTypeId: "type-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(false);
@@ -120,7 +155,7 @@ describe("AU payroll write path", () => {
     const result = await approveLeaveApplication({
       xeroEmployeeId: "employee-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(true);
@@ -128,6 +163,7 @@ describe("AU payroll write path", () => {
       "https://api.xero.com/payroll.xro/1.0/LeaveApplications/leave-1/approve",
       expect.objectContaining({ method: "POST" })
     );
+    expectBearerAccessToken(fetchMock);
   });
 
   it.each([
@@ -156,7 +192,7 @@ describe("AU payroll write path", () => {
     const result = await approveLeaveApplication({
       xeroEmployeeId: "employee-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(false);
@@ -177,12 +213,12 @@ describe("AU payroll write path", () => {
       reason: "Not enough balance",
       xeroEmployeeId: "employee-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
     await withdrawLeaveApplication({
       xeroEmployeeId: "employee-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(declineResult.ok).toBe(true);
@@ -193,6 +229,7 @@ describe("AU payroll write path", () => {
       })
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expectBearerAccessToken(fetchMock);
   });
 
   it.each([
@@ -222,7 +259,7 @@ describe("AU payroll write path", () => {
       reason: "Not enough balance",
       xeroEmployeeId: "employee-1",
       xeroLeaveApplicationId: "leave-1",
-      xeroTenant,
+      xeroTenant: buildXeroTenant(),
     });
 
     expect(result.ok).toBe(false);
