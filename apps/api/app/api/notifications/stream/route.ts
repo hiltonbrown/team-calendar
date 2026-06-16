@@ -7,6 +7,18 @@ const QuerySchema = z.object({
   organisationId: z.string().uuid(),
 });
 
+function allowedOrigin(requestOrigin: string | null): string | null {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!(requestOrigin && appUrl)) {
+    return null;
+  }
+  try {
+    return new URL(appUrl).origin === requestOrigin ? requestOrigin : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: Request): Promise<Response> {
   let clerkOrgId: string;
   try {
@@ -62,11 +74,24 @@ export async function GET(request: Request): Promise<Response> {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      controller.enqueue(encoder.encode(": connected\n\n"));
+      const safeEnqueue = (chunk: Uint8Array): void => {
+        try {
+          controller.enqueue(chunk);
+        } catch {
+          // Controller already closed; stop pushing and release resources.
+          unsubscribe?.();
+          if (keepAlive) {
+            clearInterval(keepAlive);
+            keepAlive = null;
+          }
+        }
+      };
+
+      safeEnqueue(encoder.encode(": connected\n\n"));
       unsubscribe = subscribeToNotificationStream(
         { organisationId: organisation.id, userId: user.id },
         (event) => {
-          controller.enqueue(
+          safeEnqueue(
             encoder.encode(
               `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`
             )
@@ -74,7 +99,7 @@ export async function GET(request: Request): Promise<Response> {
         }
       );
       keepAlive = setInterval(() => {
-        controller.enqueue(encoder.encode(": keep-alive\n\n"));
+        safeEnqueue(encoder.encode(": keep-alive\n\n"));
       }, 25_000);
     },
     cancel() {
@@ -85,14 +110,18 @@ export async function GET(request: Request): Promise<Response> {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Access-Control-Allow-Credentials": "true",
-      "Access-Control-Allow-Origin": request.headers.get("origin") ?? "*",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-      "Content-Type": "text/event-stream",
-      "X-Accel-Buffering": "no",
-    },
-  });
+  const origin = allowedOrigin(request.headers.get("origin"));
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "Content-Type": "text/event-stream",
+    "X-Accel-Buffering": "no",
+  };
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Access-Control-Allow-Credentials"] = "true";
+    headers.Vary = "Origin";
+  }
+
+  return new Response(stream, { headers });
 }
