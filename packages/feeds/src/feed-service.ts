@@ -15,6 +15,7 @@ import {
   FeedScopesSchema,
   findActingPersonId,
   isAdminOrOwner,
+  loadFeedScopeData,
   normaliseRole,
   type ResolvedFeedScope,
   resolveScopeRows,
@@ -467,6 +468,18 @@ export async function listFeeds(
       },
     });
 
+    const scopeData =
+      feeds.length > 0
+        ? await loadFeedScopeData({
+            clerkOrgId: parsed.data.clerkOrgId,
+            organisationId: parsed.data.organisationId,
+          })
+        : null;
+    if (scopeData && !scopeData.ok) {
+      return { ok: false, error: scopeData.error };
+    }
+    const preloadedScopeData = scopeData ? scopeData.value : undefined;
+
     const visibleItems: FeedListItem[] = [];
     for (const feed of feeds) {
       const scopes = feed.scopes.map((scope) => ({
@@ -478,6 +491,7 @@ export async function listFeeds(
         clerkOrgId: parsed.data.clerkOrgId,
         createdByUserId: feed.created_by_user_id,
         organisationId: parsed.data.organisationId,
+        preloaded: preloadedScopeData,
         role,
         scopes,
       });
@@ -487,6 +501,7 @@ export async function listFeeds(
       const labels = await resolveScopeRows({
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
+        preloaded: preloadedScopeData,
         scopes: feed.scopes,
       });
       visibleItems.push({

@@ -50,6 +50,13 @@ export interface ScopedFeedPerson {
   teamId: string | null;
 }
 
+export interface FeedScopeData {
+  // Keep this in step with scope features so preloaded and direct-query paths
+  // resolve the same teams and people.
+  people: PersonRow[];
+  teams: { id: string; name: string }[];
+}
+
 export const FeedScopeSchema = z
   .object({
     scopeType: z.enum(["org", "team", "person", "self", "manager_team"]),
@@ -141,19 +148,22 @@ export async function resolvePeopleForFeed(input: {
   clerkOrgId: string;
   createdByUserId?: string | null;
   organisationId: string;
+  preloaded?: FeedScopeData;
   scopes: FeedScopeInput[];
 }): Promise<Result<ScopedFeedPerson[], FeedScopeError>> {
   try {
-    const people = await database.person.findMany({
-      orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
-      select: personSelect,
-      where: {
-        archived_at: null,
-        clerk_org_id: input.clerkOrgId,
-        is_active: true,
-        organisation_id: input.organisationId,
-      },
-    });
+    const people =
+      input.preloaded?.people.filter((person) => person.is_active) ??
+      (await database.person.findMany({
+        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+        select: personSelect,
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          is_active: true,
+          organisation_id: input.organisationId,
+        },
+      }));
 
     const dynamicPerson = resolveDynamicPersonId({
       actingPersonId: input.actingPersonId ?? null,
@@ -181,17 +191,21 @@ export async function resolvePeopleForFeed(input: {
   }
 }
 
-export async function resolveScopeRows(input: {
+export async function loadFeedScopeData(input: {
   clerkOrgId: string;
   organisationId: string;
-  scopes: Array<{
-    id: string;
-    scope_type: feed_scope_rule_type;
-    scope_value: string | null;
-  }>;
-}): Promise<Result<ResolvedFeedScope[], FeedScopeError>> {
+}): Promise<Result<FeedScopeData, FeedScopeError>> {
   try {
-    const [teams, people] = await Promise.all([
+    const [people, teams] = await Promise.all([
+      database.person.findMany({
+        orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
+        select: personSelect,
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          organisation_id: input.organisationId,
+        },
+      }),
       database.team.findMany({
         select: { id: true, name: true },
         where: {
@@ -199,15 +213,44 @@ export async function resolveScopeRows(input: {
           organisation_id: input.organisationId,
         },
       }),
-      database.person.findMany({
-        select: { first_name: true, id: true, last_name: true },
-        where: {
-          archived_at: null,
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
-        },
-      }),
     ]);
+
+    return { ok: true, value: { people, teams } };
+  } catch {
+    return unknownError("Failed to load feed scope data.");
+  }
+}
+
+export async function resolveScopeRows(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  preloaded?: FeedScopeData;
+  scopes: Array<{
+    id: string;
+    scope_type: feed_scope_rule_type;
+    scope_value: string | null;
+  }>;
+}): Promise<Result<ResolvedFeedScope[], FeedScopeError>> {
+  try {
+    const [teams, people] = input.preloaded
+      ? [input.preloaded.teams, input.preloaded.people]
+      : await Promise.all([
+          database.team.findMany({
+            select: { id: true, name: true },
+            where: {
+              clerk_org_id: input.clerkOrgId,
+              organisation_id: input.organisationId,
+            },
+          }),
+          database.person.findMany({
+            select: { first_name: true, id: true, last_name: true },
+            where: {
+              archived_at: null,
+              clerk_org_id: input.clerkOrgId,
+              organisation_id: input.organisationId,
+            },
+          }),
+        ]);
     const teamNames = new Map(teams.map((team) => [team.id, team.name]));
     const personNames = new Map(
       people.map((person) => [
@@ -235,6 +278,7 @@ export async function canViewFeed(input: {
   clerkOrgId: string;
   createdByUserId?: string | null;
   organisationId: string;
+  preloaded?: FeedScopeData;
   role: FeedRole;
   scopes: FeedScopeInput[];
 }): Promise<Result<boolean, FeedScopeError>> {
@@ -524,6 +568,7 @@ const personSelect = {
   display_name: true,
   first_name: true,
   id: true,
+  is_active: true,
   last_name: true,
   location_id: true,
   manager_person_id: true,
