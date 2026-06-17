@@ -4,6 +4,8 @@ import { encryptXeroToken } from "../crypto/tokens";
 vi.mock("server-only", () => ({}));
 
 const dbMock = vi.hoisted(() => ({
+  $queryRaw: vi.fn(),
+  $transaction: vi.fn(),
   xeroConnection: {
     findFirst: vi.fn(),
     update: vi.fn(),
@@ -43,6 +45,10 @@ beforeEach(() => {
     "https://api.example.com/api/xero/oauth/callback";
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32).toString("base64");
   delete process.env.VERCEL_ENV;
+  dbMock.$queryRaw.mockReset();
+  dbMock.$queryRaw.mockResolvedValue([]);
+  dbMock.$transaction.mockReset();
+  dbMock.$transaction.mockImplementation((callback) => callback(dbMock));
   dbMock.xeroConnection.findFirst.mockReset();
   dbMock.xeroConnection.update.mockReset();
 });
@@ -249,16 +255,19 @@ describe("ensureFreshXeroConnection", () => {
         revoked_at: null,
         status: "active",
       })
-      // refreshXeroOAuthConnection: encrypted refresh-token material.
+      // ensureFreshXeroConnection: re-read inside the advisory lock.
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      // refreshXeroOAuthConnection: scoped encrypted refresh-token material.
       .mockResolvedValueOnce({
         id: input.connectionId,
         refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
-      })
-      // ensureFreshXeroConnection: re-read expiry after refresh
-      .mockResolvedValueOnce({
-        expires_at: new Date(input.now.getTime() + 30 * 60 * 1000),
       });
     dbMock.xeroConnection.update.mockResolvedValueOnce({});
 
@@ -294,5 +303,181 @@ describe("ensureFreshXeroConnection", () => {
     const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
     expect(updateArg.data.status).toBe("active");
     expect(updateArg.data.access_token_encrypted).not.toBe("");
+  });
+
+  it("skips refresh inside the lock when another caller already refreshed", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toEqual({
+        expiresAt: new Date(input.now.getTime() + 20 * 60 * 1000),
+        refreshed: false,
+      });
+    }
+    expect(dbMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("refreshes inside the lock when the locked re-read is still stale", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "new-access-token",
+        expires_in: 1800,
+        refresh_token: "new-refresh-token",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.refreshed).toBe(true);
+    }
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const requestBody = fetchSpy.mock.calls[0]?.[1]?.body;
+    expect(requestBody).toBeInstanceOf(URLSearchParams);
+    if (requestBody instanceof URLSearchParams) {
+      expect(requestBody.get("refresh_token")).toBe("refresh-token");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
+    const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
+    expect(updateArg.data.refresh_token_encrypted).not.toBe(
+      storedTokens.refresh_token_encrypted
+    );
+  });
+
+  it("serialises concurrent refresh checks so only the winner exchanges tokens", async () => {
+    const storedTokens = buildStoredTokenFields();
+    const staleConnection = {
+      ...storedTokens,
+      expires_at: new Date(input.now.getTime() + 60 * 1000),
+      revoked_at: null,
+      status: "active",
+    };
+    const freshConnection = {
+      ...storedTokens,
+      expires_at: new Date(input.now.getTime() + 20 * 60 * 1000),
+      revoked_at: null,
+      status: "active",
+    };
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      })
+      .mockResolvedValueOnce(freshConnection);
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    let lockHeld = false;
+    let releaseLock: (() => void) | undefined;
+    dbMock.$queryRaw.mockImplementation(async () => {
+      if (!lockHeld) {
+        lockHeld = true;
+        return [];
+      }
+      await new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      });
+      return [];
+    });
+    dbMock.$transaction.mockImplementation(async (callback) => {
+      const result = await callback(dbMock);
+      if (lockHeld) {
+        lockHeld = false;
+        releaseLock?.();
+      }
+      return result;
+    });
+
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        access_token: "new-access-token",
+        expires_in: 1800,
+        refresh_token: "new-refresh-token",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const [first, second] = await Promise.all([
+      ensureFreshXeroConnection(input),
+      ensureFreshXeroConnection(input),
+    ]);
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns unknown_error when acquiring the advisory lock fails", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
+      ...storedTokens,
+      expires_at: new Date(input.now.getTime() + 60 * 1000),
+      revoked_at: null,
+      status: "active",
+    });
+    dbMock.$queryRaw.mockRejectedValueOnce(new Error("lock failed"));
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
 });

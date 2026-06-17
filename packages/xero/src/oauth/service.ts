@@ -3,6 +3,7 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
@@ -399,7 +400,26 @@ export async function refreshXeroOAuthConnection(input: {
   connectionId: string;
   organisationId: string;
 }): Promise<Result<{ refreshedAt: Date }, XeroOAuthError>> {
-  const connection = await database.xeroConnection.findFirst({
+  const refreshed = await refreshXeroOAuthConnectionWithClient(database, input);
+  if (!refreshed.ok) {
+    return refreshed;
+  }
+
+  return {
+    ok: true,
+    value: { refreshedAt: refreshed.value.refreshedAt },
+  };
+}
+
+async function refreshXeroOAuthConnectionWithClient(
+  client: Pick<Prisma.TransactionClient, "xeroConnection">,
+  input: {
+    clerkOrgId: string;
+    connectionId: string;
+    organisationId: string;
+  }
+): Promise<Result<{ expiresAt: Date; refreshedAt: Date }, XeroOAuthError>> {
+  const connection = await client.xeroConnection.findFirst({
     where: {
       clerk_org_id: input.clerkOrgId,
       id: input.connectionId,
@@ -441,8 +461,11 @@ export async function refreshXeroOAuthConnection(input: {
   const refreshedAt = new Date();
   const encryptedAccessToken = encryptXeroToken(token.value.access_token);
   const encryptedRefreshToken = encryptXeroToken(token.value.refresh_token);
+  const expiresAt = new Date(
+    refreshedAt.getTime() + token.value.expires_in * 1000
+  );
 
-  await database.xeroConnection.update({
+  await client.xeroConnection.update({
     where: { id: input.connectionId },
     data: {
       access_token_auth_tag: encryptedAccessToken.authTag,
@@ -450,9 +473,7 @@ export async function refreshXeroOAuthConnection(input: {
       access_token_iv: encryptedAccessToken.iv,
       disconnected_at: null,
       disconnected_by_user_id: null,
-      expires_at: new Date(
-        refreshedAt.getTime() + token.value.expires_in * 1000
-      ),
+      expires_at: expiresAt,
       last_error_code: null,
       last_error_message: null,
       last_refreshed_at: refreshedAt,
@@ -467,7 +488,7 @@ export async function refreshXeroOAuthConnection(input: {
     },
   });
 
-  return { ok: true, value: { refreshedAt } };
+  return { ok: true, value: { expiresAt, refreshedAt } };
 }
 
 // Xero access tokens live for 30 minutes. Refresh proactively when the token is within this
@@ -566,30 +587,94 @@ export async function ensureFreshXeroConnection(input: {
     };
   }
 
-  const refreshed = await refreshXeroOAuthConnection({
-    clerkOrgId: input.clerkOrgId,
-    connectionId: input.connectionId,
-    organisationId: input.organisationId,
-  });
-  if (!refreshed.ok) {
-    return refreshed;
-  }
+  try {
+    return await database.$transaction(
+      async (tx) => {
+        // Serialise refreshes for this connection across all instances. The lock is
+        // transaction-scoped, so it releases automatically on commit or rollback.
+        // Any future token rotation write path must take this same lock key.
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtextextended(${input.connectionId}, 0))
+        `;
 
-  const updated = await database.xeroConnection.findFirst({
-    where: {
-      clerk_org_id: input.clerkOrgId,
-      id: input.connectionId,
-      organisation_id: input.organisationId,
-    },
-    select: { expires_at: true },
-  });
-  return {
-    ok: true,
-    value: {
-      expiresAt: updated?.expires_at ?? connection.expires_at,
-      refreshed: true,
-    },
-  };
+        // Re-read inside the lock: a concurrent winner may have refreshed already.
+        const current = await tx.xeroConnection.findFirst({
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            id: input.connectionId,
+            organisation_id: input.organisationId,
+          },
+          select: {
+            access_token_encrypted: true,
+            expires_at: true,
+            refresh_token_auth_tag: true,
+            refresh_token_encrypted: true,
+            refresh_token_iv: true,
+            revoked_at: true,
+            status: true,
+          },
+        });
+        if (!current) {
+          return {
+            ok: false,
+            error: {
+              code: "organisation_not_found",
+              message: "Xero connection not found.",
+            },
+          };
+        }
+
+        const lockedDecision = xeroConnectionRefreshDecision(
+          {
+            expiresAt: current.expires_at,
+            hasAccessToken: current.access_token_encrypted.length > 0,
+            hasRefreshToken: current.refresh_token_encrypted.length > 0,
+            revokedAt: current.revoked_at,
+            status: current.status,
+          },
+          now
+        );
+        if (lockedDecision === "inactive") {
+          return {
+            ok: false,
+            error: {
+              code: "connection_inactive",
+              message: "Xero connection is not active; reconnect required.",
+            },
+          };
+        }
+        if (lockedDecision === "active") {
+          return {
+            ok: true,
+            value: { expiresAt: current.expires_at, refreshed: false },
+          };
+        }
+
+        const refreshed = await refreshXeroOAuthConnectionWithClient(tx, {
+          clerkOrgId: input.clerkOrgId,
+          connectionId: input.connectionId,
+          organisationId: input.organisationId,
+        });
+        if (!refreshed.ok) {
+          return refreshed;
+        }
+
+        return {
+          ok: true,
+          value: { expiresAt: refreshed.value.expiresAt, refreshed: true },
+        };
+      },
+      { timeout: 15_000 }
+    );
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to refresh the Xero connection.",
+      },
+    };
+  }
 }
 
 export async function disconnectXeroOAuthConnection(input: {
