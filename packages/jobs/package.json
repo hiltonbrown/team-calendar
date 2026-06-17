@@ -19,7 +19,7 @@
     "@repo/observability": "*",
     "@repo/xero": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "inngest": "latest",
+    "inngest": "^4.5.0",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
