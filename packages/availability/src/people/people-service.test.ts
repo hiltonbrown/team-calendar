@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   availabilityCount: vi.fn(),
+  availabilityGroupBy: vi.fn(),
   computeCurrentStatus: vi.fn(),
   managerScopePersonIds: vi.fn(),
+  personCount: vi.fn(),
   personFindMany: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
@@ -17,8 +19,10 @@ vi.mock("@repo/database", () => ({
   database: {
     availabilityRecord: {
       count: mocks.availabilityCount,
+      groupBy: mocks.availabilityGroupBy,
     },
     person: {
+      count: mocks.personCount,
       findMany: mocks.personFindMany,
     },
   },
@@ -51,29 +55,15 @@ const { listPeople, toBalanceRow } = await import("./people-service");
 
 const managerId = "00000000-0000-4000-8000-000000000010";
 const directReportId = "00000000-0000-4000-8000-000000000011";
+const organisationId = "00000000-0000-4000-8000-000000000001";
 
 describe("people-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.managerScopePersonIds.mockResolvedValue([managerId, directReportId]);
-    mocks.personFindMany.mockResolvedValue([
-      {
-        archived_at: null,
-        avatar_url: null,
-        email: "ava@example.com",
-        employment_type: "employee",
-        first_name: "Ava",
-        id: directReportId,
-        job_title: null,
-        last_name: "Nguyen",
-        location: null,
-        location_id: null,
-        manager: null,
-        person_type: "employee",
-        team: null,
-        xero_employee_id: null,
-      },
-    ]);
+    mocks.personFindMany.mockResolvedValue([personRow(directReportId)]);
+    mocks.personCount.mockResolvedValue(1);
+    mocks.availabilityGroupBy.mockResolvedValue([]);
     mocks.computeCurrentStatus.mockResolvedValue({
       label: "Available",
       recordId: null,
@@ -92,7 +82,7 @@ describe("people-service", () => {
         xeroLinked: "all",
         xeroSyncFailedOnly: false,
       },
-      organisationId: "00000000-0000-4000-8000-000000000001",
+      organisationId,
       pagination: { pageSize: 50 },
       role: "manager",
     });
@@ -101,19 +91,185 @@ describe("people-service", () => {
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith({
       actingPersonId: managerId,
       clerkOrgId: "org_1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
+      organisationId,
     });
     expect(mocks.personFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           clerk_org_id: "org_1",
           id: { in: [managerId, directReportId] },
-          organisation_id: "00000000-0000-4000-8000-000000000001",
+          organisation_id: organisationId,
         }),
       })
     );
   });
+
+  it("batches xero sync failed counts instead of counting per person", async () => {
+    const people = Array.from({ length: 5 }, (_, index) =>
+      personRow(`00000000-0000-4000-8000-00000000010${index}`)
+    );
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.personCount.mockResolvedValue(5);
+    mocks.availabilityGroupBy.mockResolvedValue([
+      { _count: { _all: 2 }, person_id: people[0]?.id },
+      { _count: { _all: 1 }, person_id: people[3]?.id },
+    ]);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      organisationId,
+      pagination: { pageSize: 50 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityCount).not.toHaveBeenCalled();
+    expect(mocks.availabilityGroupBy).toHaveBeenCalledOnce();
+    expect(mocks.availabilityGroupBy).toHaveBeenCalledWith({
+      by: ["person_id"],
+      _count: { _all: true },
+      where: {
+        approval_status: "xero_sync_failed",
+        clerk_org_id: "org_1",
+        organisation_id: organisationId,
+        person_id: { in: people.map((person) => person.id) },
+      },
+    });
+    expect(result.value.people[0]?.xeroSyncFailedCount).toBe(2);
+    expect(result.value.people[3]?.xeroSyncFailedCount).toBe(1);
+    expect(result.value.people[1]?.xeroSyncFailedCount).toBe(0);
+  });
+
+  it("pushes xero sync failed only filtering into the person query", async () => {
+    await listPeople({
+      clerkOrgId: "org_1",
+      filters: { xeroSyncFailedOnly: true },
+      organisationId,
+      pagination: { pageSize: 50 },
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          availability_records: {
+            some: {
+              approval_status: "xero_sync_failed",
+              clerk_org_id: "org_1",
+              organisation_id: organisationId,
+            },
+          },
+        }),
+      })
+    );
+  });
+
+  it("uses database pagination and full count when no in-memory filters apply", async () => {
+    const people = [
+      personRow("00000000-0000-4000-8000-000000000101", {
+        first_name: "Ava",
+        last_name: "Brown",
+      }),
+      personRow("00000000-0000-4000-8000-000000000102", {
+        first_name: "Ben",
+        last_name: "Brown",
+      }),
+      personRow("00000000-0000-4000-8000-000000000103", {
+        first_name: "Cara",
+        last_name: "Brown",
+      }),
+    ];
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.personCount.mockResolvedValue(7);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      organisationId,
+      pagination: { pageSize: 2 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 3 })
+    );
+    expect(mocks.personCount).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        clerk_org_id: "org_1",
+        organisation_id: organisationId,
+      }),
+    });
+    expect(result.value.people).toHaveLength(2);
+    expect(result.value.nextCursor).toEqual(expect.any(String));
+    expect(result.value.totalCount).toBe(7);
+  });
+
+  it("does not set a next cursor on the fast path without an extra row", async () => {
+    mocks.personFindMany.mockResolvedValue([
+      personRow("00000000-0000-4000-8000-000000000101"),
+      personRow("00000000-0000-4000-8000-000000000102"),
+    ]);
+    mocks.personCount.mockResolvedValue(2);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      organisationId,
+      pagination: { pageSize: 2 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.value.people).toHaveLength(2);
+    expect(result.value.nextCursor).toBeNull();
+    expect(result.value.totalCount).toBe(2);
+  });
+
+  it("keeps filtered path pagination in memory when status filters apply", async () => {
+    mocks.personFindMany.mockResolvedValue([
+      personRow("00000000-0000-4000-8000-000000000101"),
+      personRow("00000000-0000-4000-8000-000000000102"),
+      personRow("00000000-0000-4000-8000-000000000103"),
+    ]);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      filters: { status: ["available"] },
+      organisationId,
+      pagination: { pageSize: 2 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.not.objectContaining({ take: expect.any(Number) })
+    );
+    expect(mocks.personCount).not.toHaveBeenCalled();
+    expect(result.value.people).toHaveLength(2);
+    expect(result.value.nextCursor).toEqual(expect.any(String));
+    expect(result.value.totalCount).toBe(3);
+  });
 });
+
+function personRow(
+  id: string,
+  overrides: Partial<{
+    first_name: string;
+    last_name: string;
+  }> = {}
+) {
+  return {
+    archived_at: null,
+    avatar_url: null,
+    email: `${id}@example.com`,
+    employment_type: "employee",
+    first_name: "Ava",
+    id,
+    job_title: null,
+    last_name: "Nguyen",
+    location: null,
+    location_id: null,
+    manager: null,
+    person_type: "employee",
+    team: null,
+    xero_employee_id: null,
+    ...overrides,
+  };
+}
 
 function balanceRowInput(
   overrides: Partial<Parameters<typeof toBalanceRow>[0]>

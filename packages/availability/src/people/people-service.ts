@@ -262,42 +262,50 @@ export async function listPeople(input: {
             organisationId,
           })
         : null;
+    const personWhere = buildPeopleWhere({
+      filters,
+      scoped,
+      visiblePersonIds,
+    });
+    const cursor = decodePeopleCursor(pagination.cursor ?? null);
+    const hasInMemoryFilters = Boolean(
+      filters.status?.length || filters.xeroSyncFailedOnly
+    );
     const people = await database.person.findMany({
-      where: {
-        ...scoped,
-        ...(filters.includeArchived ? {} : { archived_at: null }),
-        ...(visiblePersonIds ? { id: { in: visiblePersonIds } } : {}),
-        ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
-        ...(filters.locationId?.length
-          ? { location_id: { in: filters.locationId } }
-          : {}),
-        ...(filters.personType === "all"
-          ? {}
-          : { person_type: filters.personType }),
-        ...(filters.xeroLinked === "true"
-          ? { xero_employee_id: { not: null } }
-          : {}),
-        ...(filters.xeroLinked === "false" ? { xero_employee_id: null } : {}),
-        ...(filters.search
-          ? {
-              OR: [
-                {
-                  first_name: { contains: filters.search, mode: "insensitive" },
-                },
-                {
-                  last_name: { contains: filters.search, mode: "insensitive" },
-                },
-                { email: { contains: filters.search, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      },
+      where: personWhere,
       orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
       select: personListSelect,
+      ...(hasInMemoryFilters
+        ? {}
+        : {
+            ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
+            take: pagination.pageSize + 1,
+          }),
     });
+    const totalCount = hasInMemoryFilters
+      ? null
+      : await database.person.count({ where: personWhere });
+    const failedCounts = await database.availabilityRecord.groupBy({
+      by: ["person_id"],
+      _count: { _all: true },
+      where: {
+        ...scoped,
+        approval_status: "xero_sync_failed",
+        person_id: { in: people.map((person) => person.id) },
+      },
+    });
+    const failedCountByPersonId = new Map(
+      failedCounts.map((row) => [row.person_id, row._count._all])
+    );
 
     const mapped = await Promise.all(
-      people.map(async (person) => toPersonListItem(person, scoped))
+      people.map(async (person) =>
+        toPersonListItem(
+          person,
+          scoped,
+          failedCountByPersonId.get(person.id) ?? 0
+        )
+      )
     );
     const filtered = mapped.filter((person) => {
       if (filters.xeroSyncFailedOnly && person.xeroSyncFailedCount === 0) {
@@ -312,10 +320,10 @@ export async function listPeople(input: {
       return true;
     });
 
-    const cursor = decodePeopleCursor(pagination.cursor ?? null);
-    const afterCursor = cursor
-      ? filtered.filter((person) => comparePeopleCursor(person, cursor) > 0)
-      : filtered;
+    const afterCursor =
+      cursor && hasInMemoryFilters
+        ? filtered.filter((person) => comparePeopleCursor(person, cursor) > 0)
+        : filtered;
     const page = afterCursor.slice(0, pagination.pageSize);
     const nextCursor =
       afterCursor.length > pagination.pageSize
@@ -327,12 +335,59 @@ export async function listPeople(input: {
       value: {
         nextCursor,
         people: page,
-        totalCount: filtered.length,
+        totalCount: totalCount ?? filtered.length,
       },
     };
   } catch {
     return unknownError("Failed to list people.");
   }
+}
+
+function buildPeopleWhere({
+  filters,
+  scoped,
+  visiblePersonIds,
+}: {
+  filters: PeopleFilters;
+  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId };
+  visiblePersonIds: null | string[];
+}): Prisma.PersonWhereInput {
+  return {
+    ...scoped,
+    ...(filters.includeArchived ? {} : { archived_at: null }),
+    ...(visiblePersonIds ? { id: { in: visiblePersonIds } } : {}),
+    ...(filters.teamId?.length ? { team_id: { in: filters.teamId } } : {}),
+    ...(filters.locationId?.length
+      ? { location_id: { in: filters.locationId } }
+      : {}),
+    ...(filters.personType === "all"
+      ? {}
+      : { person_type: filters.personType }),
+    ...(filters.xeroLinked === "true"
+      ? { xero_employee_id: { not: null } }
+      : {}),
+    ...(filters.xeroLinked === "false" ? { xero_employee_id: null } : {}),
+    ...(filters.xeroSyncFailedOnly
+      ? {
+          availability_records: {
+            some: { ...scoped, approval_status: "xero_sync_failed" },
+          },
+        }
+      : {}),
+    ...(filters.search
+      ? {
+          OR: [
+            {
+              first_name: { contains: filters.search, mode: "insensitive" },
+            },
+            {
+              last_name: { contains: filters.search, mode: "insensitive" },
+            },
+            { email: { contains: filters.search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 }
 
 export async function getPersonProfile(input: {
@@ -719,24 +774,16 @@ async function toPersonListItem(
     team: { id: string; name: string } | null;
     xero_employee_id: string | null;
   },
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId }
+  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
+  xeroSyncFailedCount: number
 ): Promise<PersonListItem> {
-  const [currentStatus, xeroSyncFailedCount] = await Promise.all([
-    computeCurrentStatus({
-      at: new Date(),
-      clerkOrgId: scoped.clerk_org_id,
-      locationId: person.location_id,
-      organisationId: scoped.organisation_id,
-      personId: person.id,
-    }),
-    database.availabilityRecord.count({
-      where: {
-        ...scoped,
-        approval_status: "xero_sync_failed",
-        person_id: person.id,
-      },
-    }),
-  ]);
+  const currentStatus = await computeCurrentStatus({
+    at: new Date(),
+    clerkOrgId: scoped.clerk_org_id,
+    locationId: person.location_id,
+    organisationId: scoped.organisation_id,
+    personId: person.id,
+  });
 
   return {
     archivedAt: person.archived_at,
