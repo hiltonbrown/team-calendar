@@ -1,31 +1,30 @@
-# Plan 002: Feed ETag and 304 Responses
+# Plan: Review and Merge Branches Into Main
 
 ## Plan
 
-- [x] Read `plans/002-feed-etag-304.md`, `PRODUCT.md`, current task notes, and relevant source files.
-- [x] Run the required drift check for the feed route and render service.
-- [x] Decouple the feed cache write from the render response path.
-- [x] Add `ETag` headers and `If-None-Match` handling to the ICS route.
-- [x] Add route tests for 200, 304, 404, 410, weak/list validators, mismatches, and `.ics` token stripping.
-- [x] Add render-service coverage proving cache write failures do not fail a rendered response.
-- [x] Run targeted tests and verification checks.
-- [x] Run full `bun run check`, app typecheck, and `bun run test`.
-- [x] Update `plans/README.md` status for plan 002.
+- [x] Confirm the current worktree is clean and on `main`.
+- [x] Refresh `main` from the remote.
+- [x] Inventory local branches, remote branches, and git worktrees.
+- [x] Review whether each non-main branch contains commits not already in `main`.
+- [x] Merge any outstanding branch work into `main`, resolving conflicts if needed.
+- [x] Run verification after merge decisions.
+- [x] Document the review result here.
 
 ## Review
 
-- `GET /ical/:token.ics` now returns quoted `ETag` headers on 200 responses and serves 304 responses for matching strong, weak, or listed `If-None-Match` validators.
-- Expired and revoked feed tokens still return 410 before ETag comparison, so empty service etags never participate in cache validation.
-- `renderFeedForToken` still awaits the token/feed database writes, then attempts the KV cache write separately and logs a warning if that performance-layer write fails.
-- `packages/feeds` now declares its `@repo/observability` dependency for the render-service warning log.
+- `git pull --ff-only` reported `Already up to date`.
+- There is one worktree: `/home/hilton/Documents/leavesync`, checked out on `main`.
+- Local branches reviewed:
+  - `main` at `043425ba25fe162525b8ff172994a3386e85cb4a`.
+  - `advisor/010-feed-token-service-tests` at `043425ba25fe162525b8ff172994a3386e85cb4a`.
+- Remote branches reviewed:
+  - `origin/main` at `043425ba25fe162525b8ff172994a3386e85cb4a`.
+  - `origin/HEAD` points to `origin/main`.
+- `advisor/010-feed-token-service-tests` is already contained in `main`; no merge commit was needed.
+- `git branch --no-merged main` and `git branch -r --no-merged main` returned no branches.
 
 ## Verification
 
-- `bun install --frozen-lockfile`: passed.
-- `bunx vitest run apps/api/app/ical/[token]/route.test.ts`: 9 tests passed.
-- `bunx vitest run packages/feeds/src/render/render-feed.test.ts`: 4 tests passed.
-- `grep -n "_request" apps/api/app/ical/[token]/route.ts`: no matches.
-- `grep -n "setCachedFeedBody" packages/feeds/src/render/render-feed.ts`: cache write is outside the persistence `Promise.all`.
-- `cd apps/api && bun run typecheck`: passed.
-- `bun run check`: passed.
-- `bun run test`: passed.
+- `git branch --no-merged main`: no output.
+- `git branch -r --no-merged main`: no output.
+- `bun run check`: passed, 626 files checked with no fixes applied.
