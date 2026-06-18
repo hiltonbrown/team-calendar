@@ -49,6 +49,7 @@ type JsonValue =
 
 const BATCH_SIZE = 50;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const FailedRecordTypeSchema = z.enum([
   "people",
@@ -119,6 +120,7 @@ export const syncXeroLeaveRecordsFunction: InngestFunction.Any =
       )
   );
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, tenant readiness, batching, publication updates and finalisation.
 export async function syncXeroLeaveRecords(
   input: unknown
 ): Promise<SyncXeroLeaveRecordsResult> {
@@ -129,6 +131,7 @@ export async function syncXeroLeaveRecords(
 
   const context = parsed.data;
   const startedAt = new Date();
+  let runId: string | null = null;
 
   try {
     const duplicateRun = await cancelDuplicateRun(context, startedAt);
@@ -137,6 +140,7 @@ export async function syncXeroLeaveRecords(
     }
 
     const run = await createRun(context, startedAt);
+    runId = run.id;
 
     publishRunStatusChanged(context, run.id, "running");
 
@@ -251,6 +255,14 @@ export async function syncXeroLeaveRecords(
     };
   } catch (error) {
     log.error("Unhandled exception in syncXeroLeaveRecords:", { error });
+    if (runId) {
+      await completeRun(context, runId, {
+        counts: emptyCounts(),
+        errorSummary:
+          error instanceof Error ? error.message : "Unhandled exception",
+        status: "failed",
+      });
+    }
     return {
       ok: false,
       error: {
@@ -269,6 +281,7 @@ async function cancelDuplicateRun(
     where: {
       ...scoped(context),
       run_type: "leave_records",
+      started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
       status: "running",
       xero_tenant_id: context.xeroTenantId,
     },

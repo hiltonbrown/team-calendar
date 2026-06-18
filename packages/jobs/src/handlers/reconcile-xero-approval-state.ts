@@ -9,6 +9,7 @@ import {
   type NotificationDispatchDatabase,
   publishOrganisationNotificationEvent,
 } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import {
   ensureFreshXeroConnection,
   fetchLeaveApplicationStatusForRegion,
@@ -44,6 +45,7 @@ type JsonValue =
 
 const ACTIVE_STATUSES = ["submitted", "approved", "declined"] as const;
 const BATCH_SIZE = 50;
+const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const FailedRecordTypeSchema = z.enum([
   "people",
   "leave_records",
@@ -125,12 +127,14 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
 
   const context = parsed.data;
   const startedAt = new Date();
+  let runId: string | null = null;
 
   try {
     const existingRun = await database.syncRun.findFirst({
       where: {
         ...scoped(context),
         run_type: "approval_state_reconciliation",
+        started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
         status: "running",
         xero_tenant_id: context.xeroTenantId,
       },
@@ -170,6 +174,7 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
       },
       select: { id: true },
     });
+    runId = run.id;
 
     publishRunStatusChanged(context, run.id, "running");
 
@@ -327,7 +332,15 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
       ok: true,
       value: { ...counts, runId: run.id, status: finalStatus },
     };
-  } catch {
+  } catch (error) {
+    log.error("Unhandled exception in reconcileXeroApprovalState:", { error });
+    if (runId) {
+      await completeRun(context, runId, {
+        errorSummary:
+          error instanceof Error ? error.message : "Unhandled exception",
+        status: "failed",
+      });
+    }
     return {
       ok: false,
       error: {
@@ -532,7 +545,10 @@ async function completionRecipients(
       )
       .map((membership) => membership.publicUserData?.userId)
       .filter((userId): userId is string => Boolean(userId));
-  } catch {
+  } catch (error) {
+    log.error("Failed to load reconciliation notification recipients:", {
+      error,
+    });
     return [];
   }
 }

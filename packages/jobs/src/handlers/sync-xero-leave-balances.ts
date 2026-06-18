@@ -61,6 +61,7 @@ type XeroTenant = NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
 
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const BALANCE_BATCH_SIZE = 50;
+const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 
 export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
   inngest.createFunction(
@@ -90,6 +91,7 @@ export async function syncXeroLeaveBalances(
 
   const context = parsed.data;
   const startedAt = new Date();
+  let runId: string | null = null;
 
   try {
     const duplicateRun = await cancelDuplicateRun(context, startedAt);
@@ -98,6 +100,7 @@ export async function syncXeroLeaveBalances(
     }
 
     const run = await createRun(context, startedAt);
+    runId = run.id;
     publishRunStatusChanged(context, run.id, "running");
 
     const tenantReadiness = await ensureTenantReady(context, run.id);
@@ -193,6 +196,14 @@ export async function syncXeroLeaveBalances(
     };
   } catch (error) {
     log.error("Unhandled exception in syncXeroLeaveBalances:", { error });
+    if (runId) {
+      await completeRun(context, runId, {
+        counts: emptyCounts(),
+        errorSummary:
+          error instanceof Error ? error.message : "Unhandled exception",
+        status: "failed",
+      });
+    }
     return {
       ok: false,
       error: {
@@ -350,6 +361,7 @@ async function cancelDuplicateRun(
     where: {
       ...scoped(context),
       run_type: "leave_balances",
+      started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
       status: "running",
       xero_tenant_id: context.xeroTenantId,
     },

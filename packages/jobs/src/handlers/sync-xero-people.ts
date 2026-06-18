@@ -39,6 +39,7 @@ type JsonValue =
   | { [key: string]: JsonValue };
 
 const BATCH_SIZE = 50;
+const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 
 export const syncXeroPeopleFunction: InngestFunction.Any =
@@ -57,6 +58,7 @@ export const syncXeroPeopleFunction: InngestFunction.Any =
       await step.run("sync-people", async () => syncXeroPeople(event.data))
   );
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, tenant readiness, batching, per-record outcomes and finalisation.
 export async function syncXeroPeople(input: unknown): Promise<
   Result<
     {
@@ -77,12 +79,14 @@ export async function syncXeroPeople(input: unknown): Promise<
 
   const context = parsed.data;
   const startedAt = new Date();
+  let runId: string | null = null;
 
   try {
     const existingRun = await database.syncRun.findFirst({
       where: {
         ...scoped(context),
         run_type: "people",
+        started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
         status: "running",
         xero_tenant_id: context.xeroTenantId,
       },
@@ -122,6 +126,7 @@ export async function syncXeroPeople(input: unknown): Promise<
       },
       select: { id: true },
     });
+    runId = run.id;
 
     publishRunStatusChanged(context, run.id, "running");
 
@@ -217,6 +222,14 @@ export async function syncXeroPeople(input: unknown): Promise<
     };
   } catch (error) {
     log.error("Unhandled exception in syncXeroPeople:", { error });
+    if (runId) {
+      await completeRun(context, runId, {
+        counts: emptyCounts(),
+        errorSummary:
+          error instanceof Error ? error.message : "Unhandled exception",
+        status: "failed",
+      });
+    }
     return {
       ok: false,
       error: {
