@@ -4,14 +4,31 @@ import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 config({ path: new URL("../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
 
-const {
-  createFeed,
-  hashFeedToken,
-  pauseFeed,
-  renderFeedForToken,
-  rotateToken,
-} = await import("./index");
-const { database } = await import("@repo/database");
+let createFeed: typeof import("./index")["createFeed"];
+let hashFeedToken: typeof import("./index")["hashFeedToken"];
+let pauseFeed: typeof import("./index")["pauseFeed"];
+let renderFeedForToken: typeof import("./index")["renderFeedForToken"];
+let revokeAllFeedTokens: typeof import("./index")["revokeAllFeedTokens"];
+let revokeToken: typeof import("./index")["revokeToken"];
+let rotateToken: typeof import("./index")["rotateToken"];
+let database: typeof import("@repo/database")["database"];
+
+const describeWithDatabase = process.env.DATABASE_URL
+  ? describe
+  : describe.skip;
+
+if (process.env.DATABASE_URL) {
+  ({
+    createFeed,
+    hashFeedToken,
+    pauseFeed,
+    renderFeedForToken,
+    revokeAllFeedTokens,
+    revokeToken,
+    rotateToken,
+  } = await import("./index"));
+  ({ database } = await import("@repo/database"));
+}
 
 const tenant = {
   clerkOrgId: "org_test_feed_services_a",
@@ -24,18 +41,18 @@ const otherTenant = {
 const clerkOrgIds = [tenant.clerkOrgId, otherTenant.clerkOrgId];
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{40}$/;
 
-beforeEach(async () => {
-  await cleanTestData();
-  await createTenant(tenant);
-  await createTenant(otherTenant);
-});
+describeWithDatabase("feed services", () => {
+  beforeEach(async () => {
+    await cleanTestData();
+    await createTenant(tenant);
+    await createTenant(otherTenant);
+  });
 
-afterAll(async () => {
-  await cleanTestData();
-  await database.$disconnect();
-});
+  afterAll(async () => {
+    await cleanTestData();
+    await database.$disconnect();
+  });
 
-describe("feed services", () => {
   test("creates feeds with a one-time plaintext token and persisted hash", async () => {
     const result = await createFeed({
       actingRole: "org:admin",
@@ -89,6 +106,115 @@ describe("feed services", () => {
     });
     expect(tokens.map((token) => token.status)).toEqual(["revoked", "active"]);
     expect(tokens[1]?.rotated_from_token_id).toBe(tokens[0]?.id);
+  });
+
+  test("preserves token isolation when another org rotates or revokes", async () => {
+    const created = await createTestFeed();
+    const token = await database.feedToken.findFirstOrThrow({
+      where: {
+        clerk_org_id: tenant.clerkOrgId,
+        feed_id: created.feedId,
+        organisation_id: tenant.organisationId,
+        status: "active",
+      },
+    });
+
+    await expect(
+      rotateToken({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: otherTenant.clerkOrgId,
+        feedId: created.feedId,
+        organisationId: otherTenant.organisationId,
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "cross_org_leak" },
+    });
+
+    await expect(
+      revokeToken({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: otherTenant.clerkOrgId,
+        organisationId: otherTenant.organisationId,
+        tokenId: token.id,
+      })
+    ).resolves.toMatchObject({
+      ok: false,
+      error: { code: "cross_org_leak" },
+    });
+
+    const activeToken = await database.feedToken.findUnique({
+      where: { id: token.id },
+    });
+    expect(activeToken).toMatchObject({
+      clerk_org_id: tenant.clerkOrgId,
+      feed_id: created.feedId,
+      organisation_id: tenant.organisationId,
+      status: "active",
+    });
+    expect(activeToken?.revoked_at).toBeNull();
+  });
+
+  test("supports token lookup, rotation, and revoke-all round trip", async () => {
+    const created = await createTestFeed();
+    const initialToken = await database.feedToken.findUnique({
+      where: { token_hash: hashFeedToken(created.plaintext) },
+    });
+    expect(initialToken).toMatchObject({
+      clerk_org_id: tenant.clerkOrgId,
+      feed_id: created.feedId,
+      organisation_id: tenant.organisationId,
+      status: "active",
+    });
+
+    const rotated = await rotateToken({
+      actingRole: "owner",
+      actingUserId: "user_owner",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: created.feedId,
+      organisationId: tenant.organisationId,
+    });
+    expect(rotated.ok).toBe(true);
+    if (!rotated.ok) {
+      return;
+    }
+
+    const oldToken = await database.feedToken.findUnique({
+      where: { token_hash: hashFeedToken(created.plaintext) },
+    });
+    const newToken = await database.feedToken.findUnique({
+      where: { token_hash: hashFeedToken(rotated.value.plaintext) },
+    });
+    expect(oldToken).toMatchObject({
+      feed_id: created.feedId,
+      status: "revoked",
+    });
+    expect(newToken).toMatchObject({
+      feed_id: created.feedId,
+      rotated_from_token_id: oldToken?.id,
+      status: "active",
+    });
+
+    const revoked = await revokeAllFeedTokens({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    expect(revoked).toMatchObject({
+      ok: true,
+      value: { revokedCount: 1 },
+    });
+
+    const activeTokens = await database.feedToken.findMany({
+      where: {
+        clerk_org_id: tenant.clerkOrgId,
+        feed_id: created.feedId,
+        organisation_id: tenant.organisationId,
+        status: "active",
+      },
+    });
+    expect(activeTokens).toHaveLength(0);
   });
 
   test("pauses feeds and preserves tenant isolation", async () => {
