@@ -1,4 +1,25 @@
-# Plan: Review Open GitHub Issues and Finalise Fixes
+# Plan: Marketing Website Impeccable Audit
+
+## Plan
+
+- [x] Load impeccable audit guidance, register guidance, PRODUCT.md, DESIGN.md, and current lessons.
+- [x] Inspect the marketing app structure, tokens, CSS, and representative pages/components.
+- [x] Run static checks for accessibility, responsive, theming, performance, and anti-pattern risks.
+- [x] Run local build/browser verification where practical.
+- [x] Write the audit report as Markdown in `plans/`.
+- [x] Document verification results here.
+
+## Review
+
+- Created `plans/019-marketing-website-impeccable-audit.md`.
+- `node /home/hilton/.agents/skills/impeccable/scripts/detect.mjs --json apps/web/app apps/web/src`: passed with no detector findings (`[]`).
+- `bun run typecheck` from `apps/web`: passed.
+- `bun run build` from `apps/web`: failed with existing invalid local env values, then failed without `VERCEL_PROJECT_PRODUCTION_URL`, then passed with valid local public URLs, a dummy syntactically valid `RESEND_TOKEN`, and `VERCEL_PROJECT_PRODUCTION_URL=localhost:3001`.
+- Browser screenshot, Lighthouse, Playwright, and axe verification were not run because no Playwright/axe/Lighthouse dependency is installed in this repository.
+
+---
+
+# Previous Plan: Review Open GitHub Issues and Finalise Fixes
 
 ## Plan
 
