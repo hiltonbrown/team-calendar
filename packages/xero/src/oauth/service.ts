@@ -1298,5 +1298,11 @@ function xeroConnectDisabled(): Result<never, XeroOAuthError> {
 }
 
 function stateSecret(): string {
-  return keys().XERO_CLIENT_SECRET ?? "xero-oauth-state";
+  const secret = keys().XERO_CLIENT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "XERO_CLIENT_SECRET is required to sign OAuth state but was not found in the environment."
+    );
+  }
+  return secret;
 }

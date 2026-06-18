@@ -17,6 +17,7 @@ vi.mock("@repo/database", () => ({
 
 const {
   buildXeroOAuthStartUrl,
+  completeXeroOAuth,
   ensureFreshXeroConnection,
   isPreviewDeployment,
   xeroConnectionRefreshDecision,
@@ -93,6 +94,26 @@ describe("buildXeroOAuthStartUrl", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("oauth_not_configured");
     }
+  });
+
+  it("fails closed when verifying state without the client secret", async () => {
+    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    expect(start.ok).toBe(true);
+    if (!start.ok) {
+      return;
+    }
+
+    const redirectUrl = new URL(start.value.redirectUrl);
+    const state = redirectUrl.searchParams.get("state");
+    expect(state).toBeTruthy();
+
+    delete process.env.XERO_CLIENT_SECRET;
+
+    await expect(
+      completeXeroOAuth({ code: "authorisation-code", state: state ?? "" })
+    ).rejects.toThrow(
+      "XERO_CLIENT_SECRET is required to sign OAuth state but was not found in the environment."
+    );
   });
 
   it("uses the pre-registered redirect URI when configured", () => {
