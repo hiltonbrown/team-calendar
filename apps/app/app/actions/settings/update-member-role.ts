@@ -13,10 +13,13 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 export const updateMemberRole = async (
   input: unknown
 ): Promise<Result<void>> => {
-  const { orgId } = await auth();
+  const { orgId, orgRole } = await auth();
 
   if (!orgId) {
     return { ok: false, error: "Not authenticated" };
+  }
+  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+    return { ok: false, error: "You do not have permission to manage members" };
   }
 
   const parsed = UpdateRoleSchema.safeParse(input);
