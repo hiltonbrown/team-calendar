@@ -59,7 +59,7 @@ export const updateOrg = async (
       return { ok: false, error: contextResult.error.message };
     }
 
-    await database.organisation.updateMany({
+    const updateResult = await database.organisation.updateMany({
       where: { clerk_org_id: orgId, id: organisationId },
       data: {
         fiscal_year_start: fiscalYearStart,
@@ -70,6 +70,10 @@ export const updateOrg = async (
         working_hours_per_day: workingHoursPerDay,
       },
     });
+
+    if (updateResult.count !== 1) {
+      return { ok: false, error: "Organisation not found" };
+    }
 
     const clerk = await clerkClient();
     await clerk.organizations.updateOrganization(orgId, {

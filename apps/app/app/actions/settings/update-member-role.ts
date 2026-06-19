@@ -30,6 +30,15 @@ export const updateMemberRole = async (
     };
   }
 
+  // Owner assignment is ownership-sensitive: only owners may grant the owner
+  // role, otherwise an admin could escalate themselves (or others) to owner.
+  if (parsed.data.role === "org:owner" && orgRole !== "org:owner") {
+    return {
+      ok: false,
+      error: "Only owners can assign the owner role",
+    };
+  }
+
   try {
     const clerk = await clerkClient();
     await clerk.organizations.updateOrganizationMembership({
