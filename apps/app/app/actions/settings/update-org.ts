@@ -23,10 +23,16 @@ type Result<T, E = string> = { ok: true; value: T } | { ok: false; error: E };
 export const updateOrg = async (
   input: UpdateOrgInput
 ): Promise<Result<void>> => {
-  const { orgId } = await auth();
+  const { orgId, orgRole } = await auth();
 
   if (!orgId) {
     return { ok: false, error: "No active organisation" };
+  }
+  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+    return {
+      ok: false,
+      error: "You do not have permission to update organisation settings",
+    };
   }
 
   const parsed = UpdateOrgSchema.safeParse(input);
@@ -53,8 +59,8 @@ export const updateOrg = async (
       return { ok: false, error: contextResult.error.message };
     }
 
-    await database.organisation.update({
-      where: { id: organisationId },
+    const updateResult = await database.organisation.updateMany({
+      where: { clerk_org_id: orgId, id: organisationId },
       data: {
         fiscal_year_start: fiscalYearStart,
         locale,
@@ -64,6 +70,10 @@ export const updateOrg = async (
         working_hours_per_day: workingHoursPerDay,
       },
     });
+
+    if (updateResult.count !== 1) {
+      return { ok: false, error: "Organisation not found" };
+    }
 
     const clerk = await clerkClient();
     await clerk.organizations.updateOrganization(orgId, {

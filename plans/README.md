@@ -9,7 +9,7 @@ row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Role-gate settings server actions (privilege escalation) | P1 | S | — | TODO |
+| 001 | Role-gate settings server actions (privilege escalation) | P1 | S | — | DONE |
 | 002 | Harden Xero OAuth: state secret + start-route auth | P1 | S | — | TODO |
 | 003 | Finalise and self-heal stuck sync runs; restore reconcile logging | P1 | M | — | DONE |
 | 004 | Guard `archiveStaleRecords` against empty-fetch data loss | P1 | S | — | TODO |

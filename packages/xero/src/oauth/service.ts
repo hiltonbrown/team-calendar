@@ -95,12 +95,15 @@ export function buildXeroOAuthStartUrl(input: {
   url.searchParams.set("scope", XERO_SCOPES);
   url.searchParams.set(
     "state",
-    signState({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId ?? null,
-      returnTo: input.returnTo ?? "/settings/integrations/xero",
-      userId: input.userId ?? null,
-    })
+    signState(
+      {
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId ?? null,
+        returnTo: input.returnTo ?? "/settings/integrations/xero",
+        userId: input.userId ?? null,
+      },
+      clientSecret
+    )
   );
 
   return { ok: true, value: { redirectUrl: url.toString() } };
@@ -1215,21 +1218,26 @@ function payrollRegionForCountry(
   return null;
 }
 
-function signState(payload: OAuthStatePayload): string {
+function signState(payload: OAuthStatePayload, secret: string): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = createHmac("sha256", stateSecret())
+  const signature = createHmac("sha256", secret)
     .update(encoded)
     .digest("base64url");
   return `${encoded}.${signature}`;
 }
 
 function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
+  const secret = stateSecret();
+  if (!secret) {
+    return oauthNotConfigured();
+  }
+
   const [encoded, signature] = value.split(".");
   if (!(encoded && signature)) {
     return invalidState();
   }
 
-  const expected = createHmac("sha256", stateSecret())
+  const expected = createHmac("sha256", secret)
     .update(encoded)
     .digest("base64url");
   const matches =
@@ -1297,6 +1305,6 @@ function xeroConnectDisabled(): Result<never, XeroOAuthError> {
   };
 }
 
-function stateSecret(): string {
-  return keys().XERO_CLIENT_SECRET ?? "xero-oauth-state";
+function stateSecret(): null | string {
+  return keys().XERO_CLIENT_SECRET ?? null;
 }
