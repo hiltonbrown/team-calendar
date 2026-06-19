@@ -107,13 +107,22 @@ describe("buildXeroOAuthStartUrl", () => {
     const state = redirectUrl.searchParams.get("state");
     expect(state).toBeTruthy();
 
+    const previousSecret = process.env.XERO_CLIENT_SECRET;
     delete process.env.XERO_CLIENT_SECRET;
 
-    await expect(
-      completeXeroOAuth({ code: "authorisation-code", state: state ?? "" })
-    ).rejects.toThrow(
-      "XERO_CLIENT_SECRET is required to sign OAuth state but was not found in the environment."
-    );
+    try {
+      const result = await completeXeroOAuth({
+        code: "authorisation-code",
+        state: state ?? "",
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("oauth_not_configured");
+      }
+    } finally {
+      process.env.XERO_CLIENT_SECRET = previousSecret;
+    }
   });
 
   it("uses the pre-registered redirect URI when configured", () => {

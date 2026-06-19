@@ -20,6 +20,13 @@ export async function GET(request: Request) {
   const organisationId = url.searchParams.get("organisationId");
   const returnTo = url.searchParams.get("returnTo") ?? undefined;
 
+  if (!clerkOrgId) {
+    return NextResponse.json(
+      { error: "Missing Clerk organisation ID." },
+      { status: 400 }
+    );
+  }
+
   if (clerkOrgId !== authenticatedClerkOrgId) {
     return NextResponse.json(
       { error: "Organisation mismatch." },
