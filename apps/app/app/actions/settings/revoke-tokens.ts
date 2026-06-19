@@ -1,5 +1,6 @@
 "use server";
 
+import { auth } from "@repo/auth/server";
 import { revokeAllFeedTokens } from "@repo/feeds";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -18,6 +19,17 @@ export const revokeAllTokens = async (
 
   if (!parsed.success) {
     return { ok: false, error: "Invalid organisation" };
+  }
+
+  const { orgId, orgRole } = await auth();
+  if (!orgId) {
+    return { ok: false, error: "Not authenticated" };
+  }
+  if (orgRole !== "org:owner" && orgRole !== "org:admin") {
+    return {
+      ok: false,
+      error: "You do not have permission to revoke feed tokens",
+    };
   }
 
   const contextResult = await getActiveOrgContext(parsed.data.organisationId);
