@@ -169,6 +169,10 @@ export async function fetchLeaveRecords(input: {
 
 export async function fetchLeaveBalances(input: {
   employeeIds: string[];
+  // Invoked after each employee is processed so a long-running caller can emit a
+  // liveness heartbeat. The fetch reads one employee per second to stay under
+  // the Xero rate limit, so large tenants can run for many minutes.
+  onProgress?: (processed: number, total: number) => Promise<void> | void;
   // Override the per-request pacing. Defaults to the Xero rate-limit interval;
   // tests pass 0 to run without the real-time delay.
   readIntervalMs?: number;
@@ -255,10 +259,12 @@ export async function fetchLeaveBalances(input: {
         return { ok: false, error: mappedError };
       }
       failures.push({ employeeId, error: mappedError });
+      await input.onProgress?.(index + 1, input.employeeIds.length);
       continue;
     }
 
     leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    await input.onProgress?.(index + 1, input.employeeIds.length);
   }
 
   return {

@@ -116,7 +116,11 @@ export async function fetchLeaveRecordsForRegion(
 
 export async function fetchLeaveBalancesForRegion(
   payrollRegion: PayrollRegion | string,
-  input: { employeeIds: string[]; xeroTenant: XeroTenantForWrite }
+  input: {
+    employeeIds: string[];
+    onProgress?: (processed: number, total: number) => Promise<void> | void;
+    xeroTenant: XeroTenantForWrite;
+  }
 ): Promise<
   XeroWriteResult<{
     failures: XeroLeaveBalanceFetchFailure[];

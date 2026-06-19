@@ -61,7 +61,13 @@ type XeroTenant = NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
 
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const BALANCE_BATCH_SIZE = 50;
+// A running balance sync is treated as abandoned once its last heartbeat is this
+// old. Balance fetches read one employee per second, so a live run keeps
+// touching `updated_at`; only a crashed run lets the heartbeat go stale.
 const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
+// How often the fetch loop refreshes the run heartbeat. Kept well below the
+// stale window so a healthy run is never mistaken for an abandoned one.
+const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 
 export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
   inngest.createFunction(
@@ -135,7 +141,7 @@ export async function syncXeroLeaveBalances(
 
     const balancesResult = await fetchLeaveBalancesForRegion(
       xeroTenant.payroll_region,
-      { employeeIds, xeroTenant }
+      { employeeIds, onProgress: makeHeartbeat(context, run.id), xeroTenant }
     );
     if (!balancesResult.ok) {
       await completeRun(context, run.id, {
@@ -324,6 +330,27 @@ async function processBalances(
   return false;
 }
 
+// Returns a throttled progress callback that refreshes the run's heartbeat
+// (updated_at) while a long fetch is in flight, so the duplicate-run guard can
+// tell a live run from a crashed one. The final tick always flushes.
+function makeHeartbeat(
+  context: SyncXeroLeaveBalancesInput,
+  runId: string
+): (processed: number, total: number) => Promise<void> {
+  let lastBeatAt = Date.now();
+  return async (processed, total) => {
+    const now = Date.now();
+    if (now - lastBeatAt < HEARTBEAT_INTERVAL_MS && processed < total) {
+      return;
+    }
+    lastBeatAt = now;
+    await database.syncRun.updateMany({
+      data: { updated_at: new Date() },
+      where: { ...scoped(context), id: runId, status: "running" },
+    });
+  };
+}
+
 async function cancellationRequested(
   context: SyncXeroLeaveBalancesInput,
   runId: string
@@ -361,8 +388,11 @@ async function cancelDuplicateRun(
     where: {
       ...scoped(context),
       run_type: "leave_balances",
-      started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
       status: "running",
+      // Use the heartbeat (updated_at), not started_at: a large tenant can take
+      // well over the window to fetch, so anchoring on start would wrongly free
+      // a still-running sync and let a duplicate race the same balance writes.
+      updated_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
       xero_tenant_id: context.xeroTenantId,
     },
     select: { id: true },
