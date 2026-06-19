@@ -224,6 +224,7 @@ export {
   type InboundLeaveRecordInput,
   type NormalisedInboundLeaveRecord,
   normaliseInboundLeaveRecord,
+  recordTypeFromLeaveType,
 } from "./src/sync/inbound-leave-normaliser";
 export {
   cancelRun,

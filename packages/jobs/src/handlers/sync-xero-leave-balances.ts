@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recordTypeFromLeaveType } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
@@ -258,6 +259,8 @@ async function processBalance(
       return false;
     }
 
+    const recordType = recordTypeFromLeaveType(balance.leaveTypeName);
+
     await database.leaveBalance.upsert({
       create: {
         ...scoped(context),
@@ -268,6 +271,7 @@ async function processBalance(
         leave_type_name: balance.leaveTypeName,
         leave_type_xero_id: balance.leaveTypeId,
         person_id: person.id,
+        record_type: recordType,
         xero_tenant_id: xeroTenantId,
       },
       update: {
@@ -276,6 +280,7 @@ async function processBalance(
         balance_unit: balance.unitType,
         last_fetched_at: new Date(),
         leave_type_name: balance.leaveTypeName,
+        record_type: recordType,
         updated_at: new Date(),
       },
       where: {

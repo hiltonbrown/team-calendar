@@ -2,11 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   deriveXeroStableSourceKey,
   normaliseInboundLeaveRecord,
+  recordTypeFromLeaveType,
 } from "./inbound-leave-normaliser";
 
 const ICAL_UID_SUFFIX_REGEX = /@ical\.leavesync\.app$/;
 
 describe("inbound leave normaliser", () => {
+  it.each([
+    ["Annual Leave", "annual_leave"],
+    ["Personal/Carer's Leave", "personal_leave"],
+    ["Sick Leave", "sick_leave"],
+    ["Long Service Leave", "long_service_leave"],
+    ["Unpaid Leave", "unpaid_leave"],
+    ["Public Holiday", "holiday"],
+    [null, "leave"],
+  ] as const)("maps leave type name %s to record type %s", (leaveTypeName, expectedRecordType) => {
+    expect(recordTypeFromLeaveType(leaveTypeName)).toBe(expectedRecordType);
+  });
+
   it("derives canonical Xero availability record fields", () => {
     const startsAt = new Date("2026-05-07T00:00:00.000Z");
     const endsAt = new Date("2026-05-08T00:00:00.000Z");

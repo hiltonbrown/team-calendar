@@ -124,7 +124,7 @@ function mapApprovalStatus(
   }
 }
 
-function recordTypeFromLeaveType(
+export function recordTypeFromLeaveType(
   leaveTypeName: string | null
 ): availability_record_type {
   const value = leaveTypeName?.toLowerCase() ?? "";

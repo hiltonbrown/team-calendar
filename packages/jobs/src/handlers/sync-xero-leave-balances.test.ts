@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   failedRecordCreate: vi.fn(),
   fetchLeaveBalancesForRegion: vi.fn(),
   leaveBalanceUpsert: vi.fn(),
+  personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
   syncRunCreate: vi.fn(),
@@ -26,7 +27,10 @@ vi.mock("@repo/database", () => ({
   database: {
     failedRecord: { create: mocks.failedRecordCreate },
     leaveBalance: { upsert: mocks.leaveBalanceUpsert },
-    person: { findMany: mocks.personFindMany },
+    person: {
+      findFirst: mocks.personFindFirst,
+      findMany: mocks.personFindMany,
+    },
     syncRun: {
       create: mocks.syncRunCreate,
       findFirst: mocks.syncRunFindFirst,
@@ -91,6 +95,10 @@ describe("leave balances sync run lifecycle", () => {
     mocks.personFindMany.mockResolvedValue([
       { id: "50000000-0000-4000-8000-000000000001", xero_employee_id: "emp_1" },
     ]);
+    mocks.personFindFirst.mockResolvedValue({
+      id: "50000000-0000-4000-8000-000000000001",
+    });
+    mocks.leaveBalanceUpsert.mockResolvedValue({});
     mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
       ok: true,
       value: { failures: [], leaveBalances: [], rawResponses: [] },
@@ -139,5 +147,48 @@ describe("leave balances sync run lifecycle", () => {
         call?.data?.updated_at instanceof Date
     );
     expect(heartbeatCall).toBeDefined();
+  });
+
+  it("upserts the derived record type for fetched balances", async () => {
+    const employeeId = "60000000-0000-4000-8000-000000000001";
+    mocks.personFindMany.mockResolvedValue([
+      {
+        id: "50000000-0000-4000-8000-000000000001",
+        xero_employee_id: employeeId,
+      },
+    ]);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [],
+        leaveBalances: [
+          {
+            balance: 12.5,
+            employeeId,
+            leaveTypeId: "annual-leave",
+            leaveTypeName: "Annual Leave",
+            rawPayload: { LeaveType: "Annual Leave" },
+            unitType: "hours",
+          },
+        ],
+        rawResponses: [],
+      },
+    });
+
+    const result = await syncXeroLeaveBalances(input());
+
+    expect(result.ok).toBe(true);
+    expect(mocks.leaveBalanceUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          leave_type_name: "Annual Leave",
+          record_type: "annual_leave",
+        }),
+        update: expect.objectContaining({
+          leave_type_name: "Annual Leave",
+          record_type: "annual_leave",
+        }),
+      })
+    );
   });
 });

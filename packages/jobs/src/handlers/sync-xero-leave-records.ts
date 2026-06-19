@@ -576,14 +576,15 @@ async function archiveStaleRecords(
   context: SyncXeroLeaveRecordsInput,
   fetchedRemoteIds: string[]
 ): Promise<{ archived: number; personIds: string[] }> {
+  if (fetchedRemoteIds.length === 0) {
+    return { archived: 0, personIds: [] };
+  }
+
   const stale = await database.availabilityRecord.findMany({
     where: {
       ...scoped(context),
       archived_at: null,
-      source_remote_id:
-        fetchedRemoteIds.length > 0
-          ? { notIn: fetchedRemoteIds }
-          : { not: null },
+      source_remote_id: { notIn: fetchedRemoteIds },
       source_type: "xero_leave",
     },
     select: { id: true, person_id: true },
