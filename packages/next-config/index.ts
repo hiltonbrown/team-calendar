@@ -2,7 +2,11 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
 
 export const config: NextConfig = {
-  serverExternalPackages: ["@prisma/client", "@prisma/adapter-neon"],
+  serverExternalPackages: [
+    "@prisma/client",
+    "@prisma/adapter-neon",
+    "@prisma/adapter-pg",
+  ],
 
   images: {
     formats: ["image/avif", "image/webp"],
