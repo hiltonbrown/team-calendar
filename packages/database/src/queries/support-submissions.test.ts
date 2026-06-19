@@ -1,3 +1,4 @@
+import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -25,10 +26,10 @@ const { listRecentSupportSubmissionAudits } = await import(
 );
 
 describe("listRecentSupportSubmissionAudits", () => {
-  const tenant = {
-    clerkOrgId: "org_test_support_audits",
-    organisationId: "65000000-0000-4000-8000-000000000001",
-  } as const;
+  const tenant: { clerkOrgId: ClerkOrgId; organisationId: OrganisationId } = {
+    clerkOrgId: "org_test_support_audits" as ClerkOrgId,
+    organisationId: "65000000-0000-4000-8000-000000000001" as OrganisationId,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();

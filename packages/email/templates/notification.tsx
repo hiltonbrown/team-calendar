@@ -10,6 +10,7 @@ import {
   Tailwind,
   Text,
 } from "@react-email/components";
+import type { ReactElement } from "react";
 
 interface NotificationEmailTemplateProps {
   readonly actionUrl: string | null;
@@ -18,7 +19,13 @@ interface NotificationEmailTemplateProps {
   readonly unsubscribeUrl: string;
 }
 
-export const NotificationEmailTemplate = ({
+type NotificationEmailTemplateComponent = ((
+  props: NotificationEmailTemplateProps
+) => ReactElement) & {
+  PreviewProps?: NotificationEmailTemplateProps;
+};
+
+export const NotificationEmailTemplate: NotificationEmailTemplateComponent = ({
   actionUrl,
   body,
   title,

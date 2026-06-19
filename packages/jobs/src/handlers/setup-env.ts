@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 try {
-  const targetPath = path.join(import.meta.dirname, "../../../database/.env");
+  const targetPath = path.join(process.cwd(), "../database/.env");
   const envPath = path.normalize(targetPath);
   if (fs.existsSync(envPath)) {
     const envContent = fs.readFileSync(envPath, "utf-8");

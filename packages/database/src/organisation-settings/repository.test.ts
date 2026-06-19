@@ -1,3 +1,4 @@
+import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -29,10 +30,10 @@ const { getOrCreateForOrganisation, updateForOrganisation } = await import(
   "./repository"
 );
 
-const tenant = {
-  clerkOrgId: "org_test_settings_repo",
-  organisationId: "65000000-0000-4000-8000-000000000001",
-} as const;
+const tenant: { clerkOrgId: ClerkOrgId; organisationId: OrganisationId } = {
+  clerkOrgId: "org_test_settings_repo" as ClerkOrgId,
+  organisationId: "65000000-0000-4000-8000-000000000001" as OrganisationId,
+};
 
 const row = {
   clerk_org_id: tenant.clerkOrgId,

@@ -14,7 +14,7 @@ row when done.
 | 003 | Finalise and self-heal stuck sync runs; restore reconcile logging | P1 | M | — | DONE |
 | 004 | Guard `archiveStaleRecords` against empty-fetch data loss | P1 | S | — | DONE |
 | 005 | Populate `leave_balances.record_type` on Xero balance sync | P1 | S | — | DONE |
-| 006 | Restore package-level typecheck gate | P2 | M | — | TODO |
+| 006 | Restore package-level typecheck gate | P2 | M | — | DONE |
 | 007 | Batch per-record lookups in Xero sync handlers | P2 | M | — | TODO |
 | 008 | Eliminate per-row N+1 in people & approvals services | P2 | M | — | TODO |
 | 009 | Scope feed-render people fetch by feed scope | P2 | M | — | TODO |
