@@ -11,7 +11,7 @@ row when done.
 |------|-------|----------|--------|------------|--------|
 | 001 | Role-gate settings server actions (privilege escalation) | P1 | S | — | TODO |
 | 002 | Harden Xero OAuth: state secret + start-route auth | P1 | S | — | TODO |
-| 003 | Finalise and self-heal stuck sync runs; restore reconcile logging | P1 | M | — | TODO |
+| 003 | Finalise and self-heal stuck sync runs; restore reconcile logging | P1 | M | — | DONE |
 | 004 | Guard `archiveStaleRecords` against empty-fetch data loss | P1 | S | — | TODO |
 | 005 | Populate `leave_balances.record_type` on Xero balance sync | P1 | S | — | TODO |
 | 006 | Restore package-level typecheck gate | P2 | M | — | TODO |
