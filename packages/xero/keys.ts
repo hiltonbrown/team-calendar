@@ -28,6 +28,10 @@ if (process.env.NODE_ENV === "test" && !process.env.XERO_TOKEN_ENCRYPTION_KEY) {
     "dGhpcyBpcyBhIDMyLWJ5dGUga2V5IGZvciB4ZXJvITE=";
 }
 
+if (process.env.NODE_ENV === "test" && !process.env.XERO_CLIENT_SECRET) {
+  process.env.XERO_CLIENT_SECRET = "test-xero-client-secret";
+}
+
 export const keys = () =>
   createEnv({
     server: {
