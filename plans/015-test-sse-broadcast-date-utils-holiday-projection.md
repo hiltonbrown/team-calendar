@@ -4,7 +4,7 @@
 > command. If a STOP condition occurs, stop and report. Update `plans/README.md`
 > when done unless a reviewer maintains the index.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/notifications/src/sse packages/core/index.ts packages/feeds/src/projection/feed-projection.ts`
+> **Drift check (run first)**: `git diff --stat 5651856..HEAD -- packages/notifications/src/sse packages/core/index.ts packages/feeds/src/projection/feed-projection.ts`
 > Compare against live code; on a mismatch, STOP.
 
 ## Status
@@ -14,7 +14,7 @@
 - **Risk**: LOW (test-only)
 - **Depends on**: none
 - **Category**: tests
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Planned at**: commit `5651856`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
 
 ## Why this matters
