@@ -21,8 +21,8 @@ row when done.
 | 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | TODO |
 | 011 | Remove dead `load-*-data` loaders + dedupe feed projection helpers | P3 | S | — | TODO |
 | 012 | Remove dead dependencies (`concurrently`, `@auto-it/*`, unused `date-fns`) | P3 | S | — | TODO |
-| 013 | Test the Xero write adapter and read mappers | P2 | M | — | TODO |
-| 014 | Test approval guards, balance-refresh auth, and OAuth disconnect cascade | P2 | M | — | TODO |
+| 013 | Test the Xero write adapter and read mappers | P2 | M | — | DONE |
+| 014 | Test approval guards, balance-refresh auth, and OAuth disconnect cascade | P2 | M | — | DONE |
 | 015 | Test SSE org broadcast, core date utils, and public-holiday projection | P3 | M | — | TODO |
 | 016 | [spike] Analytics UI over the existing reporting services (DIR-01) | P2 | M | — | TODO |
 | 017 | [spike] HTML calendar view renderer (DIR-03) | P3 | M | — | TODO |

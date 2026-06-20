@@ -71,7 +71,9 @@ const {
   approve,
   decline,
   listForApprover,
+  requestMoreInfo,
   revertApprovalAttempt,
+  retryApproval,
   retryDecline,
 } = await import("./approval-service");
 
@@ -304,6 +306,122 @@ describe("approval-service", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("missing_preserved_reason");
+    }
+  });
+
+  it("rejects approve when the record is not submitted", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "approved",
+    });
+
+    const result = await approve(input, mockPort);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_approve");
+    }
+    expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("rejects decline when the record is not submitted", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "declined",
+    });
+
+    const result = await decline(
+      { ...input, reason: "Too much overlap" },
+      mockPort
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_decline");
+    }
+    expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("rejects retryApproval unless the failed action is approve", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "xero_sync_failed",
+      failed_action: "decline",
+    });
+
+    const result = await retryApproval(input, mockPort);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_retry");
+    }
+    expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("rejects retryDecline unless the failed action is decline", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_note: "Too much overlap",
+      approval_status: "xero_sync_failed",
+      failed_action: "approve",
+    });
+
+    const result = await retryDecline(input, mockPort);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_retry");
+    }
+    expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("rejects more-info requests when the record is not submitted", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "approved",
+    });
+
+    const result = await requestMoreInfo({
+      ...input,
+      question: "Can you add more context?",
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_info_request");
+    }
+    expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+  });
+
+  it("rejects revert unless the record is a failed approve or decline", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "submitted",
+      failed_action: null,
+    });
+
+    const result = await revertApprovalAttempt(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_revert");
+    }
+    expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("surfaces optimistic approval conflicts as invalid state", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+    mocks.approveLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
+
+    const result = await approve(input, mockPort);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("invalid_state_for_approve");
     }
   });
 
