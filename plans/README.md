@@ -24,7 +24,7 @@ row when done.
 | 013 | Test the Xero write adapter and read mappers | P2 | M | — | DONE |
 | 014 | Test approval guards, balance-refresh auth, and OAuth disconnect cascade | P2 | M | — | DONE |
 | 015 | Test SSE org broadcast, core date utils, and public-holiday projection | P3 | M | — | DONE |
-| 016 | [spike] Analytics UI over the existing reporting services (DIR-01) | P2 | M | — | TODO |
+| 016 | [spike] Analytics UI over the existing reporting services (DIR-01) | P2 | M | — | DONE |
 | 017 | [spike] HTML calendar view renderer (DIR-03) | P3 | M | — | TODO |
 | 018 | [spike] NZ/UK payroll write-back + read (DIR-02) | P3 | L | — | TODO |
 
