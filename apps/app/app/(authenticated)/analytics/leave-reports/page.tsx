@@ -142,8 +142,8 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
               Leave trends for {report.range.label}
             </h2>
             <p className="text-muted-foreground text-sm">
-              A prototype slice using the existing leave reports service and the
-              real organisation-scoped dataset.
+              Compare approved leave patterns across teams and identify where
+              coverage needs attention.
             </p>
           </div>
         </section>
