@@ -7,17 +7,23 @@ const mocks = vi.hoisted(() => ({
   availabilityFindMany: vi.fn(),
   availabilityUpdateMany: vi.fn(),
   approveLeaveApplicationForRegion: vi.fn(),
+  computeWorkingDaysFromReferenceData: vi.fn(),
   computeWorkingDays: vi.fn(),
   declineLeaveApplicationForRegion: vi.fn(),
   dispatchNotification: vi.fn(),
   getSettings: vi.fn(),
   hasActiveXeroConnection: vi.fn(),
+  leaveBalanceFindMany: vi.fn(),
   leaveBalanceFindFirst: vi.fn(),
+  listForOrganisation: vi.fn(),
+  locationFindMany: vi.fn(),
   materialiseAvailabilityPublication: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined })
   ),
   managerScopePersonIds: vi.fn(),
+  organisationFindFirst: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
+  workingDayYearsForInput: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
 
@@ -35,12 +41,23 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.availabilityFindFirst,
       findMany: mocks.availabilityFindMany,
     },
-    leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
+    leaveBalance: {
+      findFirst: mocks.leaveBalanceFindFirst,
+      findMany: mocks.leaveBalanceFindMany,
+    },
+    location: { findMany: mocks.locationFindMany },
+    organisation: { findFirst: mocks.organisationFindFirst },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
 }));
 vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
+  computeWorkingDaysFromReferenceData:
+    mocks.computeWorkingDaysFromReferenceData,
+  workingDayYearsForInput: mocks.workingDayYearsForInput,
+}));
+vi.mock("../holidays/holiday-service", () => ({
+  listForOrganisation: mocks.listForOrganisation,
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
@@ -139,12 +156,27 @@ describe("approval-service", () => {
     vi.clearAllMocks();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
+    mocks.computeWorkingDaysFromReferenceData.mockReturnValue({
+      ok: true,
+      value: 2,
+    });
     mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.leaveBalanceFindMany.mockResolvedValue([
+      {
+        balance: 10,
+        balance_unit: "days",
+        person_id: record.person_id,
+        record_type: record.record_type,
+        updated_at: new Date("2026-04-01T00:00:00.000Z"),
+      },
+    ]);
     mocks.leaveBalanceFindFirst.mockResolvedValue({
       balance: 10,
       balance_unit: "days",
       updated_at: new Date("2026-04-01T00:00:00.000Z"),
     });
+    mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
+    mocks.locationFindMany.mockResolvedValue([]);
     mocks.dispatchNotification.mockResolvedValue({
       ok: true,
       value: { emailQueued: false, inAppDelivered: true },
@@ -165,11 +197,19 @@ describe("approval-service", () => {
         showPendingOnCalendar: true,
       },
     });
+    mocks.organisationFindFirst.mockResolvedValue({
+      country_code: "AU",
+      timezone: "Australia/Brisbane",
+    });
     mocks.resolveXeroEmployeeId.mockResolvedValue({
       ok: true,
       value: "employee-1",
     });
     mocks.managerScopePersonIds.mockResolvedValue([record.person_id]);
+    mocks.workingDayYearsForInput.mockReturnValue({
+      ok: true,
+      value: [2026],
+    });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
   });
 
@@ -479,5 +519,80 @@ describe("approval-service", () => {
         organisationId: input.organisationId,
       })
     );
+  });
+
+  it("preloads approver list durations and balances without per-row reference queries", async () => {
+    const locationId = "00000000-0000-4000-8000-000000000301";
+    const secondRecord = {
+      ...record,
+      id: "00000000-0000-4000-8000-000000000098",
+      person: {
+        ...record.person,
+        id: "00000000-0000-4000-8000-000000000022",
+        location_id: locationId,
+      },
+      person_id: "00000000-0000-4000-8000-000000000022",
+      record_type: "sick_leave",
+    };
+    mocks.availabilityFindMany.mockResolvedValue([
+      {
+        ...record,
+        person: { ...record.person, location_id: locationId },
+      },
+      secondRecord,
+    ]);
+    mocks.locationFindMany.mockResolvedValue([
+      {
+        country_code: "AU",
+        id: locationId,
+        region_code: "QLD",
+        timezone: "Australia/Brisbane",
+      },
+    ]);
+    mocks.computeWorkingDaysFromReferenceData
+      .mockReturnValueOnce({ ok: true, value: 2 })
+      .mockReturnValueOnce({ ok: true, value: 1 });
+    mocks.leaveBalanceFindMany.mockResolvedValue([
+      {
+        balance: 10,
+        balance_unit: "days",
+        person_id: record.person_id,
+        record_type: record.record_type,
+        updated_at: new Date("2026-04-01T00:00:00.000Z"),
+      },
+      {
+        balance: 4,
+        balance_unit: "days",
+        person_id: secondRecord.person_id,
+        record_type: secondRecord.record_type,
+        updated_at: new Date("2026-04-02T00:00:00.000Z"),
+      },
+    ]);
+
+    const result = await listForApprover({
+      ...input,
+      filters: { status: ["submitted"] },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(mocks.locationFindMany).toHaveBeenCalledOnce();
+    expect(mocks.organisationFindFirst).toHaveBeenCalledOnce();
+    expect(mocks.listForOrganisation).toHaveBeenCalledOnce();
+    expect(mocks.leaveBalanceFindMany).toHaveBeenCalledOnce();
+    expect(mocks.leaveBalanceFindFirst).not.toHaveBeenCalled();
+    expect(mocks.computeWorkingDaysFromReferenceData).toHaveBeenCalledTimes(2);
+    expect(result.value[0]?.durationWorkingDays).toBe(2);
+    expect(result.value[0]?.balanceSnapshot).toMatchObject({
+      balanceAvailable: 10,
+      balanceRemainingAfterApproval: 8,
+    });
+    expect(result.value[1]?.durationWorkingDays).toBe(1);
+    expect(result.value[1]?.balanceSnapshot).toMatchObject({
+      balanceAvailable: 4,
+      balanceRemainingAfterApproval: 3,
+    });
   });
 });

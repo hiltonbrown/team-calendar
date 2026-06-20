@@ -1,7 +1,9 @@
 import "server-only";
 
 import type {
+  ClerkOrgId,
   ExternalWritePort,
+  OrganisationId,
   ProviderResolutionError,
   ProviderWriteError,
   Result,
@@ -20,7 +22,14 @@ import {
 } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
-import { computeWorkingDays } from "../duration/working-days";
+import { createAggregationCache } from "../analytics/request-cache";
+import {
+  computeWorkingDays,
+  computeWorkingDaysFromReferenceData,
+  type WorkingDaysReferenceData,
+  workingDayYearsForInput,
+} from "../duration/working-days";
+import { listForOrganisation } from "../holidays/holiday-service";
 import { isXeroLeaveType } from "../records/record-type-categories";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
@@ -183,6 +192,15 @@ type DeclineInput = z.infer<typeof DeclineSchema>;
 type InfoInput = z.infer<typeof InfoSchema>;
 type DispatchInput = z.infer<typeof DispatchSchema>;
 type LoadedApprovalRecord = NonNullable<Awaited<ReturnType<typeof loadRecord>>>;
+interface BalanceSnapshotRow {
+  balance: unknown;
+  balance_unit: string | null;
+  updated_at: Date;
+}
+interface ApprovalListContext {
+  balanceByPersonAndRecordType: Map<string, BalanceSnapshotRow>;
+  workingDaysReferenceData: WorkingDaysReferenceData;
+}
 type JsonValue =
   | boolean
   | null
@@ -256,8 +274,9 @@ export async function listForApprover(
       orderBy: [{ submitted_at: "asc" }, { starts_at: "asc" }],
     });
 
+    const listContext = await loadApprovalListContext(records);
     const items = await Promise.all(
-      records.map((record) => toApprovalListItem(record))
+      records.map((record) => toApprovalListItem(record, listContext))
     );
     return { ok: true, value: items };
   } catch {
@@ -995,6 +1014,165 @@ async function materialiseApprovalPublication(input: {
 
 // removed loadXeroTenant
 
+async function loadApprovalListContext(
+  records: LoadedApprovalRecord[]
+): Promise<ApprovalListContext> {
+  const cache = createAggregationCache();
+  if (records.length === 0) {
+    return {
+      balanceByPersonAndRecordType: new Map(),
+      workingDaysReferenceData: {
+        holidaysByYear: new Map(),
+        locationById: new Map(),
+        organisation: null,
+      },
+    };
+  }
+
+  const firstRecord = records[0];
+  if (!firstRecord) {
+    throw new Error("Approval records changed while loading list context");
+  }
+  const clerkOrgId = firstRecord.clerk_org_id;
+  const organisationId = firstRecord.organisation_id;
+  const locationIds = [
+    ...new Set(
+      records
+        .map((record) => record.person.location_id)
+        .filter((locationId): locationId is string => locationId !== null)
+    ),
+  ];
+
+  const [locations, organisation] = await Promise.all([
+    cache.getOrLoad("approval-list:locations", () =>
+      locationIds.length
+        ? database.location.findMany({
+            where: {
+              ...scoped({ clerkOrgId, organisationId }),
+              id: { in: locationIds },
+            },
+            select: {
+              country_code: true,
+              id: true,
+              region_code: true,
+              timezone: true,
+            },
+          })
+        : Promise.resolve([])
+    ),
+    cache.getOrLoad("approval-list:organisation", async () => {
+      const row = await database.organisation.findFirst({
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          id: organisationId,
+        },
+        select: {
+          country_code: true,
+          timezone: true,
+        },
+      });
+      return row
+        ? {
+            country_code: row.country_code,
+            region_code: null,
+            timezone: row.timezone,
+          }
+        : null;
+    }),
+  ]);
+
+  const workingDaysReferenceData: WorkingDaysReferenceData = {
+    holidaysByYear: new Map(),
+    locationById: new Map(
+      locations.map((location) => [
+        location.id,
+        {
+          country_code: location.country_code,
+          region_code: location.region_code,
+          timezone: location.timezone,
+        },
+      ])
+    ),
+    organisation,
+  };
+  const years = new Set<number>();
+  for (const record of records) {
+    const result = workingDayYearsForInput(
+      workingDaysInputForRecord(record),
+      workingDaysReferenceData
+    );
+    if (result.ok) {
+      for (const year of result.value) {
+        years.add(year);
+      }
+    }
+  }
+
+  const holidayEntries = await Promise.all(
+    [...years].map(
+      async (year) =>
+        [
+          year,
+          await cache.getOrLoad(`approval-list:holidays:${year}`, () =>
+            listForOrganisation(
+              clerkOrgId as ClerkOrgId,
+              organisationId as OrganisationId,
+              { year }
+            )
+          ),
+        ] as const
+    )
+  );
+  workingDaysReferenceData.holidaysByYear = new Map(holidayEntries);
+
+  const personIds = [...new Set(records.map((record) => record.person_id))];
+  const recordTypes = [
+    ...new Set(
+      records
+        .map((record) => record.record_type)
+        .filter((recordType) => isXeroLeaveType(recordType))
+    ),
+  ];
+  const balances =
+    personIds.length && recordTypes.length
+      ? await database.leaveBalance.findMany({
+          where: {
+            ...scoped({ clerkOrgId, organisationId }),
+            person_id: { in: personIds },
+            record_type: { in: recordTypes },
+          },
+          orderBy: { updated_at: "desc" },
+          select: {
+            balance: true,
+            balance_unit: true,
+            person_id: true,
+            record_type: true,
+            updated_at: true,
+          },
+        })
+      : [];
+  const balanceByPersonAndRecordType = new Map<string, BalanceSnapshotRow>();
+  for (const balance of balances) {
+    if (!balance.record_type) {
+      continue;
+    }
+    const key = balanceKey(balance.person_id, balance.record_type);
+    if (!balanceByPersonAndRecordType.has(key)) {
+      balanceByPersonAndRecordType.set(key, {
+        balance: balance.balance,
+        balance_unit: balance.balance_unit,
+        updated_at: balance.updated_at,
+      });
+    }
+  }
+
+  return {
+    balanceByPersonAndRecordType,
+    workingDaysReferenceData,
+  };
+}
+
 async function loadAndAuthorise(
   input: CommandInput
 ): Promise<Result<LoadedApprovalRecord, ApprovalServiceError>> {
@@ -1010,10 +1188,11 @@ async function loadAndAuthorise(
 }
 
 async function toApprovalListItem(
-  record: LoadedApprovalRecord
+  record: LoadedApprovalRecord,
+  context?: ApprovalListContext
 ): Promise<ApprovalListItem> {
-  const duration = await computeDuration(record);
-  const balanceSnapshot = await loadBalanceSnapshot(record, duration);
+  const duration = await computeDuration(record, context);
+  const balanceSnapshot = await loadBalanceSnapshot(record, duration, context);
   const availableActions = actionsForRecord(record);
   return {
     allDay: record.all_day,
@@ -1052,42 +1231,65 @@ async function toApprovalListItem(
 }
 
 async function computeDuration(
-  record: LoadedApprovalRecord
+  record: LoadedApprovalRecord,
+  context?: ApprovalListContext
 ): Promise<number | null> {
-  const duration = await computeWorkingDays({
+  const input = workingDaysInputForRecord(record);
+  const duration = context
+    ? computeWorkingDaysFromReferenceData(
+        input,
+        context.workingDaysReferenceData
+      )
+    : await computeWorkingDays(input);
+  return duration.ok ? duration.value : null;
+}
+
+function workingDaysInputForRecord(record: LoadedApprovalRecord) {
+  return {
     allDay: record.all_day,
     clerkOrgId: record.clerk_org_id,
     endsAt: record.ends_at,
     locationId: record.person.location_id,
     organisationId: record.organisation_id,
     startsAt: record.starts_at,
-  });
-  return duration.ok ? duration.value : null;
+  };
+}
+
+function balanceKey(
+  personId: string,
+  recordType: availability_record_type
+): string {
+  return `${personId}:${recordType}`;
 }
 
 async function loadBalanceSnapshot(
   record: LoadedApprovalRecord,
-  duration: number | null
+  duration: number | null,
+  context?: ApprovalListContext
 ): Promise<ApprovalListItem["balanceSnapshot"]> {
   if (!isXeroLeaveType(record.record_type)) {
     return null;
   }
-  const balance = await database.leaveBalance.findFirst({
-    where: {
-      ...scoped({
-        clerkOrgId: record.clerk_org_id,
-        organisationId: record.organisation_id,
-      }),
-      person_id: record.person_id,
-      record_type: record.record_type,
-    },
-    orderBy: { updated_at: "desc" },
-    select: {
-      balance: true,
-      balance_unit: true,
-      updated_at: true,
-    },
-  });
+  const balance = context
+    ? (context.balanceByPersonAndRecordType.get(
+        balanceKey(record.person_id, record.record_type)
+      ) ?? null)
+    : await database.leaveBalance.findFirst({
+        where: {
+          ...scoped({
+            clerkOrgId: record.clerk_org_id,
+            organisationId: record.organisation_id,
+          }),
+          person_id: record.person_id,
+          record_type: record.record_type,
+        },
+        orderBy: { updated_at: "desc" },
+        select: {
+          balance: true,
+          balance_unit: true,
+          updated_at: true,
+        },
+      });
   if (!balance) {
     return {
       balanceAvailable: null,

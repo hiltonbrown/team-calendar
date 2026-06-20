@@ -41,6 +41,22 @@ interface HolidayForDuration {
   region_code: string | null;
 }
 
+interface DurationLocation {
+  country_code: string | null;
+  region_code: string | null;
+  timezone: string | null;
+}
+
+interface HolidayLoadError {
+  message: string;
+}
+
+export interface WorkingDaysReferenceData {
+  holidaysByYear: Map<number, Result<HolidayForDuration[], HolidayLoadError>>;
+  locationById: Map<string, DurationLocation>;
+  organisation: DurationLocation | null;
+}
+
 const WORKING_DAY_START_MINUTES = 9 * 60;
 const WORKING_DAY_END_MINUTES = 17 * 60;
 const WORKING_DAY_MINUTES = WORKING_DAY_END_MINUTES - WORKING_DAY_START_MINUTES;
@@ -73,11 +89,122 @@ export async function computeWorkingDays(
     const timezone = location.timezone ?? "UTC";
     const startParts = getLocalDateParts(input.startsAt, timezone);
     const endParts = getLocalDateParts(input.endsAt, timezone);
-    const holidayDates = await loadHolidayDates({
-      endYear: endParts.year,
-      input,
+    const holidayDates = loadHolidayDatesFromResults({
       location,
-      startYear: startParts.year,
+      locationId: input.locationId,
+      timezone,
+      holidayResults: await Promise.all(
+        yearsBetween(startParts.year, endParts.year).map((year) =>
+          listForOrganisation(
+            input.clerkOrgId as ClerkOrgId,
+            input.organisationId as OrganisationId,
+            { year }
+          )
+        )
+      ),
+    });
+
+    if (!holidayDates.ok) {
+      return holidayDates;
+    }
+
+    let duration = 0;
+    for (const dateOnly of dateRange(startParts.dateOnly, endParts.dateOnly)) {
+      if (!(isWeekday(dateOnly) && !holidayDates.value.has(dateOnly))) {
+        continue;
+      }
+
+      if (input.allDay) {
+        duration += 1;
+        continue;
+      }
+
+      duration += fractionalWorkingDay(dateOnly, startParts, endParts);
+    }
+
+    return { ok: true, value: roundHalfUpToQuarter(duration) };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to compute working days",
+      },
+    };
+  }
+}
+
+export function workingDayYearsForInput(
+  input: ComputeWorkingDaysInput,
+  referenceData: Pick<WorkingDaysReferenceData, "locationById" | "organisation">
+): Result<number[], DurationError> {
+  if (input.endsAt < input.startsAt) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_range",
+        message: "End date must be after start date",
+      },
+    };
+  }
+
+  const location = resolveDurationLocation(input, referenceData);
+  if (!location) {
+    return {
+      ok: false,
+      error: {
+        code: "location_not_found",
+        message: "Location could not be found",
+      },
+    };
+  }
+
+  const timezone = location.timezone ?? "UTC";
+  const startParts = getLocalDateParts(input.startsAt, timezone);
+  const endParts = getLocalDateParts(input.endsAt, timezone);
+  return { ok: true, value: yearsBetween(startParts.year, endParts.year) };
+}
+
+export function computeWorkingDaysFromReferenceData(
+  input: ComputeWorkingDaysInput,
+  referenceData: WorkingDaysReferenceData
+): Result<number, DurationError> {
+  if (input.endsAt < input.startsAt) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_range",
+        message: "End date must be after start date",
+      },
+    };
+  }
+
+  try {
+    const location = resolveDurationLocation(input, referenceData);
+    if (!location) {
+      return {
+        ok: false,
+        error: {
+          code: "location_not_found",
+          message: "Location could not be found",
+        },
+      };
+    }
+
+    const timezone = location.timezone ?? "UTC";
+    const startParts = getLocalDateParts(input.startsAt, timezone);
+    const endParts = getLocalDateParts(input.endsAt, timezone);
+    const holidayResults = yearsBetween(startParts.year, endParts.year).map(
+      (year) =>
+        referenceData.holidaysByYear.get(year) ?? {
+          ok: false as const,
+          error: { message: "Failed to load holidays" },
+        }
+    );
+    const holidayDates = loadHolidayDatesFromResults({
+      holidayResults,
+      location,
+      locationId: input.locationId,
       timezone,
     });
 
@@ -129,7 +256,7 @@ async function loadDurationLocation(input: ComputeWorkingDaysInput) {
     });
   }
 
-  return await database.organisation.findFirst({
+  const organisation = await database.organisation.findFirst({
     where: {
       archived_at: null,
       clerk_org_id: input.clerkOrgId,
@@ -140,30 +267,36 @@ async function loadDurationLocation(input: ComputeWorkingDaysInput) {
       timezone: true,
     },
   });
+  return organisation
+    ? {
+        country_code: organisation.country_code,
+        region_code: null,
+        timezone: organisation.timezone,
+      }
+    : null;
 }
 
-async function loadHolidayDates({
-  endYear,
-  input,
+function resolveDurationLocation(
+  input: ComputeWorkingDaysInput,
+  referenceData: Pick<WorkingDaysReferenceData, "locationById" | "organisation">
+): DurationLocation | null {
+  if (input.locationId) {
+    return referenceData.locationById.get(input.locationId) ?? null;
+  }
+  return referenceData.organisation;
+}
+
+function loadHolidayDatesFromResults({
+  holidayResults,
   location,
-  startYear,
+  locationId,
   timezone,
 }: {
-  endYear: number;
-  input: ComputeWorkingDaysInput;
-  location: Awaited<ReturnType<typeof loadDurationLocation>>;
-  startYear: number;
+  holidayResults: Result<HolidayForDuration[], HolidayLoadError>[];
+  location: DurationLocation | null;
+  locationId: string | null;
   timezone: string;
-}): Promise<Result<Set<string>, DurationError>> {
-  const holidayResults = await Promise.all(
-    yearsBetween(startYear, endYear).map((year) =>
-      listForOrganisation(
-        input.clerkOrgId as ClerkOrgId,
-        input.organisationId as OrganisationId,
-        { year }
-      )
-    )
-  );
+}): Result<Set<string>, DurationError> {
   const holidayDates = new Set<string>();
   for (const result of holidayResults) {
     if (!(result.ok && location)) {
@@ -180,8 +313,8 @@ async function loadHolidayDates({
       addExcludedHolidayDate({
         holiday,
         holidayDates,
-        input,
         location,
+        locationId,
         timezone,
       });
     }
@@ -193,22 +326,22 @@ async function loadHolidayDates({
 function addExcludedHolidayDate({
   holiday,
   holidayDates,
-  input,
   location,
+  locationId,
   timezone,
 }: {
   holiday: HolidayForDuration;
   holidayDates: Set<string>;
-  input: ComputeWorkingDaysInput;
-  location: NonNullable<Awaited<ReturnType<typeof loadDurationLocation>>>;
+  location: DurationLocation;
+  locationId: string | null;
   timezone: string;
 }) {
   if (
     shouldExcludeHoliday({
       countryCode: location.country_code,
       holiday,
-      locationId: input.locationId,
-      regionCode: "region_code" in location ? location.region_code : null,
+      locationId,
+      regionCode: location.region_code,
       timezone,
     })
   ) {
