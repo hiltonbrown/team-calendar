@@ -15,7 +15,7 @@ row when done.
 | 004 | Guard `archiveStaleRecords` against empty-fetch data loss | P1 | S | — | DONE |
 | 005 | Populate `leave_balances.record_type` on Xero balance sync | P1 | S | — | DONE |
 | 006 | Restore package-level typecheck gate | P2 | M | — | DONE |
-| 007 | Batch per-record lookups in Xero sync handlers | P2 | M | — | TODO |
+| 007 | Batch per-record lookups in Xero sync handlers | P2 | M | — | BLOCKED (drifted; implementation appears present, full jobs Vitest needs explicit disposable DB access) |
 | 008 | Eliminate per-row N+1 in people & approvals services | P2 | M | — | DONE |
 | 009 | Scope feed-render people fetch by feed scope | P2 | M | — | DONE |
 | 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | DONE |
