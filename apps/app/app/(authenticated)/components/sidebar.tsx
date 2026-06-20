@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@repo/auth/client";
 import {
   Sidebar,
   SidebarContent,
@@ -17,12 +18,14 @@ import {
 import { cn } from "@repo/design-system/lib/utils";
 import {
   ActivityIcon,
+  BarChart3Icon,
   BellIcon,
   CalendarDaysIcon,
   ClipboardListIcon,
   FlagIcon,
   LayoutDashboardIcon,
   LinkIcon,
+  type LucideIcon,
   Settings2Icon,
   UsersIcon,
 } from "lucide-react";
@@ -35,7 +38,21 @@ interface GlobalSidebarProperties {
   readonly children: ReactNode;
 }
 
-const navGroups = [
+interface NavItem {
+  href: string;
+  icon: LucideIcon;
+  roles?: readonly string[];
+  title: string;
+}
+
+interface NavGroup {
+  items: NavItem[];
+  label: string | null;
+}
+
+const ANALYTICS_NAV_ROLES = ["org:manager", "org:admin", "org:owner"];
+
+const navGroups: NavGroup[] = [
   {
     label: null,
     items: [{ title: "Dashboard", href: "/", icon: LayoutDashboardIcon }],
@@ -53,6 +70,12 @@ const navGroups = [
     items: [
       { title: "People", href: "/people", icon: UsersIcon },
       { title: "Calendar Feeds", href: "/feeds", icon: LinkIcon },
+      {
+        title: "Analytics",
+        href: "/analytics/leave-reports",
+        icon: BarChart3Icon,
+        roles: ANALYTICS_NAV_ROLES,
+      },
     ],
   },
   {
@@ -67,13 +90,14 @@ const navGroups = [
       { title: "Sync Health", href: "/sync", icon: ActivityIcon },
     ],
   },
-] as const;
+];
 
 export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
   const sidebar = useSidebar();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const orgId = getOrgFromSearchParams(searchParams);
+  const { orgRole } = useAuth();
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -142,26 +166,28 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
               )}
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        className="h-9 gap-3"
-                        isActive={isActive(item.href)}
-                        tooltip={item.title}
-                      >
-                        <Link href={withOrg(item.href, orgId)}>
-                          <item.icon
-                            className="h-4 w-4 shrink-0"
-                            strokeWidth={1.75}
-                          />
-                          <span className="font-medium text-[0.8125rem]">
-                            {item.title}
-                          </span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {group.items
+                    .filter((item) => isNavItemVisible(item.roles, orgRole))
+                    .map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          className="h-9 gap-3"
+                          isActive={isActive(item.href)}
+                          tooltip={item.title}
+                        >
+                          <Link href={withOrg(item.href, orgId)}>
+                            <item.icon
+                              className="h-4 w-4 shrink-0"
+                              strokeWidth={1.75}
+                            />
+                            <span className="font-medium text-[0.8125rem]">
+                              {item.title}
+                            </span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -196,3 +222,10 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
     </>
   );
 };
+
+function isNavItemVisible(
+  roles: readonly string[] | undefined,
+  orgRole: string | null | undefined
+): boolean {
+  return roles ? roles.includes(orgRole ?? "") : true;
+}
