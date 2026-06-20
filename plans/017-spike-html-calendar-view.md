@@ -5,7 +5,7 @@
 > ship a full feature. If a STOP condition occurs, stop and report. Update
 > `plans/README.md` when done.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/feeds/src/projection packages/feeds/src/render packages/feeds/src/preview`
+> **Drift check (run first)**: `git diff --stat 400eb53..HEAD -- packages/feeds/src/projection packages/feeds/src/render packages/feeds/src/preview`
 > Compare against live code; on a mismatch, note it in your design doc.
 
 ## Status
@@ -15,7 +15,7 @@
 - **Risk**: LOW (additive renderer over a proven projection)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Planned at**: commit `400eb53`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
 
 ## Why this matters
@@ -113,3 +113,10 @@ Stop and report back if:
   already-projected events and never re-derive visibility. The prototype test pins
   this.
 - The follow-up build (route/auth/cache) is scoped by the design doc.
+- Reconciled on 2026-06-20 after drift in
+  `packages/feeds/src/projection/feed-projection.ts` and
+  `packages/feeds/src/projection/feed-projection.test.ts`. The live
+  `PreviewEvent` shape still carries display-ready, privacy-applied fields for
+  HTML rendering, including `summary`, `displayName`, `description`, `location`,
+  `recordType`, `contactabilityStatus`, `isPublicHoliday`, `startsAt`, `endsAt`,
+  `allDay`, `publishedUid`, and `publishedSequence`.
