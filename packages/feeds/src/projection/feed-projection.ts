@@ -326,7 +326,7 @@ function holidayAppliesToLocation(
   return true;
 }
 
-function displayNameForPrivacy(
+export function displayNameForPrivacy(
   privacyMode: availability_privacy_mode,
   personName: string
 ): string {
@@ -339,7 +339,7 @@ function displayNameForPrivacy(
   return personName;
 }
 
-function labelForRecordType(
+export function labelForRecordType(
   recordType: availability_record_type,
   title: string | null
 ): string {

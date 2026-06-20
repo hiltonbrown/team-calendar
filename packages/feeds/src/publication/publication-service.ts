@@ -3,12 +3,13 @@ import "server-only";
 import { appError, type Result } from "@repo/core";
 import { database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
-import type {
-  availability_privacy_mode,
-  availability_record_type,
-} from "@repo/database/generated/enums";
+import type { availability_privacy_mode } from "@repo/database/generated/enums";
 import { invalidateFeedCachesForPerson } from "../cache/feed-invalidation";
-import { projectSummaryLine } from "../projection/feed-projection";
+import {
+  displayNameForPrivacy,
+  labelForRecordType,
+  projectSummaryLine,
+} from "../projection/feed-projection";
 
 export interface MaterialisedPublication {
   availabilityRecordId: string;
@@ -205,32 +206,6 @@ function projectPublishedRecord(record: RecordRow): {
     }),
     uid: record.derived_uid_key,
   };
-}
-
-function displayNameForPrivacy(
-  privacyMode: availability_privacy_mode,
-  personName: string
-): string {
-  if (privacyMode === "private") {
-    return "Unavailable";
-  }
-  if (privacyMode === "masked") {
-    return "Team member";
-  }
-  return personName;
-}
-
-function labelForRecordType(
-  recordType: availability_record_type,
-  title: string | null
-): string {
-  if (title?.trim()) {
-    return title.trim();
-  }
-  return recordType
-    .split("_")
-    .map((part) => part.slice(0, 1).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function toMaterialisedPublication(
