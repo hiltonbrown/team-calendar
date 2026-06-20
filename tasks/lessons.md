@@ -23,4 +23,11 @@
   `@repo/webhooks` package.
 - Xero access tokens are short-lived (~30 min). Any sync/write path must refresh
   proactively; `connectionActive` only checks expiry, it does not refresh.
-
+- After merging executor branches, check `git worktree list --porcelain`,
+  `git branch -vv`, and `git branch --no-merged main` before declaring the repo
+  tidy. A clean merge can still leave an auxiliary worktree checked out on an
+  already-merged branch, which looks suspicious to the user even when the branch is
+  contained in `main`.
+- Treat `git fsck` dangling objects as normal unless it reports missing or corrupt
+  objects. Do not present dangling commits/blobs from prior rebases or abandoned
+  work as repository corruption.

@@ -13,6 +13,26 @@
 ## Review
 - Verification results and lesson summaries will be recorded here upon completion.
 
+# Plan: Repair Branch and Worktree State
+
+## Plan
+
+- [x] Inspect all local branches, worktrees, branch containment, and git object health.
+- [ ] Commit any uncommitted edits in every worktree.
+- [ ] Rebase local worktree branches onto `main` where they are not already contained.
+- [ ] Merge all local branches into `main`.
+- [ ] Remove or prune stale/corrupt worktree metadata only if git reports it as stale.
+- [ ] Run verification commands from `main`.
+- [ ] Document the final branch/worktree state and verification results here.
+- [ ] Capture any lesson learned in `tasks/lessons.md`.
+
+## Review
+
+- `git fsck --full` reports dangling objects only, not missing or corrupt objects.
+- `git worktree prune --dry-run --verbose` reports no stale worktree metadata.
+- All local branches are already contained in `main`; `advisor/016-analytics-spike`
+  remains checked out in `/tmp/leavesync-016` at its branch tip.
+
 # Plan: Execute Plan 007 Batch Xero Sync Handler Lookups
 
 ## Plan
