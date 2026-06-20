@@ -13,6 +13,48 @@
 ## Review
 - Verification results and lesson summaries will be recorded here upon completion.
 
+# Plan: Execute Plan 007 Batch Xero Sync Handler Lookups
+
+## Plan
+
+- [x] Refresh `plans/007-batch-sync-handler-lookups.md` against current HEAD `d99740f`.
+- [x] Dispatch the implementation to a worker with source scope limited to the two sync handlers and matching handler tests.
+- [x] Review the worker diff for scope, batching semantics, and meaningful tests.
+- [x] Run `bunx tsc --noEmit -p packages/jobs/tsconfig.json`.
+- [ ] Run `bunx vitest run packages/jobs`.
+- [x] Run `bun run check`.
+- [ ] Mark `plans/README.md` plan 007 as DONE if review and verification pass.
+
+## Review
+
+- Implemented batched person lookups for leave balances, batched person and existing-record lookups for leave records, and batched feed rebuild events.
+- `bunx tsc --noEmit -p packages/jobs/tsconfig.json` exits 0.
+- Targeted handler tests pass: `bunx vitest run packages/jobs/src/handlers/sync-xero-leave-balances.test.ts packages/jobs/src/handlers/sync-xero-leave-records.test.ts` exits 0 with 9 tests passing.
+- `bun run check` exits 0.
+- `bunx vitest run packages/jobs` exits 1 before Plan 007 assertions fail because `packages/jobs/src/handlers/sync-xero-people.integration.test.ts` imports database config without `DATABASE_URL` set. This is outside Plan 007 scope, so `plans/README.md` was not marked DONE.
+
+# Plan: Execute Plan 008 Batch People And Approvals N+1 Queries
+
+## Plan
+
+- [x] Refresh `plans/008-batch-people-approvals-n-plus-one.md` against current HEAD `d99740f`.
+- [x] Dispatch the implementation to a worker with source scope limited to availability people, approvals, duration, and matching tests.
+- [x] Review the worker diff for scope, batching semantics, and behavioural equivalence.
+- [x] Run `bunx tsc --noEmit -p packages/availability/tsconfig.json`.
+- [x] Run `bunx vitest run packages/availability`.
+- [x] Run `bun run check`.
+- [x] Mark `plans/README.md` plan 008 as DONE if review and verification pass.
+
+## Review
+
+- Worker implemented Plan 008 in commits `52d0706` and `8198ce0` on branch `advisor/008-people-approvals-batching`.
+- `computeCurrentStatusForPeople` batches people-list current status lookups; `listPeople` now calls it once per result set. No dashboard edit was required because `dashboard-service.ts` reaches this path through `listPeople`.
+- `listForApprover` now preloads working-day reference data and leave balances for the list, while detail/action paths retain their existing single-record fallback helpers.
+- `bunx tsc --noEmit -p packages/availability/tsconfig.json` exits 0.
+- `bunx vitest run packages/availability` exits 0 with 31 files and 183 tests passing.
+- `bun run check` exits 0.
+- `plans/README.md` now marks plan 008 as DONE.
+
 # Plan: Restore Package Typecheck Gate
 
 ## Plan

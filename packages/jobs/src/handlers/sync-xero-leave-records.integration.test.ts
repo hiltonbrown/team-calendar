@@ -148,15 +148,17 @@ describeWithDatabase("sync-xero-leave-records database flow", () => {
       )?.published_sequence
     ).toBe(0);
 
-    expect(mockInngestSend).toHaveBeenCalledWith({
-      data: {
-        clerkOrgId: tenantA.clerkOrgId,
-        feedId: expect.any(String),
-        organisationId: tenantA.organisationId,
-        reason: "xero_leave_records_synced",
+    expect(mockInngestSend).toHaveBeenCalledWith([
+      {
+        data: {
+          clerkOrgId: tenantA.clerkOrgId,
+          feedId: expect.any(String),
+          organisationId: tenantA.organisationId,
+          reason: "xero_leave_records_synced",
+        },
+        name: "rebuild-feed-cache",
       },
-      name: "rebuild-feed-cache",
-    });
+    ]);
   });
 
   it("isolates record failures and completes as partial_success", async () => {

@@ -4,7 +4,7 @@
 > command. If a STOP condition occurs, stop and report. Update `plans/README.md`
 > when done unless a reviewer maintains the index.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/jobs/src/handlers/sync-xero-leave-balances.ts packages/jobs/src/handlers/sync-xero-leave-records.ts`
+> **Drift check (run first)**: `git diff --stat d99740f..HEAD -- packages/jobs/src/handlers/sync-xero-leave-balances.ts packages/jobs/src/handlers/sync-xero-leave-records.ts`
 > Compare the "Current state" excerpts to the live code; on a mismatch, STOP.
 
 ## Status
@@ -14,7 +14,7 @@
 - **Risk**: MED
 - **Depends on**: none (prefer landing plan 013/014 tests first if doing both)
 - **Category**: perf
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Planned at**: commit `d99740f`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
 
 ## Why this matters
@@ -34,7 +34,7 @@ to batch is already in hand or fetchable in one `IN (...)` query.
 ## Current state
 
 `packages/jobs/src/handlers/sync-xero-leave-balances.ts`:
-- Up-front people fetch (lines 120-128):
+- Up-front people fetch (lines 130-138):
   ```ts
   const people = await database.person.findMany({
     where: { ...scoped(context), archived_at: null,
@@ -42,7 +42,7 @@ to batch is already in hand or fetchable in one `IN (...)` query.
     select: { id: true, xero_employee_id: true },
   });
   ```
-- Per-balance re-query inside `processBalance` (lines 225-232):
+- Per-balance re-query inside `processBalance` (lines 243-250):
   ```ts
   const person = await database.person.findFirst({
     where: { ...scoped(context), archived_at: null, xero_employee_id: balance.employeeId },
@@ -52,9 +52,9 @@ to batch is already in hand or fetchable in one `IN (...)` query.
   ```
 
 `packages/jobs/src/handlers/sync-xero-leave-records.ts`:
-- Per-record person lookup (line 414) and per-record existing-record lookup by
-  `source_remote_id` (line 488), both inside the per-record loop (line 199).
-- Feed-rebuild events sent one-by-one (lines 672-679):
+- Per-record person lookup (line 427) and per-record existing-record lookup by
+  `source_remote_id` (line 501), both inside the per-record loop (line 203).
+- Feed-rebuild events sent one-by-one (lines 686-695):
   ```ts
   for (const feed of feeds) {
     await inngest.send({ data: { clerkOrgId, feedId: feed.id, organisationId, reason: "xero_leave_records_synced" }, ... });

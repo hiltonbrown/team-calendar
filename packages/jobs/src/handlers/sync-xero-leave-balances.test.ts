@@ -178,6 +178,8 @@ describe("leave balances sync run lifecycle", () => {
     const result = await syncXeroLeaveBalances(input());
 
     expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.personFindFirst).not.toHaveBeenCalled();
     expect(mocks.leaveBalanceUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
@@ -190,5 +192,81 @@ describe("leave balances sync run lifecycle", () => {
         }),
       })
     );
+  });
+
+  it("uses the upfront people query for multiple balances", async () => {
+    const people = [
+      {
+        id: "50000000-0000-4000-8000-000000000001",
+        xero_employee_id: "60000000-0000-4000-8000-000000000001",
+      },
+      {
+        id: "50000000-0000-4000-8000-000000000002",
+        xero_employee_id: "60000000-0000-4000-8000-000000000002",
+      },
+      {
+        id: "50000000-0000-4000-8000-000000000003",
+        xero_employee_id: "60000000-0000-4000-8000-000000000003",
+      },
+    ];
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [],
+        leaveBalances: people.map((person, index) => ({
+          balance: 10 + index,
+          employeeId: person.xero_employee_id,
+          leaveTypeId: `annual-${index}`,
+          leaveTypeName: "Annual Leave",
+          rawPayload: { LeaveType: "Annual Leave" },
+          unitType: "hours",
+        })),
+        rawResponses: [],
+      },
+    });
+
+    const result = await syncXeroLeaveBalances(input());
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.personFindFirst).not.toHaveBeenCalled();
+    expect(mocks.leaveBalanceUpsert).toHaveBeenCalledTimes(3);
+  });
+
+  it("records person_not_found when a balance has no scoped person", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [],
+        leaveBalances: [
+          {
+            balance: 12.5,
+            employeeId: "60000000-0000-4000-8000-000000000009",
+            leaveTypeId: "annual-leave",
+            leaveTypeName: "Annual Leave",
+            rawPayload: { LeaveType: "Annual Leave" },
+            unitType: "hours",
+          },
+        ],
+        rawResponses: [],
+      },
+    });
+
+    const result = await syncXeroLeaveBalances(input());
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.personFindFirst).not.toHaveBeenCalled();
+    expect(mocks.failedRecordCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_code: "person_not_found",
+          source_id: "annual-leave",
+        }),
+      })
+    );
+    expect(mocks.leaveBalanceUpsert).not.toHaveBeenCalled();
   });
 });

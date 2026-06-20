@@ -139,6 +139,12 @@ export async function syncXeroLeaveBalances(
     const employeeIds = people
       .map((person) => person.xero_employee_id)
       .filter((employeeId): employeeId is string => Boolean(employeeId));
+    const personIdByEmployeeId = new Map<string, string>();
+    for (const person of people) {
+      if (person.xero_employee_id) {
+        personIdByEmployeeId.set(person.xero_employee_id, person.id);
+      }
+    }
 
     const balancesResult = await fetchLeaveBalancesForRegion(
       xeroTenant.payroll_region,
@@ -171,6 +177,7 @@ export async function syncXeroLeaveBalances(
       run.id,
       xeroTenant.id,
       balancesResult.value.leaveBalances,
+      personIdByEmployeeId,
       counts
     );
     if (cancelled) {
@@ -225,7 +232,8 @@ async function processBalance(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
   xeroTenantId: string,
-  balance: XeroLeaveBalance
+  balance: XeroLeaveBalance,
+  personIdByEmployeeId: Map<string, string>
 ): Promise<boolean> {
   const validation = validateBalance(balance);
   if (!validation.valid) {
@@ -240,15 +248,8 @@ async function processBalance(
   }
 
   try {
-    const person = await database.person.findFirst({
-      where: {
-        ...scoped(context),
-        archived_at: null,
-        xero_employee_id: balance.employeeId,
-      },
-      select: { id: true },
-    });
-    if (!person) {
+    const personId = personIdByEmployeeId.get(balance.employeeId);
+    if (!personId) {
       await recordFailure(context, {
         errorCode: "person_not_found",
         errorMessage: "No scoped person exists for the Xero employee.",
@@ -270,7 +271,7 @@ async function processBalance(
         last_fetched_at: new Date(),
         leave_type_name: balance.leaveTypeName,
         leave_type_xero_id: balance.leaveTypeId,
-        person_id: person.id,
+        person_id: personId,
         record_type: recordType,
         xero_tenant_id: xeroTenantId,
       },
@@ -286,7 +287,7 @@ async function processBalance(
       where: {
         person_id_xero_tenant_id_leave_type_xero_id: {
           leave_type_xero_id: balance.leaveTypeId,
-          person_id: person.id,
+          person_id: personId,
           xero_tenant_id: xeroTenantId,
         },
       },
@@ -310,6 +311,7 @@ async function processBalances(
   runId: string,
   xeroTenantId: string,
   balances: XeroLeaveBalance[],
+  personIdByEmployeeId: Map<string, string>,
   counts: Counts
 ): Promise<boolean> {
   for (let index = 0; index < balances.length; index += BALANCE_BATCH_SIZE) {
@@ -323,7 +325,8 @@ async function processBalances(
         context,
         runId,
         xeroTenantId,
-        balance
+        balance,
+        personIdByEmployeeId
       );
       if (result) {
         counts.upserted += 1;

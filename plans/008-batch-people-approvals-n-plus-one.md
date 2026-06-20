@@ -5,8 +5,10 @@
 > verification command. If a STOP condition occurs, stop and report. Update
 > `plans/README.md` when done unless a reviewer maintains the index.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/availability/src/people packages/availability/src/approvals packages/availability/src/duration`
-> Compare excerpts to live code; on a mismatch, STOP.
+> **Drift check (run first)**: `git diff --stat d99740f..HEAD -- packages/availability/src/people packages/availability/src/approvals packages/availability/src/duration`
+> The previous `e1b06a3..HEAD` drift was test-only from Plan 014
+> (`approval-service.test.ts`, `balance-refresh.test.ts`). Compare excerpts to
+> live service code; on a service-code mismatch, STOP.
 
 ## Status
 
@@ -15,7 +17,7 @@
 - **Risk**: MED
 - **Depends on**: none (prefer landing plan 014 approval tests first if doing both)
 - **Category**: perf
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Planned at**: commit `d99740f`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
 
 ## Why this matters
@@ -54,8 +56,9 @@ in memory.
   ]);
   // ... plus a public-holiday lookup further down
   ```
-- `dashboard-service.ts:~1037` `listAllPeople` paginates the whole org and feeds it
-  into the same per-person status path.
+- `dashboard-service.ts:1037` `listAllPeople` paginates the whole org through
+  `listPeople`, so batching in `people-service` automatically improves the
+  dashboard path unless tests prove a direct dashboard change is needed.
 
 **Part B — approvals:**
 - `packages/availability/src/approvals/approval-service.ts:259`:
@@ -84,8 +87,9 @@ in memory.
 **In scope**:
 - `packages/availability/src/people/current-status.ts` (add a batch variant)
 - `packages/availability/src/people/people-service.ts` (call the batch variant)
-- `packages/availability/src/dashboard/dashboard-service.ts` (the team-today path
-  that uses per-person status) — only the call into the status computation
+- `packages/availability/src/dashboard/dashboard-service.ts` only if tests prove a
+  direct dashboard change is needed; current code reaches the path through
+  `listPeople`
 - `packages/availability/src/approvals/approval-service.ts` (pre-load reference
   data for `listForApprover`)
 - `packages/availability/src/duration/working-days.ts` (if a batch entry point is

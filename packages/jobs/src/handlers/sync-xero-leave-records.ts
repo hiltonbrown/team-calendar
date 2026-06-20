@@ -200,12 +200,30 @@ export async function syncXeroLeaveRecords(
       }
 
       const batch = fetched.slice(index, index + BATCH_SIZE);
+      const peopleByEmployeeId = await loadPeopleByEmployeeId(
+        context,
+        batch
+          .map((record) => record.employeeId)
+          .filter((employeeId): employeeId is string => Boolean(employeeId))
+      );
+      const existingRecordsBySourceRemoteId =
+        await loadExistingRecordsBySourceRemoteId(
+          context,
+          batch
+            .map((record) => record.leaveApplicationId)
+            .filter((leaveApplicationId): leaveApplicationId is string =>
+              Boolean(leaveApplicationId)
+            )
+        );
+
       for (const leaveRecord of batch) {
         const result = await processLeaveRecord(
           context,
           run.id,
           xeroTenant.id,
-          leaveRecord
+          leaveRecord,
+          peopleByEmployeeId,
+          existingRecordsBySourceRemoteId
         );
         if (result) {
           processed.push(result);
@@ -404,11 +422,62 @@ async function skipUnsupportedRegion(
   };
 }
 
+async function loadPeopleByEmployeeId(
+  context: SyncXeroLeaveRecordsInput,
+  employeeIds: string[]
+) {
+  const people = await database.person.findMany({
+    where: {
+      ...scoped(context),
+      archived_at: null,
+      xero_employee_id: { in: [...new Set(employeeIds)] },
+    },
+    select: {
+      default_privacy_mode: true,
+      id: true,
+      include_in_feeds_by_default: true,
+      xero_employee_id: true,
+    },
+  });
+  const peopleByEmployeeId = new Map<string, (typeof people)[number]>();
+  for (const person of people) {
+    if (person.xero_employee_id) {
+      peopleByEmployeeId.set(person.xero_employee_id, person);
+    }
+  }
+  return peopleByEmployeeId;
+}
+
+async function loadExistingRecordsBySourceRemoteId(
+  context: SyncXeroLeaveRecordsInput,
+  sourceRemoteIds: string[]
+) {
+  const records = await database.availabilityRecord.findMany({
+    where: {
+      ...scoped(context),
+      source_remote_id: { in: [...new Set(sourceRemoteIds)] },
+      source_type: "xero_leave",
+    },
+    select: { id: true, source_remote_hash: true, source_remote_id: true },
+  });
+  const recordsBySourceRemoteId = new Map<string, (typeof records)[number]>();
+  for (const record of records) {
+    if (record.source_remote_id) {
+      recordsBySourceRemoteId.set(record.source_remote_id, record);
+    }
+  }
+  return recordsBySourceRemoteId;
+}
+
 async function processLeaveRecord(
   context: SyncXeroLeaveRecordsInput,
   runId: string,
   xeroTenantId: string,
-  leaveRecord: XeroLeaveRecord
+  leaveRecord: XeroLeaveRecord,
+  peopleByEmployeeId: Awaited<ReturnType<typeof loadPeopleByEmployeeId>>,
+  existingRecordsBySourceRemoteId: Awaited<
+    ReturnType<typeof loadExistingRecordsBySourceRemoteId>
+  >
 ): Promise<ProcessedLeaveRecord | null> {
   const validation = validateLeaveRecord(leaveRecord);
   if (!validation.valid) {
@@ -424,18 +493,7 @@ async function processLeaveRecord(
   }
 
   try {
-    const person = await database.person.findFirst({
-      where: {
-        ...scoped(context),
-        archived_at: null,
-        xero_employee_id: leaveRecord.employeeId,
-      },
-      select: {
-        default_privacy_mode: true,
-        id: true,
-        include_in_feeds_by_default: true,
-      },
-    });
+    const person = peopleByEmployeeId.get(leaveRecord.employeeId);
     if (!person) {
       await recordFailure(context, {
         errorCode: "person_not_found",
@@ -498,14 +556,9 @@ async function processLeaveRecord(
       units: leaveRecord.units,
     });
 
-    const existing = await database.availabilityRecord.findFirst({
-      where: {
-        ...scoped(context),
-        source_remote_id: normalised.sourceRemoteId,
-        source_type: normalised.sourceType,
-      },
-      select: { id: true, source_remote_hash: true },
-    });
+    const existing = existingRecordsBySourceRemoteId.get(
+      normalised.sourceRemoteId
+    );
     const changed =
       existing?.source_remote_hash !== normalised.sourceRemoteHash;
     const data = {
@@ -535,6 +588,11 @@ async function processLeaveRecord(
         data,
         where: { ...scoped(context), id: recordId },
       });
+      existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        id: recordId,
+        source_remote_hash: normalised.sourceRemoteHash,
+        source_remote_id: normalised.sourceRemoteId,
+      });
     } else {
       const created = await database.availabilityRecord.create({
         data: {
@@ -545,6 +603,11 @@ async function processLeaveRecord(
           source_type: normalised.sourceType,
         },
         select: { id: true },
+      });
+      existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        id: created.id,
+        source_remote_hash: normalised.sourceRemoteHash,
+        source_remote_id: normalised.sourceRemoteId,
       });
       await materialiseSyncedPublication(context, created.id);
     }
@@ -683,8 +746,12 @@ async function enqueueFeedRebuilds(
     select: { id: true },
   });
 
-  for (const feed of feeds) {
-    await inngest.send({
+  if (feeds.length === 0) {
+    return;
+  }
+
+  await inngest.send(
+    feeds.map((feed) => ({
       data: {
         clerkOrgId: context.clerkOrgId,
         feedId: feed.id,
@@ -692,8 +759,8 @@ async function enqueueFeedRebuilds(
         reason: "xero_leave_records_synced",
       },
       name: "rebuild-feed-cache",
-    });
-  }
+    }))
+  );
 }
 
 function validateLeaveRecord(
