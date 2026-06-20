@@ -10,7 +10,7 @@ row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Role-gate settings server actions (privilege escalation) | P1 | S | — | DONE |
-| 002 | Harden Xero OAuth: state secret + start-route auth | P1 | S | — | TODO |
+| 002 | Harden Xero OAuth: state secret + start-route auth | P1 | S | — | DONE |
 | 003 | Finalise and self-heal stuck sync runs; restore reconcile logging | P1 | M | — | DONE |
 | 004 | Guard `archiveStaleRecords` against empty-fetch data loss | P1 | S | — | DONE |
 | 005 | Populate `leave_balances.record_type` on Xero balance sync | P1 | S | — | DONE |
@@ -18,7 +18,7 @@ row when done.
 | 007 | Batch per-record lookups in Xero sync handlers | P2 | M | — | TODO |
 | 008 | Eliminate per-row N+1 in people & approvals services | P2 | M | — | DONE |
 | 009 | Scope feed-render people fetch by feed scope | P2 | M | — | DONE |
-| 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | TODO |
+| 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | DONE |
 | 011 | Remove dead `load-*-data` loaders + dedupe feed projection helpers | P3 | S | — | TODO |
 | 012 | Remove dead dependencies (`concurrently`, `@auto-it/*`, unused `date-fns`) | P3 | S | — | TODO |
 | 013 | Test the Xero write adapter and read mappers | P2 | M | — | DONE |
