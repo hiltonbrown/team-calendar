@@ -55,6 +55,28 @@
 - `bun run check` exits 0.
 - `plans/README.md` now marks plan 008 as DONE.
 
+# Plan: Execute Plan 009 Scope Feed Render People Fetch
+
+## Plan
+
+- [x] Refresh `plans/009-scope-feed-render-people-fetch.md` against current HEAD `b224ab0`.
+- [x] Dispatch the implementation to a worker with source scope limited to feed scope resolution and tests.
+- [x] Review the worker diff for scope safety and unchanged manager/dynamic-scope behaviour.
+- [x] Run `bunx tsc --noEmit -p packages/feeds/tsconfig.json`.
+- [x] Run `bunx vitest run packages/feeds`.
+- [x] Run `bun run check`.
+- [x] Mark `plans/README.md` plan 009 as DONE if review and verification pass.
+
+## Review
+
+- Worker implemented scope-aware non-preloaded people fetches in `resolvePeopleForFeed`.
+- Person and team scopes now narrow the Prisma `where`; org, self, and manager-team scopes keep the broad active-org fetch.
+- Added query-shape and output-equivalence tests for person, team, mixed person/team, org, self, and manager-team scopes.
+- `bunx tsc --noEmit -p packages/feeds/tsconfig.json` exits 0.
+- `bunx vitest run packages/feeds` exits 0 with 9 files and 50 tests passing.
+- `bun run check` exits 0.
+- `plans/README.md` now marks plan 009 as DONE.
+
 # Plan: Restore Package Typecheck Gate
 
 ## Plan

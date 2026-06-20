@@ -13,7 +13,9 @@ vi.mock("@repo/database", () => ({
   },
 }));
 
-const { canViewFeed, resolveScopeRows } = await import("./feed-scope");
+const { canViewFeed, resolvePeopleForFeed, resolveScopeRows } = await import(
+  "./feed-scope"
+);
 
 const baseInput = {
   actingPersonId: "00000000-0000-4000-8000-000000000001",
@@ -46,6 +48,200 @@ function buildPerson(input: {
     team_id: input.teamId ?? null,
   };
 }
+
+const activePeople = [
+  buildPerson({
+    displayName: "Avery Viewer",
+    firstName: "Avery",
+    id: baseInput.actingPersonId,
+    lastName: "Viewer",
+    teamId: "20000000-0000-4000-8000-000000000001",
+  }),
+  buildPerson({
+    displayName: "Blair Other",
+    firstName: "Blair",
+    id: "00000000-0000-4000-8000-000000000002",
+    lastName: "Other",
+    teamId: "20000000-0000-4000-8000-000000000002",
+  }),
+  buildPerson({
+    displayName: "Casey Report",
+    firstName: "Casey",
+    id: "00000000-0000-4000-8000-000000000003",
+    lastName: "Report",
+    managerPersonId: baseInput.actingPersonId,
+    teamId: "20000000-0000-4000-8000-000000000001",
+  }),
+];
+
+const broadPeopleWhere = {
+  archived_at: null,
+  clerk_org_id: baseInput.clerkOrgId,
+  is_active: true,
+  organisation_id: baseInput.organisationId,
+};
+
+describe("resolvePeopleForFeed", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches person-scoped feeds by person id and returns matching people", async () => {
+    const personId = "00000000-0000-4000-8000-000000000002";
+    const scopes = [{ scopeType: "person", scopeValue: personId }] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(
+      activePeople.filter((person) => person.id === personId)
+    );
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ...broadPeopleWhere,
+          OR: [{ id: { in: [personId] } }],
+        },
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+
+  it("fetches team-scoped feeds by team id and returns matching people", async () => {
+    const teamId = "20000000-0000-4000-8000-000000000001";
+    const scopes = [{ scopeType: "team", scopeValue: teamId }] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(
+      activePeople.filter((person) => person.team_id === teamId)
+    );
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ...broadPeopleWhere,
+          OR: [{ team_id: { in: [teamId] } }],
+        },
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+
+  it("fetches mixed person and team scopes with one combined OR", async () => {
+    const personId = "00000000-0000-4000-8000-000000000002";
+    const teamId = "20000000-0000-4000-8000-000000000001";
+    const scopes = [
+      { scopeType: "person", scopeValue: personId },
+      { scopeType: "team", scopeValue: teamId },
+    ] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(
+      activePeople.filter(
+        (person) => person.id === personId || person.team_id === teamId
+      )
+    );
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ...broadPeopleWhere,
+          OR: [{ id: { in: [personId] } }, { team_id: { in: [teamId] } }],
+        },
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+
+  it("keeps org-scoped feeds on the broad people fetch", async () => {
+    const scopes = [{ scopeType: "org", scopeValue: null }] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(activePeople);
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: broadPeopleWhere,
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+
+  it("keeps self-scoped feeds on the broad people fetch", async () => {
+    const scopes = [{ scopeType: "self", scopeValue: null }] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(activePeople);
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: broadPeopleWhere,
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+
+  it("keeps manager-team-scoped feeds on the broad people fetch", async () => {
+    const scopes = [{ scopeType: "manager_team", scopeValue: null }] as const;
+    const expected = await resolvePeopleForFeed({
+      ...baseInput,
+      preloaded: { people: activePeople, teams: [] },
+      scopes,
+    });
+    mocks.personFindMany.mockResolvedValueOnce(activePeople);
+
+    const result = await resolvePeopleForFeed({
+      ...baseInput,
+      scopes,
+    });
+
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: broadPeopleWhere,
+      })
+    );
+    expect(result).toEqual(expected);
+  });
+});
 
 describe("canViewFeed", () => {
   beforeEach(() => {

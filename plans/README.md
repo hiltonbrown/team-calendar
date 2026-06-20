@@ -17,7 +17,7 @@ row when done.
 | 006 | Restore package-level typecheck gate | P2 | M | — | DONE |
 | 007 | Batch per-record lookups in Xero sync handlers | P2 | M | — | TODO |
 | 008 | Eliminate per-row N+1 in people & approvals services | P2 | M | — | DONE |
-| 009 | Scope feed-render people fetch by feed scope | P2 | M | — | TODO |
+| 009 | Scope feed-render people fetch by feed scope | P2 | M | — | DONE |
 | 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | TODO |
 | 011 | Remove dead `load-*-data` loaders + dedupe feed projection helpers | P3 | S | — | TODO |
 | 012 | Remove dead dependencies (`concurrently`, `@auto-it/*`, unused `date-fns`) | P3 | S | — | TODO |

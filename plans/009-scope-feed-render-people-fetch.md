@@ -4,8 +4,9 @@
 > command. If a STOP condition occurs, stop and report. Update `plans/README.md`
 > when done unless a reviewer maintains the index.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/feeds/src/scope/feed-scope.ts`
-> Compare the excerpt to live code; on a mismatch, STOP.
+> **Drift check (run first)**: `git diff --stat b224ab0..HEAD -- packages/feeds/src/scope/feed-scope.ts`
+> The previous `e1b06a3..HEAD` drift check is empty for this file. Compare the
+> excerpt to live code; on a mismatch, STOP.
 
 ## Status
 
@@ -14,7 +15,7 @@
 - **Risk**: MED
 - **Depends on**: none
 - **Category**: perf
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Planned at**: commit `b224ab0`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
 
 ## Why this matters

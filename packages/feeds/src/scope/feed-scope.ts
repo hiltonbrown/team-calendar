@@ -157,12 +157,7 @@ export async function resolvePeopleForFeed(input: {
       (await database.person.findMany({
         orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
         select: personSelect,
-        where: {
-          archived_at: null,
-          clerk_org_id: input.clerkOrgId,
-          is_active: true,
-          organisation_id: input.organisationId,
-        },
+        where: peopleWhereForFeedScope(input),
       }));
 
     const dynamicPerson = resolveDynamicPersonId({
@@ -415,6 +410,57 @@ function dedupeScopes(scopes: FeedScopeInput[]): FeedScopeInput[] {
     }
   }
   return result;
+}
+
+function peopleWhereForFeedScope(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  scopes: FeedScopeInput[];
+}): Prisma.PersonWhereInput {
+  const where: Prisma.PersonWhereInput = {
+    archived_at: null,
+    clerk_org_id: input.clerkOrgId,
+    is_active: true,
+    organisation_id: input.organisationId,
+  };
+  const scopes = dedupeScopes(input.scopes);
+
+  if (
+    scopes.some(
+      (scope) =>
+        scope.scopeType === "org" ||
+        scope.scopeType === "self" ||
+        scope.scopeType === "manager_team"
+    )
+  ) {
+    return where;
+  }
+
+  const personIds = scopes
+    .filter(
+      (scope): scope is FeedScopeInput & { scopeValue: string } =>
+        scope.scopeType === "person" && typeof scope.scopeValue === "string"
+    )
+    .map((scope) => scope.scopeValue);
+  const teamIds = scopes
+    .filter(
+      (scope): scope is FeedScopeInput & { scopeValue: string } =>
+        scope.scopeType === "team" && typeof scope.scopeValue === "string"
+    )
+    .map((scope) => scope.scopeValue);
+  const scopedWhere: Prisma.PersonWhereInput[] = [];
+
+  if (personIds.length > 0) {
+    scopedWhere.push({ id: { in: personIds } });
+  }
+  if (teamIds.length > 0) {
+    scopedWhere.push({ team_id: { in: teamIds } });
+  }
+
+  return {
+    ...where,
+    OR: scopedWhere.length > 0 ? scopedWhere : [{ id: { in: [] } }],
+  };
 }
 
 function resolveDynamicPersonId(input: {
