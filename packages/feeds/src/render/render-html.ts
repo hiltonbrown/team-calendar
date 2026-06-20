@@ -85,7 +85,7 @@ export function renderFeedHtml(input: RenderFeedHtmlInput): string {
       margin: 0;
       font-size: 2.25rem;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       line-height: 1.2;
       text-wrap: balance;
     }
@@ -161,7 +161,7 @@ export function renderFeedHtml(input: RenderFeedHtmlInput): string {
       display: inline-flex;
       font-size: 0.75rem;
       font-weight: 500;
-      letter-spacing: 0.01em;
+      letter-spacing: 0;
       line-height: 1.3;
       padding: 3px 10px;
     }
