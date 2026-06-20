@@ -19,7 +19,7 @@ row when done.
 | 008 | Eliminate per-row N+1 in people & approvals services | P2 | M | — | DONE |
 | 009 | Scope feed-render people fetch by feed scope | P2 | M | — | DONE |
 | 010 | Bound the `syncRun` summary scan to its window | P2 | S | — | DONE |
-| 011 | Remove dead `load-*-data` loaders + dedupe feed projection helpers | P3 | S | — | TODO |
+| 011 | Remove dead `load-*-data` loaders + dedupe feed projection helpers | P3 | S | — | DONE |
 | 012 | Remove dead dependencies (`concurrently`, `@auto-it/*`, unused `date-fns`) | P3 | S | — | TODO |
 | 013 | Test the Xero write adapter and read mappers | P2 | M | — | DONE |
 | 014 | Test approval guards, balance-refresh auth, and OAuth disconnect cascade | P2 | M | — | DONE |
