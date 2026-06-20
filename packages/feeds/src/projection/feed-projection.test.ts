@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const record = {
@@ -83,6 +83,10 @@ describe("projectFeedEvents", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("applies privacy transforms in projection and carries publication identity", async () => {
     const named = await projectFeedEvents({
       ...baseInput,
@@ -115,5 +119,167 @@ describe("projectFeedEvents", () => {
       location: null,
       summary: "Unavailable",
     });
+  });
+
+  it("projects public holidays for matching locations and deduplicates by id and date", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-20T09:00:00.000Z"));
+
+    mocks.feedFindFirst.mockResolvedValueOnce({
+      created_by_user_id: "user_1",
+      includes_public_holidays: true,
+      privacy_mode: "named",
+      scopes: [{ scope_type: "org", scope_value: null }],
+    });
+    mocks.resolvePeopleForFeed.mockResolvedValueOnce({
+      ok: true,
+      value: [
+        {
+          displayName: "Jane Smith",
+          firstName: "Jane",
+          id: "20000000-0000-4000-8000-000000000001",
+          lastName: "Smith",
+          location: {
+            countryCode: "AU",
+            id: "50000000-0000-4000-8000-000000000001",
+            name: "Brisbane",
+            regionCode: "QLD",
+            timezone: "Australia/Brisbane",
+          },
+          locationId: "50000000-0000-4000-8000-000000000001",
+          managerPersonId: null,
+          team: null,
+          teamId: null,
+        },
+        {
+          displayName: "Moana Lee",
+          firstName: "Moana",
+          id: "20000000-0000-4000-8000-000000000002",
+          lastName: "Lee",
+          location: {
+            countryCode: "NZ",
+            id: "50000000-0000-4000-8000-000000000002",
+            name: "Auckland",
+            regionCode: "AUK",
+            timezone: "Pacific/Auckland",
+          },
+          locationId: "50000000-0000-4000-8000-000000000002",
+          managerPersonId: null,
+          team: null,
+          teamId: null,
+        },
+      ],
+    });
+    mocks.publicHolidayFindMany.mockResolvedValueOnce([
+      {
+        archived_at: null,
+        assignments: [
+          {
+            archived_at: null,
+            day_classification: "non_working",
+            scope_type: "location",
+            scope_value: "50000000-0000-4000-8000-000000000001",
+          },
+        ],
+        country_code: "AU",
+        default_classification: "working",
+        holiday_date: new Date("2026-06-22T00:00:00.000Z"),
+        id: "60000000-0000-4000-8000-000000000001",
+        name: "Assigned Picnic Day",
+        region_code: "NSW",
+      },
+      {
+        archived_at: null,
+        assignments: [
+          {
+            archived_at: null,
+            day_classification: "working",
+            scope_type: "location",
+            scope_value: "50000000-0000-4000-8000-000000000001",
+          },
+        ],
+        country_code: "AU",
+        default_classification: "non_working",
+        holiday_date: new Date("2026-06-23T00:00:00.000Z"),
+        id: "60000000-0000-4000-8000-000000000002",
+        name: "Local Trading Day",
+        region_code: "QLD",
+      },
+      {
+        archived_at: null,
+        assignments: [],
+        country_code: "CUSTOM",
+        default_classification: "non_working",
+        holiday_date: new Date("2026-06-24T00:00:00.000Z"),
+        id: "60000000-0000-4000-8000-000000000003",
+        name: "Company Holiday",
+        region_code: null,
+      },
+      {
+        archived_at: null,
+        assignments: [],
+        country_code: "CUSTOM",
+        default_classification: "non_working",
+        holiday_date: new Date("2026-06-24T00:00:00.000Z"),
+        id: "60000000-0000-4000-8000-000000000003",
+        name: "Company Holiday Duplicate",
+        region_code: null,
+      },
+      {
+        archived_at: null,
+        assignments: [],
+        country_code: "AU",
+        default_classification: "non_working",
+        holiday_date: new Date("2026-06-25T00:00:00.000Z"),
+        id: "60000000-0000-4000-8000-000000000004",
+        name: "State Holiday",
+        region_code: "NSW",
+      },
+    ]);
+
+    const result = await projectFeedEvents({
+      ...baseInput,
+      privacyMode: "named",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    const publicHolidays = result.value.filter(
+      (event) => event.isPublicHoliday
+    );
+
+    expect(publicHolidays).toHaveLength(2);
+    expect(publicHolidays).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          allDay: true,
+          displayName: "Public holiday: Assigned Picnic Day",
+          endsAt: new Date("2026-06-23T00:00:00.000Z"),
+          publishedUid:
+            "60000000-0000-4000-8000-000000000001@ical.leavesync.app",
+          sourceRecordId: "60000000-0000-4000-8000-000000000001",
+          startsAt: new Date("2026-06-22T00:00:00.000Z"),
+          summary: "Public holiday: Assigned Picnic Day",
+        }),
+        expect.objectContaining({
+          displayName: "Public holiday: Company Holiday",
+          endsAt: new Date("2026-06-25T00:00:00.000Z"),
+          publishedUid:
+            "60000000-0000-4000-8000-000000000003@ical.leavesync.app",
+          sourceRecordId: "60000000-0000-4000-8000-000000000003",
+          startsAt: new Date("2026-06-24T00:00:00.000Z"),
+          summary: "Public holiday: Company Holiday",
+        }),
+      ])
+    );
+    expect(publicHolidays.map((event) => event.summary)).not.toContain(
+      "Public holiday: Local Trading Day"
+    );
+    expect(publicHolidays.map((event) => event.summary)).not.toContain(
+      "Public holiday: State Holiday"
+    );
   });
 });
