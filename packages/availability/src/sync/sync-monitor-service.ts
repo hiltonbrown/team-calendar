@@ -225,6 +225,7 @@ export async function listTenantSummaries(
       database.syncRun.findMany({
         where: {
           ...scoped(parsed.data),
+          started_at: { gte: since },
           xero_tenant_id: { in: tenantIds },
         },
         orderBy: [{ started_at: "desc" }, { id: "desc" }],
@@ -233,7 +234,10 @@ export async function listTenantSummaries(
       database.failedRecord.findMany({
         where: {
           ...scoped(parsed.data),
-          sync_run: { xero_tenant_id: { in: tenantIds } },
+          sync_run: {
+            started_at: { gte: since },
+            xero_tenant_id: { in: tenantIds },
+          },
         },
         include: {
           sync_run: {

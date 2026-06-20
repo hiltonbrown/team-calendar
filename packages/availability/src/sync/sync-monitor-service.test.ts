@@ -98,6 +98,83 @@ describe("sync-monitor-service", () => {
     });
   });
 
+  it("bounds tenant summary run and failed-record queries to the 30-day window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-20T12:00:00.000Z"));
+
+    const startedAt = new Date("2026-04-19T12:00:00.000Z");
+    const completedAt = new Date("2026-04-19T12:05:00.000Z");
+    mocks.syncRunFindMany.mockResolvedValue([
+      {
+        completed_at: completedAt,
+        failed_records: [{ id: "failed_record_1" }],
+        id: "run_1",
+        records_failed: 1,
+        records_upserted: 4,
+        run_type: "people",
+        started_at: startedAt,
+        status: "partial_success",
+        xero_tenant_id: "tenant_1",
+      },
+    ]);
+    mocks.failedRecordFindMany.mockResolvedValue([
+      {
+        created_at: new Date("2026-04-19T12:01:00.000Z"),
+        id: "failed_record_1",
+        sync_run: {
+          run_type: "people",
+          started_at: startedAt,
+          xero_tenant_id: "tenant_1",
+        },
+      },
+    ]);
+
+    try {
+      const result = await listTenantSummaries(baseInput);
+      const since = new Date("2026-03-21T12:00:00.000Z");
+
+      expect(mocks.syncRunFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            started_at: { gte: since },
+            xero_tenant_id: { in: ["tenant_1"] },
+          }),
+        })
+      );
+      expect(mocks.failedRecordFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            sync_run: {
+              started_at: { gte: since },
+              xero_tenant_id: { in: ["tenant_1"] },
+            },
+          }),
+        })
+      );
+      expect(result).toMatchObject({
+        ok: true,
+        value: [
+          {
+            failedRunsLast30Days: 1,
+            lastPeopleSync: completedAt,
+            lastRun: {
+              id: "run_1",
+              recordsFailed: 1,
+              recordsUpserted: 4,
+              runType: "people",
+              startedAt,
+              status: "partial_success",
+            },
+            pendingFailedRecords: 1,
+            totalRunsLast30Days: 1,
+          },
+        ],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses manual sync for paused tenants", async () => {
     const result = await dispatchManualSync({
       ...baseInput,
