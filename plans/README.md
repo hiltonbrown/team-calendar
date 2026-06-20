@@ -26,7 +26,7 @@ row when done.
 | 015 | Test SSE org broadcast, core date utils, and public-holiday projection | P3 | M | — | DONE |
 | 016 | [spike] Analytics UI over the existing reporting services (DIR-01) | P2 | M | — | DONE |
 | 017 | [spike] HTML calendar view renderer (DIR-03) | P3 | M | — | DONE |
-| 018 | [spike] NZ/UK payroll write-back + read (DIR-02) | P3 | L | — | TODO |
+| 018 | [spike] NZ/UK payroll write-back + read (DIR-02) | P3 | L | — | BLOCKED (official NZ/UK payroll leave application payloads unavailable in public Xero docs; design doc written) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 

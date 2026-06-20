@@ -6,7 +6,7 @@
 > without maintainer sign-off. If a STOP condition occurs, stop and report. Update
 > `plans/README.md` when done.
 >
-> **Drift check (run first)**: `git diff --stat e1b06a3..HEAD -- packages/xero/src/nz packages/xero/src/uk packages/xero/src/au packages/xero/src/write packages/xero/src/read`
+> **Drift check (run first)**: `git diff --stat 1201404..HEAD -- packages/xero/src/nz packages/xero/src/uk packages/xero/src/au packages/xero/src/write packages/xero/src/read`
 > Compare against live code; on a mismatch, note it in your design doc.
 
 ## Status
@@ -16,8 +16,27 @@
 - **Risk**: MED (writes to a customer's live payroll once enabled)
 - **Depends on**: none
 - **Category**: direction
-- **Planned at**: commit `e1b06a3`, 2026-06-18
+- **Execution status**: BLOCKED, official Xero NZ/UK payroll leave application
+  payloads could not be confirmed from public official docs; see
+  `plans/018-nz-uk-payroll-design.md`
+- **Planned at**: commit `1201404`, 2026-06-20
 - **Issue**: <!-- filled when published via --issues -->
+
+## Drift reconciliation
+
+This plan was originally written at `e1b06a3` and reconciled at `1201404`.
+Between those commits, the Xero read layer gained:
+
+- `packages/xero/src/au/read.ts`: optional `onProgress(processed, total)` support
+  for `fetchLeaveBalances`
+- `packages/xero/src/read/dispatch.ts`: the same optional `onProgress` field in
+  `fetchLeaveBalancesForRegion`
+- mapper tests for employees and leave-application status under
+  `packages/xero/src/read`
+
+The executor must preserve the current dispatch signatures and follow the new
+mapper-test style. If files in the drift check changed again after `1201404`,
+record the mismatch in `plans/018-nz-uk-payroll-design.md` before implementing.
 
 ## Why this matters
 
