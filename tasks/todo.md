@@ -18,13 +18,13 @@
 ## Plan
 
 - [x] Inspect all local branches, worktrees, branch containment, and git object health.
-- [ ] Commit any uncommitted edits in every worktree.
-- [ ] Rebase local worktree branches onto `main` where they are not already contained.
-- [ ] Merge all local branches into `main`.
-- [ ] Remove or prune stale/corrupt worktree metadata only if git reports it as stale.
-- [ ] Run verification commands from `main`.
-- [ ] Document the final branch/worktree state and verification results here.
-- [ ] Capture any lesson learned in `tasks/lessons.md`.
+- [x] Commit any uncommitted edits in every worktree.
+- [x] Rebase local worktree branches onto `main` where they are not already contained.
+- [x] Merge all local branches into `main`.
+- [x] Remove or prune stale/corrupt worktree metadata only if git reports it as stale.
+- [x] Run verification commands from `main`.
+- [x] Document the final branch/worktree state and verification results here.
+- [x] Capture any lesson learned in `tasks/lessons.md`.
 
 ## Review
 
@@ -32,6 +32,17 @@
 - `git worktree prune --dry-run --verbose` reports no stale worktree metadata.
 - All local branches are already contained in `main`; `advisor/016-analytics-spike`
   remains checked out in `/tmp/leavesync-016` at its branch tip.
+- Committed the repair plan and lesson in `4eca137`.
+- Rebased `advisor/015-broadcast-date-holiday-tests`,
+  `advisor/016-analytics-spike`, and `advisor/017-html-calendar-spike` onto
+  `main`.
+- Merged all three advisor branches back into `main`; each reported "Already up
+  to date" after the rebase.
+- Final `git branch --no-merged main` produced no output.
+- Final `git worktree prune --dry-run --verbose` produced no output.
+- Final `bun run check` exits 0.
+- Final `bunx vitest run packages/feeds` exits 0 with 10 files and 53 tests
+  passing.
 
 # Plan: Execute Plan 007 Batch Xero Sync Handler Lookups
 
