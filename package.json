@@ -20,7 +20,6 @@
     "clean": "git clean -xdf node_modules"
   },
   "devDependencies": {
-    "@auto-it/first-time-contributor": "^11.3.6",
     "@biomejs/biome": "2.4.15",
     "@repo/typescript-config": "*",
     "@turbo/gen": "^2.9.14",
