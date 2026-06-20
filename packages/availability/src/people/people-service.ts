@@ -19,6 +19,7 @@ import {
   type CurrentStatus,
   type CurrentStatusKey,
   computeCurrentStatus,
+  computeCurrentStatusForPeople,
 } from "./current-status";
 import {
   type FieldOwnership,
@@ -298,15 +299,26 @@ export async function listPeople(input: {
       failedCounts.map((row) => [row.person_id, row._count._all])
     );
 
-    const mapped = await Promise.all(
-      people.map(async (person) =>
-        toPersonListItem(
-          person,
-          scoped,
-          failedCountByPersonId.get(person.id) ?? 0
-        )
-      )
-    );
+    const currentStatusesByPersonId = await computeCurrentStatusForPeople({
+      at: new Date(),
+      clerkOrgId: scoped.clerk_org_id,
+      organisationId: scoped.organisation_id,
+      people: people.map((person) => ({
+        locationId: person.location_id,
+        personId: person.id,
+      })),
+    });
+    const mapped = people.map((person) => {
+      const currentStatus = currentStatusesByPersonId.get(person.id);
+      if (!currentStatus) {
+        throw new Error("Current status missing for person list item");
+      }
+      return toPersonListItem(
+        person,
+        currentStatus,
+        failedCountByPersonId.get(person.id) ?? 0
+      );
+    });
     const filtered = mapped.filter((person) => {
       if (filters.xeroSyncFailedOnly && person.xeroSyncFailedCount === 0) {
         return false;
@@ -751,7 +763,7 @@ export function toBalanceRow(balance: LeaveBalanceProfileRow): BalanceRow {
   };
 }
 
-async function toPersonListItem(
+function toPersonListItem(
   person: {
     archived_at: Date | null;
     avatar_url: string | null;
@@ -774,17 +786,9 @@ async function toPersonListItem(
     team: { id: string; name: string } | null;
     xero_employee_id: string | null;
   },
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
+  currentStatus: CurrentStatus,
   xeroSyncFailedCount: number
-): Promise<PersonListItem> {
-  const currentStatus = await computeCurrentStatus({
-    at: new Date(),
-    clerkOrgId: scoped.clerk_org_id,
-    locationId: person.location_id,
-    organisationId: scoped.organisation_id,
-    personId: person.id,
-  });
-
+): PersonListItem {
   return {
     archivedAt: person.archived_at,
     avatarUrl: person.avatar_url,

@@ -64,6 +64,21 @@ export interface CurrentStatus {
   statusKey: CurrentStatusKey;
 }
 
+export interface CurrentStatusPersonInput {
+  locationId: string | null;
+  personId: string;
+}
+
+interface CurrentStatusHolidayRow {
+  country_code: string;
+  holiday_date: Date;
+  holiday_type: public_holiday_type;
+  id: string;
+  name: string;
+  region_code: string | null;
+  source: public_holiday_source;
+}
+
 const LOCAL_PRIORITY: Array<{
   label: string;
   recordTypes: availability_record_type[];
@@ -115,6 +130,132 @@ const LOCAL_PRIORITY: Array<{
     statusKey: "other",
   },
 ];
+
+export async function computeCurrentStatusForPeople(input: {
+  at: Date;
+  clerkOrgId: string;
+  organisationId: string;
+  people: CurrentStatusPersonInput[];
+}): Promise<Map<string, CurrentStatus>> {
+  const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+  const organisationId = input.organisationId as OrganisationId;
+  const personIds = input.people.map((person) => person.personId);
+  if (personIds.length === 0) {
+    return new Map();
+  }
+
+  const locationIds = [
+    ...new Set(
+      input.people
+        .map((person) => person.locationId)
+        .filter((locationId): locationId is string => locationId !== null)
+    ),
+  ];
+
+  const [locations, organisation, activeRecords] = await Promise.all([
+    locationIds.length
+      ? database.location.findMany({
+          where: {
+            ...scopedQuery(clerkOrgId, organisationId),
+            id: { in: locationIds },
+          },
+          select: {
+            country_code: true,
+            id: true,
+            region_code: true,
+            timezone: true,
+          },
+        })
+      : Promise.resolve([]),
+    database.organisation.findFirst({
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        id: organisationId,
+      },
+      select: {
+        country_code: true,
+        timezone: true,
+      },
+    }),
+    database.availabilityRecord.findMany({
+      where: {
+        ...scopedQuery(clerkOrgId, organisationId),
+        archived_at: null,
+        approval_status: { in: ["approved", "submitted"] },
+        ends_at: { gte: input.at },
+        person_id: { in: personIds },
+        starts_at: { lte: input.at },
+      },
+      select: {
+        approval_status: true,
+        archived_at: true,
+        contactability: true,
+        ends_at: true,
+        id: true,
+        person_id: true,
+        record_type: true,
+        source_type: true,
+        starts_at: true,
+        title: true,
+      },
+    }),
+  ]);
+
+  const locationsById = new Map(
+    locations.map((location) => [location.id, location])
+  );
+  const recordsByPersonId = new Map<string, CurrentStatusRecord[]>();
+  for (const record of activeRecords) {
+    const records = recordsByPersonId.get(record.person_id) ?? [];
+    records.push(toStatusRecord(record));
+    recordsByPersonId.set(record.person_id, records);
+  }
+
+  const holidayLookupInputs = input.people.map((person) => {
+    const location = person.locationId
+      ? (locationsById.get(person.locationId) ?? null)
+      : null;
+    return {
+      countryCode: location?.country_code ?? organisation?.country_code ?? null,
+      localDate: dateOnlyInTimeZone(
+        input.at,
+        location?.timezone ?? organisation?.timezone ?? "UTC"
+      ),
+      regionCode: location?.region_code ?? null,
+    };
+  });
+  const holidays = await findPublicHolidays({
+    clerkOrgId,
+    holidayLookupInputs,
+    organisationId,
+  });
+
+  const statuses = new Map<string, CurrentStatus>();
+  for (const person of input.people) {
+    const records = recordsByPersonId.get(person.personId) ?? [];
+    const leaveStatus = statusFromApprovedOrPendingLeave(records);
+    if (leaveStatus) {
+      statuses.set(person.personId, leaveStatus);
+      continue;
+    }
+
+    const location = person.locationId
+      ? (locationsById.get(person.locationId) ?? null)
+      : null;
+    const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
+    const localDate = dateOnlyInTimeZone(input.at, timezone);
+    const holiday = findPublicHolidayInRows({
+      countryCode: location?.country_code ?? organisation?.country_code ?? null,
+      holidays,
+      localDate,
+      regionCode: location?.region_code ?? null,
+    });
+    statuses.set(person.personId, statusFromHolidayOrLocal(records, holiday));
+  }
+
+  return statuses;
+}
 
 export async function computeCurrentStatus(input: {
   at: Date;
@@ -174,30 +315,9 @@ export async function computeCurrentStatus(input: {
   ]);
 
   const mappedRecords = activeRecords.map(toStatusRecord);
-  const approvedLeave = mappedRecords.find(
-    (record) =>
-      record.approvalStatus === "approved" &&
-      isXeroLeaveType(record.recordType as RecordType)
-  );
-  if (approvedLeave) {
-    return statusFromRecord(
-      "on_leave",
-      `On ${leaveTypeLabel(approvedLeave.recordType)}`,
-      approvedLeave
-    );
-  }
-
-  const pendingLeave = mappedRecords.find(
-    (record) =>
-      record.approvalStatus === "submitted" &&
-      isXeroLeaveType(record.recordType as RecordType)
-  );
-  if (pendingLeave) {
-    return statusFromRecord(
-      "pending_leave",
-      "Leave pending approval",
-      pendingLeave
-    );
+  const leaveStatus = statusFromApprovedOrPendingLeave(mappedRecords);
+  if (leaveStatus) {
+    return leaveStatus;
   }
 
   const timezone = location?.timezone ?? organisation?.timezone ?? "UTC";
@@ -209,42 +329,7 @@ export async function computeCurrentStatus(input: {
     organisationId,
     regionCode: location?.region_code ?? null,
   });
-  if (holiday) {
-    return {
-      activePublicHoliday: {
-        date: holiday.holiday_date,
-        id: holiday.id,
-        name: holiday.name,
-        source: holiday.source,
-        type: holiday.holiday_type,
-      },
-      activeRecord: null,
-      approvalStatus: null,
-      contactabilityStatus: null,
-      label: "Public holiday",
-      recordType: null,
-      statusKey: "public_holiday",
-    };
-  }
-
-  for (const rung of LOCAL_PRIORITY) {
-    const match = mappedRecords.find((record) =>
-      rung.recordTypes.includes(record.recordType)
-    );
-    if (match) {
-      return statusFromRecord(rung.statusKey, rung.label, match);
-    }
-  }
-
-  return {
-    activePublicHoliday: null,
-    activeRecord: null,
-    approvalStatus: null,
-    contactabilityStatus: null,
-    label: "Available",
-    recordType: null,
-    statusKey: "available",
-  };
+  return statusFromHolidayOrLocal(mappedRecords, holiday);
 }
 
 function toStatusRecord(record: {
@@ -287,6 +372,80 @@ function statusFromRecord(
   };
 }
 
+function statusFromApprovedOrPendingLeave(
+  records: CurrentStatusRecord[]
+): CurrentStatus | null {
+  const approvedLeave = records.find(
+    (record) =>
+      record.approvalStatus === "approved" &&
+      isXeroLeaveType(record.recordType as RecordType)
+  );
+  if (approvedLeave) {
+    return statusFromRecord(
+      "on_leave",
+      `On ${leaveTypeLabel(approvedLeave.recordType)}`,
+      approvedLeave
+    );
+  }
+
+  const pendingLeave = records.find(
+    (record) =>
+      record.approvalStatus === "submitted" &&
+      isXeroLeaveType(record.recordType as RecordType)
+  );
+  if (pendingLeave) {
+    return statusFromRecord(
+      "pending_leave",
+      "Leave pending approval",
+      pendingLeave
+    );
+  }
+
+  return null;
+}
+
+function statusFromHolidayOrLocal(
+  records: CurrentStatusRecord[],
+  holiday: CurrentStatusHolidayRow | null
+): CurrentStatus {
+  if (holiday) {
+    return {
+      activePublicHoliday: {
+        date: holiday.holiday_date,
+        id: holiday.id,
+        name: holiday.name,
+        source: holiday.source,
+        type: holiday.holiday_type,
+      },
+      activeRecord: null,
+      approvalStatus: null,
+      contactabilityStatus: null,
+      label: "Public holiday",
+      recordType: null,
+      statusKey: "public_holiday",
+    };
+  }
+
+  for (const rung of LOCAL_PRIORITY) {
+    const match = records.find((record) =>
+      rung.recordTypes.includes(record.recordType)
+    );
+    if (match) {
+      return statusFromRecord(rung.statusKey, rung.label, match);
+    }
+  }
+
+  return {
+    activePublicHoliday: null,
+    activeRecord: null,
+    approvalStatus: null,
+    contactabilityStatus: null,
+    label: "Available",
+    recordType: null,
+    statusKey: "available",
+  };
+}
+
 function findPublicHoliday(input: {
   clerkOrgId: ClerkOrgId;
   countryCode: string | null;
@@ -314,13 +473,115 @@ function findPublicHoliday(input: {
     },
     orderBy: [{ region_code: "desc" }, { name: "asc" }],
     select: {
+      country_code: true,
       holiday_date: true,
       holiday_type: true,
       id: true,
       name: true,
+      region_code: true,
       source: true,
     },
   });
+}
+
+function findPublicHolidays(input: {
+  clerkOrgId: ClerkOrgId;
+  holidayLookupInputs: Array<{
+    countryCode: string | null;
+    localDate: string;
+    regionCode: string | null;
+  }>;
+  organisationId: OrganisationId;
+}): Promise<CurrentStatusHolidayRow[]> {
+  const countries = [
+    ...new Set(
+      input.holidayLookupInputs
+        .map((lookup) => lookup.countryCode)
+        .filter((countryCode): countryCode is string => countryCode !== null)
+    ),
+  ];
+  if (countries.length === 0) {
+    return Promise.resolve([]);
+  }
+
+  const regions = [
+    ...new Set(
+      input.holidayLookupInputs
+        .map((lookup) => lookup.regionCode)
+        .filter((regionCode): regionCode is string => regionCode !== null)
+    ),
+  ];
+  const starts = input.holidayLookupInputs.map((lookup) =>
+    startOfUtcDay(lookup.localDate)
+  );
+  const earliest = new Date(Math.min(...starts.map((date) => date.getTime())));
+  const latest = new Date(Math.max(...starts.map((date) => date.getTime())));
+  latest.setUTCDate(latest.getUTCDate() + 1);
+
+  return database.publicHoliday.findMany({
+    where: {
+      ...scopedQuery(input.clerkOrgId, input.organisationId),
+      archived_at: null,
+      country_code: { in: countries },
+      holiday_date: {
+        gte: earliest,
+        lt: latest,
+      },
+      OR: [
+        { region_code: null },
+        ...(regions.length ? [{ region_code: { in: regions } }] : []),
+      ],
+    },
+    orderBy: [{ region_code: "desc" }, { name: "asc" }],
+    select: {
+      country_code: true,
+      holiday_date: true,
+      holiday_type: true,
+      id: true,
+      name: true,
+      region_code: true,
+      source: true,
+    },
+  });
+}
+
+function findPublicHolidayInRows(input: {
+  countryCode: string | null;
+  holidays: CurrentStatusHolidayRow[];
+  localDate: string;
+  regionCode: string | null;
+}): CurrentStatusHolidayRow | null {
+  if (!input.countryCode) {
+    return null;
+  }
+
+  const holidayStart = startOfUtcDay(input.localDate);
+  const holidayEnd = new Date(holidayStart);
+  holidayEnd.setUTCDate(holidayEnd.getUTCDate() + 1);
+  const matches = input.holidays
+    .filter(
+      (holiday) =>
+        holiday.country_code === input.countryCode &&
+        holiday.holiday_date >= holidayStart &&
+        holiday.holiday_date < holidayEnd &&
+        (holiday.region_code === null ||
+          holiday.region_code === input.regionCode)
+    )
+    .sort(compareHolidayPriority);
+
+  return matches[0] ?? null;
+}
+
+function compareHolidayPriority(
+  left: CurrentStatusHolidayRow,
+  right: CurrentStatusHolidayRow
+): number {
+  const regionPriority =
+    Number(Boolean(right.region_code)) - Number(Boolean(left.region_code));
+  if (regionPriority !== 0) {
+    return regionPriority;
+  }
+  return left.name.localeCompare(right.name);
 }
 
 export function dateOnlyInTimeZone(date: Date, timeZone: string): string {

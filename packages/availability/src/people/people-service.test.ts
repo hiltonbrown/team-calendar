@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   availabilityCount: vi.fn(),
   availabilityGroupBy: vi.fn(),
   computeCurrentStatus: vi.fn(),
+  computeCurrentStatusForPeople: vi.fn(),
   managerScopePersonIds: vi.fn(),
   personCount: vi.fn(),
   personFindMany: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock("../settings/manager-scope", () => ({
 }));
 vi.mock("./current-status", () => ({
   computeCurrentStatus: mocks.computeCurrentStatus,
+  computeCurrentStatusForPeople: mocks.computeCurrentStatusForPeople,
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: vi.fn(),
@@ -64,11 +66,15 @@ describe("people-service", () => {
     mocks.personFindMany.mockResolvedValue([personRow(directReportId)]);
     mocks.personCount.mockResolvedValue(1);
     mocks.availabilityGroupBy.mockResolvedValue([]);
-    mocks.computeCurrentStatus.mockResolvedValue({
-      label: "Available",
-      recordId: null,
-      statusKey: "available",
-    });
+    mocks.computeCurrentStatus.mockResolvedValue(currentStatus());
+    mocks.computeCurrentStatusForPeople.mockImplementation(
+      async (input: {
+        people: Array<{ locationId: string | null; personId: string }>;
+      }) =>
+        new Map(
+          input.people.map((person) => [person.personId, currentStatus()])
+        )
+    );
     mocks.availabilityCount.mockResolvedValue(0);
   });
 
@@ -137,6 +143,35 @@ describe("people-service", () => {
     expect(result.value.people[0]?.xeroSyncFailedCount).toBe(2);
     expect(result.value.people[3]?.xeroSyncFailedCount).toBe(1);
     expect(result.value.people[1]?.xeroSyncFailedCount).toBe(0);
+  });
+
+  it("batches current status lookups for the people directory", async () => {
+    const people = Array.from({ length: 4 }, (_, index) =>
+      personRow(`00000000-0000-4000-8000-00000000020${index}`, {
+        location_id: `00000000-0000-4000-8000-00000000030${index}`,
+      })
+    );
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.personCount.mockResolvedValue(4);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      organisationId,
+      pagination: { pageSize: 50 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledOnce();
+    expect(mocks.computeCurrentStatusForPeople).toHaveBeenCalledWith({
+      at: expect.any(Date),
+      clerkOrgId: "org_1",
+      organisationId,
+      people: people.map((person) => ({
+        locationId: person.location_id,
+        personId: person.id,
+      })),
+    });
+    expect(mocks.computeCurrentStatus).not.toHaveBeenCalled();
   });
 
   it("pushes xero sync failed only filtering into the person query", async () => {
@@ -250,6 +285,7 @@ function personRow(
   overrides: Partial<{
     first_name: string;
     last_name: string;
+    location_id: string | null;
   }> = {}
 ) {
   return {
@@ -268,6 +304,18 @@ function personRow(
     team: null,
     xero_employee_id: null,
     ...overrides,
+  };
+}
+
+function currentStatus() {
+  return {
+    activePublicHoliday: null,
+    activeRecord: null,
+    approvalStatus: null,
+    contactabilityStatus: null,
+    label: "Available",
+    recordType: null,
+    statusKey: "available",
   };
 }
 
