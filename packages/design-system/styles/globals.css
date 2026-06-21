@@ -9,7 +9,7 @@
 
 :root,
 [data-theme="light"] {
-  /* LeaveSync light mode: botanical editorial */
+  /* Team Calendar light mode: botanical editorial */
   --background: #fcf8ff;
   --foreground: #1c1a26;
   --card: #ffffff;
@@ -68,7 +68,7 @@
 
 .dark,
 [data-theme="dark"] {
-  /* LeaveSync dark mode */
+  /* Team Calendar dark mode */
   --background: #131218;
   --foreground: #e6e1ec;
   --card: #0e0d13;
