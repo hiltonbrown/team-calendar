@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import { resolveCanonicalWebUrl } from "@repo/seo/canonical-url";
 import type { MetadataRoute } from "next";
 import { env } from "@/env";
 import { getAllPosts } from "@/src/lib/blog";
@@ -10,10 +11,10 @@ const pages = appFolders
   .filter((folder) => !folder.name.startsWith("("))
   .map((folder) => folder.name);
 const blogs = (await getAllPosts()).map((post) => post.slug);
-const protocol = env.VERCEL_PROJECT_PRODUCTION_URL?.startsWith("https")
-  ? "https"
-  : "http";
-const url = new URL(`${protocol}://${env.VERCEL_PROJECT_PRODUCTION_URL}`);
+const url = resolveCanonicalWebUrl({
+  webUrl: env.NEXT_PUBLIC_WEB_URL,
+  vercelProjectProductionUrl: env.VERCEL_PROJECT_PRODUCTION_URL,
+});
 
 const sitemap = async (): Promise<MetadataRoute.Sitemap> => [
   {

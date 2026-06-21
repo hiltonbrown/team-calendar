@@ -1,10 +1,11 @@
+import { resolveCanonicalWebUrl } from "@repo/seo/canonical-url";
 import type { MetadataRoute } from "next";
 import { env } from "@/env";
 
-const protocol = env.VERCEL_PROJECT_PRODUCTION_URL?.startsWith("https")
-  ? "https"
-  : "http";
-const url = new URL(`${protocol}://${env.VERCEL_PROJECT_PRODUCTION_URL}`);
+const url = resolveCanonicalWebUrl({
+  webUrl: env.NEXT_PUBLIC_WEB_URL,
+  vercelProjectProductionUrl: env.VERCEL_PROJECT_PRODUCTION_URL,
+});
 
 export default function robots(): MetadataRoute.Robots {
   return {
