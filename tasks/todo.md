@@ -1,3 +1,134 @@
+# Plan: Add Clerk Authentication With CLI
+
+## Plan
+
+- [x] Verify Clerk CLI availability and update or install it from the project root.
+- [x] Authenticate with `clerk auth login`.
+- [x] Run `clerk init --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` for this existing Bun/Next.js monorepo.
+- [ ] Link the repo and pull env values through the CLI fallback after Clerk re-authentication completes.
+- [x] Verify the Next.js app proxy matcher includes `'/__clerk/:path*'` after the API/TRPC matcher.
+- [x] Confirm clear signed-out and signed-in auth controls exist in the app UI, adding them if missing.
+- [x] Run `clerk doctor` and targeted repo verification.
+- [ ] Start the app and document the setup result in this review section.
+
+## Review
+
+- `clerk update --yes` exits 0 and reports Clerk CLI `1.5.0` is already the
+  latest available version.
+- `clerk auth login` confirmed the existing session for
+  `hello@hiltonbrown.com.au`.
+- `clerk init --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` was run from the monorepo
+  root, but the CLI exited 1 because it could not detect a framework.
+- The fallback inspection confirmed this is an existing Next.js app:
+  `packages/auth` already depends on `@clerk/nextjs` `^7.3.7`, the provider is
+  mounted inside `<body>` through `DesignSystemProvider`, sign-in/sign-up pages
+  exist under `apps/app/app/(unauthenticated)`, and the authenticated header
+  renders a Clerk `UserButton` via `CustomUserButton`.
+- Added `'/__clerk/:path*'` after `'/(api|trpc)(.*)'` in
+  `apps/app/proxy.ts`.
+- `clerk link --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` exits 1 with
+  `authorization_missing_scopes` for `applications:read`.
+- Re-authentication was attempted, but the browser OAuth callback timed out
+  before completion. Until that succeeds, the CLI cannot link this repo or run
+  `clerk env pull`.
+- A second `clerk auth login -y` browser OAuth attempt also timed out before
+  the callback completed.
+- `clerk env pull --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` also exits 1 with
+  `authorization_missing_scopes` for `applications:read`, confirming the
+  remaining setup is blocked on completing Clerk CLI browser authentication.
+- A later `clerk auth login -y` attempt completed successfully and logged in as
+  `hello@hiltonbrown.com.au`, but `clerk link --app
+  app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` still exits 1 with
+  `authorization_missing_scopes` for `applications:read`.
+- `clerk apps list` also exits 1 with `authorization_missing_scopes` for
+  `applications:read`, confirming the authenticated CLI token cannot read Clerk
+  applications.
+- `clerk doctor` exits 1: host state is writable, CLI is up to date, and the
+  CLI is logged in, but the project is not linked and Clerk env values have not
+  been pulled.
+- `cd apps/app && bun run typecheck` exits 0.
+- `bun run check` exits 0.
+- `cd apps/app && bun run dev` was started, but after 40 seconds it had not
+  emitted a ready line and `curl -I http://localhost:3000` could not connect, so
+  the dev process was stopped.
+
+# Plan: Harden apps/web Marketing Surfaces
+
+## Plan
+
+- [x] Verify the current `apps/web` routes, shared header/footer, and marketing CSS for brittle links, overflow, focus, motion, and fallback risks.
+- [x] Fix broken or fragile navigation targets without changing the public information architecture.
+- [x] Harden responsive layouts against long labels, narrow screens, horizontal demos, and translated copy.
+- [x] Add accessibility resilience for keyboard focus, menu semantics, reduced motion, reduced transparency, and high-contrast/forced-colour modes.
+- [x] Run targeted static scans for hardening regressions.
+- [x] Run `cd apps/web && bun run typecheck`.
+- [x] Run `cd apps/web && bun run build`.
+- [x] Document the verification and results in this review section.
+
+## Review
+
+- Hardened the shared web header with labelled nav regions, `aria-current`,
+  Escape-to-close behaviour, a persistent mobile nav container, and a
+  no-JavaScript mobile navigation fallback.
+- Added frosted-header opaque fallbacks for unsupported backdrop blur and
+  `prefers-reduced-transparency`, plus forced-colour boundaries for shared
+  shell, timeline, calendar, feature, pricing, and form surfaces.
+- Hardened calendar and team timeline demos with minimum day-column widths,
+  horizontal overflow containment, ellipsis-safe titles, LTR feed URL handling,
+  and tokenised provenance colours instead of hard-coded inset side stripes.
+- Tightened feature/pricing CSS by removing broad `transition: all`, reducing
+  persistent 24px radii to the repo's 16px rule, adding focus-visible states to
+  pricing FAQ/form controls, and using token colours for marketing pills.
+- Targeted scan exits clean: no `repeating-linear-gradient`, `outline: none`,
+  `transition: all`, gradient text, 24px+ persistent radii, `#000` text, or
+  inset 3px side-stripe shadows in `apps/web/app` and `apps/web/src`.
+- Route check confirmed `/integrations/xero` exists for the header/footer links.
+- `cd apps/web && bun run typecheck` exits 0.
+- `cd apps/web && bun run build` exits 0 and prerenders all public routes.
+- `bun run fix` exits 0 and fixed formatting/property order in changed files.
+- `bun run check` exits 0.
+- `apps/web/next-env.d.ts` was restored after `next build` rewrote it to the
+  production route-types import.
+- The working tree already contained other web and SEO changes before this
+  hardening pass; those were left in place.
+
+# Plan: Execute Plan 019 Marketing Website P1 Launch Pass
+
+## Plan
+
+- [x] Add a shared canonical web URL helper for metadata, robots, and sitemap generation.
+- [x] Fix P1 accessibility issues in the feature sandbox, contact form, and calendar integration tabs.
+- [x] Bring `/security`, `/integrations/xero`, `/blog`, `/changelog`, and `/contact` into the marketing token vocabulary.
+- [x] Remove P1 feature-page visual anti-patterns: striped pending states, hidden focus, persistent glass/shadow mixtures, and over-rounding.
+- [x] Run static scans for the fixed anti-patterns.
+- [x] Run `bun run check`.
+- [x] Run `bun run typecheck`.
+- [x] Run `cd apps/web && bun run typecheck`.
+- [x] Run `cd apps/web && bun run build`.
+- [x] Document the verification and results in `tasks/todo.md`.
+
+## Review
+
+- Added `packages/seo/canonical-url.ts` and reused it from SEO metadata,
+  `robots.ts`, and `sitemap.ts`.
+- Updated the contact form heading and labels, calendar integration tab ARIA,
+  and feature sandbox keyboard focus state.
+- Converted the legacy web routes to tokenised `marketing-simple` surfaces in
+  `apps/web/app/styles/shell.css`.
+- Removed the required scan targets: no `repeating-linear-gradient`, no
+  `outline: none`, and no scaffold `uppercase tracking-widest` /
+  `rounded-2xl bg-muted` / `rounded-2xl bg-background` matches in the scoped
+  route files.
+- `env -u NEXT_PUBLIC_WEB_URL -u VERCEL_PROJECT_PRODUCTION_URL bun -e 'import { resolveCanonicalWebUrl } from "./packages/seo/canonical-url.ts"; console.log(resolveCanonicalWebUrl().href)'`
+  prints `http://localhost:3001/`.
+- `bun run check` exits 0.
+- `bun run typecheck` exits 0.
+- `cd apps/web && bun run typecheck` exits 0.
+- `cd apps/web && bun run build` exits 0 and prerenders `/robots.txt` and
+  `/sitemap.xml`.
+- `apps/web/next-env.d.ts` was restored after `next build` rewrote it to the
+  production route-types import.
+
 # Plan: Fix Local Build and Runtime Environment Variables
 
 ## Plan
