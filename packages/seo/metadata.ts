@@ -15,8 +15,6 @@ const author: Metadata["authors"] = {
   url: primaryDomain,
 };
 const publisher = brandNameDisplay;
-// TODO: set the real Team Calendar X/Twitter handle before launch.
-const twitterHandle = "@vercel";
 
 export const createMetadata = ({
   title,
@@ -50,7 +48,6 @@ export const createMetadata = ({
     publisher,
     twitter: {
       card: "summary_large_image",
-      creator: twitterHandle,
     },
   };
 
