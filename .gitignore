@@ -71,3 +71,6 @@ tmp/
 apps/email/.react-email/
 
 .env*
+
+# Claude Code local settings (machine-specific permission allowlist)
+.claude/settings.local.json
