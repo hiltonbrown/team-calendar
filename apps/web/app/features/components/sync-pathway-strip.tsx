@@ -79,7 +79,7 @@ const XeroIcon = () => (
 const steps: PathwayStep[] = [
   {
     label: "Enter leave",
-    copy: "Submitted once in LeaveSync.",
+    copy: "Submitted once in Team Calendar.",
     icon: <PencilIcon />,
     iconClass: "fmkt-pathway__icon--primary",
   },
@@ -141,7 +141,7 @@ export const SyncPathwayStrip = () => (
               <path d="M15.6 15.6H20V20" />
             </g>
             <text className="fmkt-sync-label" x="120" y="79">
-              LeaveSync
+              Team Calendar
             </text>
             <text className="fmkt-sync-meta" x="120" y="105">
               submit once

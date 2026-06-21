@@ -159,7 +159,8 @@ const DAYS: DayData[] = [
   },
 ];
 const feedUrl =
-  "https://leavesync.app/feeds/teams/8a3f4d2c-9b71-44e2/team-availability.ics";
+  "https://teamcalendar.online/feeds/teams/8a3f4d2c-9b71-44e2/team-availability.ics";
+const weekGridTemplate = "repeat(7, minmax(8.5rem, 1fr))";
 
 export const CalendarIntegrationSection = () => {
   const [days, setDays] = useState<DayData[]>(DAYS);
@@ -315,7 +316,7 @@ export const CalendarIntegrationSection = () => {
             </div>
             <div
               className="ci-week"
-              style={{ gridTemplateColumns: "repeat(7, 1fr)", opacity: 0.5 }}
+              style={{ gridTemplateColumns: weekGridTemplate, opacity: 0.5 }}
             >
               {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                 <div className="ci-day" key={i}>
@@ -402,12 +403,15 @@ export const CalendarIntegrationSection = () => {
         >
           {DESTINATIONS.map((d, index) => (
             <button
+              aria-controls={`calendar-destination-panel-${d.id}`}
               aria-selected={activeId === d.id}
               className={`ci-tab ${activeId === d.id ? "is-active" : ""}`}
+              id={`calendar-destination-tab-${d.id}`}
               key={d.id}
               onClick={() => setActiveId(d.id)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               role="tab"
+              tabIndex={activeId === d.id ? 0 : -1}
               type="button"
             >
               <MarketingIcon id={d.iconId} size={16} />
@@ -416,7 +420,12 @@ export const CalendarIntegrationSection = () => {
           ))}
         </div>
 
-        <div className="ci-card">
+        <div
+          aria-labelledby={`calendar-destination-tab-${active.id}`}
+          className="ci-card"
+          id={`calendar-destination-panel-${active.id}`}
+          role="tabpanel"
+        >
           <div className="ci-card__head">
             <div className="ci-card__head-l">
               <div aria-hidden="true" className="ci-card__head-icon">
@@ -442,7 +451,7 @@ export const CalendarIntegrationSection = () => {
             aria-label={`Week ${dateRangeLabel} in ${active.name}`}
             className="ci-week"
             role="grid"
-            style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+            style={{ gridTemplateColumns: weekGridTemplate }}
           >
             {days.map((d) => (
               /* biome-ignore lint/a11y/useFocusableInteractive: day cell is non-interactive container */

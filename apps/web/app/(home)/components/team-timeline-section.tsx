@@ -104,6 +104,7 @@ const STAFF: Staff[] = [
   { id: "mt", name: "Mia Tanaka", role: "Design", initials: "MT" },
   { id: "rp", name: "Ruben Park", role: "Support", initials: "RP" },
 ];
+const weekGridTemplate = "repeat(7, minmax(7rem, 1fr))";
 
 const KIND: Record<
   KindKey,
@@ -578,7 +579,7 @@ export const TeamTimelineSection = () => {
               <div className="tl-corner">Team</div>
               <div
                 className="tl-days-header"
-                style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+                style={{ gridTemplateColumns: weekGridTemplate }}
               >
                 {[0, 1, 2, 3, 4, 5, 6].map((i) => (
                   <div className="tl-day-head" key={i}>
@@ -612,7 +613,7 @@ export const TeamTimelineSection = () => {
                   </div>
                   <div
                     className="tl-row-track"
-                    style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+                    style={{ gridTemplateColumns: weekGridTemplate }}
                   >
                     {[1, 2, 3, 4, 5, 6].map((i) => (
                       <span
@@ -754,7 +755,7 @@ export const TeamTimelineSection = () => {
             <div
               className="tl-days-header"
               role="row"
-              style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+              style={{ gridTemplateColumns: weekGridTemplate }}
             >
               {todayLeftPct !== null && (
                 <span
@@ -800,7 +801,7 @@ export const TeamTimelineSection = () => {
                 <div
                   className="tl-row-track"
                   role="row"
-                  style={{ gridTemplateColumns: "repeat(7, 1fr)" }}
+                  style={{ gridTemplateColumns: weekGridTemplate }}
                 >
                   {todayLeftPct !== null && (
                     <span

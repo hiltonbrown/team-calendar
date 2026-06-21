@@ -5,7 +5,7 @@ import { ContactForm } from "./components/contact-form";
 export const metadata: Metadata = createMetadata({
   title: "Get in touch",
   description:
-    "Talk to us about connecting LeaveSync to your Xero Payroll account.",
+    "Talk to us about connecting Team Calendar to your Xero Payroll account.",
 });
 
 const Contact = () => <ContactForm />;

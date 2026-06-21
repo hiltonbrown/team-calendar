@@ -34,9 +34,9 @@ export const WorkflowSection = () => (
         <p className="marketing-overline">Workflow</p>
         <h2>From request to calendar, automatically.</h2>
         <p>
-          LeaveSync keeps the operational loop short: people choose the right
-          availability type, add the details once, and the right calendars stay
-          current.
+          Team Calendar keeps the operational loop short: people choose the
+          right availability type, add the details once, and the right calendars
+          stay current.
         </p>
       </div>
       <ol className="marketing-workflow__steps">

@@ -8,9 +8,9 @@ import { InteractiveHeroSection } from "./components/interactive-hero";
 import { ScrollReveal } from "./components/scroll-reveal";
 
 export const metadata: Metadata = createMetadata({
-  title: "LeaveSync: Features",
+  title: "Team Calendar: Features",
   description:
-    "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once. LeaveSync publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
+    "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once. Team Calendar publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
 });
 
 // ---- Personas ----------------------------------------------------------------
@@ -44,16 +44,20 @@ const personas: Persona[] = [
     role: "Contractor · off payroll",
     title: "Unavailable days, WFH, deep work.",
     copy: "Contractors don't need a Xero record. Add them as a non-payroll teammate and they can mark unavailable days, project work and out-of-office, visible to everyone they collaborate with.",
-    source: { mod: "purple", label: "Added in LeaveSync", sub: "Manual entry" },
+    source: {
+      mod: "purple",
+      label: "Added in Team Calendar",
+      sub: "Manual entry",
+    },
   },
   {
     mod: "director",
     role: "Director · off payroll",
     title: "Board days, travel, out of office.",
-    copy: "Directors who draw fees rather than wages stay invisible to payroll-only tools. In LeaveSync they get the same calendar presence as the rest of the team, without showing up in pay runs.",
+    copy: "Directors who draw fees rather than wages stay invisible to payroll-only tools. In Team Calendar they get the same calendar presence as the rest of the team, without showing up in pay runs.",
     source: {
       mod: "purple",
-      label: "Added in LeaveSync",
+      label: "Added in Team Calendar",
       sub: "No payroll impact",
     },
   },
@@ -65,9 +69,9 @@ const FeaturesPersonas = () => (
       <div className="ft-overline">Built for everyone you work with</div>
       <h2>Three kinds of people. One availability view.</h2>
       <p className="ft-section__lead">
-        Most leave tools only see the payroll list. LeaveSync covers the whole
-        team, and keeps the source of each entry obvious. Sage came from Xero.
-        Purple was added by hand.
+        Most leave tools only see the payroll list. Team Calendar covers the
+        whole team, and keeps the source of each entry obvious. Sage came from
+        Xero. Purple was added by hand.
       </p>
       <div className="ft-personas">
         {personas.map((p) => (
@@ -109,12 +113,12 @@ const caps: Cap[] = [
   {
     icon: "sync",
     title: "Two-way sync with Xero Payroll",
-    copy: "Approved payroll leave writes back to Xero in the right type. Anything already in Xero shows up in LeaveSync. You only key it once, whichever side you keyed it on.",
+    copy: "Approved payroll leave writes back to Xero in the right type. Anything already in Xero shows up in Team Calendar. You only key it once, whichever side you keyed it on.",
   },
   {
     icon: "link",
     title: "Outlook · Google · Apple",
-    copy: "Each person and team gets a read-only calendar feed. Subscribe once in the app you already use; LeaveSync keeps it current.",
+    copy: "Each person and team gets a read-only calendar feed. Subscribe once in the app you already use; Team Calendar keeps it current.",
   },
   {
     icon: "leaf",
@@ -140,8 +144,8 @@ const FeaturesCaps = () => (
       <div className="ft-overline">Capabilities</div>
       <h2>The work the calendar tab can&apos;t do.</h2>
       <p className="ft-section__lead">
-        Email threads, spreadsheets and Xero alone leave gaps. LeaveSync closes
-        them with one place to enter, approve, sync and publish.
+        Email threads, spreadsheets and Xero alone leave gaps. Team Calendar
+        closes them with one place to enter, approve, sync and publish.
       </p>
       <div className="ft-caps">
         {caps.map((cap) => (
@@ -215,7 +219,7 @@ const FeaturesFlow = () => (
               src="/marketing/brand-mark.svg"
               width={28}
             />
-            <span>LeaveSync</span>
+            <span>Team Calendar</span>
           </div>
           <p className="ft-flow__hub__body">
             One reconciled record per person per day. Approvals applied.
@@ -401,7 +405,7 @@ const FeaturesMatrix = () => (
 const faqs = [
   {
     q: "Do contractors and directors need a Xero record?",
-    a: "No. They're added directly in LeaveSync and never appear in Xero or your pay runs. They only show up on the calendar.",
+    a: "No. They're added directly in Team Calendar and never appear in Xero or your pay runs. They only show up on the calendar.",
   },
   {
     q: "What happens to leave I've already keyed into Xero?",
@@ -409,11 +413,11 @@ const faqs = [
   },
   {
     q: "Is the calendar feed read-only?",
-    a: "Yes. Outlook, Google and Apple subscribe to a .ics feed per person or per team. Edits happen in LeaveSync; calendars refresh within a minute.",
+    a: "Yes. Outlook, Google and Apple subscribe to a .ics feed per person or per team. Edits happen in Team Calendar; calendars refresh within a minute.",
   },
   {
     q: "Can I tell which entries came from where?",
-    a: "Every entry carries its source. Sage means it came from Xero Payroll. Purple means it was added by hand in LeaveSync.",
+    a: "Every entry carries its source. Sage means it came from Xero Payroll. Purple means it was added by hand in Team Calendar.",
   },
   {
     q: "Which regions of Xero Payroll are supported?",

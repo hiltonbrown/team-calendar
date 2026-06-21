@@ -4,7 +4,7 @@ import { SectionIntro } from "./section-intro";
 export const ImageShowcase = () => (
   <section className="marketing-section marketing-story-panel marketing-story-panel--showcase">
     <SectionIntro
-      copy="LeaveSync updates calendars automatically, so managers stop chasing spreadsheets and manual updates."
+      copy="Team Calendar updates calendars automatically, so managers stop chasing spreadsheets and manual updates."
       eyebrow="How it works"
       title={
         <>

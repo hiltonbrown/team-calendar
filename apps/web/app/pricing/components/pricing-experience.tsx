@@ -107,12 +107,12 @@ const faqs = [
   {
     question: "What counts as an active employee?",
     answer:
-      "An active employee is a person synced from Xero Payroll who can appear in LeaveSync availability records or calendar feeds.",
+      "An active employee is a person synced from Xero Payroll who can appear in Team Calendar availability records or calendar feeds.",
   },
   {
     question: "Do you charge for contractors?",
     answer:
-      "Contractors only count when you add them to LeaveSync and include them in availability views or feeds.",
+      "Contractors only count when you add them to Team Calendar and include them in availability views or feeds.",
   },
   {
     question: "Can we change plans later?",

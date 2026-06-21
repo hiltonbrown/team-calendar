@@ -708,7 +708,8 @@ export const InteractiveHeroSection = () => {
     useSyncParticles(setLastSyncTime);
 
   const signUpHref = "/sign-up"; // fallback standard path
-  const mockFeedUrl = "https://api.leavesync.com/v1/ical/feed_5f2d7a9b.ics";
+  const mockFeedUrl =
+    "https://api.teamcalendar.online/v1/ical/feed_5f2d7a9b.ics";
 
   // Hydration-safe dynamic dates
   useEffect(() => {
@@ -818,7 +819,7 @@ export const InteractiveHeroSection = () => {
           <em>Every person on the calendar.</em>
         </h1>
         <p className="ft-hero__body">
-          Employees request leave once. LeaveSync pulls the approved details
+          Employees request leave once. Team Calendar pulls the approved details
           sitting in Xero Payroll, layers in contractors and directors added by
           hand, and publishes a single, authoritative feed to Outlook, Google
           Calendar, and Apple Calendar automatically.

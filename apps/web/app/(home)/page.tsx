@@ -8,9 +8,9 @@ import { CalendarIntegrationSection } from "./components/calendar-integration-se
 import { TeamTimelineSection } from "./components/team-timeline-section";
 
 export const metadata: Metadata = createMetadata({
-  title: "LeaveSync: Simple leave requests, clear team calendars.",
+  title: "Team Calendar: Simple leave requests, clear team calendars.",
   description:
-    "LeaveSync gives employees one easy place to request leave and working patterns, then keeps Xero Payroll and shared calendars current automatically.",
+    "Team Calendar gives employees one easy place to request leave and working patterns, then keeps Xero Payroll and shared calendars current automatically.",
 });
 
 // Trigger recompilation after CSS syntax fixes

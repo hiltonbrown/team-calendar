@@ -5,7 +5,7 @@ import { PricingExperience } from "./components/pricing-experience";
 export const metadata: Metadata = createMetadata({
   title: "Pricing",
   description:
-    "LeaveSync pricing for Xero Payroll teams. Compare Starter, Premium, and Enterprise plans for calendar availability publishing.",
+    "Team Calendar pricing for Xero Payroll teams. Compare Starter, Premium, and Enterprise plans for calendar availability publishing.",
 });
 
 const Pricing = () => <PricingExperience />;

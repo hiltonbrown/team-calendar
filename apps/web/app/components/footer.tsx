@@ -1,3 +1,4 @@
+import { brandNameDisplay } from "@repo/seo/branding";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -36,7 +37,7 @@ export const Footer = () => (
     <div className="marketing-footer__grid">
       <div>
         <Image
-          alt="LeaveSync"
+          alt={brandNameDisplay}
           height={40}
           src="/marketing/features-logo-dark.svg"
           width={40}
@@ -58,7 +59,7 @@ export const Footer = () => (
       ))}
     </div>
     <div className="marketing-footer__bottom">
-      <span>© 2026 LeaveSync. Built on the Gold Coast.</span>
+      <span>© 2026 {brandNameDisplay}. Built on the Gold Coast.</span>
       <span>Privacy · Terms · Data processing</span>
     </div>
   </footer>

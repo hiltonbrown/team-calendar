@@ -17,7 +17,7 @@ import { useState } from "react";
 const contactCopy = {
   title: "Get in touch",
   description:
-    "Talk to us about connecting LeaveSync to your Xero Payroll account.",
+    "Talk to us about connecting Team Calendar to your Xero Payroll account.",
   benefits: [
     {
       title: "Quick setup",
@@ -47,43 +47,40 @@ const contactCopy = {
 
 export const ContactForm = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const preferredDateId = "preferred-date";
+  const uploadId = "contact-upload";
 
   return (
-    <div className="w-full py-20 lg:py-40">
-      <div className="container mx-auto max-w-6xl">
-        <div className="grid gap-10 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <h4 className="max-w-xl text-left font-regular text-3xl tracking-tighter md:text-5xl">
-                  {contactCopy.title}
-                </h4>
-                <p className="max-w-sm text-left text-lg text-muted-foreground leading-relaxed tracking-tight">
-                  {contactCopy.description}
-                </p>
+    <div className="fmkt-page marketing-simple">
+      <section className="marketing-simple__hero">
+        <div className="fmkt-container">
+          <div className="marketing-simple__grid marketing-simple__grid--two">
+            <div className="marketing-simple__intro">
+              <p className="marketing-simple__kicker">Contact</p>
+              <h1 className="marketing-simple__title">{contactCopy.title}</h1>
+              <p className="marketing-simple__lead">
+                {contactCopy.description}
+              </p>
+              <div className="marketing-simple__section-copy">
+                <ul className="marketing-simple__list">
+                  {contactCopy.benefits.map((benefit) => (
+                    <li key={benefit.title}>
+                      <Check size={16} strokeWidth={1.8} />
+                      <span>
+                        <strong>{benefit.title}</strong>
+                        <br />
+                        {benefit.description}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-            {contactCopy.benefits.map((benefit) => (
-              <div
-                className="flex flex-row items-start gap-6 text-left"
-                key={benefit.title}
-              >
-                <Check className="mt-2 h-4 w-4 text-primary" />
-                <div className="flex flex-col gap-1">
-                  <p>{benefit.title}</p>
-                  <p className="text-muted-foreground text-sm">
-                    {benefit.description}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
 
-          <div className="flex items-center justify-center">
-            <div className="flex max-w-sm flex-col gap-4 rounded-md border p-8">
-              <p>{contactCopy.form.title}</p>
+            <div className="marketing-simple__panel">
+              <h2>{contactCopy.form.title}</h2>
               <div className="grid w-full max-w-sm items-center gap-1">
-                <Label htmlFor="picture">{contactCopy.form.date}</Label>
+                <Label htmlFor={preferredDateId}>{contactCopy.form.date}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -91,6 +88,7 @@ export const ContactForm = () => {
                         "w-full max-w-sm justify-start text-left font-normal",
                         !date && "text-muted-foreground"
                       )}
+                      id={preferredDateId}
                       variant="outline"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
@@ -120,8 +118,8 @@ export const ContactForm = () => {
                 <Input id="lastname" type="text" />
               </div>
               <div className="grid w-full max-w-sm items-center gap-1">
-                <Label htmlFor="picture">{contactCopy.form.resume}</Label>
-                <Input id="picture" type="file" />
+                <Label htmlFor={uploadId}>{contactCopy.form.resume}</Label>
+                <Input id={uploadId} type="file" />
               </div>
 
               <Button className="w-full gap-4">
@@ -130,7 +128,7 @@ export const ContactForm = () => {
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

@@ -63,7 +63,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-02-14",
     title: "ICS calendar feeds",
     description:
-      "LeaveSync now publishes per-person ICS feeds. Feeds are secured with a signed token and compatible with Outlook, Google Calendar, and Apple Calendar.",
+      "Team Calendar now publishes per-person ICS feeds. Feeds are secured with a signed token and compatible with Outlook, Google Calendar, and Apple Calendar.",
     changes: [
       {
         type: "feat",
@@ -92,7 +92,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-01-10",
     title: "Xero Payroll integration and leave sync",
     description:
-      "Initial release. LeaveSync connects to Xero Payroll AU, NZ, and UK via OAuth. Employee records and approved leave sync automatically.",
+      "Initial release. Team Calendar connects to Xero Payroll AU, NZ, and UK via OAuth. Employee records and approved leave sync automatically.",
     changes: [
       {
         type: "feat",
