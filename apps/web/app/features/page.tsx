@@ -66,7 +66,7 @@ const personas: Persona[] = [
 const FeaturesPersonas = () => (
   <section className="ft-section" id="coverage">
     <div className="fmkt-container">
-      <div className="ft-overline">Built for everyone you work with</div>
+      <p className="fmkt-overline">Built for everyone you work with</p>
       <h2>Three kinds of people. One availability view.</h2>
       <p className="ft-section__lead">
         Most leave tools only see the payroll list. Team Calendar covers the
@@ -141,7 +141,7 @@ const caps: Cap[] = [
 const FeaturesCaps = () => (
   <section className="ft-section">
     <div className="fmkt-container">
-      <div className="ft-overline">Capabilities</div>
+      <p className="fmkt-overline">Capabilities</p>
       <h2>The work the calendar tab can&apos;t do.</h2>
       <p className="ft-section__lead">
         Email threads, spreadsheets and Xero alone leave gaps. Team Calendar
@@ -170,7 +170,7 @@ const FeaturesCaps = () => (
 const FeaturesFlow = () => (
   <section className="ft-section">
     <div className="fmkt-container">
-      <div className="ft-overline">Sync model</div>
+      <p className="fmkt-overline">Sync model</p>
       <h2>Xero is the source. Calendars are the destination.</h2>
       <p className="ft-section__lead">
         We don&apos;t ask you to replace Xero or re-do its leave types. We treat
@@ -353,7 +353,7 @@ const matrixRows: MatrixRow[] = [
 const FeaturesMatrix = () => (
   <section className="ft-section">
     <div className="fmkt-container">
-      <div className="ft-overline">Coverage matrix</div>
+      <p className="fmkt-overline">Coverage matrix</p>
       <h2>What each kind of teammate can do.</h2>
       <p className="ft-section__lead">
         The short version: everyone gets calendar presence. Only payroll people
@@ -432,7 +432,7 @@ const faqs = [
 const FeaturesFAQ = () => (
   <section className="ft-section ft-section--tight">
     <div className="fmkt-container">
-      <div className="ft-overline">Common questions</div>
+      <p className="fmkt-overline">Common questions</p>
       <h2>Short answers.</h2>
       <div className="ft-faq">
         {faqs.map((f) => (

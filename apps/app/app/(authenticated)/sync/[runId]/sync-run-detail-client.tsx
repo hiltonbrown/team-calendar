@@ -12,6 +12,7 @@ import { Button } from "@repo/design-system/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { EmptyState } from "@/components/states/empty-state";
 import {
   cancelRunAction,
@@ -140,7 +141,9 @@ export function SyncRunDetailClient({
         </div>
 
         {run.errorSummary && (
-          <div className="rounded-2xl bg-amber-50 p-4 text-amber-950 text-sm dark:bg-amber-950/30 dark:text-amber-100">
+          <div
+            className={`rounded-2xl p-4 text-sm ${statusToneClasses.failed}`}
+          >
             <p>{run.errorSummary}</p>
             {detail.failedRecords.some((record) => record.rawPayload) && (
               <p className="mt-2 text-muted-foreground">
@@ -306,13 +309,17 @@ function StatCell({ label, value }: { label: string; value: number }) {
 
 function StatusBadge({ status }: { status: SyncRunStatus }) {
   const className = {
-    cancelled: "bg-muted-foreground text-background",
-    failed: "bg-red-600 text-white",
-    partial_success: "bg-amber-500 text-white",
-    running: "bg-blue-600 text-white motion-safe:animate-pulse",
-    succeeded: "bg-emerald-600 text-white",
+    cancelled: statusToneClasses.private,
+    failed: statusToneClasses.failed,
+    partial_success: statusToneClasses.holiday,
+    running: `${statusToneClasses.manual} motion-safe:animate-pulse`,
+    succeeded: statusToneClasses.leave,
   }[status];
-  return <Badge className={className}>{status.replaceAll("_", " ")}</Badge>;
+  return (
+    <Badge className={`border-0 ring-1 ${className}`}>
+      {status.replaceAll("_", " ")}
+    </Badge>
+  );
 }
 
 function runTypeLabel(runType: SyncRunType): string {

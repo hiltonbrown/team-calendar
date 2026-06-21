@@ -23,6 +23,7 @@ import {
   SlidersHorizontalIcon,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { labelForValue } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
 import {
@@ -78,87 +79,93 @@ export function CalendarToolbar({
   };
 
   const today = dateOnlyInTimeZone(new Date(), data.range.timezone);
+  const activeFilters = activeFilterLabels({
+    filters,
+    locations,
+    teams,
+  });
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          onClick={() => shift(-1)}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <ChevronLeftIcon className="size-4" />
-        </Button>
-        <div className="min-w-52 text-center font-semibold">
-          {periodLabel(data)}
+    <div className="rounded-2xl bg-muted p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            onClick={() => shift(-1)}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronLeftIcon className="size-4" />
+          </Button>
+          <div className="min-w-52 text-center font-semibold">
+            {periodLabel(data)}
+          </div>
+          <Button
+            onClick={() => shift(1)}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronRightIcon className="size-4" />
+          </Button>
+          <Button
+            onClick={() => update({ anchor: today })}
+            type="button"
+            variant="secondary"
+          >
+            Today
+          </Button>
         </div>
-        <Button
-          onClick={() => shift(1)}
-          size="icon"
-          type="button"
-          variant="ghost"
-        >
-          <ChevronRightIcon className="size-4" />
-        </Button>
-        <Button
-          onClick={() => update({ anchor: today })}
-          type="button"
-          variant="secondary"
-        >
-          Today
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            onValueChange={(value) => update({ view: parseView(value) })}
+            value={filters.view}
+          >
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="day">Day</SelectItem>
+              <SelectItem value="week">Week</SelectItem>
+              <SelectItem value="month">Month</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <ScopeSelect
+            filters={filters}
+            people={data.people}
+            setFilterParams={update}
+            teams={teams}
+          />
+
+          <FilterSheet
+            filters={filters}
+            locations={locations}
+            setFilterParams={update}
+          />
+
+          <Button
+            onClick={() => {
+              const params = new URLSearchParams(
+                Array.from(searchParams.entries())
+              );
+              params.set("startsAt", today);
+              if (selectedPersonId) {
+                params.set("personId", selectedPersonId);
+              }
+              router.push(
+                withOrg(`/plans/new?${params.toString()}`, orgQueryValue)
+              );
+            }}
+            type="button"
+          >
+            <PlusIcon className="size-4" />
+            Add leave or availability
+          </Button>
+        </div>
       </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <Select
-          onValueChange={(value) =>
-            update({ view: value as CalendarFilterInput["view"] })
-          }
-          value={filters.view}
-        >
-          <SelectTrigger className="w-32">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="day">Day</SelectItem>
-            <SelectItem value="week">Week</SelectItem>
-            <SelectItem value="month">Month</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <ScopeSelect
-          filters={filters}
-          people={data.people}
-          setFilterParams={update}
-          teams={teams}
-        />
-
-        <FilterSheet
-          filters={filters}
-          locations={locations}
-          setFilterParams={update}
-        />
-
-        <Button
-          onClick={() => {
-            const params = new URLSearchParams(
-              Array.from(searchParams.entries())
-            );
-            params.set("startsAt", today);
-            if (selectedPersonId) {
-              params.set("personId", selectedPersonId);
-            }
-            router.push(
-              withOrg(`/plans/new?${params.toString()}`, orgQueryValue)
-            );
-          }}
-          type="button"
-        >
-          <PlusIcon className="size-4" />
-          Add record
-        </Button>
-      </div>
+      <ActiveFilterSummary labels={activeFilters} />
     </div>
   );
 }
@@ -183,7 +190,7 @@ function ScopeSelect({
       onValueChange={(nextValue) => {
         const [scopeType, scopeValue] = nextValue.split(":");
         setFilterParams({
-          scopeType: scopeType as CalendarFilterInput["scopeType"],
+          scopeType: parseScopeType(scopeType),
           scopeValue: scopeValue || undefined,
         });
       }}
@@ -209,6 +216,124 @@ function ScopeSelect({
       </SelectContent>
     </Select>
   );
+}
+
+function ActiveFilterSummary({ labels }: { labels: string[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-muted-foreground">Showing</span>
+      {labels.map((label) => (
+        <span
+          className="rounded-xl bg-background px-2.5 py-1 font-medium text-foreground"
+          key={label}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function activeFilterLabels({
+  filters,
+  locations,
+  teams,
+}: {
+  filters: CalendarFilterInput;
+  locations: Option[];
+  teams: Option[];
+}) {
+  const labels = [
+    labelForValue(filters.view),
+    scopeLabel(filters, teams),
+    recordCategoryLabel(filters.recordTypeCategory),
+  ];
+  if (filters.approvalStatus?.[0]) {
+    labels.push(labelForValue(filters.approvalStatus[0]));
+  }
+  if (filters.personType?.[0]) {
+    labels.push(labelForValue(filters.personType[0]));
+  }
+  const location = locations.find(
+    (option) => option.id === filters.locationId?.[0]
+  );
+  if (location) {
+    labels.push(location.name);
+  }
+  if (filters.includeDrafts) {
+    labels.push("Drafts included");
+  }
+  return labels;
+}
+
+function scopeLabel(filters: CalendarFilterInput, teams: Option[]) {
+  if (filters.scopeType === "my_team") {
+    return "My team";
+  }
+  if (filters.scopeType === "all_teams") {
+    return "All teams";
+  }
+  if (filters.scopeType === "team") {
+    return teams.find((team) => team.id === filters.scopeValue)?.name ?? "Team";
+  }
+  if (filters.scopeType === "person") {
+    return "Person";
+  }
+  return "Myself";
+}
+
+function recordCategoryLabel(value: CalendarFilterInput["recordTypeCategory"]) {
+  if (value === "xero_leave") {
+    return "Leave";
+  }
+  if (value === "local_only") {
+    return "Availability";
+  }
+  return "All records";
+}
+
+function parseView(value: string): CalendarFilterInput["view"] {
+  if (value === "day" || value === "month") {
+    return value;
+  }
+  return "week";
+}
+
+function parseScopeType(value: string): CalendarFilterInput["scopeType"] {
+  if (
+    value === "all_teams" ||
+    value === "my_team" ||
+    value === "person" ||
+    value === "team"
+  ) {
+    return value;
+  }
+  return "my_self";
+}
+
+function parseRecordTypeCategory(
+  value: string
+): CalendarFilterInput["recordTypeCategory"] {
+  if (value === "xero_leave" || value === "local_only") {
+    return value;
+  }
+  return "all";
+}
+
+function parseApprovalStatus(
+  value: string
+): "approved" | "submitted" | "xero_sync_failed" {
+  if (value === "submitted" || value === "xero_sync_failed") {
+    return value;
+  }
+  return "approved";
+}
+
+function parsePersonType(value: string): "contractor" | "employee" {
+  if (value === "contractor") {
+    return "contractor";
+  }
+  return "employee";
 }
 
 function FilterSheet({
@@ -237,8 +362,7 @@ function FilterSheet({
             label="Record category"
             onValueChange={(value) =>
               setFilterParams({
-                recordTypeCategory:
-                  value as CalendarFilterInput["recordTypeCategory"],
+                recordTypeCategory: parseRecordTypeCategory(value),
               })
             }
             options={[
@@ -253,7 +377,7 @@ function FilterSheet({
             onValueChange={(value) =>
               setFilterParams({
                 approvalStatus:
-                  value === "all" ? undefined : [value as "approved"],
+                  value === "all" ? undefined : [parseApprovalStatus(value)],
               })
             }
             options={[
@@ -268,7 +392,8 @@ function FilterSheet({
             label="Person type"
             onValueChange={(value) =>
               setFilterParams({
-                personType: value === "all" ? undefined : [value as "employee"],
+                personType:
+                  value === "all" ? undefined : [parsePersonType(value)],
               })
             }
             options={[

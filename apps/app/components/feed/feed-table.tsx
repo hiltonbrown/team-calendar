@@ -22,6 +22,7 @@ import {
   buildSubscribeUrl,
   useFeedTokenSession,
 } from "@/app/(authenticated)/feeds/feed-token-session";
+import { statusToneClasses } from "@/components/availability/availability-status";
 
 export interface FeedTableItem {
   activeTokenHint: { hint: string; lastUsedAt: Date | null } | null;
@@ -245,15 +246,15 @@ export function FeedTable({
 }
 
 function StatusDot({ status }: { status: FeedTableItem["status"] }) {
-  let colour = "bg-muted-foreground";
+  let colour = statusToneClasses.private;
   if (status === "active") {
-    colour = "bg-primary";
+    colour = statusToneClasses.leave;
   } else if (status === "paused") {
-    colour = "bg-amber-500";
+    colour = statusToneClasses.holiday;
   }
   return (
     <span className="flex items-center gap-2 text-sm capitalize">
-      <span className={`size-2 rounded-full ${colour}`} />
+      <span className={`size-2 rounded-full ring-2 ${colour}`} />
       {status}
     </span>
   );

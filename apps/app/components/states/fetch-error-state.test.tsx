@@ -11,7 +11,9 @@ describe("FetchErrorState", () => {
 
     expect(screen.getByText("Unable to load people")).toBeDefined();
     expect(
-      screen.getByText("Try again or contact support if the issue continues.")
+      screen.getByText(
+        "Try again. If the issue continues, check the Xero connection and contact support with this page name."
+      )
     ).toBeDefined();
   });
 

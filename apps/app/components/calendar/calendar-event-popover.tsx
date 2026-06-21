@@ -10,6 +10,7 @@ import {
 import { AlertTriangleIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
 
 interface CalendarEventPopoverProps {
@@ -38,7 +39,7 @@ export function CalendarEventPopover({
             <p className="text-muted-foreground text-sm">{recordTypeLabel}</p>
           </div>
           {event.renderTreatment === "failed" && (
-            <AlertTriangleIcon className="size-4 text-amber-700" />
+            <AlertTriangleIcon className="size-4 text-destructive" />
           )}
         </div>
 
@@ -57,7 +58,9 @@ export function CalendarEventPopover({
         </dl>
 
         {event.xeroWriteError && (
-          <div className="mt-4 rounded-2xl bg-amber-100 p-3 text-amber-950 text-sm dark:bg-amber-950 dark:text-amber-100">
+          <div
+            className={`mt-4 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
+          >
             {event.xeroWriteError}
           </div>
         )}

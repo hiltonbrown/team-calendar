@@ -41,7 +41,7 @@ const AppLayout = async ({ children }: AppLayoutProperties) => {
         <GlobalSidebar>
           <SidebarInset className="overflow-y-auto">
             {betaFeature && (
-              <div className="m-4 rounded-full bg-blue-500 p-1.5 text-center text-sm text-white">
+              <div className="m-4 rounded-full bg-accent-container p-1.5 text-center text-on-accent-container text-sm">
                 Beta feature now available
               </div>
             )}

@@ -2,6 +2,7 @@ import type { CalendarRange } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
 import { cn } from "@repo/design-system/lib/utils";
 import Link from "next/link";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
@@ -71,13 +72,15 @@ export function CalendarMonthView({
                       "flex size-7 items-center justify-center rounded-xl font-medium text-sm tabular-nums",
                       day.isToday && "bg-primary text-primary-foreground",
                       day.publicHolidays.length > 0 &&
-                        "underline decoration-2 decoration-violet-500 underline-offset-4"
+                        "underline decoration-2 decoration-on-accent-container underline-offset-4"
                     )}
                   >
                     {day.date.getUTCDate()}
                   </span>
                   {day.publicHolidays.length > 0 && (
-                    <span className="rounded-lg bg-violet-100 px-1.5 py-0.5 text-violet-950 text-xs dark:bg-violet-950 dark:text-violet-100">
+                    <span
+                      className={`rounded-lg px-1.5 py-0.5 text-xs ${statusToneClasses.holiday}`}
+                    >
                       Holiday
                     </span>
                   )}

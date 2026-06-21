@@ -1,6 +1,10 @@
 import type { CalendarEvent } from "@repo/availability";
 import { cn } from "@repo/design-system/lib/utils";
 import { AlertTriangleIcon } from "lucide-react";
+import {
+  statusToneClasses,
+  toneForCalendarEvent,
+} from "@/components/availability/availability-status";
 import { CalendarEventPopover } from "./calendar-event-popover";
 
 interface CalendarEventChipProps {
@@ -8,22 +12,11 @@ interface CalendarEventChipProps {
   orgQueryValue: string | null;
 }
 
-const categoryStyles = {
-  // Provenance-based: Xero-synced leave uses sage (secondary), manual entries use lavender (accent-container).
-  local_only:
-    "bg-accent-container text-on-accent-container ring-accent-container/50",
-  private: "bg-muted text-muted-foreground ring-muted-foreground/15",
-  xero_leave: "bg-secondary text-secondary-foreground ring-secondary/50",
-};
-
 export function CalendarEventChip({
   event,
   orgQueryValue,
 }: CalendarEventChipProps) {
-  const isPrivate = event.recordType === "private";
-  const style = isPrivate
-    ? categoryStyles.private
-    : categoryStyles[event.recordTypeCategory];
+  const style = statusToneClasses[toneForCalendarEvent(event)];
   const microLabel = treatmentLabel(event.renderTreatment);
 
   return (
@@ -34,9 +27,7 @@ export function CalendarEventChip({
           style,
           event.renderTreatment === "dashed" &&
             "border border-dashed opacity-85",
-          event.renderTreatment === "draft" && "opacity-65",
-          event.renderTreatment === "failed" &&
-            "bg-error-container text-destructive ring-destructive/30"
+          event.renderTreatment === "draft" && "opacity-65"
         )}
         onClick={(event) => event.stopPropagation()}
         type="button"

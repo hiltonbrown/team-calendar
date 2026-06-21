@@ -31,15 +31,11 @@ export const HowItWorksSection = () => (
   <section className="fmkt-how" id="how-it-works">
     <div className="fmkt-container">
       <div className="fmkt-section-header">
-        <p className="fmkt-overline">How it works</p>
         <h2 className="fmkt-section-title">Four steps. One calm workflow.</h2>
       </div>
       <div className="fmkt-how__steps">
         {steps.map((step) => (
           <div className="fmkt-how__item" key={step.number}>
-            <span aria-hidden="true" className="fmkt-how__num">
-              0{step.number}
-            </span>
             <h3 className="fmkt-how__title">{step.title}</h3>
             <p className="fmkt-how__copy">{step.copy}</p>
           </div>

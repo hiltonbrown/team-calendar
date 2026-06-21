@@ -20,7 +20,8 @@ export const FetchErrorState = ({
     <EmptyHeader>
       <EmptyTitle>Unable to load {entityName}</EmptyTitle>
       <EmptyDescription>
-        Try again or contact support if the issue continues.
+        Try again. If the issue continues, check the Xero connection and contact
+        support with this page name.
       </EmptyDescription>
     </EmptyHeader>
     {retrySlot && <EmptyContent>{retrySlot}</EmptyContent>}

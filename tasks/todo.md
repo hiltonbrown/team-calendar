@@ -1,3 +1,134 @@
+# Plan: Implement Clerk Self-Service Organisation Onboarding
+
+## Plan
+
+- [x] Wire Clerk's `choose-organization` session task to an app route for public self-service sign-up.
+- [x] Route completed self-service sign-ups to organisation creation/selection, while preserving invited-user organisation membership flow.
+- [x] Add visible sign-in/sign-up headings to replace hidden Clerk headers on the unauthenticated surface.
+- [x] Add tests for auth page copy and Clerk component props.
+- [x] Run targeted auth/app typechecks and tests.
+- [x] Document verification and results.
+
+## Review
+
+- Added Clerk `taskUrls` wiring in `AuthProvider` so
+  `choose-organization` resolves to `/session-tasks/choose-organization`.
+- Added the app task route at
+  `apps/app/app/(unauthenticated)/session-tasks/choose-organization/page.tsx`,
+  backed by a shared `@repo/auth` task component. It completes back to `/`
+  after Clerk finishes organisation creation or selection.
+- Kept invited-user handling on Clerk's membership path: the sign-up flow is
+  not forced through a custom redirect; Clerk session tasks decide when the
+  organisation choice page is needed.
+- Added a shared auth form frame and embedded Clerk appearance constant so
+  both sign-in and sign-up have visible headings while Clerk's duplicate
+  embedded header remains hidden.
+- Updated sign-up metadata/copy to make public self-service organisation
+  creation explicit while mentioning invitations.
+- Added targeted tests for the task route constant, task completion URL,
+  visible sign-in/sign-up copy, and hidden embedded Clerk header setting.
+- Scoped Biome check exits 0:
+  `bunx biome check --write packages/auth/provider.tsx packages/auth/components/sign-in.tsx packages/auth/components/sign-up.tsx packages/auth/components/choose-organization-task.tsx packages/auth/components/auth-form-frame.tsx packages/auth/components/embedded-auth-appearance.ts apps/app/app/(unauthenticated)/session-tasks/choose-organization/page.tsx apps/app/app/(unauthenticated)/sign-up/[[...sign-up]]/page.tsx apps/app/__tests__/auth-components.test.tsx`.
+- Auth page tests pass from `apps/app`: 3 files, 7 tests.
+- `cd packages/auth && bun run typecheck` exits 0.
+- `cd apps/app && bun run typecheck` exits 0.
+- `cd apps/app && bun run dev` was started for a route smoke check, but after
+  about 60 seconds it had not emitted a ready line and
+  `curl -I http://localhost:3000` could not connect. The dev process was
+  stopped.
+
+# Plan: Review Clerk Unauthenticated Account Pages
+
+## Plan
+
+- [x] Load Clerk guidance and verify SDK version.
+- [x] Inspect unauthenticated sign-in/sign-up pages, layout, auth provider, and proxy.
+- [x] Review environment defaults and test coverage for unauthenticated flows.
+- [x] Document findings, risks, and recommended fixes.
+
+## Review
+
+- Reviewed Clerk SDK version, unauthenticated sign-in/sign-up pages, shared auth
+  components, `AuthProvider`, route proxy, environment defaults, and page tests.
+- Findings: default sign-up does not encode the required organisation path;
+  Clerk form headers are hidden without replacement headings on the mobile
+  auth surface; Clerk v7 appearance setup uses the older `@clerk/themes`
+  package rather than the current shadcn-first theme guidance; page tests only
+  assert render smoke.
+
+# Plan: Fix Product UI Critique Issues
+
+## Plan
+
+- [x] Create a shared availability scan component and status vocabulary for dashboard and calendar.
+- [x] Upgrade the manager dashboard scan surface from counts to actionable person/status rows.
+- [x] Add calendar scanability: selected/today agenda, active filters, status legend, and mobile-resilient week layout.
+- [x] Replace hard-coded/ad hoc status colours and side-stripe alerts with tokenised status treatments.
+- [x] Improve loading, empty, error recovery, and system-first copy called out in the critique.
+- [x] Run targeted tests, typecheck, and repo checks where feasible.
+- [x] Document verification and results in this review section.
+
+## Review
+
+- Added shared availability scan/status components in
+  `apps/app/components/availability/` and reused the scan surface from both the
+  manager dashboard and calendar.
+- Extended `ManagerDashboardView.teamToday` with `peopleNeedingAttention`
+  rows, sorted by operational urgency, while retaining existing count metrics.
+- Updated the calendar with a today/selected-day scan panel, status legend,
+  active filter chips, clearer "Add leave or availability" copy, and a
+  horizontally resilient week grid.
+- Tokenised app status treatments for calendar chips/holidays, Xero sync
+  failures, feed statuses, people status chips, provider connection badges, and
+  sync run badges.
+- Replaced the side-stripe Xero sync failure alert with a full tokenised error
+  surface.
+- Hardened generic loading and fetch-error states with a dashboard skeleton and
+  clearer recovery copy.
+- Cleaned user-facing copy for manual availability, calendar empty states,
+  feeds, and disconnected-Xero guidance.
+- Scoped Biome check on touched files exits 0:
+  `bunx biome check --write ...`.
+- App tests pass from `apps/app`: 6 files, 10 tests.
+- Dashboard service test passes: 1 file, 9 tests.
+- `cd apps/app && bun run typecheck` exits 0.
+- `bunx tsc --noEmit -p packages/availability/tsconfig.json` exits 0.
+- `bun run check` exits 1 on unrelated existing `apps/web/app/styles/home.css`
+  formatting/property-order issues. The app/availability files touched in this
+  pass are covered by the scoped Biome check above.
+- `cd apps/app && bun run dev` was started as a smoke check, but after 60
+  seconds it had not emitted a ready line and `curl -I http://localhost:3000`
+  could not connect. The dev process was stopped.
+
+# Plan: Critique apps/app/app Product UI
+
+## Plan
+
+- [x] Resolve the target and load Impeccable critique/product guidance.
+- [x] Run independent design assessment and detector assessment.
+- [x] Inspect representative app routes, shared app chrome, and design tokens.
+- [x] Synthesize heuristic scores, priority issues, persona red flags, and run notes.
+- [x] Persist the critique snapshot under `.impeccable/critique/`.
+
+## Review
+
+- Critiqued the authenticated product UI at `apps/app/app`, with emphasis on
+  `apps/app/app/(authenticated)`, shared app chrome, dashboard, calendar, feeds,
+  state components, and design tokens.
+- Assessment independence was preserved with two subagents: design review and
+  detector/evidence pass.
+- Deterministic detector exited 0 with no findings:
+  `node /home/hilton/.agents/skills/impeccable/scripts/detect.mjs --json apps/app/app`.
+- Browser overlay evidence was skipped because browser automation was not
+  available in this session.
+- Design health score: 26/40, with 0 P0 issues and 2 P1 issues.
+- Top issues: manager scan surface answers with counts instead of people;
+  component vocabulary/token usage drifts across admin surfaces; calendar
+  controls are complete but not scan-optimised; loading, empty, and recovery
+  states are too generic.
+- Snapshot written to
+  `.impeccable/critique/2026-06-21T06-28-02Z__apps-app-app.md`.
+
 # Plan: Add Clerk Authentication With CLI
 
 ## Plan

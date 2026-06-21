@@ -12,12 +12,15 @@ type AuthProviderProperties = ComponentProps<typeof ClerkProvider> & {
   helpUrl?: string;
 };
 
+export const chooseOrganizationTaskUrl = "/session-tasks/choose-organization";
+
 export const AuthProvider = ({
   privacyUrl,
   termsUrl,
   helpUrl,
   ...properties
 }: AuthProviderProperties) => {
+  const { taskUrls, ...clerkProperties } = properties;
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const baseTheme = isDark ? dark : undefined;
@@ -63,11 +66,16 @@ export const AuthProvider = ({
     termsPageUrl: termsUrl,
     helpPageUrl: helpUrl,
   };
+  const sessionTaskUrls: NonNullable<AuthProviderProperties["taskUrls"]> = {
+    "choose-organization": chooseOrganizationTaskUrl,
+    ...taskUrls,
+  };
 
   return (
     <ClerkProvider
-      {...properties}
+      {...clerkProperties}
       appearance={{ layout, baseTheme, elements, variables }}
+      taskUrls={sessionTaskUrls}
     />
   );
 };

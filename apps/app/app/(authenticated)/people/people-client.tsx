@@ -23,6 +23,10 @@ import {
 import { AlertTriangleIcon, SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  statusToneClasses,
+  toneForStatusKey,
+} from "@/components/availability/availability-status";
 import { EmptyState } from "@/components/states/empty-state";
 import { withOrg } from "@/lib/navigation/org-url";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
@@ -428,19 +432,7 @@ function StatusChip({
 }
 
 function statusTone(statusKey: string): string {
-  if (statusKey === "available") {
-    return "bg-primary/10 text-primary";
-  }
-  if (statusKey === "pending_leave") {
-    return "border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300";
-  }
-  if (statusKey === "on_leave") {
-    return "bg-destructive/10 text-destructive";
-  }
-  if (statusKey === "public_holiday") {
-    return "bg-secondary-container text-on-secondary-container";
-  }
-  return "bg-surface-container-high text-on-surface-variant";
+  return statusToneClasses[toneForStatusKey({ statusKey })];
 }
 
 function locationLabel(person: PersonListItem): string {

@@ -344,7 +344,7 @@ const Detail = ({ selected, onClose }: DetailProps) => {
         <span aria-hidden="true" className="tl-detail-hint-icon">
           <MarketingIcon id="arrowUpRight" size={14} />
         </span>
-        Click any block above to see the entry details, owner and provenance.
+        Select any entry above to see its details, owner and provenance.
       </div>
     );
   }
@@ -510,14 +510,17 @@ export const TeamTimelineSection = () => {
     return (
       <section className="fmkt-timeline" id="team-timeline">
         <div className="fmkt-container">
-          <p className="fmkt-overline">Team availability, live</p>
           <h2 className="fmkt-section-title">
             See who is in, who is out and where they are.
           </h2>
           <p className="fmkt-timeline__lead">
             Sage entries arrive from Xero Payroll the moment they are approved.
             Purple entries are manual: working from home, client site, training.
-            Click any block for details.
+            Select any entry for details.
+          </p>
+
+          <p aria-hidden="true" className="tl-scrollhint">
+            Swipe to see the full week
           </p>
 
           <div className="tl-card tl-card--skeleton">
@@ -639,14 +642,17 @@ export const TeamTimelineSection = () => {
   return (
     <section className="fmkt-timeline" id="team-timeline">
       <div className="fmkt-container">
-        <p className="fmkt-overline">Team availability, live</p>
         <h2 className="fmkt-section-title">
           See who is in, who is out and where they are.
         </h2>
         <p className="fmkt-timeline__lead">
           Sage entries arrive from Xero Payroll the moment they are approved.
           Purple entries are manual: working from home, client site, training.
-          Click any block for details.
+          Select any entry for details.
+        </p>
+
+        <p aria-hidden="true" className="tl-scrollhint">
+          Swipe to see the full week
         </p>
 
         <div className="tl-card">
@@ -695,7 +701,7 @@ export const TeamTimelineSection = () => {
                 </svg>
               </button>
               <button
-                className={`tl-today-btn${weekIdx === 1 ? "is-current" : ""}`}
+                className={`tl-today-btn ${weekIdx === 1 ? "is-current" : ""}`}
                 onClick={handleToday}
                 type="button"
               >
@@ -768,7 +774,7 @@ export const TeamTimelineSection = () => {
                 /* biome-ignore lint/a11y/useSemanticElements: Day head cell */
                 /* biome-ignore lint/a11y/useFocusableInteractive: non-interactive day header */
                 <div
-                  className={`tl-day-head${
+                  className={`tl-day-head ${
                     i === week.todayIdx ? "tl-day-head--today" : ""
                   }`}
                   key={d.dow}

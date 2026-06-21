@@ -1,6 +1,7 @@
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { AlertTriangleIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 
 interface XeroSyncFailedStateProps {
   readonly message: string;
@@ -13,10 +14,12 @@ export const XeroSyncFailedState = ({
   retrySlot,
   revertSlot,
 }: XeroSyncFailedStateProps) => (
-  <div className="flex flex-col gap-3 rounded-lg border-border border-y border-r border-l-2 border-l-amber-500 bg-amber-50/50 p-4 dark:bg-amber-950/20">
+  <div
+    className={`flex flex-col gap-3 rounded-2xl p-4 ${statusToneClasses.failed}`}
+  >
     <div className="flex items-center gap-2">
       <Badge
-        className="gap-1 border-transparent bg-amber-500 text-white shadow-none hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700"
+        className="gap-1 border-transparent bg-destructive text-destructive-foreground shadow-none hover:bg-destructive/90"
         variant="destructive"
       >
         <AlertTriangleIcon className="size-3" />

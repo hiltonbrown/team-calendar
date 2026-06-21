@@ -38,7 +38,9 @@ describe("CalendarDayView", () => {
       />
     );
 
-    expect(screen.getByText("No records for this day")).toBeDefined();
+    expect(
+      screen.getByText("No leave or availability for this day")
+    ).toBeDefined();
   });
 });
 

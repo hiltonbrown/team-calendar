@@ -258,18 +258,56 @@ describe("dashboard-service", () => {
         nextCursor: null,
         people: [
           {
-            currentStatus: { statusKey: "on_leave" },
+            currentStatus: {
+              activePublicHoliday: null,
+              activeRecord: {
+                endsAt: new Date("2026-04-22T23:59:59.999Z"),
+                recordType: "annual_leave",
+                startsAt: new Date("2026-04-20T00:00:00.000Z"),
+              },
+              approvalStatus: "approved",
+              contactabilityStatus: "unavailable",
+              label: "On annual leave",
+              recordType: "annual_leave",
+              statusKey: "on_leave",
+            },
+            firstName: "Ari",
             id: "00000000-0000-4000-8000-000000000012",
+            lastName: "Report",
             xeroSyncFailedCount: 1,
           },
           {
-            currentStatus: { statusKey: "wfh" },
+            currentStatus: {
+              activePublicHoliday: null,
+              activeRecord: {
+                endsAt: new Date("2026-04-20T23:59:59.999Z"),
+                recordType: "wfh",
+                startsAt: new Date("2026-04-20T00:00:00.000Z"),
+              },
+              approvalStatus: "approved",
+              contactabilityStatus: "contactable",
+              label: "Working from home",
+              recordType: "wfh",
+              statusKey: "wfh",
+            },
+            firstName: "Sam",
             id: "00000000-0000-4000-8000-000000000013",
+            lastName: "Home",
             xeroSyncFailedCount: 0,
           },
           {
-            currentStatus: { statusKey: "available" },
+            currentStatus: {
+              activePublicHoliday: null,
+              activeRecord: null,
+              approvalStatus: null,
+              contactabilityStatus: null,
+              label: "Available",
+              recordType: null,
+              statusKey: "available",
+            },
+            firstName: "Lee",
             id: "00000000-0000-4000-8000-000000000014",
+            lastName: "Ready",
             xeroSyncFailedCount: 0,
           },
         ],
@@ -515,6 +553,16 @@ describe("dashboard-service", () => {
       status: "ready",
       data: {
         peopleAvailableCount: 1,
+        peopleNeedingAttention: [
+          expect.objectContaining({
+            personFirstName: "Ari",
+            statusLabel: "Xero sync failed",
+          }),
+          expect.objectContaining({
+            personFirstName: "Sam",
+            statusLabel: "Working from home",
+          }),
+        ],
         peopleOnLeaveCount: 1,
         peopleWorkingFromHomeCount: 1,
       },

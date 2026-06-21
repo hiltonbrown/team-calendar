@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MarketingIcon } from "../../(home)/components/marketing-icons";
 
 const CheckIcon = () => (
   <svg
@@ -16,6 +17,7 @@ const CheckIcon = () => (
   </svg>
 );
 
+// Beat 1 (in): the request goes in once, in one place.
 const LeaveFormMock = () => (
   <div className="fmkt-mock-form">
     <div className="fmkt-mock-form__header">New leave request</div>
@@ -44,100 +46,66 @@ const LeaveFormMock = () => (
   </div>
 );
 
-const days = ["Mon 11", "Tue 12", "Wed 13", "Thu 14", "Fri 15"];
-
-interface CalRow {
-  barClass: string;
-  label: string;
-  span: [number, number];
-  tone: string;
-}
-
-const calRows: CalRow[] = [
-  {
-    tone: "sage",
-    label: "S",
-    barClass: "fmkt-mock-cal__bar--leave",
-    span: [0, 5],
-  },
-  {
-    tone: "mauve",
-    label: "A",
-    barClass: "fmkt-mock-cal__bar--wfh",
-    span: [2, 5],
-  },
-  {
-    tone: "cream",
-    label: "J",
-    barClass: "fmkt-mock-cal__bar--sick",
-    span: [0, 2],
-  },
-  {
-    tone: "ink",
-    label: "R",
-    barClass: "fmkt-mock-cal__bar--training",
-    span: [3, 4],
-  },
-];
-
-const TeamCalendarMock = () => (
-  <div className="fmkt-mock-cal">
-    <div className="fmkt-mock-cal__header">
-      <span className="fmkt-mock-cal__corner">Team calendar</span>
-      <div className="fmkt-mock-cal__days">
-        {days.map((d) => (
-          <span className="fmkt-mock-cal__day" key={d}>
-            {d}
-          </span>
-        ))}
+// Beat 2 (through): approval writes back to Xero. Sage = the Xero-synced
+// provenance the rest of the page teaches.
+const WriteBackReceiptMock = () => (
+  <div className="fmkt-mock-receipt">
+    <div className="fmkt-mock-receipt__head">
+      <span className="fmkt-mock-receipt__badge">
+        <MarketingIcon id="sync" size={14} />
+      </span>
+      <div>
+        <span className="fmkt-mock-receipt__title">Written back to Xero</span>
+        <span className="fmkt-mock-receipt__sub">
+          Leave application · approved
+        </span>
       </div>
     </div>
-    {calRows.map((row) => (
-      <div className="fmkt-mock-cal__row" key={row.label}>
-        <span
-          className={`fmkt-mock-cal__avatar fmkt-mock-cal__avatar--${row.tone}`}
-        >
-          {row.label}
-        </span>
-        <div className="fmkt-mock-cal__grid">
-          {days.map((day, i) => {
-            const inSpan = i >= row.span[0] && i < row.span[1];
-            return (
-              <div
-                className={`fmkt-mock-cal__cell ${inSpan ? `${row.barClass} fmkt-mock-cal__cell--filled` : ""}`}
-                key={day}
-              />
-            );
-          })}
+    <div className="fmkt-mock-receipt__rows">
+      {[
+        { label: "Employee", value: "Sam Aboud" },
+        { label: "Leave type", value: "Annual leave" },
+        { label: "Dates", value: "Mon 12 to Fri 16 May" },
+        { label: "Units", value: "5 days" },
+      ].map((row) => (
+        <div className="fmkt-mock-receipt__row" key={row.label}>
+          <span className="fmkt-mock-receipt__label">{row.label}</span>
+          <span className="fmkt-mock-receipt__value">{row.value}</span>
         </div>
-      </div>
-    ))}
+      ))}
+    </div>
+    <div className="fmkt-mock-receipt__foot">
+      <span aria-hidden="true" className="fmkt-mock-receipt__foot-dot" />
+      Updated in Xero · today, 9:15 am
+    </div>
   </div>
 );
 
-const PayrollSyncMock = () => (
-  <div className="fmkt-mock-payroll">
-    <div className="fmkt-mock-payroll__header">
-      <span className="fmkt-mock-payroll__check-icon">
-        <CheckIcon />
+// Beat 3 (out): the same record appears in the calendar app, subscribed once.
+const FeedSubscriptionMock = () => (
+  <div className="fmkt-mock-sub">
+    <div className="fmkt-mock-sub__head">
+      <span className="fmkt-mock-sub__app">
+        <MarketingIcon id="calendar" size={14} />
       </span>
-      Payroll sync
+      <span className="fmkt-mock-sub__name">Team availability</span>
+      <span className="fmkt-mock-sub__check">
+        <MarketingIcon id="check" size={12} />
+      </span>
     </div>
-    <div className="fmkt-mock-payroll__status">
-      <span aria-hidden="true" className="fmkt-mock-payroll__status-dot" />
-      Synced to Xero
+    <div className="fmkt-mock-sub__events">
+      <div className="fmkt-mock-sub__event fmkt-mock-sub__event--sage">
+        <MarketingIcon id="leaf" size={11} />
+        James · Annual leave
+      </div>
+      <div className="fmkt-mock-sub__event fmkt-mock-sub__event--purple">
+        <MarketingIcon id="home" size={11} />
+        Sarah · Working from home
+      </div>
     </div>
-    <div className="fmkt-mock-payroll__rows">
-      {[
-        { label: "Pay run", value: "Weekly" },
-        { label: "Total leave", value: "8 days" },
-        { label: "Last synced", value: "Today, 9:15 am" },
-      ].map((row) => (
-        <div className="fmkt-mock-payroll__row" key={row.label}>
-          <span className="fmkt-mock-payroll__row-label">{row.label}</span>
-          <span className="fmkt-mock-payroll__row-value">{row.value}</span>
-        </div>
-      ))}
+    <div className="fmkt-mock-sub__foot">
+      <MarketingIcon id="sync" size={11} />
+      Subscribed · updates automatically
     </div>
   </div>
 );
@@ -145,28 +113,24 @@ const PayrollSyncMock = () => (
 interface FeatureCard {
   readonly copy: string;
   readonly mock: ReactNode;
-  readonly number: number;
   readonly title: string;
 }
 
 const cards: FeatureCard[] = [
   {
-    number: 1,
     title: "Request leave without chasing forms",
     copy: "Employees add dates, leave type and notes in one place, with fewer follow-up questions.",
     mock: <LeaveFormMock />,
   },
   {
-    number: 2,
-    title: "Make availability visible",
-    copy: "Approved leave, WFH and training appear in team calendars, so managers can plan cover before clashes happen.",
-    mock: <TeamCalendarMock />,
+    title: "Approved leave writes back to Xero",
+    copy: "Each approval syncs to Xero Payroll as a leave application, so records stay correct without re-keying.",
+    mock: <WriteBackReceiptMock />,
   },
   {
-    number: 3,
-    title: "Keep Xero aligned",
-    copy: "Approved requests write back to Xero Payroll, reducing duplicate entry and reconciliation.",
-    mock: <PayrollSyncMock />,
+    title: "It shows up in everyone's calendar",
+    copy: "The same approved leave and manual entries publish to one secure feed your team subscribes to once.",
+    mock: <FeedSubscriptionMock />,
   },
 ];
 
@@ -174,25 +138,22 @@ export const FeatureCardsSection = () => (
   <section className="fmkt-cards-section">
     <div className="fmkt-container">
       <div className="fmkt-section-header">
-        <p className="fmkt-overline">Leave. Calendars. Payroll.</p>
         <h2 className="fmkt-section-title">
-          One simple flow from request to calendar.
+          From a leave request to <em>everyone&rsquo;s calendar.</em>
         </h2>
         <p className="fmkt-cards-section__lead">
-          Sage means the record came from Xero. Purple means someone added it
-          manually. The split is scannable at a glance, on every calendar.
+          Employees submit once. Approved leave writes back to Xero Payroll,
+          then publishes to the calendars your team already opens. No re-keying,
+          no separate planner to maintain.
         </p>
       </div>
       <div className="fmkt-card-grid">
         {cards.map((card) => (
-          <article className="fmkt-card" key={card.number}>
+          <article className="fmkt-card" key={card.title}>
             <div aria-hidden="true" className="fmkt-card__mock">
               {card.mock}
             </div>
             <div className="fmkt-card__body">
-              <span aria-hidden="true" className="fmkt-card__number">
-                {card.number}
-              </span>
               <h3 className="fmkt-card__title">{card.title}</h3>
               <p className="fmkt-card__copy">{card.copy}</p>
             </div>

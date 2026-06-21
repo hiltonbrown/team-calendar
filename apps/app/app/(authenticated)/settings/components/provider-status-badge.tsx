@@ -6,6 +6,7 @@ import {
   TriangleAlertIcon,
   XCircleIcon,
 } from "lucide-react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 
 type ConnectionStatus =
   | "connected"
@@ -29,27 +30,27 @@ const STATUS_CONFIG: Record<
   connected: {
     label: "Connected",
     icon: CircleCheckIcon,
-    className: "bg-primary/10 text-primary border-primary/20",
+    className: statusToneClasses.leave,
   },
   disconnected: {
     label: "Not connected",
     icon: CircleIcon,
-    className: "bg-muted text-muted-foreground border-border",
+    className: statusToneClasses.private,
   },
   error: {
     label: "Error",
     icon: TriangleAlertIcon,
-    className: "bg-destructive/10 text-destructive border-destructive/20",
+    className: statusToneClasses.failed,
   },
   expired: {
     label: "Connection expired",
     icon: TriangleAlertIcon,
-    className: "bg-amber-500/10 text-amber-700 border-amber-500/20",
+    className: statusToneClasses.holiday,
   },
   revoked: {
     label: "Connection revoked",
     icon: XCircleIcon,
-    className: "bg-destructive/10 text-destructive border-destructive/20",
+    className: statusToneClasses.failed,
   },
 };
 
@@ -57,7 +58,10 @@ export const ProviderStatusBadge = ({ status }: ProviderStatusBadgeProps) => {
   const { label, icon: Icon, className } = STATUS_CONFIG[status];
 
   return (
-    <Badge className={cn("gap-1.5 font-medium", className)} variant="outline">
+    <Badge
+      className={cn("gap-1.5 border-0 font-medium ring-1", className)}
+      variant="outline"
+    >
       <Icon className="h-3 w-3" strokeWidth={2} />
       {label}
     </Badge>

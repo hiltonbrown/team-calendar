@@ -19,6 +19,7 @@ coverage/
 playwright-report/
 test-results/
 storybook-static/
+.impeccable/
 
 # Logs
 npm-debug.log*
@@ -35,6 +36,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.*.local
+.env*
 
 # Vercel
 .vercel
@@ -70,7 +72,9 @@ tmp/
 # React Email (generated, may contain local font files)
 apps/email/.react-email/
 
-.env*
-
 # Claude Code local settings (machine-specific permission allowlist)
 .claude/settings.local.json
+.claude/skills/*
+.claude/*
+
+

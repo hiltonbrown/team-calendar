@@ -91,7 +91,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
 
   return (
     <>
-      <Header page="Feed" />
+      <Header page="Feeds" />
       <main className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <section className="flex flex-col justify-between gap-4 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end">
           <div>

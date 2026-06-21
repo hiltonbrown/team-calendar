@@ -1,15 +1,6 @@
 import { createMetadata } from "@repo/seo/metadata";
-import {
-  ArrowLeftRight,
-  Building2,
-  CheckCircle,
-  Globe,
-  Lock,
-  RefreshCw,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
 import type { Metadata } from "next";
+import { MarketingIcon } from "../../(home)/components/marketing-icons";
 
 export const metadata: Metadata = createMetadata({
   title: "Xero Integration",
@@ -85,173 +76,143 @@ const oauthSteps = [
   },
 ];
 
-const XeroPage = () => (
-  <div className="fmkt-page marketing-simple">
-    <header className="marketing-simple__hero">
-      <div className="fmkt-container">
-        <div className="marketing-simple__intro">
-          <p className="marketing-simple__kicker">Integrations</p>
-          <h1 className="marketing-simple__title">Xero Payroll integration</h1>
-          <p className="marketing-simple__lead">
-            Team Calendar is built exclusively for Xero Payroll. It connects via
-            OAuth, syncs leave data continuously, and writes approved leave
-            submissions back to Xero. Xero remains your payroll source of truth.
-          </p>
-        </div>
-      </div>
-    </header>
+const syncModel = [
+  {
+    title: "Employee sync",
+    description:
+      "Xero employee records are synced into Team Calendar. When a new employee is added in Xero, they appear in Team Calendar after the next sync. Terminated employees are archived automatically.",
+  },
+  {
+    title: "Leave sync",
+    description:
+      "Approved leave from Xero is continuously synced. Leave data is normalised into a canonical availability model. The raw Xero payload is retained for audit purposes.",
+  },
+  {
+    title: "Write-back",
+    description:
+      "When a manager approves or declines a leave request in Team Calendar, the decision is written back to Xero synchronously. There is no batch process or delay.",
+  },
+];
 
-    <section className="marketing-simple__section">
+const XeroPage = () => (
+  <main className="fmkt-page fmkt-xero">
+    <section className="fmkt-xero__hero">
       <div className="fmkt-container">
-        <div className="marketing-simple__section-head">
-          <div className="marketing-simple__icon">
-            <Globe size={22} strokeWidth={1.5} />
-          </div>
-          <h2 className="marketing-simple__section-title">
-            Supported payroll regions
-          </h2>
-          <p className="marketing-simple__section-copy">
+        <p className="fmkt-overline">Integrations</p>
+        <h1 className="fmkt-xero__title">Xero Payroll integration</h1>
+        <p className="fmkt-xero__lead">
+          Team Calendar is built exclusively for Xero Payroll. It connects via
+          OAuth, syncs leave data continuously, and writes approved leave
+          submissions back to Xero. Xero remains your payroll source of truth.
+        </p>
+      </div>
+    </section>
+
+    <section className="fmkt-xero__section">
+      <div className="fmkt-container">
+        <div className="fmkt-section-header">
+          <h2 className="fmkt-section-title">Supported payroll regions</h2>
+          <p className="fmkt-xero__copy">
             Team Calendar supports Xero Payroll in three regions. Each region
             has its own leave type configuration, and Team Calendar handles each
             correctly.
           </p>
         </div>
-        <div className="marketing-simple__grid">
+        <div className="fmkt-xero__grid">
           {regions.map((region) => (
-            <div className="marketing-simple__panel" key={region.code}>
-              <div className="marketing-simple__panel-row">
-                <div className="marketing-simple__icon">
-                  <Building2 size={20} strokeWidth={1.5} />
-                </div>
-                <div>
-                  <p className="marketing-simple__tag">{region.code}</p>
-                  <h3>{region.name}</h3>
-                </div>
-              </div>
+            <article className="fmkt-xero__panel" key={region.code}>
+              <span className="fmkt-xero__tag">{region.code}</span>
+              <h3>{region.name}</h3>
               <p>{region.detail}</p>
-            </div>
+            </article>
           ))}
         </div>
       </div>
     </section>
 
-    <section className="marketing-simple__section marketing-simple__section--tonal">
+    <section className="fmkt-xero__section fmkt-xero__section--tonal">
       <div className="fmkt-container">
-        <div className="marketing-simple__section-head">
-          <div className="marketing-simple__icon">
-            <ArrowLeftRight size={22} strokeWidth={1.5} />
-          </div>
-          <h2 className="marketing-simple__section-title">
+        <div className="fmkt-section-header">
+          <h2 className="fmkt-section-title">
             What Team Calendar reads and writes
           </h2>
-          <p className="marketing-simple__section-copy">
+          <p className="fmkt-xero__copy">
             Team Calendar accesses only payroll data relevant to leave and
             availability. It does not read salary, banking, tax, or
             superannuation data.
           </p>
         </div>
-        <div className="marketing-simple__grid marketing-simple__grid--two">
+        <div className="fmkt-xero__grid fmkt-xero__grid--two">
           {dataPoints.map((section) => (
-            <div className="marketing-simple__panel" key={section.direction}>
+            <article className="fmkt-xero__panel" key={section.direction}>
               <h3>{section.direction}</h3>
-              <ul className="marketing-simple__list">
+              <ul className="fmkt-xero__list">
                 {section.items.map((item) => (
                   <li key={item}>
-                    <CheckCircle size={16} strokeWidth={1.5} />
+                    <MarketingIcon id="check" size={16} />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
-            </div>
+            </article>
           ))}
         </div>
       </div>
     </section>
 
-    <section className="marketing-simple__section">
+    <section className="fmkt-xero__section">
       <div className="fmkt-container">
-        <div className="marketing-simple__section-head">
-          <div className="marketing-simple__icon">
-            <RefreshCw size={22} strokeWidth={1.5} />
-          </div>
-          <h2 className="marketing-simple__section-title">
-            How the connection works
-          </h2>
-          <p className="marketing-simple__section-copy">
+        <div className="fmkt-section-header">
+          <h2 className="fmkt-section-title">How the connection works</h2>
+          <p className="fmkt-xero__copy">
             The Xero OAuth flow is standard and takes a few minutes. You
-            authorise Team Calendar directly from your Xero account, no
+            authorise Team Calendar directly from your Xero account, with no
             third-party credentials required.
           </p>
         </div>
-        <div className="marketing-simple__grid marketing-simple__grid--two">
+        <div className="fmkt-xero__grid fmkt-xero__grid--two">
           {oauthSteps.map((step) => (
-            <div className="marketing-simple__panel-row" key={step.step}>
-              <span className="marketing-simple__step">{step.step}</span>
-              <div className="marketing-simple__panel">
+            <div className="fmkt-xero__step-row" key={step.step}>
+              <span className="fmkt-xero__step">{step.step}</span>
+              <article className="fmkt-xero__panel">
                 <h3>{step.title}</h3>
                 <p>{step.description}</p>
-              </div>
+              </article>
             </div>
           ))}
         </div>
       </div>
     </section>
 
-    <section className="marketing-simple__section marketing-simple__section--tonal">
+    <section className="fmkt-xero__section fmkt-xero__section--tonal">
       <div className="fmkt-container">
-        <div className="marketing-simple__section-head">
-          <div className="marketing-simple__icon">
-            <Users size={22} strokeWidth={1.5} />
-          </div>
-          <h2 className="marketing-simple__section-title">
-            Sync model explained
-          </h2>
-          <p className="marketing-simple__section-copy">
+        <div className="fmkt-section-header">
+          <h2 className="fmkt-section-title">Sync model explained</h2>
+          <p className="fmkt-xero__copy">
             Team Calendar runs scheduled syncs to keep availability data
             current. Here is how data flows between systems.
           </p>
         </div>
-        <div className="marketing-simple__grid">
-          {[
-            {
-              title: "Employee sync",
-              description:
-                "Xero employee records are synced into Team Calendar. When a new employee is added in Xero, they appear in Team Calendar after the next sync. Terminated employees are archived automatically.",
-            },
-            {
-              title: "Leave sync",
-              description:
-                "Approved leave from Xero is continuously synced. Leave data is normalised into a canonical availability model. The raw Xero payload is retained for audit purposes.",
-            },
-            {
-              title: "Write-back",
-              description:
-                "When a manager approves or declines a leave request in Team Calendar, the decision is written back to Xero synchronously. There is no batch process or delay.",
-            },
-          ].map((item) => (
-            <div className="marketing-simple__panel" key={item.title}>
+        <div className="fmkt-xero__grid">
+          {syncModel.map((item) => (
+            <article className="fmkt-xero__panel" key={item.title}>
               <h3>{item.title}</h3>
               <p>{item.description}</p>
-            </div>
+            </article>
           ))}
         </div>
       </div>
     </section>
 
-    <section className="marketing-simple__section">
+    <section className="fmkt-xero__section">
       <div className="fmkt-container">
-        <div className="marketing-simple__callout">
-          <div className="marketing-simple__icon">
-            <ShieldCheck size={22} strokeWidth={1.5} />
-          </div>
-          <div className="marketing-simple__intro">
-            <div className="marketing-simple__panel-row">
-              <Lock size={20} strokeWidth={1.5} />
-              <h2 className="marketing-simple__section-title">
-                Security and token handling
-              </h2>
-            </div>
-            <p className="marketing-simple__section-copy">
+        <div className="fmkt-xero__callout">
+          <span className="fmkt-xero__callout-icon">
+            <MarketingIcon id="shieldCheck" size={24} />
+          </span>
+          <div>
+            <h2>Security and token handling</h2>
+            <p>
               Xero OAuth tokens are encrypted at rest using industry-standard
               encryption. Tokens are never exposed to client-side code or stored
               in plaintext. Team Calendar rotates tokens proactively before
@@ -262,7 +223,7 @@ const XeroPage = () => (
         </div>
       </div>
     </section>
-  </div>
+  </main>
 );
 
 export default XeroPage;

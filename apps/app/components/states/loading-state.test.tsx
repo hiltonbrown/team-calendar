@@ -6,7 +6,7 @@ describe("LoadingState", () => {
   it("renders correctly", () => {
     render(<LoadingState />);
 
-    expect(screen.getByText("Loading")).toBeDefined();
+    expect(screen.getByText("Loading workspace")).toBeDefined();
     expect(screen.getByRole("status")).toBeDefined();
   });
 });

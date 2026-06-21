@@ -51,6 +51,9 @@
   --marketing-on-hero-highlight: var(--marketing-on-primary);
   --marketing-font:
     var(--font-plus-jakarta-sans), "Plus Jakarta Sans", sans-serif;
+  /* Second voice: Lora italic carries the brand's human asides (hero
+     emphasis line, section signatures). Headlines stay on the sans. */
+  --marketing-serif: var(--font-lora), "Lora", Georgia, serif;
 
   /* Fluid typography scale scoped to marketing pages */
   --text-display-lg: clamp(2.5rem, 6.5vw, 3.5rem);
@@ -69,19 +72,12 @@
   --marketing-event-wfh-fg: var(--marketing-on-secondary-container);
   --marketing-event-training-bg: var(--marketing-surface-highest);
   --marketing-event-training-fg: var(--marketing-on-surface-variant);
-  --marketing-event-client-bg: var(--marketing-error-container);
-  --marketing-event-client-fg: var(--marketing-error);
-  --marketing-event-travel-bg: var(--marketing-inverse-surface);
-  --marketing-event-travel-fg: var(--marketing-inverse-on-surface);
 
+  /* sage + plum are consumed by .fmkt-bigcal__avatar; slate/forest were unused. */
   --marketing-avatar-sage-bg: var(--marketing-secondary-container);
   --marketing-avatar-sage-fg: var(--marketing-on-secondary-container);
-  --marketing-avatar-slate-bg: var(--marketing-surface-highest);
-  --marketing-avatar-slate-fg: var(--marketing-on-surface);
   --marketing-avatar-plum-bg: var(--marketing-surface-container);
   --marketing-avatar-plum-fg: var(--marketing-inverse-surface);
-  --marketing-avatar-forest-bg: var(--marketing-primary);
-  --marketing-avatar-forest-fg: var(--marketing-on-primary);
 
   /* Vendor colours are external brand identifiers. */
   --marketing-xero-cyan: #00b4ce;
@@ -129,20 +125,4 @@
   --feature-ghost-border: var(--marketing-ghost-border);
   --feature-shadow-ambient: var(--marketing-shadow-ambient);
   --feature-font: var(--marketing-font);
-  --feature-avatar-sage-bg: var(--marketing-avatar-sage-bg);
-  --feature-avatar-sage-fg: var(--marketing-avatar-sage-fg);
-  --feature-avatar-mauve-bg: var(--marketing-avatar-plum-bg);
-  --feature-avatar-mauve-fg: var(--marketing-avatar-plum-fg);
-  --feature-avatar-cream-bg: var(--marketing-surface-low);
-  --feature-avatar-cream-fg: var(--marketing-on-surface-variant);
-  --feature-avatar-ink-bg: var(--marketing-inverse-surface);
-  --feature-avatar-ink-fg: var(--marketing-inverse-on-surface);
-  --feature-avatar-rose-bg: var(--marketing-error-container);
-  --feature-avatar-rose-fg: var(--marketing-error);
-  --feature-avatar-sky-bg: color-mix(
-    in oklch,
-    var(--marketing-surface-highest) 78%,
-    var(--marketing-primary-container)
-  );
-  --feature-avatar-sky-fg: var(--marketing-on-surface);
 }

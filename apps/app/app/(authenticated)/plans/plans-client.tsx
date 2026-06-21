@@ -24,6 +24,7 @@ import { AlertCircleIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { SubmitConfirmationModal } from "@/components/plans/submit-confirmation-modal";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 import { withOrg } from "@/lib/navigation/org-url";
@@ -360,8 +361,10 @@ export function PlansClient({
                       })}
                     </div>
                     {inlineError[record.id] && (
-                      <div className="mt-3 flex items-start gap-2 rounded-2xl bg-background p-3 text-muted-foreground text-sm">
-                        <AlertCircleIcon className="mt-0.5 size-4 shrink-0 text-amber-600" />
+                      <div
+                        className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
+                      >
+                        <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
                         <span>{inlineError[record.id]}</span>
                       </div>
                     )}

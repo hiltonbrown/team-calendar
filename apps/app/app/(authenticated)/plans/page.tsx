@@ -168,7 +168,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <p>
                 Xero is not connected. Leave records will save locally only.
-                Connect Xero in Settings &gt; Integrations to enable submission
+                Connect Xero from the integrations settings to enable submission
                 for approval.
               </p>
               {isAdminOrOwner(orgRole) && (

@@ -1,4 +1,5 @@
 import type { CalendarRange } from "@repo/availability";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
 
@@ -32,7 +33,7 @@ export function CalendarDayView({
         <div className="mb-4 space-y-2">
           {day.publicHolidays.map((holiday) => (
             <div
-              className="rounded-2xl bg-violet-100 px-4 py-3 text-sm text-violet-950 dark:bg-violet-950 dark:text-violet-100"
+              className={`rounded-2xl px-4 py-3 text-sm ${statusToneClasses.holiday}`}
               key={holiday.name}
             >
               <p className="font-medium">{holiday.name}</p>
@@ -52,7 +53,7 @@ export function CalendarDayView({
           personId={createPersonId}
           startsAt={dateOnly}
         >
-          No records for this day
+          No leave or availability for this day
         </CalendarCreateLauncher>
       ) : (
         <div className="space-y-4">

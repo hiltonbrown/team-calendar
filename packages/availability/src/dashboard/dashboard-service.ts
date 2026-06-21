@@ -4,6 +4,7 @@ import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import type {
   availability_approval_status,
+  availability_contactability,
   availability_failed_action,
   availability_record_type,
   availability_source_type,
@@ -185,6 +186,19 @@ export interface ManagerDashboardView extends EmployeeDashboardView {
   teamToday: DashboardSection<{
     ctaUrl: string;
     peopleAvailableCount: number;
+    peopleNeedingAttention: Array<{
+      approvalStatus: availability_approval_status | null;
+      contactabilityStatus: availability_contactability | null;
+      endsAt: Date | null;
+      personFirstName: string;
+      personId: string;
+      personLastName: string;
+      recordType: availability_record_type | null;
+      startsAt: Date | null;
+      statusKey: PersonListItem["currentStatus"]["statusKey"];
+      statusLabel: string;
+      xeroSyncFailedCount: number;
+    }>;
     peopleOnLeaveCount: number;
     peopleOtherOooCount: number;
     peopleTravellingCount: number;
@@ -1117,6 +1131,19 @@ function buildTeamTodayCard(people: PersonListItem[]) {
   let peopleOtherOooCount = 0;
   let peopleAvailableCount = 0;
   let peopleWithXeroSyncFailedCount = 0;
+  const peopleNeedingAttention: Array<{
+    approvalStatus: availability_approval_status | null;
+    contactabilityStatus: availability_contactability | null;
+    endsAt: Date | null;
+    personFirstName: string;
+    personId: string;
+    personLastName: string;
+    recordType: availability_record_type | null;
+    startsAt: Date | null;
+    statusKey: PersonListItem["currentStatus"]["statusKey"];
+    statusLabel: string;
+    xeroSyncFailedCount: number;
+  }> = [];
 
   for (const person of people) {
     if (person.xeroSyncFailedCount > 0) {
@@ -1139,17 +1166,67 @@ function buildTeamTodayCard(people: PersonListItem[]) {
         peopleOtherOooCount += 1;
         break;
     }
+
+    if (
+      person.currentStatus.statusKey !== "available" ||
+      person.xeroSyncFailedCount > 0
+    ) {
+      peopleNeedingAttention.push({
+        approvalStatus: person.currentStatus.approvalStatus,
+        contactabilityStatus: person.currentStatus.contactabilityStatus,
+        endsAt:
+          person.currentStatus.activeRecord?.endsAt ??
+          person.currentStatus.activePublicHoliday?.date ??
+          null,
+        personFirstName: person.firstName,
+        personId: person.id,
+        personLastName: person.lastName,
+        recordType: person.currentStatus.recordType,
+        startsAt:
+          person.currentStatus.activeRecord?.startsAt ??
+          person.currentStatus.activePublicHoliday?.date ??
+          null,
+        statusKey: person.currentStatus.statusKey,
+        statusLabel:
+          person.xeroSyncFailedCount > 0
+            ? "Xero sync failed"
+            : person.currentStatus.label,
+        xeroSyncFailedCount: person.xeroSyncFailedCount,
+      });
+    }
   }
 
   return {
     ctaUrl: "/people",
     peopleAvailableCount,
+    peopleNeedingAttention: peopleNeedingAttention
+      .sort(
+        (first, second) =>
+          teamTodaySortWeight(first) - teamTodaySortWeight(second)
+      )
+      .slice(0, 8),
     peopleOnLeaveCount,
     peopleOtherOooCount,
     peopleTravellingCount,
     peopleWithXeroSyncFailedCount,
     peopleWorkingFromHomeCount,
   };
+}
+
+function teamTodaySortWeight(person: {
+  statusKey: PersonListItem["currentStatus"]["statusKey"];
+  xeroSyncFailedCount: number;
+}) {
+  if (person.xeroSyncFailedCount > 0) {
+    return 0;
+  }
+  if (person.statusKey === "on_leave" || person.statusKey === "pending_leave") {
+    return 1;
+  }
+  if (person.statusKey === "wfh" || person.statusKey === "travelling") {
+    return 2;
+  }
+  return 3;
 }
 
 function buildTeamThisWeekCard(input: CalendarRangeData) {

@@ -556,7 +556,7 @@ const TeammateTrackRow = ({
                 <span className="tl-block__days">{block.span}d</span>
               )}
               {block.state === "pending" && (
-                <span className="ml-auto rounded bg-amber-500/90 px-1 py-0.5 font-bold text-[9px] text-white uppercase leading-none tracking-tight">
+                <span className="ml-auto rounded bg-muted px-1 py-0.5 font-bold text-[9px] text-muted-foreground uppercase leading-none tracking-tight">
                   Pending
                 </span>
               )}
@@ -615,8 +615,8 @@ const TimelineDetailStrip = ({
           <span
             className={`ml-1.5 rounded px-1.5 py-0.5 font-semibold text-[10px] ${
               selectedBlock.state === "pending"
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
-                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                ? "bg-muted text-muted-foreground"
+                : "bg-secondary text-secondary-foreground"
             }`}
           >
             {selectedBlock.state === "pending"
@@ -646,7 +646,7 @@ const TimelineDetailStrip = ({
         {selectedBlock.state === "pending" ? (
           <>
             <button
-              className="cursor-pointer rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white text-xs transition-colors hover:bg-emerald-700"
+              className="cursor-pointer rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground text-xs transition-colors hover:bg-primary/90"
               onClick={handleApprove}
               type="button"
             >
@@ -662,7 +662,7 @@ const TimelineDetailStrip = ({
           </>
         ) : (
           <button
-            className="cursor-pointer border-none bg-transparent font-medium text-rose-600 text-xs hover:text-rose-700"
+            className="cursor-pointer border-none bg-transparent font-medium text-destructive text-xs hover:text-destructive/80"
             onClick={handleDecline}
             type="button"
           >
@@ -1063,7 +1063,7 @@ export const InteractiveHeroSection = () => {
                     value={mockFeedUrl}
                   />
                   <button
-                    className="flex min-w-[85px] cursor-pointer items-center justify-center rounded-lg bg-emerald-600 px-3.5 py-1.5 font-medium text-white text-xs transition-colors hover:bg-emerald-700"
+                    className="flex min-w-[85px] cursor-pointer items-center justify-center rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground text-xs transition-colors hover:bg-primary/90"
                     onClick={copyToClipboard}
                     type="button"
                   >

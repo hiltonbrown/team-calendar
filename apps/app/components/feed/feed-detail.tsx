@@ -17,6 +17,7 @@ import {
   rotateTokenAction,
 } from "@/app/(authenticated)/feeds/_actions";
 import { useFeedTokenSession } from "@/app/(authenticated)/feeds/feed-token-session";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { OneTimeTokenPanel } from "./one-time-token-panel";
 
 interface PreviewEvent {
@@ -286,8 +287,8 @@ function PreviewTabs({
         <TabsContent className="mt-4 space-y-3" key={mode} value={mode}>
           {(previews[mode] ?? []).length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No upcoming events. Your feed will update automatically when
-              records are added.
+              No upcoming events. Your feed will update automatically when leave
+              or availability is added.
             </p>
           ) : (
             previews[mode]?.map((event) => (
@@ -315,15 +316,15 @@ function PreviewTabs({
 }
 
 function StatusDot({ status }: { status: string }) {
-  let colour = "bg-muted-foreground";
+  let colour = statusToneClasses.private;
   if (status === "active") {
-    colour = "bg-primary";
+    colour = statusToneClasses.leave;
   } else if (status === "paused") {
-    colour = "bg-amber-500";
+    colour = statusToneClasses.holiday;
   }
   return (
     <span className="flex items-center gap-2 text-sm capitalize">
-      <span className={`size-2 rounded-full ${colour}`} />
+      <span className={`size-2 rounded-full ring-2 ${colour}`} />
       {status}
     </span>
   );

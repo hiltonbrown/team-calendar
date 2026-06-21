@@ -136,9 +136,7 @@ export function ManualAvailabilityForm({
       }
 
       toast.success(
-        mode === "edit"
-          ? "Availability record updated"
-          : "Availability record created"
+        mode === "edit" ? "Availability updated" : "Availability created"
       );
       onSaved?.();
       router.refresh();
@@ -152,7 +150,7 @@ export function ManualAvailabilityForm({
   if (people.length === 0) {
     return (
       <div className="rounded-2xl bg-muted p-5 text-muted-foreground text-sm">
-        Add at least one person before creating availability records.
+        Add at least one person before creating availability.
       </div>
     );
   }
@@ -367,5 +365,5 @@ function getSubmitLabel(isPending: boolean, mode: "create" | "edit"): string {
   if (mode === "edit") {
     return "Save changes";
   }
-  return "Create record";
+  return "Create availability";
 }

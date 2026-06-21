@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
+import { CalendarScanPanel } from "@/components/calendar/calendar-scan-panel";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -163,6 +164,11 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
           teams={teams}
         />
 
+        <CalendarScanPanel
+          data={dataResult.value}
+          orgQueryValue={orgQueryValue}
+        />
+
         {renderCalendarView({
           actingPersonId: currentPerson?.id ?? null,
           data: dataResult.value,
@@ -208,7 +214,7 @@ function DisconnectedXeroBanner({
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p>
           Xero is not connected. Leave records will save locally only. Connect
-          Xero in Settings &gt; Integrations to enable submission for approval.
+          Xero from the integrations settings to enable submission for approval.
         </p>
         {canConnect && (
           <a

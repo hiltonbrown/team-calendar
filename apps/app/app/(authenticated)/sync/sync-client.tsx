@@ -13,6 +13,7 @@ import { useNotificationEvents } from "@repo/notifications/components/provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { EmptyState } from "@/components/states/empty-state";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 import { dispatchManualSyncAction } from "./_actions";
@@ -101,7 +102,7 @@ export function SyncClient({
 
       {summaries.length === 0 ? (
         <EmptyState
-          description="Connect Xero in Settings > Integrations > Xero to monitor sync health."
+          description="Connect Xero from the integrations settings to monitor sync health."
           title="No Xero tenants"
         />
       ) : (
@@ -426,21 +427,21 @@ function ConnectionDot({
   status: TenantSummary["connectionStatus"];
 }) {
   const colour = {
-    active: "bg-emerald-500",
-    expired: "bg-amber-500",
-    not_configured: "bg-muted-foreground",
-    revoked: "bg-red-500",
+    active: statusToneClasses.leave,
+    expired: statusToneClasses.holiday,
+    not_configured: statusToneClasses.private,
+    revoked: statusToneClasses.failed,
   }[status];
   return (
     <span
       className="inline-flex items-center gap-2 text-muted-foreground text-sm"
       title={
         status === "revoked"
-          ? "Reconnect in Settings > Integrations > Xero"
+          ? "Reconnect from the Xero integrations settings"
           : undefined
       }
     >
-      <span className={`size-2 rounded-full ${colour}`} />
+      <span className={`size-2 rounded-full ring-2 ${colour}`} />
       {statusLabel(status)}
     </span>
   );
@@ -448,13 +449,17 @@ function ConnectionDot({
 
 function StatusBadge({ status }: { status: SyncRunStatus }) {
   const className = {
-    cancelled: "bg-muted-foreground text-background",
-    failed: "bg-red-600 text-white",
-    partial_success: "bg-amber-500 text-white",
-    running: "bg-blue-600 text-white motion-safe:animate-pulse",
-    succeeded: "bg-emerald-600 text-white",
+    cancelled: statusToneClasses.private,
+    failed: statusToneClasses.failed,
+    partial_success: statusToneClasses.holiday,
+    running: `${statusToneClasses.manual} motion-safe:animate-pulse`,
+    succeeded: statusToneClasses.leave,
   }[status];
-  return <Badge className={className}>{statusLabel(status)}</Badge>;
+  return (
+    <Badge className={`border-0 ring-1 ${className}`}>
+      {statusLabel(status)}
+    </Badge>
+  );
 }
 
 function buildQuery(input: {

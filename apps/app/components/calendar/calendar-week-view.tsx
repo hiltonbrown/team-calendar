@@ -1,5 +1,6 @@
 import type { CalendarRange } from "@repo/availability";
 import { cn } from "@repo/design-system/lib/utils";
+import { statusToneClasses } from "@/components/availability/availability-status";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
 
@@ -21,8 +22,8 @@ export function CalendarWeekView({
   const createPersonId = selectedPersonId ?? actingPersonId;
 
   return (
-    <section className="overflow-hidden rounded-2xl bg-muted p-1">
-      <div className="grid grid-cols-7 gap-1">
+    <section className="overflow-x-auto rounded-2xl bg-muted p-1">
+      <div className="grid min-w-[56rem] grid-cols-7 gap-1">
         {data.days.map((day) => (
           <div
             className={cn(
@@ -42,10 +43,10 @@ export function CalendarWeekView({
       </div>
 
       {data.days.some((day) => day.publicHolidays.length > 0) && (
-        <div className="mt-1 grid grid-cols-7 gap-1">
+        <div className="mt-1 grid min-w-[56rem] grid-cols-7 gap-1">
           {data.days.map((day) => (
             <div
-              className="min-h-12 rounded-xl bg-violet-100 p-2 text-violet-950 text-xs dark:bg-violet-950 dark:text-violet-100"
+              className={`min-h-12 rounded-xl p-2 text-xs ${statusToneClasses.holiday}`}
               key={`holidays-${day.date.toISOString()}`}
             >
               {day.publicHolidays.map((holiday) => (
@@ -58,7 +59,7 @@ export function CalendarWeekView({
         </div>
       )}
 
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="mt-1 grid min-w-[56rem] grid-cols-7 gap-1">
         {data.days.map((day) => {
           const dateOnly = day.date.toISOString().slice(0, 10);
           const allDayEvents = day.events.filter((event) => event.allDay);

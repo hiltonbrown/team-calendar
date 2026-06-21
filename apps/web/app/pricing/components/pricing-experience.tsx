@@ -1,56 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { MarketingIcon } from "../../(home)/components/marketing-icons";
-
-const tiers = [
-  {
-    name: "Starter",
-    price: "$9",
-    unit: "per active employee, monthly",
-    description:
-      "For smaller Xero Payroll teams that need reliable leave visibility.",
-    cta: "Start with Starter",
-    featured: false,
-    features: [
-      "One Xero organisation",
-      "Team and whole-organisation feeds",
-      "Outlook, Google, and Apple calendar subscriptions",
-      "Revocable feed links",
-    ],
-  },
-  {
-    name: "Premium",
-    price: "$19",
-    unit: "per active employee, monthly",
-    description:
-      "For growing teams that need stronger controls and reporting context.",
-    cta: "Start with Premium",
-    featured: true,
-    features: [
-      "Everything in Starter",
-      "Multiple team and location feeds",
-      "Manual availability entries",
-      "Sync health and reconciliation views",
-      "Priority support",
-    ],
-  },
-  {
-    name: "Enterprise",
-    price: "Talk to us",
-    unit: "tailored for complex payroll environments",
-    description:
-      "For multi-entity organisations with custom rollout and governance needs.",
-    cta: "Contact sales",
-    featured: false,
-    features: [
-      "Multiple Xero organisations",
-      "Custom implementation support",
-      "Advanced audit and governance requirements",
-      "Volume pricing",
-    ],
-  },
-] as const;
+import { PricingPlans } from "./pricing-plans";
 
 const comparisonRows = [
   {
@@ -105,19 +57,19 @@ const setupOptions = [
 
 const faqs = [
   {
-    question: "What counts as an active employee?",
+    question: "How does billing work?",
     answer:
-      "An active employee is a person synced from Xero Payroll who can appear in Team Calendar availability records or calendar feeds.",
+      "Team Calendar bills per organisation plan, not per seat. Each plan covers your whole Xero Payroll organisation, so adding people never changes the price.",
   },
   {
-    question: "Do you charge for contractors?",
+    question: "What if we run more than one Xero file?",
     answer:
-      "Contractors only count when you add them to Team Calendar and include them in availability views or feeds.",
+      "Each Xero Payroll file is its own organisation. Multi-entity teams run on Enterprise, which covers several organisations under one agreement.",
   },
   {
     question: "Can we change plans later?",
     answer:
-      "Yes. You can start smaller and move to Premium or Enterprise when your feed structure or support needs change.",
+      "Yes. You can start smaller and move to a larger plan when your feed structure or support needs change.",
   },
   {
     question: "Is a credit card required for early access?",
@@ -127,127 +79,42 @@ const faqs = [
 ] as const;
 
 export const PricingExperience = () => {
-  const [employees, setEmployees] = useState(35);
   const [openFaq, setOpenFaq] = useState(0);
   const [submitted, setSubmitted] = useState(false);
-
-  const estimate = useMemo(
-    () => ({
-      starter: employees * 9,
-      premium: employees * 19,
-      hoursSaved: Math.max(3, Math.round(employees * 0.35)),
-    }),
-    [employees]
-  );
 
   return (
     <main className="fmkt-page fmkt-pricing-page">
       <section className="fmkt-pricing-hero">
         <div className="fmkt-container fmkt-pricing-hero__grid">
           <div>
-            <p className="fmkt-overline">Pricing</p>
-            <h1>Choose the plan that matches your payroll complexity.</h1>
+            <h1>
+              One plan per organisation. <em>No per-seat maths.</em>
+            </h1>
             <p>
-              Simple per-employee pricing for Xero Payroll teams that want
-              approved leave and availability to appear in shared calendars
-              without manual re-entry.
+              Flat plans for Xero Payroll teams that want approved leave and
+              availability in shared calendars without manual re-entry. Add as
+              many people as your payroll file holds; the price stays the same.
             </p>
           </div>
           <div className="fmkt-pricing-hero__summary">
-            <span>From</span>
-            <strong>$9</strong>
+            <span>No per-seat billing</span>
             <p>
-              per active employee, monthly. Early access remains available while
-              billing is finalised.
+              Every plan covers your whole Xero Payroll organisation. Early
+              access is open now while plans are finalised.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="fmkt-pricing-tiers">
+      <section className="fmkt-pricing-plans">
         <div className="fmkt-container">
-          <div className="fmkt-pricing-tier-grid">
-            {tiers.map((tier) => (
-              <article
-                className={`fmkt-price-tier ${
-                  tier.featured ? "fmkt-price-tier--featured" : ""
-                }`}
-                key={tier.name}
-              >
-                {tier.featured ? (
-                  <span className="fmkt-price-tier__badge">Most teams</span>
-                ) : null}
-                <h2>{tier.name}</h2>
-                <div className="fmkt-price-tier__price">
-                  <strong>{tier.price}</strong>
-                  <span>{tier.unit}</span>
-                </div>
-                <p>{tier.description}</p>
-                <a
-                  className={`marketing-btn ${
-                    tier.featured
-                      ? "marketing-btn--primary"
-                      : "marketing-btn--secondary"
-                  }`}
-                  href={tier.name === "Enterprise" ? "#contact" : "/contact"}
-                >
-                  {tier.cta}
-                </a>
-                <ul>
-                  {tier.features.map((feature) => (
-                    <li key={feature}>
-                      <MarketingIcon id="check" size={16} />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="fmkt-pricing-estimator">
-        <div className="fmkt-container fmkt-pricing-estimator__grid">
-          <div>
-            <p className="fmkt-overline">Estimator</p>
+          <div className="fmkt-section-header">
             <h2 className="fmkt-section-title">
-              Model the monthly cost before you talk to anyone.
+              Plans that scale with your rollout, not your headcount.
             </h2>
-            <p>
-              Move the slider to match the number of active people you expect to
-              publish into calendars.
-            </p>
-            <label htmlFor="employee-estimate">
-              Active employees
-              <strong>{employees}</strong>
-            </label>
-            <input
-              id="employee-estimate"
-              max={250}
-              min={5}
-              onChange={(event) => setEmployees(Number(event.target.value))}
-              suppressHydrationWarning
-              type="range"
-              value={employees}
-            />
           </div>
-          <div className="fmkt-pricing-estimator__results">
-            <div>
-              <span>Starter</span>
-              <strong>${estimate.starter.toLocaleString()}</strong>
-              <small>per month</small>
-            </div>
-            <div>
-              <span>Premium</span>
-              <strong>${estimate.premium.toLocaleString()}</strong>
-              <small>per month</small>
-            </div>
-            <div>
-              <span>Admin time saved</span>
-              <strong>{estimate.hoursSaved} hrs</strong>
-              <small>estimated each month</small>
-            </div>
+          <div className="fmkt-pricing-plans__table">
+            <PricingPlans />
           </div>
         </div>
       </section>
@@ -255,7 +122,6 @@ export const PricingExperience = () => {
       <section className="fmkt-pricing-compare">
         <div className="fmkt-container">
           <div className="fmkt-section-header">
-            <p className="fmkt-overline">Compare</p>
             <h2 className="fmkt-section-title">
               The same calendar foundation, more control as you grow.
             </h2>
@@ -288,7 +154,6 @@ export const PricingExperience = () => {
       <section className="fmkt-pricing-setup">
         <div className="fmkt-container">
           <div className="fmkt-section-header">
-            <p className="fmkt-overline">Setup</p>
             <h2 className="fmkt-section-title">
               Start light, add guidance when the rollout needs it.
             </h2>
@@ -310,7 +175,6 @@ export const PricingExperience = () => {
       <section className="fmkt-pricing-faq">
         <div className="fmkt-container fmkt-pricing-faq__grid">
           <div>
-            <p className="fmkt-overline">FAQ</p>
             <h2 className="fmkt-section-title">Common pricing questions.</h2>
           </div>
           <div className="fmkt-pricing-faq__list">
@@ -334,7 +198,6 @@ export const PricingExperience = () => {
       <section className="fmkt-pricing-contact" id="contact">
         <div className="fmkt-container fmkt-pricing-contact__grid">
           <div>
-            <p className="fmkt-overline">Contact</p>
             <h2 className="fmkt-section-title">Need help choosing a plan?</h2>
             <p>
               Send a few details and we will help you map the right plan,

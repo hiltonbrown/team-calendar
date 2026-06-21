@@ -90,7 +90,7 @@ const steps: PathwayStep[] = [
     iconClass: "fmkt-pathway__icon--xero",
   },
   {
-    label: "Team calendar",
+    label: "Outlook Calendar",
     copy: "Availability publishes to the calendars people check.",
     icon: <TeamCalendarIcon />,
     iconClass: "fmkt-pathway__icon--team",
@@ -177,18 +177,18 @@ export const SyncPathwayStrip = () => (
               <path d="M7 15h4M15 15h4" />
             </g>
             <text className="fmkt-sync-label" x="116" y="448">
-              Team calendar
+              Outlook Calendar
             </text>
             <text className="fmkt-sync-meta" x="116" y="474">
-              Outlook, Google, Apple
+              Google, Apple too
             </text>
           </g>
 
-          <circle className="fmkt-sync-packet fmkt-sync-packet--xero" r="5.5" />
-          <circle className="fmkt-sync-packet fmkt-sync-packet--team" r="5.5" />
+          <circle className="fmkt-sync-packet fmkt-sync-packet--xero" r="6.5" />
+          <circle className="fmkt-sync-packet fmkt-sync-packet--team" r="6.5" />
           <circle
             className="fmkt-sync-packet fmkt-sync-packet--return"
-            r="4.5"
+            r="5.5"
           />
         </svg>
       </div>
