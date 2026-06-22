@@ -23,7 +23,7 @@ import { PlansClient, type PlansClientRecord } from "./plans-client";
 
 export const metadata: Metadata = {
   description: "Plan leave and availability across calendars.",
-  title: "Plans - LeaveSync",
+  title: "Plans - Team Calendar",
 };
 
 interface PlansPageProps {

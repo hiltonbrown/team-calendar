@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 
 const title = "Create your organisation";
 const description =
-  "Start a new LeaveSync organisation or accept an invitation from your team.";
+  "Start a new Team Calendar organisation or accept an invitation from your team.";
 const SignUp = dynamic(() =>
   import("@repo/auth/components/sign-up").then((mod) => mod.SignUp)
 );

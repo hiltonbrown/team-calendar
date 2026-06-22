@@ -7,7 +7,7 @@ import { GeneralClient } from "./general-client";
 
 export const metadata: Metadata = {
   description: "Manage your account and payroll entity settings.",
-  title: "General - Settings - LeaveSync",
+  title: "General - Settings - Team Calendar",
 };
 
 interface GeneralPageProps {

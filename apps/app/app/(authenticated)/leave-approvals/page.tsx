@@ -18,7 +18,7 @@ import { Header } from "../components/header";
 import { LeaveApprovalsClient } from "./leave-approvals-client";
 
 export const metadata = {
-  title: "Leave Approvals | LeaveSync",
+  title: "Leave Approvals | Team Calendar",
   description: "Approve and manage team leave requests.",
 };
 

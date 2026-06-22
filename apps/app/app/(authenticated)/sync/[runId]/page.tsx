@@ -17,7 +17,7 @@ import { SyncRunDetailClient } from "./sync-run-detail-client";
 
 export const metadata: Metadata = {
   description: "View details of a synchronisation run.",
-  title: "Sync run detail | LeaveSync",
+  title: "Sync run detail | Team Calendar",
 };
 
 interface SyncRunDetailPageProperties {

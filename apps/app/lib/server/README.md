@@ -1,7 +1,7 @@
 # Server Helpers
 
 This directory contains server-only helpers for authenticated app routes. These
-helpers establish the Clerk Organisation and LeaveSync organisation context that
+helpers establish the Clerk Organisation and Team Calendar organisation context that
 pages need before calling domain services.
 
 All files import `server-only` or are intended for server contexts. Do not import
@@ -39,7 +39,7 @@ export default async function Page({
 
 Use this from Server Components that need an active organisation. It accepts the
 optional `org` query value, validates it when present, otherwise falls back to the
-selected Clerk Organisation and ensures a default LeaveSync organisation exists.
+selected Clerk Organisation and ensures a default Team Calendar organisation exists.
 
 It returns:
 
@@ -62,9 +62,9 @@ needs a `Result` instead of page-level `notFound()` handling.
 
 ### `ensure-default-organisation.ts`
 
-Creates or resolves the default LeaveSync organisation for a Clerk Organisation.
+Creates or resolves the default Team Calendar organisation for a Clerk Organisation.
 It is used by `requireActiveOrgPageContext` when no `org` query value is present
-and the current Clerk Organisation does not yet have a LeaveSync organisation.
+and the current Clerk Organisation does not yet have a Team Calendar organisation.
 
 ### `load-onboarding-state.ts`
 

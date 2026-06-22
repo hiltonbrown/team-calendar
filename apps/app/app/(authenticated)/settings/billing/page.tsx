@@ -10,7 +10,7 @@ import { BillingClient } from "./billing-client";
 
 export const metadata: Metadata = {
   description: "Review your current plan and usage.",
-  title: "Billing - Settings - LeaveSync",
+  title: "Billing - Settings - Team Calendar",
 };
 
 interface BillingPageProps {

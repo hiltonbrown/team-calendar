@@ -19,7 +19,7 @@ import { SyncClient } from "./sync-client";
 
 export const metadata: Metadata = {
   description: "Monitor Xero synchronisation health.",
-  title: "Sync health | LeaveSync",
+  title: "Sync health | Team Calendar",
 };
 
 interface SyncPageProps {

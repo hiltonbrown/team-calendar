@@ -6,7 +6,7 @@ import { LeaveApprovalSettingsClient } from "./leave-approval-settings-client";
 
 export const metadata: Metadata = {
   description: "Configure organisation-wide leave approval behaviour.",
-  title: "Leave Approval - Settings - LeaveSync",
+  title: "Leave Approval - Settings - Team Calendar",
 };
 
 interface LeaveApprovalPageProps {

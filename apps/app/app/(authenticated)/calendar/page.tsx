@@ -23,7 +23,7 @@ import { CalendarFilterSchema } from "./_schemas";
 
 export const metadata: Metadata = {
   description: "View team leave, availability and public holidays.",
-  title: "Calendar - LeaveSync",
+  title: "Calendar - Team Calendar",
 };
 
 interface CalendarPageProps {

@@ -357,7 +357,7 @@ export function RecordForm({
         <Textarea
           defaultValue={record?.notesInternal}
           name="notesInternal"
-          placeholder="Visible inside LeaveSync only"
+          placeholder="Visible inside Team Calendar only"
           rows={4}
         />
       </Field>
