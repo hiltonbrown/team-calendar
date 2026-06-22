@@ -28,7 +28,7 @@ import {
 
 export const metadata: Metadata = {
   description: "Analyse leave trends by team.",
-  title: "Leave Reports - LeaveSync",
+  title: "Leave Reports - Team Calendar",
 };
 
 interface LeaveReportsPageProps {

@@ -2,6 +2,9 @@ import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 config({ path: new URL("../database/.env", import.meta.url).pathname });
+// getFeedDetail builds the masked subscribe URL from the API origin and now
+// requires it to be configured. Provide one for the integration environment.
+process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
 vi.mock("server-only", () => ({}));
 
 let createFeed: typeof import("./index")["createFeed"];

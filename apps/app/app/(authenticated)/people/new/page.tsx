@@ -5,7 +5,7 @@ import { Header } from "../../components/header";
 import { NewPersonClient } from "./new-person-client";
 
 export const metadata: Metadata = {
-  title: "Add Person | LeaveSync",
+  title: "Add Person | Team Calendar",
 };
 
 interface NewPersonPageProps {

@@ -18,7 +18,7 @@ import { Header } from "../components/header";
 import { NotificationsClient } from "./notifications-client";
 
 export const metadata: Metadata = {
-  title: "Notifications | LeaveSync",
+  title: "Notifications | Team Calendar",
   description: "View notifications and manage delivery preferences.",
 };
 

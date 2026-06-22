@@ -11,7 +11,7 @@ import { AuditLogClient } from "./audit-log-client";
 
 export const metadata: Metadata = {
   description: "All system and user actions for this organisation.",
-  title: "Audit Log - Settings - LeaveSync",
+  title: "Audit Log - Settings - Team Calendar",
 };
 
 interface AuditLogPageProps {

@@ -119,7 +119,7 @@ export function PersonProfileContent({
 
           {profile.xeroSyncFailedCount > 0 && (
             <XeroSyncFailedState
-              message={`${profile.xeroSyncFailedCount} record${profile.xeroSyncFailedCount === 1 ? "" : "s"} need attention before Xero and LeaveSync are aligned.`}
+              message={`${profile.xeroSyncFailedCount} record${profile.xeroSyncFailedCount === 1 ? "" : "s"} need attention before Xero and Team Calendar are aligned.`}
               retrySlot={
                 <Button asChild size="sm" variant="secondary">
                   <Link

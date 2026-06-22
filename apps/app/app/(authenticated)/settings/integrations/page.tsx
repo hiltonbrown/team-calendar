@@ -5,8 +5,8 @@ import { requirePageRole } from "@/lib/auth/require-page-role";
 import { IntegrationsClient } from "./integrations-client";
 
 export const metadata: Metadata = {
-  description: "Connect external services to extend LeaveSync.",
-  title: "Integrations - Settings - LeaveSync",
+  description: "Connect external services to extend Team Calendar.",
+  title: "Integrations - Settings - Team Calendar",
 };
 
 export default async function IntegrationsPage() {

@@ -69,7 +69,7 @@ export function XeroConnectClient({
         <CardHeader>
           <CardTitle>Select a Xero tenant</CardTitle>
           <CardDescription>
-            Choose the payroll file to connect. LeaveSync will detect its
+            Choose the payroll file to connect. Team Calendar will detect its
             payroll region after selection.
           </CardDescription>
         </CardHeader>
@@ -125,7 +125,7 @@ export function XeroConnectClient({
           <CardHeader>
             <CardTitle>Create the first payroll organisation</CardTitle>
             <CardDescription>
-              LeaveSync will create the first Organisation row using the
+              Team Calendar will create the first Organisation row using the
               selected tenant name as the default label.
             </CardDescription>
           </CardHeader>

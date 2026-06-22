@@ -8,7 +8,7 @@ import { SettingsSectionHeader } from "../components/settings-section-header";
 
 export const metadata: Metadata = {
   description: "Review optional setup steps for this organisation.",
-  title: "Getting Started - Settings - LeaveSync",
+  title: "Getting Started - Settings - Team Calendar",
 };
 
 interface GettingStartedSettingsPageProps {

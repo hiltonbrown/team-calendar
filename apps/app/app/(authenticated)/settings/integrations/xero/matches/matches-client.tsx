@@ -36,8 +36,8 @@ export function MatchesClient({ matches }: MatchesClientProps) {
         <CardHeader>
           <CardTitle>No pending matches</CardTitle>
           <CardDescription>
-            LeaveSync will show possible Xero and manual person matches here for
-            explicit admin review.
+            Team Calendar will show possible Xero and manual person matches here
+            for explicit admin review.
           </CardDescription>
         </CardHeader>
       </Card>

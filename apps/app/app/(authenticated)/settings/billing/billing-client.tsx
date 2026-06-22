@@ -19,7 +19,7 @@ interface BillingClientProps {
 export const BillingClient = ({ summary }: BillingClientProps) => (
   <div className="space-y-6">
     <SettingsSectionHeader
-      description="Billing is read-only here. Plan changes are handled outside LeaveSync."
+      description="Billing is read-only here. Plan changes are handled outside Team Calendar."
       title="Billing"
     />
 

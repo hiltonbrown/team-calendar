@@ -8,7 +8,7 @@ import { FeedsClient } from "./feeds-client";
 
 export const metadata: Metadata = {
   description: "Manage organisation feed defaults and view every feed.",
-  title: "Feeds - Settings - LeaveSync",
+  title: "Feeds - Settings - Team Calendar",
 };
 
 interface FeedsPageProps {

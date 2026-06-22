@@ -199,7 +199,7 @@ export function FeedDetail({
           <div className="mt-2 rounded-xl bg-background p-3 font-mono text-xs">
             {showUrl
               ? detail.maskedSubscribeUrl
-              : "https://leavesync.app/ical/•••••••••••••.ics"}
+              : "https://••••••••••/ical/•••••••••••••.ics"}
           </div>
           <Button
             className="mt-2"
