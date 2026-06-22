@@ -1,4 +1,5 @@
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
+import { brandNameDisplay } from "@repo/seo/branding";
 import { CommandIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -12,7 +13,7 @@ const AuthLayout = ({ children }: AuthLayoutProps) => (
       <div className="absolute inset-0 bg-muted" />
       <div className="relative z-20 flex items-center font-medium text-lg text-primary">
         <CommandIcon className="mr-2 h-6 w-6" />
-        LeaveSync
+        {brandNameDisplay}
       </div>
       <div className="absolute top-4 right-4">
         <ModeToggle />
@@ -23,7 +24,7 @@ const AuthLayout = ({ children }: AuthLayoutProps) => (
             &ldquo;Publish approved leave and manual availability to secure
             calendar feeds without handing payroll access to every team.&rdquo;
           </p>
-          <footer className="text-sm">LeaveSync</footer>
+          <footer className="text-sm">{brandNameDisplay}</footer>
         </blockquote>
       </div>
     </div>

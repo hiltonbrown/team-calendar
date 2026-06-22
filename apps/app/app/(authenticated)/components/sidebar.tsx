@@ -16,6 +16,7 @@ import {
   useSidebar,
 } from "@repo/design-system/components/ui/sidebar";
 import { cn } from "@repo/design-system/lib/utils";
+import { brandNameDisplay } from "@repo/seo/branding";
 import {
   ActivityIcon,
   BarChart3Icon,
@@ -150,7 +151,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                 </div>
                 {sidebar.open && (
                   <span className="font-semibold text-[0.9375rem] tracking-[-0.01em]">
-                    LeaveSync
+                    {brandNameDisplay}
                   </span>
                 )}
               </div>
