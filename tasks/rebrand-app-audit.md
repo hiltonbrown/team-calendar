@@ -41,12 +41,28 @@ Note: the mark artwork (coloured rounded bars) is unchanged. A final
 redesigned Team Calendar logo asset is still pending and should replace
 both the SVG icons and the inline sidebar SVG when delivered.
 
-### URLs (import `primaryDomain`)
+### Feed subscribe URLs (require API origin, no hardcoded fallback)
 
-| File | Line | Before | After | Status |
-|---|---|---|---|---|
-| `apps/app/app/(authenticated)/feeds/layout.tsx` | 22 | `"https://leavesync.app"` fallback origin | `primaryDomain` | Resolved |
-| `apps/app/components/feed/feed-detail.tsx` | 202 | `"https://leavesync.app/ical/...ics"` masked placeholder | `` `${primaryDomain}/ical/...ics` `` | Resolved |
+Initial pass replaced the `leavesync.app` fallbacks with `primaryDomain`.
+Review feedback on PR #71 (Codex, Copilot) correctly noted that feed
+subscribe URLs are served by the **API origin** (`apps/api`
+`/ical/:token.ics`), not the marketing canonical `primaryDomain`
+(`teamcalendar.online`), so a `primaryDomain` fallback would 404 when the
+origin env vars are unset. Final approach: drop the hardcoded fallback
+entirely and require `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_APP_URL`,
+failing clearly when neither is configured.
+
+| File | Before | After | Status |
+|---|---|---|---|
+| `apps/app/app/(authenticated)/feeds/layout.tsx` | `"https://leavesync.app"` fallback origin | require env, throw if unset | Resolved |
+| `apps/app/components/feed/feed-detail.tsx` | `"https://leavesync.app/ical/...ics"` masked placeholder | domain-agnostic masked placeholder (no brand) | Resolved |
+| `packages/feeds/src/feed-service.ts` | `"https://leavesync.app"` fallback in `maskedSubscribeUrl()` | require env, throw if unset | Resolved |
+
+`packages/feeds` was outside the original declared scope; this edit was
+authorised by the PR owner in response to the review feedback, and is
+limited to the masked-subscribe-URL origin. The ICS UID namespace and
+source-type enum in that package were **not** touched (see flagged
+section below).
 
 ### Page titles and metadata descriptions (inline literal)
 
@@ -133,6 +149,9 @@ They were deliberately left untouched.
 | `lib/public-api-url.test.ts` | 10, 12, 14 | `"https://api.leavesync.test"` | Stubbed env value in a unit test; generic test fixture. |
 | `app/(authenticated)/setup/_actions.test.ts` | 49, 55 | `name: "LeaveSync Test"` | Arbitrary organisation name used as test data; not display copy. |
 | `__tests__/auth-components.test.tsx` | 45 | `"Start a new LeaveSync organisation, ..."` | Asserts copy that lives in `@repo/auth/components/sign-up` (the `signUpCopy` export). The source string is in `packages/auth`, which is **out of scope** for this pass. Changing the assertion without changing the source would fail the test. See out-of-scope section. |
+| `packages/feeds/src/projection/feed-projection.ts` | 287 | `` `${holiday.id}@ical.leavesync.app` `` | **ICS UID namespace.** This forms the deterministic UID published into calendar feeds. Changing the `@ical.leavesync.app` host would re-issue every event in every subscriber's calendar. Explicitly out of scope ("ICS UID derivation in packages/feeds") and a known failure mode. Must never change as part of a rebrand. |
+| `packages/feeds/src/**/*.test.ts` | various | `...@ical.leavesync.app` UID fixtures | Test fixtures for the UID namespace above. Untouched with the namespace. |
+| `packages/feeds/src/projection/feed-projection.ts` | 46 | `FEED_SOURCE_TYPES` includes `"leavesync_leave"` | Source-type enum value (data identifier), mirrors `apps/app` `planSourceTypes`. Not display text. |
 
 ## Out of scope, flagged for separate initiative
 
