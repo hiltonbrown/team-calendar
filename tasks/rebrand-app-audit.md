@@ -64,6 +64,17 @@ limited to the masked-subscribe-URL origin. The ICS UID namespace and
 source-type enum in that package were **not** touched (see flagged
 section below).
 
+Blast-radius note: `maskedSubscribeUrl()` is reached by `getFeedDetail()`,
+which the feed transition operations (`pauseFeed` / `resumeFeed` /
+`archiveFeed` / `restoreFeed`) return. With the require-env behaviour they
+throw and surface `ok:false` if no API origin is configured. The feeds
+integration suite only set `DATABASE_URL`, so the pause test began
+returning `ok:false`; `index.integration.test.ts` now sets a test
+`NEXT_PUBLIC_API_URL`. In production the variable is always configured, so
+there is no runtime impact, but a softer host-agnostic masked string
+(matching the feed-detail placeholder) is available if hard-failing feed
+reads on a missing origin is undesirable.
+
 ### Page titles and metadata descriptions (inline literal)
 
 All `metadata.title` / `description` strings of the form `... LeaveSync`
