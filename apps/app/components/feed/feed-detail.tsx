@@ -8,7 +8,6 @@ import {
   TabsList,
   TabsTrigger,
 } from "@repo/design-system/components/ui/tabs";
-import { primaryDomain } from "@repo/seo/branding";
 import { ArchiveIcon, PauseIcon, PlayIcon, RotateCwIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import {
@@ -200,7 +199,7 @@ export function FeedDetail({
           <div className="mt-2 rounded-xl bg-background p-3 font-mono text-xs">
             {showUrl
               ? detail.maskedSubscribeUrl
-              : `${primaryDomain}/ical/•••••••••••••.ics`}
+              : "https://••••••••••/ical/•••••••••••••.ics"}
           </div>
           <Button
             className="mt-2"

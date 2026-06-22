@@ -831,10 +831,16 @@ function scopedFeed(input: {
 const TRAILING_SLASH_PATTERN = /\/$/;
 
 function maskedSubscribeUrl(hint?: string): string {
+  // The masked URL must reflect the API origin that serves /ical/:token.ics.
+  // There is no safe hardcoded default, so require the origin to be
+  // configured rather than surfacing a wrong or stale host.
   const origin =
-    process.env.NEXT_PUBLIC_API_URL ??
-    process.env.NEXT_PUBLIC_APP_URL ??
-    "https://leavesync.app";
+    process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (!origin) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL must be configured to build feed subscribe URLs."
+    );
+  }
   return `${origin.replace(TRAILING_SLASH_PATTERN, "")}/ical/${hint ? `••••${hint}` : "••••"}.ics`;
 }
 
