@@ -16,7 +16,7 @@ import { Header } from "../../components/header";
 
 export const metadata: Metadata = {
   description: "View person profile, availability history, and balances.",
-  title: "Person Profile - LeaveSync",
+  title: "Person Profile - Team Calendar",
 };
 
 interface PersonProfilePageProps {

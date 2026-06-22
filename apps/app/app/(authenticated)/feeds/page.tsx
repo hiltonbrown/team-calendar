@@ -15,7 +15,7 @@ import { FeedFilterSchema } from "./_schemas";
 import { FeedFilterBar } from "./feed-filter-bar";
 
 export const metadata: Metadata = {
-  title: "Feeds | LeaveSync",
+  title: "Feeds | Team Calendar",
   description:
     "Create and manage iCal calendar feeds for your team's leave and availability.",
 };

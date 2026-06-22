@@ -23,7 +23,7 @@ import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-pag
 import { Header } from "./components/header";
 
 export const metadata: Metadata = {
-  title: "Dashboard | LeaveSync",
+  title: "Dashboard | Team Calendar",
   description: "Role-aware overview of leave, availability, and sync status.",
 };
 

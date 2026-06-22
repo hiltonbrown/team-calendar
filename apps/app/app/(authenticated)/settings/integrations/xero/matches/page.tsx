@@ -8,7 +8,7 @@ import { MatchesClient } from "./matches-client";
 export const metadata: Metadata = {
   description:
     "Review possible matches between Xero people and existing manual people.",
-  title: "Xero Person Matches - Settings - LeaveSync",
+  title: "Xero Person Matches - Settings - Team Calendar",
 };
 
 export default async function XeroMatchesPage() {

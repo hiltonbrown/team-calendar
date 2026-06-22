@@ -6,7 +6,7 @@ import { XeroClient } from "./xero-client";
 
 export const metadata: Metadata = {
   description: "Manage Xero connections for each payroll organisation.",
-  title: "Xero - Settings - LeaveSync",
+  title: "Xero - Settings - Team Calendar",
 };
 
 export default async function XeroPage() {

@@ -12,7 +12,7 @@ import { PeopleClient } from "./people-client";
 
 export const metadata: Metadata = {
   description: "Team directory with live availability and Xero sync status.",
-  title: "People - LeaveSync",
+  title: "People - Team Calendar",
 };
 
 interface PeoplePageProps {

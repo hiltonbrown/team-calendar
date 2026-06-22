@@ -134,7 +134,7 @@ export async function loadOnboardingState({
           ctaHref: "/settings/integrations/xero",
           ctaLabel: hasActiveXeroConnection ? "Manage Xero" : "Connect Xero",
           description:
-            "Connect Xero now or skip for later. LeaveSync keeps a persistent setup task until the first payroll connection is in place.",
+            "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place.",
           id: "xero",
           status: hasActiveXeroConnection ? "complete" : "next",
           title: "Connect Xero",

@@ -48,7 +48,8 @@ export const OnboardingClient = ({ prefillName }: OnboardingClientProps) => {
         <CardHeader>
           <CardTitle>Set up your organisation</CardTitle>
           <CardDescription>
-            Complete your organisation profile to get started with LeaveSync.
+            Complete your organisation profile to get started with Team
+            Calendar.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">

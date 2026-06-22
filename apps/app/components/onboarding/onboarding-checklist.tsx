@@ -30,7 +30,7 @@ export function OnboardingChecklist({
             Publish availability when you are ready
           </h2>
           <p className="mt-2 max-w-2xl text-muted-foreground text-sm">
-            LeaveSync works without Xero or completed onboarding. Use these
+            Team Calendar works without Xero or completed onboarding. Use these
             steps when they are useful, or continue using the dashboard.
           </p>
         </div>

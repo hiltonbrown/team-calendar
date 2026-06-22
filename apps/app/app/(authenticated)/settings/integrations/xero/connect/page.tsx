@@ -8,7 +8,7 @@ import { XeroConnectClient } from "./connect-client";
 
 export const metadata: Metadata = {
   description: "Finish connecting a Xero payroll organisation.",
-  title: "Connect Xero - Settings - LeaveSync",
+  title: "Connect Xero - Settings - Team Calendar",
 };
 
 interface XeroConnectPageProps {
@@ -36,7 +36,7 @@ export default async function XeroConnectPage({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Select the tenant and payroll organisation before LeaveSync finalises the shared Xero connection."
+        description="Select the tenant and payroll organisation before Team Calendar finalises the shared Xero connection."
         title="Connect Xero"
       />
       <XeroConnectClient

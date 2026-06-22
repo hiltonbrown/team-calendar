@@ -6,7 +6,7 @@ import { HolidaysClient } from "./holidays-client";
 
 export const metadata: Metadata = {
   description: "Manage public holiday imports and custom holidays.",
-  title: "Holidays - Settings - LeaveSync",
+  title: "Holidays - Settings - Team Calendar",
 };
 
 interface HolidaysPageProps {
