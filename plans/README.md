@@ -27,8 +27,14 @@ row when done.
 | 016 | [spike] Analytics UI over the existing reporting services (DIR-01) | P2 | M | — | DONE |
 | 017 | [spike] HTML calendar view renderer (DIR-03) | P3 | M | — | DONE |
 | 018 | [spike] NZ/UK payroll write-back + read (DIR-02) | P3 | L | — | BLOCKED (official NZ/UK payroll leave application payloads unavailable in public Xero docs; design doc written) |
+| 020 | Migrate `availability_source_type` enum `leavesync_leave` → `team_calendar_leave` (fixes "Unable to load" on /plans, /calendar, /leave-reports, /leave-approvals) | P1 | S | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
+
+> Plan 020 (added 2026-06-26, against commit `6b14003`) is the root-cause fix for
+> the four data pages rendering "Unable to load". It is independent of 001–019.
+> Note: 019 is `019-marketing-website-impeccable-audit.md` (present in this
+> directory, not yet in the table above).
 
 ## Dependency notes
 
