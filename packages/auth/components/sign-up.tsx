@@ -5,7 +5,7 @@ import { embeddedAuthAppearance } from "./embedded-auth-appearance";
 export const signUpCopy = {
   title: "Create your organisation",
   description:
-    "Start a new LeaveSync organisation, or accept an invitation from your team email.",
+    "Start a new Team Calendar organisation, or accept an invitation from your team email.",
 };
 
 export const SignUp = () => (

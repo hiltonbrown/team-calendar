@@ -1,35 +1,20 @@
 import { ModeToggle } from "@repo/design-system/components/mode-toggle";
-import { brandNameDisplay } from "@repo/seo/branding";
-import { CommandIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { BrandPanel, MobileBrand } from "./components/brand-panel";
 
 interface AuthLayoutProps {
   readonly children: ReactNode;
 }
 
 const AuthLayout = ({ children }: AuthLayoutProps) => (
-  <div className="container relative grid h-dvh flex-col items-center justify-center lg:max-w-none lg:grid-cols-2 lg:px-0">
-    <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-      <div className="absolute inset-0 bg-muted" />
-      <div className="relative z-20 flex items-center font-medium text-lg text-primary">
-        <CommandIcon className="mr-2 h-6 w-6" />
-        {brandNameDisplay}
-      </div>
-      <div className="absolute top-4 right-4">
+  <div className="relative grid h-dvh w-full grid-cols-1 lg:grid-cols-2">
+    <BrandPanel />
+    <div className="auth-form-pane relative flex items-center justify-center px-4 py-12 sm:px-8 lg:p-8">
+      <div className="absolute top-4 right-4 lg:hidden">
         <ModeToggle />
       </div>
-      <div className="relative z-20 mt-auto text-primary">
-        <blockquote className="space-y-2">
-          <p className="text-lg">
-            &ldquo;Publish approved leave and manual availability to secure
-            calendar feeds without handing payroll access to every team.&rdquo;
-          </p>
-          <footer className="text-sm">{brandNameDisplay}</footer>
-        </blockquote>
-      </div>
-    </div>
-    <div className="lg:p-8">
-      <div className="mx-auto flex w-full max-w-[400px] flex-col justify-center space-y-6">
+      <div className="auth-rise mx-auto flex w-full max-w-[400px] flex-col justify-center gap-8">
+        <MobileBrand />
         {children}
       </div>
     </div>

@@ -17,7 +17,6 @@
     "@repo/availability": "*",
     "@repo/core": "*",
     "@repo/database": "*",
-    "@repo/design-system": "*",
     "@repo/email": "*",
     "@repo/feeds": "*",
     "@repo/jobs": "*",

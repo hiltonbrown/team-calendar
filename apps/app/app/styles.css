@@ -36,3 +36,161 @@
     scale: 1;
   }
 }
+
+/* ─── Auth: brand panel ─────────────────────────────────────────────────── */
+/* The sign-in / sign-up welcome surface is the one screen where green leads  */
+/* as a brand moment (DESIGN.md: "brand anchors"). Deep sage in light, deep   */
+/* near-black green in dark, both carrying a soft sage glow. These tokens are  */
+/* scoped to this brand surface and never reused on data surfaces.            */
+:root,
+[data-theme="light"] {
+  --auth-panel: linear-gradient(158deg, #14301b 0%, #21482a 46%, #336a3b 100%);
+  --auth-glow: radial-gradient(
+    52% 48% at 28% 46%,
+    rgba(141, 212, 150, 0.26),
+    transparent 72%
+  );
+  --auth-ink: #f0f6ee;
+  /* 86% keeps subline/footnote >= 4.5:1 even over the lightest gradient stop. */
+  --auth-ink-soft: color-mix(in srgb, #f0f6ee 86%, transparent);
+  --auth-ink-faint: color-mix(in srgb, #f0f6ee 16%, transparent);
+  --auth-in: #6da671; /* sage: in office / Xero-synced */
+  --auth-wfh: #c8bfff; /* lavender: manual availability */
+  --auth-off: color-mix(in srgb, #f0f6ee 24%, transparent); /* ghost: away */
+  /* Logo bars on the deep panel (brand artwork, fixed tones). */
+  --auth-glyph-1: #cfeccb;
+  --auth-glyph-2: #a7e0ad;
+  --auth-glyph-3: #7fc98a;
+}
+
+.dark,
+[data-theme="dark"] {
+  --auth-panel: linear-gradient(158deg, #0a0f0b 0%, #122017 48%, #1f5226 100%);
+  --auth-glow: radial-gradient(
+    52% 48% at 28% 46%,
+    rgba(141, 212, 150, 0.2),
+    transparent 72%
+  );
+  --auth-ink: #e9f3ea;
+  --auth-ink-soft: color-mix(in srgb, #e9f3ea 76%, transparent);
+  --auth-ink-faint: color-mix(in srgb, #e9f3ea 14%, transparent);
+  --auth-in: #8fd496;
+  --auth-wfh: #c8bfff;
+  --auth-off: color-mix(in srgb, #e9f3ea 22%, transparent);
+  --auth-glyph-1: #cfeccb;
+  --auth-glyph-2: #a7e0ad;
+  --auth-glyph-3: #7fc98a;
+}
+
+.auth-panel {
+  background: var(--auth-glow), var(--auth-panel);
+  background-repeat: no-repeat;
+}
+
+/* Clerk's card carries a fixed ~25rem width that overflows on phones. Let it  */
+/* flow to the column instead. Scoped to the auth pane so the in-app Clerk      */
+/* widgets (OrganizationSwitcher, UserButton) keep their own sizing.           */
+.auth-form-pane :is(.cl-rootBox, .cl-cardBox, .cl-card, .cl-main, .cl-form) {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+/* AuthFormFrame supplies the title/subtitle on sign-in and sign-up, so the    */
+/* embedded Clerk card sets header="hidden". Clerk's own display rule defeats   */
+/* Tailwind's .hidden, so enforce it. Only headers carrying .hidden are         */
+/* affected, leaving the choose-organization task header intact.                */
+.auth-form-pane .cl-header.hidden {
+  display: none !important;
+}
+
+/* Theme toggle sitting on the deep panel needs light ink, not --foreground,   */
+/* and a light focus ring (the default green ring is invisible on deep green).  */
+.auth-toggle button {
+  color: var(--auth-ink);
+}
+.auth-toggle button:hover {
+  background-color: var(--auth-ink-faint);
+}
+.auth-toggle button:focus-visible {
+  outline: 2px solid var(--auth-ink);
+  outline-offset: 2px;
+}
+
+@keyframes authRise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes authCellIn {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes authGlyphIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px) scaleX(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+}
+
+/* The single "live status update" cell: a person quietly switching to WFH. */
+@keyframes authLive {
+  0%,
+  44% {
+    opacity: 0;
+  }
+  54%,
+  92% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.auth-rise {
+  animation: authRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-cell {
+  animation: authCellIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-glyph-bar {
+  transform-origin: left center;
+  transform-box: fill-box;
+  animation: authGlyphIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.auth-live {
+  animation: authLive 7s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-rise,
+  .auth-cell,
+  .auth-glyph-bar {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  /* No looping status change: settle on the steady "in office" dot. */
+  .auth-live {
+    opacity: 0;
+    animation: none;
+  }
+}

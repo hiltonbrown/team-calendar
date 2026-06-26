@@ -3,7 +3,7 @@
   "version": "6.0.2",
   "scripts": {
     "build": "turbo build --filter=!email",
-    "dev": "turbo dev --filter=app --filter=api --filter=web --filter=email",
+    "dev": "bunx turbo dev --ui=stream --filter=app --filter=api --filter=web --filter=email",
     "check": "ultracite check apps packages scripts tooling tsup.config.ts next-env.d.ts",
     "fix": "ultracite fix",
     "typecheck": "turbo typecheck",
@@ -25,7 +25,7 @@
     "@turbo/gen": "^2.9.14",
     "@types/node": "^25.9.1",
     "tsup": "^8.5.1",
-    "turbo": "^2.9.14",
+    "turbo": "^2.10.0",
     "typescript": "^6.0.3",
     "ultracite": "7.7.0",
     "vitest": "^4.1.7"

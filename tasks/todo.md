@@ -1,3 +1,113 @@
+# Plan: Fix Turbo Dev Shutdown Address Boundary Error
+
+## Plan
+
+- [x] Reproduce `bun run dev` startup after freeing stale ports.
+- [x] Confirm the address boundary error happens during Turbo TUI shutdown.
+- [x] Test Turbo stream UI as the smaller workaround.
+- [x] Update the dev script to use stream UI and verify startup plus Ctrl-C shutdown.
+
+## Review
+
+- Freed stale dev processes that were occupying ports 3000, 3001, 3002, and
+  3003 from previous smoke checks.
+- Reproduced the shutdown problem: `bun run dev` with the bare `turbo` script
+  starts all four services, but Ctrl-C exits with `SIGSEGV (Address boundary
+  error)`.
+- Direct `bunx turbo dev --ui=stream ...` starts all services and does not emit
+  the address-boundary shutdown error.
+- Updated the root `dev` script to use
+  `bunx turbo dev --ui=stream --filter=app --filter=api --filter=web --filter=email`.
+- Verified the updated `bun run dev` starts app, web, api, and email on ports
+  3000, 3001, 3002, and 3003.
+- Ctrl-C on the updated script exits without the address-boundary error; Turbo
+  reports force-killed persistent tasks during shutdown.
+- Confirmed no listeners remain on ports 3000-3003 after shutdown.
+- `bun run check` exits 0.
+
+# Plan: Fix Remaining API Runtime Error
+
+## Plan
+
+- [x] Reproduce the API runtime error from `apps/api` dev server.
+- [x] Identify whether the failure is route code, instrumentation, config, or cache state.
+- [x] Patch the smallest source or config issue.
+- [x] Verify with API dev smoke test plus targeted checks.
+
+## Review
+
+- The remaining API error was not the design-system boundary issue. The running
+  `/api/inngest` route returned `500` because the SDK was in cloud mode without
+  `INNGEST_SIGNING_KEY`.
+- The active local API env came from Vercel-style values and did not include
+  `INNGEST_DEV`, so Inngest did not enter local development mode.
+- Added `INNGEST_DEV` validation to `packages/jobs/keys.ts`, documented
+  `INNGEST_DEV="1"` in `apps/api/.env.example`, and added it to
+  `apps/api/.env.local` without changing secret values.
+- Added jobs client coverage for `INNGEST_DEV="1"` and explicit dev server URL
+  values.
+- Restarted the stale API dev process so it picked up the updated env.
+- `curl -i --max-time 15 http://localhost:3002/health` returns `HTTP/1.1 200 OK`.
+- `curl -i --max-time 15 http://localhost:3002/api/inngest` returns
+  `HTTP/1.1 200 OK` with `"mode":"dev"`.
+- `bunx vitest run packages/jobs/src/client.test.ts` passes: 4 tests.
+- `cd apps/api && bun run typecheck` exits 0.
+- `cd packages/jobs && bun run typecheck` exits 0.
+- `bun run check` exits 0.
+
+# Plan: Fix API Boundary Error
+
+## Plan
+
+- [x] Reproduce the API boundary failure with the project boundary checker.
+- [x] Identify the exact import or package rule violation.
+- [x] Patch the smallest source/package change that restores the intended boundary.
+- [x] Run targeted API boundary/type checks and document the result.
+
+## Review
+
+- `apps/api/app/global-error.tsx` was the only API source importing
+  `@repo/design-system`, through the shared `Button` component and font helper.
+- Replaced that global error page with self-contained HTML and a native button,
+  keeping Sentry error capture and the reset behaviour.
+- Removed the unused `@repo/design-system` dependency from `apps/api/package.json`
+  and synced `bun.lock` with `bun install`.
+- `rg -n "@repo/design-system" apps/api apps/api/package.json` finds no remaining
+  API design-system references.
+- `bun run boundaries --filter=api` exits 0.
+- `cd apps/api && bun run typecheck` exits 0.
+- `bun run check apps/api` exits 0.
+- `bun run boundaries` exits 0.
+
+# Plan: Fix Web Dev Instrumentation Failure After Turbo 2.10
+
+## Plan
+
+- [x] Reproduce `apps/web` dev failure outside the aggregate Turbo TUI.
+- [x] Inspect generated instrumentation output and local config to identify the root cause.
+- [x] Apply the smallest durable fix that preserves shared observability conventions.
+- [x] Run targeted web verification and repo checks where practical.
+- [x] Document verification and results in this review section.
+
+## Review
+
+- The failing file was a stale generated Turbopack artefact:
+  `apps/web/.next/dev/server/chunks/[project]_apps_web_instrumentation_ts_056r9kp._.js`.
+  It threw `MODULE_UNPARSABLE` for `apps/web/instrumentation.ts` even though the
+  source file existed.
+- Removed the generated `apps/web/.next` cache so Next 16.2.6/Turbopack could
+  rebuild instrumentation from source after the Turbo 2.10 upgrade.
+- No source-level instrumentation or observability code changes were required.
+- `cd apps/web && bun run dev` starts successfully outside the Codex sandbox:
+  Next reports ready on `http://localhost:3001`.
+- `curl -I --max-time 10 http://localhost:3001` returns `HTTP/1.1 200 OK`.
+- `cd apps/web && bun run typecheck` exits 0.
+- `bun run check` exits 0.
+- The original root command `bun run dev` starts `web`, `app`, `api`, and
+  `email`; all four services report ready. The bounded verification was stopped
+  by `timeout` after startup, so Turborepo reported persistent tasks as
+  interrupted, but the original web instrumentation error did not recur.
+
 # Plan: Implement Clerk Self-Service Organisation Onboarding
 
 ## Plan
@@ -140,7 +250,7 @@
 - [x] Verify the Next.js app proxy matcher includes `'/__clerk/:path*'` after the API/TRPC matcher.
 - [x] Confirm clear signed-out and signed-in auth controls exist in the app UI, adding them if missing.
 - [x] Run `clerk doctor` and targeted repo verification.
-- [ ] Start the app and document the setup result in this review section.
+- [x] Start the app and document the setup result in this review section.
 
 ## Review
 
@@ -174,14 +284,52 @@
 - `clerk apps list` also exits 1 with `authorization_missing_scopes` for
   `applications:read`, confirming the authenticated CLI token cannot read Clerk
   applications.
+- On retry in this session, `clerk auth login` completed successfully as
+  `hello@hiltonbrown.com.au`; `clerk auth login -y` also completed successfully.
+- `clerk init --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` still exits 1 because the
+  Clerk CLI cannot detect a framework from the monorepo root.
+- The existing Next.js fallback remains valid: `@clerk/nextjs` `^7.3.7` is
+  installed through `@repo/auth`, `ClerkProvider` is mounted inside `<body>` via
+  `DesignSystemProvider`, auth pages render Clerk sign-in/sign-up components
+  with visible headings, authenticated routes use `await auth()`, and the
+  authenticated header renders a Clerk `UserButton`.
+- The explicit app-linking fallback is blocked by Clerk OAuth scope:
+  `clerk link --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` exits 1 with
+  `authorization_missing_scopes` for `applications:read`.
+- `clerk env pull --app app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` exits 1 with the same
+  missing `applications:read` scope, so the CLI could not write Clerk env
+  values.
 - `clerk doctor` exits 1: host state is writable, CLI is up to date, and the
   CLI is logged in, but the project is not linked and Clerk env values have not
   been pulled.
+- A fresh `clerk doctor --json` confirms the CLI is authenticated as
+  `hello@hiltonbrown.com.au`, but the project is not linked and `.env.local` is
+  missing `CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`.
+- Local Clerk development env values were updated without printing secrets:
+  `.env.local` now has the Clerk key names required by `clerk doctor`, and both
+  `.env.local` and `apps/app/.env.local` have the Clerk route URLs set to
+  `/sign-in`, `/sign-up`, `/`, and `/`.
+- Root `.env.local` was normalised again from `apps/app/.env.local`: the Clerk
+  development publishable key, secret key, optional webhook secret, CLI
+  `CLERK_PUBLISHABLE_KEY`, and auth route URLs are present without printing any
+  secret values. Prefix checks confirm the publishable key is `pk_test_`, the
+  secret key is `sk_test_`, and the CLI publishable key matches the public key.
+- After the local env update, `clerk doctor --json` passes the environment
+  variables check, but still exits 1 because the project is not linked.
+- `clerk link` cannot select an application in agent mode, and `clerk link --app
+  app_3FQcAQ0Wg9Oz9Dog0oTw7bBBbR1` still exits 1 with
+  `authorization_missing_scopes` for `applications:read`.
+- Root `components.json` is absent, so the requested `@clerk/ui` shadcn setup
+  does not apply at the project root.
 - `cd apps/app && bun run typecheck` exits 0.
 - `bun run check` exits 0.
-- `cd apps/app && bun run dev` was started, but after 40 seconds it had not
-  emitted a ready line and `curl -I http://localhost:3000` could not connect, so
-  the dev process was stopped.
+- `cd apps/app && bun run dev` was started, but after about 50 seconds it had
+  not emitted a ready line and `curl -I http://localhost:3000` could not
+  connect, so the dev process was stopped.
+- After the env update, `cd apps/app && bun run dev` was retried, but after
+  about 65 seconds it still had not emitted a ready line and
+  `curl -I http://localhost:3000` could not connect, so the dev process was
+  stopped again.
 
 # Plan: Harden apps/web Marketing Surfaces
 

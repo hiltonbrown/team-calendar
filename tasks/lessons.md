@@ -2,6 +2,11 @@
 
 ## Repo conventions inferred during the finalisation audit (2026-06)
 
+- When starting persistent dev servers for smoke checks, always stop every
+  spawned app before handing back. Check `lsof -iTCP:3000-3003` or equivalent
+  host process state after `bun run dev` verification. Leaving app/web/api/email
+  listeners running causes the user's next `bun run dev` to fail with
+  `EADDRINUSE`.
 - The dev/integration database is built with `db push` (schema-direct), not
   `migrate deploy`. The migration history has drifted from `schema.prisma`: several
   tables and columns exist only in the schema. Always diff migration `CREATE TABLE`

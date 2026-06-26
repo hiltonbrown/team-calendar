@@ -8,6 +8,7 @@ beforeEach(() => {
   vi.resetModules();
   delete process.env.INNGEST_EVENT_KEY;
   delete process.env.INNGEST_SIGNING_KEY;
+  delete process.env.INNGEST_DEV;
 });
 
 afterEach(() => {
@@ -16,6 +17,16 @@ afterEach(() => {
 
 describe("inngest client configuration", () => {
   it("loads when neither Inngest key is set (local development)", async () => {
+    process.env.INNGEST_DEV = "1";
+
+    const mod = await import("./client");
+
+    expect(mod.inngest).toBeDefined();
+  });
+
+  it("accepts an explicit Inngest dev server URL", async () => {
+    process.env.INNGEST_DEV = "http://localhost:8288";
+
     const mod = await import("./client");
 
     expect(mod.inngest).toBeDefined();
