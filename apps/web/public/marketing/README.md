@@ -14,4 +14,4 @@ Current prototype-derived assets:
 - `approval-review.png`: leave review showcase image.
 - `team-calendar.png`: subscribed calendar showcase image.
 
-These assets were extracted from `docs/LeaveSync Marketing.html`.
+These assets were extracted from `docs/Team Calendar Marketing.html`.

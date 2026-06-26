@@ -1,14 +1,14 @@
 # AGENTS.md
 
-This file provides shared instructions for coding agents working in the LeaveSync repository. It applies regardless of which agent or IDE is in use.
+This file provides shared instructions for coding agents working in the Team Calendar repository. It applies regardless of which agent or IDE is in use.
 
 ## Project overview
 
-**LeaveSync** is a multi-tenant availability publishing platform. It connects to Xero Payroll (AU, NZ, UK), syncs approved leave data, normalises it into a canonical availability model, and publishes through secure ICS calendar feeds.
+**Team Calendar** is a multi-tenant availability publishing platform. It connects to Xero Payroll (AU, NZ, UK), syncs approved leave data, normalises it into a canonical availability model, and publishes through secure ICS calendar feeds.
 
 The architecture is: **Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**.
 
-LeaveSync does not manage payroll, accruals, or leave approvals. Xero is the source of truth for approved leave. LeaveSync standardises both Xero leave and manual availability entries (WFH, travelling, training, client site) into one publishable calendar domain.
+Team Calendar does not manage payroll, accruals, or leave approvals. Xero is the source of truth for approved leave. Team Calendar standardises both Xero leave and manual availability entries (WFH, travelling, training, client site) into one publishable calendar domain.
 
 ### Reference docs
 
@@ -151,7 +151,7 @@ Do not reference or depend on: `packages/ai`, `packages/cms`, `packages/collabor
 
 ### Tenancy
 
-LeaveSync uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
 
 ```
 Clerk Organisation (clerk_org_id)   — one per customer account; one country code

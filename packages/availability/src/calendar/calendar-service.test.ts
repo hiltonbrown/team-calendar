@@ -128,7 +128,7 @@ describe("calendar-service", () => {
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          source_type: { in: ["xero_leave", "leavesync_leave"] },
+          source_type: { in: ["xero_leave", "team_calendar_leave"] },
         }),
       })
     );
@@ -284,7 +284,7 @@ function record(id: string, personId: string) {
     person_id: personId,
     privacy_mode: "named",
     record_type: "annual_leave",
-    source_type: "leavesync_leave",
+    source_type: "team_calendar_leave",
     starts_at: new Date("2026-04-15T00:00:00.000Z"),
     submitted_at: null,
     title: null,

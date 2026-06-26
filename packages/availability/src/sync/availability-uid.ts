@@ -3,8 +3,7 @@ import type {
   availability_record_type,
   availability_source_type,
 } from "@repo/database/generated/enums";
-
-const ICAL_UID_SUFFIX = "@ical.leavesync.app";
+import { icsUidSuffix } from "@repo/seo/branding";
 
 export function deriveAvailabilityUidKey(input: {
   clerkOrgId: string;
@@ -30,5 +29,5 @@ export function deriveAvailabilityUidKey(input: {
       ].join("|")
     )
     .digest("hex");
-  return `${digest}${ICAL_UID_SUFFIX}`;
+  return `${digest}${icsUidSuffix}`;
 }

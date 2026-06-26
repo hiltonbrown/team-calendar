@@ -1,4 +1,4 @@
-# LeaveSync: Screen Catalogue v4.1
+# Team Calendar: Screen Catalogue v4.1
 
 Definitive reference for every screen in `apps/app`, prepared for design and design-system handoff. Each entry covers route, access roles, purpose, user interactions, data displayed, and design requirements.
 
@@ -159,7 +159,7 @@ Australian English throughout. No em dashes. Direct, professional tone. No hype,
 **Purpose:** Organisation selection and creation for users who are members of multiple Clerk Organisations. Personal accounts are disabled, so every user belongs to at least one. Switching organisations after entry is handled by `<OrganizationSwitcher />` in the top bar.
 
 **Design requirements:**
-- No custom screen. Apply Clerk's `appearance` API and CSS variables to match the LeaveSync palette: `primary` (`#336A3B`) on primary actions, Plus Jakarta Sans, 16px card radius, 12px input radius, `surface` background.
+- No custom screen. Apply Clerk's `appearance` API and CSS variables to match the Team Calendar palette: `primary` (`#336A3B`) on primary actions, Plus Jakarta Sans, 16px card radius, 12px input radius, `surface` background.
 - Designer deliverable: a Clerk theme mapping, not a page layout. Provide the token-to-Clerk-variable mapping alongside S-01 so sign-in and organisation selection read as one continuous branded surface.
 
 ---
@@ -346,7 +346,7 @@ Australian English throughout. No em dashes. Direct, professional tone. No hype,
 - Single-column layout: header, status, balances, records stacked vertically.
 - Leave balances: compact table. Type left, balance right (aligned, bold). Last fetched in `label-sm` `on-surface-variant` below.
 - Balance of zero: `error` text. Balance within 20% of typical entitlement: amber text.
-- **[v4 resolved]** Leave balances panel has two states. **Locked** (Xero connected): muted fill, lock icon at right edge, no edit affordance, label "Managed by Xero". **Editable** (no Xero connection, admin-only): inline edit, no lock icon. LeaveSync never edits Xero balances; admin-managed manual balances are editable only when disconnected.
+- **[v4 resolved]** Leave balances panel has two states. **Locked** (Xero connected): muted fill, lock icon at right edge, no edit affordance, label "Managed by Xero". **Editable** (no Xero connection, admin-only): inline edit, no lock icon. Team Calendar never edits Xero balances; admin-managed manual balances are editable only when disconnected.
 - Provenance badge in the person header signals Xero-synced vs manually created person.
 - Closes via cancel, background click, or browser back.
 
@@ -517,7 +517,7 @@ Australian English throughout. No em dashes. Direct, professional tone. No hype,
 **Access:** Manager (own team), Admin, Owner
 **Country context:** Leave type labels adapt to `country_code`. Public holidays excluded from leave-day calculations unless the "Include public holidays" toggle is on.
 
-**Purpose:** Leave pattern analytics on `availability_records` with `source_type` of `xero_leave` or `leavesync_leave` and `approval_status = 'approved'`.
+**Purpose:** Leave pattern analytics on `availability_records` with `source_type` of `xero_leave` or `team-calendar_leave` and `approval_status = 'approved'`.
 
 **Interactions:** Date range presets (this month, last month, this quarter, last quarter, this year, custom). Filter: team, location, person type, leave type. Toggle: include or exclude public holidays. Toggle: by person / by team aggregate. Export CSV. Click a data point to drill to the record list.
 
@@ -601,7 +601,7 @@ Settings screens share a left sub-navigation within the settings section, separa
 
 **Design requirements:**
 - Simple toggle and select form.
-- Info callout at the top (info style, not warning): "Leave approval actions are written to Xero Payroll immediately and cannot be undone from LeaveSync. Declined leave must be re-submitted in LeaveSync or Xero."
+- Info callout at the top (info style, not warning): "Leave approval actions are written to Xero Payroll immediately and cannot be undone from Team Calendar. Declined leave must be re-submitted in Team Calendar or Xero."
 - Toggle rows: label left, one-line description below the label, toggle right.
 
 ---
@@ -620,7 +620,7 @@ Settings screens share a left sub-navigation within the settings section, separa
 **Design requirements:**
 - Card grid, landscape orientation.
 - Status: "Connected" (`primary` chip), "Not connected" (muted), "Error" (`error` chip).
-- Xero card: top left, most prominent, Xero logo. Description: "Sync approved leave and employee data from Xero Payroll (AU, NZ, UK). Submit and approve leave directly from LeaveSync."
+- Xero card: top left, most prominent, Xero logo. Description: "Sync approved leave and employee data from Xero Payroll (AU, NZ, UK). Submit and approve leave directly from Team Calendar."
 - Coming soon cards: greyed, not interactive, "Coming soon" label.
 
 ---

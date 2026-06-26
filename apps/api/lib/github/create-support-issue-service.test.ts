@@ -31,7 +31,7 @@ describe("createSupportGitHubIssue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.keys.mockReturnValue({
-      GITHUB_OWNER: "leavesync",
+      GITHUB_OWNER: "team-calendar",
       GITHUB_REPO: "app",
       GITHUB_TOKEN: "secret-token",
     });
@@ -44,7 +44,7 @@ describe("createSupportGitHubIssue", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            html_url: "https://github.com/leavesync/app/issues/42",
+            html_url: "https://github.com/team-calendar/app/issues/42",
             number: 42,
             title: "[Support] Missing leave entry",
           }),
@@ -62,7 +62,7 @@ describe("createSupportGitHubIssue", () => {
     const payload: SupportSubmissionPayload = {
       category: "support",
       message: "The calendar is missing one leave entry.",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Missing leave entry",
     };
@@ -70,7 +70,7 @@ describe("createSupportGitHubIssue", () => {
     const result = await createSupportGitHubIssue({
       clerk_org_id: "org_123",
       organisation_id: "00000000-0000-4000-8000-000000000001",
-      organisation_name: "LeaveSync Dev Organisation",
+      organisation_name: "Team Calendar Dev Organisation",
       payload,
       user_email: "person@example.com",
       user_id: "user_123",
@@ -82,7 +82,7 @@ describe("createSupportGitHubIssue", () => {
       value: {
         issueNumber: 42,
         issueTitle: "[Support] Missing leave entry",
-        issueUrl: "https://github.com/leavesync/app/issues/42",
+        issueUrl: "https://github.com/team-calendar/app/issues/42",
         labelAssignmentSucceeded: true,
         labelsAttempted: ["support", "priority:normal"],
       },
@@ -90,14 +90,14 @@ describe("createSupportGitHubIssue", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "https://api.github.com/repos/leavesync/app/issues",
+      "https://api.github.com/repos/team-calendar/app/issues",
       {
         body: JSON.stringify({
           body: buildSupportIssueMarkdownBody({
             ...payload,
             clerk_org_id: "org_123",
             organisation_id: "00000000-0000-4000-8000-000000000001",
-            organisation_name: "LeaveSync Dev Organisation",
+            organisation_name: "Team Calendar Dev Organisation",
             user_email: "person@example.com",
             user_id: "user_123",
             user_name: "Alex Example",
@@ -116,7 +116,7 @@ describe("createSupportGitHubIssue", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      "https://api.github.com/repos/leavesync/app/issues/42/labels",
+      "https://api.github.com/repos/team-calendar/app/issues/42/labels",
       {
         body: JSON.stringify({
           labels: [...getSupportIssueLabels(payload)],
@@ -141,7 +141,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "support",
         message: "Need assistance",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "normal",
         subject: "Help",
       },
@@ -165,7 +165,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "feedback",
         message: "This flow could be clearer.",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "high",
         subject: "Clarify save feedback",
       },
@@ -188,7 +188,7 @@ describe("createSupportGitHubIssue", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            html_url: "https://github.com/leavesync/app/issues/9",
+            html_url: "https://github.com/team-calendar/app/issues/9",
             number: 9,
             title: "[Feedback] Clarify save feedback",
           }),
@@ -203,7 +203,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "feedback",
         message: "This flow could be clearer.",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "high",
         subject: "Clarify save feedback",
       },
@@ -214,7 +214,7 @@ describe("createSupportGitHubIssue", () => {
       value: {
         issueNumber: 9,
         issueTitle: "[Feedback] Clarify save feedback",
-        issueUrl: "https://github.com/leavesync/app/issues/9",
+        issueUrl: "https://github.com/team-calendar/app/issues/9",
         labelAssignmentSucceeded: false,
         labelsAttempted: ["feedback", "priority:high"],
       },
@@ -224,7 +224,7 @@ describe("createSupportGitHubIssue", () => {
       {
         issueNumber: 9,
         labels: ["feedback", "priority:high"],
-        owner: "leavesync",
+        owner: "team-calendar",
         repo: "app",
         status: 404,
       }
@@ -233,7 +233,7 @@ describe("createSupportGitHubIssue", () => {
 
   it("returns a configuration error when GitHub config is missing", async () => {
     mocks.keys.mockReturnValue({
-      GITHUB_OWNER: "leavesync",
+      GITHUB_OWNER: "team-calendar",
       GITHUB_REPO: undefined,
       GITHUB_TOKEN: "secret-token",
     });
@@ -242,7 +242,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "support",
         message: "Need assistance",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "normal",
         subject: "Help",
       },
@@ -282,7 +282,7 @@ describe("createSupportGitHubIssue", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
-            html_url: "https://github.com/leavesync/app/issues/7",
+            html_url: "https://github.com/team-calendar/app/issues/7",
             number: 7,
             title: "[Support] Missing leave entry",
           }),
@@ -297,7 +297,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "support",
         message: "The calendar is missing one leave entry.",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "normal",
         subject: "Missing leave entry",
       },
@@ -317,7 +317,7 @@ describe("createSupportGitHubIssue", () => {
       payload: {
         category: "support",
         message: "Need assistance",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "normal",
         subject: "Help",
       },
@@ -334,7 +334,7 @@ describe("createSupportGitHubIssue", () => {
       "Unexpected GitHub issue creation failure",
       {
         error: expect.any(Error),
-        owner: "leavesync",
+        owner: "team-calendar",
         repo: "app",
       }
     );

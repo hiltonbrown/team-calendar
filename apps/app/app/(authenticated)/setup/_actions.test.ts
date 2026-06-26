@@ -46,13 +46,13 @@ describe("setup organisation actions", () => {
   it("ensures the creator is linked to a person after setup", async () => {
     await createOrganisationAction({
       countryCode: "AU",
-      name: "LeaveSync Test",
+      name: "Team Calendar Test",
     });
 
     expect(mocks.ensureOrganisationForClerk).toHaveBeenCalledWith({
       clerkOrgId: "org_1",
       countryCode: "AU",
-      name: "LeaveSync Test",
+      name: "Team Calendar Test",
     });
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledWith(
       {

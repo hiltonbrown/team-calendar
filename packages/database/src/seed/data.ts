@@ -60,7 +60,7 @@ export interface OrganisationSeed {
 }
 
 /** Default Clerk Organisation id used when SEED_CLERK_ORG_ID is not provided. */
-export const DEFAULT_SEED_CLERK_ORG_ID = "org_dev_leavesync";
+export const DEFAULT_SEED_CLERK_ORG_ID = "org_dev_teamcalendar";
 
 // Acme Restaurants Pty Ltd (Queensland payroll entity).
 const ORG_RESTAURANTS_ID = "a1000000-0000-4000-8000-000000000001";

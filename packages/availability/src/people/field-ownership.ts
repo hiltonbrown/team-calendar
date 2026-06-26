@@ -1,35 +1,37 @@
-export type FieldOwner = "leavesync" | "xero";
+export type FieldOwner = "team-calendar" | "xero";
 
 export interface FieldOwnership {
-  avatarUrl: "leavesync";
+  avatarUrl: "team-calendar";
   email: FieldOwner;
   firstName: FieldOwner;
   jobTitle: FieldOwner;
   lastName: FieldOwner;
-  location: "leavesync";
-  manager: "leavesync";
-  personType: "leavesync";
+  location: "team-calendar";
+  manager: "team-calendar";
+  personType: "team-calendar";
   startDate: FieldOwner;
-  statusNote: "leavesync";
-  team: "leavesync";
+  statusNote: "team-calendar";
+  team: "team-calendar";
 }
 
 export function fieldOwnershipForPerson(input: {
   xeroEmployeeId: string | null;
 }): FieldOwnership {
-  const syncedOwner: FieldOwner = input.xeroEmployeeId ? "xero" : "leavesync";
+  const syncedOwner: FieldOwner = input.xeroEmployeeId
+    ? "xero"
+    : "team-calendar";
 
   return {
-    avatarUrl: "leavesync",
+    avatarUrl: "team-calendar",
     email: syncedOwner,
     firstName: syncedOwner,
     jobTitle: syncedOwner,
     lastName: syncedOwner,
-    location: "leavesync",
-    manager: "leavesync",
-    personType: "leavesync",
+    location: "team-calendar",
+    manager: "team-calendar",
+    personType: "team-calendar",
     startDate: syncedOwner,
-    statusNote: "leavesync",
-    team: "leavesync",
+    statusNote: "team-calendar",
+    team: "team-calendar",
   };
 }

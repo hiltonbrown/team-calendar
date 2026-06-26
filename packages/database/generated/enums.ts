@@ -174,7 +174,7 @@ export type availability_record_type = (typeof availability_record_type)[keyof t
 export const availability_source_type = {
   xero: 'xero',
   xero_leave: 'xero_leave',
-  leavesync_leave: 'leavesync_leave',
+  team_calendar_leave: 'team_calendar_leave',
   manual: 'manual'
 } as const
 

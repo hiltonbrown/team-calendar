@@ -1,3 +1,4 @@
+import { icsUidSuffix } from "@repo/seo/branding";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -89,9 +90,9 @@ describe("plan-service", () => {
     ["wfh", true, "manual", "approved"],
     ["wfh", false, "manual", "approved"],
     ["training", true, "manual", "approved"],
-    ["annual_leave", true, "leavesync_leave", "draft"],
-    ["annual_leave", false, "leavesync_leave", "approved"],
-    ["sick_leave", true, "leavesync_leave", "draft"],
+    ["annual_leave", true, "team_calendar_leave", "draft"],
+    ["annual_leave", false, "team_calendar_leave", "approved"],
+    ["sick_leave", true, "team_calendar_leave", "draft"],
   ] as const)("routes %s with Xero %s to %s and %s", async (recordType, hasXero, sourceType, approvalStatus) => {
     mocks.hasActiveXeroConnection.mockResolvedValue(hasXero);
 
@@ -108,7 +109,7 @@ describe("plan-service", () => {
       recordType,
       sourceType,
     });
-    expect(result.value.derivedUidKey).toContain("@ical.leavesync.app");
+    expect(result.value.derivedUidKey).toContain(icsUidSuffix);
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

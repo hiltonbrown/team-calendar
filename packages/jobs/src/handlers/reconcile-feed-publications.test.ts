@@ -52,7 +52,7 @@ function materialised(changed: boolean) {
       publishedDescription: null,
       publishedSequence: changed ? 1 : 0,
       publishedSummary: "Pat Taylor: Annual Leave",
-      publishedUid: "stable@ical.leavesync.app",
+      publishedUid: "stable@ical.teamcalendar.online",
     },
   };
 }

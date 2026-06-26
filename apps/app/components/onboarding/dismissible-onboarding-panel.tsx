@@ -22,7 +22,7 @@ export function DismissibleOnboardingPanel({
 }: DismissibleOnboardingPanelProps) {
   const storageKey = useMemo(
     () =>
-      `leavesync:onboarding-dismissed:${clerkOrgId}:${organisationId}:${userId}`,
+      `team-calendar:onboarding-dismissed:${clerkOrgId}:${organisationId}:${userId}`,
     [clerkOrgId, organisationId, userId]
   );
   const [isDismissed, setIsDismissed] = useState(false);

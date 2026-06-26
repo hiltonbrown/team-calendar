@@ -18,7 +18,7 @@ Use one of these channels:
 1. Preferred: open a private GitHub Security Advisory for this repository.
 2. Alternative: contact the maintainers directly through your established private support channel.
 
-If your organisation has a dedicated account manager or support contact for LeaveSync, use that private channel and mark the report as **Security: Confidential**.
+If your organisation has a dedicated account manager or support contact for Team Calendar, use that private channel and mark the report as **Security: Confidential**.
 
 ## What to Include
 
@@ -68,4 +68,4 @@ Please do not publicly disclose vulnerabilities until:
 1. A fix or mitigation is available, and
 2. We confirm affected users have had reasonable time to apply it.
 
-Thank you for helping keep LeaveSync and its customers safe.
+Thank you for helping keep Team Calendar and its customers safe.

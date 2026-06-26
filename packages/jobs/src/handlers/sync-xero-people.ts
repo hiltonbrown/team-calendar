@@ -5,6 +5,7 @@ import { database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
+import { noemailFallbackDomain } from "@repo/seo/branding";
 import {
   ensureFreshXeroConnection,
   fetchEmployeesForRegion,
@@ -263,7 +264,7 @@ async function processBatch(
     try {
       const raw =
         employee.email ||
-        `${employee.firstName}.${employee.lastName}@noemail.leavesync.app`;
+        `${employee.firstName}.${employee.lastName}@${noemailFallbackDomain}`;
       const email = raw.toLowerCase();
       await database.person.upsert({
         where: {

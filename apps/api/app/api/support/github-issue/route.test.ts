@@ -53,7 +53,7 @@ describe("support GitHub issue route", () => {
       value: {
         clerkOrgId: "org_clerk_123",
         id: "00000000-0000-4000-8000-000000000001",
-        name: "LeaveSync Dev Organisation",
+        name: "Team Calendar Dev Organisation",
       },
     });
     mocks.createSupportGitHubIssue.mockResolvedValue({
@@ -61,7 +61,7 @@ describe("support GitHub issue route", () => {
       value: {
         issueNumber: 123,
         issueTitle: "[Support] Missing leave entry",
-        issueUrl: "https://github.com/hiltonbrown/leavesync/issues/123",
+        issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
         labelAssignmentSucceeded: true,
         labelsAttempted: ["support", "priority:normal"],
       },
@@ -79,7 +79,7 @@ describe("support GitHub issue route", () => {
           category: "support",
           message: "The calendar is missing one leave entry.",
           page_url:
-            "https://app.leavesync.test/support?org=00000000-0000-4000-8000-000000000001&tab=form",
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001&tab=form",
           priority: "normal",
           subject: "Missing leave entry",
         }),
@@ -94,7 +94,7 @@ describe("support GitHub issue route", () => {
     await expect(response.json()).resolves.toEqual({
       ok: true,
       issueNumber: 123,
-      issueUrl: "https://github.com/hiltonbrown/leavesync/issues/123",
+      issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
     });
 
     expect(mocks.getOrganisationById).toHaveBeenCalledWith(
@@ -106,13 +106,13 @@ describe("support GitHub issue route", () => {
         category: "support",
         message: "The calendar is missing one leave entry.",
         page_url:
-          "https://app.leavesync.test/support?org=00000000-0000-4000-8000-000000000001&tab=form",
+          "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001&tab=form",
         priority: "normal",
         subject: "Missing leave entry",
       },
       clerk_org_id: "org_clerk_123",
       organisation_id: "00000000-0000-4000-8000-000000000001",
-      organisation_name: "LeaveSync Dev Organisation",
+      organisation_name: "Team Calendar Dev Organisation",
       current_route:
         "/support?org=00000000-0000-4000-8000-000000000001&tab=form",
       environment: "test",
@@ -124,7 +124,7 @@ describe("support GitHub issue route", () => {
       category: "support",
       clerkOrgId: "org_clerk_123",
       issueNumber: 123,
-      issueUrl: "https://github.com/hiltonbrown/leavesync/issues/123",
+      issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
       labelAssignmentSucceeded: true,
       labelsAttempted: ["support", "priority:normal"],
       organisationId: "00000000-0000-4000-8000-000000000001",
@@ -168,7 +168,7 @@ describe("support GitHub issue route", () => {
         body: JSON.stringify({
           category: "support",
           message: "Need help",
-          page_url: "https://app.leavesync.test/support",
+          page_url: "https://app.teamcalendar.test/support",
           priority: "normal",
           subject: "Help",
         }),
@@ -195,7 +195,7 @@ describe("support GitHub issue route", () => {
         body: JSON.stringify({
           category: "support",
           message: "Need help",
-          page_url: "https://app.leavesync.test/support",
+          page_url: "https://app.teamcalendar.test/support",
           priority: "normal",
           subject: "Help",
         }),
@@ -220,7 +220,7 @@ describe("support GitHub issue route", () => {
         body: JSON.stringify({
           category: "support",
           message: "Need help",
-          page_url: "https://app.leavesync.test/support?org=not-a-uuid",
+          page_url: "https://app.teamcalendar.test/support?org=not-a-uuid",
           priority: "normal",
           subject: "Help",
         }),
@@ -253,7 +253,7 @@ describe("support GitHub issue route", () => {
           category: "support",
           message: "Need help",
           page_url:
-            "https://app.leavesync.test/support?org=00000000-0000-4000-8000-000000000001",
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
           priority: "normal",
           subject: "Help",
         }),
@@ -285,7 +285,7 @@ describe("support GitHub issue route", () => {
           category: "support",
           message: "Need help",
           page_url:
-            "https://app.leavesync.test/support?org=00000000-0000-4000-8000-000000000001",
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
           priority: "normal",
           subject: "Help",
         }),
@@ -325,7 +325,7 @@ describe("support GitHub issue route", () => {
         body: JSON.stringify({
           category: "feedback",
           message: "This flow could be clearer.",
-          page_url: "https://app.leavesync.test/support",
+          page_url: "https://app.teamcalendar.test/support",
           priority: "high",
           subject: "Clarify save feedback",
         }),
@@ -351,7 +351,7 @@ describe("support GitHub issue route", () => {
         body: JSON.stringify({
           category: "feedback",
           message: "This flow could be clearer.",
-          page_url: "https://app.leavesync.test/support",
+          page_url: "https://app.teamcalendar.test/support",
           priority: "high",
           subject: "Clarify save feedback",
         }),
@@ -368,7 +368,7 @@ describe("support GitHub issue route", () => {
       payload: {
         category: "feedback",
         message: "This flow could be clearer.",
-        page_url: "https://app.leavesync.test/support",
+        page_url: "https://app.teamcalendar.test/support",
         priority: "high",
         subject: "Clarify save feedback",
       },
@@ -399,7 +399,7 @@ describe("support GitHub issue route", () => {
           category: "support",
           message: "The calendar is missing one leave entry.",
           page_url:
-            "https://app.leavesync.test/support?org=00000000-0000-4000-8000-000000000001",
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
           priority: "normal",
           subject: "Missing leave entry",
         }),
@@ -414,7 +414,7 @@ describe("support GitHub issue route", () => {
     await expect(response.json()).resolves.toEqual({
       ok: true,
       issueNumber: 123,
-      issueUrl: "https://github.com/hiltonbrown/leavesync/issues/123",
+      issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/123",
     });
     expect(mocks.logError).toHaveBeenCalledWith(
       "Failed to persist support submission audit event",

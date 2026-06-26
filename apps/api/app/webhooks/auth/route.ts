@@ -50,7 +50,7 @@ const ClerkOrganizationMembershipDataSchema = z.object({
   }),
 });
 
-// Discriminated over the event types LeaveSync acts on. Any other event type is
+// Discriminated over the event types Team Calendar acts on. Any other event type is
 // not validated here because the switch below ignores it.
 const ClerkWebhookEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user.created"), data: ClerkUserDataSchema }),

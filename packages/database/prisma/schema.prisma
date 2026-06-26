@@ -134,7 +134,7 @@ enum availability_record_type {
 enum availability_source_type {
   xero
   xero_leave
-  leavesync_leave
+  team_calendar_leave
   manual
 }
 

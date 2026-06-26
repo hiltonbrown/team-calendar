@@ -4,7 +4,7 @@ vi.mock("server-only", () => ({}));
 
 const mockFetchLeaveRecordsForRegion = vi.fn();
 const mockInngestSend = vi.fn(async () => ({ ids: ["event_1"] }));
-const ICAL_UID_SUFFIX_REGEX = /@ical\.leavesync\.app$/;
+const ICAL_UID_SUFFIX_REGEX = /@ical.teamcalendar.online$/;
 
 vi.mock("../client", () => ({
   inngest: {
@@ -144,7 +144,7 @@ describeWithDatabase("sync-xero-leave-records database flow", () => {
     expect(publications).toHaveLength(2);
     expect(
       publications.find((publication) =>
-        publication.published_uid.endsWith("@ical.leavesync.app")
+        publication.published_uid.endsWith("@ical.teamcalendar.online")
       )?.published_sequence
     ).toBe(0);
 

@@ -256,7 +256,7 @@ export async function listForApprover(
       where: {
         ...scoped(parsed.data),
         archived_at: null,
-        source_type: { in: ["leavesync_leave", "xero_leave"] },
+        source_type: { in: ["team_calendar_leave", "xero_leave"] },
         approval_status: { in: filters.status },
         ...(filters.personId?.length
           ? { person_id: { in: filters.personId } }
@@ -362,7 +362,7 @@ export async function getApprovalSummaryCounts(input: {
     const baseWhere = {
       ...scoped(parsed.data),
       archived_at: null,
-      source_type: { in: ["leavesync_leave", "xero_leave"] },
+      source_type: { in: ["team_calendar_leave", "xero_leave"] },
       ...(parsed.data.role === "manager"
         ? { person_id: { in: managedPersonIds } }
         : {}),

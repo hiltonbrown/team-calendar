@@ -78,7 +78,7 @@ The direct NZ and UK leave-application URLs returned either `Not Authorized` or 
 
 ## Region mapping design
 
-The canonical LeaveSync layer should continue to depend only on the narrow mapper outputs, not on raw Xero region payloads.
+The canonical Team Calendar layer should continue to depend only on the narrow mapper outputs, not on raw Xero region payloads.
 
 Required region mapper outputs:
 

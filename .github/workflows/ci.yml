@@ -15,9 +15,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: leavesync
-          POSTGRES_PASSWORD: leavesync
-          POSTGRES_DB: leavesync_test
+          POSTGRES_USER: team-calendar
+          POSTGRES_PASSWORD: team-calendar
+          POSTGRES_DB: team-calendar_test
         ports:
           - 5432:5432
         options: >-
@@ -27,7 +27,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://leavesync:leavesync@localhost:5432/leavesync_test
+      DATABASE_URL: postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
 
     steps:
       - uses: actions/checkout@v4

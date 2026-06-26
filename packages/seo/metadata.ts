@@ -1,6 +1,6 @@
 import merge from "lodash.merge";
 import type { Metadata } from "next";
-import { brandNameDisplay, primaryDomain } from "./branding";
+import { brandNameDisplay, primaryDomainUrl } from "./branding";
 import { resolveCanonicalWebUrl } from "./canonical-url";
 
 type MetadataGenerator = Omit<Metadata, "description" | "title"> & {
@@ -12,7 +12,7 @@ type MetadataGenerator = Omit<Metadata, "description" | "title"> & {
 const applicationName = brandNameDisplay;
 const author: Metadata["authors"] = {
   name: brandNameDisplay,
-  url: primaryDomain,
+  url: primaryDomainUrl,
 };
 const publisher = brandNameDisplay;
 

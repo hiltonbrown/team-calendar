@@ -1,4 +1,4 @@
-# LeaveSync Product Specification
+# Team Calendar Product Specification
 
 ## Companion documents
 
@@ -29,7 +29,7 @@ The interface must serve all three without making any group feel like a second-c
 
 ## Product Purpose
 
-LeaveSync exists so that teams can see who is in, who is out, and why, without hunting through email or Xero. Employees submit and manage leave; managers approve or decline; the resulting state writes back to Xero synchronously and publishes as secure ICS feeds for calendar subscriptions.
+Team Calendar exists so that teams can see who is in, who is out, and why, without hunting through email or Xero. Employees submit and manage leave; managers approve or decline; the resulting state writes back to Xero synchronously and publishes as secure ICS feeds for calendar subscriptions.
 
 Success: a team manager arrives, scans their calendar, and is back to work in under 30 seconds.
 
@@ -37,7 +37,7 @@ Success: a team manager arrives, scans their calendar, and is back to work in un
 
 **Modern. Calm. Precise.**
 
-LeaveSync is a tool people trust with real business data. It should feel like a well-made instrument: composed, reliable, purposeful. It does not try to entertain. It does not overwhelm. Every screen should lower cognitive load, not raise it.
+Team Calendar is a tool people trust with real business data. It should feel like a well-made instrument: composed, reliable, purposeful. It does not try to entertain. It does not overwhelm. Every screen should lower cognitive load, not raise it.
 
 The emotional goal is **quiet confidence**: the user arrives, sees what they need, acts, and leaves. No friction, no noise.
 
@@ -64,9 +64,9 @@ WCAG 2.2 AA is the floor for all text, interactive elements, and status indicato
 
 ## Product truth
 
-LeaveSync is a multi-tenant leave management and availability publishing platform for organisations running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside LeaveSync; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which LeaveSync reads but never calculates.
+Team Calendar is a multi-tenant leave management and availability publishing platform for organisations running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside Team Calendar; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which Team Calendar reads but never calculates.
 
-Alongside Xero leave, LeaveSync captures manual availability entries (WFH, travelling, training, client site) that are not written to Xero, then publishes a combined, privacy-controlled view as secure ICS feeds.
+Alongside Xero leave, Team Calendar captures manual availability entries (WFH, travelling, training, client site) that are not written to Xero, then publishes a combined, privacy-controlled view as secure ICS feeds.
 
 The architecture is:
 
@@ -83,7 +83,7 @@ Bidirectional leave management is a shipped capability of the initial build, not
 
 ### Product boundaries
 
-LeaveSync is:
+Team Calendar is:
 
 - a leave submission and approval workflow system, bidirectionally synced with Xero Payroll
 - a canonical availability publisher
@@ -92,7 +92,7 @@ LeaveSync is:
 - a secure ICS feed generator for Outlook, Google Calendar, and Apple Calendar
 - a real-time notification platform (SSE-delivered in-app notifications, plus transactional email)
 
-LeaveSync is not:
+Team Calendar is not:
 
 - a full HRIS
 - a payroll engine or accrual calculator (balances are read from Xero, never computed)
@@ -128,7 +128,7 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 
 ## Tenancy model
 
-LeaveSync uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
 
 | Concept | Role |
 |---|---|
@@ -174,7 +174,7 @@ Permission checks use `auth().has({ role: 'org:admin' })` or the `has()` helper 
 ## Monorepo structure
 
 ```text
-leavesync/
+team-calendar/
 ├─ apps/
 │  ├─ app/                    # authenticated product UI (port 3000)
 │  ├─ api/                    # sync, webhooks, feed endpoints, admin APIs (port 3002)
@@ -412,7 +412,7 @@ Materialised publishing state per AvailabilityRecord. Decouples raw data from wh
 
 ### `leave_balances`
 
-Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances. Never calculated by LeaveSync. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows.
+Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances. Never calculated by Team Calendar. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows.
 
 **Note on the unique constraint:** PostgreSQL treats each NULL value as distinct, so the composite unique above does not prevent duplicate manual balances where `xero_tenant_id IS NULL`. A partial unique index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` guards the manual case so create-or-update can target a single row.
 
@@ -509,7 +509,7 @@ uid = sha256(
   starts_at_utc + "|" +
   ends_at_utc + "|" +
   record_type
-) + "@ical.leavesync.app"
+) + "@ical.teamcalendar.online"
 ```
 
 Where `stable_source_key` is:
@@ -675,7 +675,7 @@ Each step produces a deployable, testable vertical slice.
 - Australian English in all UI copy and documentation.
 - No em dashes anywhere.
 - Outbound Xero writes are synchronous. No background queuing of approval state.
-- Leave balances displayed in the UI are always sourced from the `leave_balances` table. Never calculated by LeaveSync.
+- Leave balances displayed in the UI are always sourced from the `leave_balances` table. Never calculated by Team Calendar.
 - SSE connections are per-user and per-Clerk-Organisation. Must not leak across organisation boundaries.
 - Notification preferences default to in-app enabled, email enabled for all types.
 - Xero write errors are surfaced to the user in plain language. Raw error payloads stored in `xero_write_error_raw` for admin audit only; never displayed to employees.

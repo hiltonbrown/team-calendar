@@ -118,7 +118,7 @@ Team Calendar is under active development and pre-launch. Core infrastructure, C
    writes canonical data only; it never seeds Xero tokens or any other secret.
 
    Every seeded row is scoped to a `clerk_org_id`. By default this is the
-   placeholder `org_dev_leavesync`. For the authenticated app to render the
+   placeholder `org_dev_teamcalendar`. For the authenticated app to render the
    seeded tenant, the rows must be scoped to a **real** Clerk Organisation id.
    Set `SEED_CLERK_ORG_ID` to your Clerk org id (visible in the Clerk dashboard,
    in the form `org_...`) before seeding:

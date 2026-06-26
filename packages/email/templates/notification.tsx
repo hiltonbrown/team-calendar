@@ -48,7 +48,7 @@ export const NotificationEmailTemplate: NotificationEmailTemplateComponent = ({
                   className="mt-6 rounded-md bg-[#336A3B] px-4 py-3 font-medium text-white"
                   href={actionUrl}
                 >
-                  Open in LeaveSync
+                  Open in Team Calendar
                 </Button>
               )}
               <Hr className="my-6" />
@@ -68,11 +68,11 @@ export const NotificationEmailTemplate: NotificationEmailTemplateComponent = ({
 );
 
 NotificationEmailTemplate.PreviewProps = {
-  actionUrl: "https://app.leavesync.test/notifications",
+  actionUrl: "https://app.teamcalendar.test/notifications",
   body: "A leave request needs your attention.",
   title: "Leave submitted for approval",
   unsubscribeUrl:
-    "https://app.leavesync.test/notifications?tab=preferences&focus=leave_submitted",
+    "https://app.teamcalendar.test/notifications?tab=preferences&focus=leave_submitted",
 };
 
 // React Email's CLI discovers templates via the default export, so keep one

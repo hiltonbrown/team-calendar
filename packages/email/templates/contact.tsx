@@ -46,8 +46,8 @@ export const ContactTemplate = ({
 );
 
 ContactTemplate.PreviewProps = {
-  name: "LeaveSync contact",
-  email: "contact@leavesync.test",
+  name: "Team Calendar contact",
+  email: "contact@teamcalendar.test",
   message: "I need help with availability publishing.",
 };
 

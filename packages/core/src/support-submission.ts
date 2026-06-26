@@ -88,7 +88,7 @@ const PRIORITY_LABELS: Record<SupportSubmissionPriority, string> = {
 };
 
 const INTERNAL_NOTES_PLACEHOLDER = [
-  "Submitted from LeaveSync support form.",
+  "Submitted from Team Calendar support form.",
   "",
   "Complete triage notes here.",
 ].join("\n");

@@ -1,4 +1,4 @@
--- LeaveSync baseline (init) migration.
+-- Team Calendar baseline (init) migration.
 -- Generated from packages/database/prisma/schema.prisma via:
 --   prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script
 -- followed by the two raw-SQL partial unique indexes that Prisma @@unique cannot
@@ -48,7 +48,7 @@ CREATE TYPE "sync_failed_record_type" AS ENUM ('people', 'leave_records', 'leave
 CREATE TYPE "availability_record_type" AS ENUM ('leave', 'annual_leave', 'personal_leave', 'holiday', 'sick_leave', 'long_service_leave', 'unpaid_leave', 'public_holiday', 'wfh', 'travel', 'travelling', 'training', 'client_site', 'another_office', 'offsite_meeting', 'contractor_unavailable', 'limited_availability', 'alternative_contact', 'other', 'leave_request');
 
 -- CreateEnum
-CREATE TYPE "availability_source_type" AS ENUM ('xero', 'xero_leave', 'leavesync_leave', 'manual');
+CREATE TYPE "availability_source_type" AS ENUM ('xero', 'xero_leave', 'team_calendar_leave', 'manual');
 
 -- CreateEnum
 CREATE TYPE "availability_approval_status" AS ENUM ('draft', 'submitted', 'approved', 'declined', 'cancelled', 'withdrawn', 'xero_sync_failed');

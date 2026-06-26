@@ -74,7 +74,7 @@ describe("Plans page client surface", () => {
             id: "00000000-0000-4000-8000-000000000099",
             personName: "Test Person",
             recordType: "annual_leave",
-            sourceType: "leavesync_leave",
+            sourceType: "team_calendar_leave",
             startsAt: "2026-05-04T00:00:00.000Z",
             workingDays: 2,
             workingDaysError: null,

@@ -1,4 +1,4 @@
-# DESIGN.md - LeaveSync Design System
+# DESIGN.md - Team Calendar Design System
 
 ## Creative North Star
 

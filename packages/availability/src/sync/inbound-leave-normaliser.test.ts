@@ -5,7 +5,7 @@ import {
   recordTypeFromLeaveType,
 } from "./inbound-leave-normaliser";
 
-const ICAL_UID_SUFFIX_REGEX = /@ical\.leavesync\.app$/;
+const ICAL_UID_SUFFIX_REGEX = /@ical\.teamcalendar\.online$/;
 
 describe("inbound leave normaliser", () => {
   it.each([

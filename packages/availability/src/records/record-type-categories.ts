@@ -57,12 +57,12 @@ export const sourceTypesForCategory = (
   category: RecordTypeCategory
 ): availability_source_type[] => {
   if (category === "xero_leave") {
-    return ["xero_leave", "leavesync_leave"];
+    return ["xero_leave", "team_calendar_leave"];
   }
   if (category === "local_only") {
     return ["manual"];
   }
-  return ["xero_leave", "leavesync_leave", "manual"];
+  return ["xero_leave", "team_calendar_leave", "manual"];
 };
 
 type KnownRecordType = (typeof ALL_KNOWN_RECORD_TYPES)[number];

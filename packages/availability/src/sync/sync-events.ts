@@ -2,7 +2,7 @@ import type { Result } from "@repo/core";
 import { Inngest } from "inngest";
 import { z } from "zod";
 
-const inngest = new Inngest({ id: "leavesync" });
+const inngest = new Inngest({ id: "team-calendar" });
 
 export const syncEventNames = {
   approval_state_reconciliation: "reconcile-xero-approval-state",

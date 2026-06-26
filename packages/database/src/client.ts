@@ -8,7 +8,7 @@ import { PrismaClient } from "../generated/client";
 import { keys } from "../keys";
 
 declare global {
-  var __leavesyncDatabase: PrismaClient | undefined;
+  var __teamCalendarDatabase: PrismaClient | undefined;
 }
 
 // The Neon serverless adapter speaks Neon's WebSocket protocol, which a plain
@@ -43,10 +43,10 @@ const createDatabaseClient = (): PrismaClient => {
 };
 
 export const database =
-  globalThis.__leavesyncDatabase ?? createDatabaseClient();
+  globalThis.__teamCalendarDatabase ?? createDatabaseClient();
 
 if (process.env.NODE_ENV !== "production") {
-  globalThis.__leavesyncDatabase = database;
+  globalThis.__teamCalendarDatabase = database;
 }
 
 export type Database = PrismaClient;

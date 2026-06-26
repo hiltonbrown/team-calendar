@@ -1,5 +1,5 @@
 {
-  "name": "leavesync",
+  "name": "team-calendar",
   "version": "6.0.2",
   "scripts": {
     "build": "turbo build --filter=!email",

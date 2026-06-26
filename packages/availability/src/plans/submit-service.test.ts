@@ -93,7 +93,7 @@ const record = {
   person_id: "00000000-0000-4000-8000-000000000011",
   record_type: "annual_leave",
   source_remote_id: null,
-  source_type: "leavesync_leave",
+  source_type: "team_calendar_leave",
   starts_at: new Date("2026-05-04T00:00:00.000Z"),
   title: "Annual leave",
 };

@@ -1,3 +1,45 @@
+# Plan: Rebrand LeaveSync to Team Calendar
+
+## Plan
+
+- [x] **Step 1: Read-only Discovery & Audit**
+  - [x] Search the repository case-insensitively for `leavesync`, `LeaveSync`, `LEAVESYNC`, `leave-sync`, `leave_sync`, and `@ical.leavesync.app`.
+  - [x] Group findings and produce the initial audit inventory in `tasks/rebrand-final-audit.md` (identifying exclusions, human-facing copy, package names, code identifiers, comments, configs, and dev seed placeholder).
+- [x] **Step 2: Consolidate Branding Constants**
+  - [x] Locate `packages/seo/branding.ts` or its equivalent.
+  - [x] Add canonical display name, slug, compact slug, domain, and ICS host constants if missing.
+  - [x] Replace any hardcoded brand literals in code with references to these constants.
+- [x] **Step 3: Execute Rename & Rebrand**
+  - [x] Update human-facing copy (UI strings, HTML templates, email templates) to **Team Calendar**.
+  - [x] Update package names and manifests (`package.json`, workspace configurations) to **team-calendar**.
+  - [x] Update repo-internal directory/slug identifiers.
+  - [x] Rename the seed placeholder `org_dev_leavesync` to `org_dev_teamcalendar` consistently.
+- [x] **Step 4: Update ICS UID Suffix**
+  - [x] In `packages/feeds`, replace `@ical.leavesync.app` with `@ical.teamcalendar.online`.
+  - [x] Update UID formula, constant, and associated tests asserting on the suffix.
+- [x] **Step 5: Update Documentation & Email**
+  - [x] Update `README.md`, `PRODUCT.md`, `CLAUDE.md`, `DESIGN.md`, screen catalogues. Ensure no tenancy key descriptions (like `clerk_org_id`) are altered.
+  - [x] Update transactional email/notifications copy in `apps/email` and `packages/notifications`.
+- [x] **Step 6: Document External Follow-Ups**
+  - [x] Group all manual/external service changes in `tasks/rebrand-final-audit.md`.
+- [x] **Step 7: Verification & Compliance**
+  - [x] Run `bun run check` to verify linting and formatting.
+  - [x] Run typescript typechecking across all workspaces.
+  - [x] Run the Vitest test suite (`bun run test`).
+  - [x] Confirm everything compiles, typechecks, and tests pass clean.
+
+## Review
+
+- Compiled a case-insensitive search inventory of legacy brand strings and generated the initial audit report in `tasks/rebrand-final-audit.md`.
+- Updated `packages/seo/branding.ts` to expose all canonical constants (display name, hyphenated and compact slugs, primary domain and URL, ICS suffix, noemail domain).
+- Refactored hardcoded literals across the workspace packages (`packages/feeds`, `packages/availability`, `packages/jobs`) to import and use the new branding constants.
+- Renamed the `leavesync_leave` database enum value to `team_calendar_leave` across the Prisma schema, init migration, and 21 workspace files.
+- Renamed the local cache connection database variable and the `leavesync:` localStorage onboarding namespace prefix.
+- Updated Vercel project configuration names and package names to use the package slug `team-calendar`.
+- Refactored documentation prose, transactional email/notification copy, and doc page favicons, while fully preserving Clerk tenancy rules and the `clerk_org_id` / `organisation_id` model references.
+- Renamed the local developer seed org placeholder `org_dev_leavesync` to `org_dev_teamcalendar` consistently.
+- Verified workspace compliance: `bun run check` exits with 0 errors, and the entire Vitest suite passes successfully. All files have been clean-formatted.
+
 # Plan: Fix Turbo Dev Shutdown Address Boundary Error
 
 ## Plan

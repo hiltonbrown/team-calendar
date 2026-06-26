@@ -125,7 +125,7 @@ const ApprovalStatusSchema = z.enum([
 ]);
 const SourceTypeSchema = z.enum([
   "manual",
-  "leavesync_leave",
+  "team_calendar_leave",
   "xero_leave",
   "xero",
 ]);
@@ -618,7 +618,7 @@ export async function deleteDraftRecord(
       return existing;
     }
     if (
-      existing.value.source_type !== "leavesync_leave" ||
+      existing.value.source_type !== "team_calendar_leave" ||
       existing.value.approval_status !== "draft"
     ) {
       return {
@@ -802,7 +802,7 @@ async function listRecordsForScope({
   const records = await database.availabilityRecord.findMany({
     where: {
       ...scoped(clerkOrgId, organisationId),
-      source_type: { in: ["manual", "leavesync_leave"] },
+      source_type: { in: ["manual", "team_calendar_leave"] },
       ...(filters.includeArchived ? {} : { archived_at: null }),
       ...(filters.approvalStatus?.length
         ? { approval_status: { in: filters.approvalStatus } }
@@ -818,7 +818,8 @@ async function listRecordsForScope({
             source_type: {
               in: filters.sourceType.filter(
                 (sourceType) =>
-                  sourceType === "manual" || sourceType === "leavesync_leave"
+                  sourceType === "manual" ||
+                  sourceType === "team_calendar_leave"
               ),
             },
           }
@@ -1015,7 +1016,7 @@ function deriveActions(
     return ["edit", "archive"];
   }
 
-  if (record.source_type !== "leavesync_leave") {
+  if (record.source_type !== "team_calendar_leave") {
     return ["view"];
   }
 
@@ -1100,15 +1101,15 @@ function routeRecord(
   hasXero: boolean
 ): {
   approvalStatus: "approved" | "draft";
-  sourceType: "leavesync_leave" | "manual";
+  sourceType: "team_calendar_leave" | "manual";
 } {
   if (isLocalOnlyType(recordType)) {
     return { approvalStatus: "approved", sourceType: "manual" };
   }
   if (isXeroLeaveType(recordType) && hasXero) {
-    return { approvalStatus: "draft", sourceType: "leavesync_leave" };
+    return { approvalStatus: "draft", sourceType: "team_calendar_leave" };
   }
-  return { approvalStatus: "approved", sourceType: "leavesync_leave" };
+  return { approvalStatus: "approved", sourceType: "team_calendar_leave" };
 }
 
 async function materialisePlanPublication(input: {

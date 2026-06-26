@@ -67,7 +67,7 @@ function event(overrides = {}) {
     recordType: "annual_leave",
     recordTypeCategory: "xero_leave",
     renderTreatment: "solid",
-    sourceType: "leavesync_leave",
+    sourceType: "team_calendar_leave",
     startsAt: new Date("2026-04-15T00:00:00.000Z"),
     xeroWriteError: null,
     ...overrides,

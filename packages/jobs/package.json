@@ -17,6 +17,7 @@
     "@repo/feeds": "*",
     "@repo/notifications": "*",
     "@repo/observability": "*",
+    "@repo/seo": "*",
     "@repo/xero": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "inngest": "^4.5.0",

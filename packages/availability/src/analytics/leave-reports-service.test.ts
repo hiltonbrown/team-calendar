@@ -61,7 +61,7 @@ const record = {
   person,
   person_id: person.id,
   record_type: "annual_leave",
-  source_type: "leavesync_leave",
+  source_type: "team_calendar_leave",
   starts_at: new Date("2026-05-04T00:00:00.000Z"),
   submitted_at: null,
 };
@@ -74,7 +74,7 @@ describe("aggregateLeaveReports", () => {
     mocks.holidayList.mockResolvedValue({ ok: true, value: [] });
   });
 
-  it("aggregates approved LeaveSync and Xero leave records only", async () => {
+  it("aggregates approved Team Calendar and Xero leave records only", async () => {
     const result = await aggregateLeaveReports({
       actingUserId: "user_1",
       clerkOrgId: "org_1",
@@ -101,7 +101,7 @@ describe("aggregateLeaveReports", () => {
           archived_at: null,
           clerk_org_id: "org_1",
           organisation_id: "00000000-0000-4000-8000-000000000001",
-          source_type: { in: ["xero_leave", "leavesync_leave"] },
+          source_type: { in: ["xero_leave", "team_calendar_leave"] },
         }),
       })
     );

@@ -23,8 +23,8 @@ describe("org-aware URLs", () => {
   });
 
   it("does not rewrite external URLs", () => {
-    expect(withOrg("https://leavesync.app", orgId)).toBe(
-      "https://leavesync.app"
+    expect(withOrg("https://teamcalendar.online", orgId)).toBe(
+      "https://teamcalendar.online"
     );
   });
 

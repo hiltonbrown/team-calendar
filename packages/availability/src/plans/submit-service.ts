@@ -173,7 +173,7 @@ export async function withdrawSubmission(
     if (
       record.approval_status !== "submitted" ||
       !record.source_remote_id ||
-      record.source_type !== "leavesync_leave"
+      record.source_type !== "team_calendar_leave"
     ) {
       return invalidState("invalid_state_for_withdraw");
     }
@@ -276,7 +276,7 @@ async function performSubmission(
     const record = authorised.value;
 
     if (
-      record.source_type !== "leavesync_leave" ||
+      record.source_type !== "team_calendar_leave" ||
       record.approval_status !== options.validStatus ||
       (options.validStatus === "xero_sync_failed" &&
         record.failed_action !== "submit")

@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
           isPublicHoliday: false,
           location: "Brisbane",
           publishedSequence: 2,
-          publishedUid: "stable@ical.leavesync.app",
+          publishedUid: "stable@ical.teamcalendar.online",
           recordType: "annual_leave",
           sourceRecordId: "10000000-0000-4000-8000-000000000001",
           startsAt: new Date("2026-05-07T00:00:00.000Z"),
@@ -95,7 +95,7 @@ describe("renderFeedForToken", () => {
           isPublicHoliday: false,
           location: "Brisbane",
           publishedSequence: 2,
-          publishedUid: "stable@ical.leavesync.app",
+          publishedUid: "stable@ical.teamcalendar.online",
           recordType: "annual_leave",
           sourceRecordId: "10000000-0000-4000-8000-000000000001",
           startsAt: new Date("2026-05-07T00:00:00.000Z"),
@@ -114,7 +114,7 @@ describe("renderFeedForToken", () => {
       return;
     }
     expect(result.value.status).toBe("active");
-    expect(result.value.body).toContain("UID:stable@ical.leavesync.app");
+    expect(result.value.body).toContain("UID:stable@ical.teamcalendar.online");
     expect(result.value.body).toContain("SEQUENCE:2");
     expect(result.value.body).toContain("SUMMARY:Jane Smith: Annual Leave");
     expect(result.value.body).not.toContain(

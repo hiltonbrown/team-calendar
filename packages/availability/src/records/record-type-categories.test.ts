@@ -70,12 +70,12 @@ describe("record type categories", () => {
   it("maps calendar category filters to source types", () => {
     expect(sourceTypesForCategory("xero_leave")).toEqual([
       "xero_leave",
-      "leavesync_leave",
+      "team_calendar_leave",
     ]);
     expect(sourceTypesForCategory("local_only")).toEqual(["manual"]);
     expect(sourceTypesForCategory("all")).toEqual([
       "xero_leave",
-      "leavesync_leave",
+      "team_calendar_leave",
       "manual",
     ]);
   });

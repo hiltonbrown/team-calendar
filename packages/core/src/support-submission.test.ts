@@ -12,7 +12,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     const parsed = SupportSubmissionPayloadSchema.safeParse({
       category: "support",
       message: "The calendar is missing one leave entry.",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Missing leave entry",
     });
@@ -21,7 +21,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     expect(parsed.data).toEqual({
       category: "support",
       message: "The calendar is missing one leave entry.",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Missing leave entry",
     });
@@ -39,8 +39,8 @@ describe("SupportSubmissionPayloadSchema", () => {
       expected_outcome: "The updated plan should appear immediately.",
       message: "It would help to show a clearer success state after saving.",
       organisation_id: "00000000-0000-4000-8000-000000000001",
-      organisation_name: "LeaveSync Dev Organisation",
-      page_url: "https://app.leavesync.test/plans",
+      organisation_name: "Team Calendar Dev Organisation",
+      page_url: "https://app.teamcalendar.test/plans",
       priority: "high",
       reproduction_steps: "1. Open Plans\n2. Save a change",
       subject: "Improve post-save feedback",
@@ -61,8 +61,8 @@ describe("SupportSubmissionPayloadSchema", () => {
       expected_outcome: "The updated plan should appear immediately.",
       message: "It would help to show a clearer success state after saving.",
       organisation_id: "00000000-0000-4000-8000-000000000001",
-      organisation_name: "LeaveSync Dev Organisation",
-      page_url: "https://app.leavesync.test/plans",
+      organisation_name: "Team Calendar Dev Organisation",
+      page_url: "https://app.teamcalendar.test/plans",
       priority: "high",
       reproduction_steps: "1. Open Plans\n2. Save a change",
       subject: "Improve post-save feedback",
@@ -85,7 +85,7 @@ describe("SupportSubmissionPayloadSchema", () => {
       message: "Need assistance",
       organisation_id: " ",
       organisation_name: " ",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "low",
       reproduction_steps: " ",
       subject: "Help",
@@ -97,7 +97,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     expect(parsed).toEqual({
       category: "support",
       message: "Need assistance",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "low",
       subject: "Help",
     });
@@ -107,7 +107,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     const parsed = SupportSubmissionPayloadSchema.safeParse({
       category: "bug",
       message: "Need assistance",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Help",
     });
@@ -119,7 +119,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     const parsed = SupportSubmissionPayloadSchema.safeParse({
       category: "support",
       message: "Need assistance",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "urgent",
       subject: "Help",
     });
@@ -131,7 +131,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     const parsed = SupportSubmissionPayloadSchema.safeParse({
       category: "support",
       message: "Need assistance",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "   ",
     });
@@ -143,7 +143,7 @@ describe("SupportSubmissionPayloadSchema", () => {
     const parsed = SupportSubmissionPayloadSchema.safeParse({
       category: "support",
       message: "   ",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Help",
     });
@@ -168,7 +168,7 @@ describe("SupportSubmissionPayloadSchema", () => {
       category: "support",
       email_override: "not-an-email",
       message: "Need assistance",
-      page_url: "https://app.leavesync.test/support",
+      page_url: "https://app.teamcalendar.test/support",
       priority: "normal",
       subject: "Help",
     });
@@ -211,8 +211,8 @@ describe("buildSupportIssueMarkdownBody", () => {
         expected_outcome: "The updated plan should appear immediately.",
         message: "A saved plan is not visible until a hard refresh.",
         organisation_id: "00000000-0000-4000-8000-000000000001",
-        organisation_name: "LeaveSync Dev Organisation",
-        page_url: "https://app.leavesync.test/plans",
+        organisation_name: "Team Calendar Dev Organisation",
+        page_url: "https://app.teamcalendar.test/plans",
         priority: "high",
         reproduction_steps: "1. Open Plans\n2. Edit a plan\n3. Save changes",
         subject: "Saved plan does not refresh",
@@ -230,12 +230,12 @@ A saved plan is not visible until a hard refresh.
 ## Metadata
 - Category: Support
 - Priority: High
-- Page URL: https://app.leavesync.test/plans
+- Page URL: https://app.teamcalendar.test/plans
 - Email override: help@example.com
 - Current route: /plans
 - Clerk organisation ID: org_123
 - Organisation ID: 00000000-0000-4000-8000-000000000001
-- Organisation name: LeaveSync Dev Organisation
+- Organisation name: Team Calendar Dev Organisation
 - User ID: user_123
 - User email: user@example.com
 - User name: Alex Example
@@ -254,7 +254,7 @@ The updated plan should appear immediately.
 The saved plan does not refresh.
 
 ## Internal notes
-Submitted from LeaveSync support form.
+Submitted from Team Calendar support form.
 
 Complete triage notes here.`);
   });
@@ -264,7 +264,7 @@ Complete triage notes here.`);
       SupportSubmissionIssueInputSchema.parse({
         category: "feedback",
         message: "The navigation could be clearer for new users.",
-        page_url: "https://app.leavesync.test/dashboard",
+        page_url: "https://app.teamcalendar.test/dashboard",
         priority: "normal",
         subject: "Clarify navigation labels",
       })
@@ -278,7 +278,9 @@ Complete triage notes here.`);
     expect(body).not.toContain("## Actual outcome");
     expect(body).toContain("- Category: Feedback");
     expect(body).toContain("- Priority: Normal");
-    expect(body).toContain("- Page URL: https://app.leavesync.test/dashboard");
+    expect(body).toContain(
+      "- Page URL: https://app.teamcalendar.test/dashboard"
+    );
   });
 });
 

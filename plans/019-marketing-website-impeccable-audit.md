@@ -180,7 +180,7 @@ Suggested command: `$impeccable harden apps/web`
 
 Location: `apps/web/app/components/header/index.tsx:32`  
 Category: Accessibility  
-Impact: This is acceptable because the link also contains visible "LeaveSync" text. Keep it intentional and consistent. The footer uses `alt="LeaveSync"`, which may produce redundant announcement if adjacent text repeats the brand.  
+Impact: This is acceptable because the link also contains visible "Team Calendar" text. Keep it intentional and consistent. The footer uses `alt="Team Calendar"`, which may produce redundant announcement if adjacent text repeats the brand.  
 WCAG/Standard: WCAG 2.2 AA, Non-text Content, 1.1.1  
 Recommendation: Audit decorative versus informative logo use across header and footer so the brand link announces once.  
 Suggested command: `$impeccable harden apps/web`

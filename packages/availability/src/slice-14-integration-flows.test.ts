@@ -149,7 +149,7 @@ function draftLeave(records: Slice14AvailabilityRecordFixture[]) {
     records.find(
       (record) =>
         record.approvalStatus === "draft" &&
-        record.sourceType === "leavesync_leave"
+        record.sourceType === "team_calendar_leave"
     ) ?? records[0]
   );
 }
@@ -159,7 +159,7 @@ function submittedLeave(records: Slice14AvailabilityRecordFixture[]) {
     records.find(
       (record) =>
         record.approvalStatus === "submitted" &&
-        record.sourceType === "leavesync_leave"
+        record.sourceType === "team_calendar_leave"
     ) ?? records[1]
   );
 }

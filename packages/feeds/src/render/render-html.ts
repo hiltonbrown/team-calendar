@@ -19,7 +19,7 @@ export function renderFeedHtml(input: RenderFeedHtmlInput): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(input.feedName)} | LeaveSync</title>
+  <title>${escapeHtml(input.feedName)} | Team Calendar</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -203,7 +203,7 @@ export function renderFeedHtml(input: RenderFeedHtmlInput): string {
   <header class="page-header">
     <div class="page-header-inner">
       <h1>${escapeHtml(input.feedName)}</h1>
-      <p class="feed-meta">${events.length} ${events.length === 1 ? "event" : "events"} published by LeaveSync. Updated ${escapeHtml(formatDateTime(generatedAt))}.</p>
+      <p class="feed-meta">${events.length} ${events.length === 1 ? "event" : "events"} published by Team Calendar. Updated ${escapeHtml(formatDateTime(generatedAt))}.</p>
     </div>
   </header>
   <main class="calendar-shell">

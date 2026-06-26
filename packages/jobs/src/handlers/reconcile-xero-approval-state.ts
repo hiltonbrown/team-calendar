@@ -574,7 +574,7 @@ async function recordFailure(
           : input.error.code,
       error_message:
         input.error.code === "not_found_error"
-          ? "The Xero leave application no longer exists. The LeaveSync record has been archived."
+          ? "The Xero leave application no longer exists. The Team Calendar record has been archived."
           : toPlainLanguageMessage(input.error),
       raw_payload: toPrismaJsonValue(input.rawPayload),
       record_type: failedRecordType(input.recordType),

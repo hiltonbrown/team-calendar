@@ -2,7 +2,7 @@
 
 ## Spike outcome
 
-The current feed projection is sufficient for a read-only HTML availability view. No STOP condition was reached. One nuance: the live `PreviewEvent` shape does not carry the raw `source_type`, so a richer future provenance chip that distinguishes Xero-synced leave from LeaveSync-created leave would need a projection addition. The thin month/list HTML view does not require that field.
+The current feed projection is sufficient for a read-only HTML availability view. No STOP condition was reached. One nuance: the live `PreviewEvent` shape does not carry the raw `source_type`, so a richer future provenance chip that distinguishes Xero-synced leave from Team Calendar-created leave would need a projection addition. The thin month/list HTML view does not require that field.
 
 Drift check:
 
@@ -115,5 +115,5 @@ The prototype includes these decisions inline so the follow-up route can inspect
 - Should HTML and ICS share one `last_etag` field, or should feed render metadata become representation-specific?
 - Should public holiday rows include jurisdiction or location labels if future projection fields add them?
 - Should feed timezone be added to the projection or feed model before production HTML, so timed events can display in the feed owner's local timezone rather than UTC?
-- Should `source_type` be added to `PreviewEvent` before production HTML, so provenance chips can distinguish Xero-synced leave from LeaveSync-created leave?
+- Should `source_type` be added to `PreviewEvent` before production HTML, so provenance chips can distinguish Xero-synced leave from Team Calendar-created leave?
 - Should the production HTML page expose a print stylesheet and a downloadable ICS link, or should it remain a single-purpose read-only page?

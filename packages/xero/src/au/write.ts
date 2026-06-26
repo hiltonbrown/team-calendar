@@ -125,7 +125,7 @@ export async function withdrawLeaveApplication(
 ): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
   const response = await xeroRequest(input.xeroTenant, {
     body: {
-      Reason: "Withdrawn by employee in LeaveSync.",
+      Reason: "Withdrawn by employee in Team Calendar.",
     },
     method: "POST",
     path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(

@@ -117,7 +117,7 @@ export async function completeTenantSelectionAction(input: {
 }
 
 function appendOrgQuery(path: string, organisationId: string): string {
-  const url = new URL(path, "https://leavesync.local");
+  const url = new URL(path, "https://teamcalendar.local");
   url.searchParams.set("org", organisationId);
   return `${url.pathname}${url.search}`;
 }

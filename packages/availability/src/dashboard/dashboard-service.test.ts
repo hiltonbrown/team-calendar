@@ -122,7 +122,7 @@ describe("dashboard-service", () => {
             endsAt: new Date("2026-04-19T23:59:59.999Z"),
             id: "record_active",
             recordType: "annual_leave",
-            sourceType: "leavesync_leave",
+            sourceType: "team_calendar_leave",
             startsAt: new Date("2026-04-19T00:00:00.000Z"),
             title: null,
           },

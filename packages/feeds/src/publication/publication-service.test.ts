@@ -11,12 +11,12 @@ const mocks = vi.hoisted(() => {
     published_description: "Initial note",
     published_sequence: 0,
     published_summary: "Jane Smith: Annual Leave",
-    published_uid: "stable@ical.leavesync.app",
+    published_uid: "stable@ical.teamcalendar.online",
   };
   const record = {
     all_day: true,
     clerk_org_id: "org_publication",
-    derived_uid_key: "stable@ical.leavesync.app",
+    derived_uid_key: "stable@ical.teamcalendar.online",
     id: "10000000-0000-4000-8000-000000000001",
     notes_internal: "Initial note",
     organisation_id: "30000000-0000-4000-8000-000000000001",
@@ -93,7 +93,7 @@ const mocks = vi.hoisted(() => {
     record,
     reset: () => {
       record.all_day = true;
-      record.derived_uid_key = "stable@ical.leavesync.app";
+      record.derived_uid_key = "stable@ical.teamcalendar.online";
       record.notes_internal = "Initial note";
       record.privacy_mode = "named";
       record.publication = null;
@@ -141,7 +141,7 @@ describe("materialiseAvailabilityPublication", () => {
         publishedDescription: "Initial note",
         publishedSequence: 0,
         publishedSummary: "Jane Smith: Annual Leave",
-        publishedUid: "stable@ical.leavesync.app",
+        publishedUid: "stable@ical.teamcalendar.online",
       },
     });
   });
@@ -158,7 +158,7 @@ describe("materialiseAvailabilityPublication", () => {
       value: {
         publishedDescription: "Updated note",
         publishedSequence: 1,
-        publishedUid: "stable@ical.leavesync.app",
+        publishedUid: "stable@ical.teamcalendar.online",
       },
     });
   });
@@ -174,7 +174,7 @@ describe("materialiseAvailabilityPublication", () => {
       ok: true,
       value: {
         publishedSequence: 1,
-        publishedUid: "stable@ical.leavesync.app",
+        publishedUid: "stable@ical.teamcalendar.online",
       },
     });
   });
@@ -189,7 +189,7 @@ describe("materialiseAvailabilityPublication", () => {
       ok: true,
       value: {
         publishedSequence: 0,
-        publishedUid: "stable@ical.leavesync.app",
+        publishedUid: "stable@ical.teamcalendar.online",
       },
     });
     expect(mocks.availabilityPublicationUpdate).not.toHaveBeenCalled();
@@ -209,7 +209,7 @@ describe("materialiseAvailabilityPublication", () => {
       ok: true,
       value: {
         publishedSequence: 0,
-        publishedUid: "stable@ical.leavesync.app",
+        publishedUid: "stable@ical.teamcalendar.online",
       },
     });
     expect(mocks.availabilityPublicationFindUnique).toHaveBeenCalledTimes(1);

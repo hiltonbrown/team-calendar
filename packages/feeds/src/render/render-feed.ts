@@ -52,7 +52,7 @@ export async function renderFeedBody(input: {
 
   const calendar = ical({
     name: input.feedName,
-    prodId: { company: "LeaveSync", product: "LeaveSync" },
+    prodId: { company: "Team Calendar", product: "Team Calendar" },
   });
 
   for (const event of projected.value) {

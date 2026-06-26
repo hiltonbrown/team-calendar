@@ -50,7 +50,7 @@ function maskedProjectedEvent(): PreviewEvent {
     isPublicHoliday: false,
     location: "Brisbane",
     publishedSequence: 3,
-    publishedUid: "published@ical.leavesync.app",
+    publishedUid: "published@ical.teamcalendar.online",
     recordType: "annual_leave",
     sourceRecordId: "10000000-0000-4000-8000-000000000001",
     startsAt: new Date("2026-05-07T00:00:00.000Z"),

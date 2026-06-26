@@ -458,7 +458,7 @@ function recordWhere(
     record_type: {
       in: filters.leaveType?.length ? filters.leaveType : [...XERO_LEAVE_TYPES],
     },
-    source_type: { in: ["xero_leave", "leavesync_leave"] },
+    source_type: { in: ["xero_leave", "team_calendar_leave"] },
     starts_at: { lt: input.dateRange.end },
   };
 }

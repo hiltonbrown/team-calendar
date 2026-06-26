@@ -98,8 +98,8 @@ describe("feed token pure functions", () => {
   it("pins the token hash stability vector", () => {
     // If this test fails, every persisted token_hash in production is invalidated,
     // do not update the expectation without a migration plan.
-    expect(hashFeedToken("leavesync-test-vector")).toBe(
-      "b61d4e761bb66dbd3be2fc675178a07d3767b5e667ab9f755c8183dedbdf3233"
+    expect(hashFeedToken("team-calendar-test-vector")).toBe(
+      "674691f5c86301ca2ebf20072f56f06cf5e72347db4f643a309f7f7596c5e18c"
     );
   });
 });

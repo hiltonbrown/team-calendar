@@ -47,7 +47,7 @@ describe("listRecentSupportSubmissionAudits", () => {
         payload: {
           category: "support",
           issueNumber: 42,
-          issueUrl: "https://github.com/hiltonbrown/leavesync/issues/42",
+          issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/42",
           labelAssignmentSucceeded: true,
           labelsAttempted: ["support", "priority:normal"],
           status: "created",
@@ -90,7 +90,7 @@ describe("listRecentSupportSubmissionAudits", () => {
           createdAt: new Date("2026-04-22T00:00:00.000Z"),
           id: "audit_123",
           issueNumber: 42,
-          issueUrl: "https://github.com/hiltonbrown/leavesync/issues/42",
+          issueUrl: "https://github.com/hiltonbrown/team-calendar/issues/42",
           labelAssignmentSucceeded: true,
           labelsAttempted: ["support", "priority:normal"],
           organisationId: tenant.organisationId,

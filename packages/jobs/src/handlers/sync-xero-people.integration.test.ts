@@ -155,7 +155,7 @@ describe("sync-xero-people handler", () => {
     expect(people1[0]).toMatchObject({
       first_name: "Jane",
       last_name: "Smith",
-      email: "jane.smith@noemail.leavesync.app", // fallback email
+      email: "jane.smith@noemail.teamcalendar.online", // fallback email
       employment_type: "contractor",
       is_active: true,
     });

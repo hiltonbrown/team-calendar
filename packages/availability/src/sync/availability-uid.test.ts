@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { icsUidSuffix } from "@repo/seo/branding";
 import { describe, expect, it } from "vitest";
 import { deriveAvailabilityUidKey } from "./availability-uid";
 
@@ -25,7 +26,7 @@ describe("deriveAvailabilityUidKey", () => {
       baseInput.endsAt.toISOString(),
       baseInput.recordType,
     ].join("|");
-    const expected = `${createHash("sha256").update(formula).digest("hex")}@ical.leavesync.app`;
+    const expected = `${createHash("sha256").update(formula).digest("hex")}${icsUidSuffix}`;
 
     expect(deriveAvailabilityUidKey(baseInput)).toBe(expected);
   });

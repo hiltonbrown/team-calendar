@@ -943,7 +943,7 @@ async function inferPayrollRegionForTenant(input: {
       error: {
         code: "invalid_country",
         message:
-          "This Xero tenant is outside LeaveSync's supported payroll regions.",
+          "This Xero tenant is outside Team Calendar's supported payroll regions.",
       },
     };
   }

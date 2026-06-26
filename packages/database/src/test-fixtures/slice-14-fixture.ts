@@ -6,7 +6,7 @@ export type Slice14ApprovalStatus =
   | "withdrawn"
   | "xero_sync_failed";
 
-export type Slice14SourceType = "leavesync_leave" | "manual" | "xero_leave";
+export type Slice14SourceType = "team_calendar_leave" | "manual" | "xero_leave";
 
 export interface Slice14OrganisationFixture {
   clerkOrgId: string;
@@ -92,7 +92,7 @@ const STATUS_CYCLE: Slice14ApprovalStatus[] = [
   "xero_sync_failed",
 ];
 const SOURCE_CYCLE: Slice14SourceType[] = [
-  "leavesync_leave",
+  "team_calendar_leave",
   "manual",
   "xero_leave",
 ];
@@ -111,13 +111,13 @@ export function createSlice14Fixture(): Slice14Fixture {
       clerkOrgId: CLERK_ORG_A,
       countryCode: "AU",
       id: ORG_A,
-      name: "LeaveSync Fixture A",
+      name: "Team Calendar Fixture A",
     },
     {
       clerkOrgId: CLERK_ORG_B,
       countryCode: "NZ",
       id: ORG_B,
-      name: "LeaveSync Fixture B",
+      name: "Team Calendar Fixture B",
     },
   ];
 
@@ -141,7 +141,7 @@ export function createSlice14Fixture(): Slice14Fixture {
     )[index % 2];
     return {
       clerkOrgId: organisation.clerkOrgId,
-      email: `person${index + 1}@leavesync.test`,
+      email: `person${index + 1}@teamcalendar.test`,
       firstName: `Person${index + 1}`,
       id: fixtureId("300", index),
       lastName: "Fixture",

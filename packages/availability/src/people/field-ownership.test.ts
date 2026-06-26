@@ -11,21 +11,21 @@ describe("field-ownership", () => {
       jobTitle: "xero",
       lastName: "xero",
       startDate: "xero",
-      location: "leavesync",
-      manager: "leavesync",
-      personType: "leavesync",
-      statusNote: "leavesync",
-      team: "leavesync",
+      location: "team-calendar",
+      manager: "team-calendar",
+      personType: "team-calendar",
+      statusNote: "team-calendar",
+      team: "team-calendar",
     });
   });
 
-  it("marks all identity fields as LeaveSync-owned for manual people", () => {
+  it("marks all identity fields as Team Calendar-owned for manual people", () => {
     expect(fieldOwnershipForPerson({ xeroEmployeeId: null })).toMatchObject({
-      email: "leavesync",
-      firstName: "leavesync",
-      jobTitle: "leavesync",
-      lastName: "leavesync",
-      startDate: "leavesync",
+      email: "team-calendar",
+      firstName: "team-calendar",
+      jobTitle: "team-calendar",
+      lastName: "team-calendar",
+      startDate: "team-calendar",
     });
   });
 });

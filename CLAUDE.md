@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in the LeaveSync repository.
+This file provides guidance to Claude Code when working in the Team Calendar repository.
 
 ## Project overview
 
-**LeaveSync** is a multi-tenant leave management and availability publishing platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: employees submit and manage leave requests in LeaveSync, approved state is written back to Xero synchronously, and Xero-side leave data is pulled into the canonical availability model on a scheduled basis.
+**Team Calendar** is a multi-tenant leave management and availability publishing platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: employees submit and manage leave requests in Team Calendar, approved state is written back to Xero synchronously, and Xero-side leave data is pulled into the canonical availability model on a scheduled basis.
 
 The architecture is: **Leave submission layer > bidirectional Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**
 
-LeaveSync is:
+Team Calendar is:
 
 - a leave submission and approval workflow system, bidirectionally synced with Xero Payroll
 - a canonical availability publisher
@@ -17,13 +17,13 @@ LeaveSync is:
 - a secure ICS feed generator for Outlook, Google Calendar, and Apple Calendar
 - a real-time notification platform (SSE-delivered in-app notifications plus transactional email)
 
-LeaveSync is not:
+Team Calendar is not:
 
 - a full HRIS
 - a payroll engine or accrual calculator
 - a multi-connector abstraction layer (Xero only at this stage)
 
-Xero remains the payroll source of truth. Outbound writes (submit, approve, decline, withdraw) are synchronous and user-triggered. Inbound sync is pull-first via scheduled Inngest jobs. Leave balances are always sourced from Xero; never calculated by LeaveSync.
+Xero remains the payroll source of truth. Outbound writes (submit, approve, decline, withdraw) are synchronous and user-triggered. Inbound sync is pull-first via scheduled Inngest jobs. Leave balances are always sourced from Xero; never calculated by Team Calendar.
 
 **Reference docs (read before implementing any domain logic):**
 
@@ -142,7 +142,7 @@ bun run clean              # Remove git-ignored files
 
 ## Tenancy model
 
-LeaveSync uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
 
 ### Hierarchy
 

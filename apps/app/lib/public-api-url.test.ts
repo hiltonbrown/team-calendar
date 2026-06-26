@@ -7,11 +7,11 @@ describe("public API URL helpers", () => {
   });
 
   test("uses the configured public API origin without trailing slashes", () => {
-    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.leavesync.test/");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.teamcalendar.test/");
 
-    expect(getPublicApiOrigin()).toBe("https://api.leavesync.test");
+    expect(getPublicApiOrigin()).toBe("https://api.teamcalendar.test");
     expect(getPublicApiUrl("/api/notifications/stream")).toBe(
-      "https://api.leavesync.test/api/notifications/stream"
+      "https://api.teamcalendar.test/api/notifications/stream"
     );
   });
 

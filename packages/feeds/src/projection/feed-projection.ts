@@ -8,6 +8,7 @@ import type {
   availability_privacy_mode,
   availability_record_type,
 } from "@repo/database/generated/enums";
+import { icsUidSuffix } from "@repo/seo/branding";
 import { type FeedRole, resolvePeopleForFeed } from "../scope/feed-scope";
 
 export type FeedProjectionError =
@@ -43,7 +44,11 @@ export interface FeedProjectionContext {
   privacyMode?: availability_privacy_mode;
 }
 
-const FEED_SOURCE_TYPES = ["manual", "leavesync_leave", "xero_leave"] as const;
+const FEED_SOURCE_TYPES = [
+  "manual",
+  "team_calendar_leave",
+  "xero_leave",
+] as const;
 
 export async function projectFeedEvents(
   input: FeedProjectionContext
@@ -284,7 +289,7 @@ async function projectPublicHolidays(input: {
         location: null,
         recordType: "public_holiday",
         publishedSequence: 0,
-        publishedUid: `${holiday.id}@ical.leavesync.app`,
+        publishedUid: `${holiday.id}${icsUidSuffix}`,
         sourceRecordId: holiday.id,
         startsAt: holiday.holiday_date,
         summary,

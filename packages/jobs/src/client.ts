@@ -1,3 +1,4 @@
+import { brandNameSlug } from "@repo/seo/branding";
 import { Inngest } from "inngest";
 import { keys } from "../keys";
 
@@ -9,6 +10,6 @@ const { INNGEST_EVENT_KEY, INNGEST_SIGNING_KEY } = keys();
 
 export const inngest = new Inngest({
   eventKey: INNGEST_EVENT_KEY,
-  id: "leavesync",
+  id: brandNameSlug,
   signingKey: INNGEST_SIGNING_KEY,
 });

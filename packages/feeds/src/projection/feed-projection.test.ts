@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
     all_day: true,
     contactability: "unavailable",
     derived_sequence: 0,
-    derived_uid_key: "fallback@ical.leavesync.app",
+    derived_uid_key: "fallback@ical.teamcalendar.online",
     ends_at: new Date("2026-05-08T00:00:00.000Z"),
     id: "10000000-0000-4000-8000-000000000001",
     notes_internal: "Internal note",
@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => {
     },
     publication: {
       published_sequence: 3,
-      published_uid: "published@ical.leavesync.app",
+      published_uid: "published@ical.teamcalendar.online",
     },
     record_type: "annual_leave",
     starts_at: new Date("2026-05-07T00:00:00.000Z"),
@@ -105,7 +105,7 @@ describe("projectFeedEvents", () => {
       description: "Internal note",
       location: "Brisbane",
       publishedSequence: 3,
-      publishedUid: "published@ical.leavesync.app",
+      publishedUid: "published@ical.teamcalendar.online",
       sourceRecordId: "10000000-0000-4000-8000-000000000001",
       summary: "Jane Smith: Annual Leave",
     });
@@ -259,7 +259,7 @@ describe("projectFeedEvents", () => {
           displayName: "Public holiday: Assigned Picnic Day",
           endsAt: new Date("2026-06-23T00:00:00.000Z"),
           publishedUid:
-            "60000000-0000-4000-8000-000000000001@ical.leavesync.app",
+            "60000000-0000-4000-8000-000000000001@ical.teamcalendar.online",
           sourceRecordId: "60000000-0000-4000-8000-000000000001",
           startsAt: new Date("2026-06-22T00:00:00.000Z"),
           summary: "Public holiday: Assigned Picnic Day",
@@ -268,7 +268,7 @@ describe("projectFeedEvents", () => {
           displayName: "Public holiday: Company Holiday",
           endsAt: new Date("2026-06-25T00:00:00.000Z"),
           publishedUid:
-            "60000000-0000-4000-8000-000000000003@ical.leavesync.app",
+            "60000000-0000-4000-8000-000000000003@ical.teamcalendar.online",
           sourceRecordId: "60000000-0000-4000-8000-000000000003",
           startsAt: new Date("2026-06-24T00:00:00.000Z"),
           summary: "Public holiday: Company Holiday",

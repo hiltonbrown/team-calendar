@@ -1,14 +1,14 @@
 # GEMINI.md
 
-This file provides foundational mandates and procedural guidance for Gemini CLI when working in the LeaveSync repository. These instructions take precedence over general defaults.
+This file provides foundational mandates and procedural guidance for Gemini CLI when working in the Team Calendar repository. These instructions take precedence over general defaults.
 
 ## Project context
 
-**LeaveSync** is a multi-tenant availability publishing platform. It connects to Xero Payroll (AU, NZ, UK), syncs approved leave data, normalises it into a canonical availability model, and publishes through secure ICS calendar feeds.
+**Team Calendar** is a multi-tenant availability publishing platform. It connects to Xero Payroll (AU, NZ, UK), syncs approved leave data, normalises it into a canonical availability model, and publishes through secure ICS calendar feeds.
 
 The architecture is: **Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**.
 
-LeaveSync does not manage payroll, accruals, or leave approvals. Xero is the only provider. Manual availability entries (WFH, travelling, training, client site) are added directly by users.
+Team Calendar does not manage payroll, accruals, or leave approvals. Xero is the only provider. Manual availability entries (WFH, travelling, training, client site) are added directly by users.
 
 ### Reference docs
 
