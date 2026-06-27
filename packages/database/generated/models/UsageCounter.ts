@@ -38,6 +38,7 @@ export type UsageCounterMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   metric_key: string | null
+  counter_type: $Enums.usage_counter_type | null
   current_value: number | null
   period_start: Date | null
   period_end: Date | null
@@ -49,6 +50,7 @@ export type UsageCounterMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   metric_key: string | null
+  counter_type: $Enums.usage_counter_type | null
   current_value: number | null
   period_start: Date | null
   period_end: Date | null
@@ -60,6 +62,7 @@ export type UsageCounterCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   metric_key: number
+  counter_type: number
   current_value: number
   period_start: number
   period_end: number
@@ -81,6 +84,7 @@ export type UsageCounterMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   metric_key?: true
+  counter_type?: true
   current_value?: true
   period_start?: true
   period_end?: true
@@ -92,6 +96,7 @@ export type UsageCounterMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   metric_key?: true
+  counter_type?: true
   current_value?: true
   period_start?: true
   period_end?: true
@@ -103,6 +108,7 @@ export type UsageCounterCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   metric_key?: true
+  counter_type?: true
   current_value?: true
   period_start?: true
   period_end?: true
@@ -201,6 +207,7 @@ export type UsageCounterGroupByOutputType = {
   id: string
   clerk_org_id: string
   metric_key: string
+  counter_type: $Enums.usage_counter_type | null
   current_value: number
   period_start: Date
   period_end: Date
@@ -235,6 +242,7 @@ export type UsageCounterWhereInput = {
   id?: Prisma.UuidFilter<"UsageCounter"> | string
   clerk_org_id?: Prisma.StringFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringFilter<"UsageCounter"> | string
+  counter_type?: Prisma.Enumusage_counter_typeNullableFilter<"UsageCounter"> | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFilter<"UsageCounter"> | number
   period_start?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   period_end?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
@@ -246,6 +254,7 @@ export type UsageCounterOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
+  counter_type?: Prisma.SortOrderInput | Prisma.SortOrder
   current_value?: Prisma.SortOrder
   period_start?: Prisma.SortOrder
   period_end?: Prisma.SortOrder
@@ -256,22 +265,25 @@ export type UsageCounterOrderByWithRelationInput = {
 export type UsageCounterWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   clerk_org_id_metric_key_period_start_period_end?: Prisma.UsageCounterClerk_org_idMetric_keyPeriod_startPeriod_endCompoundUniqueInput
+  clerk_org_id_counter_type?: Prisma.UsageCounterClerk_org_idCounter_typeCompoundUniqueInput
   AND?: Prisma.UsageCounterWhereInput | Prisma.UsageCounterWhereInput[]
   OR?: Prisma.UsageCounterWhereInput[]
   NOT?: Prisma.UsageCounterWhereInput | Prisma.UsageCounterWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringFilter<"UsageCounter"> | string
+  counter_type?: Prisma.Enumusage_counter_typeNullableFilter<"UsageCounter"> | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFilter<"UsageCounter"> | number
   period_start?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   period_end?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   created_at?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"UsageCounter"> | Date | string
-}, "id" | "clerk_org_id_metric_key_period_start_period_end">
+}, "id" | "clerk_org_id_metric_key_period_start_period_end" | "clerk_org_id_counter_type">
 
 export type UsageCounterOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
+  counter_type?: Prisma.SortOrderInput | Prisma.SortOrder
   current_value?: Prisma.SortOrder
   period_start?: Prisma.SortOrder
   period_end?: Prisma.SortOrder
@@ -291,6 +303,7 @@ export type UsageCounterScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"UsageCounter"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"UsageCounter"> | string
   metric_key?: Prisma.StringWithAggregatesFilter<"UsageCounter"> | string
+  counter_type?: Prisma.Enumusage_counter_typeNullableWithAggregatesFilter<"UsageCounter"> | $Enums.usage_counter_type | null
   current_value?: Prisma.IntWithAggregatesFilter<"UsageCounter"> | number
   period_start?: Prisma.DateTimeWithAggregatesFilter<"UsageCounter"> | Date | string
   period_end?: Prisma.DateTimeWithAggregatesFilter<"UsageCounter"> | Date | string
@@ -302,6 +315,7 @@ export type UsageCounterCreateInput = {
   id?: string
   clerk_org_id: string
   metric_key: string
+  counter_type?: $Enums.usage_counter_type | null
   current_value?: number
   period_start: Date | string
   period_end: Date | string
@@ -313,6 +327,7 @@ export type UsageCounterUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   metric_key: string
+  counter_type?: $Enums.usage_counter_type | null
   current_value?: number
   period_start: Date | string
   period_end: Date | string
@@ -324,6 +339,7 @@ export type UsageCounterUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
+  counter_type?: Prisma.NullableEnumusage_counter_typeFieldUpdateOperationsInput | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
   period_start?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   period_end?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -335,6 +351,7 @@ export type UsageCounterUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
+  counter_type?: Prisma.NullableEnumusage_counter_typeFieldUpdateOperationsInput | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
   period_start?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   period_end?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -346,6 +363,7 @@ export type UsageCounterCreateManyInput = {
   id?: string
   clerk_org_id: string
   metric_key: string
+  counter_type?: $Enums.usage_counter_type | null
   current_value?: number
   period_start: Date | string
   period_end: Date | string
@@ -357,6 +375,7 @@ export type UsageCounterUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
+  counter_type?: Prisma.NullableEnumusage_counter_typeFieldUpdateOperationsInput | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
   period_start?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   period_end?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -368,6 +387,7 @@ export type UsageCounterUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   metric_key?: Prisma.StringFieldUpdateOperationsInput | string
+  counter_type?: Prisma.NullableEnumusage_counter_typeFieldUpdateOperationsInput | $Enums.usage_counter_type | null
   current_value?: Prisma.IntFieldUpdateOperationsInput | number
   period_start?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   period_end?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -382,10 +402,16 @@ export type UsageCounterClerk_org_idMetric_keyPeriod_startPeriod_endCompoundUniq
   period_end: Date | string
 }
 
+export type UsageCounterClerk_org_idCounter_typeCompoundUniqueInput = {
+  clerk_org_id: string
+  counter_type: $Enums.usage_counter_type
+}
+
 export type UsageCounterCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
+  counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
   period_start?: Prisma.SortOrder
   period_end?: Prisma.SortOrder
@@ -401,6 +427,7 @@ export type UsageCounterMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
+  counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
   period_start?: Prisma.SortOrder
   period_end?: Prisma.SortOrder
@@ -412,6 +439,7 @@ export type UsageCounterMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   metric_key?: Prisma.SortOrder
+  counter_type?: Prisma.SortOrder
   current_value?: Prisma.SortOrder
   period_start?: Prisma.SortOrder
   period_end?: Prisma.SortOrder
@@ -423,12 +451,17 @@ export type UsageCounterSumOrderByAggregateInput = {
   current_value?: Prisma.SortOrder
 }
 
+export type NullableEnumusage_counter_typeFieldUpdateOperationsInput = {
+  set?: $Enums.usage_counter_type | null
+}
+
 
 
 export type UsageCounterSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   metric_key?: boolean
+  counter_type?: boolean
   current_value?: boolean
   period_start?: boolean
   period_end?: boolean
@@ -440,6 +473,7 @@ export type UsageCounterSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   id?: boolean
   clerk_org_id?: boolean
   metric_key?: boolean
+  counter_type?: boolean
   current_value?: boolean
   period_start?: boolean
   period_end?: boolean
@@ -451,6 +485,7 @@ export type UsageCounterSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   id?: boolean
   clerk_org_id?: boolean
   metric_key?: boolean
+  counter_type?: boolean
   current_value?: boolean
   period_start?: boolean
   period_end?: boolean
@@ -462,6 +497,7 @@ export type UsageCounterSelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   metric_key?: boolean
+  counter_type?: boolean
   current_value?: boolean
   period_start?: boolean
   period_end?: boolean
@@ -469,7 +505,7 @@ export type UsageCounterSelectScalar = {
   updated_at?: boolean
 }
 
-export type UsageCounterOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "metric_key" | "current_value" | "period_start" | "period_end" | "created_at" | "updated_at", ExtArgs["result"]["usageCounter"]>
+export type UsageCounterOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "metric_key" | "counter_type" | "current_value" | "period_start" | "period_end" | "created_at" | "updated_at", ExtArgs["result"]["usageCounter"]>
 
 export type $UsageCounterPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "UsageCounter"
@@ -478,6 +514,7 @@ export type $UsageCounterPayload<ExtArgs extends runtime.Types.Extensions.Intern
     id: string
     clerk_org_id: string
     metric_key: string
+    counter_type: $Enums.usage_counter_type | null
     current_value: number
     period_start: Date
     period_end: Date
@@ -909,6 +946,7 @@ export interface UsageCounterFieldRefs {
   readonly id: Prisma.FieldRef<"UsageCounter", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"UsageCounter", 'String'>
   readonly metric_key: Prisma.FieldRef<"UsageCounter", 'String'>
+  readonly counter_type: Prisma.FieldRef<"UsageCounter", 'usage_counter_type'>
   readonly current_value: Prisma.FieldRef<"UsageCounter", 'Int'>
   readonly period_start: Prisma.FieldRef<"UsageCounter", 'DateTime'>
   readonly period_end: Prisma.FieldRef<"UsageCounter", 'DateTime'>

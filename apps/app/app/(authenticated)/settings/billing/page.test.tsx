@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   currentUser: vi.fn(),
-  getBillingSummary: vi.fn(),
+  getBillingOverview: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
 }));
@@ -12,11 +12,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/availability", () => ({
-  getBillingSummary: mocks.getBillingSummary,
-}));
 vi.mock("@repo/database", () => ({
   database: { auditEvent: { create: mocks.auditCreate } },
+  getBillingOverview: mocks.getBillingOverview,
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
@@ -27,19 +25,21 @@ vi.mock("@/lib/server/require-active-org-page-context", () => ({
 
 const Page = (await import("./page")).default;
 
+const UNLIMITED_PATTERN = /Unlimited/;
+
 const organisationId = "00000000-0000-4000-8000-000000000001";
-const summary = {
-  hasContactFlow: false,
-  hasUpgradeFlow: true,
-  isOverLimit: false,
-  plan: {
-    currentPeriodEnd: null,
-    key: "pro",
-    label: "Pro",
-    seatsPurchased: 12,
-    status: "active",
-  },
-  usage: [],
+const overview = {
+  billingInterval: "month",
+  cancelAtPeriodEnd: false,
+  clerkPlanKey: "premium",
+  currentPeriodEnd: new Date("2026-05-01T00:00:00.000Z"),
+  planName: "Premium",
+  seatsPurchased: 10,
+  status: "active",
+  usage: [
+    { current: 8, limit: 50, limitType: "seats" },
+    { current: 3, limit: -1, limitType: "feeds" },
+  ],
 };
 
 describe("BillingPage", () => {
@@ -58,7 +58,7 @@ describe("BillingPage", () => {
       clerkOrgId: "org_1",
       organisationId,
     });
-    mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
+    mocks.getBillingOverview.mockResolvedValue({ ok: true, value: overview });
   });
 
   it("requires owner access", async () => {
@@ -73,17 +73,14 @@ describe("BillingPage", () => {
     await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow(
       "Permission denied"
     );
-    expect(mocks.getBillingSummary).not.toHaveBeenCalled();
+    expect(mocks.getBillingOverview).not.toHaveBeenCalled();
   });
 
-  it("renders the owner billing view via the owner service", async () => {
+  it("renders the live plan name and an unlimited dimension", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
-    expect(mocks.getBillingSummary).toHaveBeenCalledWith(
-      expect.objectContaining({ actingRole: "owner" })
-    );
-    expect(
-      screen.queryByText("Billing actions are managed by the account owner.")
-    ).toBeNull();
+    expect(mocks.getBillingOverview).toHaveBeenCalledWith("org_1");
+    expect(screen.getByText("Premium")).toBeDefined();
+    expect(screen.getByText(UNLIMITED_PATTERN)).toBeDefined();
   });
 });

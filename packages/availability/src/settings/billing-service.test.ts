@@ -1,20 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  clerkOrgSubscriptionFindUnique: vi.fn(),
-  usageCounterFindMany: vi.fn(),
+  getBillingOverview: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    clerkOrgSubscription: {
-      findUnique: mocks.clerkOrgSubscriptionFindUnique,
-    },
-    usageCounter: {
-      findMany: mocks.usageCounterFindMany,
-    },
-  },
+  UNLIMITED: -1,
+  getBillingOverview: mocks.getBillingOverview,
 }));
 
 const { getBillingSummary, getBillingSummaryForDashboard } = await import(
@@ -28,46 +21,62 @@ const baseInput = {
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
 
+function overview(
+  usage: Array<{ current: number; limit: number; limitType: string }>
+) {
+  return {
+    ok: true,
+    value: {
+      billingInterval: "month",
+      cancelAtPeriodEnd: false,
+      clerkPlanKey: "premium",
+      currentPeriodEnd: new Date("2026-05-01T00:00:00.000Z"),
+      planName: "Premium",
+      seatsPurchased: 10,
+      status: "active",
+      usage,
+    },
+  };
+}
+
 describe("billing-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.clerkOrgSubscriptionFindUnique.mockResolvedValue({
-      clerk_org_id: "org_1",
-      current_period_end: new Date("2026-05-01T00:00:00.000Z"),
-      id: "sub_1",
-      plan_key: "pro",
-      seats_purchased: 10,
-      status: "active",
-    });
-    mocks.usageCounterFindMany.mockResolvedValue([
-      {
-        current_value: 42,
-        metric_key: "people_count",
-      },
-      {
-        current_value: 8,
-        metric_key: "active_feeds",
-      },
-    ]);
+    mocks.getBillingOverview.mockResolvedValue(
+      overview([
+        { current: 42, limit: 50, limitType: "seats" },
+        { current: 1, limit: -1, limitType: "feeds" },
+        { current: 1, limit: 2, limitType: "payroll_entities" },
+      ])
+    );
   });
 
-  it("returns plan, usage, and over-limit state", async () => {
+  it("maps the catalogue-backed overview to plan and usage", async () => {
     const result = await getBillingSummary(baseInput);
 
     expect(result).toMatchObject({
       ok: true,
       value: {
-        hasContactFlow: false,
-        hasUpgradeFlow: false,
         isOverLimit: false,
         plan: {
-          key: "pro",
-          label: "Pro",
+          key: "premium",
+          label: "Premium",
           seatsPurchased: 10,
           status: "active",
         },
       },
     });
+    if (result.ok) {
+      const seats = result.value.usage.find((u) => u.metricKey === "seats");
+      const feeds = result.value.usage.find((u) => u.metricKey === "feeds");
+      expect(seats).toMatchObject({
+        currentValue: 42,
+        label: "People",
+        limit: 50,
+      });
+      // Unlimited dimensions surface as a null limit.
+      expect(feeds?.limit).toBeNull();
+    }
   });
 
   it("rejects non-owners", async () => {
@@ -82,8 +91,11 @@ describe("billing-service", () => {
     });
   });
 
-  it("returns subscription_not_found when no row exists", async () => {
-    mocks.clerkOrgSubscriptionFindUnique.mockResolvedValue(null);
+  it("returns subscription_not_found when no overview exists", async () => {
+    mocks.getBillingOverview.mockResolvedValue({
+      ok: false,
+      error: { code: "not_found", message: "none" },
+    });
 
     const result = await getBillingSummary(baseInput);
 
@@ -94,12 +106,9 @@ describe("billing-service", () => {
   });
 
   it("flags over-limit metrics", async () => {
-    mocks.usageCounterFindMany.mockResolvedValue([
-      {
-        current_value: 501,
-        metric_key: "people_count",
-      },
-    ]);
+    mocks.getBillingOverview.mockResolvedValue(
+      overview([{ current: 51, limit: 50, limitType: "seats" }])
+    );
 
     const result = await getBillingSummary(baseInput);
 
@@ -117,10 +126,7 @@ describe("billing-service", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      value: {
-        hasUpgradeFlow: false,
-        visibleToAdmin: false,
-      },
+      value: { hasUpgradeFlow: false, visibleToAdmin: false },
     });
   });
 
@@ -129,10 +135,7 @@ describe("billing-service", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      value: {
-        hasUpgradeFlow: true,
-        visibleToAdmin: true,
-      },
+      value: { hasUpgradeFlow: true, visibleToAdmin: true },
     });
   });
 });

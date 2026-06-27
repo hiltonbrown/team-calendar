@@ -1,3 +1,72 @@
+# Plan: Clerk Billing slice (Basic / Premium / Enterprise, USD, Org-level)
+
+## Discovery findings (read-only pass)
+
+A prior billing slice already exists. Reconciling additively (no drops):
+
+- `plan_limit_type` enum currently: `active_people, connections, feeds, organisations`.
+  Add `payroll_entities`, `seats` (`feeds` already present).
+- `plans`: add `clerk_plan_key` (unique), `is_custom`.
+- `clerk_org_subscriptions`: add `clerk_plan_key`, `cancel_at_period_end`, `billing_interval`
+  (new enum month|year). Existing required FK `plan_key -> plans.key` kept; webhook writes
+  `plan_key = clerk_plan_key`.
+- `usage_counters`: add `counter_type` (new enum `usage_counter_type`) + new unique
+  (clerk_org_id, counter_type). Old metric_key rows/constraint kept.
+- Old `billing-service.ts` hardcodes LIMITS + plan keys; refactor to catalogue-backed DB.
+- Creation sites: feeds -> `feed-service.createFeed`; people -> `ensureCurrentUserPerson`;
+  payroll entity -> `ensureOrganisationForClerk`.
+- Webhook pattern: `apps/api/app/webhooks/auth/route.ts` (Svix). Job pattern: `rebuild-feed-cache`.
+- Integration DB uses `db push` from schema.prisma; still ship one additive migration.
+
+## Tasks
+
+- [ ] core: LimitType/FeatureKey unions + LIMIT_TYPES/FEATURE_KEYS arrays
+- [ ] schema.prisma additive changes + hand-written additive migration + prisma generate
+- [ ] seed/plans.ts PLAN_CATALOGUE (single source of truth) + ClerkPlanKey type
+- [ ] seed-sync script (idempotent upsert of plans + plan_limits)
+- [ ] queries/billing.ts
+- [ ] auth/entitlements.ts (hasFeature, withinLimit)
+- [ ] jobs/recount-usage.ts + register + dispatch
+- [ ] webhook route POST /webhooks/clerk-billing + secret env
+- [ ] enforcement at feeds + availability create sites
+- [ ] S-22 page/client rewrite; refactor billing-service.ts to catalogue-backed
+- [ ] co-located Vitest tests; typecheck + lint + tests; grep proof; commit; push
+
+## Flags (carry to final summary)
+- Clerk Billing is not merchant of record: no GST/VAT for AU/NZ/UK. Out of scope.
+- usage_counters gained a counter_type column (task assumed it existed); fully additive.
+- Enforcement reads usage_counters (per spec); counters eventually consistent via recount-usage.
+- Enforcement fails open when no subscription/limit configured (non-breaking).
+- Clerk billing webhook payload field paths are best-effort; confirm against Dashboard samples.
+
+## Review
+
+- core: added `LimitType`/`FeatureKey` unions plus `LIMIT_TYPES`/`FEATURE_KEYS`
+  arrays, and a `validation_error` AppErrorCode.
+- database: one additive migration (`20260627090000_clerk_billing_slice`),
+  schema additions (clerk_plan_key, is_custom, cancel_at_period_end,
+  billing_interval enum, usage_counter_type enum + counter_type column + unique).
+  Regenerated the checked-in Prisma client offline (seeded the schema-engine by
+  hand; engine CDN was reachable via curl but the prisma downloader failed TLS).
+- PLAN_CATALOGUE is the only declaration of limit values and plan keys (grep
+  proven). Idempotent seed-sync `syncPlanCatalogue` + `bun run seed:plans`.
+- Billing queries: getSubscriptionForOrg, getPlanLimits, getUsageCounter,
+  upsertSubscriptionFromWebhook, getBillingOverview.
+- auth: generic `hasFeature` (defers to Clerk) and `withinLimit` (generic over
+  LimitType). auth gained @repo/database + @repo/core deps; auth import is lazy
+  in hasFeature so feeds/availability do not pull Clerk into their test loads.
+- jobs: `recount-usage` Inngest job iterating LIMIT_TYPES, plus dispatcher.
+- api: POST /webhooks/clerk-billing (Svix verify, Zod, upsert, enqueue recount).
+- Enforcement: createFeed (feeds), ensureCurrentUserPerson (seats),
+  ensureOrganisationForClerk (payroll entities). billing-service refactored to
+  read catalogue-backed data; S-22 rewritten with status badges, usage bars
+  (amber at 80, error at 100), and "Unlimited" rendering.
+- Verification: typecheck clean across all changed workspaces; ultracite check
+  clean; new + existing tests pass (database 18, auth 9, jobs 31, feeds 50,
+  availability 178, api webhooks 10, app billing 3).
+
+---
+
 # Plan: Document Production URLs
 
 ## Plan

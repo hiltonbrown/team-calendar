@@ -29,6 +29,8 @@ export type PlanMinAggregateOutputType = {
   key: string | null
   name: string | null
   is_active: boolean | null
+  clerk_plan_key: string | null
+  is_custom: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -38,6 +40,8 @@ export type PlanMaxAggregateOutputType = {
   key: string | null
   name: string | null
   is_active: boolean | null
+  clerk_plan_key: string | null
+  is_custom: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -47,6 +51,8 @@ export type PlanCountAggregateOutputType = {
   key: number
   name: number
   is_active: number
+  clerk_plan_key: number
+  is_custom: number
   created_at: number
   updated_at: number
   _all: number
@@ -58,6 +64,8 @@ export type PlanMinAggregateInputType = {
   key?: true
   name?: true
   is_active?: true
+  clerk_plan_key?: true
+  is_custom?: true
   created_at?: true
   updated_at?: true
 }
@@ -67,6 +75,8 @@ export type PlanMaxAggregateInputType = {
   key?: true
   name?: true
   is_active?: true
+  clerk_plan_key?: true
+  is_custom?: true
   created_at?: true
   updated_at?: true
 }
@@ -76,6 +86,8 @@ export type PlanCountAggregateInputType = {
   key?: true
   name?: true
   is_active?: true
+  clerk_plan_key?: true
+  is_custom?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -158,6 +170,8 @@ export type PlanGroupByOutputType = {
   key: string
   name: string
   is_active: boolean
+  clerk_plan_key: string | null
+  is_custom: boolean
   created_at: Date
   updated_at: Date
   _count: PlanCountAggregateOutputType | null
@@ -188,6 +202,8 @@ export type PlanWhereInput = {
   key?: Prisma.StringFilter<"Plan"> | string
   name?: Prisma.StringFilter<"Plan"> | string
   is_active?: Prisma.BoolFilter<"Plan"> | boolean
+  clerk_plan_key?: Prisma.StringNullableFilter<"Plan"> | string | null
+  is_custom?: Prisma.BoolFilter<"Plan"> | boolean
   created_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   limits?: Prisma.PlanLimitListRelationFilter
@@ -199,6 +215,8 @@ export type PlanOrderByWithRelationInput = {
   key?: Prisma.SortOrder
   name?: Prisma.SortOrder
   is_active?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrderInput | Prisma.SortOrder
+  is_custom?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   limits?: Prisma.PlanLimitOrderByRelationAggregateInput
@@ -208,22 +226,26 @@ export type PlanOrderByWithRelationInput = {
 export type PlanWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   key?: string
+  clerk_plan_key?: string
   AND?: Prisma.PlanWhereInput | Prisma.PlanWhereInput[]
   OR?: Prisma.PlanWhereInput[]
   NOT?: Prisma.PlanWhereInput | Prisma.PlanWhereInput[]
   name?: Prisma.StringFilter<"Plan"> | string
   is_active?: Prisma.BoolFilter<"Plan"> | boolean
+  is_custom?: Prisma.BoolFilter<"Plan"> | boolean
   created_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Plan"> | Date | string
   limits?: Prisma.PlanLimitListRelationFilter
   clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionListRelationFilter
-}, "id" | "key">
+}, "id" | "key" | "clerk_plan_key">
 
 export type PlanOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   key?: Prisma.SortOrder
   name?: Prisma.SortOrder
   is_active?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrderInput | Prisma.SortOrder
+  is_custom?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.PlanCountOrderByAggregateInput
@@ -239,6 +261,8 @@ export type PlanScalarWhereWithAggregatesInput = {
   key?: Prisma.StringWithAggregatesFilter<"Plan"> | string
   name?: Prisma.StringWithAggregatesFilter<"Plan"> | string
   is_active?: Prisma.BoolWithAggregatesFilter<"Plan"> | boolean
+  clerk_plan_key?: Prisma.StringNullableWithAggregatesFilter<"Plan"> | string | null
+  is_custom?: Prisma.BoolWithAggregatesFilter<"Plan"> | boolean
   created_at?: Prisma.DateTimeWithAggregatesFilter<"Plan"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"Plan"> | Date | string
 }
@@ -248,6 +272,8 @@ export type PlanCreateInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitCreateNestedManyWithoutPlanInput
@@ -259,6 +285,8 @@ export type PlanUncheckedCreateInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitUncheckedCreateNestedManyWithoutPlanInput
@@ -270,6 +298,8 @@ export type PlanUpdateInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUpdateManyWithoutPlanNestedInput
@@ -281,6 +311,8 @@ export type PlanUncheckedUpdateInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUncheckedUpdateManyWithoutPlanNestedInput
@@ -292,6 +324,8 @@ export type PlanCreateManyInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -301,6 +335,8 @@ export type PlanUpdateManyMutationInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -310,6 +346,8 @@ export type PlanUncheckedUpdateManyInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -319,6 +357,8 @@ export type PlanCountOrderByAggregateInput = {
   key?: Prisma.SortOrder
   name?: Prisma.SortOrder
   is_active?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
+  is_custom?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -328,6 +368,8 @@ export type PlanMaxOrderByAggregateInput = {
   key?: Prisma.SortOrder
   name?: Prisma.SortOrder
   is_active?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
+  is_custom?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -337,6 +379,8 @@ export type PlanMinOrderByAggregateInput = {
   key?: Prisma.SortOrder
   name?: Prisma.SortOrder
   is_active?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
+  is_custom?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -379,6 +423,8 @@ export type PlanCreateWithoutLimitsInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionCreateNestedManyWithoutPlanInput
@@ -389,6 +435,8 @@ export type PlanUncheckedCreateWithoutLimitsInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedCreateNestedManyWithoutPlanInput
@@ -415,6 +463,8 @@ export type PlanUpdateWithoutLimitsInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUpdateManyWithoutPlanNestedInput
@@ -425,6 +475,8 @@ export type PlanUncheckedUpdateWithoutLimitsInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   clerk_org_subscriptions?: Prisma.ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanNestedInput
@@ -435,6 +487,8 @@ export type PlanCreateWithoutClerk_org_subscriptionsInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitCreateNestedManyWithoutPlanInput
@@ -445,6 +499,8 @@ export type PlanUncheckedCreateWithoutClerk_org_subscriptionsInput = {
   key: string
   name: string
   is_active?: boolean
+  clerk_plan_key?: string | null
+  is_custom?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   limits?: Prisma.PlanLimitUncheckedCreateNestedManyWithoutPlanInput
@@ -471,6 +527,8 @@ export type PlanUpdateWithoutClerk_org_subscriptionsInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUpdateManyWithoutPlanNestedInput
@@ -481,6 +539,8 @@ export type PlanUncheckedUpdateWithoutClerk_org_subscriptionsInput = {
   key?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_custom?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   limits?: Prisma.PlanLimitUncheckedUpdateManyWithoutPlanNestedInput
@@ -531,6 +591,8 @@ export type PlanSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   key?: boolean
   name?: boolean
   is_active?: boolean
+  clerk_plan_key?: boolean
+  is_custom?: boolean
   created_at?: boolean
   updated_at?: boolean
   limits?: boolean | Prisma.Plan$limitsArgs<ExtArgs>
@@ -543,6 +605,8 @@ export type PlanSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   key?: boolean
   name?: boolean
   is_active?: boolean
+  clerk_plan_key?: boolean
+  is_custom?: boolean
   created_at?: boolean
   updated_at?: boolean
 }, ExtArgs["result"]["plan"]>
@@ -552,6 +616,8 @@ export type PlanSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   key?: boolean
   name?: boolean
   is_active?: boolean
+  clerk_plan_key?: boolean
+  is_custom?: boolean
   created_at?: boolean
   updated_at?: boolean
 }, ExtArgs["result"]["plan"]>
@@ -561,11 +627,13 @@ export type PlanSelectScalar = {
   key?: boolean
   name?: boolean
   is_active?: boolean
+  clerk_plan_key?: boolean
+  is_custom?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type PlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "key" | "name" | "is_active" | "created_at" | "updated_at", ExtArgs["result"]["plan"]>
+export type PlanOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "key" | "name" | "is_active" | "clerk_plan_key" | "is_custom" | "created_at" | "updated_at", ExtArgs["result"]["plan"]>
 export type PlanInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   limits?: boolean | Prisma.Plan$limitsArgs<ExtArgs>
   clerk_org_subscriptions?: boolean | Prisma.Plan$clerk_org_subscriptionsArgs<ExtArgs>
@@ -585,6 +653,8 @@ export type $PlanPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     key: string
     name: string
     is_active: boolean
+    clerk_plan_key: string | null
+    is_custom: boolean
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["plan"]>
@@ -1016,6 +1086,8 @@ export interface PlanFieldRefs {
   readonly key: Prisma.FieldRef<"Plan", 'String'>
   readonly name: Prisma.FieldRef<"Plan", 'String'>
   readonly is_active: Prisma.FieldRef<"Plan", 'Boolean'>
+  readonly clerk_plan_key: Prisma.FieldRef<"Plan", 'String'>
+  readonly is_custom: Prisma.FieldRef<"Plan", 'Boolean'>
   readonly created_at: Prisma.FieldRef<"Plan", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"Plan", 'DateTime'>
 }

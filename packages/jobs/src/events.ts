@@ -101,6 +101,49 @@ export async function dispatchSyncEvent(
   }
 }
 
+const RecountUsageEventSchema = z.object({
+  clerkOrgId: z.string().min(1),
+  organisationId: z.string().uuid(),
+});
+
+/**
+ * Enqueues a usage recount for a Clerk Organisation. Carries both tenant ids so
+ * the handler never relies on session context. Used by the billing webhook to
+ * refresh counters after a subscription change.
+ */
+export async function dispatchRecountUsage(
+  input: z.input<typeof RecountUsageEventSchema>
+): Promise<
+  Result<
+    { queued: true },
+    { code: "dispatch_failed" | "validation_error"; message: string }
+  >
+> {
+  const parsed = RecountUsageEventSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: parsed.error.issues[0]?.message ?? "Invalid recount event.",
+      },
+    };
+  }
+
+  try {
+    await inngest.send({ name: "recount-usage", data: parsed.data });
+    return { ok: true, value: { queued: true } };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "dispatch_failed",
+        message: "Failed to queue the usage recount.",
+      },
+    };
+  }
+}
+
 export async function dispatchCancelSyncRun(
   input: z.input<typeof CancelSyncEventSchema>
 ): Promise<

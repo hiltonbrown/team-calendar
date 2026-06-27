@@ -973,6 +973,40 @@ export type Enumplan_limit_typeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
 }
 
+export type Enumbilling_intervalNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.billing_interval | Prisma.Enumbilling_intervalFieldRefInput<$PrismaModel> | null
+  in?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel> | $Enums.billing_interval | null
+}
+
+export type Enumbilling_intervalNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.billing_interval | Prisma.Enumbilling_intervalFieldRefInput<$PrismaModel> | null
+  in?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumbilling_intervalNullableWithAggregatesFilter<$PrismaModel> | $Enums.billing_interval | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel>
+}
+
+export type Enumusage_counter_typeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.usage_counter_type | Prisma.Enumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel> | $Enums.usage_counter_type | null
+}
+
+export type Enumusage_counter_typeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.usage_counter_type | Prisma.Enumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumusage_counter_typeNullableWithAggregatesFilter<$PrismaModel> | $Enums.usage_counter_type | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel>
+}
+
 export type NestedUuidFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -1885,6 +1919,40 @@ export type NestedEnumplan_limit_typeWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumplan_limit_typeFilter<$PrismaModel>
+}
+
+export type NestedEnumbilling_intervalNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.billing_interval | Prisma.Enumbilling_intervalFieldRefInput<$PrismaModel> | null
+  in?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel> | $Enums.billing_interval | null
+}
+
+export type NestedEnumbilling_intervalNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.billing_interval | Prisma.Enumbilling_intervalFieldRefInput<$PrismaModel> | null
+  in?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.billing_interval[] | Prisma.ListEnumbilling_intervalFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumbilling_intervalNullableWithAggregatesFilter<$PrismaModel> | $Enums.billing_interval | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumbilling_intervalNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumusage_counter_typeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.usage_counter_type | Prisma.Enumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel> | $Enums.usage_counter_type | null
+}
+
+export type NestedEnumusage_counter_typeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.usage_counter_type | Prisma.Enumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.usage_counter_type[] | Prisma.ListEnumusage_counter_typeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumusage_counter_typeNullableWithAggregatesFilter<$PrismaModel> | $Enums.usage_counter_type | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumusage_counter_typeNullableFilter<$PrismaModel>
 }
 
 

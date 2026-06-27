@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withinLimit } from "@repo/auth/entitlements";
 import {
   appError,
   type ClerkOrgId,
@@ -95,6 +96,13 @@ export const ensureOrganisationForClerk = async (
     orderBy: { created_at: "asc" },
   });
 
+  // Note: this bootstrap only ever creates the first organisation for a Clerk
+  // Org (it finds-or-creates a single canonical entity), which is within every
+  // plan's payroll_entities limit. The payroll_entities gate therefore belongs
+  // on the path that creates additional entities (the Xero connection flow),
+  // not here, where a guard would be unreachable and could only ever throw
+  // spuriously. Seat and feed limits are enforced at their real create sites.
+
   const organisation = existingOrganisation
     ? await database.organisation.update({
         where: { id: existingOrganisation.id },
@@ -184,6 +192,24 @@ export const ensureCurrentUserPerson = async (
 
         return { ok: true, value: mapPerson(person) };
       }
+    }
+
+    // Linking this Clerk user creates a new person, which consumes a seat.
+    // Existing linked or same-email people returned above do not pass through
+    // here, so the gate only applies to genuinely new seats.
+    const seatLimit = await withinLimit(
+      tenant.clerkOrgId,
+      tenant.organisationId,
+      "seats"
+    );
+    if (seatLimit.ok && !seatLimit.value.allowed) {
+      return {
+        ok: false,
+        error: appError(
+          "validation_error",
+          `You have reached your plan's seat limit (${seatLimit.value.limit}). Upgrade your plan to add more people.`
+        ),
+      };
     }
 
     const person = await database.person.create({

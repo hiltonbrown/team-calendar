@@ -197,6 +197,8 @@
       "dependencies": {
         "@clerk/nextjs": "^7.3.7",
         "@clerk/themes": "^2.4.57",
+        "@repo/core": "*",
+        "@repo/database": "*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "next-themes": "^0.4.6",
         "react": "19.2.6",
@@ -210,12 +212,14 @@
         "@types/react": "19.2.15",
         "@types/react-dom": "19.2.3",
         "typescript": "^6.0.3",
+        "vitest": "^4.1.7",
       },
     },
     "packages/availability": {
       "name": "@repo/availability",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/auth": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/feeds": "*",
@@ -339,6 +343,7 @@
       "name": "@repo/feeds",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/auth": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/observability": "*",

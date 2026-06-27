@@ -340,7 +340,26 @@ export const plan_limit_type = {
   active_people: 'active_people',
   connections: 'connections',
   feeds: 'feeds',
-  organisations: 'organisations'
+  organisations: 'organisations',
+  payroll_entities: 'payroll_entities',
+  seats: 'seats'
 } as const
 
 export type plan_limit_type = (typeof plan_limit_type)[keyof typeof plan_limit_type]
+
+
+export const billing_interval = {
+  month: 'month',
+  year: 'year'
+} as const
+
+export type billing_interval = (typeof billing_interval)[keyof typeof billing_interval]
+
+
+export const usage_counter_type = {
+  payroll_entities: 'payroll_entities',
+  seats: 'seats',
+  feeds: 'feeds'
+} as const
+
+export type usage_counter_type = (typeof usage_counter_type)[keyof typeof usage_counter_type]
