@@ -1,3 +1,43 @@
+# Plan: Document Production URLs
+
+## Plan
+
+- [x] Inspect the current README for the best placement.
+- [x] Add descriptions and purposes for the app, API, and marketing URLs.
+- [x] Review the docs-only diff.
+
+## Review
+
+- Added a `Production URLs` section to `README.md`.
+- Documented `https://app.teamcalendar.online/`, `https://api.teamcalendar.online/`, and `https://teamcalendar.online/` with concise descriptions and operational purpose.
+- Verification scope: docs-only edit reviewed with `git diff -- README.md tasks/todo.md`.
+
+# Plan: Shape Web Integrations Marketing
+
+## Plan
+
+- [ ] **Step 1: Discovery**
+  - [x] Load product, design, and impeccable shape/register guidance.
+  - [x] Inspect existing web integration routes, homepage integration content, navigation, footer, and relevant CSS.
+  - [x] Confirm `/integrations` should cover both Xero Payroll sync and calendar subscriptions.
+  - [ ] Confirm route behaviour and homepage content reduction.
+- [ ] **Step 2: Design Brief**
+  - [x] Define the `/integrations` information architecture, hierarchy, and content cuts.
+  - [x] Define what happens to `/integrations/xero` and any homepage integration sections.
+  - [x] Document layout, states, interaction model, and implementation references.
+- [ ] **Step 3: Confirmation**
+  - [x] Present the brief for approval before any implementation.
+  - [x] Implement the confirmed consolidation.
+  - [x] Verify the route, typecheck, lint, and smoke behaviour.
+
+## Review
+
+- Confirmed scope: all integration information on marketing should consolidate on `/integrations`, covering Xero Payroll sync plus Outlook, Google Calendar, and Apple Calendar subscriptions.
+- Confirmed implementation direction: remove `/integrations/xero`, keep `/integrations`, and replace the detailed homepage integration demo with a concise pointer.
+- Added the consolidated `/integrations` page, updated header/footer links, deleted the Xero child page, and removed the old homepage feed demo code/styles.
+- Verification passed: `bun run fix`, `bun run check`, `cd apps/web && bun run typecheck`, `git diff --check`, and full `bun run build`.
+- Route smoke against the existing web server on port 3001 passed: `/integrations` returns `HTTP/1.1 200 OK`; `/integrations/xero` returns `HTTP/1.1 404 Not Found`.
+
 # Plan: Distil Calendar Scan Area
 
 ## Plan

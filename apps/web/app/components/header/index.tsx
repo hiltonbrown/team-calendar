@@ -18,7 +18,7 @@ const signUpHref = env.NEXT_PUBLIC_APP_URL
 const navLinks = [
   { title: "Home", href: "/" },
   { title: "Features", href: "/features" },
-  { title: "Integrations", href: "/integrations/xero" },
+  { title: "Integrations", href: "/integrations" },
   { title: "Pricing", href: "/pricing" },
 ];
 

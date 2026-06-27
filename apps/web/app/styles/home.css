@@ -1,5 +1,5 @@
-/* Live homepage interactive styles: team timeline (.tl-*) and calendar
-   integration (.ci-*). The legacy .marketing-* homepage was removed; those
+/* Live homepage interactive styles: team timeline (.tl-*). The legacy
+   .marketing-* homepage was removed; those
    components were orphaned (imported by nothing). */
 
 /* ============ Interactive timeline ============ */
@@ -514,165 +514,7 @@
   }
 }
 
-/* ============ Calendar integration demo ============ */
-.ci-tabs {
-  display: inline-flex;
-  gap: 2px;
-  max-width: 100%;
-  padding: 4px;
-  margin-top: 40px;
-  overflow-x: auto;
-  scrollbar-color: var(--outline-variant) transparent;
-  background: var(--surface-container-low);
-  border-radius: 12px;
-}
-.ci-tab {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  height: 38px;
-  padding: 0 16px;
-  font: 500 13px / 1 var(--font-sans);
-  color: var(--on-surface-variant);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  border-radius: 12px;
-  transition:
-    background 0.15s ease-out,
-    color 0.15s ease-out;
-}
-.ci-tab:hover {
-  color: var(--on-surface);
-}
-.ci-tab.is-active {
-  color: var(--on-surface);
-  background: var(--surface-container-lowest);
-}
-
-.ci-card {
-  margin-top: 16px;
-  overflow: hidden;
-  background: var(--surface-container-low);
-  border-radius: 16px;
-}
-
-/* Subscribe flow: copy the URL, add it to your app, it stays current.
-   Three steps on a tray, connected by arrows; stacks on mobile. */
-.ci-flow {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-  padding: 8px;
-}
-.ci-flow__step {
-  display: flex;
-  flex: 1 1 0;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  padding: 20px;
-  background: var(--surface-container-lowest);
-  border-radius: 12px;
-}
-.ci-flow__step--primary {
-  flex: 1.5 1 0;
-}
-.ci-flow__head {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-.ci-flow__icon {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--primary);
-  background: color-mix(in oklch, var(--primary-container) 32%, transparent);
-  border-radius: 10px;
-}
-.ci-flow__label {
-  font: 600 0.875rem / 1.3 var(--font-sans);
-  color: var(--on-surface);
-  letter-spacing: -0.01em;
-}
-.ci-flow__copy {
-  font: 400 0.8125rem / 1.5 var(--font-sans);
-  color: var(--on-surface-variant);
-}
-.ci-flow__url-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.ci-flow__url {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font: 500 12px / 1.4 var(--font-mono);
-  color: var(--on-surface);
-  white-space: nowrap;
-  background: var(--surface-container-highest);
-  border-radius: 9px;
-  direction: ltr;
-}
-.ci-copy-btn {
-  display: inline-flex;
-  flex-shrink: 0;
-  gap: 8px;
-  align-items: center;
-  height: 38px;
-  padding: 0 16px;
-  font: 500 13px / 1 var(--font-sans);
-  color: var(--primary-foreground);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  cursor: pointer;
-  background: var(--primary);
-  border: 0;
-  border-radius: 12px;
-  transition:
-    background 0.15s ease-out,
-    color 0.15s ease-out;
-}
-.ci-copy-btn:hover {
-  background: color-mix(in srgb, var(--primary) 92%, var(--on-surface));
-}
-.ci-copy-btn.is-copied {
-  color: var(--secondary-foreground);
-  background: var(--secondary);
-}
-.ci-flow__hint {
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-  margin-top: auto;
-  font: 400 11px / 1.4 var(--font-sans);
-  color: var(--on-surface-variant);
-}
-.ci-flow__pulse {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  background: var(--primary);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
-}
-.ci-flow__arrow {
-  flex-shrink: 0;
-  align-self: center;
-  color: var(--outline-variant);
-}
-
 /* Focus visible styles for accessibility */
-.ci-tab:focus-visible,
-.ci-copy-btn:focus-visible,
 .tl-nav-btn:focus-visible,
 .tl-today-btn:focus-visible,
 .tl-detail-close:focus-visible {
@@ -680,33 +522,11 @@
   outline-offset: 2px;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .ci-tabs {
-    width: 100%;
-    overflow-x: auto;
-  }
-  .ci-flow {
-    flex-direction: column;
-  }
-  .ci-flow__step--primary {
-    flex: 1 1 0;
-  }
-  .ci-flow__arrow {
-    transform: rotate(90deg);
-  }
-}
-
 @media (forced-colors: active) {
   .tl-card,
   .tl-grid,
   .tl-block,
-  .tl-detail,
-  .ci-tabs,
-  .ci-card,
-  .ci-tab,
-  .ci-flow__step,
-  .ci-copy-btn {
+  .tl-detail {
     border: 1px solid CanvasText;
   }
 }

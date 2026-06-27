@@ -7,7 +7,7 @@ const footerColumns = [
     title: "Product",
     items: [
       { title: "Calendar subscriptions", href: "/features#ics-feeds" },
-      { title: "Xero integration", href: "/integrations/xero" },
+      { title: "Integrations", href: "/integrations" },
       { title: "Approvals", href: "/features#leave-workflow" },
       { title: "Changelog", href: "/changelog" },
     ],

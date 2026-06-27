@@ -62,6 +62,14 @@ The following are out of scope for the initial build and do not require structur
 
 Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop.
 
+## Production URLs
+
+| URL | Description | Purpose |
+|---|---|---|
+| `https://app.teamcalendar.online/` | Authenticated product application. | Used by employees, managers, admins, and account owners to manage leave, manual availability, teams, feeds, Xero connections, reports, and account settings. |
+| `https://api.teamcalendar.online/` | Public API service for server-side product operations. | Handles Xero OAuth callbacks, sync orchestration, secure ICS feed delivery, SSE notification streams, support submissions, health checks, cron routes, and Inngest handlers. |
+| `https://teamcalendar.online/` | Public marketing website. | Explains Team Calendar to prospective customers, publishes product and integration information, and routes visitors into sign-in, sign-up, support, and documentation journeys. |
+
 ## Local development
 
 ### Prerequisites
