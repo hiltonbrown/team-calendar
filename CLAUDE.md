@@ -445,3 +445,15 @@ Optional variables with format constraints must be absent (commented out), not `
 - Route protection composed in `apps/app/proxy.ts`, not `middleware.ts`.
 - Biome 2 + Ultracite enforce repo style. Configuration in `biome.jsonc` at root.
 - Git: conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`), one logical change per commit, branch per feature slice.
+
+### Stripe billing environment
+
+| Variable | Scope | Notes |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | `packages/billing` | Server-side Stripe secret key. Must be absent, not empty, when unset. |
+| `STRIPE_WEBHOOK_SECRET` | `apps/api` | Stripe endpoint signing secret (`whsec_...`). |
+| `STRIPE_PRICE_BASIC` | seed/config | Stripe recurring Price id for the Basic product. |
+| `STRIPE_PRICE_PREMIUM` | seed/config | Stripe recurring Price id for the Premium product. Enterprise is custom quoted and has no price id. |
+| `STRIPE_PORTAL_RETURN_URL` | `packages/billing` | Return URL after the hosted Customer Portal. |
+| `STRIPE_CHECKOUT_SUCCESS_URL` | `packages/billing` | Success URL after hosted Checkout. |
+| `STRIPE_CHECKOUT_CANCEL_URL` | `packages/billing` | Cancel URL after hosted Checkout. |

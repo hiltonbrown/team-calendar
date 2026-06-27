@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withinLimit } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
@@ -179,6 +180,14 @@ export async function createFeed(
   }
   if (!isAdminOrOwner(parsed.data.actingRole)) {
     return notAuthorised();
+  }
+
+  const entitlement = await withinLimit(parsed.data.clerkOrgId, parsed.data.organisationId, "feeds");
+  if (!entitlement.ok) {
+    return { ok: false, error: { code: "unknown_error", message: entitlement.error.message } };
+  }
+  if (!entitlement.value.allowed) {
+    return { ok: false, error: { code: "validation_error", message: "Your current plan has reached its active feed limit." } };
   }
 
   const scopes = await validateScopes(parsed.data);

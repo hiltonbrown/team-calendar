@@ -29,3 +29,4 @@ export {
   syncXeroLeaveBalances,
   syncXeroLeaveBalancesFunction,
 } from "./src/handlers/sync-xero-leave-balances";
+export { recountUsage, recountUsageFunction, type RecountUsageInput } from "./src/handlers/recount-usage";

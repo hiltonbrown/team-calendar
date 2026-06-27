@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withinLimit } from "@repo/auth/server";
 import {
   appError,
   type ClerkOrgId,
@@ -95,6 +96,13 @@ export const ensureOrganisationForClerk = async (
     orderBy: { created_at: "asc" },
   });
 
+  if (!existingOrganisation) {
+    const entitlement = await withinLimit(input.clerkOrgId, "00000000-0000-4000-8000-000000000000", "payroll_entities");
+    if (entitlement.ok && !entitlement.value.allowed) {
+      throw new Error("Your current plan has reached its payroll entity limit.");
+    }
+  }
+
   const organisation = existingOrganisation
     ? await database.organisation.update({
         where: { id: existingOrganisation.id },
@@ -184,6 +192,17 @@ export const ensureCurrentUserPerson = async (
 
         return { ok: true, value: mapPerson(person) };
       }
+    }
+
+    const entitlement = await withinLimit(tenant.clerkOrgId, tenant.organisationId, "seats");
+    if (!entitlement.ok) {
+      return { ok: false, error: entitlement.error };
+    }
+    if (!entitlement.value.allowed) {
+      return {
+        ok: false,
+        error: appError("bad_request", "Your current plan has reached its active people limit."),
+      };
     }
 
     const person = await database.person.create({
