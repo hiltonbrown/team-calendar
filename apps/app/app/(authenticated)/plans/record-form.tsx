@@ -15,6 +15,10 @@ import {
 } from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import { Textarea } from "@repo/design-system/components/ui/textarea";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@repo/design-system/components/ui/toggle-group";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { SubmitConfirmationModal } from "@/components/plans/submit-confirmation-modal";
@@ -61,6 +65,8 @@ interface RecordFormProps {
   record?: EditablePlanRecord;
 }
 
+type PlanIntent = "availability" | "leave";
+
 const recordTypeDescriptions: Record<string, string> = {
   annual_leave: "Paid annual leave.",
   personal_leave: "Personal or carer's leave.",
@@ -96,9 +102,12 @@ export function RecordForm({
   const [personId, setPersonId] = useState(
     record?.personId ?? people[0]?.id ?? ""
   );
-  const [recordType, setRecordType] = useState<
-    PlanRecordFormInput["recordType"]
-  >(record?.recordType ?? "annual_leave");
+  const initialRecordType = record?.recordType ?? "annual_leave";
+  const [intent, setIntent] = useState<PlanIntent>(
+    intentForRecordType(initialRecordType)
+  );
+  const [recordType, setRecordType] =
+    useState<PlanRecordFormInput["recordType"]>(initialRecordType);
   const [contactabilityStatus, setContactabilityStatus] = useState<
     PlanRecordFormInput["contactabilityStatus"]
   >(record?.contactabilityStatus ?? "contactable");
@@ -115,20 +124,25 @@ export function RecordForm({
   } | null>(null);
 
   const selectedPerson = people.find((person) => person.id === personId);
-  const isXeroLeave = isOneOf(recordType, xeroLeaveRecordTypes);
-  const isLocalOnly = isOneOf(recordType, localOnlyRecordTypes);
+  const isXeroLeave = isXeroLeaveSelection(intent, recordType);
   const showSubmitPath = isXeroLeave && hasActiveXeroConnection;
   const primaryLabel = primarySubmitLabel(showSubmitPath, mode);
+  const visibleRecordTypes = recordTypesForIntent(intent);
+  const recordTypeLabels = recordTypeLabelsForIntent(intent);
 
-  const dynamicPanel = useMemo(() => {
-    if (isLocalOnly) {
-      return "Saves as approved and appears on your calendar immediately.";
+  const dynamicPanel = useMemo(
+    () => dynamicPanelForIntent(intent, hasActiveXeroConnection),
+    [hasActiveXeroConnection, intent]
+  );
+
+  const setPlanIntent = (value: string) => {
+    if (value !== "leave" && value !== "availability") {
+      return;
     }
-    if (!hasActiveXeroConnection) {
-      return "Saves as approved. Xero is not connected, so this plan will not sync to payroll.";
-    }
-    return "Saves as draft. Next step: submit for approval.";
-  }, [hasActiveXeroConnection, isLocalOnly]);
+    const nextIntent = value;
+    setIntent(nextIntent);
+    setRecordType(firstRecordTypeForIntent(nextIntent));
+  };
 
   const submit = (formData: FormData, submitAfterSave: boolean) => {
     const input: PlanRecordFormInput = {
@@ -182,7 +196,7 @@ export function RecordForm({
   if (people.length === 0) {
     return (
       <div className="rounded-2xl bg-muted p-5 text-muted-foreground text-sm">
-        Add at least one person before creating records.
+        Add a person profile before creating leave or availability records.
       </div>
     );
   }
@@ -197,17 +211,51 @@ export function RecordForm({
         {isXeroLeave && hasActiveXeroConnection && (
           <p className="mt-2 font-medium text-foreground">
             {balanceAvailable === null
-              ? "Balance unavailable. Last sync: never."
-              : `Current balance: ${balanceAvailable} days.`}
+              ? "Balance has not synced yet. You can still save a draft before submitting."
+              : `Current Xero balance: ${balanceAvailable} days before this request.`}
           </p>
         )}
       </div>
 
       {error && (
         <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
-          {error}
+          We could not save this plan. {error}
         </div>
       )}
+
+      <Field label="Intent">
+        <ToggleGroup
+          aria-label="Plan intent"
+          className="grid w-full grid-cols-2"
+          onValueChange={setPlanIntent}
+          type="single"
+          value={intent}
+          variant="outline"
+        >
+          <ToggleGroupItem
+            className="justify-start rounded-xl px-4 py-3 text-left"
+            value="leave"
+          >
+            <span className="flex flex-col items-start gap-1">
+              <span>Leave</span>
+              <span className="font-normal text-current/75 text-xs">
+                Payroll leave sent to Xero
+              </span>
+            </span>
+          </ToggleGroupItem>
+          <ToggleGroupItem
+            className="justify-start rounded-xl px-4 py-3 text-left"
+            value="availability"
+          >
+            <span className="flex flex-col items-start gap-1">
+              <span>Availability</span>
+              <span className="font-normal text-current/75 text-xs">
+                Calendar-only work status
+              </span>
+            </span>
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </Field>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Person">
@@ -231,7 +279,7 @@ export function RecordForm({
           )}
         </Field>
 
-        <Field label="Plan type">
+        <Field label={recordTypeLabels.field}>
           <Select
             onValueChange={(value) =>
               setRecordType(value as PlanRecordFormInput["recordType"])
@@ -243,16 +291,8 @@ export function RecordForm({
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectLabel>Leave types</SelectLabel>
-                {xeroLeaveRecordTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {labelForType(type)}: {recordTypeDescriptions[type]}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-              <SelectGroup>
-                <SelectLabel>Availability</SelectLabel>
-                {localOnlyRecordTypes.map((type) => (
+                <SelectLabel>{recordTypeLabels.group}</SelectLabel>
+                {visibleRecordTypes.map((type) => (
                   <SelectItem key={type} value={type}>
                     {labelForType(type)}: {recordTypeDescriptions[type]}
                   </SelectItem>
@@ -381,12 +421,11 @@ export function RecordForm({
 
       {confirmationRecord && (
         <SubmitConfirmationModal
-          inline
           mode="submit"
           onClose={() => setConfirmationRecord(null)}
           onSuccess={() => {
             setConfirmationRecord(null);
-            toast.success("Leave submitted for approval.");
+            toast.success("Leave sent to Xero for approval.");
             router.push(closeHref);
             router.refresh();
           }}
@@ -427,11 +466,63 @@ function labelForType(recordType: string): string {
     .join(" ");
 }
 
+function isXeroLeaveSelection(
+  intent: PlanIntent,
+  recordType: PlanRecordFormInput["recordType"]
+): boolean {
+  return intent === "leave" && isOneOf(recordType, xeroLeaveRecordTypes);
+}
+
+function recordTypesForIntent(
+  intent: PlanIntent
+): readonly PlanRecordFormInput["recordType"][] {
+  if (intent === "leave") {
+    return xeroLeaveRecordTypes;
+  }
+  return localOnlyRecordTypes;
+}
+
+function firstRecordTypeForIntent(
+  intent: PlanIntent
+): PlanRecordFormInput["recordType"] {
+  if (intent === "leave") {
+    return xeroLeaveRecordTypes[0];
+  }
+  return localOnlyRecordTypes[0];
+}
+
+function recordTypeLabelsForIntent(intent: PlanIntent): {
+  field: string;
+  group: string;
+} {
+  if (intent === "leave") {
+    return { field: "Leave type", group: "Leave types" };
+  }
+  return { field: "Availability type", group: "Availability" };
+}
+
+function dynamicPanelForIntent(
+  intent: PlanIntent,
+  hasActiveXeroConnection: boolean
+): string {
+  if (intent === "availability") {
+    return "Saves immediately in Team Calendar. It appears on calendars and feeds without approval or Xero sync.";
+  }
+  if (!hasActiveXeroConnection) {
+    return "Saves as approved in Team Calendar only. It appears on calendars, but it will not create payroll leave or go to Xero for approval.";
+  }
+  return "Saves as a draft first. Use Save and submit when you are ready to send it to Xero for manager approval.";
+}
+
 function isOneOf<T extends string>(
   value: string,
   values: readonly T[]
 ): value is T {
   return values.some((candidate) => candidate === value);
+}
+
+function intentForRecordType(recordType: string): PlanIntent {
+  return isOneOf(recordType, localOnlyRecordTypes) ? "availability" : "leave";
 }
 
 function isUnchanged(

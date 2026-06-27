@@ -39,8 +39,8 @@ export function OrgXeroSyncFailedCard({
           title="No failed records"
         />
       ) : (
-        <div className="space-y-2 text-sm">
-          <p className="font-semibold text-2xl">{state.data.count}</p>
+        <div className="space-y-2 text-body-sm">
+          <p className="font-semibold text-headline-md">{state.data.count}</p>
           <p className="text-muted-foreground">
             Submit {state.data.byFailedAction.submit}, approve{" "}
             {state.data.byFailedAction.approve}, decline{" "}

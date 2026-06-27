@@ -18,7 +18,7 @@ import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
-import { PlansFilterSchema } from "./_schemas";
+import { type PlansFilterInput, PlansFilterSchema } from "./_schemas";
 import { PlansClient, type PlansClientRecord } from "./plans-client";
 
 export const metadata: Metadata = {
@@ -134,7 +134,10 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       <>
         <Header page="Plans" />
         <main className="flex flex-1 flex-col p-6 pt-0">
-          <FetchErrorState entityName="plans" />
+          <FetchErrorState
+            description="We could not load leave and availability records. Reload the page, then check the Xero connection if leave records still look out of date."
+            entityName="plans"
+          />
         </main>
       </>
     );
@@ -167,16 +170,16 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           <div className="rounded-2xl bg-muted p-5 text-muted-foreground text-sm">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <p>
-                Xero is not connected. Leave records will save locally only.
-                Connect Xero from the integrations settings to enable submission
-                for approval.
+                Xero is not connected. Leave saves in Team Calendar only, so it
+                appears on calendars but does not create payroll leave or enter
+                the Xero approval queue.
               </p>
               {isAdminOrOwner(orgRole) && (
                 <a
                   className="font-medium text-primary"
                   href={withOrg("/settings/integrations/xero", orgQueryValue)}
                 >
-                  Connect Xero
+                  Connect Xero to submit leave
                 </a>
               )}
             </div>
@@ -194,8 +197,19 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
 
         {records.length === 0 && (
           <EmptyState
-            description="No plans match the current filters."
-            title="No plans found"
+            actionSlot={
+              filtersAreDefault(filters) ? (
+                <Button asChild>
+                  <Link href={withOrg("/plans/new", orgQueryValue)}>
+                    Create a plan
+                  </Link>
+                </Button>
+              ) : undefined
+            }
+            description={emptyStateDescription(filters)}
+            title={
+              filtersAreDefault(filters) ? "No plans yet" : "No matching plans"
+            }
           />
         )}
       </main>
@@ -234,4 +248,25 @@ function isManagerOrAbove(role: string | null | undefined): boolean {
 
 function isAdminOrOwner(role: string | null | undefined): boolean {
   return role === "org:admin" || role === "org:owner";
+}
+
+function filtersAreDefault(filters: PlansFilterInput): boolean {
+  return (
+    filters.tab === "my" &&
+    filters.recordTypeCategory === "all" &&
+    filters.includeArchived === false &&
+    !filters.approvalStatus &&
+    !filters.dateFrom &&
+    !filters.dateTo &&
+    !filters.personId &&
+    !filters.recordType &&
+    !filters.sourceType
+  );
+}
+
+function emptyStateDescription(filters: PlansFilterInput): string {
+  if (filtersAreDefault(filters)) {
+    return "Create leave or availability so calendars, feeds, and approval queues have something to track.";
+  }
+  return "Change the filters or clear the date and status selections to see more leave and availability records.";
 }

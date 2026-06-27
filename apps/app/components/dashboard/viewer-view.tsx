@@ -7,7 +7,6 @@ export function ViewerView() {
         name="Welcome"
         roleLabel="Viewer"
         subtitle="Your account does not have a person profile in this organisation yet. Contact the account owner if this looks wrong."
-        xeroConnected={false}
       />
     </div>
   );

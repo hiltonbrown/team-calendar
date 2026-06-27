@@ -8,6 +8,8 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SubmitConfirmationModal } from "./submit-confirmation-modal";
 
+const APPROVAL_QUEUE_COPY = /puts it in the manager approval queue/;
+
 const mocks = vi.hoisted(() => ({
   retrySubmissionAction: vi.fn(),
   revertToDraftAction: vi.fn(),
@@ -42,7 +44,6 @@ describe("SubmitConfirmationModal", () => {
   it("renders leave summary and balance impact", () => {
     render(
       <SubmitConfirmationModal
-        inline
         mode="submit"
         onClose={vi.fn()}
         onSuccess={vi.fn()}
@@ -50,6 +51,9 @@ describe("SubmitConfirmationModal", () => {
       />
     );
 
+    expect(
+      screen.getByRole("dialog", { name: "Send leave to Xero?" })
+    ).toBeDefined();
     expect(screen.getByText("Annual leave")).toBeDefined();
     expect(
       screen.getByText("9 December 2026 to 13 December 2026")
@@ -58,6 +62,25 @@ describe("SubmitConfirmationModal", () => {
     expect(
       screen.getByText("5 days remaining after this submission")
     ).toBeDefined();
+    expect(screen.getByText("Send leave to Xero?")).toBeDefined();
+    expect(screen.getByText(APPROVAL_QUEUE_COPY)).toBeDefined();
+  });
+
+  it("closes through the shared dialog close control", () => {
+    const onClose = vi.fn();
+
+    render(
+      <SubmitConfirmationModal
+        mode="submit"
+        onClose={onClose}
+        onSuccess={vi.fn()}
+        record={record}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("closes on successful submission", async () => {
@@ -73,7 +96,6 @@ describe("SubmitConfirmationModal", () => {
 
     render(
       <SubmitConfirmationModal
-        inline
         mode="submit"
         onClose={vi.fn()}
         onSuccess={onSuccess}
@@ -81,7 +103,7 @@ describe("SubmitConfirmationModal", () => {
       />
     );
 
-    fireEvent.click(screen.getByText("Confirm and submit"));
+    fireEvent.click(screen.getByText("Send to Xero"));
 
     await waitFor(() => expect(onSuccess).toHaveBeenCalled());
   });
@@ -98,7 +120,6 @@ describe("SubmitConfirmationModal", () => {
 
     render(
       <SubmitConfirmationModal
-        inline
         mode="submit"
         onClose={vi.fn()}
         onSuccess={vi.fn()}
@@ -106,11 +127,11 @@ describe("SubmitConfirmationModal", () => {
       />
     );
 
-    fireEvent.click(screen.getByText("Confirm and submit"));
+    fireEvent.click(screen.getByText("Send to Xero"));
 
     await screen.findByText("This leave overlaps an existing record in Xero.");
     expect(screen.getByText("Try again")).toBeDefined();
-    expect(screen.getByText("Save as draft instead")).toBeDefined();
+    expect(screen.getByText("Revert to draft")).toBeDefined();
     expect(screen.queryByText("rawPayload")).toBeNull();
   });
 
@@ -135,7 +156,6 @@ describe("SubmitConfirmationModal", () => {
 
     render(
       <SubmitConfirmationModal
-        inline
         mode="submit"
         onClose={onClose}
         onSuccess={vi.fn()}
@@ -143,9 +163,9 @@ describe("SubmitConfirmationModal", () => {
       />
     );
 
-    fireEvent.click(screen.getByText("Confirm and submit"));
-    await screen.findByText("Save as draft instead");
-    fireEvent.click(screen.getByText("Save as draft instead"));
+    fireEvent.click(screen.getByText("Send to Xero"));
+    await screen.findByText("Revert to draft");
+    fireEvent.click(screen.getByText("Revert to draft"));
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
     expect(mocks.revertToDraftAction).toHaveBeenCalledWith({

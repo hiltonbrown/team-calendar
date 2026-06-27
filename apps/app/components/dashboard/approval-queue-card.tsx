@@ -2,6 +2,7 @@ import type { ManagerDashboardView } from "@repo/availability";
 import { EmptyState } from "@/components/states/empty-state";
 import { DashboardCardError, DashboardCardShell } from "./dashboard-card-shell";
 import { formatDate } from "./dashboard-format";
+import { MetricTile } from "./metric-tile";
 
 interface ApprovalQueueCardProps {
   orgQueryValue: string | null;
@@ -42,16 +43,14 @@ export function ApprovalQueueCard({
           title="Queue is clear"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-muted-foreground">Pending</p>
-              <p className="font-semibold text-xl">{state.data.pendingCount}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Failed</p>
-              <p className="font-semibold text-xl">{state.data.failedCount}</p>
-            </div>
+            <MetricTile label="Pending" value={state.data.pendingCount} />
+            <MetricTile
+              label="Failed"
+              tone={state.data.failedCount > 0 ? "danger" : "neutral"}
+              value={state.data.failedCount}
+            />
           </div>
           {state.data.mostRecent.map((record) => (
             <div key={record.recordId}>

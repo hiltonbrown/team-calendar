@@ -37,6 +37,7 @@
   --destructive: #ba1a1a;
   --destructive-foreground: #ffffff;
   --error-container: #ffdad6;
+  --on-error-container: #410002;
   --success: #6da671;
   --surface-container-lowest: #ffffff;
   --surface-container-low: #f6f1ff;
@@ -96,6 +97,7 @@
   --destructive: #ffb4ab;
   --destructive-foreground: #690005;
   --error-container: #93000a;
+  --on-error-container: #ffdad6;
   --success: #8fd496;
   --surface-container-lowest: #0e0d13;
   --surface-container-low: #1c1b22;
@@ -146,6 +148,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
   --color-error-container: var(--error-container);
+  --color-on-error-container: var(--on-error-container);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-accent-container: var(--accent-container);

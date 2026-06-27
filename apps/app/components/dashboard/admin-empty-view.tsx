@@ -20,7 +20,6 @@ export function AdminEmptyView({
         name="Welcome"
         roleLabel={roleLabel}
         subtitle="Your dashboard is ready. Add people manually, connect Xero, or create calendar feeds when you need them."
-        xeroConnected={hasActiveXeroConnection}
       />
 
       {hasActiveXeroConnection ? null : (
@@ -38,7 +37,7 @@ export function AdminEmptyView({
           orgQueryValue={orgQueryValue}
           title="People"
         >
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             People and their availability will appear here once they are added
             to this organisation.
           </p>
@@ -50,7 +49,7 @@ export function AdminEmptyView({
           orgQueryValue={orgQueryValue}
           title="Calendar"
         >
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             The calendar is available now and will fill as records are created
             or synced.
           </p>
@@ -62,7 +61,7 @@ export function AdminEmptyView({
           orgQueryValue={orgQueryValue}
           title="Feeds"
         >
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             Create a feed when you are ready to share availability with Google
             Calendar, Outlook, or Apple Calendar.
           </p>

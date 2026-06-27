@@ -1,3 +1,55 @@
+# Plan: Distil Calendar Scan Area
+
+## Plan
+
+- [x] **Step 1: Reduce Scan Area Density**
+  - [x] Retain the Today in view panel.
+  - [x] Remove the separate status legend from the primary scan area.
+  - [x] Keep Today copy direct and manager-scannable.
+- [x] **Step 2: Quiet Timeline**
+  - [x] Retain coverage rail and people lanes.
+  - [x] Remove non-essential summary pills and repeated labels.
+  - [x] Keep exception signals such as Xero sync issues and hidden people.
+- [x] **Step 3: Verification**
+  - [x] Update focused calendar tests.
+  - [x] Run targeted calendar tests, typecheck, lint/check, and route smoke where practical.
+
+## Review
+
+- Removed the separate status legend from `CalendarScanPanel`, leaving the scan area focused on the Today in view panel.
+- Updated the Today empty copy to "No one needs attention today" when the selected scan day is today.
+- Quieted `CalendarTimeline` by removing routine "affected" and "busiest" summary pills while keeping Xero sync issue and hidden-people exception signals.
+- Updated timeline tests to assert that coverage and person lanes remain while non-essential summary copy is absent.
+- Verification passed: calendar component/page Vitest suite, `apps/app` typecheck, `bun run check`, `git diff --check`, and the live `/calendar` signed-out redirect smoke check.
+
+# Plan: Overdrive Calendar Timeline
+
+## Plan
+
+- [x] **Step 1: Calendar Timeline Shape**
+  - [x] Combine the selected coverage rail and people timeline directions into one product-appropriate calendar module.
+  - [x] Keep the interaction model scannable for managers: range pressure first, person lanes second.
+- [x] **Step 2: Implementation**
+  - [x] Add a reusable calendar timeline component using existing `CalendarRange` data.
+  - [x] Integrate the timeline into `apps/app/app/(authenticated)/calendar/page.tsx` without changing calendar data loading.
+  - [x] Preserve token-based colour usage, 16px radius, Australian English, and reduced-motion support.
+- [x] **Step 3: Verification**
+  - [x] Add focused rendering tests for the timeline.
+  - [x] Run targeted Vitest coverage for calendar components.
+  - [x] Run relevant lint/type/check commands where practical.
+  - [x] Perform a local visual smoke check if the app can start in this environment.
+
+## Review
+
+- Added `CalendarTimeline`, combining a daily coverage rail with compact person lanes derived from the existing `CalendarRange` projection.
+- The coverage rail links each day into day view and surfaces affected people, busiest day, public holidays, and Xero sync failures.
+- The person timeline groups records by person, assigns overlap-safe lanes, preserves event popovers, and caps the compact view at 10 people with a hidden-count summary.
+- Integrated the timeline into the authenticated calendar page after the scan panel and before the existing calendar grid.
+- Added focused timeline tests for range coverage, person lanes, compact lane capping, and the empty range state.
+- Verification passed: scoped Ultracite check, full `bun run check`, calendar component/page Vitest suite, `apps/app` typecheck, and `git diff --check`.
+- Local smoke check against the existing app server on port 3000 returned the expected Clerk signed-out redirect for `/calendar`.
+- Browser screenshot automation was not available in this workspace, so visual verification was limited to rendered component tests and the live route smoke check.
+
 # Plan: Rebrand LeaveSync to Team Calendar
 
 ## Plan
@@ -220,37 +272,131 @@
 - [x] Run targeted tests, typecheck, and repo checks where feasible.
 - [x] Document verification and results in this review section.
 
+# Plan: Critique Plans UI
+
+## Plan
+
+- [x] Resolve the concrete plans route files and read the relevant UI implementation.
+- [x] Run the impeccable deterministic detector for the plans surface.
+- [x] Review the plans list, create, edit, modal, loading, empty, and error behaviours against PRODUCT.md, DESIGN.md, and the product register.
+- [x] Persist the critique snapshot under `.impeccable/critique`.
+- [x] Document the critique result and run notes.
+
 ## Review
 
-- Added shared availability scan/status components in
-  `apps/app/components/availability/` and reused the scan surface from both the
-  manager dashboard and calendar.
-- Extended `ManagerDashboardView.teamToday` with `peopleNeedingAttention`
-  rows, sorted by operational urgency, while retaining existing count metrics.
-- Updated the calendar with a today/selected-day scan panel, status legend,
-  active filter chips, clearer "Add leave or availability" copy, and a
-  horizontally resilient week grid.
-- Tokenised app status treatments for calendar chips/holidays, Xero sync
-  failures, feed statuses, people status chips, provider connection badges, and
-  sync run badges.
-- Replaced the side-stripe Xero sync failure alert with a full tokenised error
-  surface.
-- Hardened generic loading and fetch-error states with a dashboard skeleton and
-  clearer recovery copy.
-- Cleaned user-facing copy for manual availability, calendar empty states,
-  feeds, and disconnected-Xero guidance.
-- Scoped Biome check on touched files exits 0:
-  `bunx biome check --write ...`.
-- App tests pass from `apps/app`: 6 files, 10 tests.
-- Dashboard service test passes: 1 file, 9 tests.
-- `cd apps/app && bun run typecheck` exits 0.
-- `bunx tsc --noEmit -p packages/availability/tsconfig.json` exits 0.
-- `bun run check` exits 1 on unrelated existing `apps/web/app/styles/home.css`
-  formatting/property-order issues. The app/availability files touched in this
-  pass are covered by the scoped Biome check above.
-- `cd apps/app && bun run dev` was started as a smoke check, but after 60
-  seconds it had not emitted a ready line and `curl -I http://localhost:3000`
-  could not connect. The dev process was stopped.
+- Used `$impeccable critique` against `apps/app/app/(authenticated)/plans`.
+- Detector returned 0 findings for the route directory.
+- Manual design assessment scored the plans surface 22/40 with 0 P0 and 3 P1 issues.
+- Main critique: no obvious visual slop, but the product workflow feels scaffolded because status semantics, row actions, and leave-vs-availability intent are not structurally clear enough for a payroll-adjacent flow.
+- Persisted the snapshot to `.impeccable/critique/2026-06-27T00-35-57Z__apps-app-app-authenticated-plans.md`.
+
+# Plan: Colorize Plans Status Vocabulary
+
+## Plan
+
+- [x] Define a restrained, token-based plans status vocabulary for draft, pending, approved, declined, withdrawn, archived, and Xero sync failed.
+- [x] Apply the vocabulary to status badges, source chips, row treatments, and a compact status legend/summary on the plans table.
+- [x] Add focused tests for status labels and scanability cues.
+- [x] Run targeted plans tests and relevant checks.
+- [x] Document verification and results.
+
+## Review
+
+- Added `apps/app/app/(authenticated)/plans/_status.ts` with a plans-specific status vocabulary that maps `submitted` to `Pending`, uses sage for approved, lavender for pending, red container for declined/Xero failures, and muted treatments for draft/withdrawn/archived.
+- Updated the plans table to use status badges with icons, source chips for Leave vs Availability, row tints for attention states, and a compact current-view status summary for manager scanning.
+- Added `_status.test.ts` for vocabulary mapping and extended `page.test.tsx` to verify visible status labels and current-view counts.
+- Verification passed: scoped Biome check, focused plans Vitest suite, `apps/app` typecheck, and impeccable detector.
+- Attempted to start an alternate dev server on port 3012, but Next reported an existing app dev server on port 3000. Verified the existing server responds with the expected unauthenticated redirect.
+
+# Plan: Distill Plans Action Queue
+
+## Plan
+
+- [x] Define action priority so each row exposes one primary next action and hides secondary actions behind a menu.
+- [x] Remove the disabled `View` affordance from rendered row actions.
+- [x] Strengthen pending and failed rows with concise action guidance.
+- [x] Add focused tests for primary action selection, overflow actions, and no disabled `View`.
+- [x] Run scoped formatting, targeted tests, typecheck, and detector.
+
+## Review
+
+- Replaced the visible row action pile-up with a single primary next action plus a `More actions` dropdown for secondary actions.
+- Removed the disabled `View` affordance from rendered row actions until a real view state exists.
+- Added concise status cues under attention states: pending rows show "Awaiting approval", declined rows show "Needs correction", and Xero sync failures show "Retry or revert".
+- Extended the plans client tests to cover primary action selection, overflow actions, and absence of disabled `View`.
+- Verification passed: scoped Biome check, focused plans Vitest suite, `apps/app` typecheck, and impeccable detector.
+
+# Plan: Shape Plans Form Intent
+
+## Plan
+
+- [x] Add an intent-first segmented control for Leave vs Availability in the plans form.
+- [x] Filter plan type options by intent and reset the record type when intent changes.
+- [x] Keep consequence copy, balance visibility, and submit buttons aligned to the selected intent and Xero connection state.
+- [x] Add focused tests for default leave intent, switching to availability, and local availability edit defaults.
+- [x] Run scoped formatting, targeted tests, typecheck, and detector.
+
+## Review
+
+- Added an intent-first Leave vs Availability segmented control to the plans form.
+- Filtered plan type choices by intent, with intent changes resetting the selected type to the first valid option for that intent.
+- Kept the consequence panel, balance visibility, and submit action set aligned to the selected intent and Xero connection state.
+- Extended the modal form tests for default leave intent, switching to availability, and availability edit defaults.
+- Verification passed: scoped Biome check, focused modal form Vitest suite, full scoped plans Vitest suite, `apps/app` typecheck, and impeccable detector.
+
+# Plan: Clarify Plans Consequence Copy
+
+## Plan
+
+- [x] Tighten Xero disconnected copy on the plans page, table footer, and leave form.
+- [x] Clarify balance copy so unavailable and remaining-balance states explain the consequence.
+- [x] Clarify submit, retry, revert, empty-state, and recovery messages across plans.
+- [x] Update focused tests for the revised copy.
+- [x] Run scoped formatting, plans tests, app typecheck, and detector.
+
+## Review
+
+- Rewrote the plans page disconnected-Xero banner to say leave saves in Team Calendar only, appears on calendars, and does not create payroll leave or enter the Xero approval queue.
+- Updated the plans empty state, plans fetch recovery copy, table introduction, pending/declined/Xero-failed row cues, balance text, and disconnected footer.
+- Updated the form consequence panel, intent helper text, balance copy, save error prefix, and no-people empty state.
+- Updated submit/retry confirmation copy so users see the Xero handoff, manager approval consequence, retry outcome, and draft recovery path before acting.
+- Verification passed: scoped Biome check, full scoped plans Vitest suite, submit confirmation and fetch error state tests, and impeccable detector.
+- `cd apps/app && bun run typecheck` is blocked by unrelated existing unauthenticated route moves: generated `.next/types` and `apps/app/__tests__/sign-in.test.tsx` / `sign-up.test.tsx` still reference `app/(unauthenticated)/sign-in` and `sign-up`, while the worktree has those pages under `app/(unauthenticated)/(auth)/...`.
+
+# Plan: Harden Plans Confirmation Dialogs
+
+## Plan
+
+- [x] Replace the submit confirmation inline overlay with the shared dialog system.
+- [x] Replace the plans revert/withdraw fixed overlay with the shared alert dialog system.
+- [x] Preserve existing submit, retry, revert, and withdraw behaviour while improving focus trapping and close semantics.
+- [x] Add focused tests for dialog roles, accessible names, and confirmation controls.
+- [x] Run scoped formatting, targeted tests, plans tests, typecheck where possible, and detector.
+
+## Review
+
+- Replaced the custom inline submit confirmation overlay in `SubmitConfirmationModal` with a controlled shared `Dialog`, including `DialogTitle`, `DialogDescription`, close handling, and disabled-close behaviour while pending.
+- Replaced the custom fixed revert/withdraw overlay in the plans table with a controlled shared `AlertDialog`, including labelled title, description, cancel action, and confirm action.
+- Added tests for the submit dialog role/name, shared close control, alert dialog role/name, focused cancel action, and cancel dismissal.
+- Verification passed: scoped Biome check, full scoped plans plus submit confirmation Vitest suite, impeccable detector, `next typegen`, and `cd apps/app && bun run typecheck`.
+
+# Plan: Polish Plans Surface
+
+## Plan
+
+- [x] Review the latest plans critique snapshot and current plans implementation against product/design-system guidance.
+- [x] Remove stale confirmation dialog API and polish async confirmation behaviour.
+- [x] Tighten final accessibility and responsive table details.
+- [x] Run scoped formatting, plans tests, typecheck, detector, and diff checks.
+
+## Review
+
+- Reviewed critique snapshot `.impeccable/critique/2026-06-27T00-35-57Z__apps-app-app-authenticated-plans.md`, which had 0 P0 and 3 P1 issues. The status, action queue, form IA, consequence copy, and dialog-pattern issues have now been addressed by the recent passes.
+- Removed the obsolete `inline` prop from `SubmitConfirmationModal` and its callers/tests now that submit confirmation always uses the shared `Dialog`.
+- Prevented `AlertDialogAction` from auto-closing the revert/withdraw confirmation before the async record action runs to completion.
+- Removed the table wrapper clipping so the shared table component can provide horizontal scrolling on narrow viewports.
+- Marked row-level action errors with `role="alert"` so async failures are announced.
+- Verification passed: scoped Biome check, full scoped plans plus submit confirmation Vitest suite, `cd apps/app && bun run typecheck`, impeccable detector, and `git diff --check`.
 
 # Plan: Critique apps/app/app Product UI
 

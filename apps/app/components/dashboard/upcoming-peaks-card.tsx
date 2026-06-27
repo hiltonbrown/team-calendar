@@ -40,7 +40,7 @@ export function UpcomingPeaksCard({
           title="No peaks"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           {state.data.peaks.map((peak) => (
             <div key={peak.date.toISOString()}>
               <p className="font-medium">

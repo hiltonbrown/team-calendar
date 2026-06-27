@@ -2,6 +2,7 @@ import type { AdminDashboardView } from "@repo/availability";
 import { EmptyState } from "@/components/states/empty-state";
 import { DashboardCardError, DashboardCardShell } from "./dashboard-card-shell";
 import { formatDateTime } from "./dashboard-format";
+import { MetricTile } from "./metric-tile";
 
 interface SyncHealthCardProps {
   orgQueryValue: string | null;
@@ -32,23 +33,32 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
       title="Sync health"
     >
       {state.data.hasActiveXeroConnection ? (
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <Metric label="Tenants" value={state.data.tenantCount} />
-          <Metric label="Active" value={state.data.activeTenantCount} />
-          <Metric label="Runs 24h" value={state.data.runsLast24h} />
-          <Metric label="Failed 24h" value={state.data.failedRunsLast24h} />
-          <Metric
+        <div className="grid grid-cols-2 gap-3 text-body-sm">
+          <MetricTile label="Tenants" value={state.data.tenantCount} />
+          <MetricTile
+            label="Active"
+            tone={state.data.activeTenantCount > 0 ? "positive" : "neutral"}
+            value={state.data.activeTenantCount}
+          />
+          <MetricTile label="Runs 24h" value={state.data.runsLast24h} />
+          <MetricTile
+            label="Failed 24h"
+            tone={state.data.failedRunsLast24h > 0 ? "danger" : "neutral"}
+            value={state.data.failedRunsLast24h}
+          />
+          <MetricTile
             label="Failed records"
+            tone={state.data.pendingFailedRecords > 0 ? "danger" : "neutral"}
             value={state.data.pendingFailedRecords}
           />
-          <div className="rounded-xl bg-muted p-3">
-            <p className="text-muted-foreground text-xs">Last success</p>
-            <p className="font-medium">
-              {state.data.lastSuccessfulSync
+          <MetricTile
+            label="Last success"
+            value={
+              state.data.lastSuccessfulSync
                 ? formatDateTime(state.data.lastSuccessfulSync)
-                : "Never"}
-            </p>
-          </div>
+                : "Never"
+            }
+          />
         </div>
       ) : (
         <EmptyState
@@ -57,14 +67,5 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
         />
       )}
     </DashboardCardShell>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-muted p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="font-semibold text-lg">{value}</p>
-    </div>
   );
 }

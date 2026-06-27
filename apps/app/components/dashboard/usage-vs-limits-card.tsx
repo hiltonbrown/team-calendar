@@ -26,7 +26,7 @@ export function UsageVsLimitsCard({
       {state.status === "error" ? (
         <DashboardCardError entityName="billing" />
       ) : (
-        <div className="space-y-4 text-sm">
+        <div className="space-y-4 text-body-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-semibold">{state.data.plan.label}</p>
@@ -51,8 +51,10 @@ export function UsageVsLimitsCard({
               {metric.percentage === null ? null : (
                 <div className="h-2 rounded-full bg-muted">
                   <div
-                    className="h-2 rounded-full bg-primary"
-                    style={{ width: `${metric.percentage}%` }}
+                    className={`h-2 rounded-full ${
+                      metric.percentage >= 90 ? "bg-destructive" : "bg-primary"
+                    }`}
+                    style={{ width: `${Math.min(100, metric.percentage)}%` }}
                   />
                 </div>
               )}

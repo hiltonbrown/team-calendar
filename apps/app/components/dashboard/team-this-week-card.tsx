@@ -44,7 +44,7 @@ export function TeamThisWeekCard({
           title="Quiet week"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           <p className="font-medium">
             {state.data.peopleWithLeaveCount} people with leave this week
           </p>

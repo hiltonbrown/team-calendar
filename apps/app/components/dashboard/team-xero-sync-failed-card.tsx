@@ -39,7 +39,7 @@ export function TeamXeroSyncFailedCard({
           title="No failed records"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           <p className="font-medium">{state.data.count} failed records</p>
           {state.data.recentRecords.map((record) => (
             <div key={record.recordId}>

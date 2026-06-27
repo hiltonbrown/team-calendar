@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarScanPanel } from "@/components/calendar/calendar-scan-panel";
+import { CalendarTimeline } from "@/components/calendar/calendar-timeline";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { CalendarWeekView } from "@/components/calendar/calendar-week-view";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -165,6 +166,11 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         />
 
         <CalendarScanPanel
+          data={dataResult.value}
+          orgQueryValue={orgQueryValue}
+        />
+
+        <CalendarTimeline
           data={dataResult.value}
           orgQueryValue={orgQueryValue}
         />

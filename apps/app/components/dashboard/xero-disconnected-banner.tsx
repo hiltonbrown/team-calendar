@@ -11,7 +11,7 @@ export function XeroDisconnectedBanner({
   orgQueryValue,
 }: XeroDisconnectedBannerProps) {
   return (
-    <div className="rounded-2xl bg-muted px-5 py-4 text-muted-foreground text-sm">
+    <div className="rounded-2xl bg-muted px-5 py-4 text-body-sm text-muted-foreground">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p>
           Xero is not connected. Team Calendar works without Xero, and leave

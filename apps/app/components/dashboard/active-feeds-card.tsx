@@ -42,8 +42,10 @@ export function ActiveFeedsCard({
           title="No feeds"
         />
       ) : (
-        <div className="space-y-2 text-sm">
-          <p className="font-semibold text-2xl">{state.data.activeCount}</p>
+        <div className="space-y-2 text-body-sm">
+          <p className="font-semibold text-headline-md">
+            {state.data.activeCount}
+          </p>
           <p className="text-muted-foreground">
             {state.data.pausedCount} paused
           </p>

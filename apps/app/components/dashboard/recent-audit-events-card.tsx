@@ -40,7 +40,7 @@ export function RecentAuditEventsCard({
           title="No events"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           {state.data.events.map((event) => (
             <div key={event.id}>
               <p className="font-medium">{event.action}</p>

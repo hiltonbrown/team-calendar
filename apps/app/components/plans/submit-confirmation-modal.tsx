@@ -1,6 +1,14 @@
 "use client";
 
 import { Button } from "@repo/design-system/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@repo/design-system/components/ui/dialog";
 import { Loader2Icon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -8,7 +16,6 @@ import {
   revertToDraftAction,
   submitForApprovalAction,
 } from "@/app/(authenticated)/plans/_actions";
-import { InterceptingModalShell } from "@/components/modals/intercepting-modal-shell";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 
 interface SubmitConfirmationRecord {
@@ -22,7 +29,6 @@ interface SubmitConfirmationRecord {
 }
 
 interface SubmitConfirmationModalProps {
-  inline?: boolean;
   mode: "retry" | "submit";
   onClose: () => void;
   onSuccess: () => void;
@@ -39,7 +45,6 @@ const recordTypeLabels: Record<string, string> = {
 };
 
 export function SubmitConfirmationModal({
-  inline = false,
   mode,
   onClose,
   onSuccess,
@@ -47,7 +52,18 @@ export function SubmitConfirmationModal({
 }: SubmitConfirmationModalProps) {
   const [isPending, setIsPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const title = mode === "retry" ? "Retry submission?" : "Submit for approval?";
+  const title =
+    mode === "retry" ? "Retry Xero submission?" : "Send leave to Xero?";
+  const description =
+    mode === "retry"
+      ? "This will send the leave request to Xero again. If Xero accepts it, the request moves back into the manager approval queue."
+      : "This sends the leave request to Xero Payroll and puts it in the manager approval queue. It is not approved until Xero accepts it.";
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!(nextOpen || isPending)) {
+      onClose();
+    }
+  };
 
   const submit = async () => {
     setIsPending(true);
@@ -68,7 +84,7 @@ export function SubmitConfirmationModal({
       if (result.value.approvalStatus === "xero_sync_failed") {
         setMessage(
           result.value.xeroWriteError ??
-            "Something went wrong when sending this to Xero. Try again or contact support if the issue continues."
+            "We could not send this leave to Xero. Try again, or save it as a draft if you need to edit the dates or leave type."
         );
         return;
       }
@@ -118,10 +134,6 @@ export function SubmitConfirmationModal({
         </dl>
       </div>
 
-      <p className="text-muted-foreground text-sm">
-        This will send the record to Xero Payroll and notify your manager.
-      </p>
-
       {message && (
         <XeroSyncFailedState
           message={message}
@@ -143,13 +155,13 @@ export function SubmitConfirmationModal({
               type="button"
               variant="secondary"
             >
-              Save as draft instead
+              Revert to draft
             </Button>
           }
         />
       )}
 
-      <div className="flex justify-end gap-3">
+      <DialogFooter>
         <Button
           disabled={isPending}
           onClick={onClose}
@@ -160,27 +172,25 @@ export function SubmitConfirmationModal({
         </Button>
         <Button disabled={isPending} onClick={submit} type="button">
           {isPending && <Loader2Icon className="mr-2 size-4 animate-spin" />}
-          {mode === "retry" ? "Try again" : "Confirm and submit"}
+          {mode === "retry" ? "Retry Xero sync" : "Send to Xero"}
         </Button>
-      </div>
+      </DialogFooter>
     </div>
   );
 
-  if (inline) {
-    return (
-      <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-background/80 p-4 backdrop-blur-sm">
-        <section className="w-full max-w-[400px] rounded-2xl bg-background p-6 shadow-sm">
-          <h2 className="mb-4 font-semibold text-xl">{title}</h2>
-          {content}
-        </section>
-      </div>
-    );
-  }
-
   return (
-    <InterceptingModalShell onClose={onClose} size="narrow" title={title}>
-      {content}
-    </InterceptingModalShell>
+    <Dialog onOpenChange={handleOpenChange} open={true}>
+      <DialogContent
+        className="max-h-[92dvh] overflow-y-auto rounded-2xl sm:max-w-[400px]"
+        showCloseButton={!isPending}
+      >
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        {content}
+      </DialogContent>
+    </Dialog>
   );
 }
 

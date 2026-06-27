@@ -1,7 +1,23 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@repo/design-system/components/ui/alert-dialog";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@repo/design-system/components/ui/dropdown-menu";
 import { Input } from "@repo/design-system/components/ui/input";
 import { Label } from "@repo/design-system/components/ui/label";
 import {
@@ -20,7 +36,20 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/design-system/components/ui/table";
-import { AlertCircleIcon, PlusIcon } from "lucide-react";
+import {
+  AlertCircleIcon,
+  AlertTriangleIcon,
+  ArchiveIcon,
+  CheckCircle2Icon,
+  CircleDashedIcon,
+  Clock3Icon,
+  LeafIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  XCircleIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -38,6 +67,13 @@ import {
   withdrawSubmissionAction,
 } from "./_actions";
 import type { PlansFilterInput } from "./_schemas";
+import {
+  type PlanStatusTone,
+  planStatusForRecord,
+  planStatusLegend,
+  planStatusStyle,
+  planStatusToneForRecord,
+} from "./_status";
 
 type EditableAction =
   | "archive"
@@ -51,6 +87,7 @@ type EditableAction =
   | "withdraw";
 
 type RunnableAction = Exclude<EditableAction, "edit" | "view">;
+type RowAction = Exclude<EditableAction, "view">;
 
 interface BalanceChip {
   balanceAvailable: number | null;
@@ -102,6 +139,17 @@ const recordTypeLabels: Record<string, string> = {
   unpaid_leave: "Unpaid leave",
   wfh: "Working from home",
 };
+
+const primaryActionOrder: RowAction[] = [
+  "retry_submission",
+  "submit_for_approval",
+  "edit",
+  "restore",
+  "revert_to_draft",
+  "archive",
+  "withdraw",
+  "delete_draft",
+];
 
 export function PlansClient({
   canViewTeam,
@@ -179,8 +227,8 @@ export function PlansClient({
             Plans
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground text-sm">
-            Save leave and availability records before they appear in calendars,
-            feeds and dashboards.
+            Create leave requests and availability records, then track what
+            needs approval, Xero sync, or correction.
           </p>
         </div>
         <Button asChild>
@@ -207,6 +255,8 @@ export function PlansClient({
           </TabLink>
         )}
       </div>
+
+      {records.length > 0 && <StatusOverview records={records} />}
 
       <form
         className="grid gap-4 rounded-2xl bg-muted p-5 md:grid-cols-5"
@@ -264,7 +314,7 @@ export function PlansClient({
       </form>
 
       {records.length > 0 && (
-        <div className="overflow-hidden rounded-2xl bg-muted">
+        <div className="rounded-2xl bg-muted">
           <Table>
             <TableHeader>
               <TableRow>
@@ -278,135 +328,93 @@ export function PlansClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {records.map((record) => (
-                <TableRow key={record.id}>
-                  {filters.tab === "team" && (
-                    <TableCell>{record.personName}</TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span className="font-medium">
-                        {recordTypeLabels[record.recordType] ??
-                          record.recordType}
-                      </span>
-                      <Badge variant="secondary">
-                        {record.sourceType === "manual"
-                          ? "Availability"
-                          : "Leave"}
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {formatDateRange(record.startsAt, record.endsAt)}
-                  </TableCell>
-                  <TableCell>
-                    {record.workingDays === null
-                      ? (record.workingDaysError ?? "Unavailable")
-                      : `${record.workingDays} working days`}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge record={record} />
-                  </TableCell>
-                  <TableCell>{renderBalance(record)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {record.editableActions.map((action) => {
-                        if (action === "view") {
-                          return (
-                            <Button
-                              disabled
-                              key={action}
-                              size="sm"
-                              variant="ghost"
-                            >
-                              View
-                            </Button>
-                          );
-                        }
-                        if (action === "edit") {
-                          return (
-                            <Button
-                              asChild
-                              key={action}
-                              size="sm"
-                              variant="secondary"
-                            >
-                              <Link
-                                href={withOrg(
-                                  `/plans/${record.id}/edit`,
-                                  orgQueryValue
-                                )}
-                              >
-                                Edit
-                              </Link>
-                            </Button>
-                          );
-                        }
-                        return (
-                          <Button
-                            disabled={isPending}
-                            key={action}
-                            onClick={() => runAction(record.id, action)}
-                            size="sm"
-                            type="button"
-                            variant={
-                              action === "submit_for_approval"
-                                ? "secondary"
-                                : "ghost"
-                            }
-                          >
-                            {actionLabel(action)}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                    {inlineError[record.id] && (
-                      <div
-                        className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
-                      >
-                        <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-                        <span>{inlineError[record.id]}</span>
-                      </div>
+              {records.map((record) => {
+                const status = planStatusForRecord(record);
+                return (
+                  <TableRow className={status.rowClassName} key={record.id}>
+                    {filters.tab === "team" && (
+                      <TableCell>{record.personName}</TableCell>
                     )}
-                    {record.approvalStatus === "xero_sync_failed" &&
-                      record.xeroWriteError && (
-                        <div className="mt-3">
-                          <XeroSyncFailedState
-                            message={record.xeroWriteError}
-                            retrySlot={
-                              <Button
-                                disabled={isPending}
-                                onClick={() =>
-                                  setSubmissionModal({
-                                    mode: "retry",
-                                    record,
-                                  })
-                                }
-                                size="sm"
-                                type="button"
-                              >
-                                Retry
-                              </Button>
-                            }
-                            revertSlot={
-                              <Button
-                                disabled={isPending}
-                                onClick={() =>
-                                  runAction(record.id, "revert_to_draft")
-                                }
-                                size="sm"
-                                type="button"
-                                variant="secondary"
-                              >
-                                Revert to draft
-                              </Button>
-                            }
-                          />
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <span className="font-medium">
+                          {recordTypeLabels[record.recordType] ??
+                            record.recordType}
+                        </span>
+                        <SourceBadge sourceType={record.sourceType} />
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {formatDateRange(record.startsAt, record.endsAt)}
+                    </TableCell>
+                    <TableCell>
+                      {record.workingDays === null
+                        ? (record.workingDaysError ?? "Unavailable")
+                        : `${record.workingDays} working days`}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col items-start gap-1.5">
+                        <StatusBadge status={status} />
+                        <StatusCue status={status} />
+                      </div>
+                    </TableCell>
+                    <TableCell>{renderBalance(record)}</TableCell>
+                    <TableCell>
+                      <RowActions
+                        disabled={isPending}
+                        onRunAction={runAction}
+                        orgQueryValue={orgQueryValue}
+                        record={record}
+                      />
+                      {inlineError[record.id] && (
+                        <div
+                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
+                          role="alert"
+                        >
+                          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
+                          <span>{inlineError[record.id]}</span>
                         </div>
                       )}
-                  </TableCell>
-                </TableRow>
-              ))}
+                      {record.approvalStatus === "xero_sync_failed" &&
+                        record.xeroWriteError && (
+                          <div className="mt-3">
+                            <XeroSyncFailedState
+                              message={record.xeroWriteError}
+                              retrySlot={
+                                <Button
+                                  disabled={isPending}
+                                  onClick={() =>
+                                    setSubmissionModal({
+                                      mode: "retry",
+                                      record,
+                                    })
+                                  }
+                                  size="sm"
+                                  type="button"
+                                >
+                                  Retry
+                                </Button>
+                              }
+                              revertSlot={
+                                <Button
+                                  disabled={isPending}
+                                  onClick={() =>
+                                    runAction(record.id, "revert_to_draft")
+                                  }
+                                  size="sm"
+                                  type="button"
+                                  variant="secondary"
+                                >
+                                  Revert to draft
+                                </Button>
+                              }
+                            />
+                          </div>
+                        )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
@@ -414,7 +422,9 @@ export function PlansClient({
 
       {!hasActiveXeroConnection && (
         <p className="text-muted-foreground text-sm">
-          Leave records are saved as approved while Xero is disconnected.
+          Xero is disconnected, so new leave records save locally as approved
+          calendar entries. They will not be submitted to payroll until Xero is
+          connected.
         </p>
       )}
 
@@ -424,7 +434,7 @@ export function PlansClient({
           onClose={() => setSubmissionModal(null)}
           onSuccess={() => {
             setSubmissionModal(null);
-            toast.success("Leave submitted for approval.");
+            toast.success("Leave sent to Xero for approval.");
             router.refresh();
           }}
           record={{
@@ -492,17 +502,207 @@ function tabHref(tab: "my" | "team", orgQueryValue: string | null): string {
   return withOrg(`/plans?tab=${tab}`, orgQueryValue);
 }
 
-function StatusBadge({ record }: { record: PlansClientRecord }) {
-  let label = "Archived";
-  if (record.archivedAt === null) {
-    label =
-      record.approvalStatus === "xero_sync_failed"
-        ? "Xero sync failed"
-        : record.approvalStatus.charAt(0).toUpperCase() +
-          record.approvalStatus.slice(1).replaceAll("_", " ");
+function RowActions({
+  disabled,
+  onRunAction,
+  orgQueryValue,
+  record,
+}: {
+  disabled: boolean;
+  onRunAction: (recordId: string, action: RunnableAction) => void;
+  orgQueryValue: string | null;
+  record: PlansClientRecord;
+}) {
+  const actions = renderableActions(record.editableActions);
+  const primaryAction = primaryActionForRecord(actions);
+  const secondaryActions = actions.filter((action) => action !== primaryAction);
+
+  if (!primaryAction && secondaryActions.length === 0) {
+    return (
+      <p className="text-right text-muted-foreground text-sm">No action</p>
+    );
   }
 
-  return <Badge variant="secondary">{label}</Badge>;
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {primaryAction && (
+        <ActionButton
+          action={primaryAction}
+          disabled={disabled}
+          onRunAction={onRunAction}
+          orgQueryValue={orgQueryValue}
+          record={record}
+        />
+      )}
+      {secondaryActions.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              aria-label={`More actions for ${recordTypeLabel(record.recordType)}`}
+              disabled={disabled}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <MoreHorizontalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {secondaryActions.map((action) => (
+              <ActionMenuItem
+                action={action}
+                disabled={disabled}
+                key={action}
+                onRunAction={onRunAction}
+                orgQueryValue={orgQueryValue}
+                record={record}
+              />
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({
+  action,
+  disabled,
+  onRunAction,
+  orgQueryValue,
+  record,
+}: {
+  action: RowAction;
+  disabled: boolean;
+  onRunAction: (recordId: string, action: RunnableAction) => void;
+  orgQueryValue: string | null;
+  record: PlansClientRecord;
+}) {
+  if (action === "edit") {
+    return (
+      <Button asChild size="sm" variant="secondary">
+        <Link href={withOrg(`/plans/${record.id}/edit`, orgQueryValue)}>
+          Edit
+        </Link>
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      disabled={disabled}
+      onClick={() => onRunAction(record.id, action)}
+      size="sm"
+      type="button"
+      variant={buttonVariantForAction(action)}
+    >
+      {actionLabel(action)}
+    </Button>
+  );
+}
+
+function ActionMenuItem({
+  action,
+  disabled,
+  onRunAction,
+  orgQueryValue,
+  record,
+}: {
+  action: RowAction;
+  disabled: boolean;
+  onRunAction: (recordId: string, action: RunnableAction) => void;
+  orgQueryValue: string | null;
+  record: PlansClientRecord;
+}) {
+  if (action === "edit") {
+    return (
+      <DropdownMenuItem asChild>
+        <Link href={withOrg(`/plans/${record.id}/edit`, orgQueryValue)}>
+          Edit
+        </Link>
+      </DropdownMenuItem>
+    );
+  }
+
+  return (
+    <DropdownMenuItem
+      disabled={disabled}
+      onSelect={() => onRunAction(record.id, action)}
+      variant={isDestructiveAction(action) ? "destructive" : "default"}
+    >
+      {actionLabel(action)}
+    </DropdownMenuItem>
+  );
+}
+
+function StatusOverview({ records }: { records: PlansClientRecord[] }) {
+  const summary = planStatusLegend.map((item) => ({
+    ...item,
+    count: countRecordsForLegend(records, item.tone),
+    style: planStatusStyle(item.tone),
+  }));
+
+  return (
+    <div className="grid gap-3 md:grid-cols-4">
+      {summary.map((item) => (
+        <div
+          className={`rounded-2xl p-4 ${item.style.badgeClassName}`}
+          key={item.label}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 font-medium text-sm">
+              <span
+                aria-hidden="true"
+                className={`${item.style.dotClassName} size-2 rounded-full`}
+              />
+              {item.label}
+            </span>
+            <span className="font-semibold text-lg leading-none">
+              {item.count}
+            </span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed opacity-80">
+            {item.description}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SourceBadge({ sourceType }: { sourceType: string }) {
+  const isManual = sourceType === "manual";
+  return (
+    <Badge
+      className={
+        isManual
+          ? "border-transparent bg-accent-container text-on-accent-container ring-1 ring-on-accent-container/15"
+          : "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary/60"
+      }
+      variant="secondary"
+    >
+      {isManual ? (
+        <PencilIcon className="size-3" />
+      ) : (
+        <LeafIcon className="size-3" />
+      )}
+      {isManual ? "Availability" : "Leave"}
+    </Badge>
+  );
+}
+
+function StatusBadge({
+  status,
+}: {
+  status: ReturnType<typeof planStatusForRecord>;
+}) {
+  const Icon = iconForPlanStatus(status.tone);
+  return (
+    <Badge className={status.badgeClassName} variant="secondary">
+      <Icon className="size-3" />
+      {status.label}
+    </Badge>
+  );
 }
 
 function renderBalance(record: PlansClientRecord): string {
@@ -510,13 +710,27 @@ function renderBalance(record: PlansClientRecord): string {
     return "";
   }
   if (record.balanceChip.balanceAvailable === null) {
-    return "Balance unavailable";
+    return balanceUnavailableCopy(record.balanceChip.balanceUnavailableReason);
   }
   const remaining =
     record.workingDays === null
       ? record.balanceChip.balanceAvailable
       : record.balanceChip.balanceAvailable - record.workingDays;
-  return `${remaining} days remaining after this`;
+  return `${remaining} days left if approved`;
+}
+
+function balanceUnavailableCopy(
+  reason: BalanceChip["balanceUnavailableReason"]
+) {
+  switch (reason) {
+    case "local_only":
+    case "not_xero_leave":
+      return "No payroll balance needed";
+    case "not_synced":
+      return "Balance not synced yet";
+    default:
+      return "Balance not available";
+  }
 }
 
 function formatDateRange(startsAt: string, endsAt: string): string {
@@ -559,6 +773,105 @@ function actionLabel(action: EditableAction): string {
   }
 }
 
+function countRecordsForLegend(
+  records: PlansClientRecord[],
+  tone: PlanStatusTone
+): number {
+  return records.filter((record) => {
+    const recordTone = planStatusToneForRecord(record);
+    if (tone === "xero_sync_failed") {
+      return recordTone === "xero_sync_failed" || recordTone === "declined";
+    }
+    if (tone === "draft") {
+      return (
+        recordTone === "draft" ||
+        recordTone === "archived" ||
+        recordTone === "withdrawn"
+      );
+    }
+    return recordTone === tone;
+  }).length;
+}
+
+function iconForPlanStatus(tone: PlanStatusTone) {
+  switch (tone) {
+    case "approved":
+      return CheckCircle2Icon;
+    case "archived":
+      return ArchiveIcon;
+    case "declined":
+      return XCircleIcon;
+    case "pending":
+      return Clock3Icon;
+    case "withdrawn":
+      return RotateCcwIcon;
+    case "xero_sync_failed":
+      return AlertTriangleIcon;
+    default:
+      return CircleDashedIcon;
+  }
+}
+
+function StatusCue({
+  status,
+}: {
+  status: ReturnType<typeof planStatusForRecord>;
+}) {
+  const cue = statusCueForTone(status.tone);
+  if (!cue) {
+    return null;
+  }
+  return (
+    <span className="text-muted-foreground text-xs leading-tight">{cue}</span>
+  );
+}
+
+function statusCueForTone(tone: PlanStatusTone): string | null {
+  switch (tone) {
+    case "pending":
+      return "Sent to Xero, waiting on approval";
+    case "declined":
+      return "Declined in Xero, edit before retrying";
+    case "xero_sync_failed":
+      return "Xero did not accept it, retry or revert";
+    default:
+      return null;
+  }
+}
+
+function renderableActions(actions: EditableAction[]): RowAction[] {
+  return actions.filter((action): action is RowAction => action !== "view");
+}
+
+function primaryActionForRecord(actions: RowAction[]): RowAction | null {
+  for (const action of primaryActionOrder) {
+    if (actions.includes(action)) {
+      return action;
+    }
+  }
+  return actions[0] ?? null;
+}
+
+function isDestructiveAction(action: RowAction): boolean {
+  return action === "delete_draft" || action === "withdraw";
+}
+
+function buttonVariantForAction(
+  action: RowAction
+): "default" | "destructive" | "secondary" {
+  if (action === "retry_submission" || action === "submit_for_approval") {
+    return "default";
+  }
+  if (isDestructiveAction(action)) {
+    return "destructive";
+  }
+  return "secondary";
+}
+
+function recordTypeLabel(recordType: string): string {
+  return recordTypeLabels[recordType] ?? recordType;
+}
+
 function ConfirmActionDialog({
   action,
   disabled,
@@ -571,32 +884,47 @@ function ConfirmActionDialog({
   onConfirm: () => void;
 }) {
   const isWithdraw = action === "withdraw";
+  const title = isWithdraw ? "Withdraw submission?" : "Revert to draft?";
+  const description = isWithdraw
+    ? "This removes the pending request from Xero. Team Calendar will keep the local record as withdrawn."
+    : "This clears the failed Xero sync state and keeps the record editable. It will not be sent again until you submit.";
+  const cancelLabel = isWithdraw ? "Keep submitted" : "Keep failed state";
+  const confirmLabel = isWithdraw ? "Withdraw from Xero" : "Revert to draft";
+
+  const handleOpenChange = (open: boolean) => {
+    if (!(open || disabled)) {
+      onCancel();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-      <section className="w-full max-w-[400px] rounded-2xl bg-background p-6 shadow-sm">
-        <h2 className="font-semibold text-xl">
-          {isWithdraw ? "Withdraw submission?" : "Revert to draft?"}
-        </h2>
-        <p className="mt-3 text-muted-foreground text-sm">
-          {isWithdraw
-            ? "This will withdraw the submitted leave record in Xero."
-            : "This will clear the Xero sync error so you can edit before retrying."}
-        </p>
-        <div className="mt-5 flex justify-end gap-3">
-          <Button
+    <AlertDialog onOpenChange={handleOpenChange} open={true}>
+      <AlertDialogContent className="rounded-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={disabled}>
+            {cancelLabel}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            className={
+              isWithdraw
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : undefined
+            }
             disabled={disabled}
-            onClick={onCancel}
-            type="button"
-            variant="secondary"
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
           >
-            Cancel
-          </Button>
-          <Button disabled={disabled} onClick={onConfirm} type="button">
-            {isWithdraw ? "Withdraw" : "Revert to draft"}
-          </Button>
-        </div>
-      </section>
-    </div>
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

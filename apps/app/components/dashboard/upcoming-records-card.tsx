@@ -40,7 +40,7 @@ export function UpcomingRecordsCard({
           title="Nothing scheduled"
         />
       ) : (
-        <div className="space-y-3 text-sm">
+        <div className="space-y-3 text-body-sm">
           {state.data.next14Days.map((record) => (
             <div
               className="flex items-center justify-between gap-4"

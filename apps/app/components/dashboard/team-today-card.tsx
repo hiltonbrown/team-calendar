@@ -6,6 +6,7 @@ import {
 } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
 import { DashboardCardError, DashboardCardShell } from "./dashboard-card-shell";
+import { MetricTile } from "./metric-tile";
 
 interface TeamTodayCardProps {
   orgQueryValue: string | null;
@@ -35,20 +36,37 @@ export function TeamTodayCard({ state, orgQueryValue }: TeamTodayCardProps) {
             )}
             title="Needs attention today"
           />
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-            <Metric label="On leave" value={state.data.peopleOnLeaveCount} />
-            <Metric label="WFH" value={state.data.peopleWorkingFromHomeCount} />
-            <Metric
+          <div className="grid grid-cols-2 gap-2 text-body-sm sm:grid-cols-3">
+            <MetricTile
+              label="On leave"
+              value={state.data.peopleOnLeaveCount}
+            />
+            <MetricTile
+              label="WFH"
+              tone="info"
+              value={state.data.peopleWorkingFromHomeCount}
+            />
+            <MetricTile
               label="Travelling"
+              tone="info"
               value={state.data.peopleTravellingCount}
             />
-            <Metric
+            <MetricTile
               label="Other unavailable"
               value={state.data.peopleOtherOooCount}
             />
-            <Metric label="Available" value={state.data.peopleAvailableCount} />
-            <Metric
+            <MetricTile
+              label="Available"
+              tone="positive"
+              value={state.data.peopleAvailableCount}
+            />
+            <MetricTile
               label="Sync failed"
+              tone={
+                state.data.peopleWithXeroSyncFailedCount > 0
+                  ? "danger"
+                  : "neutral"
+              }
               value={state.data.peopleWithXeroSyncFailedCount}
             />
           </div>
@@ -86,13 +104,4 @@ function toScanItem(
       xeroSyncFailedCount: person.xeroSyncFailedCount,
     }),
   };
-}
-
-function Metric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-muted p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="font-semibold text-lg">{value}</p>
-    </div>
-  );
 }

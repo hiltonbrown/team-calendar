@@ -8,9 +8,11 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RecordForm } from "../../record-form";
 
-const WILL_NOT_SYNC_COPY = /will not sync to payroll/;
-const CURRENT_BALANCE_COPY = /Current balance/;
-const CALENDAR_IMMEDIATE_COPY = /appears on your calendar immediately/;
+const LOCAL_ONLY_COPY = /will not create payroll leave/;
+const CURRENT_BALANCE_COPY = /Current Xero balance/;
+const CALENDAR_IMMEDIATE_COPY = /appears on calendars and feeds/;
+const LEAVE_INTENT_NAME = /Leave/;
+const AVAILABILITY_INTENT_NAME = /Availability/;
 
 const mocks = vi.hoisted(() => ({
   createRecordAction: vi.fn(),
@@ -111,6 +113,12 @@ describe("new record modal form", () => {
       />
     );
 
+    expect(
+      screen
+        .getByRole("radio", { name: LEAVE_INTENT_NAME })
+        .getAttribute("data-state")
+    ).toBe("on");
+    expect(screen.getByText("Payroll leave sent to Xero")).toBeDefined();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDefined();
     expect(
       screen.getByRole("button", { name: "Save and submit" })
@@ -133,7 +141,39 @@ describe("new record modal form", () => {
 
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
-    expect(screen.getByText(WILL_NOT_SYNC_COPY)).toBeDefined();
+    expect(screen.getByText(LOCAL_ONLY_COPY)).toBeDefined();
+  });
+
+  it("switches from leave to availability intent", () => {
+    render(
+      <RecordForm
+        balanceAvailable={10}
+        canSelectPerson={false}
+        closeHref="/plans"
+        hasActiveXeroConnection={true}
+        mode="create"
+        organisationId="00000000-0000-4000-8000-000000000001"
+        people={people}
+        record={initialRecord}
+      />
+    );
+
+    fireEvent.click(
+      screen.getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
+    );
+
+    expect(
+      screen
+        .getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
+        .getAttribute("data-state")
+    ).toBe("on");
+    expect(screen.getByText(CALENDAR_IMMEDIATE_COPY)).toBeDefined();
+    expect(screen.queryByText(CURRENT_BALANCE_COPY)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save draft" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Save and submit" })
+    ).toBeNull();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
   });
 
   it("shows a single Save button and no balance panel for local-only records", () => {
@@ -150,6 +190,12 @@ describe("new record modal form", () => {
       />
     );
 
+    expect(
+      screen
+        .getByRole("radio", { name: AVAILABILITY_INTENT_NAME })
+        .getAttribute("data-state")
+    ).toBe("on");
+    expect(screen.getByText("Calendar-only work status")).toBeDefined();
     expect(screen.getByRole("button", { name: "Save" })).toBeDefined();
     expect(screen.queryByText(CURRENT_BALANCE_COPY)).toBeNull();
     expect(screen.getByText(CALENDAR_IMMEDIATE_COPY)).toBeDefined();
@@ -170,8 +216,8 @@ describe("new record modal form", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Save and submit" }));
-    await screen.findByText("Submit for approval?");
-    fireEvent.click(screen.getByRole("button", { name: "Confirm and submit" }));
+    await screen.findByText("Send leave to Xero?");
+    fireEvent.click(screen.getByRole("button", { name: "Send to Xero" }));
 
     await waitFor(() => {
       expect(screen.getByText("Could not reach Xero.")).toBeDefined();

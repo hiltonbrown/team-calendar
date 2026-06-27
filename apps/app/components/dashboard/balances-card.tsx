@@ -54,7 +54,7 @@ export function BalancesCard({
     );
   } else {
     content = (
-      <div className="space-y-3 text-sm">
+      <div className="space-y-3 text-body-sm">
         {state.data.rows.map((row) => (
           <div className="flex items-center justify-between gap-4" key={row.id}>
             <span>{row.leaveTypeName ?? row.recordType ?? "Leave"}</span>
@@ -64,7 +64,7 @@ export function BalancesCard({
           </div>
         ))}
         {state.data.lastFetchedAt ? (
-          <p className="text-muted-foreground text-xs">
+          <p className="text-label-md text-muted-foreground">
             Last updated {formatDateTime(state.data.lastFetchedAt)}
           </p>
         ) : null}

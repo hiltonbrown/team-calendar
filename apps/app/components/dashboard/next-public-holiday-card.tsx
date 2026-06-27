@@ -36,11 +36,13 @@ export function NextPublicHolidayCard({
     >
       {state.data.next ? (
         <div className="space-y-2">
-          <p className="font-semibold text-lg">{state.data.next.name}</p>
-          <p className="text-muted-foreground text-sm">
+          <p className="font-semibold text-body-lg">{state.data.next.name}</p>
+          <p className="text-body-sm text-muted-foreground">
             {formatDate(state.data.next.holiday_date)}
           </p>
-          <p className="text-sm">{formatDaysUntil(state.data.daysUntil)}</p>
+          <p className="text-body-sm">
+            {formatDaysUntil(state.data.daysUntil)}
+          </p>
         </div>
       ) : (
         <EmptyState

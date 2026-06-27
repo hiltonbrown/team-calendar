@@ -39,8 +39,8 @@ export function OrgPendingApprovalsCard({
           title="Queue is clear"
         />
       ) : (
-        <div className="space-y-2 text-sm">
-          <p className="font-semibold text-2xl">{state.data.count}</p>
+        <div className="space-y-2 text-body-sm">
+          <p className="font-semibold text-headline-md">{state.data.count}</p>
           <p className="text-muted-foreground">
             Oldest age:{" "}
             {state.data.oldestAgeDays === null

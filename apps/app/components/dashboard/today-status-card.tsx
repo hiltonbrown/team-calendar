@@ -32,10 +32,10 @@ export function TodayStatusCard({
   if (state.data.activeRecord) {
     content = (
       <div className="space-y-2">
-        <p className="font-semibold text-lg">
+        <p className="font-semibold text-body-lg">
           {state.data.currentStatus.label}
         </p>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           {formatDate(state.data.activeRecord.startsAt)} to{" "}
           {formatDate(state.data.activeRecord.endsAt)}
         </p>
@@ -44,8 +44,8 @@ export function TodayStatusCard({
   } else if (state.data.activePublicHoliday) {
     content = (
       <div className="space-y-2">
-        <p className="font-semibold text-lg">Public holiday</p>
-        <p className="text-muted-foreground text-sm">
+        <p className="font-semibold text-body-lg">Public holiday</p>
+        <p className="text-body-sm text-muted-foreground">
           {state.data.activePublicHoliday.name}
         </p>
       </div>
