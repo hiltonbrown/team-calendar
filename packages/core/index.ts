@@ -8,6 +8,7 @@ export type AppErrorCode =
   | "unauthorised"
   | "forbidden"
   | "conflict"
+  | "validation_error"
   | "internal";
 
 export interface AppError {
@@ -27,6 +28,18 @@ export type OrganisationId = Brand<string, "OrganisationId">;
 export type PersonId = Brand<string, "PersonId">;
 export type AvailabilityRecordId = Brand<string, "AvailabilityRecordId">;
 export type FeedId = Brand<string, "FeedId">;
+
+// Billing entitlement vocabulary. These are the canonical sets the whole
+// billing slice types against: PLAN_CATALOGUE, plan_limits, usage_counters,
+// and the entitlement helpers all reference them, so a typo is a compile error
+// and the set is discoverable in one place. Hard limits are counted numbers
+// enforced through usage_counters; feature keys are booleans gated through
+// Clerk plan features. Adding a new hard limit or feature starts here.
+export const LIMIT_TYPES = ["payroll_entities", "seats", "feeds"] as const;
+export type LimitType = (typeof LIMIT_TYPES)[number];
+
+export const FEATURE_KEYS = ["analytics", "priority_support"] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
 
 export const toDateOnly = (date: Date): string =>
   date.toISOString().slice(0, 10);
