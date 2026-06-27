@@ -3,6 +3,7 @@
 import { addDays, format, startOfWeek } from "date-fns";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { signUpHref } from "@/src/lib/auth-links";
 import { MarketingIcon } from "../../(home)/components/marketing-icons";
 
 // Raw SVGs for brand calendar logos
@@ -707,7 +708,6 @@ export const InteractiveHeroSection = () => {
   const { canvasRef, containerRef, cellsRef, emitParticles, emitLegendSpark } =
     useSyncParticles(setLastSyncTime);
 
-  const signUpHref = "/sign-up"; // fallback standard path
   const mockFeedUrl =
     "https://api.teamcalendar.online/v1/ical/feed_5f2d7a9b.ics";
 

@@ -28,6 +28,7 @@ row when done.
 | 017 | [spike] HTML calendar view renderer (DIR-03) | P3 | M | — | DONE |
 | 018 | [spike] NZ/UK payroll write-back + read (DIR-02) | P3 | L | — | BLOCKED (official NZ/UK payroll leave application payloads unavailable in public Xero docs; design doc written) |
 | 020 | Migrate `availability_source_type` enum `leavesync_leave` → `team_calendar_leave` (fixes "Unable to load" on /plans, /calendar, /leave-reports, /leave-approvals) | P1 | S | — | DONE |
+| 021 | Fix marketing sign-in/sign-up links to use the app domain in production | P1 | S | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rationale)
 
@@ -35,11 +36,18 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (reason) | REJECTED (rational
 > the four data pages rendering "Unable to load". It is independent of 001–019.
 > Note: 019 is `019-marketing-website-impeccable-audit.md` (present in this
 > directory, not yet in the table above).
+>
+> Plan 021 (added 2026-06-27, against commit `341dce9`) fixes the production
+> marketing homepage auth links that currently route to localhost when the web
+> deployment has a local `NEXT_PUBLIC_APP_URL` value.
 
 ## Dependency notes
 
 - All plans are independent and can be executed in any order. Recommended order
   is leverage: security (001-002), reliability bugs (003-005), then the rest.
+- 021 is independent and should be executed immediately if production marketing
+  auth links point at `http://localhost:3000/sign-in` or
+  `http://localhost:3000/sign-up`.
 - **006 is a soft prerequisite for the refactor-heavy plans.** It re-enables
   package-level typechecking; running it first means later plans get a real type
   gate. But it will surface latent type errors that must be cleared, so it can be

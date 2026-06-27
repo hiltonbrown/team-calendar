@@ -6,14 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { env } from "@/env";
-
-const signInHref = env.NEXT_PUBLIC_APP_URL
-  ? `${env.NEXT_PUBLIC_APP_URL}/sign-in`
-  : "/";
-const signUpHref = env.NEXT_PUBLIC_APP_URL
-  ? `${env.NEXT_PUBLIC_APP_URL}/sign-up`
-  : "/";
+import { signInHref, signUpHref } from "@/src/lib/auth-links";
 
 const navLinks = [
   { title: "Home", href: "/" },
