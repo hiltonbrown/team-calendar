@@ -1,9 +1,5 @@
 import Link from "next/link";
-import { env } from "@/env";
-
-const signUpHref = env.NEXT_PUBLIC_APP_URL
-  ? `${env.NEXT_PUBLIC_APP_URL}/sign-up`
-  : "/";
+import { signUpHref } from "@/src/lib/auth-links";
 
 export const FinalCtaSection = () => (
   <section className="fmkt-cta">

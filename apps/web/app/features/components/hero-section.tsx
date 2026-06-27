@@ -1,10 +1,6 @@
 import Link from "next/link";
-import { env } from "@/env";
+import { signUpHref } from "@/src/lib/auth-links";
 import { SyncPathwayStrip } from "./sync-pathway-strip";
-
-const signUpHref = env.NEXT_PUBLIC_APP_URL
-  ? `${env.NEXT_PUBLIC_APP_URL}/sign-up`
-  : "/";
 
 export const HeroSection = () => (
   <section className="fmkt-hero">
