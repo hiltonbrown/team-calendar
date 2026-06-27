@@ -15,114 +15,140 @@ import { env } from "@/env";
 // signature, validates the payload, upserts the mirror, enqueues a usage
 // recount, and returns fast.
 //
-// Field paths below follow Clerk's billing event shape (payer.organization_id,
-// items[].plan.slug, period_end as unix seconds). Confirm against the sample
-// payloads in the Clerk Dashboard before going live; the Zod schema rejects
-// anything that does not match so a shape change fails loudly rather than
-// writing bad state.
+// Field shapes follow Clerk's BillingSubscription(Item)WebhookEventJSON
+// (@clerk/backend): payer.organization_id, items[].plan.slug, plan_period of
+// "month" | "annual" (mapped to the month | year DB enum), and period_end as a
+// Unix timestamp in MILLISECONDS. Cancellation is derived from the subscription
+// status and canceled_at, since Clerk does not emit a discrete deleted event.
+
+const SUBSCRIPTION_EVENT_TYPES = new Set([
+  "subscription.created",
+  "subscription.updated",
+  "subscription.active",
+  "subscription.pastDue",
+]);
+
+const ITEM_EVENT_TYPES = new Set([
+  "subscriptionItem.created",
+  "subscriptionItem.updated",
+  "subscriptionItem.active",
+  "subscriptionItem.canceled",
+  "subscriptionItem.pastDue",
+  "subscriptionItem.ended",
+]);
 
 const PlanRefSchema = z.object({ slug: z.string().min(1) });
-const PayerSchema = z.object({ organization_id: z.string().min(1) });
-const IntervalSchema = z.enum(["month", "year"]);
+const PayerSchema = z.object({ organization_id: z.string().min(1).optional() });
+const PlanPeriodSchema = z.enum(["month", "annual"]);
 
 const SubscriptionItemShape = z.object({
-  cancel_at_period_end: z.boolean().nullish(),
+  canceled_at: z.number().int().nullish(),
   period_end: z.number().int().nullish(),
-  plan: PlanRefSchema,
-  plan_period: IntervalSchema.nullish(),
+  plan: PlanRefSchema.nullish(),
+  plan_period: PlanPeriodSchema.nullish(),
   status: z.string().min(1),
 });
 
 const SubscriptionDataSchema = z.object({
+  canceled_at: z.number().int().nullish(),
   items: z.array(SubscriptionItemShape).min(1),
   payer: PayerSchema,
   status: z.string().min(1),
 });
 
 const SubscriptionItemDataSchema = SubscriptionItemShape.extend({
-  payer: PayerSchema,
+  payer: PayerSchema.nullish(),
 });
 
-const BillingWebhookEventSchema = z.discriminatedUnion("type", [
-  z.object({
-    type: z.literal("subscription.created"),
-    data: SubscriptionDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscription.updated"),
-    data: SubscriptionDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscription.active"),
-    data: SubscriptionDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscription.past_due"),
-    data: SubscriptionDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscription.deleted"),
-    data: SubscriptionDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscriptionItem.created"),
-    data: SubscriptionItemDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscriptionItem.updated"),
-    data: SubscriptionItemDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscriptionItem.active"),
-    data: SubscriptionItemDataSchema,
-  }),
-  z.object({
-    type: z.literal("subscriptionItem.canceled"),
-    data: SubscriptionItemDataSchema,
-  }),
-]);
+const EnvelopeSchema = z.object({ data: z.unknown(), type: z.string() });
 
-type BillingWebhookEvent = z.infer<typeof BillingWebhookEventSchema>;
+// Clerk period timestamps are Unix milliseconds.
+const toPeriodEnd = (ms: number | null | undefined): Date | null =>
+  typeof ms === "number" ? new Date(ms) : null;
 
-const toPeriodEnd = (seconds: number | null | undefined): Date | null =>
-  typeof seconds === "number" ? new Date(seconds * 1000) : null;
-
-const isCancellation = (eventType: string): boolean =>
-  eventType === "subscription.deleted" ||
-  eventType === "subscriptionItem.canceled";
-
-// Reduces a verified event to the subscription mirror shape. Returns null when
-// the event carries no usable subscription item.
-export function mapBillingEvent(
-  event: BillingWebhookEvent
-): UpsertSubscriptionInput | null {
-  const cancelled = isCancellation(event.type);
-
-  if ("items" in event.data) {
-    const item =
-      event.data.items.find((candidate) => candidate.status === "active") ??
-      event.data.items[0];
-    if (!item) {
-      return null;
-    }
-    return {
-      billingInterval: item.plan_period ?? null,
-      cancelAtPeriodEnd: cancelled || (item.cancel_at_period_end ?? false),
-      clerkOrgId: event.data.payer.organization_id,
-      clerkPlanKey: item.plan.slug,
-      currentPeriodEnd: toPeriodEnd(item.period_end),
-      status: cancelled ? "canceled" : event.data.status,
-    };
+// Clerk reports "month" | "annual"; the DB enum is month | year.
+const toBillingInterval = (
+  period: "month" | "annual" | null | undefined
+): "month" | "year" | null => {
+  if (period === "annual") {
+    return "year";
   }
+  if (period === "month") {
+    return "month";
+  }
+  return null;
+};
 
+const isCancelled = (
+  status: string,
+  canceledAt: number | null | undefined
+): boolean => status === "canceled" || status === "ended" || canceledAt != null;
+
+export function mapSubscriptionEvent(
+  data: z.infer<typeof SubscriptionDataSchema>
+): UpsertSubscriptionInput | null {
+  const organizationId = data.payer.organization_id;
+  if (!organizationId) {
+    return null;
+  }
+  const item =
+    data.items.find((candidate) => candidate.status === "active") ??
+    data.items[0];
+  if (!item?.plan?.slug) {
+    return null;
+  }
   return {
-    billingInterval: event.data.plan_period ?? null,
-    cancelAtPeriodEnd: cancelled || (event.data.cancel_at_period_end ?? false),
-    clerkOrgId: event.data.payer.organization_id,
-    clerkPlanKey: event.data.plan.slug,
-    currentPeriodEnd: toPeriodEnd(event.data.period_end),
-    status: cancelled ? "canceled" : event.data.status,
+    billingInterval: toBillingInterval(item.plan_period),
+    cancelAtPeriodEnd: isCancelled(
+      data.status,
+      data.canceled_at ?? item.canceled_at
+    ),
+    clerkOrgId: organizationId,
+    clerkPlanKey: item.plan.slug,
+    currentPeriodEnd: toPeriodEnd(item.period_end),
+    status: data.status,
   };
+}
+
+export function mapSubscriptionItemEvent(
+  data: z.infer<typeof SubscriptionItemDataSchema>
+): UpsertSubscriptionInput | null {
+  const organizationId = data.payer?.organization_id;
+  if (!(organizationId && data.plan?.slug)) {
+    return null;
+  }
+  return {
+    billingInterval: toBillingInterval(data.plan_period),
+    cancelAtPeriodEnd: isCancelled(data.status, data.canceled_at),
+    clerkOrgId: organizationId,
+    clerkPlanKey: data.plan.slug,
+    currentPeriodEnd: toPeriodEnd(data.period_end),
+    status: data.status,
+  };
+}
+
+// Parses and maps a verified event. Returns the mirror shape, or null when the
+// event type is not one we mirror or it carries no organisation-scoped item.
+// Throws a typed marker for malformed payloads of handled types so the caller
+// can answer 400.
+class MalformedPayloadError extends Error {}
+
+function mapEvent(type: string, data: unknown): UpsertSubscriptionInput | null {
+  if (SUBSCRIPTION_EVENT_TYPES.has(type)) {
+    const parsed = SubscriptionDataSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new MalformedPayloadError();
+    }
+    return mapSubscriptionEvent(parsed.data);
+  }
+  if (ITEM_EVENT_TYPES.has(type)) {
+    const parsed = SubscriptionItemDataSchema.safeParse(data);
+    if (!parsed.success) {
+      throw new MalformedPayloadError();
+    }
+    return mapSubscriptionItemEvent(parsed.data);
+  }
+  return null;
 }
 
 export const POST = async (request: Request): Promise<Response> => {
@@ -154,16 +180,23 @@ export const POST = async (request: Request): Promise<Response> => {
     return new Response("Invalid signature", { status: 400 });
   }
 
-  const parsed = BillingWebhookEventSchema.safeParse(verified);
-  if (!parsed.success) {
+  const envelope = EnvelopeSchema.safeParse(verified);
+  if (!envelope.success) {
+    return new Response("Invalid webhook payload", { status: 400 });
+  }
+
+  let mapped: UpsertSubscriptionInput | null;
+  try {
+    mapped = mapEvent(envelope.data.type, envelope.data.data);
+  } catch {
     log.error("Invalid billing webhook payload", {
-      issues: parsed.error.issues,
+      type: envelope.data.type,
     });
     return new Response("Invalid webhook payload", { status: 400 });
   }
 
-  const mapped = mapBillingEvent(parsed.data);
   if (!mapped) {
+    // Unhandled event type or non-organisation payer: acknowledge and move on.
     return new Response("Ignored", { status: 200 });
   }
 

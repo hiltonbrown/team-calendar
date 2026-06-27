@@ -92,7 +92,7 @@ describe("recountUsage", () => {
       clerk_org_id: ORG,
       counter_type: "seats",
     });
-    expect(seatsCall?.update).toEqual({ current_value: 7 });
+    expect(seatsCall?.update.current_value).toBe(7);
   });
 
   it("is idempotent: a re-run issues the same upserts", async () => {

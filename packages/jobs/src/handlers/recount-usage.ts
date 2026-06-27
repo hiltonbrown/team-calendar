@@ -100,7 +100,9 @@ export async function recountUsage(
           period_end: now,
           period_start: now,
         },
-        update: { current_value: value },
+        // Refresh the period stamp on every recount so the row stays
+        // self-describing rather than reflecting the first recount only.
+        update: { current_value: value, period_end: now, period_start: now },
       });
     }
 

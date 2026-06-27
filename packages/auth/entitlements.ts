@@ -60,23 +60,36 @@ export async function withinLimit(
     };
   }
 
-  const subscription = await getSubscriptionForOrg(clerkOrgId);
-  if (!subscription) {
-    // No plan assigned yet: do not block creation.
-    const current = await getUsageCounter(clerkOrgId, limitType);
+  try {
+    const subscription = await getSubscriptionForOrg(clerkOrgId);
+    if (!subscription) {
+      // No plan assigned yet: do not block creation.
+      const current = await getUsageCounter(clerkOrgId, limitType);
+      return {
+        ok: true,
+        value: { allowed: true, current, limit: UNLIMITED },
+      };
+    }
+
+    const clerkPlanKey = subscription.clerk_plan_key ?? subscription.plan_key;
+    const [limits, current] = await Promise.all([
+      getPlanLimits(clerkPlanKey),
+      getUsageCounter(clerkOrgId, limitType),
+    ]);
+
+    const limit = limits[limitType];
+    const allowed = limit === UNLIMITED || current < limit;
+    return { ok: true, value: { allowed, current, limit } };
+  } catch (error) {
+    // Callers (for example createFeed) invoke withinLimit outside their own
+    // try/catch, so a Prisma failure must not bubble. Surface an internal error
+    // they can map; the gate treats a non-ok result as "do not block".
     return {
-      ok: true,
-      value: { allowed: true, current, limit: UNLIMITED },
+      ok: false,
+      error: appError(
+        "internal",
+        error instanceof Error ? error.message : "Failed to read usage limit."
+      ),
     };
   }
-
-  const clerkPlanKey = subscription.clerk_plan_key ?? subscription.plan_key;
-  const [limits, current] = await Promise.all([
-    getPlanLimits(clerkPlanKey),
-    getUsageCounter(clerkOrgId, limitType),
-  ]);
-
-  const limit = limits[limitType];
-  const allowed = limit === UNLIMITED || current < limit;
-  return { ok: true, value: { allowed, current, limit } };
 }

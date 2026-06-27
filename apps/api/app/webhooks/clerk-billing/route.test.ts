@@ -31,21 +31,25 @@ vi.mock("next/headers", () => ({
   headers: () => ({ get: () => "svix-header-value" }),
 }));
 
-const { POST, mapBillingEvent } = await import("./route");
+const { POST, mapSubscriptionEvent } = await import("./route");
 
-function subscriptionEvent() {
+// Clerk period_end is Unix milliseconds.
+const PERIOD_END_MS = 1_900_000_000_000;
+
+function subscriptionEvent(
+  overrides: { plan_period?: "month" | "annual"; status?: string } = {}
+) {
   return {
     type: "subscription.created",
     data: {
       payer: { organization_id: "org_billing" },
-      status: "active",
+      status: overrides.status ?? "active",
       items: [
         {
           status: "active",
           plan: { slug: "premium" },
-          plan_period: "month",
-          period_end: 1_900_000_000,
-          cancel_at_period_end: false,
+          plan_period: overrides.plan_period ?? "month",
+          period_end: PERIOD_END_MS,
         },
       ],
     },
@@ -59,23 +63,30 @@ function request(body: unknown): Request {
   });
 }
 
-describe("mapBillingEvent", () => {
-  it("maps a subscription event to the mirror shape", () => {
-    const mapped = mapBillingEvent(subscriptionEvent() as never);
+describe("mapSubscriptionEvent", () => {
+  it("maps a monthly event with a millisecond period_end", () => {
+    const mapped = mapSubscriptionEvent(subscriptionEvent().data as never);
     expect(mapped).toEqual({
       billingInterval: "month",
       cancelAtPeriodEnd: false,
       clerkOrgId: "org_billing",
       clerkPlanKey: "premium",
-      currentPeriodEnd: new Date(1_900_000_000 * 1000),
+      currentPeriodEnd: new Date(PERIOD_END_MS),
       status: "active",
     });
   });
 
-  it("marks a deleted subscription as cancelled", () => {
-    const event = subscriptionEvent();
-    event.type = "subscription.deleted";
-    const mapped = mapBillingEvent(event as never);
+  it("maps Clerk's annual plan period to the year DB enum", () => {
+    const mapped = mapSubscriptionEvent(
+      subscriptionEvent({ plan_period: "annual" }).data as never
+    );
+    expect(mapped?.billingInterval).toBe("year");
+  });
+
+  it("derives cancellation from a canceled status", () => {
+    const mapped = mapSubscriptionEvent(
+      subscriptionEvent({ status: "canceled" }).data as never
+    );
     expect(mapped?.status).toBe("canceled");
     expect(mapped?.cancelAtPeriodEnd).toBe(true);
   });
@@ -103,7 +114,7 @@ describe("POST /webhooks/clerk-billing", () => {
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
   });
 
-  it("returns 400 on a malformed payload", async () => {
+  it("returns 400 on a malformed payload for a handled type", async () => {
     mocks.verify.mockReturnValue({ type: "subscription.created", data: {} });
 
     const response = await POST(request({ nonsense: true }));
@@ -112,17 +123,28 @@ describe("POST /webhooks/clerk-billing", () => {
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
   });
 
-  it("mirrors the subscription and enqueues a recount on a valid event", async () => {
-    mocks.verify.mockReturnValue(subscriptionEvent());
+  it("ignores unhandled event types with a 200", async () => {
+    mocks.verify.mockReturnValue({
+      type: "subscriptionItem.freeTrialEnding",
+      data: {},
+    });
 
-    const response = await POST(request(subscriptionEvent()));
+    const response = await POST(request({}));
+
+    expect(response.status).toBe(200);
+    expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it("handles a past-due event and mirrors the subscription", async () => {
+    const event = subscriptionEvent({ status: "past_due" });
+    event.type = "subscription.pastDue";
+    mocks.verify.mockReturnValue(event);
+
+    const response = await POST(request({}));
 
     expect(response.status).toBe(200);
     expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
-      expect.objectContaining({
-        clerkOrgId: "org_billing",
-        clerkPlanKey: "premium",
-      })
+      expect.objectContaining({ clerkOrgId: "org_billing", status: "past_due" })
     );
     expect(mocks.dispatchRecountUsage).toHaveBeenCalledWith({
       clerkOrgId: "org_billing",

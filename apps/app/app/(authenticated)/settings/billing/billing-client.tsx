@@ -62,6 +62,15 @@ function statusBadge(status: string): StatusBadge {
   return { className: "bg-muted text-muted-foreground", label: status };
 }
 
+// A zero-limit plan reads as 0% when nothing is used and 100% the moment
+// anything is, rather than a division-by-zero guard always showing a full bar.
+function usagePercentage(current: number, limit: number): number {
+  if (limit === 0) {
+    return current > 0 ? 100 : 0;
+  }
+  return Math.min((current / limit) * 100, 100);
+}
+
 function barColour(percentage: number): string {
   if (percentage >= 100) {
     return "bg-destructive";
@@ -134,10 +143,7 @@ export const BillingClient = ({ view }: BillingClientProps) => {
               );
             }
 
-            const percentage =
-              item.limit === 0
-                ? 100
-                : Math.min((item.current / item.limit) * 100, 100);
+            const percentage = usagePercentage(item.current, item.limit);
 
             return (
               <div key={item.label}>
