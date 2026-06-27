@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withinLimit } from "@repo/auth/entitlements";
 import {
   appError,
   type ClerkOrgId,
@@ -95,6 +96,22 @@ export const ensureOrganisationForClerk = async (
     orderBy: { created_at: "asc" },
   });
 
+  if (!existingOrganisation) {
+    // Creating a payroll entity is gated by the plan's payroll_entities limit.
+    // The Clerk Organisation is the billing anchor, so the count is scoped to
+    // clerk_org_id; the second argument carries that tenant context.
+    const entityLimit = await withinLimit(
+      input.clerkOrgId,
+      input.clerkOrgId,
+      "payroll_entities"
+    );
+    if (entityLimit.ok && !entityLimit.value.allowed) {
+      throw new Error(
+        `You have reached your plan's payroll entity limit (${entityLimit.value.limit}). Upgrade your plan to add more entities.`
+      );
+    }
+  }
+
   const organisation = existingOrganisation
     ? await database.organisation.update({
         where: { id: existingOrganisation.id },
@@ -184,6 +201,24 @@ export const ensureCurrentUserPerson = async (
 
         return { ok: true, value: mapPerson(person) };
       }
+    }
+
+    // Linking this Clerk user creates a new person, which consumes a seat.
+    // Existing linked or same-email people returned above do not pass through
+    // here, so the gate only applies to genuinely new seats.
+    const seatLimit = await withinLimit(
+      tenant.clerkOrgId,
+      tenant.organisationId,
+      "seats"
+    );
+    if (seatLimit.ok && !seatLimit.value.allowed) {
+      return {
+        ok: false,
+        error: appError(
+          "validation_error",
+          `You have reached your plan's seat limit (${seatLimit.value.limit}). Upgrade your plan to add more people.`
+        ),
+      };
     }
 
     const person = await database.person.create({

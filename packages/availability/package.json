@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@repo/auth": "*",
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/feeds": "*",

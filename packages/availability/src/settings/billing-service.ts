@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import type { LimitType, Result } from "@repo/core";
+import { getBillingOverview, UNLIMITED } from "@repo/database";
 import { z } from "zod";
 
 export interface BillingSummary {
@@ -47,22 +47,13 @@ const SummarySchema = z.object({
   organisationId: z.string().uuid(),
 });
 
-const LIMITS: Record<
-  string,
-  Partial<Record<string, { limit: number | null; unit: string }>>
-> = {
-  enterprise: {
-    active_feeds: { limit: null, unit: "feeds" },
-    people_count: { limit: null, unit: "people" },
-  },
-  free: {
-    active_feeds: { limit: 2, unit: "feeds" },
-    people_count: { limit: 5, unit: "people" },
-  },
-  pro: {
-    active_feeds: { limit: 100, unit: "feeds" },
-    people_count: { limit: 500, unit: "people" },
-  },
+// Display metadata only. Limit values and plan keys live solely in
+// PLAN_CATALOGUE; this maps each hard-limit dimension to its human label and
+// unit for the read-only usage view.
+const LIMIT_DISPLAY: Record<LimitType, { label: string; unit: string }> = {
+  feeds: { label: "Active feeds", unit: "feeds" },
+  payroll_entities: { label: "Payroll entities", unit: "entities" },
+  seats: { label: "People", unit: "people" },
 };
 
 export async function getBillingSummary(
@@ -137,17 +128,8 @@ async function loadBillingSummary(
   input: z.infer<typeof SummarySchema>
 ): Promise<Result<BillingSummaryCore, BillingServiceError>> {
   try {
-    const [subscription, usage] = await Promise.all([
-      database.clerkOrgSubscription.findUnique({
-        where: { clerk_org_id: input.clerkOrgId },
-      }),
-      database.usageCounter.findMany({
-        where: { clerk_org_id: input.clerkOrgId },
-        orderBy: [{ metric_key: "asc" }, { period_start: "desc" }],
-      }),
-    ]);
-
-    if (!subscription) {
+    const overview = await getBillingOverview(input.clerkOrgId);
+    if (!overview.ok) {
       return {
         ok: false,
         error: {
@@ -157,13 +139,12 @@ async function loadBillingSummary(
       };
     }
 
-    const planLimits = LIMITS[subscription.plan_key] ?? {};
-    const usageItems = usage.map((item) => ({
-      currentValue: item.current_value,
-      label: labelForMetric(item.metric_key),
-      limit: planLimits[item.metric_key]?.limit ?? null,
-      metricKey: item.metric_key,
-      unit: planLimits[item.metric_key]?.unit ?? "units",
+    const usageItems = overview.value.usage.map((item) => ({
+      currentValue: item.current,
+      label: LIMIT_DISPLAY[item.limitType].label,
+      limit: item.limit === UNLIMITED ? null : item.limit,
+      metricKey: item.limitType,
+      unit: LIMIT_DISPLAY[item.limitType].unit,
     }));
 
     return {
@@ -173,11 +154,11 @@ async function loadBillingSummary(
           (item) => item.limit !== null && item.currentValue > item.limit
         ),
         plan: {
-          currentPeriodEnd: subscription.current_period_end,
-          key: subscription.plan_key,
-          label: labelForPlan(subscription.plan_key),
-          seatsPurchased: subscription.seats_purchased,
-          status: subscription.status,
+          currentPeriodEnd: overview.value.currentPeriodEnd,
+          key: overview.value.clerkPlanKey ?? "",
+          label: overview.value.planName,
+          seatsPurchased: overview.value.seatsPurchased,
+          status: overview.value.status,
         },
         usage: usageItems,
       },
@@ -185,26 +166,6 @@ async function loadBillingSummary(
   } catch {
     return unknownError("Failed to load billing summary.");
   }
-}
-
-function labelForPlan(value: string): string {
-  if (value === "enterprise") {
-    return "Enterprise";
-  }
-  if (value === "pro") {
-    return "Pro";
-  }
-  return "Free";
-}
-
-function labelForMetric(value: string): string {
-  if (value === "people_count") {
-    return "People";
-  }
-  if (value === "active_feeds") {
-    return "Active feeds";
-  }
-  return value.replaceAll("_", " ");
 }
 
 function unknownError(message: string): Result<never, BillingServiceError> {

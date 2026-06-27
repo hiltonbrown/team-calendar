@@ -1,5 +1,6 @@
 import "server-only";
 
+import { withinLimit } from "@repo/auth/entitlements";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
@@ -184,6 +185,21 @@ export async function createFeed(
   const scopes = await validateScopes(parsed.data);
   if (!scopes.ok) {
     return { ok: false, error: scopes.error };
+  }
+
+  const limit = await withinLimit(
+    parsed.data.clerkOrgId,
+    parsed.data.organisationId,
+    "feeds"
+  );
+  if (limit.ok && !limit.value.allowed) {
+    return {
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: `You have reached your plan's feed limit (${limit.value.limit}). Upgrade your plan to publish more feeds.`,
+      },
+    };
   }
 
   try {
