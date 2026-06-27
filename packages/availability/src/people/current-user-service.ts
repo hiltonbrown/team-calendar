@@ -96,21 +96,12 @@ export const ensureOrganisationForClerk = async (
     orderBy: { created_at: "asc" },
   });
 
-  if (!existingOrganisation) {
-    // Creating a payroll entity is gated by the plan's payroll_entities limit.
-    // The Clerk Organisation is the billing anchor, so the count is scoped to
-    // clerk_org_id; the second argument carries that tenant context.
-    const entityLimit = await withinLimit(
-      input.clerkOrgId,
-      input.clerkOrgId,
-      "payroll_entities"
-    );
-    if (entityLimit.ok && !entityLimit.value.allowed) {
-      throw new Error(
-        `You have reached your plan's payroll entity limit (${entityLimit.value.limit}). Upgrade your plan to add more entities.`
-      );
-    }
-  }
+  // Note: this bootstrap only ever creates the first organisation for a Clerk
+  // Org (it finds-or-creates a single canonical entity), which is within every
+  // plan's payroll_entities limit. The payroll_entities gate therefore belongs
+  // on the path that creates additional entities (the Xero connection flow),
+  // not here, where a guard would be unreachable and could only ever throw
+  // spuriously. Seat and feed limits are enforced at their real create sites.
 
   const organisation = existingOrganisation
     ? await database.organisation.update({
