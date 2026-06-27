@@ -1,6 +1,7 @@
 export { inngest } from "./src/client";
 export {
   dispatchCancelSyncRun,
+  dispatchRecountUsage,
   dispatchSyncEvent,
   getRegisteredSyncEventName,
   type RegisteredSyncRunType,
@@ -13,6 +14,12 @@ export {
   rebuildFeedCache,
   rebuildFeedCacheFunction,
 } from "./src/handlers/rebuild-feed-cache";
+export {
+  type RecountUsageError,
+  type RecountUsageInput,
+  recountUsage,
+  recountUsageFunction,
+} from "./src/handlers/recount-usage";
 export {
   type ReconcileFeedPublicationsError,
   type ReconcileFeedPublicationsInput,
