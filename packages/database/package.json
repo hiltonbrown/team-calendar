@@ -8,6 +8,7 @@
     "build": "prisma generate --no-hints --schema=./prisma/schema.prisma",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "seed": "bun run seed.ts",
+    "seed:plans": "bun run seed-plans.ts",
     "test": "NODE_ENV=test vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "NODE_ENV=test vitest run .integration.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"

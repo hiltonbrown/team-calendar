@@ -672,6 +672,8 @@ export const PlanScalarFieldEnum = {
   key: 'key',
   name: 'name',
   is_active: 'is_active',
+  clerk_plan_key: 'clerk_plan_key',
+  is_custom: 'is_custom',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -695,8 +697,11 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   plan_key: 'plan_key',
+  clerk_plan_key: 'clerk_plan_key',
   status: 'status',
   current_period_end: 'current_period_end',
+  cancel_at_period_end: 'cancel_at_period_end',
+  billing_interval: 'billing_interval',
   seats_purchased: 'seats_purchased',
   created_at: 'created_at',
   updated_at: 'updated_at'
@@ -709,6 +714,7 @@ export const UsageCounterScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   metric_key: 'metric_key',
+  counter_type: 'counter_type',
   current_value: 'current_value',
   period_start: 'period_start',
   period_end: 'period_end',

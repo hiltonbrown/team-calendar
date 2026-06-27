@@ -38,8 +38,11 @@ export type ClerkOrgSubscriptionMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   plan_key: string | null
+  clerk_plan_key: string | null
   status: string | null
   current_period_end: Date | null
+  cancel_at_period_end: boolean | null
+  billing_interval: $Enums.billing_interval | null
   seats_purchased: number | null
   created_at: Date | null
   updated_at: Date | null
@@ -49,8 +52,11 @@ export type ClerkOrgSubscriptionMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   plan_key: string | null
+  clerk_plan_key: string | null
   status: string | null
   current_period_end: Date | null
+  cancel_at_period_end: boolean | null
+  billing_interval: $Enums.billing_interval | null
   seats_purchased: number | null
   created_at: Date | null
   updated_at: Date | null
@@ -60,8 +66,11 @@ export type ClerkOrgSubscriptionCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   plan_key: number
+  clerk_plan_key: number
   status: number
   current_period_end: number
+  cancel_at_period_end: number
+  billing_interval: number
   seats_purchased: number
   created_at: number
   updated_at: number
@@ -81,8 +90,11 @@ export type ClerkOrgSubscriptionMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   plan_key?: true
+  clerk_plan_key?: true
   status?: true
   current_period_end?: true
+  cancel_at_period_end?: true
+  billing_interval?: true
   seats_purchased?: true
   created_at?: true
   updated_at?: true
@@ -92,8 +104,11 @@ export type ClerkOrgSubscriptionMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   plan_key?: true
+  clerk_plan_key?: true
   status?: true
   current_period_end?: true
+  cancel_at_period_end?: true
+  billing_interval?: true
   seats_purchased?: true
   created_at?: true
   updated_at?: true
@@ -103,8 +118,11 @@ export type ClerkOrgSubscriptionCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   plan_key?: true
+  clerk_plan_key?: true
   status?: true
   current_period_end?: true
+  cancel_at_period_end?: true
+  billing_interval?: true
   seats_purchased?: true
   created_at?: true
   updated_at?: true
@@ -201,8 +219,11 @@ export type ClerkOrgSubscriptionGroupByOutputType = {
   id: string
   clerk_org_id: string
   plan_key: string
+  clerk_plan_key: string | null
   status: string
   current_period_end: Date | null
+  cancel_at_period_end: boolean
+  billing_interval: $Enums.billing_interval | null
   seats_purchased: number
   created_at: Date
   updated_at: Date
@@ -235,8 +256,11 @@ export type ClerkOrgSubscriptionWhereInput = {
   id?: Prisma.UuidFilter<"ClerkOrgSubscription"> | string
   clerk_org_id?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   plan_key?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  clerk_plan_key?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  billing_interval?: Prisma.Enumbilling_intervalNullableFilter<"ClerkOrgSubscription"> | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
@@ -247,8 +271,11 @@ export type ClerkOrgSubscriptionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   plan_key?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  billing_interval?: Prisma.SortOrderInput | Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -262,8 +289,11 @@ export type ClerkOrgSubscriptionWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.ClerkOrgSubscriptionWhereInput[]
   NOT?: Prisma.ClerkOrgSubscriptionWhereInput | Prisma.ClerkOrgSubscriptionWhereInput[]
   plan_key?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  clerk_plan_key?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  billing_interval?: Prisma.Enumbilling_intervalNullableFilter<"ClerkOrgSubscription"> | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
@@ -274,8 +304,11 @@ export type ClerkOrgSubscriptionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   plan_key?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  billing_interval?: Prisma.SortOrderInput | Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -293,8 +326,11 @@ export type ClerkOrgSubscriptionScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"ClerkOrgSubscription"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"ClerkOrgSubscription"> | string
   plan_key?: Prisma.StringWithAggregatesFilter<"ClerkOrgSubscription"> | string
+  clerk_plan_key?: Prisma.StringNullableWithAggregatesFilter<"ClerkOrgSubscription"> | string | null
   status?: Prisma.StringWithAggregatesFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string | null
+  cancel_at_period_end?: Prisma.BoolWithAggregatesFilter<"ClerkOrgSubscription"> | boolean
+  billing_interval?: Prisma.Enumbilling_intervalNullableWithAggregatesFilter<"ClerkOrgSubscription"> | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntWithAggregatesFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string
@@ -303,8 +339,11 @@ export type ClerkOrgSubscriptionScalarWhereWithAggregatesInput = {
 export type ClerkOrgSubscriptionCreateInput = {
   id?: string
   clerk_org_id: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -315,8 +354,11 @@ export type ClerkOrgSubscriptionUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   plan_key: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -325,8 +367,11 @@ export type ClerkOrgSubscriptionUncheckedCreateInput = {
 export type ClerkOrgSubscriptionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -337,8 +382,11 @@ export type ClerkOrgSubscriptionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   plan_key?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -348,8 +396,11 @@ export type ClerkOrgSubscriptionCreateManyInput = {
   id?: string
   clerk_org_id: string
   plan_key: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -358,8 +409,11 @@ export type ClerkOrgSubscriptionCreateManyInput = {
 export type ClerkOrgSubscriptionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -369,8 +423,11 @@ export type ClerkOrgSubscriptionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   plan_key?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -390,8 +447,11 @@ export type ClerkOrgSubscriptionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   plan_key?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  billing_interval?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -405,8 +465,11 @@ export type ClerkOrgSubscriptionMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   plan_key?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  billing_interval?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -416,8 +479,11 @@ export type ClerkOrgSubscriptionMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   plan_key?: Prisma.SortOrder
+  clerk_plan_key?: Prisma.SortOrder
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  billing_interval?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -469,11 +535,18 @@ export type ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanNestedInput = {
   deleteMany?: Prisma.ClerkOrgSubscriptionScalarWhereInput | Prisma.ClerkOrgSubscriptionScalarWhereInput[]
 }
 
+export type NullableEnumbilling_intervalFieldUpdateOperationsInput = {
+  set?: $Enums.billing_interval | null
+}
+
 export type ClerkOrgSubscriptionCreateWithoutPlanInput = {
   id?: string
   clerk_org_id: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -482,8 +555,11 @@ export type ClerkOrgSubscriptionCreateWithoutPlanInput = {
 export type ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput = {
   id?: string
   clerk_org_id: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -522,8 +598,11 @@ export type ClerkOrgSubscriptionScalarWhereInput = {
   id?: Prisma.UuidFilter<"ClerkOrgSubscription"> | string
   clerk_org_id?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   plan_key?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
+  clerk_plan_key?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  billing_interval?: Prisma.Enumbilling_intervalNullableFilter<"ClerkOrgSubscription"> | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
@@ -532,8 +611,11 @@ export type ClerkOrgSubscriptionScalarWhereInput = {
 export type ClerkOrgSubscriptionCreateManyPlanInput = {
   id?: string
   clerk_org_id: string
+  clerk_plan_key?: string | null
   status: string
   current_period_end?: Date | string | null
+  cancel_at_period_end?: boolean
+  billing_interval?: $Enums.billing_interval | null
   seats_purchased?: number
   created_at?: Date | string
   updated_at?: Date | string
@@ -542,8 +624,11 @@ export type ClerkOrgSubscriptionCreateManyPlanInput = {
 export type ClerkOrgSubscriptionUpdateWithoutPlanInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -552,8 +637,11 @@ export type ClerkOrgSubscriptionUpdateWithoutPlanInput = {
 export type ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -562,8 +650,11 @@ export type ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput = {
 export type ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_plan_key?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  billing_interval?: Prisma.NullableEnumbilling_intervalFieldUpdateOperationsInput | $Enums.billing_interval | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -575,8 +666,11 @@ export type ClerkOrgSubscriptionSelect<ExtArgs extends runtime.Types.Extensions.
   id?: boolean
   clerk_org_id?: boolean
   plan_key?: boolean
+  clerk_plan_key?: boolean
   status?: boolean
   current_period_end?: boolean
+  cancel_at_period_end?: boolean
+  billing_interval?: boolean
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -587,8 +681,11 @@ export type ClerkOrgSubscriptionSelectCreateManyAndReturn<ExtArgs extends runtim
   id?: boolean
   clerk_org_id?: boolean
   plan_key?: boolean
+  clerk_plan_key?: boolean
   status?: boolean
   current_period_end?: boolean
+  cancel_at_period_end?: boolean
+  billing_interval?: boolean
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -599,8 +696,11 @@ export type ClerkOrgSubscriptionSelectUpdateManyAndReturn<ExtArgs extends runtim
   id?: boolean
   clerk_org_id?: boolean
   plan_key?: boolean
+  clerk_plan_key?: boolean
   status?: boolean
   current_period_end?: boolean
+  cancel_at_period_end?: boolean
+  billing_interval?: boolean
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -611,14 +711,17 @@ export type ClerkOrgSubscriptionSelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   plan_key?: boolean
+  clerk_plan_key?: boolean
   status?: boolean
   current_period_end?: boolean
+  cancel_at_period_end?: boolean
+  billing_interval?: boolean
   seats_purchased?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type ClerkOrgSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "plan_key" | "status" | "current_period_end" | "seats_purchased" | "created_at" | "updated_at", ExtArgs["result"]["clerkOrgSubscription"]>
+export type ClerkOrgSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "plan_key" | "clerk_plan_key" | "status" | "current_period_end" | "cancel_at_period_end" | "billing_interval" | "seats_purchased" | "created_at" | "updated_at", ExtArgs["result"]["clerkOrgSubscription"]>
 export type ClerkOrgSubscriptionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
 }
@@ -638,8 +741,11 @@ export type $ClerkOrgSubscriptionPayload<ExtArgs extends runtime.Types.Extension
     id: string
     clerk_org_id: string
     plan_key: string
+    clerk_plan_key: string | null
     status: string
     current_period_end: Date | null
+    cancel_at_period_end: boolean
+    billing_interval: $Enums.billing_interval | null
     seats_purchased: number
     created_at: Date
     updated_at: Date
@@ -1070,8 +1176,11 @@ export interface ClerkOrgSubscriptionFieldRefs {
   readonly id: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
   readonly plan_key: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
+  readonly clerk_plan_key: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
   readonly status: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
   readonly current_period_end: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
+  readonly cancel_at_period_end: Prisma.FieldRef<"ClerkOrgSubscription", 'Boolean'>
+  readonly billing_interval: Prisma.FieldRef<"ClerkOrgSubscription", 'billing_interval'>
   readonly seats_purchased: Prisma.FieldRef<"ClerkOrgSubscription", 'Int'>
   readonly created_at: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
