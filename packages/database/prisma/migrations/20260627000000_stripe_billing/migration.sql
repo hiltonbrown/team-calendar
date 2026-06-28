@@ -18,12 +18,12 @@ UPDATE "usage_counters" SET "counter_type" = "metric_key"::"plan_limit_type" WHE
 CREATE UNIQUE INDEX IF NOT EXISTS "usage_counters_clerk_org_id_counter_type_key" ON "usage_counters"("clerk_org_id", "counter_type");
 
 CREATE TABLE IF NOT EXISTS "stripe_events" (
-  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "id" UUID NOT NULL,
   "stripe_event_id" TEXT NOT NULL,
   "type" TEXT NOT NULL,
   "processed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
   "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at" TIMESTAMP(3) NOT NULL,
   CONSTRAINT "stripe_events_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "stripe_events_stripe_event_id_key" ON "stripe_events"("stripe_event_id");

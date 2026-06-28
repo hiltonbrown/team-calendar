@@ -73,10 +73,10 @@ export const getUsageCounter = async (
 export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
   database.$executeRaw`
     INSERT INTO clerk_org_subscriptions (
-      clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+      id, clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
       stripe_subscription_id, cancel_at_period_end, ended_at, created_at, updated_at
     ) VALUES (
-      ${input.clerkOrgId}, ${input.planKey}, ${input.status}, ${input.currentPeriodEnd},
+      gen_random_uuid(), ${input.clerkOrgId}, ${input.planKey}, ${input.status}, ${input.currentPeriodEnd},
       ${input.stripeCustomerId}, ${input.stripeSubscriptionId}, ${input.cancelAtPeriodEnd},
       ${input.endedAt}, NOW(), NOW()
     )
@@ -105,8 +105,8 @@ export const recordStripeEvent = async (
   type: string
 ): Promise<void> => {
   await database.$executeRaw`
-    INSERT INTO stripe_events (stripe_event_id, type, processed_at, created_at, updated_at)
-    VALUES (${eventId}, ${type}, NOW(), NOW(), NOW())
+    INSERT INTO stripe_events (id, stripe_event_id, type, processed_at, created_at, updated_at)
+    VALUES (gen_random_uuid(), ${eventId}, ${type}, NOW(), NOW(), NOW())
     ON CONFLICT (stripe_event_id) DO NOTHING
   `;
 };

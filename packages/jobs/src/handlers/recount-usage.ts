@@ -36,8 +36,8 @@ export const recountUsage = async (input: unknown) => {
     seats,
   })) {
     await database.$executeRaw`
-      INSERT INTO usage_counters (clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
-      VALUES (${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
+      INSERT INTO usage_counters (id, clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
       ON CONFLICT (clerk_org_id, counter_type) DO UPDATE SET
         current_value = EXCLUDED.current_value,
         metric_key = EXCLUDED.metric_key,
