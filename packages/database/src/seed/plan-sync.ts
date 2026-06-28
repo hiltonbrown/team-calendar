@@ -12,8 +12,8 @@ export const syncPlansFromCatalogue = async (
   let limits = 0;
   for (const plan of PLAN_CATALOGUE) {
     const rows = await db.$queryRaw<Array<{ id: string }>>`
-      INSERT INTO plans (key, plan_key, name, is_active, is_custom, stripe_price_id, created_at, updated_at)
-      VALUES (${plan.plan_key}, ${plan.plan_key}, ${plan.name}, true, ${plan.is_custom}, ${plan.priceId}, NOW(), NOW())
+      INSERT INTO plans (id, key, plan_key, name, is_active, is_custom, stripe_price_id, created_at, updated_at)
+      VALUES (gen_random_uuid(), ${plan.plan_key}, ${plan.plan_key}, ${plan.name}, true, ${plan.is_custom}, ${plan.priceId}, NOW(), NOW())
       ON CONFLICT (key) DO UPDATE SET
         plan_key = EXCLUDED.plan_key,
         name = EXCLUDED.name,
@@ -29,8 +29,8 @@ export const syncPlansFromCatalogue = async (
     }
     for (const [limitType, limitValue] of Object.entries(plan.limits)) {
       await db.$executeRaw`
-        INSERT INTO plan_limits (plan_id, limit_type, limit_value, created_at, updated_at)
-        VALUES (${planId}, ${limitType}, ${limitValue}, NOW(), NOW())
+        INSERT INTO plan_limits (id, plan_id, limit_type, limit_value, created_at, updated_at)
+        VALUES (gen_random_uuid(), ${planId}, ${limitType}::plan_limit_type, ${limitValue}, NOW(), NOW())
         ON CONFLICT (plan_id, limit_type) DO UPDATE SET limit_value = EXCLUDED.limit_value, updated_at = NOW()
       `;
       limits += 1;

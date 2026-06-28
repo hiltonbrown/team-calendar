@@ -32,6 +32,11 @@ const footerColumns = [
   },
 ];
 
+const legalLinks = [
+  { title: "Privacy", href: "/privacy-policy" },
+  { title: "Terms", href: "/terms-of-service" },
+];
+
 export const Footer = () => (
   <footer className="marketing-footer">
     <div className="marketing-footer__grid">
@@ -60,7 +65,13 @@ export const Footer = () => (
     </div>
     <div className="marketing-footer__bottom">
       <span>© 2026 {brandNameDisplay}. Built on the Gold Coast.</span>
-      <span>Privacy · Terms · Data processing</span>
+      <nav aria-label="Legal" className="marketing-footer__legal">
+        {legalLinks.map((item) => (
+          <Link href={item.href} key={item.title}>
+            {item.title}
+          </Link>
+        ))}
+      </nav>
     </div>
   </footer>
 );
