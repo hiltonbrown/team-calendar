@@ -80,7 +80,8 @@ export const ModelName = {
   Plan: 'Plan',
   PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
-  UsageCounter: 'UsageCounter'
+  UsageCounter: 'UsageCounter',
+  StripeEvent: 'StripeEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -670,8 +671,11 @@ export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof
 export const PlanScalarFieldEnum = {
   id: 'id',
   key: 'key',
+  plan_key: 'plan_key',
   name: 'name',
   is_active: 'is_active',
+  is_custom: 'is_custom',
+  stripe_price_id: 'stripe_price_id',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -698,6 +702,10 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   status: 'status',
   current_period_end: 'current_period_end',
   seats_purchased: 'seats_purchased',
+  stripe_customer_id: 'stripe_customer_id',
+  stripe_subscription_id: 'stripe_subscription_id',
+  cancel_at_period_end: 'cancel_at_period_end',
+  ended_at: 'ended_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -709,6 +717,7 @@ export const UsageCounterScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   metric_key: 'metric_key',
+  counter_type: 'counter_type',
   current_value: 'current_value',
   period_start: 'period_start',
   period_end: 'period_end',
@@ -717,6 +726,18 @@ export const UsageCounterScalarFieldEnum = {
 } as const
 
 export type UsageCounterScalarFieldEnum = (typeof UsageCounterScalarFieldEnum)[keyof typeof UsageCounterScalarFieldEnum]
+
+
+export const StripeEventScalarFieldEnum = {
+  id: 'id',
+  stripe_event_id: 'stripe_event_id',
+  type: 'type',
+  processed_at: 'processed_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
 
 
 export const SortOrder = {

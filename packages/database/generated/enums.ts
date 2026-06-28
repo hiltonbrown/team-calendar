@@ -340,7 +340,9 @@ export const plan_limit_type = {
   active_people: 'active_people',
   connections: 'connections',
   feeds: 'feeds',
-  organisations: 'organisations'
+  organisations: 'organisations',
+  payroll_entities: 'payroll_entities',
+  seats: 'seats'
 } as const
 
 export type plan_limit_type = (typeof plan_limit_type)[keyof typeof plan_limit_type]
