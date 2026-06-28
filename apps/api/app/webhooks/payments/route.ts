@@ -1,45 +1,57 @@
 import { constructEvent, resolvePlanKey } from "@repo/billing";
-import { recordStripeEvent, upsertSubscriptionFromWebhook } from "@repo/database";
+import {
+  isStripeEventProcessed,
+  recordStripeEvent,
+  upsertSubscriptionFromWebhook,
+} from "@repo/database";
 import { inngest } from "@repo/jobs";
+import { log } from "@repo/observability/log";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { env } from "@/env";
 
-const MetadataSchema = z.object({ clerk_org_id: z.string().min(1).optional() }).nullable();
+const MetadataSchema = z
+  .object({ clerk_org_id: z.string().min(1).optional() })
+  .nullable();
+const StripeRef = z.union([z.string(), z.object({ id: z.string() })]);
 const SessionSchema = z.object({
-  customer: z.union([z.string(), z.object({ id: z.string() })]).nullable(),
+  customer: StripeRef.nullable(),
   metadata: MetadataSchema,
-  subscription: z.union([z.string(), z.object({ id: z.string() })]).nullable(),
+  subscription: StripeRef.nullable(),
 });
 const SubscriptionSchema = z.object({
   cancel_at_period_end: z.boolean().default(false),
   current_period_end: z.number().nullable().optional(),
-  customer: z.union([z.string(), z.object({ id: z.string() })]),
+  customer: StripeRef,
   ended_at: z.number().nullable().optional(),
   id: z.string(),
-  items: z.object({ data: z.array(z.object({ price: z.object({ id: z.string() }) })).min(1) }),
+  items: z.object({
+    data: z.array(z.object({ price: z.object({ id: z.string() }) })).min(1),
+  }),
   metadata: MetadataSchema,
   status: z.string(),
 });
+// An invoice references its subscription either by id (the unexpanded default)
+// or as the full expanded subscription object, which we mirror directly.
 const InvoiceSchema = z.object({
-  subscription: z.union([z.string(), z.object({ id: z.string(), metadata: MetadataSchema, items: z.object({ data: z.array(z.object({ price: z.object({ id: z.string() }) })).min(1) }), status: z.string(), customer: z.union([z.string(), z.object({ id: z.string() })]), current_period_end: z.number().nullable().optional(), cancel_at_period_end: z.boolean().default(false), ended_at: z.number().nullable().optional() })]).nullable().optional(),
+  subscription: z.union([z.string(), SubscriptionSchema]).nullable().optional(),
 });
 
 const objectId = (value: string | { id: string } | null | undefined) =>
-  typeof value === "string" ? value : value?.id ?? null;
+  typeof value === "string" ? value : (value?.id ?? null);
 const dateFromSeconds = (value: number | null | undefined) =>
   value ? new Date(value * 1000) : null;
 
 async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
   const clerkOrgId = data.metadata?.clerk_org_id;
   if (!clerkOrgId) {
-    console.warn("Stripe subscription event missing clerk_org_id metadata.");
+    log.warn("Stripe subscription event missing clerk_org_id metadata.");
     return;
   }
   const priceId = data.items.data[0]?.price.id;
   const plan = resolvePlanKey(priceId);
   if (!plan.ok) {
-    console.warn("Stripe subscription event used an unknown price.");
+    log.warn("Stripe subscription event used an unknown price.");
     return;
   }
   await upsertSubscriptionFromWebhook({
@@ -52,32 +64,50 @@ async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
     stripeCustomerId: objectId(data.customer),
     stripeSubscriptionId: data.id,
   });
-  await inngest.send({ name: "recount-usage", data: { clerkOrgId, organisationId: "00000000-0000-4000-8000-000000000000" } });
+  await inngest.send({
+    name: "recount-usage",
+    data: {
+      clerkOrgId,
+      organisationId: "00000000-0000-4000-8000-000000000000",
+    },
+  });
 }
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
-  const eventResult = constructEvent(rawBody, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET);
+  const eventResult = constructEvent(
+    rawBody,
+    request.headers.get("stripe-signature"),
+    env.STRIPE_WEBHOOK_SECRET
+  );
   if (!eventResult.ok) {
-    return NextResponse.json({ error: eventResult.error.message }, { status: 400 });
+    return NextResponse.json(
+      { error: eventResult.error.message },
+      { status: 400 }
+    );
   }
   const event = eventResult.value;
-  const shouldProcess = await recordStripeEvent(event.id, event.type);
-  if (!shouldProcess) {
+  // Skip events we have already mirrored. We only record the event after
+  // processing succeeds (below), so a failure leaves no row and Stripe's retry
+  // reprocesses it. Mirror writes are idempotent, so a duplicate is harmless.
+  if (await isStripeEventProcessed(event.id)) {
     return NextResponse.json({ received: true });
   }
 
   if (event.type === "checkout.session.completed") {
     const parsed = SessionSchema.safeParse(event.data.object);
-    if (parsed.success) {
-      const clerkOrgId = parsed.data.metadata?.clerk_org_id;
-      if (!clerkOrgId) {
-        console.warn("Stripe checkout session missing clerk_org_id metadata.");
-      }
+    if (parsed.success && !parsed.data.metadata?.clerk_org_id) {
+      log.warn("Stripe checkout session missing clerk_org_id metadata.");
     }
   }
 
-  if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
+  if (
+    [
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+    ].includes(event.type)
+  ) {
     const parsed = SubscriptionSchema.safeParse(event.data.object);
     if (parsed.success) {
       await mirrorSubscription(parsed.data);
@@ -92,5 +122,6 @@ export async function POST(request: Request) {
     }
   }
 
+  await recordStripeEvent(event.id, event.type);
   return NextResponse.json({ received: true });
 }

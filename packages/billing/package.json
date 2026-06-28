@@ -13,8 +13,12 @@
     "@repo/database": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
     "server-only": "^0.0.1",
-    "stripe": "^18.5.0",
+    "stripe": "^20.0.0",
     "zod": "^4.4.3"
   },
-  "devDependencies": {"@repo/typescript-config": "*", "typescript": "^6.0.3", "vitest": "^4.1.7"}
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
 }

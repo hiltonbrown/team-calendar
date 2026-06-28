@@ -38,21 +38,30 @@ export const getSubscriptionForOrg = async (
 };
 
 export const getPlanLimits = async (planKey: PlanKey) => {
-  const rows = await database.$queryRaw<Array<{ limit_type: LimitType; limit_value: number }>>`
+  const rows = await database.$queryRaw<
+    Array<{ limit_type: LimitType; limit_value: number }>
+  >`
     SELECT pl.limit_type, pl.limit_value
     FROM plan_limits pl
     INNER JOIN plans p ON p.id = pl.plan_id
     WHERE p.plan_key = ${planKey} OR p.key = ${planKey}
   `;
-  if (rows.length === 0) {
-    return getPlanDefinition(planKey).limits;
-  }
-  return Object.fromEntries(rows.map((limit) => [limit.limit_type, limit.limit_value])) as Record<LimitType, number>;
+  // Layer any persisted limits over the catalogue defaults so every LimitType is
+  // always present, even when the DB only holds a partial set of rows for a plan.
+  const defaults = getPlanDefinition(planKey).limits;
+  const persisted = Object.fromEntries(
+    rows.map((limit) => [limit.limit_type, limit.limit_value])
+  );
+  return { ...defaults, ...persisted } as Record<LimitType, number>;
 };
 
-export const getPlanFeatures = (planKey: PlanKey) => getPlanDefinition(planKey).features;
+export const getPlanFeatures = (planKey: PlanKey) =>
+  getPlanDefinition(planKey).features;
 
-export const getUsageCounter = async (clerkOrgId: string, counterType: LimitType) => {
+export const getUsageCounter = async (
+  clerkOrgId: string,
+  counterType: LimitType
+) => {
   const rows = await database.$queryRaw<Array<{ current_value: number }>>`
     SELECT current_value FROM usage_counters
     WHERE clerk_org_id = ${clerkOrgId} AND (counter_type::text = ${counterType} OR metric_key = ${counterType})
@@ -82,11 +91,22 @@ export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
       updated_at = NOW()
   `;
 
-export const recordStripeEvent = async (eventId: string, type: string): Promise<boolean> => {
-  const result = await database.$executeRaw`
+export const isStripeEventProcessed = async (
+  eventId: string
+): Promise<boolean> => {
+  const rows = await database.$queryRaw<Array<{ stripe_event_id: string }>>`
+    SELECT stripe_event_id FROM stripe_events WHERE stripe_event_id = ${eventId} LIMIT 1
+  `;
+  return rows.length > 0;
+};
+
+export const recordStripeEvent = async (
+  eventId: string,
+  type: string
+): Promise<void> => {
+  await database.$executeRaw`
     INSERT INTO stripe_events (stripe_event_id, type, processed_at, created_at, updated_at)
     VALUES (${eventId}, ${type}, NOW(), NOW(), NOW())
     ON CONFLICT (stripe_event_id) DO NOTHING
   `;
-  return result === 1;
 };

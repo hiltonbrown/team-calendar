@@ -1,15 +1,34 @@
 import "server-only";
 
-import { appError, type FeatureKey, type LimitType, type PlanKey, type Result } from "@repo/core";
-import { getPlanFeatures, getPlanLimits, getSubscriptionForOrg, getUsageCounter } from "@repo/database";
+import {
+  appError,
+  type FeatureKey,
+  type LimitType,
+  type PlanKey,
+  planKeys,
+  type Result,
+} from "@repo/core";
+import {
+  getPlanFeatures,
+  getPlanLimits,
+  getSubscriptionForOrg,
+  getUsageCounter,
+} from "@repo/database";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
 const BASIC_PLAN_KEY: PlanKey = "basic";
 
+const isPlanKey = (value: string): value is PlanKey =>
+  (planKeys as readonly string[]).includes(value);
+
 const activePlanKey = async (clerkOrgId: string): Promise<PlanKey> => {
   const subscription = await getSubscriptionForOrg(clerkOrgId);
-  return subscription && ACTIVE_STATUSES.has(subscription.status)
-    ? (subscription.plan_key as PlanKey)
+  // Fall back to Basic for inactive subscriptions or any unrecognised plan_key
+  // (e.g. legacy data) rather than casting blindly and throwing downstream.
+  return subscription &&
+    ACTIVE_STATUSES.has(subscription.status) &&
+    isPlanKey(subscription.plan_key)
+    ? subscription.plan_key
     : BASIC_PLAN_KEY;
 };
 
@@ -26,9 +45,15 @@ export const withinLimit = async (
     ]);
     const limit = limits[limitType];
     const current = usage?.current_value ?? 0;
-    return { ok: true, value: { allowed: limit === -1 || current < limit, current, limit } };
+    return {
+      ok: true,
+      value: { allowed: limit === -1 || current < limit, current, limit },
+    };
   } catch {
-    return { ok: false, error: appError("internal", "Failed to check billing limits.") };
+    return {
+      ok: false,
+      error: appError("internal", "Failed to check billing limits."),
+    };
   }
 };
 
@@ -41,6 +66,9 @@ export const hasFeature = async (
     const features = getPlanFeatures(planKey);
     return { ok: true, value: features[feature] };
   } catch {
-    return { ok: false, error: appError("internal", "Failed to check billing features.") };
+    return {
+      ok: false,
+      error: appError("internal", "Failed to check billing features."),
+    };
   }
 };

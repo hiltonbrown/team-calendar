@@ -97,9 +97,20 @@ export const ensureOrganisationForClerk = async (
   });
 
   if (!existingOrganisation) {
-    const entitlement = await withinLimit(input.clerkOrgId, "00000000-0000-4000-8000-000000000000", "payroll_entities");
-    if (entitlement.ok && !entitlement.value.allowed) {
-      throw new Error("Your current plan has reached its payroll entity limit.");
+    const entitlement = await withinLimit(
+      input.clerkOrgId,
+      "00000000-0000-4000-8000-000000000000",
+      "payroll_entities"
+    );
+    // Fail closed: if the entitlement check itself fails (DB outage, query
+    // error) we must not silently allow a new payroll entity to be created.
+    if (!entitlement.ok) {
+      throw new Error("Unable to verify billing limits. Please try again.");
+    }
+    if (!entitlement.value.allowed) {
+      throw new Error(
+        "Your current plan has reached its payroll entity limit."
+      );
     }
   }
 
@@ -194,14 +205,21 @@ export const ensureCurrentUserPerson = async (
       }
     }
 
-    const entitlement = await withinLimit(tenant.clerkOrgId, tenant.organisationId, "seats");
+    const entitlement = await withinLimit(
+      tenant.clerkOrgId,
+      tenant.organisationId,
+      "seats"
+    );
     if (!entitlement.ok) {
       return { ok: false, error: entitlement.error };
     }
     if (!entitlement.value.allowed) {
       return {
         ok: false,
-        error: appError("bad_request", "Your current plan has reached its active people limit."),
+        error: appError(
+          "bad_request",
+          "Your current plan has reached its active people limit."
+        ),
       };
     }
 

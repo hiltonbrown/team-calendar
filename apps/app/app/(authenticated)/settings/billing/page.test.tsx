@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   requirePageRole: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("./actions", () => ({
+  startCheckout: vi.fn(),
+  startPortal: vi.fn(),
+}));
 vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));

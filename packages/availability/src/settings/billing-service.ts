@@ -1,7 +1,13 @@
 import "server-only";
 
-import { planKeys, type PlanKey, type Result } from "@repo/core";
-import { getPlanDefinition, getPlanLimits, getSubscriptionForOrg, database, limitTypes } from "@repo/database";
+import { type PlanKey, planKeys, type Result } from "@repo/core";
+import {
+  database,
+  getPlanDefinition,
+  getPlanLimits,
+  getSubscriptionForOrg,
+  limitTypes,
+} from "@repo/database";
 import { z } from "zod";
 
 export interface BillingSummary {
@@ -121,12 +127,17 @@ async function loadBillingSummary(
   try {
     const [subscription, usage] = await Promise.all([
       getSubscriptionForOrg(input.clerkOrgId),
-      database.$queryRaw<Array<{ metric_key: string; current_value: number }>>`SELECT metric_key, current_value FROM usage_counters WHERE clerk_org_id = ${input.clerkOrgId} AND metric_key IN ('payroll_entities', 'seats', 'feeds') ORDER BY metric_key ASC, period_start DESC`,
+      database.$queryRaw<
+        Array<{ metric_key: string; current_value: number }>
+      >`SELECT DISTINCT ON (metric_key) metric_key, current_value FROM usage_counters WHERE clerk_org_id = ${input.clerkOrgId} AND metric_key IN ('payroll_entities', 'seats', 'feeds') ORDER BY metric_key ASC, period_start DESC`,
     ]);
 
-    const planKey = planKeys.find((key) => key === subscription?.plan_key) ?? "basic";
+    const planKey =
+      planKeys.find((key) => key === subscription?.plan_key) ?? "basic";
     const planLimits = await getPlanLimits(planKey);
-    const usageByMetric = new Map(usage.map((item) => [item.metric_key, item.current_value]));
+    const usageByMetric = new Map(
+      usage.map((item) => [item.metric_key, item.current_value])
+    );
     const usageItems = limitTypes.map((limitType) => ({
       currentValue: usageByMetric.get(limitType) ?? 0,
       label: labelForMetric(limitType),

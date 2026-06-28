@@ -1,9 +1,14 @@
 import type { PrismaClient } from "../../generated/client";
 import { PLAN_CATALOGUE } from "./plans";
 
-export interface PlanSeedSummary { plans: number; limits: number }
+export interface PlanSeedSummary {
+  limits: number;
+  plans: number;
+}
 
-export const syncPlansFromCatalogue = async (db: PrismaClient): Promise<PlanSeedSummary> => {
+export const syncPlansFromCatalogue = async (
+  db: PrismaClient
+): Promise<PlanSeedSummary> => {
   let limits = 0;
   for (const plan of PLAN_CATALOGUE) {
     const rows = await db.$queryRaw<Array<{ id: string }>>`

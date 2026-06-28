@@ -182,12 +182,25 @@ export async function createFeed(
     return notAuthorised();
   }
 
-  const entitlement = await withinLimit(parsed.data.clerkOrgId, parsed.data.organisationId, "feeds");
+  const entitlement = await withinLimit(
+    parsed.data.clerkOrgId,
+    parsed.data.organisationId,
+    "feeds"
+  );
   if (!entitlement.ok) {
-    return { ok: false, error: { code: "unknown_error", message: entitlement.error.message } };
+    return {
+      ok: false,
+      error: { code: "unknown_error", message: entitlement.error.message },
+    };
   }
   if (!entitlement.value.allowed) {
-    return { ok: false, error: { code: "validation_error", message: "Your current plan has reached its active feed limit." } };
+    return {
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+    };
   }
 
   const scopes = await validateScopes(parsed.data);

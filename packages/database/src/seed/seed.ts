@@ -11,6 +11,8 @@ export interface SeedSummary {
   locations: number;
   organisations: number;
   people: number;
+  planLimits: number;
+  plans: number;
   teams: number;
 }
 

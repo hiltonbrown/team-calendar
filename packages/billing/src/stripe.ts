@@ -1,6 +1,6 @@
 import "server-only";
 
-import { appError, type AppError, type PlanKey, type Result } from "@repo/core";
+import { type AppError, appError, type PlanKey, type Result } from "@repo/core";
 import { getSubscriptionForOrg, PLAN_CATALOGUE } from "@repo/database";
 import Stripe from "stripe";
 
@@ -10,16 +10,27 @@ let stripeClient: Stripe | null = null;
 
 export const getStripe = (): Result<Stripe> => {
   if (!process.env.STRIPE_SECRET_KEY) {
-    return { ok: false, error: appError("internal", "Stripe is not configured.") };
+    return {
+      ok: false,
+      error: appError("internal", "Stripe is not configured."),
+    };
   }
-  stripeClient ??= new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: STRIPE_API_VERSION });
+  // The SDK type only admits its own bundled LatestApiVersion literal, but we
+  // deliberately pin the account API version we have tested against. The cast is
+  // required so the pin survives SDK minor upgrades that move LatestApiVersion.
+  stripeClient ??= new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion,
+  });
   return { ok: true, value: stripeClient };
 };
 
 export const resolvePlanKey = (priceId: string): Result<PlanKey> => {
   const plan = PLAN_CATALOGUE.find((item) => item.priceId === priceId);
   if (!plan) {
-    return { ok: false, error: appError("bad_request", "Unknown Stripe price.") };
+    return {
+      ok: false,
+      error: appError("bad_request", "Unknown Stripe price."),
+    };
   }
   return { ok: true, value: plan.plan_key };
 };
@@ -27,7 +38,10 @@ export const resolvePlanKey = (priceId: string): Result<PlanKey> => {
 const urlEnv = (key: string): Result<string> => {
   const value = process.env[key];
   if (!value) {
-    return { ok: false, error: appError("internal", `${key} is not configured.`) };
+    return {
+      ok: false,
+      error: appError("internal", `${key} is not configured.`),
+    };
   }
   return { ok: true, value };
 };
@@ -38,13 +52,22 @@ export const createCheckoutSession = async (
 ): Promise<Result<string, AppError>> => {
   const plan = PLAN_CATALOGUE.find((item) => item.plan_key === planKey);
   if (!plan?.priceId) {
-    return { ok: false, error: appError("bad_request", "Contact sales for Enterprise billing.") };
+    return {
+      ok: false,
+      error: appError("bad_request", "Contact sales for Enterprise billing."),
+    };
   }
   const stripe = getStripe();
+  if (!stripe.ok) {
+    return stripe;
+  }
   const success = urlEnv("STRIPE_CHECKOUT_SUCCESS_URL");
+  if (!success.ok) {
+    return success;
+  }
   const cancel = urlEnv("STRIPE_CHECKOUT_CANCEL_URL");
-  if (!(stripe.ok && success.ok && cancel.ok)) {
-    return stripe.ok ? (success.ok ? cancel : success) : stripe;
+  if (!cancel.ok) {
+    return cancel;
   }
   const subscription = await getSubscriptionForOrg(clerkOrgId);
   const session = await stripe.value.checkout.sessions.create({
@@ -59,10 +82,15 @@ export const createCheckoutSession = async (
   });
   return session.url
     ? { ok: true, value: session.url }
-    : { ok: false, error: appError("internal", "Stripe did not return a Checkout URL.") };
+    : {
+        ok: false,
+        error: appError("internal", "Stripe did not return a Checkout URL."),
+      };
 };
 
-export const createPortalSession = async (clerkOrgId: string): Promise<Result<string>> => {
+export const createPortalSession = async (
+  clerkOrgId: string
+): Promise<Result<string>> => {
   const stripe = getStripe();
   const returnUrl = urlEnv("STRIPE_PORTAL_RETURN_URL");
   if (!(stripe.ok && returnUrl.ok)) {
@@ -70,7 +98,13 @@ export const createPortalSession = async (clerkOrgId: string): Promise<Result<st
   }
   const subscription = await getSubscriptionForOrg(clerkOrgId);
   if (!subscription?.stripe_customer_id) {
-    return { ok: false, error: appError("not_found", "No Stripe customer is stored for this organisation.") };
+    return {
+      ok: false,
+      error: appError(
+        "not_found",
+        "No Stripe customer is stored for this organisation."
+      ),
+    };
   }
   const session = await stripe.value.billingPortal.sessions.create({
     customer: subscription.stripe_customer_id,
@@ -85,15 +119,28 @@ export const constructEvent = (
   secret: string | undefined
 ): Result<Stripe.Event> => {
   if (!(signatureHeader && secret)) {
-    return { ok: false, error: appError("bad_request", "Missing Stripe webhook signature.") };
+    return {
+      ok: false,
+      error: appError("bad_request", "Missing Stripe webhook signature."),
+    };
   }
   const stripe = getStripe();
   if (!stripe.ok) {
     return stripe;
   }
   try {
-    return { ok: true, value: stripe.value.webhooks.constructEvent(rawBody, signatureHeader, secret) };
+    return {
+      ok: true,
+      value: stripe.value.webhooks.constructEvent(
+        rawBody,
+        signatureHeader,
+        secret
+      ),
+    };
   } catch {
-    return { ok: false, error: appError("bad_request", "Invalid Stripe webhook signature.") };
+    return {
+      ok: false,
+      error: appError("bad_request", "Invalid Stripe webhook signature."),
+    };
   }
 };

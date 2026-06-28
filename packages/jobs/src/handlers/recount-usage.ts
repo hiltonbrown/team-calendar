@@ -1,4 +1,5 @@
 import { database } from "@repo/database";
+import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
 
@@ -9,17 +10,31 @@ const RecountUsageSchema = z.object({
 
 export type RecountUsageInput = z.input<typeof RecountUsageSchema>;
 
-export const recountUsage = async (input: RecountUsageInput) => {
+export const recountUsage = async (input: unknown) => {
   const parsed = RecountUsageSchema.parse(input);
   const [seats, payrollEntities, feeds] = await Promise.all([
-    database.person.count({ where: { archived_at: null, clerk_org_id: parsed.clerkOrgId } }),
-    database.organisation.count({ where: { archived_at: null, clerk_org_id: parsed.clerkOrgId } }),
-    database.feed.count({ where: { archived_at: null, clerk_org_id: parsed.clerkOrgId, status: "active" } }),
+    database.person.count({
+      where: { archived_at: null, clerk_org_id: parsed.clerkOrgId },
+    }),
+    database.organisation.count({
+      where: { archived_at: null, clerk_org_id: parsed.clerkOrgId },
+    }),
+    database.feed.count({
+      where: {
+        archived_at: null,
+        clerk_org_id: parsed.clerkOrgId,
+        status: "active",
+      },
+    }),
   ]);
   const now = new Date();
   const periodStart = new Date("1970-01-01T00:00:00.000Z");
   const periodEnd = new Date("9999-12-31T23:59:59.999Z");
-  for (const [counterType, value] of Object.entries({ feeds, payroll_entities: payrollEntities, seats })) {
+  for (const [counterType, value] of Object.entries({
+    feeds,
+    payroll_entities: payrollEntities,
+    seats,
+  })) {
     await database.$executeRaw`
       INSERT INTO usage_counters (clerk_org_id, metric_key, counter_type, current_value, period_start, period_end, created_at, updated_at)
       VALUES (${parsed.clerkOrgId}, ${counterType}, ${counterType}::plan_limit_type, ${value}, ${periodStart}, ${periodEnd}, NOW(), ${now})
@@ -34,8 +49,11 @@ export const recountUsage = async (input: RecountUsageInput) => {
   return { feeds, payrollEntities, seats };
 };
 
-export const recountUsageFunction = inngest.createFunction(
-  { id: "recount-usage" },
-  { event: "recount-usage" },
-  async ({ event }) => recountUsage(event.data)
+export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
+  {
+    id: "recount-usage",
+    triggers: { event: "recount-usage" },
+  },
+  async ({ event, step }) =>
+    await step.run("recount-usage", async () => recountUsage(event.data))
 );
