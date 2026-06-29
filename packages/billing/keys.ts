@@ -19,4 +19,8 @@ export const keys = () =>
       STRIPE_PRICE_PREMIUM: process.env.STRIPE_PRICE_PREMIUM,
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
     },
+    // Treat an empty string (e.g. a blank Vercel env var) as unset so the
+    // format-constrained optional keys do not fail validation when billing is
+    // not configured for an environment.
+    emptyStringAsUndefined: true,
   });

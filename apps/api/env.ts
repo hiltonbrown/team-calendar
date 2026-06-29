@@ -29,4 +29,7 @@ export const env = createEnv({
   server: { STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional() },
   client: {},
   runtimeEnv: { STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET },
+  // A blank Vercel env var must behave as unset, otherwise the format
+  // constraint rejects it even though the variable is optional.
+  emptyStringAsUndefined: true,
 });
