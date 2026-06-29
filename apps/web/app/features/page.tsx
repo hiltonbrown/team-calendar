@@ -139,7 +139,7 @@ const caps: Cap[] = [
 ];
 
 const FeaturesCaps = () => (
-  <section className="ft-section">
+  <section className="ft-section" id="leave-workflow">
     <div className="fmkt-container">
       <p className="fmkt-overline">Capabilities</p>
       <h2>The work the calendar tab can&apos;t do.</h2>
@@ -168,7 +168,7 @@ const FeaturesCaps = () => (
 // ---- Sync flow diagram -------------------------------------------------------
 
 const FeaturesFlow = () => (
-  <section className="ft-section">
+  <section className="ft-section" id="ics-feeds">
     <div className="fmkt-container">
       <p className="fmkt-overline">Sync model</p>
       <h2>Xero is the source. Calendars are the destination.</h2>

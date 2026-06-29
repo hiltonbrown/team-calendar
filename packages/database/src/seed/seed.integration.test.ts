@@ -1,6 +1,7 @@
 import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { seedOrganisations } from "./data";
+import { PLAN_CATALOGUE } from "./plans";
 import { seedDevelopmentData } from "./seed";
 
 config({ path: new URL("../../.env", import.meta.url).pathname });
@@ -25,6 +26,11 @@ const expectedPeople = personIds.length;
 const expectedTeams = teamIds.length;
 const expectedLocations = locationIds.length;
 const expectedOrganisations = organisationIds.length;
+const expectedPlans = PLAN_CATALOGUE.length;
+const expectedPlanLimits = PLAN_CATALOGUE.reduce(
+  (total, plan) => total + Object.keys(plan.limits).length,
+  0
+);
 
 // Clean by the test clerk_org_id scope (as the other database integration tests
 // do) so any row the seed touched is removed, even one matched by the people
@@ -55,6 +61,8 @@ describe("seedDevelopmentData", () => {
       teams: expectedTeams,
       locations: expectedLocations,
       people: expectedPeople,
+      plans: expectedPlans,
+      planLimits: expectedPlanLimits,
     });
 
     const second = await seedDevelopmentData(database, {
