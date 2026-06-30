@@ -27,6 +27,7 @@
         "@repo/analytics": "*",
         "@repo/auth": "*",
         "@repo/availability": "*",
+        "@repo/billing": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/email": "*",
@@ -65,6 +66,7 @@
         "@repo/analytics": "*",
         "@repo/auth": "*",
         "@repo/availability": "*",
+        "@repo/billing": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/design-system": "*",
@@ -197,6 +199,8 @@
       "dependencies": {
         "@clerk/nextjs": "^7.3.7",
         "@clerk/themes": "^2.4.57",
+        "@repo/core": "*",
+        "@repo/database": "*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "next-themes": "^0.4.6",
         "react": "19.2.6",
@@ -216,6 +220,7 @@
       "name": "@repo/availability",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/auth": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/feeds": "*",
@@ -229,6 +234,23 @@
       "devDependencies": {
         "@repo/typescript-config": "*",
         "dotenv": "^17.4.2",
+        "typescript": "^6.0.3",
+        "vitest": "^4.1.7",
+      },
+    },
+    "packages/billing": {
+      "name": "@repo/billing",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/core": "*",
+        "@repo/database": "*",
+        "@t3-oss/env-nextjs": "^0.13.11",
+        "server-only": "^0.0.1",
+        "stripe": "^20.0.0",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@repo/typescript-config": "*",
         "typescript": "^6.0.3",
         "vitest": "^4.1.7",
       },
@@ -339,6 +361,7 @@
       "name": "@repo/feeds",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/auth": "*",
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/observability": "*",
@@ -1235,6 +1258,8 @@
     "@repo/auth": ["@repo/auth@workspace:packages/auth"],
 
     "@repo/availability": ["@repo/availability@workspace:packages/availability"],
+
+    "@repo/billing": ["@repo/billing@workspace:packages/billing"],
 
     "@repo/core": ["@repo/core@workspace:packages/core"],
 
@@ -2757,6 +2782,8 @@
     "strip-bom": ["strip-bom@3.0.0", "", {}, "sha512-vavAMRXOgBVNF6nyEEmL3DBK19iRpDcoIwW+swQ+CbGiu7lju6t+JklA1MHweoWtadgt4ISVUsXLyDq34ddcwA=="],
 
     "strip-bom-string": ["strip-bom-string@1.0.0", "", {}, "sha512-uCC2VHvQRYu+lMh4My/sFNmF2klFymLX1wHJeXnbEJERpV/ZsVuonzerjfrGpIGF7LBVa1O7i9kjiWvJiFck8g=="],
+
+    "stripe": ["stripe@20.4.1", "", { "peerDependencies": { "@types/node": ">=16" }, "optionalPeers": ["@types/node"] }, "sha512-axCguHItc8Sxt0HC6aSkdVRPffjYPV7EQqZRb2GkIa8FzWDycE7nHJM19C6xAIynH1Qp1/BHiopSi96jGBxT0w=="],
 
     "stubborn-fs": ["stubborn-fs@2.0.0", "", { "dependencies": { "stubborn-utils": "^1.0.1" } }, "sha512-Y0AvSwDw8y+nlSNFXMm2g6L51rBGdAQT20J3YSOqxC53Lo3bjWRtr2BKcfYoAf352WYpsZSTURrA0tqhfgudPA=="],
 

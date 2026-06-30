@@ -33,7 +33,7 @@ const expectPrismaErrorCode = async (
 beforeEach(async () => {
   await cleanTestData();
   await database.plan.create({
-    data: { id: planId, key: planKey, name: "Test plan" },
+    data: { id: planId, key: planKey, plan_key: planKey, name: "Test plan" },
   });
 });
 

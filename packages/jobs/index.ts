@@ -25,6 +25,11 @@ export {
   reconcileXeroApprovalStateFunction,
 } from "./src/handlers/reconcile-xero-approval-state";
 export {
+  type RecountUsageInput,
+  recountUsage,
+  recountUsageFunction,
+} from "./src/handlers/recount-usage";
+export {
   type SyncXeroLeaveBalancesInput,
   syncXeroLeaveBalances,
   syncXeroLeaveBalancesFunction,

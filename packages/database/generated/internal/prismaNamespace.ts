@@ -413,7 +413,8 @@ export const ModelName = {
   Plan: 'Plan',
   PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
-  UsageCounter: 'UsageCounter'
+  UsageCounter: 'UsageCounter',
+  StripeEvent: 'StripeEvent'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -429,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2653,6 +2654,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    StripeEvent: {
+      payload: Prisma.$StripeEventPayload<ExtArgs>
+      fields: Prisma.StripeEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.StripeEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.StripeEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        findFirst: {
+          args: Prisma.StripeEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.StripeEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        findMany: {
+          args: Prisma.StripeEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>[]
+        }
+        create: {
+          args: Prisma.StripeEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        createMany: {
+          args: Prisma.StripeEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.StripeEventCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>[]
+        }
+        delete: {
+          args: Prisma.StripeEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        update: {
+          args: Prisma.StripeEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.StripeEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.StripeEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.StripeEventUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>[]
+        }
+        upsert: {
+          args: Prisma.StripeEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$StripeEventPayload>
+        }
+        aggregate: {
+          args: Prisma.StripeEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateStripeEvent>
+        }
+        groupBy: {
+          args: Prisma.StripeEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StripeEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.StripeEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.StripeEventCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -3263,8 +3338,11 @@ export type AuditEventScalarFieldEnum = (typeof AuditEventScalarFieldEnum)[keyof
 export const PlanScalarFieldEnum = {
   id: 'id',
   key: 'key',
+  plan_key: 'plan_key',
   name: 'name',
   is_active: 'is_active',
+  is_custom: 'is_custom',
+  stripe_price_id: 'stripe_price_id',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -3291,6 +3369,10 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   status: 'status',
   current_period_end: 'current_period_end',
   seats_purchased: 'seats_purchased',
+  stripe_customer_id: 'stripe_customer_id',
+  stripe_subscription_id: 'stripe_subscription_id',
+  cancel_at_period_end: 'cancel_at_period_end',
+  ended_at: 'ended_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -3302,6 +3384,7 @@ export const UsageCounterScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   metric_key: 'metric_key',
+  counter_type: 'counter_type',
   current_value: 'current_value',
   period_start: 'period_start',
   period_end: 'period_end',
@@ -3310,6 +3393,18 @@ export const UsageCounterScalarFieldEnum = {
 } as const
 
 export type UsageCounterScalarFieldEnum = (typeof UsageCounterScalarFieldEnum)[keyof typeof UsageCounterScalarFieldEnum]
+
+
+export const StripeEventScalarFieldEnum = {
+  id: 'id',
+  stripe_event_id: 'stripe_event_id',
+  type: 'type',
+  processed_at: 'processed_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -4016,6 +4111,7 @@ export type GlobalOmitConfig = {
   planLimit?: Prisma.PlanLimitOmit
   clerkOrgSubscription?: Prisma.ClerkOrgSubscriptionOmit
   usageCounter?: Prisma.UsageCounterOmit
+  stripeEvent?: Prisma.StripeEventOmit
 }
 
 /* Types for Logging */

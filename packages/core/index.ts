@@ -28,6 +28,25 @@ export type PersonId = Brand<string, "PersonId">;
 export type AvailabilityRecordId = Brand<string, "AvailabilityRecordId">;
 export type FeedId = Brand<string, "FeedId">;
 
+export type PlanKey = "basic" | "premium" | "enterprise";
+export type LimitType = "payroll_entities" | "seats" | "feeds";
+export type FeatureKey = "analytics" | "priority_support";
+
+export const planKeys = [
+  "basic",
+  "premium",
+  "enterprise",
+] as const satisfies readonly PlanKey[];
+export const limitTypes = [
+  "payroll_entities",
+  "seats",
+  "feeds",
+] as const satisfies readonly LimitType[];
+export const featureKeys = [
+  "analytics",
+  "priority_support",
+] as const satisfies readonly FeatureKey[];
+
 export const toDateOnly = (date: Date): string =>
   date.toISOString().slice(0, 10);
 

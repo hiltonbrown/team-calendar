@@ -1,0 +1,24 @@
+{
+  "name": "@repo/billing",
+  "version": "0.0.0",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "scripts": {
+    "clean": "git clean -xdf .cache .turbo dist node_modules",
+    "test": "NODE_ENV=test vitest run",
+    "typecheck": "tsc --noEmit --emitDeclarationOnly false"
+  },
+  "dependencies": {
+    "@repo/core": "*",
+    "@repo/database": "*",
+    "@t3-oss/env-nextjs": "^0.13.11",
+    "server-only": "^0.0.1",
+    "stripe": "^20.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "*",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7"
+  }
+}

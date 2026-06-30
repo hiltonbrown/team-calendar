@@ -4,12 +4,15 @@ import {
   type OrganisationSeed,
   seedOrganisations,
 } from "./data";
+import { syncPlansFromCatalogue } from "./plan-sync";
 
 export interface SeedSummary {
   clerkOrgId: string;
   locations: number;
   organisations: number;
   people: number;
+  planLimits: number;
+  plans: number;
   teams: number;
 }
 
@@ -146,6 +149,8 @@ export const seedDevelopmentData = async (
   let locations = 0;
   let people = 0;
 
+  const planSummary = await syncPlansFromCatalogue(db);
+
   for (const org of seedOrganisations) {
     await seedOrganisation(db, clerkOrgId, org);
     teams += org.teams.length;
@@ -159,5 +164,7 @@ export const seedDevelopmentData = async (
     teams,
     locations,
     people,
+    planLimits: planSummary.limits,
+    plans: planSummary.plans,
   };
 };

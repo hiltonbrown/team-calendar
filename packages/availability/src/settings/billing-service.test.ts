@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  clerkOrgSubscriptionFindUnique: vi.fn(),
-  usageCounterFindMany: vi.fn(),
+  getPlanLimits: vi.fn(),
+  getSubscriptionForOrg: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: {
-    clerkOrgSubscription: {
-      findUnique: mocks.clerkOrgSubscriptionFindUnique,
-    },
-    usageCounter: {
-      findMany: mocks.usageCounterFindMany,
-    },
-  },
+  database: { $queryRaw: mocks.queryRaw },
+  getPlanDefinition: (key: string) => ({
+    name: `${key.charAt(0).toUpperCase()}${key.slice(1)}`,
+  }),
+  getPlanLimits: mocks.getPlanLimits,
+  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  limitTypes: ["payroll_entities", "seats", "feeds"],
 }));
 
 const { getBillingSummary, getBillingSummaryForDashboard } = await import(
@@ -31,23 +31,20 @@ const baseInput = {
 describe("billing-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.clerkOrgSubscriptionFindUnique.mockResolvedValue({
+    mocks.getSubscriptionForOrg.mockResolvedValue({
       clerk_org_id: "org_1",
       current_period_end: new Date("2026-05-01T00:00:00.000Z"),
-      id: "sub_1",
-      plan_key: "pro",
-      seats_purchased: 10,
+      plan_key: "premium",
       status: "active",
     });
-    mocks.usageCounterFindMany.mockResolvedValue([
-      {
-        current_value: 42,
-        metric_key: "people_count",
-      },
-      {
-        current_value: 8,
-        metric_key: "active_feeds",
-      },
+    mocks.getPlanLimits.mockResolvedValue({
+      feeds: -1,
+      payroll_entities: 2,
+      seats: 50,
+    });
+    mocks.queryRaw.mockResolvedValue([
+      { current_value: 1, metric_key: "payroll_entities" },
+      { current_value: 8, metric_key: "seats" },
     ]);
   });
 
@@ -57,13 +54,12 @@ describe("billing-service", () => {
     expect(result).toMatchObject({
       ok: true,
       value: {
-        hasContactFlow: false,
-        hasUpgradeFlow: false,
+        hasContactFlow: true,
+        hasUpgradeFlow: true,
         isOverLimit: false,
         plan: {
-          key: "pro",
-          label: "Pro",
-          seatsPurchased: 10,
+          key: "premium",
+          label: "Premium",
           status: "active",
         },
       },
@@ -82,23 +78,30 @@ describe("billing-service", () => {
     });
   });
 
-  it("returns subscription_not_found when no row exists", async () => {
-    mocks.clerkOrgSubscriptionFindUnique.mockResolvedValue(null);
+  it("defaults to the basic plan when no subscription row exists", async () => {
+    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getPlanLimits.mockResolvedValue({
+      feeds: 2,
+      payroll_entities: 1,
+      seats: 10,
+    });
 
     const result = await getBillingSummary(baseInput);
 
     expect(result).toMatchObject({
-      ok: false,
-      error: { code: "subscription_not_found" },
+      ok: true,
+      value: { plan: { key: "basic", label: "Basic", status: "active" } },
     });
   });
 
   it("flags over-limit metrics", async () => {
-    mocks.usageCounterFindMany.mockResolvedValue([
-      {
-        current_value: 501,
-        metric_key: "people_count",
-      },
+    mocks.getPlanLimits.mockResolvedValue({
+      feeds: 2,
+      payroll_entities: 1,
+      seats: 10,
+    });
+    mocks.queryRaw.mockResolvedValue([
+      { current_value: 5, metric_key: "feeds" },
     ]);
 
     const result = await getBillingSummary(baseInput);
@@ -107,6 +110,16 @@ describe("billing-service", () => {
       ok: true,
       value: { isOverLimit: true },
     });
+  });
+
+  it("treats an unlimited (-1) limit as never over-limit", async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { current_value: 9999, metric_key: "feeds" },
+    ]);
+
+    const result = await getBillingSummary(baseInput);
+
+    expect(result).toMatchObject({ ok: true, value: { isOverLimit: false } });
   });
 
   it("returns dashboard summary for admins with locked visibility", async () => {

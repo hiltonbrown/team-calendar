@@ -1,7 +1,13 @@
 import "server-only";
 
-import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { type PlanKey, planKeys, type Result } from "@repo/core";
+import {
+  database,
+  getPlanDefinition,
+  getPlanLimits,
+  getSubscriptionForOrg,
+  limitTypes,
+} from "@repo/database";
 import { z } from "zod";
 
 export interface BillingSummary {
@@ -47,24 +53,6 @@ const SummarySchema = z.object({
   organisationId: z.string().uuid(),
 });
 
-const LIMITS: Record<
-  string,
-  Partial<Record<string, { limit: number | null; unit: string }>>
-> = {
-  enterprise: {
-    active_feeds: { limit: null, unit: "feeds" },
-    people_count: { limit: null, unit: "people" },
-  },
-  free: {
-    active_feeds: { limit: 2, unit: "feeds" },
-    people_count: { limit: 5, unit: "people" },
-  },
-  pro: {
-    active_feeds: { limit: 100, unit: "feeds" },
-    people_count: { limit: 500, unit: "people" },
-  },
-};
-
 export async function getBillingSummary(
   input: z.input<typeof SummarySchema>
 ): Promise<Result<BillingSummary, BillingServiceError>> {
@@ -91,8 +79,8 @@ export async function getBillingSummary(
     ok: true,
     value: {
       ...summaryResult.value,
-      hasContactFlow: false,
-      hasUpgradeFlow: false,
+      hasContactFlow: true,
+      hasUpgradeFlow: true,
     },
   };
 }
@@ -138,32 +126,24 @@ async function loadBillingSummary(
 ): Promise<Result<BillingSummaryCore, BillingServiceError>> {
   try {
     const [subscription, usage] = await Promise.all([
-      database.clerkOrgSubscription.findUnique({
-        where: { clerk_org_id: input.clerkOrgId },
-      }),
-      database.usageCounter.findMany({
-        where: { clerk_org_id: input.clerkOrgId },
-        orderBy: [{ metric_key: "asc" }, { period_start: "desc" }],
-      }),
+      getSubscriptionForOrg(input.clerkOrgId),
+      database.$queryRaw<
+        Array<{ metric_key: string; current_value: number }>
+      >`SELECT DISTINCT ON (metric_key) metric_key, current_value FROM usage_counters WHERE clerk_org_id = ${input.clerkOrgId} AND metric_key IN ('payroll_entities', 'seats', 'feeds') ORDER BY metric_key ASC, period_start DESC`,
     ]);
 
-    if (!subscription) {
-      return {
-        ok: false,
-        error: {
-          code: "subscription_not_found",
-          message: "No billing subscription is configured for this account.",
-        },
-      };
-    }
-
-    const planLimits = LIMITS[subscription.plan_key] ?? {};
-    const usageItems = usage.map((item) => ({
-      currentValue: item.current_value,
-      label: labelForMetric(item.metric_key),
-      limit: planLimits[item.metric_key]?.limit ?? null,
-      metricKey: item.metric_key,
-      unit: planLimits[item.metric_key]?.unit ?? "units",
+    const planKey =
+      planKeys.find((key) => key === subscription?.plan_key) ?? "basic";
+    const planLimits = await getPlanLimits(planKey);
+    const usageByMetric = new Map(
+      usage.map((item) => [item.metric_key, item.current_value])
+    );
+    const usageItems = limitTypes.map((limitType) => ({
+      currentValue: usageByMetric.get(limitType) ?? 0,
+      label: labelForMetric(limitType),
+      limit: planLimits[limitType] === -1 ? null : planLimits[limitType],
+      metricKey: limitType,
+      unit: labelForMetric(limitType).toLowerCase(),
     }));
 
     return {
@@ -173,11 +153,11 @@ async function loadBillingSummary(
           (item) => item.limit !== null && item.currentValue > item.limit
         ),
         plan: {
-          currentPeriodEnd: subscription.current_period_end,
-          key: subscription.plan_key,
-          label: labelForPlan(subscription.plan_key),
-          seatsPurchased: subscription.seats_purchased,
-          status: subscription.status,
+          currentPeriodEnd: subscription?.current_period_end ?? null,
+          key: planKey,
+          label: labelForPlan(planKey),
+          seatsPurchased: 0,
+          status: subscription?.status ?? "active",
         },
         usage: usageItems,
       },
@@ -187,22 +167,19 @@ async function loadBillingSummary(
   }
 }
 
-function labelForPlan(value: string): string {
-  if (value === "enterprise") {
-    return "Enterprise";
-  }
-  if (value === "pro") {
-    return "Pro";
-  }
-  return "Free";
+function labelForPlan(value: PlanKey): string {
+  return getPlanDefinition(value).name;
 }
 
 function labelForMetric(value: string): string {
-  if (value === "people_count") {
-    return "People";
+  if (value === "payroll_entities") {
+    return "Payroll entities";
   }
-  if (value === "active_feeds") {
-    return "Active feeds";
+  if (value === "seats") {
+    return "Seats";
+  }
+  if (value === "feeds") {
+    return "Feeds";
   }
   return value.replaceAll("_", " ");
 }

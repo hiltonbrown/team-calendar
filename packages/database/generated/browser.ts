@@ -167,3 +167,8 @@ export type ClerkOrgSubscription = Prisma.ClerkOrgSubscriptionModel
  * 
  */
 export type UsageCounter = Prisma.UsageCounterModel
+/**
+ * Model StripeEvent
+ * 
+ */
+export type StripeEvent = Prisma.StripeEventModel

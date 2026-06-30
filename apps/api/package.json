@@ -34,7 +34,8 @@
     "require-in-the-middle": "8.0.1",
     "server-only": "^0.0.1",
     "svix": "^1.94.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@repo/billing": "*"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",

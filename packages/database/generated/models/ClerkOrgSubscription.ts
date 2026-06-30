@@ -41,6 +41,10 @@ export type ClerkOrgSubscriptionMinAggregateOutputType = {
   status: string | null
   current_period_end: Date | null
   seats_purchased: number | null
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  cancel_at_period_end: boolean | null
+  ended_at: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -52,6 +56,10 @@ export type ClerkOrgSubscriptionMaxAggregateOutputType = {
   status: string | null
   current_period_end: Date | null
   seats_purchased: number | null
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  cancel_at_period_end: boolean | null
+  ended_at: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -63,6 +71,10 @@ export type ClerkOrgSubscriptionCountAggregateOutputType = {
   status: number
   current_period_end: number
   seats_purchased: number
+  stripe_customer_id: number
+  stripe_subscription_id: number
+  cancel_at_period_end: number
+  ended_at: number
   created_at: number
   updated_at: number
   _all: number
@@ -84,6 +96,10 @@ export type ClerkOrgSubscriptionMinAggregateInputType = {
   status?: true
   current_period_end?: true
   seats_purchased?: true
+  stripe_customer_id?: true
+  stripe_subscription_id?: true
+  cancel_at_period_end?: true
+  ended_at?: true
   created_at?: true
   updated_at?: true
 }
@@ -95,6 +111,10 @@ export type ClerkOrgSubscriptionMaxAggregateInputType = {
   status?: true
   current_period_end?: true
   seats_purchased?: true
+  stripe_customer_id?: true
+  stripe_subscription_id?: true
+  cancel_at_period_end?: true
+  ended_at?: true
   created_at?: true
   updated_at?: true
 }
@@ -106,6 +126,10 @@ export type ClerkOrgSubscriptionCountAggregateInputType = {
   status?: true
   current_period_end?: true
   seats_purchased?: true
+  stripe_customer_id?: true
+  stripe_subscription_id?: true
+  cancel_at_period_end?: true
+  ended_at?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -204,6 +228,10 @@ export type ClerkOrgSubscriptionGroupByOutputType = {
   status: string
   current_period_end: Date | null
   seats_purchased: number
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  cancel_at_period_end: boolean
+  ended_at: Date | null
   created_at: Date
   updated_at: Date
   _count: ClerkOrgSubscriptionCountAggregateOutputType | null
@@ -238,6 +266,10 @@ export type ClerkOrgSubscriptionWhereInput = {
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
+  stripe_customer_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  stripe_subscription_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  ended_at?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   plan?: Prisma.XOR<Prisma.PlanScalarRelationFilter, Prisma.PlanWhereInput>
@@ -250,6 +282,10 @@ export type ClerkOrgSubscriptionOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrderInput | Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
+  stripe_customer_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  stripe_subscription_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  ended_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   plan?: Prisma.PlanOrderByWithRelationInput
@@ -265,6 +301,10 @@ export type ClerkOrgSubscriptionWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
+  stripe_customer_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  stripe_subscription_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  ended_at?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   plan?: Prisma.XOR<Prisma.PlanScalarRelationFilter, Prisma.PlanWhereInput>
@@ -277,6 +317,10 @@ export type ClerkOrgSubscriptionOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrderInput | Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
+  stripe_customer_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  stripe_subscription_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  ended_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.ClerkOrgSubscriptionCountOrderByAggregateInput
@@ -296,6 +340,10 @@ export type ClerkOrgSubscriptionScalarWhereWithAggregatesInput = {
   status?: Prisma.StringWithAggregatesFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string | null
   seats_purchased?: Prisma.IntWithAggregatesFilter<"ClerkOrgSubscription"> | number
+  stripe_customer_id?: Prisma.StringNullableWithAggregatesFilter<"ClerkOrgSubscription"> | string | null
+  stripe_subscription_id?: Prisma.StringNullableWithAggregatesFilter<"ClerkOrgSubscription"> | string | null
+  cancel_at_period_end?: Prisma.BoolWithAggregatesFilter<"ClerkOrgSubscription"> | boolean
+  ended_at?: Prisma.DateTimeNullableWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"ClerkOrgSubscription"> | Date | string
 }
@@ -306,6 +354,10 @@ export type ClerkOrgSubscriptionCreateInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   plan: Prisma.PlanCreateNestedOneWithoutClerk_org_subscriptionsInput
@@ -318,6 +370,10 @@ export type ClerkOrgSubscriptionUncheckedCreateInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -328,6 +384,10 @@ export type ClerkOrgSubscriptionUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   plan?: Prisma.PlanUpdateOneRequiredWithoutClerk_org_subscriptionsNestedInput
@@ -340,6 +400,10 @@ export type ClerkOrgSubscriptionUncheckedUpdateInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -351,6 +415,10 @@ export type ClerkOrgSubscriptionCreateManyInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -361,6 +429,10 @@ export type ClerkOrgSubscriptionUpdateManyMutationInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -372,6 +444,10 @@ export type ClerkOrgSubscriptionUncheckedUpdateManyInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -393,6 +469,10 @@ export type ClerkOrgSubscriptionCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
+  stripe_customer_id?: Prisma.SortOrder
+  stripe_subscription_id?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  ended_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -408,6 +488,10 @@ export type ClerkOrgSubscriptionMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
+  stripe_customer_id?: Prisma.SortOrder
+  stripe_subscription_id?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  ended_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -419,6 +503,10 @@ export type ClerkOrgSubscriptionMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   current_period_end?: Prisma.SortOrder
   seats_purchased?: Prisma.SortOrder
+  stripe_customer_id?: Prisma.SortOrder
+  stripe_subscription_id?: Prisma.SortOrder
+  cancel_at_period_end?: Prisma.SortOrder
+  ended_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -475,6 +563,10 @@ export type ClerkOrgSubscriptionCreateWithoutPlanInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -485,6 +577,10 @@ export type ClerkOrgSubscriptionUncheckedCreateWithoutPlanInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -525,6 +621,10 @@ export type ClerkOrgSubscriptionScalarWhereInput = {
   status?: Prisma.StringFilter<"ClerkOrgSubscription"> | string
   current_period_end?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   seats_purchased?: Prisma.IntFilter<"ClerkOrgSubscription"> | number
+  stripe_customer_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  stripe_subscription_id?: Prisma.StringNullableFilter<"ClerkOrgSubscription"> | string | null
+  cancel_at_period_end?: Prisma.BoolFilter<"ClerkOrgSubscription"> | boolean
+  ended_at?: Prisma.DateTimeNullableFilter<"ClerkOrgSubscription"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"ClerkOrgSubscription"> | Date | string
 }
@@ -535,6 +635,10 @@ export type ClerkOrgSubscriptionCreateManyPlanInput = {
   status: string
   current_period_end?: Date | string | null
   seats_purchased?: number
+  stripe_customer_id?: string | null
+  stripe_subscription_id?: string | null
+  cancel_at_period_end?: boolean
+  ended_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -545,6 +649,10 @@ export type ClerkOrgSubscriptionUpdateWithoutPlanInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -555,6 +663,10 @@ export type ClerkOrgSubscriptionUncheckedUpdateWithoutPlanInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -565,6 +677,10 @@ export type ClerkOrgSubscriptionUncheckedUpdateManyWithoutPlanInput = {
   status?: Prisma.StringFieldUpdateOperationsInput | string
   current_period_end?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   seats_purchased?: Prisma.IntFieldUpdateOperationsInput | number
+  stripe_customer_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stripe_subscription_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  cancel_at_period_end?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ended_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -578,6 +694,10 @@ export type ClerkOrgSubscriptionSelect<ExtArgs extends runtime.Types.Extensions.
   status?: boolean
   current_period_end?: boolean
   seats_purchased?: boolean
+  stripe_customer_id?: boolean
+  stripe_subscription_id?: boolean
+  cancel_at_period_end?: boolean
+  ended_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
@@ -590,6 +710,10 @@ export type ClerkOrgSubscriptionSelectCreateManyAndReturn<ExtArgs extends runtim
   status?: boolean
   current_period_end?: boolean
   seats_purchased?: boolean
+  stripe_customer_id?: boolean
+  stripe_subscription_id?: boolean
+  cancel_at_period_end?: boolean
+  ended_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
@@ -602,6 +726,10 @@ export type ClerkOrgSubscriptionSelectUpdateManyAndReturn<ExtArgs extends runtim
   status?: boolean
   current_period_end?: boolean
   seats_purchased?: boolean
+  stripe_customer_id?: boolean
+  stripe_subscription_id?: boolean
+  cancel_at_period_end?: boolean
+  ended_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
@@ -614,11 +742,15 @@ export type ClerkOrgSubscriptionSelectScalar = {
   status?: boolean
   current_period_end?: boolean
   seats_purchased?: boolean
+  stripe_customer_id?: boolean
+  stripe_subscription_id?: boolean
+  cancel_at_period_end?: boolean
+  ended_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type ClerkOrgSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "plan_key" | "status" | "current_period_end" | "seats_purchased" | "created_at" | "updated_at", ExtArgs["result"]["clerkOrgSubscription"]>
+export type ClerkOrgSubscriptionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "plan_key" | "status" | "current_period_end" | "seats_purchased" | "stripe_customer_id" | "stripe_subscription_id" | "cancel_at_period_end" | "ended_at" | "created_at" | "updated_at", ExtArgs["result"]["clerkOrgSubscription"]>
 export type ClerkOrgSubscriptionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   plan?: boolean | Prisma.PlanDefaultArgs<ExtArgs>
 }
@@ -641,6 +773,10 @@ export type $ClerkOrgSubscriptionPayload<ExtArgs extends runtime.Types.Extension
     status: string
     current_period_end: Date | null
     seats_purchased: number
+    stripe_customer_id: string | null
+    stripe_subscription_id: string | null
+    cancel_at_period_end: boolean
+    ended_at: Date | null
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["clerkOrgSubscription"]>
@@ -1073,6 +1209,10 @@ export interface ClerkOrgSubscriptionFieldRefs {
   readonly status: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
   readonly current_period_end: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
   readonly seats_purchased: Prisma.FieldRef<"ClerkOrgSubscription", 'Int'>
+  readonly stripe_customer_id: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
+  readonly stripe_subscription_id: Prisma.FieldRef<"ClerkOrgSubscription", 'String'>
+  readonly cancel_at_period_end: Prisma.FieldRef<"ClerkOrgSubscription", 'Boolean'>
+  readonly ended_at: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"ClerkOrgSubscription", 'DateTime'>
 }
