@@ -111,6 +111,28 @@ const AboutPage = () => (
       </div>
     </section>
 
+    <section className="marketing-simple__section">
+      <div className="fmkt-container">
+        <div className="marketing-simple__founder">
+          <p className="marketing-simple__kicker">Co-founder, sort of</p>
+          <h3 className="marketing-simple__founder-name">Connie</h3>
+          <p className="marketing-simple__founder-role">
+            Chief Availability Tester
+          </p>
+          <p className="marketing-simple__section-copy">
+            Connie holds the only role at Team Calendar with genuine, unbroken
+            visibility into who is working from home. She field-tests the
+            product daily by sitting on the keyboard mid-approval, and has
+            personally verified that a warm laptop is the most reliable
+            indicator of availability yet devised. Her leave balance is
+            theoretical. Her out-of-office status is permanent. She has never
+            once used Xero, and remains unavailable for comment.
+          </p>
+          {/* CONNIE PHOTO PENDING: add /marketing/connie.jpg (or similar) and caption */}
+        </div>
+      </div>
+    </section>
+
     <section className="marketing-simple__section marketing-simple__section--tonal">
       <div className="fmkt-container">
         <div className="marketing-simple__callout">
