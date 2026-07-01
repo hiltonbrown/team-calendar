@@ -7,24 +7,24 @@ import Link from "next/link";
 export const metadata: Metadata = createMetadata({
   title: "About",
   description:
-    "Team Calendar helps Xero Payroll organisations publish clear team availability to the calendars people already use.",
+    "Team Calendar helps small businesses on Xero Payroll publish clear team availability to the calendars people already use, so leave stops slipping through texts, forms and memory.",
 });
 
 const principles = [
   {
     icon: CalendarCheck,
     title: "Calendars should stay current",
-    copy: "Managers should not need to compare Xero, spreadsheets, chat messages, and shared calendars to know who is away.",
+    copy: "Nobody should compare Xero, a spreadsheet, chat messages and a shared calendar just to know who is away.",
   },
   {
     icon: ShieldCheck,
     title: "Payroll stays the source of truth",
-    copy: "Approved payroll leave remains anchored in Xero. Team Calendar adds the availability layer around it, including manual entries that do not belong in payroll.",
+    copy: "Approved payroll leave stays anchored in Xero. Team Calendar adds the availability layer around it, including manual entries that do not belong in payroll.",
   },
   {
     icon: MapPin,
     title: "Built close to the teams using it",
-    copy: "Team Calendar is built on the Gold Coast for organisations that need practical, careful tooling around real leave and payroll data.",
+    copy: "Made on the Gold Coast for small operators that need practical, careful tooling around real leave and payroll data.",
   },
 ];
 
@@ -38,8 +38,9 @@ const AboutPage = () => (
             Availability should be visible where work already happens.
           </h1>
           <p className="marketing-simple__lead">
-            {brandNameDisplay} exists to close the gap between approved leave,
-            manual availability, and the calendar tools teams check every day.
+            {brandNameDisplay} helps small businesses on Xero Payroll publish
+            clear team availability to the calendars people already use, so
+            leave stops slipping through texts, forms and memory.
           </p>
         </div>
       </div>
