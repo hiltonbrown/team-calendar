@@ -600,3 +600,79 @@
     grid-template-columns: 1fr;
   }
 }
+/* Problem section: creates urgency after the hero. Tonal layering only. */
+.fmkt-problem {
+  padding-block: clamp(4rem, 8vw, 6rem);
+  background-color: var(--surface-container-low);
+}
+
+.fmkt-problem__lead {
+  max-width: 46rem;
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+.fmkt-problem__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+
+@media (min-width: 640px) {
+  .fmkt-problem__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .fmkt-problem__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.fmkt-problem__card {
+  padding: 1.75rem;
+  background-color: var(--surface-container);
+  border-radius: 16px;
+}
+
+.fmkt-problem__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--primary);
+  background-color: var(--surface-container-high);
+  border-radius: 12px;
+}
+
+.fmkt-problem__title {
+  margin-top: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--on-surface);
+}
+
+.fmkt-problem__copy {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+[data-theme="dark"] .fmkt-problem {
+  background-color: var(--surface-container-low);
+}
+
+[data-theme="dark"] .fmkt-problem__card {
+  background-color: var(--surface-container);
+}
+
+[data-theme="dark"] .fmkt-problem__icon {
+  background-color: var(--surface-container-high);
+}
