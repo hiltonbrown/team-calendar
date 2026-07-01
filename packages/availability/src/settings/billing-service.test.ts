@@ -66,10 +66,22 @@ describe("billing-service", () => {
     });
   });
 
-  it("rejects non-owners", async () => {
+  it("allows admins", async () => {
     const result = await getBillingSummary({
       ...baseInput,
       actingRole: "admin",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { hasContactFlow: true, hasUpgradeFlow: true },
+    });
+  });
+
+  it("rejects roles below admin", async () => {
+    const result = await getBillingSummary({
+      ...baseInput,
+      actingRole: "viewer",
     });
 
     expect(result).toMatchObject({

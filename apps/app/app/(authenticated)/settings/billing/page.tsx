@@ -1,3 +1,4 @@
+import { requireRole } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import { getBillingSummary } from "@repo/availability";
 import { database } from "@repo/database";
@@ -17,15 +18,14 @@ interface BillingPageProps {
   searchParams: Promise<{ org?: string }>;
 }
 
-// S-22 Settings > Billing is Owner only. Billing, plan limits, and usage are
-// enforced at the Clerk Organisation level, and the catalogue reserves this
-// surface for the account owner. requirePageRole below denies admins and below,
-// so only owners reach the read-only owner billing view (plan, status, usage).
-// No in-app upgrade or checkout flow is wired: getBillingSummary returns
-// hasUpgradeFlow and hasContactFlow as false, so the page shows a "contact
-// support to change your plan" note instead of action buttons.
+// S-22 Settings > Billing. Billing, plan limits, and usage are enforced at the
+// Clerk Organisation level. requirePageRole below admits owners and admins and
+// denies managers and below, so they reach the read-only billing view (plan,
+// status, usage). Clerk assigns the org creator org:admin by default; org:owner
+// is a distinct higher role, so we resolve the actual acting role rather than
+// assume owner. getBillingSummary admits both owners and admins.
 const BillingPage = async ({ searchParams }: BillingPageProps) => {
-  await requirePageRole("org:owner");
+  await requirePageRole("org:admin");
   const [user, { org }] = await Promise.all([currentUser(), searchParams]);
   const { clerkOrgId, organisationId } = await requireActiveOrgPageContext(org);
 
@@ -33,8 +33,11 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
     return <PermissionDeniedState />;
   }
 
+  const isOwner = await requireRole("org:owner");
+  const actingRole = isOwner ? "owner" : "admin";
+
   const summary = await getBillingSummary({
-    actingRole: "owner",
+    actingRole,
     actingUserId: user.id,
     clerkOrgId,
     organisationId,

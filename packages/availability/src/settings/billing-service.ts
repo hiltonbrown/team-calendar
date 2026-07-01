@@ -60,7 +60,10 @@ export async function getBillingSummary(
   if (!parsed.success) {
     return unknownError("Failed to load billing summary.");
   }
-  if (parsed.data.actingRole !== "owner") {
+  if (
+    parsed.data.actingRole !== "owner" &&
+    parsed.data.actingRole !== "admin"
+  ) {
     return {
       ok: false,
       error: {
