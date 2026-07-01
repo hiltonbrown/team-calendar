@@ -79,6 +79,18 @@ const AboutPage = () => (
       </div>
     </section>
 
+    <section className="marketing-simple__section">
+      <div className="fmkt-container">
+        <div className="marketing-simple__section-head">
+          <h2 className="marketing-simple__section-title">Who is behind it.</h2>
+          {/* FOUNDER CONTENT PENDING: name, one-line reason, optional partner line */}
+          <p className="marketing-simple__section-copy">
+            Team Calendar is built and run on the Gold Coast.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <section className="marketing-simple__section marketing-simple__section--tonal">
       <div className="fmkt-container">
         <div className="marketing-simple__callout">
