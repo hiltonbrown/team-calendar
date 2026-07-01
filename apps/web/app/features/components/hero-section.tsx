@@ -8,13 +8,15 @@ export const HeroSection = () => (
       <div className="fmkt-hero__copy-inner">
         <div className="fmkt-pill">Now in early access</div>
         <h1 className="fmkt-hero__title">
-          Simple leave requests.
-          <em>Clear calendars for everyone.</em>
+          Out of office notifications, leave and working from home.
+          <em>There is a better way to manage it all.</em>
         </h1>
         <p className="fmkt-hero__body">
-          Your team requests leave in one place. Approved leave writes back to
-          Xero Payroll and publishes to everyone&rsquo;s Outlook, Google and
-          Apple calendars, automatically.
+          Team Calendar is for small businesses running Xero Payroll. Staff
+          request leave and flag working from home in one place, approved leave
+          writes back to Xero, and one accurate view publishes to
+          everyone&rsquo;s Outlook, Google and Apple calendar. No chasing, no
+          re-keying, no guessing who is in.
         </p>
         <div className="fmkt-hero__actions">
           <Link
