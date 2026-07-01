@@ -829,7 +829,7 @@ export const InteractiveHeroSection = () => {
             className="marketing-btn marketing-btn--primary"
             href={signUpHref}
           >
-            Start free trial
+            Sign up
           </Link>
           <Link
             className="marketing-btn marketing-btn--outline"
