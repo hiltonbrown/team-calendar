@@ -115,7 +115,7 @@ const syncDetails = [
   },
   {
     title: "Feed publishing",
-    copy: "Every feed is scoped, signed, revocable, and cached by feed and etag so calendar clients receive the latest published view.",
+    copy: "Every feed is scoped, signed, revocable, and cached by feed and etag so calendar clients receive the latest published view within 60 seconds of a change.",
   },
 ];
 
@@ -130,6 +130,10 @@ const IntegrationsPage = () => (
               Xero Payroll to every calendar your team already uses.
             </h1>
             <p className="fmkt-integrations__lead">
+              Connect your Xero Payroll file once, and Team Calendar keeps leave
+              and availability flowing to the calendars your team already uses.
+            </p>
+            <p className="fmkt-integrations__copy">
               Team Calendar connects to Xero Payroll, turns approved leave and
               manual availability into one canonical view, then publishes it to
               Outlook, Google Calendar, and Apple Calendar through secure ICS
