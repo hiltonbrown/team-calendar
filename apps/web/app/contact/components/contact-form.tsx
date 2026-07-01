@@ -17,7 +17,7 @@ import { useState } from "react";
 const contactCopy = {
   title: "Get in touch",
   description:
-    "Talk to us about connecting Team Calendar to your Xero Payroll account.",
+    "Talk to us about getting your small business onto Team Calendar, connected to your Xero Payroll file. Tell us your team size and we will help you set up.",
   benefits: [
     {
       title: "Quick setup",
@@ -41,7 +41,7 @@ const contactCopy = {
     firstName: "First name",
     lastName: "Last name",
     resume: "Upload file",
-    cta: "Book the call",
+    cta: "Book your setup call",
   },
 };
 
