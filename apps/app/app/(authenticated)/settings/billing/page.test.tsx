@@ -7,12 +7,16 @@ const mocks = vi.hoisted(() => ({
   getBillingSummary: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
+  requireRole: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("./actions", () => ({
   startCheckout: vi.fn(),
   startPortal: vi.fn(),
+}));
+vi.mock("@repo/auth/helpers", () => ({
+  requireRole: mocks.requireRole,
 }));
 vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
@@ -53,6 +57,7 @@ describe("BillingPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requirePageRole.mockResolvedValue(undefined);
+    mocks.requireRole.mockResolvedValue(true);
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "owner@example.com" }],
       firstName: "Owner",
@@ -66,13 +71,13 @@ describe("BillingPage", () => {
     mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
   });
 
-  it("requires owner access", async () => {
+  it("requires admin access", async () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
-    expect(mocks.requirePageRole).toHaveBeenCalledWith("org:owner");
+    expect(mocks.requirePageRole).toHaveBeenCalledWith("org:admin");
   });
 
-  it("denies non-owners when the role guard rejects", async () => {
+  it("denies managers and below when the role guard rejects", async () => {
     mocks.requirePageRole.mockRejectedValue(new Error("Permission denied"));
 
     await expect(Page({ searchParams: Promise.resolve({}) })).rejects.toThrow(
@@ -81,7 +86,9 @@ describe("BillingPage", () => {
     expect(mocks.getBillingSummary).not.toHaveBeenCalled();
   });
 
-  it("renders the owner billing view via the owner service", async () => {
+  it("renders the owner billing view when the user is an owner", async () => {
+    mocks.requireRole.mockResolvedValue(true);
+
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(mocks.getBillingSummary).toHaveBeenCalledWith(
@@ -90,5 +97,15 @@ describe("BillingPage", () => {
     expect(
       screen.queryByText("Billing actions are managed by the account owner.")
     ).toBeNull();
+  });
+
+  it("renders the billing view for admins as the admin role", async () => {
+    mocks.requireRole.mockResolvedValue(false);
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(mocks.getBillingSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ actingRole: "admin" })
+    );
   });
 });

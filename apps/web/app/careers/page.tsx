@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = createMetadata({
   title: "Careers",
   description:
-    "Careers at Team Calendar. We are building calm, precise availability software for Xero Payroll teams.",
+    "Careers at Team Calendar. We are building calm, precise availability software for small businesses on Xero Payroll.",
 });
 
 const values = [

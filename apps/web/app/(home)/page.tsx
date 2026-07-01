@@ -5,6 +5,7 @@ import { FinalCtaSection } from "../features/components/final-cta-section";
 import { HeroSection } from "../features/components/hero-section";
 import { HowItWorksSection } from "../features/components/how-it-works-section";
 import { CalendarIntegrationSection } from "./components/calendar-integration-section";
+import { ProblemSection } from "./components/problem-section";
 import { TeamTimelineSection } from "./components/team-timeline-section";
 
 export const metadata: Metadata = createMetadata({
@@ -17,6 +18,7 @@ export const metadata: Metadata = createMetadata({
 const Home = () => (
   <main className="fmkt-page">
     <HeroSection />
+    <ProblemSection />
     <FeatureCardsSection />
     <TeamTimelineSection />
     <CalendarIntegrationSection />

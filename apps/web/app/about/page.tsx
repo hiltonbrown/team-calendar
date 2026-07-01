@@ -7,24 +7,24 @@ import Link from "next/link";
 export const metadata: Metadata = createMetadata({
   title: "About",
   description:
-    "Team Calendar helps Xero Payroll organisations publish clear team availability to the calendars people already use.",
+    "Team Calendar helps small businesses on Xero Payroll publish clear team availability to the calendars people already use, so leave stops slipping through texts, forms and memory.",
 });
 
 const principles = [
   {
     icon: CalendarCheck,
     title: "Calendars should stay current",
-    copy: "Managers should not need to compare Xero, spreadsheets, chat messages, and shared calendars to know who is away.",
+    copy: "Nobody should compare Xero, a spreadsheet, chat messages and a shared calendar just to know who is away.",
   },
   {
     icon: ShieldCheck,
     title: "Payroll stays the source of truth",
-    copy: "Approved payroll leave remains anchored in Xero. Team Calendar adds the availability layer around it, including manual entries that do not belong in payroll.",
+    copy: "Approved payroll leave stays anchored in Xero. Team Calendar adds the availability layer around it, including manual entries that do not belong in payroll.",
   },
   {
     icon: MapPin,
     title: "Built close to the teams using it",
-    copy: "Team Calendar is built on the Gold Coast for organisations that need practical, careful tooling around real leave and payroll data.",
+    copy: "Made on the Gold Coast for small operators that need practical, careful tooling around real leave and payroll data.",
   },
 ];
 
@@ -38,8 +38,9 @@ const AboutPage = () => (
             Availability should be visible where work already happens.
           </h1>
           <p className="marketing-simple__lead">
-            {brandNameDisplay} exists to close the gap between approved leave,
-            manual availability, and the calendar tools teams check every day.
+            {brandNameDisplay} helps small businesses on Xero Payroll publish
+            clear team availability to the calendars people already use, so
+            leave stops slipping through texts, forms and memory.
           </p>
         </div>
       </div>
@@ -74,6 +75,60 @@ const AboutPage = () => (
               </article>
             );
           })}
+        </div>
+      </div>
+    </section>
+
+    <section className="marketing-simple__section">
+      <div className="fmkt-container">
+        <div className="marketing-simple__section-head">
+          <p className="marketing-simple__kicker">Who builds Team Calendar</p>
+          <h2 className="marketing-simple__section-title">
+            Built by someone who has done the admin.
+          </h2>
+          <p className="marketing-simple__section-copy">
+            Team Calendar is a small, focused product, not a platform play. It
+            is built close to the businesses using it, with a bias toward
+            accuracy over features.
+          </p>
+        </div>
+        <div className="marketing-simple__founder">
+          <h3 className="marketing-simple__founder-name">Hilton Brown</h3>
+          <p className="marketing-simple__founder-role">
+            Founder, Team Calendar
+          </p>
+          {/* FOUNDER BIO PENDING: replace with Hilton's one-paragraph bio */}
+          <p className="marketing-simple__section-copy">
+            A short biography is on the way. Team Calendar is built and run on
+            the Gold Coast by Hilton Brown, for small businesses that want leave
+            and availability to stay accurate without the admin.
+          </p>
+          {/* LINKEDIN PENDING: replace href with Hilton's LinkedIn URL */}
+          <a className="marketing-simple__link" href="#linkedin-pending">
+            Connect on LinkedIn
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section className="marketing-simple__section">
+      <div className="fmkt-container">
+        <div className="marketing-simple__founder">
+          <p className="marketing-simple__kicker">Co-founder, sort of</p>
+          <h3 className="marketing-simple__founder-name">Connie</h3>
+          <p className="marketing-simple__founder-role">
+            Chief Availability Tester
+          </p>
+          <p className="marketing-simple__section-copy">
+            Connie holds the only role at Team Calendar with genuine, unbroken
+            visibility into who is working from home. She field-tests the
+            product daily by sitting on the keyboard mid-approval, and has
+            personally verified that a warm laptop is the most reliable
+            indicator of availability yet devised. Her leave balance is
+            theoretical. Her out-of-office status is permanent. She has never
+            once used Xero, and remains unavailable for comment.
+          </p>
+          {/* CONNIE PHOTO PENDING: add /marketing/connie.jpg (or similar) and caption */}
         </div>
       </div>
     </section>

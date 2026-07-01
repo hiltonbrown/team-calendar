@@ -67,10 +67,10 @@ const FeaturesPersonas = () => (
   <section className="ft-section" id="coverage">
     <div className="fmkt-container">
       <p className="fmkt-overline">Built for everyone you work with</p>
-      <h2>Three kinds of people. One availability view.</h2>
+      <h2>Everyone who affects cover, on one calendar.</h2>
       <p className="ft-section__lead">
-        Most leave tools only see the payroll list. Team Calendar covers the
-        whole team, and keeps the source of each entry obvious. Sage came from
+        Most leave tools only see your payroll list. Team Calendar covers the
+        whole team and keeps the source of each entry obvious. Sage came from
         Xero. Purple was added by hand.
       </p>
       <div className="ft-personas">
@@ -173,9 +173,9 @@ const FeaturesFlow = () => (
       <p className="fmkt-overline">Sync model</p>
       <h2>Xero is the source. Calendars are the destination.</h2>
       <p className="ft-section__lead">
-        We don&apos;t ask you to replace Xero or re-do its leave types. We treat
-        it as the system of record and add the people and detail it can&apos;t
-        carry.
+        You keep Xero as your system of record. Team Calendar adds the people
+        and detail it cannot carry, then publishes one view your whole team can
+        see.
       </p>
 
       <div className="ft-flow">
@@ -226,7 +226,7 @@ const FeaturesFlow = () => (
             Conflicts flagged. Source labelled.
           </p>
           <span className="ft-flow__hub__rule">
-            <MarketingIcon id="sync" size={12} /> Updates within 60s
+            <MarketingIcon id="sync" size={12} /> Publishes within 60s
           </span>
         </div>
 

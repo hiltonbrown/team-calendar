@@ -118,18 +118,18 @@ interface FeatureCard {
 
 const cards: FeatureCard[] = [
   {
-    title: "Request leave without chasing forms",
-    copy: "Employees add dates, leave type and notes in one place, with fewer follow-up questions.",
+    title: "One place to request leave and flag WFH",
+    copy: "Staff add dates, leave type and notes in one place, whether it is annual leave or just working from home on Thursday. No more texts, forms and missed invites to chase.",
     mock: <LeaveFormMock />,
   },
   {
-    title: "Approved leave writes back to Xero",
-    copy: "Each approval syncs to Xero Payroll as a leave application, so records stay correct without re-keying.",
+    title: "Approved leave writes back to Xero, correctly",
+    copy: "Each approval writes to Xero Payroll as a leave application in the right type, synchronously. If a write fails, you see it straight away; it never fails silently and it never corrupts your payroll data.",
     mock: <WriteBackReceiptMock />,
   },
   {
-    title: "It shows up in everyone's calendar",
-    copy: "The same approved leave and manual entries publish to one secure feed your team subscribes to once.",
+    title: "Everyone sees who is in, automatically",
+    copy: "Approved leave and manual entries publish to one secure feed. Your team subscribes once in the calendar they already use, and never updates it by hand again.",
     mock: <FeedSubscriptionMock />,
   },
 ];
@@ -139,12 +139,13 @@ export const FeatureCardsSection = () => (
     <div className="fmkt-container">
       <div className="fmkt-section-header">
         <h2 className="fmkt-section-title">
-          From a leave request to <em>everyone&rsquo;s calendar.</em>
+          From a leave request to everyone&rsquo;s calendar,{" "}
+          <em>in under a minute.</em>
         </h2>
         <p className="fmkt-cards-section__lead">
-          Employees submit once. Approved leave writes back to Xero Payroll,
-          then publishes to the calendars your team already opens. No re-keying,
-          no separate planner to maintain.
+          Staff submit once. Approved leave writes back to Xero Payroll and
+          publishes to the calendars your team already opens, within 60 seconds.
+          No re-keying, no separate planner to maintain.
         </p>
       </div>
       <div className="fmkt-card-grid">

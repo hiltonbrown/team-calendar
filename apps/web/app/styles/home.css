@@ -530,3 +530,149 @@
     border: 1px solid CanvasText;
   }
 }
+
+/* ============ Problem section ============ */
+
+/* Section-level tint against the flat page background above and below is
+   the separation cue; cards sit a shade lighter again on top of it. No
+   borders, tonal layering only. */
+.fmkt-problem {
+  padding: 72px 0;
+  background: var(--surface-container-low);
+}
+
+.fmkt-problem__lead {
+  max-width: 640px;
+  margin: 14px 0 0;
+  font: 400 var(--text-body-lg) / 1.6 var(--font-sans);
+  color: var(--on-surface-variant);
+}
+
+.fmkt-problem__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--fmkt-card-grid-gap);
+}
+
+.fmkt-problem__card {
+  padding: 28px;
+  background: var(--surface-container-lowest);
+  border-radius: 16px;
+}
+
+.fmkt-problem__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-radius: 12px;
+}
+
+.fmkt-problem__title {
+  margin: 0 0 8px;
+  font: 500 22px / 1.3 var(--font-sans);
+  color: var(--inverse-surface);
+  letter-spacing: -0.01em;
+}
+
+.fmkt-problem__copy {
+  margin: 0;
+  font: 400 0.9375rem / 1.6 var(--font-sans);
+  color: var(--on-surface-variant);
+}
+
+@media (max-width: 1024px) {
+  .fmkt-problem__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .fmkt-problem {
+    padding: 64px 0;
+  }
+
+  .fmkt-problem__grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Problem section: creates urgency after the hero. Tonal layering only. */
+.fmkt-problem {
+  padding-block: clamp(4rem, 8vw, 6rem);
+  background-color: var(--surface-container-low);
+}
+
+.fmkt-problem__lead {
+  max-width: 46rem;
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+.fmkt-problem__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-top: clamp(2.5rem, 5vw, 3.5rem);
+}
+
+@media (min-width: 640px) {
+  .fmkt-problem__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .fmkt-problem__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.fmkt-problem__card {
+  padding: 1.75rem;
+  background-color: var(--surface-container);
+  border-radius: 16px;
+}
+
+.fmkt-problem__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  color: var(--primary);
+  background-color: var(--surface-container-high);
+  border-radius: 12px;
+}
+
+.fmkt-problem__title {
+  margin-top: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--on-surface);
+}
+
+.fmkt-problem__copy {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+[data-theme="dark"] .fmkt-problem {
+  background-color: var(--surface-container-low);
+}
+
+[data-theme="dark"] .fmkt-problem__card {
+  background-color: var(--surface-container);
+}
+
+[data-theme="dark"] .fmkt-problem__icon {
+  background-color: var(--surface-container-high);
+}

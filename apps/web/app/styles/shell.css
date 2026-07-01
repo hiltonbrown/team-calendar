@@ -474,6 +474,28 @@
   text-underline-offset: 4px;
 }
 
+.marketing-simple__founder {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 620px;
+  padding: clamp(28px, 4vw, 44px);
+  background: var(--marketing-surface-container);
+  border-radius: 16px;
+}
+
+.marketing-simple__founder-name {
+  margin: 0;
+  font: 600 1.125rem / 1.35 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.marketing-simple__founder-role {
+  margin: 0;
+  font: 500 0.875rem / 1.4 var(--marketing-font);
+  color: var(--marketing-primary);
+}
+
 .marketing-legal__main {
   padding: clamp(88px, 9vw, 128px) 0;
   background: var(--marketing-surface);
