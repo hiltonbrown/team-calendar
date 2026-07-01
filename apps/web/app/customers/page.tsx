@@ -6,24 +6,24 @@ import Link from "next/link";
 export const metadata: Metadata = createMetadata({
   title: "Customers",
   description:
-    "The kinds of Xero Payroll teams Team Calendar is built for, from multi-site operators to growing professional services teams.",
+    "The Xero Payroll small businesses Team Calendar is built for, where leave admin has outgrown texts, forms and a shared calendar.",
 });
 
 const customerTypes = [
   {
     icon: Building2,
-    title: "Multi-entity operators",
-    copy: "Organisations with more than one payroll entity, location, or roster shape that still need one clear view of who is away.",
+    title: "Small teams on Xero Payroll",
+    copy: "5 to 30 staff, where one person carries the leave admin and every missed notification lands on them.",
   },
   {
     icon: CalendarDays,
     title: "Teams that live in calendars",
-    copy: "Managers and employees who already plan in Outlook, Google Calendar, or Apple Calendar, and do not want another planner to check.",
+    copy: "People already in Outlook, Google Calendar or Apple Calendar, who will not adopt a separate planner to check.",
   },
   {
     icon: UserRoundCheck,
-    title: "Mixed workforces",
-    copy: "Teams with employees, contractors, directors, advisors, and people whose availability matters even when they are not in payroll.",
+    title: "Mixed teams",
+    copy: "Employees on payroll plus contractors, directors and advisors whose availability still matters, even when they are not in a pay run.",
   },
 ];
 
@@ -34,12 +34,12 @@ const CustomersPage = () => (
         <div className="marketing-simple__intro">
           <p className="marketing-simple__kicker">Customers</p>
           <h1 className="marketing-simple__title">
-            Built for teams whose absence planning has outgrown spreadsheets.
+            Built for small teams whose leave tracking has outgrown a
+            spreadsheet.
           </h1>
           <p className="marketing-simple__lead">
-            Team Calendar is for organisations that trust Xero Payroll, but need
-            a clearer way to publish availability to the people planning the
-            week.
+            The Xero Payroll small businesses Team Calendar is built for, where
+            leave admin has outgrown texts, forms and a shared calendar.
           </p>
         </div>
       </div>
@@ -72,15 +72,15 @@ const CustomersPage = () => (
           </div>
           <div className="marketing-simple__intro">
             <h2 className="marketing-simple__section-title">
-              Check whether your team fits.
+              Check whether your business fits.
             </h2>
             <p className="marketing-simple__section-copy">
-              If your leave source is Xero Payroll and your team plans in shared
-              calendars, Team Calendar is likely a good fit.
+              If you run Xero Payroll with roughly 5 to 30 staff, and your team
+              plans in shared calendars, Team Calendar is likely a good fit.
             </p>
             <p className="marketing-simple__section-copy">
               <Link className="marketing-simple__link" href="/contact">
-                Talk to us about your organisation
+                Talk to us about your team
               </Link>
             </p>
           </div>
