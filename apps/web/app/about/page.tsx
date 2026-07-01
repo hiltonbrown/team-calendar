@@ -82,11 +82,31 @@ const AboutPage = () => (
     <section className="marketing-simple__section">
       <div className="fmkt-container">
         <div className="marketing-simple__section-head">
-          <h2 className="marketing-simple__section-title">Who is behind it.</h2>
-          {/* FOUNDER CONTENT PENDING: name, one-line reason, optional partner line */}
+          <p className="marketing-simple__kicker">Who builds Team Calendar</p>
+          <h2 className="marketing-simple__section-title">
+            Built by someone who has done the admin.
+          </h2>
           <p className="marketing-simple__section-copy">
-            Team Calendar is built and run on the Gold Coast.
+            Team Calendar is a small, focused product, not a platform play. It
+            is built close to the businesses using it, with a bias toward
+            accuracy over features.
           </p>
+        </div>
+        <div className="marketing-simple__founder">
+          <h3 className="marketing-simple__founder-name">Hilton Brown</h3>
+          <p className="marketing-simple__founder-role">
+            Founder, Team Calendar
+          </p>
+          {/* FOUNDER BIO PENDING: replace with Hilton's one-paragraph bio */}
+          <p className="marketing-simple__section-copy">
+            A short biography is on the way. Team Calendar is built and run on
+            the Gold Coast by Hilton Brown, for small businesses that want leave
+            and availability to stay accurate without the admin.
+          </p>
+          {/* LINKEDIN PENDING: replace href with Hilton's LinkedIn URL */}
+          <a className="marketing-simple__link" href="#linkedin-pending">
+            Connect on LinkedIn
+          </a>
         </div>
       </div>
     </section>
