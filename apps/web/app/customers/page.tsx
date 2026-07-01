@@ -80,7 +80,7 @@ const CustomersPage = () => (
             </p>
             <p className="marketing-simple__section-copy">
               <Link className="marketing-simple__link" href="/contact">
-                Talk to us about your team
+                Talk to us
               </Link>
             </p>
           </div>
