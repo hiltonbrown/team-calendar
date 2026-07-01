@@ -23,7 +23,7 @@ const steps: ProcessStep[] = [
   {
     number: 4,
     title: "Publish to calendars",
-    copy: "Shared calendars show who is available and when.",
+    copy: "Shared calendars show who is available and when, updated within 60 seconds of approval.",
   },
 ];
 
