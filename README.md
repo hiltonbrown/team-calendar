@@ -2,26 +2,28 @@
 
 **One accurate view of who is off, who is out, and who is in. Synced straight from Xero.**
 
-Team Calendar is the leave management and team availability platform for organisations that run payroll in Xero. Employees submit and manage leave inside Team Calendar; managers approve or decline, and approved state writes back to Xero Payroll synchronously, so Xero stays the single source of truth for balances and accruals. Alongside approved leave, Team Calendar captures everyday out-of-office context (working from home, travelling, training, client site) and publishes one combined, privacy-controlled view to the calendars your team already uses: Outlook, Google Calendar, and Apple Calendar.
+Team Calendar is the leave management and team availability platform for small businesses that run payroll in Xero. Staff request leave and flag working from home in one place; managers approve or decline, and approved leave writes back to Xero Payroll synchronously, so Xero stays the single source of truth for balances and accruals. Alongside approved leave, Team Calendar captures everyday out-of-office context (working from home, travelling, training, client site) and publishes one combined, privacy-controlled view to the calendars your team already uses: Outlook, Google Calendar, and Apple Calendar.
 
-No more chasing who is in the office. No more leave requested by email and lost in an inbox. No more double entry between a calendar and your payroll system.
+No more finding out someone is off when they do not show up. No more leave requested by text and lost in a thread. No more double entry between a calendar and your payroll system.
 
 ## The problem Team Calendar solves
 
-Availability context is scattered. Approved annual leave sits in payroll. "Working from home" and "on a client site" live in chat threads and ad hoc calendar invites. Managers approve leave in one place, then re-key it somewhere else. The result is guesswork about who is actually available, and a payroll system that drifts out of step with reality.
+On a small team, leave admin holds together until it does not. Staff flag leave inconsistently: some use a form, some send a text, some just do not. Approved annual leave sits in payroll, while "working from home" and "on a client site" live in chat threads and ad hoc calendar invites. Managers approve leave in one place, then re-key it somewhere else. The result is guesswork about who is actually available, and a payroll system that drifts out of step with reality.
 
 Team Calendar closes the gap:
 
-- **Submit and approve in one place.** Employees request leave in Team Calendar. Managers approve or decline. Approved leave writes back to Xero Payroll immediately, so balances and accruals stay correct without re-keying.
-- **One calendar your team can trust.** Approved leave and manual out-of-office states combine into a single view, published as secure calendar feeds your team subscribes to once.
+- **Submit and approve in one place.** Staff request leave in Team Calendar. Managers approve or decline. Approved leave writes back to Xero Payroll immediately, so balances and accruals stay correct without re-keying.
+- **One calendar your team can trust.** Approved leave and manual out-of-office states combine into a single view, published as secure calendar feeds your team subscribes to once, then never updates by hand again.
 - **Privacy by default.** Choose how much each feed reveals: full detail, a neutral "out of office", or a simple "busy". Sensitive leave reasons are never exposed unless an admin chooses to.
+
+Approved leave and manual entries appear in every subscribed calendar within 60 seconds of approval.
 
 ## How it works
 
 1. **Connect Xero.** Team Calendar links to your Xero Payroll file (AU, NZ, or UK) and syncs employees, leave records, and balances on a schedule.
-2. **Manage leave.** Employees submit leave and log manual availability. Managers approve or decline. Approved decisions write straight back to Xero.
+2. **Manage leave.** Staff submit leave and log manual availability. Managers approve or decline. Approved decisions write straight back to Xero.
 3. **Publish availability.** Team Calendar combines everything into a canonical view and serves it as secure, revocable ICS feeds with the privacy level you set.
-4. **Stay informed.** In-app notifications and email keep employees and managers up to date on submissions, approvals, and sync health.
+4. **Stay informed.** In-app notifications and email keep staff and managers up to date on submissions, approvals, and sync health.
 
 Xero remains the source of truth for balances. Team Calendar never calculates accruals; it reads them from Xero and writes approved leave back synchronously.
 
@@ -32,9 +34,15 @@ Xero remains the source of truth for balances. Team Calendar never calculates ac
 | Inbound | Pull-first, scheduled Inngest jobs | Employees, leave records, leave balances. Xero provides no leave webhooks. |
 | Outbound | Synchronous, user-triggered API write | Submit, approve, decline, withdraw. No background queue. Failures surfaced inline. |
 
-## Built for groups, not just single teams
+Outbound writes and feed publishing are fast (within 60 seconds); inbound Xero sync is pull-first and periodic, since Xero provides no leave webhooks.
 
-Team Calendar is multi-tenant by design. A corporate group can run several payroll entities (each with its own Xero file) under one Account, with strict isolation between entities and role-based access for owners, admins, managers, and viewers.
+## Covers everyone who affects cover, not just payroll
+
+Team Calendar is built for the whole team, not only the people on the pay run. Employees on Xero Payroll get the two-way sync and leave balances. Contractors, directors, and advisors who never appear in payroll can still be added by hand, so their availability shows on the same calendar as everyone else, without touching a pay run. Every entry is labelled by where it came from: synced from Xero, or added manually.
+
+## Built for groups too
+
+Team Calendar is multi-tenant by design. A small business that grows into several payroll entities (each with its own Xero file) can run them under one Account, with strict isolation between entities and role-based access for owners, admins, managers, and viewers.
 
 The tenancy boundary is the Clerk Organisation (the Account). Each payroll entity within it owns exactly one Xero connection and one Xero tenant. One Account maps to exactly one country code.
 
