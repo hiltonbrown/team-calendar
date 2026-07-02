@@ -29,7 +29,7 @@ The interface must serve all three without making any group feel like a second-c
 
 ## Product Purpose
 
-Team Calendar exists so that teams can see who is in, who is out, and why, without hunting through email or Xero. Employees submit and manage leave; managers approve or decline; the resulting state writes back to Xero synchronously and publishes as secure ICS feeds for calendar subscriptions.
+Team Calendar exists so that a small business can see who is in, who is out, and why, without hunting through texts, email, or Xero. It is built first for small teams on Xero Payroll where leave admin has outgrown a shared calendar, and grows with them. Employees submit and manage leave; managers approve or decline; the resulting state writes back to Xero synchronously and publishes as secure ICS feeds for calendar subscriptions.
 
 Success: a team manager arrives, scans their calendar, and is back to work in under 30 seconds.
 
@@ -64,7 +64,7 @@ WCAG 2.2 AA is the floor for all text, interactive elements, and status indicato
 
 ## Product truth
 
-Team Calendar is a multi-tenant leave management and availability publishing platform for organisations running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside Team Calendar; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which Team Calendar reads but never calculates.
+Team Calendar is a multi-tenant leave management and availability publishing platform for small businesses running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside Team Calendar; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which Team Calendar reads but never calculates.
 
 Alongside Xero leave, Team Calendar captures manual availability entries (WFH, travelling, training, client site) that are not written to Xero, then publishes a combined, privacy-controlled view as secure ICS feeds.
 
@@ -129,6 +129,8 @@ Slack notifications, Teams integration, HTML calendar views, and additional prov
 ## Tenancy model
 
 Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. There is no custom `workspaces` database table.
+
+Multi-entity groups are a supported capability, not the primary case. The typical customer is a single small business (one Account, one payroll entity). The model below also supports a business that grows into several payroll entities under one Account. Nothing in this section changes with buyer size; the invariants hold in both cases.
 
 | Concept | Role |
 |---|---|
