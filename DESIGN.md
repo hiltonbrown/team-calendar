@@ -127,16 +127,35 @@ The design tokens above use semantic names. The CSS implementation in `packages/
 | `surface-container-highest` | `--input` | Input field fill |
 | `primary` | `--ring` | Focus ring colour |
 | `primary` | `--border` applied at 15% opacity | Ghost border via `color-mix` |
+| Primary type | `--font-sans` | Plus Jakarta Sans, the default UI family |
+| Accent type | `--font-serif`, `--font-accent` | Lora, the approved complementary serif accent |
+| Monospace type | `--font-mono` | System monospace stack for code, tokens, IDs, and tabular technical text |
 
 **Note on the editorial purple**: the `accent` semantic colour (`#5E4F99` light / `#C8BFFF` dark) does not have a direct CSS variable. Purple surfaces use `--accent-container` (lavender wash) with `--on-accent-container` text. When a saturated purple stroke or icon colour is needed, apply `var(--on-accent-container)` or `var(--accent-container)` at full opacity depending on context.
 
-**Note on fonts**: `--font-sans` maps to Plus Jakarta Sans. `--font-mono` maps to Lora (a serif), used intentionally for editorial text contexts rather than code display.
+**Note on fonts**: `--font-sans` maps to Plus Jakarta Sans. `--font-serif` and `--font-accent` map to Lora, loaded from Google Fonts via `next/font/google`. `--font-mono` remains a true monospace stack for code display, tokens, IDs, and technical snippets.
 
 ---
 
 ## Typography
 
-**Font family:** Plus Jakarta Sans (Google Fonts).
+**Primary font family:** Plus Jakarta Sans (Google Fonts). This is the default family for product UI, marketing structure, navigation, buttons, labels, forms, tables, calendar data, charts, and body copy.
+
+**Accent font family:** Lora (Google Fonts). Lora is a complementary serif accent to Plus Jakarta Sans. It adds a quieter editorial note without changing the product's operational character.
+
+**Approved Lora usage:**
+
+- Short editorial asides on marketing pages, including one-line human proof points and section signatures.
+- Pull quotes, testimonials, customer quotes, and founder-style notes.
+- Small accent phrases inside a hero or feature section where the surrounding hierarchy remains Plus Jakarta Sans.
+- Empty-state or onboarding microcopy when a warmer human voice helps without reducing task clarity.
+
+**Lora restrictions:**
+
+- Do not use Lora for app navigation, buttons, labels, table cells, form fields, calendar entries, charts, IDs, tokens, or code.
+- Do not use Lora as the default body family.
+- Do not use Lora for dense product dashboards or operational headings where scan speed matters.
+- Prefer italic for the accent voice. Use normal style only for quotes or longer editorial passages that need calmer reading.
 
 | Scale         | Size     | Weight    | Letter-spacing | Line-height | Usage                              |
 |---------------|----------|-----------|----------------|-------------|------------------------------------|
@@ -349,7 +368,7 @@ Chip styling: `label-sm`, `border-radius: 12px`, `padding: 2px 10px`, no border.
 3. Never use drop shadows with high opacity. The elevation ramp is the ceiling.
 4. Never use 4px or 8px border-radius. Use `16px` (cards, elevated surfaces) or `12px` (inputs, small elements).
 5. Never use bright green for success states. Use the sage palette.
-6. Always use Plus Jakarta Sans. No Inter, Roboto, or system fonts.
+6. Use Plus Jakarta Sans for all default UI text. Lora is the only approved complementary accent font, and only for the editorial contexts defined in Typography. No Inter, Roboto, or other UI families.
 7. Always achieve hierarchy through typography scale first, colour second.
 8. Always implement colours as CSS custom properties, not hardcoded hex values.
 9. Always scope theme tokens to `[data-theme]` for light/dark switching.
