@@ -21,11 +21,11 @@ product
 
 Three overlapping user types, each with different needs and contexts:
 
-- **HR admins and ops managers**: configure Xero connections, manage feeds, review sync health and audit logs. High data density is acceptable; they need control and confidence.
-- **Team managers**: see who is out or working remotely across their team on any given day. Scannability and calendar views are the primary surface. They visit frequently, often briefly.
-- **Employees**: self-service visibility into their own leave, balances, and availability. Their surfaces should be lighter, less dense, and more approachable.
+- **HR admins and ops managers**: configure Xero connections, manage feeds and tokens, review sync health, audit logs, plans and billing. High data density is acceptable; they need control and confidence. Their surfaces: settings, sync, feeds, public holidays, plans.
+- **Team managers**: see who is out or working remotely across their team on any given day, and clear the approvals queue. Scannability and calendar views are the primary surface. They visit frequently, often briefly. Their surfaces: calendar, leave approvals, analytics.
+- **Employees**: self-service visibility into their own leave, balances, and availability, plus submitting and withdrawing requests. Their surfaces should be lighter, less dense, and more approachable. Their surfaces: dashboard, availability, leave balances, notifications.
 
-The interface must serve all three without making any group feel like a second-class citizen.
+The interface must serve all three without making any group feel like a second-class citizen. The same screen may be shared across roles; density scales with the role's tolerance, never below readability.
 
 ## Product Purpose
 
@@ -46,19 +46,21 @@ The emotional goal is **quiet confidence**: the user arrives, sees what they nee
 - **Notion**: flat document aesthetic, undifferentiated text-heavy layout, absent visual hierarchy, low-contrast chrome.
 - Generic SaaS-cream palettes (warm-tinted near-white backgrounds).
 - Hero-metric card grids and numbered section scaffolding (01 / 02 / 03).
+- Bright "success green" SaaS accents. The sage palette is the brand's only green.
+- Legacy HR portals: dense chrome, competing panels, ten actions per row, no obvious next step.
 - Any tool that prioritises decoration over density.
 
 ## Design Principles
 
 1. **Clarity over cleverness**: calendar and availability data must be immediately scannable. Visual hierarchy is non-negotiable. When in doubt, simplify.
 2. **Green as signal, not wallpaper**: the primary green earns its place on screen. Use it for primary actions, success states, and brand anchors. Resist applying it broadly as background colour or decoration.
-3. **Density is role-appropriate**: admin and manager views can be denser. Employee-facing surfaces should breathe. Never sacrifice readability for compactness.
-4. **Calm confidence through space**: whitespace is load-bearing. Crowded layouts erode trust. Generous padding and clear separation between sections are defaults, not luxuries.
-5. **Frosted touch, used sparingly**: translucent backdrop-blurred surfaces are reserved for elevated transient UI only (modals, popovers, toasts, sticky chrome). Never beneath primary content, dense data, or calendars.
+3. **Provenance at a glance**: sage marks Xero-synced leave; lavender marks manual availability. The colour split makes the source of truth scannable on every calendar, chip, and report. Never blur the two.
+4. **Density is role-appropriate**: admin and manager views can be denser. Employee-facing surfaces should breathe. Never sacrifice readability for compactness.
+5. **Calm confidence through space**: whitespace is load-bearing. Crowded layouts erode trust. Generous padding and clear separation between sections are defaults, not luxuries. Frosted, blurred treatments remain reserved for elevated transient UI only; DESIGN.md carries the full doctrine.
 
 ## Accessibility & Inclusion
 
-WCAG 2.2 AA is the floor for all text, interactive elements, and status indicators. Colour is never the sole differentiator for status. `prefers-reduced-motion` and `prefers-reduced-transparency` are respected throughout. Australian English only.
+WCAG 2.2 AA is the floor for all text, interactive elements, and status indicators. Colour is never the sole differentiator for status; provenance and status always pair colour with an icon or label. All interactive elements are keyboard reachable with a visible 3px focus ring. `prefers-reduced-motion` and `prefers-reduced-transparency` are respected throughout. Australian English only.
 
 ---
 
