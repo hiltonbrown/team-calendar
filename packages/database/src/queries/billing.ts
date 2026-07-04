@@ -37,6 +37,20 @@ export const getSubscriptionForOrg = async (
   return rows[0] ?? null;
 };
 
+export const getFirstActiveOrganisationIdForClerkOrg = async (
+  clerkOrgId: string
+): Promise<string | null> => {
+  const rows = await database.$queryRaw<Array<{ id: string }>>`
+    SELECT id
+    FROM organisations
+    WHERE clerk_org_id = ${clerkOrgId}
+      AND archived_at IS NULL
+    ORDER BY created_at ASC, name ASC
+    LIMIT 1
+  `;
+  return rows[0]?.id ?? null;
+};
+
 export const getPlanLimits = async (planKey: PlanKey) => {
   const rows = await database.$queryRaw<
     Array<{ limit_type: LimitType; limit_value: number }>

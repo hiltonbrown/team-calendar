@@ -1,5 +1,6 @@
 import { constructEvent, resolvePlanKey } from "@repo/billing";
 import {
+  getFirstActiveOrganisationIdForClerkOrg,
   isStripeEventProcessed,
   recordStripeEvent,
   upsertSubscriptionFromWebhook,
@@ -45,13 +46,18 @@ const dateFromSeconds = (value: number | null | undefined) =>
 async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
   const clerkOrgId = data.metadata?.clerk_org_id;
   if (!clerkOrgId) {
-    log.warn("Stripe subscription event missing clerk_org_id metadata.");
+    log.error("Stripe subscription event missing clerk_org_id metadata.", {
+      stripeSubscriptionId: data.id,
+    });
     return;
   }
   const priceId = data.items.data[0]?.price.id;
   const plan = resolvePlanKey(priceId);
   if (!plan.ok) {
-    log.warn("Stripe subscription event used an unknown price.");
+    log.error("Stripe subscription event used an unknown price.", {
+      priceId,
+      stripeSubscriptionId: data.id,
+    });
     return;
   }
   await upsertSubscriptionFromWebhook({
@@ -64,13 +70,96 @@ async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
     stripeCustomerId: objectId(data.customer),
     stripeSubscriptionId: data.id,
   });
+  const organisationId =
+    await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId);
+  if (!organisationId) {
+    log.error(
+      "Stripe subscription mirror skipped recount-usage because no active organisation was found.",
+      {
+        clerkOrgId,
+        stripeSubscriptionId: data.id,
+      }
+    );
+    return;
+  }
   await inngest.send({
     name: "recount-usage",
     data: {
       clerkOrgId,
-      organisationId: "00000000-0000-4000-8000-000000000000",
+      organisationId,
     },
   });
+}
+
+const SUBSCRIPTION_EVENT_TYPES = new Set([
+  "customer.subscription.created",
+  "customer.subscription.updated",
+  "customer.subscription.deleted",
+]);
+const INVOICE_EVENT_TYPES = new Set(["invoice.payment_failed", "invoice.paid"]);
+
+// Only the fields these handlers read; avoids importing the Stripe SDK type
+// into a route that otherwise depends on it only via @repo/billing.
+interface StripeEventLike {
+  data: { object: unknown };
+  id: string;
+  type: string;
+}
+
+async function handleSubscriptionEvent(event: StripeEventLike) {
+  const parsed = SubscriptionSchema.safeParse(event.data.object);
+  if (parsed.success) {
+    await mirrorSubscription(parsed.data);
+    return;
+  }
+  log.error("Stripe subscription event failed validation and was skipped.", {
+    eventId: event.id,
+    eventType: event.type,
+    issues: parsed.error.issues,
+  });
+}
+
+async function handleInvoiceEvent(event: StripeEventLike) {
+  const parsed = InvoiceSchema.safeParse(event.data.object);
+  if (!parsed.success) {
+    log.error("Stripe invoice event failed validation and was skipped.", {
+      eventId: event.id,
+      eventType: event.type,
+      issues: parsed.error.issues,
+    });
+    return;
+  }
+  const subscription = parsed.data.subscription;
+  if (subscription && typeof subscription !== "string") {
+    await mirrorSubscription(subscription);
+  } else if (subscription) {
+    log.info(
+      "Stripe invoice event carried no expanded subscription and was skipped.",
+      { eventId: event.id, eventType: event.type }
+    );
+  }
+}
+
+function checkCheckoutSessionMetadata(event: StripeEventLike) {
+  const parsed = SessionSchema.safeParse(event.data.object);
+  if (parsed.success && !parsed.data.metadata?.clerk_org_id) {
+    log.warn("Stripe checkout session missing clerk_org_id metadata.");
+  }
+}
+
+async function processStripeEvent(event: StripeEventLike) {
+  if (event.type === "checkout.session.completed") {
+    checkCheckoutSessionMetadata(event);
+  } else if (SUBSCRIPTION_EVENT_TYPES.has(event.type)) {
+    await handleSubscriptionEvent(event);
+  } else if (INVOICE_EVENT_TYPES.has(event.type)) {
+    await handleInvoiceEvent(event);
+  } else {
+    log.info("Stripe event type not handled.", {
+      eventId: event.id,
+      eventType: event.type,
+    });
+  }
 }
 
 export async function POST(request: Request) {
@@ -94,33 +183,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
-  if (event.type === "checkout.session.completed") {
-    const parsed = SessionSchema.safeParse(event.data.object);
-    if (parsed.success && !parsed.data.metadata?.clerk_org_id) {
-      log.warn("Stripe checkout session missing clerk_org_id metadata.");
-    }
-  }
-
-  if (
-    [
-      "customer.subscription.created",
-      "customer.subscription.updated",
-      "customer.subscription.deleted",
-    ].includes(event.type)
-  ) {
-    const parsed = SubscriptionSchema.safeParse(event.data.object);
-    if (parsed.success) {
-      await mirrorSubscription(parsed.data);
-    }
-  }
-
-  if (["invoice.payment_failed", "invoice.paid"].includes(event.type)) {
-    const parsed = InvoiceSchema.safeParse(event.data.object);
-    const subscription = parsed.success ? parsed.data.subscription : null;
-    if (subscription && typeof subscription !== "string") {
-      await mirrorSubscription(subscription);
-    }
-  }
+  await processStripeEvent(event);
 
   await recordStripeEvent(event.id, event.type);
   return NextResponse.json({ received: true });
