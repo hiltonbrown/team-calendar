@@ -10,7 +10,7 @@ honour its STOP conditions, and update your row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Stripe webhook: fail loudly, drop placeholder org id, add tests | P1 | M | none | TODO |
-| 002 | Stop logging full Clerk webhook body (PII) | P1 | S | none | TODO |
+| 002 | Stop logging full Clerk webhook body (PII) | P1 | S | none | DONE |
 | 003 | region_not_supported_error for NZ/UK write-back stubs | P2 | S | none | TODO |
 | 004 | Security response headers + report-only CSP on apps/app | P2 | M | none | TODO |
 | 005 | Tests for ICS feed route and availability routes | P2 | M | none | TODO |
