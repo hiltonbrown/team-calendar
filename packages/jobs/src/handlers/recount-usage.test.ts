@@ -80,20 +80,4 @@ describe("recountUsage", () => {
     ).rejects.toThrow();
     expect(mocks.executeRaw).not.toHaveBeenCalled();
   });
-
-  it("accepts a payload without organisationId, since the job is scoped by clerkOrgId alone", async () => {
-    const { organisationId: _organisationId, ...withoutOrganisationId } =
-      input();
-
-    const result = await recountUsage(withoutOrganisationId);
-
-    expect(result).toEqual({ feeds: 3, payrollEntities: 2, seats: 7 });
-    expect(mocks.executeRaw).toHaveBeenCalledTimes(3);
-  });
-
-  it("still accepts a payload that includes a valid organisationId", async () => {
-    const result = await recountUsage(input());
-
-    expect(result).toEqual({ feeds: 3, payrollEntities: 2, seats: 7 });
-  });
 });

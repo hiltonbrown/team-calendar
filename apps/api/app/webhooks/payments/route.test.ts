@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   constructEvent: vi.fn(),
+  getFirstActiveOrganisationIdForClerkOrg: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve()),
   isStripeEventProcessed: vi.fn(),
   recordStripeEvent: vi.fn(() => Promise.resolve()),
@@ -14,6 +15,8 @@ vi.mock("@repo/billing", () => ({
   resolvePlanKey: mocks.resolvePlanKey,
 }));
 vi.mock("@repo/database", () => ({
+  getFirstActiveOrganisationIdForClerkOrg:
+    mocks.getFirstActiveOrganisationIdForClerkOrg,
   isStripeEventProcessed: mocks.isStripeEventProcessed,
   recordStripeEvent: mocks.recordStripeEvent,
   upsertSubscriptionFromWebhook: mocks.upsertSubscriptionFromWebhook,
@@ -60,6 +63,9 @@ function subscriptionEvent(overrides: Record<string, unknown> = {}) {
 describe("Stripe payments webhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getFirstActiveOrganisationIdForClerkOrg.mockResolvedValue(
+      "30000000-0000-4000-8000-000000000001"
+    );
     mocks.isStripeEventProcessed.mockResolvedValue(false);
     mocks.resolvePlanKey.mockReturnValue({ ok: true, value: "basic" });
   });
@@ -113,7 +119,12 @@ describe("Stripe payments webhook", () => {
       })
     );
     expect(mocks.inngestSend).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "recount-usage" })
+      expect.objectContaining({
+        name: "recount-usage",
+        data: expect.objectContaining({
+          organisationId: "30000000-0000-4000-8000-000000000001",
+        }),
+      })
     );
     expect(mocks.recordStripeEvent).toHaveBeenCalledWith(
       "evt_1",
