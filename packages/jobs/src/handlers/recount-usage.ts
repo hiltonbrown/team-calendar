@@ -5,7 +5,7 @@ import { inngest } from "../client";
 
 const RecountUsageSchema = z.object({
   clerkOrgId: z.string().min(1),
-  organisationId: z.string().uuid(),
+  organisationId: z.string().uuid().optional(),
 });
 
 export type RecountUsageInput = z.input<typeof RecountUsageSchema>;
