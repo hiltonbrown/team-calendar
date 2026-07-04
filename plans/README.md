@@ -69,8 +69,9 @@ Because every plan now lands sequentially on `preview` in plan-number order,
 all ordering dependencies below are satisfied automatically. The notes are
 kept for context and for understanding why the sequence is what it is.
 
-- No hard dependencies. 001 and 005 both add files under `apps/api/__tests__/`
-  but touch different test files; they can land in either order.
+- 001 and 005 have no functional dependency on each other: both add files
+  under `apps/api/__tests__/` but touch different test files. They land in
+  plan-number order on `preview` like everything else.
 - 004 changes `headers()` config; 005's route tests assert only route-set
   headers, so they do not conflict.
 - 006, 007, 008 are doc-only spikes (direction findings from the 2026-07-02
@@ -80,7 +81,8 @@ kept for context and for understanding why the sequence is what it is.
   mapping traced; 008 executes first on `preview` and records the answer in
   its report for 009 to reuse.
 - Plan 003 (region error) is the stopgap for the gap plan 007 investigates;
-  003 can land any time, 007's build supersedes it for NZ later.
+  it is intentionally sequenced before 007 on `preview`, and 007's eventual
+  build supersedes it for NZ later.
 - 010 is independent of 009. 010 creates an initial token for the default feed;
   009 concerns notification dispatch when a token is later rotated.
 - 011 is sequenced after 010 because both plans touch the same Organisation
