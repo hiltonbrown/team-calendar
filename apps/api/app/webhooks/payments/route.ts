@@ -1,5 +1,6 @@
 import { constructEvent, resolvePlanKey } from "@repo/billing";
 import {
+  getFirstActiveOrganisationIdForClerkOrg,
   isStripeEventProcessed,
   recordStripeEvent,
   upsertSubscriptionFromWebhook,
@@ -69,10 +70,23 @@ async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
     stripeCustomerId: objectId(data.customer),
     stripeSubscriptionId: data.id,
   });
+  const organisationId =
+    await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId);
+  if (!organisationId) {
+    log.error(
+      "Stripe subscription mirror skipped recount-usage because no active organisation was found.",
+      {
+        clerkOrgId,
+        stripeSubscriptionId: data.id,
+      }
+    );
+    return;
+  }
   await inngest.send({
     name: "recount-usage",
     data: {
       clerkOrgId,
+      organisationId,
     },
   });
 }

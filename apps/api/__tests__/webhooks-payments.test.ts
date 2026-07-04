@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   constructEvent: vi.fn(),
+  getFirstActiveOrganisationIdForClerkOrg: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve()),
   isStripeEventProcessed: vi.fn(),
   logError: vi.fn(),
@@ -17,6 +18,8 @@ vi.mock("@repo/billing", () => ({
   resolvePlanKey: mocks.resolvePlanKey,
 }));
 vi.mock("@repo/database", () => ({
+  getFirstActiveOrganisationIdForClerkOrg:
+    mocks.getFirstActiveOrganisationIdForClerkOrg,
   isStripeEventProcessed: mocks.isStripeEventProcessed,
   recordStripeEvent: mocks.recordStripeEvent,
   upsertSubscriptionFromWebhook: mocks.upsertSubscriptionFromWebhook,
@@ -63,6 +66,9 @@ function subscriptionEvent(overrides: Record<string, unknown> = {}) {
 describe("Stripe payments webhook", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getFirstActiveOrganisationIdForClerkOrg.mockResolvedValue(
+      "30000000-0000-4000-8000-000000000001"
+    );
     mocks.isStripeEventProcessed.mockResolvedValue(false);
     mocks.resolvePlanKey.mockReturnValue({ ok: true, value: "basic" });
   });
@@ -97,7 +103,7 @@ describe("Stripe payments webhook", () => {
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
   });
 
-  it("3. mirrors a subscription.updated event, sends recount-usage without organisationId, and records the event", async () => {
+  it("3. mirrors a subscription.updated event, sends recount-usage with organisationId, and records the event", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: subscriptionEvent(),
@@ -116,8 +122,12 @@ describe("Stripe payments webhook", () => {
       })
     );
 
-    expect(mocks.inngestSend).toHaveBeenCalledExactlyOnceWith({
-      data: { clerkOrgId: "org_1" },
+    expect(mocks.inngestSend).toHaveBeenCalledOnce();
+    expect(mocks.inngestSend).toHaveBeenCalledWith({
+      data: {
+        clerkOrgId: "org_1",
+        organisationId: "30000000-0000-4000-8000-000000000001",
+      },
       name: "recount-usage",
     });
 
