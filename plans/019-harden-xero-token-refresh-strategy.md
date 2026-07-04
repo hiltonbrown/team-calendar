@@ -11,14 +11,20 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED
-- **Depends on**: none (independent of plans 017, 018; all touch `service.ts`,
-  so if executing alongside them, land one at a time and re-run the drift check)
+- **Depends on**: none functionally, but plans 016 and 018 modify `service.ts`
+  and land immediately before this one on `preview`; re-verify the "Current
+  state" excerpts after they land (the preview branch note above applies)
 - **Category**: bug / security
 - **Planned at**: commit `da91efd`, 2026-07-04
 

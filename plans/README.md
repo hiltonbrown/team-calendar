@@ -20,6 +20,13 @@ per-plan branches.
   so an individual plan can be identified and reverted on `preview` if needed.
 - Doc-only spikes (006, 007, 008) commit their reports to `plans/` on
   `preview` in sequence like any other plan.
+- Plan drift checks diff against the commit each plan was written at, so on
+  `preview` they will include earlier plans' changes. Each plan carries a
+  "Preview branch note": treat only mismatches not explained by an earlier
+  plan's documented scope as drift.
+- Sanctioned out-of-order exception: if plans 010-012 cannot pass their
+  integration-test gates because of the schema drift plan 013 repairs, run
+  plan 013 first and record the deviation in the status table below.
 - Do NOT push or open a PR unless the operator instructed it.
 
 ## Execution order & status
@@ -70,8 +77,8 @@ kept for context and for understanding why the sequence is what it is.
   `next` audit); each produces a report in `plans/` and a follow-up
   implementation plan is written only after the maintainer decides.
 - 008 and 009 both need the registry `emailTemplate` string-to-template
-  mapping traced; whichever executes first should record the answer for the
-  other.
+  mapping traced; 008 executes first on `preview` and records the answer in
+  its report for 009 to reuse.
 - Plan 003 (region error) is the stopgap for the gap plan 007 investigates;
   003 can land any time, 007's build supersedes it for NZ later.
 - 010 is independent of 009. 010 creates an initial token for the default feed;

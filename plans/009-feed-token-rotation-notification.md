@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -90,7 +95,7 @@ Repo conventions: Result pattern for service errors; notification failure must n
 
 ### Step 1: Trace the email leg before writing anything
 
-Read `packages/notifications/src/dispatch.ts` (and `email-queue-service.ts` if dispatch delegates to it) and answer: when `dispatchNotification` runs for a type whose registry entry has `emailTemplate: "FeedTokenRotated"`, what happens if no template by that name exists? Three possible worlds: (a) template strings resolve lazily and unknown names fail soft (log/skip), (b) unknown names throw at dispatch time, (c) templates are looked up from a map in `packages/email` and `FeedTokenRotated` is simply missing from it. Record which world you are in.
+Plan 008 executes earlier on `preview` and its report (`plans/008-report-manager-digest.md`) should already trace the `emailTemplate` mapping; read that section first and verify it against the code rather than re-deriving from scratch. Then read `packages/notifications/src/dispatch.ts` (and `email-queue-service.ts` if dispatch delegates to it) and answer: when `dispatchNotification` runs for a type whose registry entry has `emailTemplate: "FeedTokenRotated"`, what happens if no template by that name exists? Three possible worlds: (a) template strings resolve lazily and unknown names fail soft (log/skip), (b) unknown names throw at dispatch time, (c) templates are looked up from a map in `packages/email` and `FeedTokenRotated` is simply missing from it. Record which world you are in.
 
 **Verify**: you can state, with file:line evidence, what happens on dispatch with a missing template. If world (b) and adding a template is required, confirm the template addition is small (mirror an existing template like the `sync_failed` one); if it is not small, STOP and report.
 

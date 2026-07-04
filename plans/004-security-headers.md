@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -165,8 +170,9 @@ If the Clerk instance uses a custom domain (check `NEXT_PUBLIC_CLERK_PUBLISHABLE
 2. Start only the product app: `cd apps/app && bun run dev` (port 3000). Then in another shell:
    - `curl -sI http://localhost:3000/sign-in | grep -iE "x-frame-options|x-content-type-options|referrer-policy|content-security-policy-report-only"` → all four headers present.
 3. Stop the dev server when done (repo lesson: leaving listeners running breaks the user's next `bun run dev`). Confirm with `lsof -iTCP:3000 -sTCP:LISTEN` → no output.
+4. If the dev server cannot start because required env vars (e.g. Clerk keys) are absent in your environment, record that limitation in your report, keep `bun run build` as the configuration gate, and flag the curl check to be repeated against a preview deployment.
 
-**Verify**: the curl output shows all four headers; port 3000 is free afterwards.
+**Verify**: the curl output shows all four headers; port 3000 is free afterwards (or the item 4 limitation is recorded).
 
 ### Step 4: Manual smoke of Clerk sign-in under Report-Only
 

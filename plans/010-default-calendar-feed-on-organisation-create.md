@@ -12,6 +12,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -219,6 +224,11 @@ Relevant product constraints from `PRODUCT.md`:
 | Lint/check | `bun run check` | exit 0 |
 | Full tests | `bun run test` | exit 0 |
 
+If an integration test command fails with the Prisma error `The column
+'plan_key' does not exist`, that is the test-database schema drift plan 013
+repairs. Apply plan 013 ahead of sequence (a sanctioned exception recorded in
+`plans/README.md`), then resume this plan; do not debug it here.
+
 ## Scope
 
 **In scope**:
@@ -248,8 +258,7 @@ Relevant product constraints from `PRODUCT.md`:
 ## Git workflow
 
 - Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
-- Commit message style in recent history is short prose, e.g. `design updates`.
-  Use a clear message such as `Add default calendar feed provisioning`.
+- Commit message (conventional commits, per CLAUDE.md): `feat(feeds): provision default calendar feed for new organisations`
 - Do not push or open a PR unless the operator asks.
 
 ## Steps
@@ -356,6 +365,12 @@ Because `ensureDefaultCalendarFeed` is idempotent and does not recreate after an
 archived feed exists, it is safe to call for both new and existing Organisation
 rows. This also repairs the case where Organisation creation succeeded but feed
 creation failed on a prior request.
+
+This failure handling is deliberately stricter than plan 011's holiday
+provisioning: the default feed is a local database operation, so a failure
+indicates a real fault worth surfacing, and it throws. The holiday import
+(plan 011) depends on an external API and is non-fatal. Do not align one to
+the other.
 
 Do not change `TenantContext` unless you choose to display the one-time token in
 an existing client flow. If you do extend it, keep the new field optional so

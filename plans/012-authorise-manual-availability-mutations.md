@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -178,7 +183,7 @@ function isAdminOrOwner(role?: string | null): boolean {
 |---|---|---|
 | Typecheck | `bun run typecheck` | exit 0 |
 | Lint | `bun run check` | exit 0 |
-| Targeted tests | `bunx vitest run packages/availability/src/records/manual-records-service.test.ts apps/app/app/actions/availability/manual.test.ts apps/api/app/api/availability/route.test.ts` | all pass |
+| Targeted tests | `bunx vitest run packages/availability/src/records/manual-records-service.test.ts apps/app/app/actions/availability/manual.test.ts apps/api/__tests__/availability-routes.test.ts` | all pass |
 | Full tests | `bun run test` | exit 0 |
 
 ## Scope
@@ -190,7 +195,7 @@ function isAdminOrOwner(role?: string | null): boolean {
 - `apps/app/app/actions/availability/manual.ts`
 - `apps/app/app/actions/availability/manual.test.ts` (create if missing)
 - `apps/api/app/api/availability/route.ts`
-- `apps/api/app/api/availability/route.test.ts` (create if missing)
+- `apps/api/__tests__/availability-routes.test.ts` (extend; plan 005 creates it with the route's pre-authorisation contract. Update its mocks for the new actor signature and add the 403 case there. Only create `apps/api/app/api/availability/route.test.ts` if plan 005's file does not exist.)
 - `plans/README.md` (status row)
 
 **Out of scope**:
@@ -278,7 +283,7 @@ Use the Vitest mocking style already present in
 `packages/availability/src/calendar/calendar-service.test.ts` and
 `apps/app/app/(authenticated)/setup/_actions.test.ts`.
 
-**Verify**: `bunx vitest run packages/availability/src/records/manual-records-service.test.ts apps/app/app/actions/availability/manual.test.ts apps/api/app/api/availability/route.test.ts` -> all pass.
+**Verify**: `bunx vitest run packages/availability/src/records/manual-records-service.test.ts apps/app/app/actions/availability/manual.test.ts apps/api/__tests__/availability-routes.test.ts` -> all pass.
 
 ## Test plan
 
