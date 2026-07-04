@@ -247,7 +247,7 @@ Relevant product constraints from `PRODUCT.md`:
 
 ## Git workflow
 
-- Branch: `advisor/010-default-calendar-feed-on-organisation-create`.
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message style in recent history is short prose, e.g. `design updates`.
   Use a clear message such as `Add default calendar feed provisioning`.
 - Do not push or open a PR unless the operator asks.

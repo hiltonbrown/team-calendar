@@ -294,7 +294,7 @@ STOP condition — report it rather than hand-editing generated client code.
 
 ## Git workflow
 
-- Branch: `advisor/018-revoke-xero-connection-on-disconnect`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message (conventional commits): `feat(xero): revoke Xero connection on disconnect`
 - Do NOT push or open a PR unless the operator instructed it.
 

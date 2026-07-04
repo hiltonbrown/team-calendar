@@ -108,7 +108,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "plans_plan_key_key" ON "plans"("plan_key");
 
 ## Git workflow
 
-- Branch: `advisor/013-repair-integration-db-schema`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `fix(database): repair integration schema drift`
 - Do NOT push or open a PR unless the operator instructed it.
 

@@ -124,7 +124,7 @@ const event = toCalendarEvent(record, {
 
 ## Git workflow
 
-- Branch: `advisor/015-calendar-detail-manager-scope`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `fix(calendar): respect manager visibility in event detail`
 - Do NOT push or open a PR unless the operator instructed it.
 

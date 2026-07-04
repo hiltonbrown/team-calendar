@@ -52,6 +52,12 @@ The marketing site (`apps/web/app/integrations/page.tsx`) and PRODUCT.md both ad
 
 **Out of scope**: all source code, including the NZ stubs. No Xero API calls against real tenants.
 
+## Git workflow
+
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
+- Commit message: `docs(plans): add NZ write-back spike report`
+- Do NOT push or open a PR unless the operator instructed it.
+
 ## Steps
 
 ### Step 1: Characterise the AU baseline

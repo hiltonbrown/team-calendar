@@ -49,6 +49,12 @@ Constraints to honour: PRODUCT.md brand ("Modern. Calm. Precise.", no noise); pr
 
 **Out of scope**: all source code.
 
+## Git workflow
+
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
+- Commit message: `docs(plans): add manager weekly digest design report`
+- Do NOT push or open a PR unless the operator instructed it.
+
 ## Steps
 
 ### Step 1: Document the reusable ingredients

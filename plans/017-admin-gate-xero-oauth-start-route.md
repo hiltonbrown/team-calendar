@@ -194,7 +194,7 @@ const { GET } = await import("./route");
 
 ## Git workflow
 
-- Branch: `advisor/017-admin-gate-xero-oauth-start`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message (repo uses conventional commits): `fix(api): restrict Xero OAuth start to admins and owners`
 - Do NOT push or open a PR unless the operator instructed it.
 

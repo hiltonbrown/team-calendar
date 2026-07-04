@@ -123,7 +123,7 @@ unpatched is an avoidable production risk.
 
 ## Git workflow
 
-- Branch: `advisor/014-runtime-dependency-security`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `chore(deps): patch high-risk runtime advisories`
 - Do NOT push or open a PR unless the operator instructed it.
 

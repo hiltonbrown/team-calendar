@@ -262,7 +262,7 @@ if (!result.ok) {
 
 ## Git workflow
 
-- Branch: `advisor/019-harden-xero-token-refresh`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message (conventional commits): `fix(xero): classify refresh errors, mark stale, and lock the manual refresh path`
 - Do NOT push or open a PR unless the operator instructed it.
 

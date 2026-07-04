@@ -81,7 +81,7 @@ Conventions: Vitest; factories/builders over repeated literals (CLAUDE.md testin
 
 ## Git workflow
 
-- Branch: `advisor/005-api-boundary-tests`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `test(api): cover ical feed route and availability route handlers`
 - Do NOT push or open a PR unless the operator instructed it.
 

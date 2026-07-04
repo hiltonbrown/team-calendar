@@ -84,7 +84,7 @@ Documented constraints this plan must honour:
 
 ## Git workflow
 
-- Branch: `advisor/003-region-not-supported-error`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `feat(xero): add region_not_supported_error for NZ and UK write-back stubs`
 - Do NOT push or open a PR unless the operator instructed it.
 

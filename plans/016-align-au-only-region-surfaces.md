@@ -189,7 +189,7 @@ return Promise.resolve({ ok: false, error: writeBackNotAvailableError });
 
 ## Git workflow
 
-- Branch: `advisor/016-au-only-region-surfaces`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `fix(product): align region surfaces with AU-only launch`
 - Do NOT push or open a PR unless the operator instructed it.
 

@@ -122,7 +122,7 @@ Repo conventions to follow:
 
 ## Git workflow
 
-- Branch: `advisor/011-default-public-holidays-on-organisation-create`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit style in recent history is short descriptive messages, for example `design updates` and `feat(web): add Hilton Brown founder section to about page`. Use one logical commit for the implementation unless instructed otherwise.
 - Do not push or open a PR unless the operator asks.
 

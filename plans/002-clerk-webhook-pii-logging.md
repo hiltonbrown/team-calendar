@@ -66,7 +66,7 @@ Repo conventions: `log` from `@repo/observability/log` (already used); Australia
 
 ## Git workflow
 
-- Branch: `advisor/002-clerk-webhook-pii-logging`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `fix(api): log Clerk webhook id and type only, not the full body`
 - Do NOT push or open a PR unless the operator instructed it.
 

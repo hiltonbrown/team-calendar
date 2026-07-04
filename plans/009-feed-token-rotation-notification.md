@@ -82,7 +82,7 @@ Repo conventions: Result pattern for service errors; notification failure must n
 
 ## Git workflow
 
-- Branch: `advisor/009-feed-token-rotation-notification`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `feat(app): notify on feed token rotation`
 - Do NOT push or open a PR unless the operator instructed it.
 

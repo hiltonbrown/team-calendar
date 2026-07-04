@@ -85,7 +85,7 @@ Repo conventions: Biome 2 + Ultracite (`bun run check`); comments only where int
 
 ## Git workflow
 
-- Branch: `advisor/004-security-headers`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `feat(security): add hardening response headers and report-only CSP`
 - Do NOT push or open a PR unless the operator instructed it.
 
