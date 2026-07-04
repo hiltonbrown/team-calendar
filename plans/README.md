@@ -9,7 +9,7 @@ honour its STOP conditions, and update your row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Stripe webhook: fail loudly, drop placeholder org id, add tests | P1 | M | none | TODO |
+| 001 | Stripe webhook: fail loudly, drop placeholder org id, add tests | P1 | M | none | DONE |
 | 002 | Stop logging full Clerk webhook body (PII) | P1 | S | none | TODO |
 | 003 | region_not_supported_error for NZ/UK write-back stubs | P2 | S | none | TODO |
 | 004 | Security response headers + report-only CSP on apps/app | P2 | M | none | TODO |
@@ -25,8 +25,19 @@ honour its STOP conditions, and update your row when done.
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | TODO |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | TODO |
+| 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | TODO |
+| 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
+| 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
+
+Plans 017–018 added 2026-07-04 from a `plan` request scoping the Xero
+authentication functionality ("admins authenticate Xero; available to all users
+in the org"). See "Xero authentication: state at 2026-07-04" below for why the
+rest of that feature needed no plan.
+
+Plan 019 added 2026-07-04 from a `plan` request scoping the Xero token refresh
+strategy. See "Xero token refresh: state at 2026-07-04" below.
 
 ## Dependency notes
 
@@ -114,6 +125,63 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
   the Stripe webhook and `stripe_events` table exist and the in-app upgrade
   flow is live (owner-gated). The real gap is the marketing pricing surface,
   which became plan 006.
+
+## Xero authentication: state at 2026-07-04 (scoped investigation, not a full audit)
+
+Requirement investigated: "admin users authenticate Xero; the connection is
+then available to all users in the organisation." Finding: the flow is already
+substantially built, and only the two gaps below (plans 017, 018) needed work.
+
+- **"Available to all users" is already satisfied by architecture.** Xero tokens
+  live on `XeroConnection` (one per `Organisation`, scoped by `clerk_org_id`),
+  consumed server-side by sync jobs, feeds, and availability reads for every
+  user. There are no per-user Xero tokens. No plan required.
+- **Admin gating already exists on every app-layer surface**: the settings page
+  and connect page use `requirePageRole("org:admin")`
+  (`apps/app/.../settings/integrations/xero/page.tsx:13`,
+  `.../xero/connect/page.tsx:21`); all server actions resolve `org:admin` or
+  `org:owner` (`.../xero/_actions.ts:234-241`,
+  `.../xero/connect/_actions.ts:34-40`). The one uncovered entry point was the
+  start API route → plan 017.
+- **Token lifecycle already handled**: proactive refresh with an advisory lock
+  (`ensureFreshXeroConnection`), HMAC-signed OAuth state, AES-GCM token
+  encryption at rest, stale/disconnected status transitions. No plan required.
+- **Gap 1 (plan 017)**: the OAuth start API route is not role-checked.
+- **Gap 2 (plan 018)**: disconnect does not revoke at Xero
+  (`DELETE /connections/{id}`); the connection id is discarded at OAuth time.
+  This is the subject of the Xero "managing connections" best-practices doc.
+
+Not re-audited here: Xero read/write region adapters, sync-job internals, the
+matches (person-linking) flow — out of scope for the authentication question.
+
+## Xero token refresh: state at 2026-07-04 (scoped investigation, not a full audit)
+
+Requirement investigated: the Xero OAuth2 token refresh strategy (30-minute
+access token; single-use rotating refresh token valid 60 days). Finding: the
+proactive refresh core is sound (`ensureFreshXeroConnection` refreshes within a
+5-minute buffer under a per-connection `pg_advisory_xact_lock`; all sync jobs and
+the write adapter go through it), but three coupled gaps needed hardening — all
+folded into plan 019:
+
+- **Refresh errors are unclassified** (`exchangeToken` returns `unknown_error`
+  for everything), so callers cannot distinguish a transient 5xx from a dead
+  refresh token (`invalid_grant`).
+- **`markXeroConnectionStale` has no callers** — a dead refresh token never
+  transitions the connection to `stale`, so scheduled syncs loop on a doomed
+  refresh and the reconnect UI never appears.
+- **The manual "Refresh" action bypasses the advisory lock**
+  (`refreshXeroOAuthConnection`), racing scheduled refreshes and risking a
+  bricked connection under single-use token rotation.
+
+Audited but **not planned** (deferred decision):
+
+- **60-day idle keep-alive.** Tokens stay alive only because scheduled syncs
+  refresh them. A connection with `sync_paused_at` set, or an org idle for 60
+  days, will let the refresh token lapse and require a full reconnect. There is
+  no keep-alive job. Whether to build one (a scheduled Inngest job that refreshes
+  idle-but-active connections before the 60-day boundary) depends on whether
+  long-term paused connections are a supported product state. Becomes a plan only
+  if the maintainer confirms that need.
 
 ## Findings considered and rejected
 
