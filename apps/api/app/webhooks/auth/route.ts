@@ -333,7 +333,9 @@ export const POST = async (request: Request): Promise<Response> => {
   // Get the ID and type
   const { id } = event.data;
 
-  log.info("Webhook", { id, eventType, body });
+  // Log identifiers only. The verified payload contains PII (emails, names,
+  // phone numbers) and must never reach the log pipeline.
+  log.info("Webhook received", { id, eventType });
 
   let response: Response = new Response("", { status: 201 });
 
