@@ -9,6 +9,11 @@
 > If `packages/xero/src/au/write.ts` or `packages/xero/src/write/` changed
 > since this plan was written, compare the "Current state" notes against the
 > live code before proceeding; on a mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -51,6 +56,12 @@ The marketing site (`apps/web/app/integrations/page.tsx`) and PRODUCT.md both ad
 - `plans/README.md` (status row)
 
 **Out of scope**: all source code, including the NZ stubs. No Xero API calls against real tenants.
+
+## Git workflow
+
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
+- Commit message: `docs(plans): add NZ write-back spike report`
+- Do NOT push or open a PR unless the operator instructed it.
 
 ## Steps
 

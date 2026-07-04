@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -189,7 +194,7 @@ return Promise.resolve({ ok: false, error: writeBackNotAvailableError });
 
 ## Git workflow
 
-- Branch: `advisor/016-au-only-region-surfaces`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `fix(product): align region surfaces with AU-only launch`
 - Do NOT push or open a PR unless the operator instructed it.
 
@@ -245,8 +250,9 @@ settings action tests.
 In `packages/xero/src/oauth/service.ts`, after `inferPayrollRegionForTenant`
 returns a payroll region and before the transaction at lines 308-384 persists
 the active connection and tenant, return an error for `NZ` or `UK`. Reuse an
-existing error code if one fits; otherwise add a local error variant only if the
-service type requires it. Message should be plain: "Team Calendar currently
+existing error code if one fits (the existing `invalid_country` variant in
+`XeroOAuthError` is the likely candidate); otherwise add a local error variant
+only if the service type requires it. Message should be plain: "Team Calendar currently
 supports Australian Xero Payroll files only."
 
 Keep the broader country-to-region helper intact so future support can re-open

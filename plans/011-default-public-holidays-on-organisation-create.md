@@ -12,6 +12,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding. On a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -91,6 +96,11 @@ Repo conventions to follow:
 | Lint/check | `bun run check` | exit 0, no errors |
 | Full tests | `bun run test` | exit 0 |
 
+If an integration test command fails with the Prisma error `The column
+'plan_key' does not exist`, that is the test-database schema drift plan 013
+repairs. Apply plan 013 ahead of sequence (a sanctioned exception recorded in
+`plans/README.md`), then resume this plan; do not debug it here.
+
 ## Scope
 
 **In scope**:
@@ -122,8 +132,8 @@ Repo conventions to follow:
 
 ## Git workflow
 
-- Branch: `advisor/011-default-public-holidays-on-organisation-create`
-- Commit style in recent history is short descriptive messages, for example `design updates` and `feat(web): add Hilton Brown founder section to about page`. Use one logical commit for the implementation unless instructed otherwise.
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
+- Commit message (conventional commits, per CLAUDE.md): `feat(availability): provision default public holidays for new organisations`. Use one logical commit for the implementation unless instructed otherwise.
 - Do not push or open a PR unless the operator asks.
 
 ## Steps
@@ -395,4 +405,4 @@ Stop and report back if:
 - This plan intentionally keeps Nager import failures non-fatal during Organisation creation so a third-party API outage does not block signup or Xero connection.
 - Reviewers should scrutinise the no-region filtering carefully. The current code imports all regional holidays when `regionCode` is null; that should not survive this plan.
 - When a future retry/background job is added, it should call `ensureDefaultPublicHolidaysForOrganisation()` rather than duplicating Nager import logic.
-- If plan 010 lands first, compose both helper calls in `ensureOrganisationForClerk()` and the Xero creation path rather than letting one overwrite the other.
+- Plan 010 lands first on `preview`, so `ensureOrganisationForClerk()` and the Xero creation path will already call `ensureDefaultCalendarFeed`. Compose the holiday helper call alongside it rather than restructuring or overwriting that hook.

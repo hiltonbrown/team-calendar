@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -84,7 +89,7 @@ Documented constraints this plan must honour:
 
 ## Git workflow
 
-- Branch: `advisor/003-region-not-supported-error`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `feat(xero): add region_not_supported_error for NZ and UK write-back stubs`
 - Do NOT push or open a PR unless the operator instructed it.
 
@@ -148,4 +153,5 @@ Stop and report back if:
 ## Maintenance notes
 
 - Follow-up (deliberately deferred): gate submit/approve UI for organisations whose XeroTenant `payroll_region` is NZ or UK, showing a banner instead of a failing action; and count `region_not_supported_error` occurrences in sync-health reporting as a regional-demand signal.
+- Known parallel gap, deliberately out of scope: the read-side stubs (`packages/xero/src/read/dispatch.ts:54-69`) return the same misleading `unknown_error` for NZ/UK employee reads. They use the read error union, not `XeroWriteError`, so this plan does not touch them; plan 016 gates unsupported regions upstream before reads matter. If a read-side variant is wanted later, mirror this plan against the read error union.
 - When NZ write-back is implemented (see `TODO(nz-payroll)` markers), delete the error constants in `nz/write.ts`; the tests from step 3 will fail and point at themselves for updating.

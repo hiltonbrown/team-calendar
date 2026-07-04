@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -123,7 +128,7 @@ unpatched is an avoidable production risk.
 
 ## Git workflow
 
-- Branch: `advisor/014-runtime-dependency-security`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `chore(deps): patch high-risk runtime advisories`
 - Do NOT push or open a PR unless the operator instructed it.
 

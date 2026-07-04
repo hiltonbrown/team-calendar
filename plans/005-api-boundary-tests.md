@@ -11,6 +11,11 @@
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -81,7 +86,7 @@ Conventions: Vitest; factories/builders over repeated literals (CLAUDE.md testin
 
 ## Git workflow
 
-- Branch: `advisor/005-api-boundary-tests`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Commit message: `test(api): cover ical feed route and availability route handlers`
 - Do NOT push or open a PR unless the operator instructed it.
 
@@ -179,3 +184,4 @@ Stop and report back if:
 - Deferred follow-ups, in priority order: tests for the Xero OAuth callback route, then the server actions in `apps/app/**/_actions.ts` (9 of 16 action files are untested; approve/decline/withdraw first), then the SSE stream route.
 - When plan 004 lands (headers), these tests keep passing because they assert only route-set headers; if a test starts failing on an unexpected header, the route (not the test) changed behaviour.
 - If the availability routes are later refactored to take `organisationId` from the URL path instead of the body, update cases 4-7 accordingly; the tenant-isolation assertion (authenticated org id on every data access) must survive any such refactor.
+- Plan 012 later adds actor authorisation to these routes (`not_authorised` mapped to 403) and changes the `createManualAvailability` call signature; it extends `availability-routes.test.ts` in place rather than creating a parallel test file. Leave those updates to plan 012; do not pre-empt them here.

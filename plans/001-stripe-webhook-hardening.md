@@ -129,7 +129,7 @@ Repo conventions that apply:
 
 ## Git workflow
 
-- Branch: `advisor/001-stripe-webhook-hardening`
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
 - Conventional commits, e.g. `fix(api): log dropped Stripe webhook events before recording them`
 - Do NOT push or open a PR unless the operator instructed it.
 

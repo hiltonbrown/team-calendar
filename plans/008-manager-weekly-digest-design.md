@@ -9,6 +9,11 @@
 > If these areas changed materially since this plan was written, compare the
 > "Current state" notes against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
+>
+> **Preview branch note**: earlier-numbered plans land on `preview` before
+> this one, so this diff will legitimately include their changes. Treat a
+> mismatch as a STOP condition only when it is not explained by an earlier
+> plan's documented scope; excerpt line numbers may have shifted accordingly.
 
 ## Status
 
@@ -48,6 +53,12 @@ Constraints to honour: PRODUCT.md brand ("Modern. Calm. Precise.", no noise); pr
 - `plans/README.md` (status row)
 
 **Out of scope**: all source code.
+
+## Git workflow
+
+- Branch: `preview` (shared branch for all plans; implement sequentially in plan-number order on top of the previous plan's commits)
+- Commit message: `docs(plans): add manager weekly digest design report`
+- Do NOT push or open a PR unless the operator instructed it.
 
 ## Steps
 
@@ -97,5 +108,5 @@ Stop and report back if:
 
 ## Maintenance notes
 
-- If plan 009 (token rotation notification) is executed first, its findings about the `emailTemplate` wiring feed directly into step 1 here; note in the report whichever plan traced it first.
+- This plan executes before plan 009 on `preview`, so this spike's step 1 trace of the `emailTemplate` wiring is the canonical answer. Record it in a clearly titled report section so plan 009 can reuse it without re-deriving.
 - The digest is the natural home for future ambient signals (plan-limit warnings, sync-health summaries); the report should keep the content model extensible but must not design those now.
