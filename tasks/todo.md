@@ -1,35 +1,34 @@
-# Plan 003: Give NZ/UK write-back stubs a distinct region_not_supported_error with a plain-language message
+# Plan 004: Add security response headers (frame, sniff, referrer) to all apps, with CSP report-only on the product app
 
 ## Plan
-- [x] Step 1: Verify STOP conditions
-  - [x] Check `packages/xero/src/write/types.ts` for the exhaustive `never` switch in `toPlainLanguageMessage`.
-  - [x] Search for other packages switching on `XeroWriteError["code"]` (e.g. `unknown_error`, `rate_limit_error`) to see if adding a variant will break compilation.
-- [x] Step 2: Implement variant and plain-language message
-  - [x] Add `region_not_supported_error` to the `XeroWriteError` union in `packages/xero/src/write/types.ts`.
-  - [x] Add the case for `region_not_supported_error` to `toPlainLanguageMessage` in `packages/xero/src/write/types.ts`.
-  - [x] Run `bun run typecheck` to verify compilation.
-- [x] Step 3: Update stubs and dispatch fallback
-  - [x] Update `packages/xero/src/nz/write.ts` constants to use `region_not_supported_error`.
-  - [x] Update `packages/xero/src/uk/write.ts` constants to use `region_not_supported_error`.
-  - [x] Update `packages/xero/src/write/dispatch.ts` `unsupportedRegion` function to return `region_not_supported_error`.
-  - [x] Run `bun run typecheck` and `bun run check` to verify.
-- [x] Step 4: Find, update, and add tests
-  - [x] Find existing assertions on `unknown_error` in `packages/xero/src` tests.
-  - [x] Add test for the new plain-language message in `packages/xero/src/write/types.test.ts`.
-  - [x] Add/update tests in `packages/xero/src/write/dispatch.test.ts` to assert that NZ, UK, and unknown regions return `region_not_supported_error`.
-- [x] Step 5: Run full verification suite
-  - [x] Run `cd packages/xero && NODE_ENV=test bunx vitest run` and confirm all tests pass.
-  - [x] Run `bun run test` from workspace root and confirm exit 0.
-- [x] Step 6: Git commit and document results
-  - [x] Verify `git status` shows only expected files modified.
-  - [x] Commit with message: `feat(xero): add region_not_supported_error for NZ and UK write-back stubs`
-  - [x] Skip `plans/README.md` status row update (as per executor override).
+- [x] Step 1: Add shared baseline headers in `packages/next-config`
+  - [x] Add `securityHeaders` export in `packages/next-config/index.ts`
+  - [x] Add `headers()` async function in `config` in `packages/next-config/index.ts`
+  - [x] Verify `bun run typecheck` and `bun run check`
+- [x] Step 2: Add a report-only CSP to `apps/app` only
+  - [x] Import `securityHeaders` in `apps/app/next.config.ts`
+  - [x] Override `headers()` in `nextConfig` in `apps/app/next.config.ts` to append baseline headers and `Content-Security-Policy-Report-Only`
+  - [x] Verify `bun run typecheck`
+- [x] Step 3: Verify headers are actually served
+  - [x] Run `bun run build` to prove `headers()` is valid config in all three apps
+  - [x] Start product app with `cd apps/app && bun run dev` (on port 3000)
+  - [x] Perform `curl` checks on `http://localhost:3000/sign-in` for the presence of headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`, `Content-Security-Policy-Report-Only`
+  - [x] Stop the dev server and verify port 3000 is free with `lsof -iTCP:3000 -sTCP:LISTEN`
+- [x] Step 4: Manual smoke of Clerk sign-in under Report-Only
+  - [x] Load sign-in page (informational only since Report-Only does not block)
+- [x] Step 5: Git commit and document results
+  - [x] Verify `git status` shows only expected files modified
+  - [x] Commit with message: `feat(security): add hardening response headers and report-only CSP`
+  - [x] Skip `plans/README.md` status row update (as per executor override)
 
 ## Review
-- Verified exhaustive \`never\` switch exists in \`toPlainLanguageMessage\`.
-- Verified no other packages use exhaustive switches on \`XeroWriteError["code"]\`.
-- Implemented \`region_not_supported_error\` in \`packages/xero/src/write/types.ts\` and \`toPlainLanguageMessage\` mapping.
-- Updated NZ stubs (\`packages/xero/src/nz/write.ts\`), UK stubs (\`packages/xero/src/uk/write.ts\`), and unrecognised region fallback (\`packages/xero/src/write/dispatch.ts\`) to return the new error code.
-- Added and updated tests in \`packages/xero/src/write/types.test.ts\` and \`packages/xero/src/write/dispatch.test.ts\`.
-- Verified typecheck, formatting/linting (with Biome autofixes), xero tests, and full test suite all pass.
-
+- Added shared baseline security headers (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(), geolocation=()`) to `packages/next-config/index.ts`.
+- Configured report-only Content Security Policy (CSP) for the product app (`apps/app`) in `apps/app/next.config.ts`, appending it to the baseline headers.
+- Successfully built all packages (`app`, `api`, `web`, and shared packages) using `bun run build`.
+- Started the `apps/app` dev server and ran `curl -sI http://localhost:3000/sign-in` to verify headers are served correctly:
+  - `X-Content-Type-Options: nosniff` (verified)
+  - `X-Frame-Options: DENY` (verified)
+  - `Referrer-Policy: strict-origin-when-cross-origin` (verified)
+  - `Permissions-Policy: camera=(), microphone=(), geolocation=()` (verified)
+  - `Content-Security-Policy-Report-Only` (verified)
+- Stopped the dev server and verified the environment is clean.
