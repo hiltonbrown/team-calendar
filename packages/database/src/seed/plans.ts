@@ -9,6 +9,8 @@ export interface PlanDefinition {
   readonly priceId: string | null;
 }
 
+// NOTE: If plan features or limits change here, ensure to synchronize the public
+// marketing constants in apps/web/app/pricing/constants.ts.
 export const PLAN_CATALOGUE = [
   {
     features: { analytics: false, priority_support: false },
