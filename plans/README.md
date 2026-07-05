@@ -38,7 +38,7 @@ per-plan branches.
 | 003 | region_not_supported_error for NZ/UK write-back stubs | P2 | S | none | DONE |
 | 004 | Security response headers + report-only CSP on apps/app | P2 | M | none | DONE |
 | 005 | Tests for ICS feed route and availability routes | P2 | M | none | DONE |
-| 006 | Pricing surface decision spike (doc-only) | P1 | S | none | TODO |
+| 006 | Pricing surface decision spike (doc-only) | P1 | S | none | DONE |
 | 007 | NZ payroll write-back spike (doc-only) | P2 | M | none | TODO |
 | 008 | Manager weekly digest design spike (doc-only) | P3 | S | none | TODO |
 | 009 | Dispatch feed_token_rotated on rotation | P3 | S-M | none | TODO |
@@ -52,6 +52,7 @@ per-plan branches.
 | 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | TODO |
 | 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
+| 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
