@@ -1,24 +1,23 @@
-# Plan: Execute and Verify Plan 020 - Implement Static Pricing Cards
+# Plan 008: Design the weekly "who's out" manager digest (spike, doc-only)
 
 ## Tasks
-- [x] Create isolated git worktree and branch for the executor subagent
-- [x] Spawn the executor subagent to run Plan 020
-- [x] Review the executor's output and verify scope compliance (`git diff --stat`)
-- [x] Run verification commands in the worktree:
-  - [x] `bun run check`
-  - [x] `bun run typecheck`
-  - [x] `bun run build` (Passed after copying `.env.local` to resolve validation issues)
-- [x] Start dev server on port 3001 and run curl check:
-  - [x] Start: `cd apps/web && bun run dev` (expect port 3001)
-  - [x] Curl check: `curl -s http://localhost:3001/pricing | grep -E "Starter|Premium|Enterprise|Basic"`
-  - [x] Confirm pricing cards are visible and contain no Clerk billing components/imports
-  - [x] Stop dev server and verify port 3001 is free
-- [x] Present implementation to the user for merging
-- [x] Update plan status to `DONE` in `plans/README.md`
-- [x] Update `tasks/todo.md` with review notes
+- [x] Drift check and git verification
+- [x] Step 1: Document the reusable ingredients
+  - [x] Registry entry structure and `emailTemplate` resolution
+  - [x] `getManagerView` and `listTeamRecords` query scoping and privacy filtering
+  - [x] Scheduled Inngest jobs cron configuration and organisation context propagation
+  - [x] manager-to-reportee connection mapping (`teams.manager_person_id` correction)
+- [x] Step 2: Specify the digest design
+  - [x] Registry entry (`leave_digest` type)
+  - [x] Digest content details and empty state rules
+  - [x] Recipients resolution strategy
+  - [x] Cron schedule and timezone handling
+  - [x] Delivery format, in-app channel, and idempotency
+- [x] Step 3: Outline build plan and compile open questions
+- [x] Verify file changes are strictly doc-only (restricted to `plans/`)
+- [x] Commit design report `plans/008-report-manager-digest.md` with conventional commit message
 
 ## Review
-- **Scope Compliance**: The only files modified by the executor are `apps/web/app/pricing/components/pricing-plans.tsx`, `apps/web/app/pricing/constants.ts`, `apps/web/app/styles/features.css`, and `packages/database/src/seed/plans.ts`.
-- **Code Quality**: The changes compile, type-check, and satisfy project lint rules. The component uses the new constants cleanly, uses standard Next.js `<Link>`, and has no remaining references to Clerk Billing.
-- **Visuals**: CSS styles for pricing cards look complete, utilizing proper grid columns and clean styles matching Design tokens (forest green highlight colors, correct borders, Outfit / Plus Jakarta Sans fonts).
-- **Smoke Tests**: Verified rendering of "Basic", "Premium", and "Enterprise" static plans on the local dev server.
+- **Scope Compliance**: Verified only `plans/008-report-manager-digest.md` and `tasks/todo.md` were modified.
+- **Content Completeness**: Verified sections for Ingredients, Specification, Build skeleton, and Open questions.
+- **Audit Verification**: Every codebase claim cites file and line numbers.
