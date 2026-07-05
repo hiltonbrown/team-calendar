@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   rotateToken: vi.fn(),
   updateFeed: vi.fn(),
   revalidatePath: vi.fn(),
+  dispatchNotification: vi.fn(),
+  logError: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
@@ -36,6 +38,16 @@ vi.mock("next/cache", () => ({
 }));
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
+}));
+vi.mock("@repo/notifications", () => ({
+  dispatchNotification: mocks.dispatchNotification,
+}));
+vi.mock("@repo/observability/log", () => ({
+  log: {
+    error: mocks.logError,
+    info: vi.fn(),
+    warn: vi.fn(),
+  },
 }));
 
 const {
@@ -69,6 +81,10 @@ describe("feed actions", () => {
     mocks.rotateToken.mockResolvedValue({
       ok: true,
       value: { hint: "wxyz", plaintext: "new_plaintext", tokenId: feedId },
+    });
+    mocks.dispatchNotification.mockResolvedValue({
+      ok: true,
+      value: { inAppDelivered: true, emailQueued: false },
     });
   });
 
@@ -104,5 +120,63 @@ describe("feed actions", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
     expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feeds/${feedId}`);
     expect(mocks.revalidatePath).not.toHaveBeenCalledWith("/settings/feeds");
+  });
+
+  describe("rotateTokenAction - notifications", () => {
+    it("dispatches a notification on successful token rotation", async () => {
+      mocks.dispatchNotification.mockResolvedValue({
+        ok: true,
+        value: { inAppDelivered: true, emailQueued: false },
+      });
+
+      const result = await rotateTokenAction({ feedId, organisationId });
+
+      expect(result.ok).toBe(true);
+      expect(mocks.dispatchNotification).toHaveBeenCalledTimes(1);
+      expect(mocks.dispatchNotification).toHaveBeenCalledWith({
+        actionUrl: `/feeds/${feedId}`,
+        actorUserId: "user_1",
+        clerkOrgId: "org_1",
+        organisationId,
+        objectId: feedId,
+        objectType: "feed",
+        body: "A calendar feed token has been rotated.",
+        recipientPersonId: null,
+        recipientUserId: "user_1",
+        title: "Feed token rotated",
+        type: "feed_token_rotated",
+      });
+    });
+
+    it("does not fail token rotation if notification dispatch fails and logs the error", async () => {
+      mocks.dispatchNotification.mockResolvedValue({
+        ok: false,
+        error: { code: "unknown_error", message: "Failed to dispatch" },
+      });
+
+      const result = await rotateTokenAction({ feedId, organisationId });
+
+      expect(result.ok).toBe(true);
+      expect(mocks.dispatchNotification).toHaveBeenCalledTimes(1);
+      expect(mocks.logError).toHaveBeenCalledWith(
+        "Failed to dispatch feed_token_rotated notification",
+        expect.objectContaining({
+          feedId,
+          error: { code: "unknown_error", message: "Failed to dispatch" },
+        })
+      );
+    });
+
+    it("does not dispatch a notification if token rotation fails", async () => {
+      mocks.rotateToken.mockResolvedValue({
+        ok: false,
+        error: { code: "not_found", message: "Feed not found" },
+      });
+
+      const result = await rotateTokenAction({ feedId, organisationId });
+
+      expect(result.ok).toBe(false);
+      expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+    });
   });
 });

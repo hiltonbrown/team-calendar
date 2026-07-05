@@ -15,6 +15,8 @@ import {
   type TokenServiceError,
   updateFeed,
 } from "@repo/feeds";
+import { dispatchNotification } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
@@ -146,6 +148,28 @@ export async function rotateTokenAction(
     return result;
   }
   revalidateFeedPaths(parsed.data.feedId);
+
+  const actionUrl = `/feeds/${parsed.data.feedId}`;
+  const dispatchResult = await dispatchNotification({
+    actionUrl,
+    actorUserId: context.value.userId,
+    clerkOrgId: context.value.clerkOrgId,
+    organisationId: context.value.organisationId,
+    objectId: parsed.data.feedId,
+    objectType: "feed",
+    body: "A calendar feed token has been rotated.",
+    recipientPersonId: null,
+    recipientUserId: context.value.userId,
+    title: "Feed token rotated",
+    type: "feed_token_rotated",
+  });
+  if (!dispatchResult.ok) {
+    log.error("Failed to dispatch feed_token_rotated notification", {
+      feedId: parsed.data.feedId,
+      error: dispatchResult.error,
+    });
+  }
+
   return {
     ok: true,
     value: {
