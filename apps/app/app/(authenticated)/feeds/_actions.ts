@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
+import { database } from "@repo/database";
 import {
   archiveFeed,
   createFeed,
@@ -15,7 +16,10 @@ import {
   type TokenServiceError,
   updateFeed,
 } from "@repo/feeds";
+import { dispatchNotification } from "@repo/notifications";
+import { log } from "@repo/observability/log";
 import { revalidatePath } from "next/cache";
+import { withOrg } from "@/lib/navigation/org-url";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 import {
   type CreateFeedActionInput,
@@ -146,6 +150,66 @@ export async function rotateTokenAction(
     return result;
   }
   revalidateFeedPaths(parsed.data.feedId);
+
+  // Fetch feed name cheaply to include in notification body
+  let feedName: string | null = null;
+  try {
+    const feed = await database.feed.findFirst({
+      where: {
+        id: parsed.data.feedId,
+        organisation_id: context.value.organisationId,
+      },
+      select: { name: true },
+    });
+    if (feed) {
+      feedName = feed.name;
+    }
+  } catch (err) {
+    log.error("Failed to fetch feed name for token rotation notification", {
+      feedId: parsed.data.feedId,
+      error: err,
+    });
+  }
+
+  const actionUrl = withOrg(
+    `/feeds/${parsed.data.feedId}`,
+    context.value.clerkOrgId
+  );
+  const body = feedName
+    ? `The token for calendar feed "${feedName}" has been rotated.`
+    : "A calendar feed token has been rotated.";
+
+  try {
+    const dispatchResult = await dispatchNotification({
+      actionUrl,
+      actorUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      objectId: parsed.data.feedId,
+      objectType: "feed",
+      body,
+      recipientPersonId: null,
+      recipientUserId: context.value.userId,
+      title: "Feed token rotated",
+      type: "feed_token_rotated",
+    });
+
+    if (!dispatchResult.ok) {
+      log.error("Failed to dispatch feed token rotation notification", {
+        feedId: parsed.data.feedId,
+        error: dispatchResult.error,
+      });
+    }
+  } catch (err) {
+    log.error(
+      "Failed to dispatch feed token rotation notification (unhandled exception)",
+      {
+        feedId: parsed.data.feedId,
+        error: err,
+      }
+    );
+  }
+
   return {
     ok: true,
     value: {
