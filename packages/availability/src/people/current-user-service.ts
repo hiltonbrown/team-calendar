@@ -8,6 +8,7 @@ import {
   type Result,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import {
   normaliseCurrentUserProfile,
   safeCurrentUserProfilePatch,
@@ -139,6 +140,14 @@ export const ensureOrganisationForClerk = async (
           working_hours_per_day: input.workingHoursPerDay ?? 7.6,
         },
       });
+
+  const defaultFeed = await ensureDefaultCalendarFeed({
+    clerkOrgId: input.clerkOrgId,
+    organisationId: organisation.id,
+  });
+  if (!defaultFeed.ok) {
+    throw new Error(defaultFeed.error.message);
+  }
 
   return {
     clerkOrgId: input.clerkOrgId as ClerkOrgId,

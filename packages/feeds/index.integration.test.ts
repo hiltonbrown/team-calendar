@@ -8,6 +8,7 @@ process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
 vi.mock("server-only", () => ({}));
 
 let createFeed: typeof import("./index")["createFeed"];
+let ensureDefaultCalendarFeed: typeof import("./index")["ensureDefaultCalendarFeed"];
 let hashFeedToken: typeof import("./index")["hashFeedToken"];
 let pauseFeed: typeof import("./index")["pauseFeed"];
 let renderFeedForToken: typeof import("./index")["renderFeedForToken"];
@@ -23,6 +24,7 @@ const describeWithDatabase = process.env.DATABASE_URL
 if (process.env.DATABASE_URL) {
   ({
     createFeed,
+    ensureDefaultCalendarFeed,
     hashFeedToken,
     pauseFeed,
     renderFeedForToken,
@@ -68,9 +70,8 @@ describeWithDatabase("feed services", () => {
       scopes: [{ scopeType: "org", scopeValue: null }],
     });
 
-    expect(result.ok).toBe(true);
     if (!result.ok) {
-      return;
+      throw new Error(result.error.message);
     }
     expect(result.value.token.plaintext).toMatch(TOKEN_PATTERN);
     expect(result.value.token.hint).toBe(
@@ -85,6 +86,168 @@ describeWithDatabase("feed services", () => {
       hashFeedToken(result.value.token.plaintext)
     );
     expect(tokenRows[0]?.token_hash).not.toBe(result.value.token.plaintext);
+  });
+
+  test("provisions a default all-staff feed with an org scope and active token", async () => {
+    const result = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value).toMatchObject({ created: true });
+    expect(result.value.token?.plaintext).toMatch(TOKEN_PATTERN);
+
+    const feed = await database.feed.findUnique({
+      where: { id: result.value.feedId },
+    });
+    expect(feed).toMatchObject({
+      clerk_org_id: tenant.clerkOrgId,
+      includes_public_holidays: false,
+      name: "All staff",
+      organisation_id: tenant.organisationId,
+      privacy_mode: "named",
+      slug: "all-staff",
+      status: "active",
+    });
+
+    const scopes = await database.feedScope.findMany({
+      where: { feed_id: result.value.feedId },
+    });
+    expect(scopes).toHaveLength(1);
+    expect(scopes[0]).toMatchObject({
+      clerk_org_id: tenant.clerkOrgId,
+      organisation_id: tenant.organisationId,
+      scope_type: "org",
+      scope_value: null,
+    });
+
+    const tokens = await database.feedToken.findMany({
+      where: { feed_id: result.value.feedId },
+    });
+    expect(tokens).toHaveLength(1);
+    expect(tokens[0]).toMatchObject({
+      clerk_org_id: tenant.clerkOrgId,
+      organisation_id: tenant.organisationId,
+      status: "active",
+    });
+    expect(tokens[0]?.token_hash).toBe(
+      hashFeedToken(result.value.token?.plaintext ?? "")
+    );
+  });
+
+  test("does not duplicate the default feed, scope, or token", async () => {
+    const first = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      return;
+    }
+
+    const second = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: { created: false, feedId: first.value.feedId },
+    });
+    await expect(
+      database.feed.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+    await expect(
+      database.feedScope.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+    await expect(
+      database.feedToken.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+  });
+
+  test("suffixes default feed slugs across organisations in one Clerk org", async () => {
+    const secondOrganisationId = "51000000-0000-4000-8000-000000000002";
+    await createTenant({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: secondOrganisationId,
+    });
+
+    const first = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+    const second = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: secondOrganisationId,
+    });
+
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!(first.ok && second.ok)) {
+      return;
+    }
+
+    const feeds = await database.feed.findMany({
+      orderBy: { slug: "asc" },
+      select: { organisation_id: true, slug: true },
+      where: { clerk_org_id: tenant.clerkOrgId },
+    });
+    expect(feeds).toEqual([
+      { organisation_id: tenant.organisationId, slug: "all-staff" },
+      { organisation_id: secondOrganisationId, slug: "all-staff-2" },
+    ]);
+  });
+
+  test("does not recreate a default feed after an admin archived one", async () => {
+    const archived = await database.feed.create({
+      data: {
+        archived_at: new Date("2026-01-01T00:00:00.000Z"),
+        clerk_org_id: tenant.clerkOrgId,
+        name: "Archived all staff",
+        organisation_id: tenant.organisationId,
+        privacy_mode: "named",
+        slug: "archived-all-staff",
+        status: "archived",
+      },
+      select: { id: true },
+    });
+
+    const result = await ensureDefaultCalendarFeed({
+      clerkOrgId: tenant.clerkOrgId,
+      organisationId: tenant.organisationId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { created: false, feedId: archived.id },
+    });
+    await expect(
+      database.feed.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
   });
 
   test("rotates tokens and revokes the old active token", async () => {

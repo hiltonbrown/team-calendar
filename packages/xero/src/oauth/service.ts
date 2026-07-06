@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
+import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
@@ -845,6 +846,19 @@ async function resolveOrganisationForTenantSelection(input: {
       },
       select: { id: true },
     });
+    const defaultFeed = await ensureDefaultCalendarFeed({
+      clerkOrgId: input.clerkOrgId,
+      organisationId: organisation.id,
+    });
+    if (!defaultFeed.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: defaultFeed.error.message,
+        },
+      };
+    }
     return { ok: true, value: { id: organisation.id } };
   }
 

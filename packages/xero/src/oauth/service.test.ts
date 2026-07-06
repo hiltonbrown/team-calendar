@@ -6,18 +6,36 @@ vi.mock("server-only", () => ({}));
 const dbMock = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
+  organisation: {
+    create: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+  },
   xeroConnection: {
+    findFirst: vi.fn(),
+    upsert: vi.fn(),
+    update: vi.fn(),
+  },
+  xeroOAuthSession: {
     findFirst: vi.fn(),
     update: vi.fn(),
   },
+  xeroTenant: {
+    upsert: vi.fn(),
+  },
+}));
+const feedMock = vi.hoisted(() => ({
+  ensureDefaultCalendarFeed: vi.fn(),
 }));
 vi.mock("@repo/database", () => ({
   database: dbMock,
 }));
+vi.mock("@repo/feeds", () => feedMock);
 
 const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
+  completeXeroTenantSelection,
   ensureFreshXeroConnection,
   isPreviewDeployment,
   xeroConnectionRefreshDecision,
@@ -50,8 +68,20 @@ beforeEach(() => {
   dbMock.$queryRaw.mockResolvedValue([]);
   dbMock.$transaction.mockReset();
   dbMock.$transaction.mockImplementation((callback) => callback(dbMock));
+  dbMock.organisation.create.mockReset();
+  dbMock.organisation.findFirst.mockReset();
+  dbMock.organisation.findMany.mockReset();
   dbMock.xeroConnection.findFirst.mockReset();
+  dbMock.xeroConnection.upsert.mockReset();
   dbMock.xeroConnection.update.mockReset();
+  dbMock.xeroOAuthSession.findFirst.mockReset();
+  dbMock.xeroOAuthSession.update.mockReset();
+  dbMock.xeroTenant.upsert.mockReset();
+  feedMock.ensureDefaultCalendarFeed.mockReset();
+  feedMock.ensureDefaultCalendarFeed.mockResolvedValue({
+    ok: true,
+    value: { created: true, feedId: "feed_1" },
+  });
 });
 
 afterEach(() => {
@@ -510,4 +540,121 @@ describe("ensureFreshXeroConnection", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
+});
+
+describe("completeXeroTenantSelection", () => {
+  const sessionId = "90000000-0000-4000-8000-000000000001";
+  const organisationId = "90000000-0000-4000-8000-000000000002";
+  const connectionId = "90000000-0000-4000-8000-000000000003";
+  const xeroTenantRowId = "90000000-0000-4000-8000-000000000004";
+  const clerkOrgId = "org_xero_default_feed";
+  const tenantId = "xero-tenant-1";
+
+  beforeEach(() => {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue(buildPendingSession());
+    dbMock.organisation.findMany.mockResolvedValue([]);
+    dbMock.organisation.create.mockResolvedValue({ id: organisationId });
+    dbMock.xeroConnection.upsert.mockResolvedValue({ id: connectionId });
+    dbMock.xeroTenant.upsert.mockResolvedValue({ id: xeroTenantRowId });
+    dbMock.xeroOAuthSession.update.mockResolvedValue({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            Organisations: [{ CountryCode: "AU", Name: "Acme Payroll" }],
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      )
+    );
+  });
+
+  it("provisions the default feed when tenant selection creates an organisation", async () => {
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        connectionId,
+        organisationId,
+        xeroTenantId: xeroTenantRowId,
+      },
+    });
+    expect(dbMock.organisation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clerk_org_id: clerkOrgId,
+          country_code: "AU",
+          name: "Acme Payroll",
+        }),
+      })
+    );
+    expect(feedMock.ensureDefaultCalendarFeed).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
+    expect(dbMock.xeroConnection.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          clerk_org_id: clerkOrgId,
+          organisation_id: organisationId,
+        }),
+        where: { organisation_id: organisationId },
+      })
+    );
+  });
+
+  it("fails tenant selection when default feed provisioning fails", async () => {
+    feedMock.ensureDefaultCalendarFeed.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to create default feed.",
+      },
+    });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to create default feed.",
+      },
+    });
+    expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
+  });
+
+  function buildPendingSession() {
+    const accessToken = encryptXeroToken("access-token");
+    const refreshToken = encryptXeroToken("refresh-token");
+
+    return {
+      access_token_auth_tag: accessToken.authTag,
+      access_token_encrypted: accessToken.encrypted,
+      access_token_iv: accessToken.iv,
+      available_tenants_json: {
+        tenants: [{ tenantId, tenantName: "Acme Payroll" }],
+      },
+      expires_at: new Date("2026-07-07T00:15:00.000Z"),
+      id: sessionId,
+      organisation_id: null,
+      refresh_token_auth_tag: refreshToken.authTag,
+      refresh_token_encrypted: refreshToken.encrypted,
+      refresh_token_iv: refreshToken.iv,
+      return_to: "/settings/integrations/xero",
+      token_expires_at: new Date("2026-07-07T00:30:00.000Z"),
+    };
+  }
 });

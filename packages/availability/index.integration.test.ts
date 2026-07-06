@@ -10,6 +10,7 @@ const {
   archiveManualAvailability,
   createManualAvailability,
   ensureCurrentUserPerson,
+  ensureOrganisationForClerk,
   listAvailabilityRecords,
   updateManualAvailability,
 } = await import("./index");
@@ -32,8 +33,13 @@ const tenantB: TenantFixture = {
   organisationId: "42000000-0000-4000-8000-000000000001",
   personId: "42000000-0000-4000-8000-000000000002",
 };
+const provisioningClerkOrgId = "org_test_default_feed_provisioning";
 
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testClerkOrgIds = [
+  tenantA.clerkOrgId,
+  tenantB.clerkOrgId,
+  provisioningClerkOrgId,
+];
 
 const inputFor = (tenant: TenantFixture) => ({
   allDay: true,
@@ -83,6 +89,18 @@ const cleanTestData = async () => {
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
   await database.person.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.auditEvent.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feedToken.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feedScope.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feed.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
   await database.organisation.deleteMany({
@@ -243,6 +261,72 @@ describe("manual availability services", () => {
 });
 
 describe("current user person identity", () => {
+  test("provisions one default feed when ensuring an organisation", async () => {
+    const context = await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default feed provisioning",
+    });
+
+    await expect(
+      database.organisation.count({
+        where: { clerk_org_id: provisioningClerkOrgId },
+      })
+    ).resolves.toBe(1);
+
+    const feeds = await database.feed.findMany({
+      where: {
+        archived_at: null,
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+      },
+    });
+    expect(feeds).toHaveLength(1);
+    expect(feeds[0]).toMatchObject({
+      name: "All staff",
+      privacy_mode: "named",
+      status: "active",
+    });
+
+    await expect(
+      database.feedScope.findMany({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          feed_id: feeds[0]?.id,
+          organisation_id: context.organisationId,
+        },
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({ scope_type: "org", scope_value: null }),
+    ]);
+
+    await expect(
+      database.feedToken.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          feed_id: feeds[0]?.id,
+          organisation_id: context.organisationId,
+          status: "active",
+        },
+      })
+    ).resolves.toBe(1);
+
+    await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default feed provisioning renamed",
+    });
+
+    await expect(
+      database.feed.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          organisation_id: context.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+  });
+
   test("returns an existing linked person", async () => {
     await database.person.update({
       where: { id: tenantA.personId },
