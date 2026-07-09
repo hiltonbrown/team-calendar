@@ -97,6 +97,7 @@ export * from "./src/holidays/holiday-service";
 export {
   addCustomHoliday,
   deleteCustomHoliday,
+  ensureDefaultPublicHolidaysForOrganisation,
   importForJurisdiction,
   listForOrganisation,
   restoreHoliday,

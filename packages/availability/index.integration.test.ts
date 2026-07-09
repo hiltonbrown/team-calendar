@@ -5,6 +5,24 @@ import type { TenantContext } from "./index";
 
 config({ path: new URL("../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}), { virtual: true });
+vi.mock("./src/holidays/nager-client", () => ({
+  getPublicHolidays: vi.fn(async (countryCode: string, year: number) => ({
+    ok: true,
+    value: [
+      {
+        counties: null,
+        countryCode,
+        date: `${year}-01-01`,
+        fixed: true,
+        global: true,
+        launchYear: null,
+        localName: "New Year's Day",
+        name: "New Year's Day",
+        types: ["Public"],
+      },
+    ],
+  })),
+}));
 
 const {
   archiveManualAvailability,
@@ -15,6 +33,7 @@ const {
   updateManualAvailability,
 } = await import("./index");
 const { database } = await import("@repo/database");
+const { getPublicHolidays } = await import("./src/holidays/nager-client");
 
 interface TenantFixture {
   clerkOrgId: string;
@@ -101,6 +120,12 @@ const cleanTestData = async () => {
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
   await database.feed.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.publicHoliday.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.publicHolidayJurisdiction.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
   await database.organisation.deleteMany({
@@ -261,7 +286,10 @@ describe("manual availability services", () => {
 });
 
 describe("current user person identity", () => {
-  test("provisions one default feed when ensuring an organisation", async () => {
+  test("provisions one default feed and default holidays when ensuring an organisation", async () => {
+    const currentYear = new Date().getUTCFullYear();
+    const nextYear = currentYear + 1;
+
     const context = await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
@@ -311,6 +339,62 @@ describe("current user person identity", () => {
       })
     ).resolves.toBe(1);
 
+    await expect(
+      database.publicHolidayJurisdiction.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          is_enabled: true,
+          organisation_id: context.organisationId,
+          region_code: null,
+        },
+      })
+    ).resolves.toBe(1);
+
+    await expect(
+      database.publicHoliday.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          holiday_date: {
+            gte: new Date(Date.UTC(currentYear, 0, 1)),
+            lt: new Date(Date.UTC(currentYear + 1, 0, 1)),
+          },
+          organisation_id: context.organisationId,
+          region_code: null,
+          source: "nager",
+        },
+      })
+    ).resolves.toBeGreaterThan(0);
+
+    await expect(
+      database.publicHoliday.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          holiday_date: {
+            gte: new Date(Date.UTC(nextYear, 0, 1)),
+            lt: new Date(Date.UTC(nextYear + 1, 0, 1)),
+          },
+          organisation_id: context.organisationId,
+          region_code: null,
+          source: "nager",
+        },
+      })
+    ).resolves.toBeGreaterThan(0);
+
+    const nagerHolidayCountBeforeSecondEnsure =
+      await database.publicHoliday.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          organisation_id: context.organisationId,
+          region_code: null,
+          source: "nager",
+        },
+      });
+
     await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
@@ -325,6 +409,33 @@ describe("current user person identity", () => {
         },
       })
     ).resolves.toBe(1);
+
+    await expect(
+      database.publicHolidayJurisdiction.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          is_enabled: true,
+          organisation_id: context.organisationId,
+          region_code: null,
+        },
+      })
+    ).resolves.toBe(1);
+
+    await expect(
+      database.publicHoliday.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          country_code: "AU",
+          organisation_id: context.organisationId,
+          region_code: null,
+          source: "nager",
+        },
+      })
+    ).resolves.toBe(nagerHolidayCountBeforeSecondEnsure);
+
+    expect(vi.mocked(getPublicHolidays)).toHaveBeenCalledTimes(2);
   });
 
   test("returns an existing linked person", async () => {

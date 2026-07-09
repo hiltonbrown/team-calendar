@@ -84,4 +84,47 @@ describe("loadOnboardingState", () => {
       title: "Review calendar feed",
     });
   });
+
+  it("uses automatic holiday copy and marks holidays complete with a jurisdiction", async () => {
+    mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    const profileStep = state.steps.find((step) => step.id === "profile");
+    const holidaysStep = state.steps.find((step) => step.id === "holidays");
+
+    expect(profileStep?.description).toBe(
+      "Acme is set to AU. Confirm the country, region, and timezone used for public holiday defaults."
+    );
+    expect(holidaysStep).toMatchObject({
+      ctaLabel: "Review holidays",
+      description:
+        "Team Calendar imports your organisation's country holidays automatically. Review regional and custom dates to confirm coverage.",
+      status: "complete",
+      title: "Review public holidays",
+    });
+  });
+
+  it("keeps holidays incomplete with review setup CTA when no jurisdiction exists", async () => {
+    mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    const holidaysStep = state.steps.find((step) => step.id === "holidays");
+    expect(holidaysStep).toMatchObject({
+      ctaLabel: "Review setup",
+      description:
+        "Team Calendar imports your organisation's country holidays automatically. Review regional and custom dates to confirm coverage.",
+      status: "next",
+      title: "Review public holidays",
+    });
+  });
 });

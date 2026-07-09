@@ -1,7 +1,8 @@
 "use server";
 
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
-import type { Result } from "@repo/core";
+import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -75,6 +76,9 @@ export async function updateAccountNameAction(input: {
     });
 
     revalidatePath("/settings/general");
+    revalidatePath("/settings/holidays");
+    revalidatePath("/public-holidays");
+    revalidatePath("/calendar");
     revalidatePath("/");
 
     return { ok: true, value: { name: parsed.data.name } };
@@ -179,6 +183,22 @@ export async function updateOrganisationAction(input: {
       },
     });
 
+    const holidayJurisdictionChanged =
+      updated.country_code !== organisation.country_code ||
+      updated.region_code !== organisation.region_code;
+
+    if (holidayJurisdictionChanged) {
+      const holidayProvisioningResult =
+        await ensureDefaultPublicHolidaysForOrganisation({
+          clerkOrgId: context.value.clerkOrgId,
+          organisationId: context.value.organisationId,
+          userId: context.value.actingUserId,
+        });
+      if (!holidayProvisioningResult.ok) {
+        // Non-fatal: settings updates should still persist when holiday import fails.
+      }
+    }
+
     revalidatePath("/settings/general");
     revalidatePath("/");
 
@@ -200,9 +220,9 @@ async function resolveAdminContext(organisationId: string): Promise<
   ActionResult<{
     actingUserId: string;
     actorDisplay: string;
-    clerkOrgId: string;
+    clerkOrgId: ClerkOrgId;
     ipAddress: null | string;
-    organisationId: string;
+    organisationId: OrganisationId;
     userAgent: null | string;
   }>
 > {
