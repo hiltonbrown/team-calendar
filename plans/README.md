@@ -41,7 +41,7 @@ per-plan branches.
 | 006 | Pricing surface decision spike (doc-only) | P1 | S | none | DONE |
 | 007 | NZ payroll write-back spike (doc-only) | P2 | M | none | DONE |
 | 008 | Manager weekly digest design spike (doc-only) | P3 | S | none | DONE |
-| 009 | Dispatch feed_token_rotated on rotation | P3 | S-M | none | TODO |
+| 009 | Dispatch feed_token_rotated on rotation | P3 | S-M | none | DONE |
 | 010 | Provision a default calendar feed for every new organisation | P1 | M | none | DONE |
 | 011 | Provision default public holidays for every new organisation | P1 | M | 010 | TODO |
 | 012 | Authorise manual availability mutations by actor and person | P1 | M | none | TODO |
