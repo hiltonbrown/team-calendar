@@ -147,7 +147,7 @@ export async function loadOnboardingState({
       ctaHref: "/settings/general",
       ctaLabel: "Review profile",
       description: organisation
-        ? `${organisation.name} is set to ${organisation.country_code}. Confirm the country, region, and timezone before importing holidays.`
+        ? `${organisation.name} is set to ${organisation.country_code}. Confirm the country, region, and timezone used for public holiday defaults.`
         : "Confirm the organisation name, country, region, and timezone.",
       id: "profile",
       status: statusForRequiredStep("profile", hasProfile, nextRequiredId),
@@ -171,9 +171,9 @@ export async function loadOnboardingState({
     },
     {
       ctaHref: "/settings/holidays",
-      ctaLabel: hasPublicHolidays ? "Review holidays" : "Set holidays",
+      ctaLabel: hasPublicHolidays ? "Review holidays" : "Review setup",
       description:
-        "Configure public holidays so calendars and working-day calculations match the organisation.",
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
       id: "holidays",
       status: statusForRequiredStep(
         "holidays",

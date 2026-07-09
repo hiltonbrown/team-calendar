@@ -1,7 +1,8 @@
 "use server";
 
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
-import type { Result } from "@repo/core";
+import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -179,8 +180,23 @@ export async function updateOrganisationAction(input: {
       },
     });
 
+    const holidayJurisdictionChanged =
+      updated.country_code !== organisation.country_code ||
+      updated.region_code !== organisation.region_code;
+
+    if (holidayJurisdictionChanged) {
+      await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: context.value.clerkOrgId as ClerkOrgId,
+        organisationId: context.value.organisationId as OrganisationId,
+        userId: context.value.actingUserId,
+      });
+    }
+
     revalidatePath("/settings/general");
     revalidatePath("/");
+    revalidatePath("/public-holidays");
+    revalidatePath("/settings/holidays");
+    revalidatePath("/calendar");
 
     return {
       ok: true,

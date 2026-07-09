@@ -186,8 +186,8 @@ export const GeneralClient = ({
         <CardHeader>
           <CardTitle>Payroll entity</CardTitle>
           <CardDescription>
-            Country, region, and timezone affect future public holiday imports
-            and Xero payroll region selection.
+            Country, region, and timezone affect public holiday defaults and
+            Xero payroll region selection.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -269,9 +269,9 @@ export const GeneralClient = ({
             regionCode !== (organisation.regionCode ?? "")) && (
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
               Changing your country or region affects which public holidays and
-              Xero payroll regions are available. Existing records and
-              connections are not changed automatically. You may need to import
-              new public holidays from Settings &gt; Holidays.
+              Xero payroll regions are available. Team Calendar imports
+              available public holidays automatically and existing
+              custom/suppressed records are preserved.
             </div>
           )}
 
@@ -279,8 +279,9 @@ export const GeneralClient = ({
             <div className="space-y-3 rounded-xl bg-muted/40 p-3 text-sm">
               <p>
                 Confirm changing the organisation&apos;s country to{" "}
-                {countryCode}. This affects future Xero connections and holiday
-                imports. Existing data is preserved. Continue?
+                {countryCode}. This affects future Xero connections and
+                automatic holiday defaults. Existing data is preserved.
+                Continue?
               </p>
               <div className="flex items-start gap-2">
                 <Checkbox

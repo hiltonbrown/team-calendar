@@ -84,4 +84,42 @@ describe("loadOnboardingState", () => {
       title: "Review calendar feed",
     });
   });
+
+  it("provisions complete holidays step when jurisdiction exists", async () => {
+    mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    const holidayStep = state.steps.find((step) => step.id === "holidays");
+    expect(holidayStep).toMatchObject({
+      ctaLabel: "Review holidays",
+      description:
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
+      status: "complete",
+      title: "Review public holidays",
+    });
+  });
+
+  it("provisions incomplete holidays step when no jurisdiction exists", async () => {
+    mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    const holidayStep = state.steps.find((step) => step.id === "holidays");
+    expect(holidayStep).toMatchObject({
+      ctaLabel: "Review setup",
+      description:
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
+      status: "next",
+      title: "Review public holidays",
+    });
+  });
 });
