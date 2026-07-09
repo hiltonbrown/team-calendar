@@ -269,9 +269,8 @@ export const GeneralClient = ({
             regionCode !== (organisation.regionCode ?? "")) && (
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
               Changing your country or region affects which public holidays and
-              Xero payroll regions are available. Existing records and
-              connections are not changed automatically. Team Calendar imports
-              available public holidays automatically, while existing
+              Xero payroll regions are available. Team Calendar imports
+              available public holidays automatically and existing
               custom/suppressed records are preserved.
             </div>
           )}

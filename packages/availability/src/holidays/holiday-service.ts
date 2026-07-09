@@ -30,11 +30,15 @@ export interface AddCustomHolidayInput {
   userId: string;
 }
 
-export interface EnsureDefaultPublicHolidaysInput {
-  clerkOrgId: ClerkOrgId;
-  organisationId: OrganisationId;
-  userId?: null | string;
-  years?: number[];
+function nagerCountryCodeFor(countryCode: string): string {
+  if (countryCode === "UK") {
+    return "GB";
+  }
+  return countryCode;
+}
+
+function nagerCountyCodeFor(countryCode: string, regionCode: string): string {
+  return `${nagerCountryCodeFor(countryCode)}-${regionCode}`;
 }
 
 function sourceRemoteIdForHoliday(
@@ -45,17 +49,6 @@ function sourceRemoteIdForHoliday(
 ): string {
   const region = regionCode ?? "national";
   return `${countryCode}:${region}:${date}:${name.toLowerCase()}`;
-}
-
-function nagerCountryCodeFor(countryCode: string): string {
-  if (countryCode === "UK") {
-    return "GB";
-  }
-  return countryCode;
-}
-
-function nagerCountyCodeFor(countryCode: string, regionCode: string): string {
-  return `${nagerCountryCodeFor(countryCode)}-${regionCode}`;
 }
 
 function normaliseHolidayType(value: string | undefined): public_holiday_type {
@@ -205,106 +198,6 @@ export async function importForJurisdiction(
     return {
       ok: false,
       error: appError("internal", "Failed to import holidays"),
-    };
-  }
-}
-
-function resolveYearsToEnsure(years?: number[]): number[] {
-  if (years && years.length > 0) {
-    return [...new Set(years)].sort((a, b) => a - b);
-  }
-
-  const currentYear = new Date().getUTCFullYear();
-  return [currentYear, currentYear + 1];
-}
-
-export async function ensureDefaultPublicHolidaysForOrganisation(
-  input: EnsureDefaultPublicHolidaysInput
-): Promise<
-  Result<{
-    importedCount: number;
-    importedYears: number[];
-    skippedCount: number;
-    skippedYears: number[];
-  }>
-> {
-  try {
-    const organisation = await database.organisation.findFirst({
-      where: {
-        clerk_org_id: input.clerkOrgId,
-        archived_at: null,
-        id: input.organisationId,
-      },
-      select: {
-        country_code: true,
-        region_code: true,
-      },
-    });
-
-    if (!organisation) {
-      return {
-        ok: false,
-        error: appError("not_found", "Organisation not found"),
-      };
-    }
-
-    const years = resolveYearsToEnsure(input.years);
-    const actorUserId = input.userId ?? "system:default-public-holidays";
-    const importedYears: number[] = [];
-    const skippedYears: number[] = [];
-    let importedCount = 0;
-    let skippedCount = 0;
-
-    for (const year of years) {
-      const existingNagerCount = await database.publicHoliday.count({
-        where: {
-          ...scopedQuery(input.clerkOrgId, input.organisationId),
-          country_code: organisation.country_code,
-          holiday_date: {
-            gte: new Date(Date.UTC(year, 0, 1)),
-            lt: new Date(Date.UTC(year + 1, 0, 1)),
-          },
-          region_code: organisation.region_code,
-          source: "nager",
-        },
-      });
-
-      if (existingNagerCount > 0) {
-        skippedYears.push(year);
-        continue;
-      }
-
-      const importResult = await importForJurisdiction({
-        clerkOrgId: input.clerkOrgId,
-        countryCode: organisation.country_code,
-        organisationId: input.organisationId,
-        regionCode: organisation.region_code,
-        userId: actorUserId,
-        year,
-      });
-
-      if (!importResult.ok) {
-        return importResult;
-      }
-
-      importedCount += importResult.value.importedCount;
-      skippedCount += importResult.value.skippedCount;
-      importedYears.push(year);
-    }
-
-    return {
-      ok: true,
-      value: {
-        importedCount,
-        importedYears,
-        skippedCount,
-        skippedYears,
-      },
-    };
-  } catch {
-    return {
-      ok: false,
-      error: appError("internal", "Failed to ensure default public holidays"),
     };
   }
 }
@@ -563,6 +456,116 @@ export async function listForOrganisation(
     return {
       ok: false as const,
       error: appError("internal", "Failed to list holidays"),
+    };
+  }
+}
+
+export interface EnsureDefaultPublicHolidaysInput {
+  clerkOrgId: ClerkOrgId;
+  organisationId: OrganisationId;
+  userId?: string | null;
+  years?: number[];
+}
+
+export async function ensureDefaultPublicHolidaysForOrganisation(
+  input: EnsureDefaultPublicHolidaysInput
+): Promise<
+  Result<{
+    importedCount: number;
+    skippedCount: number;
+    importedYears: number[];
+    skippedYears: number[];
+  }>
+> {
+  try {
+    const organisation = await database.organisation.findFirst({
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        id: input.organisationId,
+        archived_at: null,
+      },
+      select: {
+        country_code: true,
+        region_code: true,
+      },
+    });
+
+    if (!organisation) {
+      return {
+        ok: false,
+        error: appError("not_found", "Organisation not found"),
+      };
+    }
+
+    const actor = input.userId ?? "system:default-public-holidays";
+
+    // Deduplicate and sort years
+    let targetYears = input.years;
+    if (!targetYears || targetYears.length === 0) {
+      const currentYear = new Date().getUTCFullYear();
+      targetYears = [currentYear, currentYear + 1];
+    } else {
+      targetYears = Array.from(new Set(targetYears)).sort((a, b) => a - b);
+    }
+
+    let totalImported = 0;
+    let totalSkipped = 0;
+    const importedYears: number[] = [];
+    const skippedYears: number[] = [];
+
+    for (const year of targetYears) {
+      const yearStart = new Date(Date.UTC(year, 0, 1));
+      const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+
+      const existingCount = await database.publicHoliday.count({
+        where: {
+          ...scopedQuery(input.clerkOrgId, input.organisationId),
+          source: "nager",
+          country_code: organisation.country_code,
+          region_code: organisation.region_code,
+          holiday_date: {
+            gte: yearStart,
+            lt: yearEnd,
+          },
+        },
+      });
+
+      if (existingCount > 0) {
+        skippedYears.push(year);
+        continue;
+      }
+
+      const importResult = await importForJurisdiction({
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+        countryCode: organisation.country_code,
+        regionCode: organisation.region_code,
+        userId: actor,
+        year,
+      });
+
+      if (!importResult.ok) {
+        return importResult;
+      }
+
+      totalImported += importResult.value.importedCount;
+      totalSkipped += importResult.value.skippedCount;
+      importedYears.push(year);
+    }
+
+    return {
+      ok: true,
+      value: {
+        importedCount: totalImported,
+        skippedCount: totalSkipped,
+        importedYears,
+        skippedYears,
+      },
+    };
+  } catch {
+    return {
+      ok: false,
+      error: appError("internal", "Failed to ensure default public holidays"),
     };
   }
 }

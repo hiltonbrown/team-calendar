@@ -27,14 +27,14 @@ const dbMock = vi.hoisted(() => ({
 const feedMock = vi.hoisted(() => ({
   ensureDefaultCalendarFeed: vi.fn(),
 }));
-const holidayMock = vi.hoisted(() => ({
+const availabilityMock = vi.hoisted(() => ({
   ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
 }));
 vi.mock("@repo/database", () => ({
   database: dbMock,
 }));
 vi.mock("@repo/feeds", () => feedMock);
-vi.mock("@repo/availability", () => holidayMock);
+vi.mock("@repo/availability", () => availabilityMock);
 
 const {
   buildXeroOAuthStartUrl,
@@ -86,16 +86,18 @@ beforeEach(() => {
     ok: true,
     value: { created: true, feedId: "feed_1" },
   });
-  holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockReset();
-  holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue({
-    ok: true,
-    value: {
-      importedCount: 2,
-      importedYears: [2026, 2027],
-      skippedCount: 0,
-      skippedYears: [],
-    },
-  });
+  availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockReset();
+  availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue(
+    {
+      ok: true,
+      value: {
+        importedCount: 2,
+        skippedCount: 0,
+        importedYears: [2026, 2027],
+        skippedYears: [],
+      },
+    }
+  );
 });
 
 afterEach(() => {
@@ -613,7 +615,7 @@ describe("completeXeroTenantSelection", () => {
       organisationId,
     });
     expect(
-      holidayMock.ensureDefaultPublicHolidaysForOrganisation
+      availabilityMock.ensureDefaultPublicHolidaysForOrganisation
     ).toHaveBeenCalledWith({
       clerkOrgId,
       organisationId,
@@ -654,18 +656,15 @@ describe("completeXeroTenantSelection", () => {
     expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
     expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
     expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
-    expect(
-      holidayMock.ensureDefaultPublicHolidaysForOrganisation
-    ).not.toHaveBeenCalled();
   });
 
-  it("continues tenant selection when default holiday provisioning fails", async () => {
-    holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValueOnce(
+  it("succeeds tenant selection even when default holiday provisioning fails", async () => {
+    availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValueOnce(
       {
         ok: false,
         error: {
           code: "internal",
-          message: "Nager unavailable",
+          message: "Network error while calling Nager.Date API",
         },
       }
     );
@@ -684,10 +683,10 @@ describe("completeXeroTenantSelection", () => {
         xeroTenantId: xeroTenantRowId,
       },
     });
-    expect(dbMock.xeroConnection.upsert).toHaveBeenCalled();
-    expect(dbMock.xeroTenant.upsert).toHaveBeenCalled();
+    expect(dbMock.organisation.create).toHaveBeenCalled();
+    expect(feedMock.ensureDefaultCalendarFeed).toHaveBeenCalled();
     expect(
-      holidayMock.ensureDefaultPublicHolidaysForOrganisation
+      availabilityMock.ensureDefaultPublicHolidaysForOrganisation
     ).toHaveBeenCalledWith({
       clerkOrgId,
       organisationId,

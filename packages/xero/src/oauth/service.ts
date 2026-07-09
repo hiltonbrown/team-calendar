@@ -860,16 +860,11 @@ async function resolveOrganisationForTenantSelection(input: {
         },
       };
     }
-
-    const holidayProvisioningResult =
-      await ensureDefaultPublicHolidaysForOrganisation({
-        clerkOrgId: input.clerkOrgId as ClerkOrgId,
-        organisationId: organisation.id as OrganisationId,
-      });
-    if (!holidayProvisioningResult.ok) {
-      // Non-fatal: Xero tenant selection should continue even if Nager is unavailable.
-    }
-
+    // Provision default public holidays; ignore errors (non-blocking)
+    await ensureDefaultPublicHolidaysForOrganisation({
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      organisationId: organisation.id as OrganisationId,
+    });
     return { ok: true, value: { id: organisation.id } };
   }
 

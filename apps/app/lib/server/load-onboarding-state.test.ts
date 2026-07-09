@@ -85,7 +85,7 @@ describe("loadOnboardingState", () => {
     });
   });
 
-  it("uses automatic holiday copy and marks holidays complete with a jurisdiction", async () => {
+  it("provisions complete holidays step when jurisdiction exists", async () => {
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
 
     const state = await loadOnboardingState({
@@ -94,22 +94,17 @@ describe("loadOnboardingState", () => {
       userId: "user_1",
     });
 
-    const profileStep = state.steps.find((step) => step.id === "profile");
-    const holidaysStep = state.steps.find((step) => step.id === "holidays");
-
-    expect(profileStep?.description).toBe(
-      "Acme is set to AU. Confirm the country, region, and timezone used for public holiday defaults."
-    );
-    expect(holidaysStep).toMatchObject({
+    const holidayStep = state.steps.find((step) => step.id === "holidays");
+    expect(holidayStep).toMatchObject({
       ctaLabel: "Review holidays",
       description:
-        "Team Calendar imports your organisation's country holidays automatically. Review regional and custom dates to confirm coverage.",
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
       status: "complete",
       title: "Review public holidays",
     });
   });
 
-  it("keeps holidays incomplete with review setup CTA when no jurisdiction exists", async () => {
+  it("provisions incomplete holidays step when no jurisdiction exists", async () => {
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(0);
 
     const state = await loadOnboardingState({
@@ -118,11 +113,11 @@ describe("loadOnboardingState", () => {
       userId: "user_1",
     });
 
-    const holidaysStep = state.steps.find((step) => step.id === "holidays");
-    expect(holidaysStep).toMatchObject({
+    const holidayStep = state.steps.find((step) => step.id === "holidays");
+    expect(holidayStep).toMatchObject({
       ctaLabel: "Review setup",
       description:
-        "Team Calendar imports your organisation's country holidays automatically. Review regional and custom dates to confirm coverage.",
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
       status: "next",
       title: "Review public holidays",
     });

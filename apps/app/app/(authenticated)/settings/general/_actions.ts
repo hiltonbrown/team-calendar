@@ -76,9 +76,6 @@ export async function updateAccountNameAction(input: {
     });
 
     revalidatePath("/settings/general");
-    revalidatePath("/settings/holidays");
-    revalidatePath("/public-holidays");
-    revalidatePath("/calendar");
     revalidatePath("/");
 
     return { ok: true, value: { name: parsed.data.name } };
@@ -188,19 +185,18 @@ export async function updateOrganisationAction(input: {
       updated.region_code !== organisation.region_code;
 
     if (holidayJurisdictionChanged) {
-      const holidayProvisioningResult =
-        await ensureDefaultPublicHolidaysForOrganisation({
-          clerkOrgId: context.value.clerkOrgId,
-          organisationId: context.value.organisationId,
-          userId: context.value.actingUserId,
-        });
-      if (!holidayProvisioningResult.ok) {
-        // Non-fatal: settings updates should still persist when holiday import fails.
-      }
+      await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: context.value.clerkOrgId as ClerkOrgId,
+        organisationId: context.value.organisationId as OrganisationId,
+        userId: context.value.actingUserId,
+      });
     }
 
     revalidatePath("/settings/general");
     revalidatePath("/");
+    revalidatePath("/public-holidays");
+    revalidatePath("/settings/holidays");
+    revalidatePath("/calendar");
 
     return {
       ok: true,
@@ -220,9 +216,9 @@ async function resolveAdminContext(organisationId: string): Promise<
   ActionResult<{
     actingUserId: string;
     actorDisplay: string;
-    clerkOrgId: ClerkOrgId;
+    clerkOrgId: string;
     ipAddress: null | string;
-    organisationId: OrganisationId;
+    organisationId: string;
     userAgent: null | string;
   }>
 > {

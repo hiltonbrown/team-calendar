@@ -173,7 +173,7 @@ export async function loadOnboardingState({
       ctaHref: "/settings/holidays",
       ctaLabel: hasPublicHolidays ? "Review holidays" : "Review setup",
       description:
-        "Team Calendar imports your organisation's country holidays automatically. Review regional and custom dates to confirm coverage.",
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
       id: "holidays",
       status: statusForRequiredStep(
         "holidays",
