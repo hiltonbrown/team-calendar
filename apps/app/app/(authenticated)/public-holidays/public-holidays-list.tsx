@@ -172,7 +172,7 @@ export function PublicHolidaysList({
               </Button>
             </div>
           }
-          description="Import holidays from a source or add custom holidays."
+          description="Team Calendar imports your organisation's country holidays automatically. Add a custom holiday for company-specific dates."
           title="No public holidays"
         />
       </div>

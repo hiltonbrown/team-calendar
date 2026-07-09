@@ -9,6 +9,7 @@ import {
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
+import { ensureDefaultPublicHolidaysForOrganisation } from "../holidays/holiday-service";
 import {
   normaliseCurrentUserProfile,
   safeCurrentUserProfilePatch,
@@ -147,6 +148,15 @@ export const ensureOrganisationForClerk = async (
   });
   if (!defaultFeed.ok) {
     throw new Error(defaultFeed.error.message);
+  }
+
+  const holidayProvisioningResult =
+    await ensureDefaultPublicHolidaysForOrganisation({
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      organisationId: organisation.id as OrganisationId,
+    });
+  if (!holidayProvisioningResult.ok) {
+    // Non-fatal: organisation provisioning should continue even if Nager is unavailable.
   }
 
   return {

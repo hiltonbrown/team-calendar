@@ -7,7 +7,11 @@ vi.mock("@repo/database/generated/enums", () => ({}));
 vi.mock("@repo/database/generated/client", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
+    organisation: {
+      findFirst: vi.fn(),
+    },
     publicHoliday: {
+      count: vi.fn(),
       findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
@@ -26,15 +30,22 @@ vi.mock("@repo/database", () => ({
   scopedQuery: vi.fn().mockImplementation(() => ({})),
 }));
 
+vi.mock("./nager-client", () => ({
+  getPublicHolidays: vi.fn(),
+}));
+
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { database } from "@repo/database";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   addCustomHoliday,
   deleteCustomHoliday,
+  ensureDefaultPublicHolidaysForOrganisation,
+  importForJurisdiction,
   restoreHoliday,
   suppressHoliday,
 } from "./holiday-service";
+import { getPublicHolidays } from "./nager-client";
 
 describe("holiday-service", () => {
   const mockClerkOrgId = "org_123" as ClerkOrgId;
@@ -44,6 +55,166 @@ describe("holiday-service", () => {
   beforeEach(() => {
     // Reset call history without clearing mock implementations.
     vi.clearAllMocks();
+    vi.mocked(database.publicHolidayJurisdiction.findFirst).mockResolvedValue({
+      id: "jurisdiction_123",
+    } as never);
+    vi.mocked(database.publicHolidayJurisdiction.update).mockResolvedValue({
+      id: "jurisdiction_123",
+    } as never);
+    vi.mocked(database.publicHolidayJurisdiction.create).mockResolvedValue({
+      id: "jurisdiction_123",
+    } as never);
+    vi.mocked(database.publicHoliday.findFirst).mockResolvedValue(null);
+    vi.mocked(database.publicHoliday.upsert).mockResolvedValue({
+      id: "holiday_123",
+    } as never);
+  });
+
+  describe("importForJurisdiction", () => {
+    it("imports globals and skips regional holidays when region is null", async () => {
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2026-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "AU",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Public"],
+          },
+          {
+            date: "2026-08-12",
+            localName: "Ekka",
+            name: "Royal Queensland Show",
+            countryCode: "AU",
+            fixed: false,
+            global: false,
+            counties: ["AU-QLD"],
+            launchYear: null,
+            types: ["Public"],
+          },
+        ],
+      });
+
+      const result = await importForJurisdiction({
+        clerkOrgId: mockClerkOrgId,
+        countryCode: "AU",
+        organisationId: mockOrgId,
+        regionCode: null,
+        userId: mockUserId,
+        year: 2026,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(database.publicHoliday.upsert).toHaveBeenCalledTimes(1);
+      expect(getPublicHolidays).toHaveBeenCalledWith("AU", 2026);
+    });
+
+    it("imports global and matching regional holidays for prefixed county codes", async () => {
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2026-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "AU",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Public"],
+          },
+          {
+            date: "2026-08-12",
+            localName: "Ekka",
+            name: "Royal Queensland Show",
+            countryCode: "AU",
+            fixed: false,
+            global: false,
+            counties: ["AU-QLD"],
+            launchYear: null,
+            types: ["Public"],
+          },
+          {
+            date: "2026-10-05",
+            localName: "Labour Day",
+            name: "Labour Day",
+            countryCode: "AU",
+            fixed: false,
+            global: false,
+            counties: ["AU-NSW"],
+            launchYear: null,
+            types: ["Public"],
+          },
+        ],
+      });
+
+      const result = await importForJurisdiction({
+        clerkOrgId: mockClerkOrgId,
+        countryCode: "AU",
+        organisationId: mockOrgId,
+        regionCode: "QLD",
+        userId: mockUserId,
+        year: 2026,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(database.publicHoliday.upsert).toHaveBeenCalledTimes(2);
+      expect(database.publicHoliday.upsert).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          create: expect.objectContaining({
+            source_remote_id: "AU:QLD:2026-08-12:royal queensland show",
+          }),
+        })
+      );
+    });
+
+    it("uses GB when fetching UK holidays while persisting UK country code", async () => {
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2026-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "GB",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Bank"],
+          },
+        ],
+      });
+
+      const result = await importForJurisdiction({
+        clerkOrgId: mockClerkOrgId,
+        countryCode: "UK",
+        organisationId: mockOrgId,
+        regionCode: null,
+        userId: mockUserId,
+        year: 2026,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(getPublicHolidays).toHaveBeenCalledWith("GB", 2026);
+      expect(database.publicHoliday.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ country_code: "UK" }),
+        })
+      );
+      expect(database.publicHolidayJurisdiction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ updated_by_user_id: mockUserId }),
+        })
+      );
+    });
   });
 
   describe("addCustomHoliday", () => {
@@ -196,6 +367,155 @@ describe("holiday-service", () => {
         expect(result.error.code).toBe("forbidden");
       }
       expect(database.publicHoliday.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("ensureDefaultPublicHolidaysForOrganisation", () => {
+    it("imports current and next year when no nager rows exist", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date("2026-05-01T00:00:00Z"));
+      vi.mocked(database.organisation.findFirst).mockResolvedValue({
+        country_code: "AU",
+        region_code: null,
+      } as never);
+      vi.mocked(database.publicHoliday.count).mockResolvedValue(0);
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2026-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "AU",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Public"],
+          },
+        ],
+      });
+
+      const result = await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: mockClerkOrgId,
+        organisationId: mockOrgId,
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.importedYears).toEqual([2026, 2027]);
+      }
+      expect(getPublicHolidays).toHaveBeenCalledWith("AU", 2026);
+      expect(getPublicHolidays).toHaveBeenCalledWith("AU", 2027);
+      vi.useRealTimers();
+    });
+
+    it("skips years that already have nager rows including archived records", async () => {
+      vi.mocked(database.organisation.findFirst).mockResolvedValue({
+        country_code: "AU",
+        region_code: null,
+      } as never);
+      vi.mocked(database.publicHoliday.count)
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(0);
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2027-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "AU",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Public"],
+          },
+        ],
+      });
+
+      const result = await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: mockClerkOrgId,
+        organisationId: mockOrgId,
+        years: [2026, 2027],
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.skippedYears).toEqual([2026]);
+        expect(result.value.importedYears).toEqual([2027]);
+      }
+      expect(database.publicHoliday.count).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: expect.objectContaining({
+            country_code: "AU",
+            region_code: null,
+            source: "nager",
+          }),
+        })
+      );
+      expect(getPublicHolidays).toHaveBeenCalledTimes(1);
+      expect(getPublicHolidays).toHaveBeenCalledWith("AU", 2027);
+    });
+
+    it("returns not_found when organisation is missing", async () => {
+      vi.mocked(database.organisation.findFirst).mockResolvedValue(null);
+
+      const result = await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: mockClerkOrgId,
+        organisationId: mockOrgId,
+        years: [2026],
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe("not_found");
+      }
+    });
+
+    it("uses the system actor when userId is absent", async () => {
+      vi.mocked(database.organisation.findFirst).mockResolvedValue({
+        country_code: "AU",
+        region_code: null,
+      } as never);
+      vi.mocked(database.publicHoliday.count).mockResolvedValue(0);
+      vi.mocked(database.publicHolidayJurisdiction.findFirst).mockResolvedValue(
+        null
+      );
+      vi.mocked(getPublicHolidays).mockResolvedValue({
+        ok: true,
+        value: [
+          {
+            date: "2026-01-01",
+            localName: "New Year's Day",
+            name: "New Year's Day",
+            countryCode: "AU",
+            fixed: true,
+            global: true,
+            counties: null,
+            launchYear: null,
+            types: ["Public"],
+          },
+        ],
+      });
+
+      const result = await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: mockClerkOrgId,
+        organisationId: mockOrgId,
+        years: [2026],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(database.publicHolidayJurisdiction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            created_by_user_id: "system:default-public-holidays",
+            updated_by_user_id: "system:default-public-holidays",
+          }),
+        })
+      );
     });
   });
 });

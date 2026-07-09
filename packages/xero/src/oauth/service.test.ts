@@ -27,10 +27,14 @@ const dbMock = vi.hoisted(() => ({
 const feedMock = vi.hoisted(() => ({
   ensureDefaultCalendarFeed: vi.fn(),
 }));
+const holidayMock = vi.hoisted(() => ({
+  ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
+}));
 vi.mock("@repo/database", () => ({
   database: dbMock,
 }));
 vi.mock("@repo/feeds", () => feedMock);
+vi.mock("@repo/availability", () => holidayMock);
 
 const {
   buildXeroOAuthStartUrl,
@@ -81,6 +85,16 @@ beforeEach(() => {
   feedMock.ensureDefaultCalendarFeed.mockResolvedValue({
     ok: true,
     value: { created: true, feedId: "feed_1" },
+  });
+  holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockReset();
+  holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue({
+    ok: true,
+    value: {
+      importedCount: 2,
+      importedYears: [2026, 2027],
+      skippedCount: 0,
+      skippedYears: [],
+    },
   });
 });
 
@@ -598,6 +612,12 @@ describe("completeXeroTenantSelection", () => {
       clerkOrgId,
       organisationId,
     });
+    expect(
+      holidayMock.ensureDefaultPublicHolidaysForOrganisation
+    ).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
     expect(dbMock.xeroConnection.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
@@ -634,6 +654,44 @@ describe("completeXeroTenantSelection", () => {
     expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
     expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
     expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
+    expect(
+      holidayMock.ensureDefaultPublicHolidaysForOrganisation
+    ).not.toHaveBeenCalled();
+  });
+
+  it("continues tenant selection when default holiday provisioning fails", async () => {
+    holidayMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValueOnce(
+      {
+        ok: false,
+        error: {
+          code: "internal",
+          message: "Nager unavailable",
+        },
+      }
+    );
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        connectionId,
+        organisationId,
+        xeroTenantId: xeroTenantRowId,
+      },
+    });
+    expect(dbMock.xeroConnection.upsert).toHaveBeenCalled();
+    expect(dbMock.xeroTenant.upsert).toHaveBeenCalled();
+    expect(
+      holidayMock.ensureDefaultPublicHolidaysForOrganisation
+    ).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
   });
 
   function buildPendingSession() {

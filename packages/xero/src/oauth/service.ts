@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { Result } from "@repo/core";
+import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
@@ -859,6 +860,16 @@ async function resolveOrganisationForTenantSelection(input: {
         },
       };
     }
+
+    const holidayProvisioningResult =
+      await ensureDefaultPublicHolidaysForOrganisation({
+        clerkOrgId: input.clerkOrgId as ClerkOrgId,
+        organisationId: organisation.id as OrganisationId,
+      });
+    if (!holidayProvisioningResult.ok) {
+      // Non-fatal: Xero tenant selection should continue even if Nager is unavailable.
+    }
+
     return { ok: true, value: { id: organisation.id } };
   }
 

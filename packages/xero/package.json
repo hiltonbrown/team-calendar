@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@repo/availability": "*",
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/feeds": "*",

@@ -32,7 +32,9 @@ describe("PublicHolidaysList", () => {
 
     expect(screen.getByText("No public holidays")).toBeDefined();
     expect(
-      screen.getByText("Import holidays from a source or add custom holidays.")
+      screen.getByText(
+        "Team Calendar imports your organisation's country holidays automatically. Add a custom holiday for company-specific dates."
+      )
     ).toBeDefined();
   });
 
