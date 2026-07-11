@@ -1,5 +1,11 @@
 # Plan 008 Design Spike Report: Weekly Manager Digest
 
+> **Historical design deliverable**: Reconciled on 2026-07-12 at `2bba19c`.
+> The digest remains unimplemented. The `file://` citations below point to the
+> executor's former worktree and are retained only as historical evidence.
+> Revalidate every source reference before producing an implementation plan.
+> The missing notification email queue consumer remains a prerequisite.
+
 This document presents the end-to-end design for the Monday-morning manager weekly availability digest, outlining current ingredients, a detailed specification, build skeleton, and open questions.
 
 ## 1. Ingredients

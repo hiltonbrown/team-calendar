@@ -1,5 +1,9 @@
 # Plan 006: Decision Report — Public Pricing Surface
 
+> **Historical deliverable**: This decision was implemented by plan 020. The
+> code inventory and `file://` citations below describe the pre-implementation
+> state and are retained as an audit record, not current execution guidance.
+
 This report inventories the pricing/billing rails in the Team Calendar codebase, specifies options for the public pricing page, recommends a course of action, and lists open questions for the maintainer.
 
 ## Inventory

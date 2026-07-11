@@ -1,5 +1,11 @@
 # Spike Report: Xero NZ Payroll Integration
 
+> **Historical research only**: Reconciliation on 2026-07-12 rejected plan 007
+> as written. The report expanded beyond the write-back spike after discovering
+> that inbound NZ support was absent, which should have triggered the plan's
+> STOP condition. Its `file://` citations and line numbers are historical. Do
+> not use this report as an executable implementation plan.
+
 ## Status
 - **Planned at**: commit 8790bdb, 2026-07-02
 - **Completed at**: 2026-07-05

@@ -1,5 +1,14 @@
 # Plan 007: NZ payroll write-back spike (investigate and specify, doc-only)
 
+> **Reconciliation status**: REJECTED on 2026-07-12 at `2bba19c`. Do not
+> execute this plan as written. Step 3 established that inbound NZ employee and
+> leave support was absent, which triggered this plan's STOP condition. The
+> produced `007-report-nz-payroll.md` continued into a broader full-region
+> specification and did not satisfy the original write-back-only contract.
+> Plan 016 subsequently established AU-only launch scope. Retain the report as
+> historical research; if NZ returns to the roadmap, create a newly numbered,
+> full NZ integration spike against current official documentation and code.
+
 > **Executor instructions**: This is a design/spike plan. Your deliverable is a
 > written report, not code. Do not modify any file outside `plans/`. If
 > anything in the "STOP conditions" section occurs, stop and report. When
@@ -23,6 +32,7 @@
 - **Depends on**: none (plan 003 improves the interim error message independently)
 - **Category**: direction
 - **Planned at**: commit `8790bdb`, 2026-07-02
+- **Final status**: REJECTED, 2026-07-12
 
 ## Why this matters
 
