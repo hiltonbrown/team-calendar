@@ -367,23 +367,36 @@ export async function getEventDetail(
     if (!record) {
       return await recordNotFoundOrLeak(parsed.data);
     }
-    const managerReportIds =
+    const includeIndirectReports =
+      settingsResult.ok &&
+      settingsResult.value.managerVisibilityScope === "all_team_leave";
+    const allPeople =
       parsed.data.role === "manager" && parsed.data.actingPersonId
-        ? transitiveReportIds(
-            await loadPeople({
-              actingPersonId: parsed.data.actingPersonId ?? null,
-              actingUserId: parsed.data.actingUserId,
-              anchorDate: new Date(),
-              clerkOrgId: parsed.data.clerkOrgId,
-              filters: {},
-              organisationId: parsed.data.organisationId,
-              role: parsed.data.role,
-              scope: { type: "all_teams" },
-              view: "month",
-            }),
-            parsed.data.actingPersonId
-          )
-        : new Set<string>();
+        ? await loadPeople({
+            actingPersonId: parsed.data.actingPersonId ?? null,
+            actingUserId: parsed.data.actingUserId,
+            anchorDate: new Date(),
+            clerkOrgId: parsed.data.clerkOrgId,
+            filters: {},
+            organisationId: parsed.data.organisationId,
+            role: parsed.data.role,
+            scope: { type: "all_teams" },
+            view: "month",
+          })
+        : [];
+    let managerReportIds = new Set<string>();
+    if (parsed.data.role === "manager" && parsed.data.actingPersonId) {
+      managerReportIds = includeIndirectReports
+        ? transitiveReportIds(allPeople, parsed.data.actingPersonId)
+        : new Set(
+            allPeople
+              .filter(
+                (person) =>
+                  person.manager_person_id === parsed.data.actingPersonId
+              )
+              .map((person) => person.id)
+          );
+    }
     if (
       !canViewRecord({
         actingPersonId: parsed.data.actingPersonId ?? null,
@@ -396,11 +409,7 @@ export async function getEventDetail(
     }
     const event = toCalendarEvent(record, {
       actingPersonId: parsed.data.actingPersonId ?? null,
-      managerReportIds:
-        settingsResult.ok &&
-        settingsResult.value.managerVisibilityScope === "all_team_leave"
-          ? managerReportIds
-          : new Set<string>(),
+      managerReportIds,
       role: parsed.data.role,
     });
     return {

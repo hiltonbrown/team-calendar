@@ -180,6 +180,7 @@ return Promise.resolve({ ok: false, error: writeBackNotAvailableError });
 - `apps/app/app/(authenticated)/setup/_actions.test.ts`
 - `apps/app/app/(authenticated)/settings/general/general-client.tsx`
 - `apps/app/app/(authenticated)/settings/general/_actions.ts`
+- `apps/app/app/(authenticated)/settings/general/_actions.test.ts`
 - `packages/xero/src/oauth/service.ts`
 - `packages/xero/src/oauth/service.test.ts`
 - `plans/README.md` (status row)
