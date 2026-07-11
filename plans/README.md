@@ -48,7 +48,7 @@ per-plan branches.
 | 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | DONE (reconciled 2026-07-11 at `d4e79a6`) |
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | DONE (reconciled 2026-07-11 at HEAD `c81028a`; audit/check pass, source and lock unchanged) |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |
-| 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | TODO |
+| 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | DONE (verified 2026-07-11 at `c4be861`) |
 | 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | TODO |
 | 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
