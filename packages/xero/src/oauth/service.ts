@@ -72,6 +72,7 @@ export type XeroOAuthError =
   | { code: "invalid_state"; message: string }
   | { code: "oauth_not_configured"; message: string }
   | { code: "organisation_not_found"; message: string }
+  | { code: "refresh_token_invalid"; message: string }
   | { code: "session_not_found"; message: string }
   | { code: "tenant_not_found"; message: string }
   | { code: "unknown_error"; message: string };
@@ -420,15 +421,34 @@ export async function refreshXeroOAuthConnection(input: {
   connectionId: string;
   organisationId: string;
 }): Promise<Result<{ refreshedAt: Date }, XeroOAuthError>> {
-  const refreshed = await refreshXeroOAuthConnectionWithClient(database, input);
-  if (!refreshed.ok) {
-    return refreshed;
+  try {
+    return await database.$transaction(
+      async (tx) => {
+        // Same lock key as ensureFreshXeroConnection so a manual refresh cannot
+        // race a scheduled refresh and consume each other's single-use tokens.
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtextextended(${input.connectionId}, 0))
+        `;
+        const refreshed = await refreshXeroOAuthConnectionWithClient(tx, input);
+        if (!refreshed.ok) {
+          return refreshed;
+        }
+        return {
+          ok: true,
+          value: { refreshedAt: refreshed.value.refreshedAt },
+        };
+      },
+      { timeout: 15_000 }
+    );
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to refresh the Xero connection.",
+      },
+    };
   }
-
-  return {
-    ok: true,
-    value: { refreshedAt: refreshed.value.refreshedAt },
-  };
 }
 
 async function refreshXeroOAuthConnectionWithClient(
@@ -475,6 +495,17 @@ async function refreshXeroOAuthConnectionWithClient(
     }),
   });
   if (!token.ok) {
+    if (token.error.code === "refresh_token_invalid") {
+      await client.xeroConnection.update({
+        where: { id: input.connectionId },
+        data: {
+          last_error_code: "refresh_token_invalid",
+          last_error_message: token.error.message,
+          stale_since: new Date(),
+          status: "stale",
+        },
+      });
+    }
     return token;
   }
 
@@ -1166,6 +1197,19 @@ async function exchangeToken(input: {
     url: XERO_TOKEN_URL,
   });
   if (!response.ok) {
+    if (input.grantType === "refresh_token") {
+      const errorCode = await readOAuthErrorCode(response);
+      if (errorCode === "invalid_grant") {
+        return {
+          ok: false,
+          error: {
+            code: "refresh_token_invalid",
+            message:
+              "The Xero refresh token is no longer valid. Reconnect Xero.",
+          },
+        };
+      }
+    }
     return {
       ok: false,
       error: {
@@ -1197,6 +1241,23 @@ async function exchangeToken(input: {
       refresh_token: payload.refresh_token,
     },
   };
+}
+
+async function readOAuthErrorCode(response: Response): Promise<null | string> {
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+    ) {
+      return body.error;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchConnections(

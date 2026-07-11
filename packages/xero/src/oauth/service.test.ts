@@ -44,6 +44,7 @@ const {
   disconnectXeroOAuthConnection,
   ensureFreshXeroConnection,
   isPreviewDeployment,
+  refreshXeroOAuthConnection,
   xeroConnectionRefreshDecision,
 } = await import("./service");
 
@@ -330,6 +331,101 @@ describe("xeroConnectionRefreshDecision", () => {
   });
 });
 
+describe("refreshXeroOAuthConnection", () => {
+  const input = {
+    clerkOrgId: "org_1",
+    connectionId: "conn_1",
+    organisationId: "11111111-1111-1111-1111-111111111111",
+  };
+
+  function mockStoredConnection() {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
+      id: input.connectionId,
+      refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+      refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+      refresh_token_iv: storedTokens.refresh_token_iv,
+    });
+  }
+
+  it("classifies an invalid refresh token and marks the connection stale", async () => {
+    mockStoredConnection();
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({ error: "invalid_grant" }),
+        ok: false,
+        status: 400,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("refresh_token_invalid");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: { id: input.connectionId },
+      data: {
+        last_error_code: "refresh_token_invalid",
+        last_error_message:
+          "The Xero refresh token is no longer valid. Reconnect Xero.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+
+  it("keeps transient refresh failures as unknown errors without marking stale", async () => {
+    mockStoredConnection();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({}),
+        ok: false,
+        status: 503,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "stale" }),
+      })
+    );
+  });
+
+  it("takes the advisory lock before a successful manual refresh", async () => {
+    mockStoredConnection();
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(true);
+    expect(dbMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(dbMock.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("ensureFreshXeroConnection", () => {
   const input = {
     clerkOrgId: "org_1",
@@ -445,6 +541,46 @@ describe("ensureFreshXeroConnection", () => {
     const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
     expect(updateArg.data.status).toBe("active");
     expect(updateArg.data.access_token_encrypted).not.toBe("");
+  });
+
+  it("marks the connection stale when a proactive refresh gets invalid_grant", async () => {
+    const storedTokens = buildStoredTokenFields();
+    const staleConnection = {
+      ...storedTokens,
+      expires_at: new Date(input.now.getTime() + 60 * 1000),
+      revoked_at: null,
+      status: "active",
+    };
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({ error: "invalid_grant" }),
+        ok: false,
+        status: 400,
+      })
+    );
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("refresh_token_invalid");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "stale" }),
+      })
+    );
   });
 
   it("skips refresh inside the lock when another caller already refreshed", async () => {
