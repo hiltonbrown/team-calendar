@@ -25,7 +25,7 @@
     "@repo/seo": "*",
     "@repo/xero": "*",
     "@hookform/resolvers": "^5.2.2",
-    "@sentry/nextjs": "^10.53.1",
+    "@sentry/nextjs": "^10.65.0",
     "@t3-oss/env-nextjs": "^0.13.11",
     "framer-motion": "^12.39.0",
     "import-in-the-middle": "^3.0.1",
@@ -50,10 +50,10 @@
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "^6.0.3",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.10"
   }
 }
