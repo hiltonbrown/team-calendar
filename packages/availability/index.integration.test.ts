@@ -6,7 +6,7 @@ import type { TenantContext } from "./index";
 config({ path: new URL("../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}), { virtual: true });
 vi.mock("./src/holidays/nager-client", () => ({
-  getPublicHolidays: vi.fn().mockImplementation((countryCode, year) =>
+  getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
     Promise.resolve({
       ok: true,
       value: [
@@ -155,7 +155,7 @@ describe("manual availability services", () => {
     const result = await createManualAvailability(
       contextFor(tenantA),
       inputFor(tenantA),
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(result.ok).toBe(true);
@@ -192,7 +192,7 @@ describe("manual availability services", () => {
           ...inputFor(tenantA),
           endsAt: new Date("2026-05-09T00:00:00.000Z"),
         },
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "bad_request" }),
@@ -203,7 +203,7 @@ describe("manual availability services", () => {
       createManualAvailability(
         contextFor(tenantA),
         { ...inputFor(tenantA), personId: tenantB.personId },
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
@@ -215,7 +215,7 @@ describe("manual availability services", () => {
     const created = await createManualAvailability(
       contextFor(tenantA),
       inputFor(tenantA),
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(created.ok).toBe(true);
@@ -228,7 +228,7 @@ describe("manual availability services", () => {
         contextFor(tenantB),
         created.value.id,
         inputFor(tenantB),
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
@@ -244,7 +244,7 @@ describe("manual availability services", () => {
         includeInFeed: false,
         title: "Training day",
       },
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(updated).toMatchObject({
@@ -257,22 +257,20 @@ describe("manual availability services", () => {
     });
 
     await expect(
-      archiveManualAvailability(
-        contextFor(tenantB),
-        created.value.id,
-        "user_test"
-      )
+      archiveManualAvailability(contextFor(tenantB), created.value.id, {
+        orgRole: "org:admin",
+        userId: "user_test",
+      })
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
 
     await expect(
-      archiveManualAvailability(
-        contextFor(tenantA),
-        created.value.id,
-        "user_test"
-      )
+      archiveManualAvailability(contextFor(tenantA), created.value.id, {
+        orgRole: "org:admin",
+        userId: "user_test",
+      })
     ).resolves.toMatchObject({ ok: true });
 
     await expect(

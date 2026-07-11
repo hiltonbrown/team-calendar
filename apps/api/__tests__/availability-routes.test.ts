@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 vi.mock("@repo/auth/helpers", () => ({
+  auth: vi.fn(),
   requireOrg: vi.fn(),
   currentUser: vi.fn(),
 }));
@@ -33,7 +34,7 @@ vi.mock("@repo/observability/log", () => ({
   },
 }));
 
-const { requireOrg, currentUser } = await import("@repo/auth/helpers");
+const { auth, requireOrg, currentUser } = await import("@repo/auth/helpers");
 const {
   createManualAvailability,
   archiveManualAvailability,
@@ -73,6 +74,7 @@ const validPatchPayload = {
 describe("Availability Collection Route (POST)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(auth).mockResolvedValue({ orgRole: "org:viewer" } as any);
   });
 
   it("returns 401 when requireOrg throws", async () => {
@@ -261,8 +263,39 @@ describe("Availability Collection Route (POST)", () => {
         personId: validPostPayload.personId,
         recordType: validPostPayload.recordType,
       }),
-      "user_123"
+      { orgRole: "org:viewer", userId: "user_123" }
     );
+  });
+
+  it("returns 403 when createManualAvailability returns not_authorised", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+    vi.mocked(getOrganisationById).mockResolvedValue({
+      ok: true,
+      value: { id: "org-1" } as any,
+    });
+    vi.mocked(listPeopleForOrganisation).mockResolvedValue({
+      ok: true,
+      value: [{ id: validPostPayload.personId }] as any,
+    });
+    vi.mocked(createManualAvailability).mockResolvedValue({
+      ok: false,
+      error: {
+        code: "not_authorised",
+        message:
+          "You do not have permission to manage this availability record.",
+      } as any,
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/availability", {
+        method: "POST",
+        body: JSON.stringify(validPostPayload),
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    expect(response.status).toBe(403);
   });
 
   it("returns mapped error code on createManualAvailability failure", async () => {
@@ -296,6 +329,7 @@ describe("Availability Collection Route (POST)", () => {
 describe("Availability Single Record Route (PATCH)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(auth).mockResolvedValue({ orgRole: "org:viewer" } as any);
   });
 
   it("returns 401 when requireOrg throws", async () => {
@@ -495,14 +529,57 @@ describe("Availability Single Record Route (PATCH)", () => {
       expect.objectContaining({
         recordType: validPatchPayload.recordType,
       }),
-      "user_123"
+      { orgRole: "org:viewer", userId: "user_123" }
     );
+  });
+
+  it("returns 403 when updateManualAvailability returns not_authorised", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+    vi.mocked(getOrganisationById).mockResolvedValue({
+      ok: true,
+      value: { id: "org-1" } as any,
+    });
+    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
+      ok: true,
+      value: {
+        id: "33333333-3333-4333-a333-333333333333",
+        sourceType: "manual",
+      } as any,
+    });
+    vi.mocked(updateManualAvailability).mockResolvedValue({
+      ok: false,
+      error: {
+        code: "not_authorised",
+        message:
+          "You do not have permission to manage this availability record.",
+      } as any,
+    });
+
+    const response = await PATCH(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          method: "PATCH",
+          body: JSON.stringify(validPatchPayload),
+          headers: { "content-type": "application/json" },
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(403);
   });
 });
 
 describe("Availability Single Record Route (DELETE)", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(auth).mockResolvedValue({ orgRole: "org:viewer" } as any);
   });
 
   it("returns 401 when requireOrg throws", async () => {
@@ -639,7 +716,51 @@ describe("Availability Single Record Route (DELETE)", () => {
         organisationId: "22222222-2222-4222-a222-222222222222",
       },
       "33333333-3333-4333-a333-333333333333",
-      "user_123"
+      { orgRole: "org:viewer", userId: "user_123" }
     );
+  });
+
+  it("returns 403 when archiveManualAvailability returns not_authorised", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+    vi.mocked(getOrganisationById).mockResolvedValue({
+      ok: true,
+      value: { id: "org-1" } as any,
+    });
+    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
+      ok: true,
+      value: {
+        id: "33333333-3333-4333-a333-333333333333",
+        sourceType: "manual",
+      } as any,
+    });
+    vi.mocked(archiveManualAvailability).mockResolvedValue({
+      ok: false,
+      error: {
+        code: "not_authorised",
+        message:
+          "You do not have permission to manage this availability record.",
+      } as any,
+    });
+
+    const response = await DELETE(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          method: "DELETE",
+          body: JSON.stringify({
+            organisationId: "22222222-2222-4222-a222-222222222222",
+          }),
+          headers: { "content-type": "application/json" },
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(403);
   });
 });

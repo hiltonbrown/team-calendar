@@ -44,7 +44,7 @@ per-plan branches.
 | 009 | Dispatch feed_token_rotated on rotation | P3 | S-M | none | DONE |
 | 010 | Provision a default calendar feed for every new organisation | P1 | M | none | DONE |
 | 011 | Provision default public holidays for every new organisation | P1 | M | 010 | DONE |
-| 012 | Authorise manual availability mutations by actor and person | P1 | M | none | TODO |
+| 012 | Authorise manual availability mutations by actor and person | P1 | M | none | DONE |
 | 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | TODO |
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | TODO |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |

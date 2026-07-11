@@ -1,6 +1,6 @@
 "use server";
 
-import { currentUser } from "@repo/auth/server";
+import { auth, currentUser } from "@repo/auth/server";
 import {
   archiveManualAvailability,
   createManualAvailability,
@@ -55,6 +55,11 @@ export async function createManualAvailabilityAction(
     return { ok: false, error: contextResult.error.message };
   }
 
+  const authResult = await auth();
+  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
   const user = await currentUser();
   if (!user) {
     return { ok: false, error: "Not authenticated" };
@@ -63,7 +68,7 @@ export async function createManualAvailabilityAction(
   const result = await createManualAvailability(
     contextResult.value,
     toServiceInput(parsed.data),
-    user.id
+    { orgRole: authResult.orgRole, userId: user.id }
   );
 
   if (!result.ok) {
@@ -96,6 +101,11 @@ export async function updateManualAvailabilityAction(
     return { ok: false, error: contextResult.error.message };
   }
 
+  const authResult = await auth();
+  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
   const user = await currentUser();
   if (!user) {
     return { ok: false, error: "Not authenticated" };
@@ -105,7 +115,7 @@ export async function updateManualAvailabilityAction(
     contextResult.value,
     recordParsed.data,
     toServiceInput(parsed.data),
-    user.id
+    { orgRole: authResult.orgRole, userId: user.id }
   );
 
   if (!result.ok) {
@@ -129,6 +139,11 @@ export async function archiveManualAvailabilityAction(
     return { ok: false, error: contextResult.error.message };
   }
 
+  const authResult = await auth();
+  if (authResult.orgId !== contextResult.value.clerkOrgId) {
+    return { ok: false, error: "Not authenticated" };
+  }
+
   const user = await currentUser();
   if (!user) {
     return { ok: false, error: "Not authenticated" };
@@ -137,7 +152,7 @@ export async function archiveManualAvailabilityAction(
   const result = await archiveManualAvailability(
     contextResult.value,
     parsed.data.recordId,
-    user.id
+    { orgRole: authResult.orgRole, userId: user.id }
   );
 
   if (!result.ok) {
