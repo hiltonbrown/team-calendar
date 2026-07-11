@@ -40,7 +40,14 @@
     "nypm": "^0.6.6"
   },
   "overrides": {
-    "parse5": "^7.2.1"
+    "@grpc/grpc-js": "1.14.4",
+    "fast-uri": "3.1.2",
+    "hono": "4.12.25",
+    "next": "16.2.6",
+    "parse5": "^7.2.1",
+    "protobufjs": "7.6.5",
+    "vite": "8.0.16",
+    "ws": "8.21.0"
   },
   "type": "module",
   "workspaces": [

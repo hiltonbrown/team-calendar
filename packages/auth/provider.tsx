@@ -1,8 +1,7 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
-import { dark } from "@clerk/themes";
-import type { Theme } from "@clerk/types";
+import { dark } from "@clerk/ui/themes";
 import { useTheme } from "next-themes";
 import type { ComponentProps } from "react";
 
@@ -11,6 +10,8 @@ type AuthProviderProperties = ComponentProps<typeof ClerkProvider> & {
   termsUrl?: string;
   helpUrl?: string;
 };
+
+type AuthAppearance = NonNullable<AuthProviderProperties["appearance"]>;
 
 export const chooseOrganizationTaskUrl = "/session-tasks/choose-organization";
 
@@ -23,9 +24,9 @@ export const AuthProvider = ({
   const { taskUrls, ...clerkProperties } = properties;
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
-  const baseTheme = isDark ? dark : undefined;
+  const theme: AuthAppearance["theme"] = isDark ? dark : undefined;
 
-  const variables: Theme["variables"] = {
+  const variables: NonNullable<AuthAppearance["variables"]> = {
     fontFamily: "var(--font-sans)",
     fontFamilyButtons: "var(--font-sans)",
     fontWeight: {
@@ -35,15 +36,15 @@ export const AuthProvider = ({
     },
     colorPrimary: "var(--primary)",
     colorDanger: "var(--destructive)",
-    colorText: "var(--foreground)",
-    colorTextSecondary: "var(--muted-foreground)",
+    colorForeground: "var(--foreground)",
+    colorMutedForeground: "var(--muted-foreground)",
     colorBackground: "var(--background)",
-    colorInputBackground: "var(--input)",
-    colorInputText: "var(--foreground)",
+    colorInput: "var(--input)",
+    colorInputForeground: "var(--foreground)",
     borderRadius: "var(--radius)",
   };
 
-  const elements: Theme["elements"] = {
+  const elements: NonNullable<AuthAppearance["elements"]> = {
     dividerLine: "bg-border",
     socialButtonsIconButton: "bg-card",
     navbarButton: "text-foreground",
@@ -61,7 +62,7 @@ export const AuthProvider = ({
     formButtonPrimary: "rounded-2xl",
   };
 
-  const layout: Theme["layout"] = {
+  const options: NonNullable<AuthAppearance["options"]> = {
     privacyPageUrl: privacyUrl,
     termsPageUrl: termsUrl,
     helpPageUrl: helpUrl,
@@ -74,7 +75,7 @@ export const AuthProvider = ({
   return (
     <ClerkProvider
       {...clerkProperties}
-      appearance={{ layout, baseTheme, elements, variables }}
+      appearance={{ options, theme, elements, variables }}
       taskUrls={sessionTaskUrls}
     />
   );
