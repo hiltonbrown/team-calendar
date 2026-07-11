@@ -25,7 +25,7 @@
 - **Depends on**: none
 - **Category**: migration
 - **Planned at**: commit `e04f37d`, 2026-07-02
-- **Execution status**: BLOCKED on 2026-07-11 reconciliation
+- **Execution status**: DONE on 2026-07-11
 - **Execution note**: The first attempt stopped because the configured database
   could not be identified as a test target. The operator then confirmed the app
   is in development and explicitly authorised using the current database
@@ -49,6 +49,9 @@
   date, but `bun run test:integration` exits 1 with five fixed-ID collisions in
   the reconciliation jobs suite. Plan 013 cannot be DONE until plan 021 lands
   on `preview` and the full gate is rerun there.
+- **Landed verification**: Merge commit `d75357a` contains plan 021 on
+  `preview`. The merged branch passes all 53 integration tests, all 18
+  typecheck tasks, and lint across 690 files.
 
 ## Why this matters
 

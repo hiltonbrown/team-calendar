@@ -45,7 +45,7 @@ per-plan branches.
 | 010 | Provision a default calendar feed for every new organisation | P1 | M | none | DONE |
 | 011 | Provision default public holidays for every new organisation | P1 | M | 010 | DONE |
 | 012 | Authorise manual availability mutations by actor and person | P1 | M | none | DONE |
-| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | BLOCKED: approved plan 021 commit `040848a` is not contained in `preview` |
+| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | DONE |
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | TODO |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | TODO |
@@ -53,7 +53,7 @@ per-plan branches.
 | 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE |
-| 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | IN PROGRESS: approved commit `040848a` awaits integration into `preview` |
+| 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

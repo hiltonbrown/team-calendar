@@ -19,7 +19,7 @@
 - **Depends on**: none
 - **Category**: tests
 - **Planned at**: commit `e5faec8`, 2026-07-11
-- **Execution status**: IN PROGRESS on 2026-07-11, approved but not landed
+- **Execution status**: DONE on 2026-07-11
 - **Implementation**: commit `040848a` on branch
   `improve/plan-021-reconcile-fixtures`, worktree
   `/tmp/teamcalendar-plan-021`
@@ -27,6 +27,8 @@
   the targeted suite passed twice (7/7 each), the full integration suite passed
   53/53 tests, typecheck passed 18/18 tasks, and lint checked 690 files with no
   fixes required.
+- **Landed**: merge commit `d75357a` on `preview`; merged-branch verification
+  repeated the full integration, typecheck, and lint gates successfully.
 
 ## Why this matters
 
