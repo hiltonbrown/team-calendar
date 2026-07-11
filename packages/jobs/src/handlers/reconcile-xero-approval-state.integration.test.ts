@@ -57,20 +57,20 @@ if (process.env.DATABASE_URL) {
 
 const tenantA = {
   clerkOrgId: "org_test_reconcile_a",
-  organisationId: "70000000-0000-4000-8000-000000000001",
-  personId: "70000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "70000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "70000000-0000-4000-8000-000000000005",
-  xeroTenantId: "70000000-0000-4000-8000-000000000003",
+  organisationId: "a1000000-0000-4000-8000-000000000001",
+  personId: "a1000000-0000-4000-8000-000000000004",
+  xeroConnectionId: "a1000000-0000-4000-8000-000000000002",
+  xeroEmployeeId: "a1000000-0000-4000-8000-000000000005",
+  xeroTenantId: "a1000000-0000-4000-8000-000000000003",
 } as const;
 
 const tenantB = {
   clerkOrgId: "org_test_reconcile_b",
-  organisationId: "80000000-0000-4000-8000-000000000001",
-  personId: "80000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "80000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "80000000-0000-4000-8000-000000000005",
-  xeroTenantId: "80000000-0000-4000-8000-000000000003",
+  organisationId: "a2000000-0000-4000-8000-000000000001",
+  personId: "a2000000-0000-4000-8000-000000000004",
+  xeroConnectionId: "a2000000-0000-4000-8000-000000000002",
+  xeroEmployeeId: "a2000000-0000-4000-8000-000000000005",
+  xeroTenantId: "a2000000-0000-4000-8000-000000000003",
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
@@ -587,7 +587,7 @@ function triggerUserId(tenant: TestTenant) {
 }
 
 function recordId(suffix: string) {
-  return `90000000-0000-4000-8000-000000000${suffix}`;
+  return `a3000000-0000-4000-8000-000000000${suffix}`;
 }
 
 function leaveApplicationId(suffix: string) {
