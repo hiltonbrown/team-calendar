@@ -20,7 +20,7 @@
     "@repo/seo": "*",
     "@repo/xero": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "inngest": "^4.5.0",
+    "inngest": "^4.12.1",
     "server-only": "^0.0.1",
     "zod": "^4.4.3"
   },
