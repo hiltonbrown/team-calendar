@@ -39,6 +39,7 @@ interface TokenResponse {
 }
 
 interface ConnectionResponse {
+  connectionId: string;
   tenantId: string;
   tenantName: string;
 }
@@ -58,6 +59,7 @@ export interface PendingXeroSessionOrganisation {
 }
 
 export interface PendingXeroSessionTenant {
+  connectionId: string;
   tenantId: string;
   tenantName: string;
 }
@@ -150,6 +152,7 @@ export async function completeXeroOAuth(input: {
       access_token_iv: encryptedAccessToken.iv,
       available_tenants_json: {
         tenants: connections.value.map((tenant) => ({
+          connectionId: tenant.connectionId,
           tenantId: tenant.tenantId,
           tenantName: tenant.tenantName,
         })),
@@ -342,6 +345,7 @@ export async function completeXeroTenantSelection(input: {
         status: "active",
         token_encrypted_at: encryptedAccessToken.encryptedAt,
         token_key_version: encryptedAccessToken.keyVersion,
+        xero_authorisation_connection_id: selectedTenant.connectionId,
       },
       update: {
         access_token_auth_tag: encryptedAccessToken.authTag,
@@ -363,6 +367,7 @@ export async function completeXeroTenantSelection(input: {
         status: "active",
         token_encrypted_at: encryptedAccessToken.encryptedAt,
         token_key_version: encryptedAccessToken.keyVersion,
+        xero_authorisation_connection_id: selectedTenant.connectionId,
       },
       select: { id: true },
     });
@@ -698,7 +703,9 @@ export async function disconnectXeroOAuthConnection(input: {
   destructive: boolean;
   organisationId: string;
   performedByUserId?: null | string;
-}): Promise<Result<{ disconnected: true }, XeroOAuthError>> {
+}): Promise<
+  Result<{ disconnected: true; remoteRevoked: boolean }, XeroOAuthError>
+> {
   const connection = await database.xeroConnection.findFirst({
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -706,7 +713,11 @@ export async function disconnectXeroOAuthConnection(input: {
       organisation_id: input.organisationId,
     },
     select: {
+      access_token_auth_tag: true,
+      access_token_encrypted: true,
+      access_token_iv: true,
       id: true,
+      xero_authorisation_connection_id: true,
       xero_tenant: { select: { id: true } },
     },
   });
@@ -718,6 +729,29 @@ export async function disconnectXeroOAuthConnection(input: {
         message: "Xero connection not found.",
       },
     };
+  }
+
+  let remoteRevoked = false;
+  if (
+    connection.xero_authorisation_connection_id &&
+    connection.access_token_encrypted.length > 0 &&
+    connection.access_token_iv &&
+    connection.access_token_auth_tag
+  ) {
+    const accessToken = decryptXeroToken({
+      authTag: connection.access_token_auth_tag,
+      encrypted: connection.access_token_encrypted,
+      iv: connection.access_token_iv,
+    });
+    remoteRevoked = await revokeXeroConnectionAtSource({
+      accessToken,
+      orgKey: orgRateLimitKey({
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+      }),
+      xeroAuthorisationConnectionId:
+        connection.xero_authorisation_connection_id,
+    });
   }
 
   const now = new Date();
@@ -800,7 +834,27 @@ export async function disconnectXeroOAuthConnection(input: {
     }
   });
 
-  return { ok: true, value: { disconnected: true } };
+  return { ok: true, value: { disconnected: true, remoteRevoked } };
+}
+
+async function revokeXeroConnectionAtSource(input: {
+  accessToken: string;
+  orgKey: string;
+  xeroAuthorisationConnectionId: string;
+}): Promise<boolean> {
+  try {
+    const response = await xeroFetch({
+      init: {
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+        method: "DELETE",
+      },
+      orgKey: input.orgKey,
+      url: `${XERO_CONNECTIONS_URL}/${input.xeroAuthorisationConnectionId}`,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function markXeroConnectionStale(input: {
@@ -1063,12 +1117,18 @@ function readAvailableTenants(payload: unknown): PendingXeroSessionTenant[] {
       "tenantId" in tenant && typeof tenant.tenantId === "string"
         ? tenant.tenantId
         : null;
+    const connectionId =
+      "connectionId" in tenant && typeof tenant.connectionId === "string"
+        ? tenant.connectionId
+        : null;
     const tenantName =
       "tenantName" in tenant && typeof tenant.tenantName === "string"
         ? tenant.tenantName
         : null;
 
-    return tenantId && tenantName ? [{ tenantId, tenantName }] : [];
+    return connectionId && tenantId && tenantName
+      ? [{ connectionId, tenantId, tenantName }]
+      : [];
   });
 }
 
@@ -1163,12 +1223,22 @@ async function fetchConnections(
     };
   }
 
-  const payload = (await response.json()) as Partial<ConnectionResponse>[];
+  const payload = (await response.json()) as Array<
+    Partial<ConnectionResponse> & { id?: string }
+  >;
   return {
     ok: true,
     value: payload.flatMap((item) =>
-      typeof item.tenantId === "string" && typeof item.tenantName === "string"
-        ? [{ tenantId: item.tenantId, tenantName: item.tenantName }]
+      typeof item.id === "string" &&
+      typeof item.tenantId === "string" &&
+      typeof item.tenantName === "string"
+        ? [
+            {
+              connectionId: item.id,
+              tenantId: item.tenantId,
+              tenantName: item.tenantName,
+            },
+          ]
         : []
     ),
   };

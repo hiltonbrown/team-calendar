@@ -17,6 +17,7 @@ const dbMock = vi.hoisted(() => ({
     update: vi.fn(),
   },
   xeroOAuthSession: {
+    create: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn(),
   },
@@ -40,6 +41,7 @@ const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
   completeXeroTenantSelection,
+  disconnectXeroOAuthConnection,
   ensureFreshXeroConnection,
   isPreviewDeployment,
   xeroConnectionRefreshDecision,
@@ -79,6 +81,7 @@ beforeEach(() => {
   dbMock.xeroConnection.upsert.mockReset();
   dbMock.xeroConnection.update.mockReset();
   dbMock.xeroOAuthSession.findFirst.mockReset();
+  dbMock.xeroOAuthSession.create.mockReset();
   dbMock.xeroOAuthSession.update.mockReset();
   dbMock.xeroTenant.upsert.mockReset();
   feedMock.ensureDefaultCalendarFeed.mockReset();
@@ -181,6 +184,69 @@ describe("buildXeroOAuthStartUrl", () => {
         "https://api.example.com/api/xero/oauth/callback"
       );
     }
+  });
+});
+
+describe("completeXeroOAuth", () => {
+  it("stores the Xero authorisation connection id in the pending session", async () => {
+    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    expect(start.ok).toBe(true);
+    if (!start.ok) {
+      return;
+    }
+
+    const state = new URL(start.value.redirectUrl).searchParams.get("state");
+    dbMock.xeroOAuthSession.create.mockResolvedValueOnce({ id: "session_1" });
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "access-token",
+            expires_in: 1800,
+            refresh_token: "refresh-token",
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "xero-connection-1",
+              tenantId: "xero-tenant-1",
+              tenantName: "Acme Payroll",
+            },
+          ]),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await completeXeroOAuth({
+      code: "authorisation-code",
+      state: state ?? "",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { sessionId: "session_1" },
+    });
+    expect(dbMock.xeroOAuthSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          available_tenants_json: {
+            tenants: [
+              {
+                connectionId: "xero-connection-1",
+                tenantId: "xero-tenant-1",
+                tenantName: "Acme Payroll",
+              },
+            ],
+          },
+        }),
+      })
+    );
   });
 });
 
@@ -558,6 +624,92 @@ describe("ensureFreshXeroConnection", () => {
   });
 });
 
+describe("disconnectXeroOAuthConnection", () => {
+  const input = {
+    clerkOrgId: "org_1",
+    connectionId: "11111111-1111-4111-8111-111111111111",
+    destructive: false,
+    organisationId: "22222222-2222-4222-8222-222222222222",
+  };
+
+  function buildConnection(
+    xeroAuthorisationConnectionId: null | string = "xero-connection-1"
+  ) {
+    return {
+      ...buildStoredTokenFields(),
+      id: input.connectionId,
+      xero_authorisation_connection_id: xeroAuthorisationConnectionId,
+      xero_tenant: null,
+    };
+  }
+
+  it("revokes the Xero connection before clearing local tokens", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(buildConnection());
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    const fetchSpy = vi.fn().mockResolvedValueOnce({ ok: true });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.xero.com/connections/xero-connection-1",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: true },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          access_token_encrypted: "",
+          status: "disconnected",
+        }),
+      })
+    );
+  });
+
+  it("clears local tokens when the Xero revoke fails", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(buildConnection());
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false }));
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: false },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ access_token_encrypted: "" }),
+      })
+    );
+  });
+
+  it("skips the remote revoke when no authorisation connection id is stored", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(
+      buildConnection(null)
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: false },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ access_token_encrypted: "" }),
+      })
+    );
+  });
+});
+
 describe("completeXeroTenantSelection", () => {
   const sessionId = "90000000-0000-4000-8000-000000000001";
   const organisationId = "90000000-0000-4000-8000-000000000002";
@@ -739,7 +891,13 @@ describe("completeXeroTenantSelection", () => {
       access_token_encrypted: accessToken.encrypted,
       access_token_iv: accessToken.iv,
       available_tenants_json: {
-        tenants: [{ tenantId, tenantName: "Acme Payroll" }],
+        tenants: [
+          {
+            connectionId: "xero-connection-1",
+            tenantId,
+            tenantName: "Acme Payroll",
+          },
+        ],
       },
       expires_at: new Date("2026-07-07T00:15:00.000Z"),
       id: sessionId,
