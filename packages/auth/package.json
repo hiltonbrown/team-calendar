@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.5.17",
-    "@clerk/ui": "^1.25.2",
+    "@clerk/themes": "^2.4.57",
     "@repo/core": "*",
     "@repo/database": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
