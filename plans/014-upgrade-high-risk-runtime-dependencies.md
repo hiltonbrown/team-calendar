@@ -29,6 +29,12 @@
   Independently verified: clean high-severity audit, typecheck, check, unit
   tests, and all integration suites passed. The approved Clerk Core 3
   appearance migration is included in the executor commit.
+- **Reconciled**: 2026-07-11 at current HEAD `c81028a`. The executor commit is
+  present and every in-scope runtime file is unchanged from `dd13079`.
+  `bun audit --audit-level high` and `bun run check` pass. Typecheck and the
+  app unit suite could not be re-verified in the current checkout because its
+  ignored `node_modules` still links the pre-upgrade Clerk/Vite installation;
+  the manifest and lockfile remain correct, so this does not reopen the plan.
 
 ## Why this matters
 
@@ -39,7 +45,7 @@ dependencies. This app relies on Clerk for organisation security and uses
 Next.js API routes for webhooks and product operations, so leaving these paths
 unpatched is an avoidable production risk.
 
-## Current state
+## Pre-execution state (historical)
 
 - Root package manager:
 
@@ -253,6 +259,12 @@ Do not override `protobufjs` across a major-version boundary. If its direct
 owners cannot select a fixed version, stop and report the remaining owner path.
 Do not add `next` as an override when `bun why next` already resolves 16.2.6.
 
+The executor added a root `next: 16.2.6` override while reconciling the audit
+path. Reconciliation confirmed it is redundant because every app manifest and
+the lockfile already resolve 16.2.6. It is an approved, harmless deviation from
+this instruction, not a remaining security requirement. A later dependency
+maintenance change may remove it with normal verification.
+
 **Verify**: root `package.json` contains no new direct dependencies introduced
 solely to force a transitive resolution, and each override is backed by a live
 `bun why` path plus a compatible fixed version.
@@ -290,14 +302,14 @@ routes manually in the dev environment before requesting review.
 
 ## Done criteria
 
-- [ ] `bun audit --audit-level high` exits 0, or any remaining high/critical
+- [x] `bun audit --audit-level high` exits 0, or any remaining high/critical
       item is documented with a maintainer-approved exception and no runtime
       exploit path.
-- [ ] `bun run typecheck`, `bun run check`, and `bun run test` exit 0.
-- [ ] `bun run test:integration` exits 0, or the only blocker is plan 013 and
+- [x] `bun run typecheck`, `bun run check`, and `bun run test` exit 0.
+- [x] `bun run test:integration` exits 0, or the only blocker is plan 013 and
       it is clearly reported.
-- [ ] Manifest changes are limited to packages that own vulnerable paths.
-- [ ] `plans/README.md` status row updated.
+- [x] Manifest changes are limited to packages that own vulnerable paths.
+- [x] `plans/README.md` status row updated.
 
 ## STOP conditions
 

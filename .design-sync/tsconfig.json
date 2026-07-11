@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
       "@repo/observability/error": ["./stubs/observability-error.ts"],
       "@repo/design-system/*": ["../packages/design-system/*"],
