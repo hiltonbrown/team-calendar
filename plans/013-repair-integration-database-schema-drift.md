@@ -26,32 +26,15 @@
 - **Category**: migration
 - **Planned at**: commit `e04f37d`, 2026-07-02
 - **Execution status**: DONE on 2026-07-11
-- **Execution note**: The first attempt stopped because the configured database
-  could not be identified as a test target. The operator then confirmed the app
-  is in development and explicitly authorised using the current database
-  configuration. Credentials must remain unlogged and uncommitted.
-- **Review result**: Prisma reports all three checked-in migrations applied and
-  the database schema up to date. Database, feeds, and availability integration
-  suites pass, confirming the original `plans.plan_key` drift is no longer
-  present. The root integration command still exits 1 because five jobs tests
-  attempt to create fixed organisation IDs already present in the shared
-  development database.
-- **Former blocker resolution**: Repair isolation or cleanup for
-  `packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts`
-  in a separate plan, then rerun this plan's full integration, typecheck, and
-  lint gates. Do not weaken this plan's full-suite done criterion.
-- **Final review**: Plan 021 isolated the colliding reconciliation fixture
-  UUIDs. The reviewer then confirmed migration status is up to date, the full
-  integration suite passes all 53 tests, typecheck passes all 18 tasks, and
-  lint checks 690 files with no fixes required. No migration change was needed.
-- **Reconciliation result**: Current branch `preview` at `e5faec8` does not
-  contain approved plan 021 commit `040848a`. Migration status remains up to
-  date, but `bun run test:integration` exits 1 with five fixed-ID collisions in
-  the reconciliation jobs suite. Plan 013 cannot be DONE until plan 021 lands
-  on `preview` and the full gate is rerun there.
-- **Landed verification**: Merge commit `d75357a` contains plan 021 on
-  `preview`. The merged branch passes all 53 integration tests, all 18
-  typecheck tasks, and lint across 690 files.
+- **Implementation result**: No migration change was required. Prisma reported
+  all three checked-in migrations applied and the database schema up to date.
+- **Landed verification**: Plan 021 isolated the unrelated reconciliation
+  fixture UUID collisions and landed through merge commit `d75357a`. The merged
+  `preview` branch passed all 53 integration tests, all 18 typecheck tasks, and
+  lint across 690 files.
+- **Reconciled at**: commit `d4e79a6`, 2026-07-11. A fresh migration-status
+  check reports the schema up to date; no code, schema, migration, or test file
+  changed after the merged-branch verification.
 
 ## Why this matters
 
@@ -202,13 +185,13 @@ expand into unrelated integration failures in this plan.
 
 ## Done criteria
 
-- [ ] Migration status reports the integration/test database is up to date.
-- [ ] The database has `plans.plan_key`, `plans.is_custom`, and
+- [x] Migration status reports the integration/test database is up to date.
+- [x] The database has `plans.plan_key`, `plans.is_custom`, and
       `plans.stripe_price_id` if those columns are required by the live schema.
-- [ ] `bun run test:integration` exits 0.
-- [ ] `bun run typecheck` and `bun run check` exit 0.
-- [ ] No old migration file was edited.
-- [ ] `plans/README.md` status row updated.
+- [x] `bun run test:integration` exits 0.
+- [x] `bun run typecheck` and `bun run check` exit 0.
+- [x] No old migration file was edited.
+- [x] `plans/README.md` status row updated.
 
 ## STOP conditions
 

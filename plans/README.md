@@ -45,7 +45,7 @@ per-plan branches.
 | 010 | Provision a default calendar feed for every new organisation | P1 | M | none | DONE |
 | 011 | Provision default public holidays for every new organisation | P1 | M | 010 | DONE |
 | 012 | Authorise manual availability mutations by actor and person | P1 | M | none | DONE |
-| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | DONE |
+| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | DONE (reconciled 2026-07-11 at `d4e79a6`) |
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | TODO |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | TODO |
@@ -96,8 +96,9 @@ kept for context and for understanding why the sequence is what it is.
 - 013 should land before treating `bun run test:integration` as a reliable
   verification gate. 014 can patch dependencies without 013, but its full
   verification depends on 013 if integration tests are still schema-blocked.
-- 021 removes the unrelated fixed-ID collision currently blocking 013's full
-  integration gate. After 021 is DONE, rerun 013's remaining gates.
+- 021 removed the unrelated fixed-ID collision that blocked 013's full
+  integration gate. Both plans are DONE, and 013's remaining gates passed after
+  021 landed on `preview`.
 - 015 is a narrow calendar authorisation fix and can land independently.
 - 016 depends on 003 for the backend unsupported-region error, but covers the
   separate setup, OAuth, and marketing surfaces that currently overstate NZ/UK
