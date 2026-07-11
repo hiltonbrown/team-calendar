@@ -1,5 +1,11 @@
 # Plan 001: Make the Stripe webhook fail loudly, drop the placeholder organisation id, and cover it with tests
 
+> **Reconciliation status**: DONE, verified at commit `e3423da` on
+> 2026-07-11. Do not execute this historical plan again. The original
+> implementation landed in `6a22002`; follow-up `99ece27` superseded the
+> optional `organisationId` approach with the stronger implementation recorded
+> under "Reconciliation outcome" below.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
@@ -20,6 +26,47 @@
 - **Depends on**: none
 - **Category**: bug
 - **Planned at**: commit `8790bdb`, 2026-07-02
+- **Reconciled at**: commit `e3423da`, 2026-07-11
+
+## Reconciliation outcome
+
+The finding is fixed and the relevant targeted tests pass. The final code keeps
+`organisationId` required on `recount-usage`, resolves the first active
+Organisation for the Clerk Organisation, and sends that real ID with the job.
+This is preferable to the plan's original instruction to make the field
+optional because it preserves the repository invariant that jobs carry both
+`clerk_org_id` and `organisation_id`.
+
+Current evidence:
+
+- `apps/api/app/webhooks/payments/route.ts:46-61` logs missing metadata and
+  unknown prices at error level without logging full Stripe payloads.
+- `apps/api/app/webhooks/payments/route.ts:73-90` resolves and sends a real
+  active Organisation ID; the placeholder UUID is gone from this sender.
+- `apps/api/app/webhooks/payments/route.ts:109-162` logs validation failures,
+  expected unexpanded invoice subscriptions, and unhandled event types.
+- `apps/api/app/webhooks/payments/route.ts:165-189` still records an event only
+  after processing succeeds, preserving Stripe retry behaviour.
+- `packages/jobs/src/handlers/recount-usage.ts:6-14` requires and validates the
+  Organisation ID.
+- `apps/api/__tests__/webhooks-payments.test.ts:76-225` covers the seven cases
+  specified by this plan, adjusted to assert the resolved Organisation ID.
+- `apps/api/app/webhooks/payments/route.test.ts:73-170` adds co-located coverage
+  of the core ordering and dispatch behaviour.
+- `packages/jobs/src/handlers/recount-usage.test.ts:47-81` covers recount input
+  validation and tenant-scoped counts.
+
+Verification run during reconciliation:
+
+```text
+NODE_ENV=test bunx vitest run apps/api/__tests__/webhooks-payments.test.ts apps/api/app/webhooks/payments/route.test.ts packages/jobs/src/handlers/recount-usage.test.ts
+Test Files  3 passed (3)
+Tests       16 passed (16)
+```
+
+The historical Step 2, test case 3, broad placeholder grep, scope list, and
+maintenance note below describe the first implementation and are superseded by
+this outcome. They are retained as an audit record, not as current instructions.
 
 ## Why this matters
 
