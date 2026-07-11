@@ -50,7 +50,7 @@ per-plan branches.
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | DONE (executed and reviewed 2026-07-11 at `374d02d`) |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | DONE (verified 2026-07-11 at `c4be861`) |
 | 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | DONE (executed, reviewed, and merged onto `preview` at `79808e5`, 2026-07-11) |
-| 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
+| 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | DONE (`11cd418`) |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE |
 | 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | DONE |
