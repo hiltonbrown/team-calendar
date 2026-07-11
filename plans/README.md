@@ -49,7 +49,7 @@ per-plan branches.
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | DONE (reconciled 2026-07-11 at HEAD `c81028a`; audit/check pass, source and lock unchanged) |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | DONE (executed and reviewed 2026-07-11 at `374d02d`) |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | DONE (verified 2026-07-11 at `c4be861`) |
-| 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | TODO |
+| 017 | Restrict the Xero OAuth start route to admins and owners | P1 | S | none | DONE (executed and reviewed 2026-07-11 at `a6c325a` in worktree, branched from `preview`'s ancestor `fee507f`; not yet merged to `preview` HEAD `dd5df3f`) |
 | 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE |
