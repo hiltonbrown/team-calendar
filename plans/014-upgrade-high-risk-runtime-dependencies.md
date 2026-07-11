@@ -7,7 +7,7 @@
 > in `plans/README.md` unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat e04f37d..HEAD -- package.json bun.lock apps/app/package.json apps/api/package.json packages/auth/package.json packages/database/package.json packages/jobs/package.json`
+> **Drift check (run first)**: `git diff --stat 637f02d..HEAD -- package.json bun.lock apps/app/package.json apps/api/package.json apps/email/package.json apps/web/package.json packages/analytics/package.json packages/auth/package.json packages/database/package.json packages/jobs/package.json packages/observability/package.json`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -24,7 +24,11 @@
 - **Risk**: MED
 - **Depends on**: plans/013-repair-integration-database-schema-drift.md for full integration verification
 - **Category**: security
-- **Planned at**: commit `e04f37d`, 2026-07-02
+- **Planned at**: commit `637f02d`, refreshed 2026-07-11
+- **Execution status**: DONE on 2026-07-11 in executor commit `dd13079`.
+  Independently verified: clean high-severity audit, typecheck, check, unit
+  tests, and all integration suites passed. The approved Clerk Core 3
+  appearance migration is included in the executor commit.
 
 ## Why this matters
 
@@ -78,17 +82,29 @@ unpatched is an avoidable production risk.
 "inngest": "^4.5.0",
 ```
 
-- Audit result captured on 2026-07-02: `bun audit --audit-level high` reported
-  36 vulnerabilities, including:
+- Audit result recaptured on 2026-07-11: `bun audit --audit-level high` still
+  reported 36 vulnerabilities from stale compatible resolutions, including:
   - `@clerk/shared >=3.0.0 <=3.47.4` via `@clerk/nextjs`, `@clerk/themes`, and
     `@clerk/types`, including auth bypass and middleware route protection
     bypass advisories.
   - `protobufjs >=8.0.0 <=8.0.1` via `posthog-js`, `inngest`, and
     `@sentry/nextjs`, including a critical arbitrary code execution advisory.
   - `@grpc/grpc-js`, `undici`, `ws`, `hono`, `fast-uri`, and `vite`.
-  - The audit output also mentioned `next >=16.0.0 <16.2.5`; manifests show
-    `next: 16.2.6`, so the lockfile and transitive path must be reconciled
-    rather than assuming Next is already clean.
+  - The audit output also mentioned `next >=16.0.0 <16.2.5`, while `bun why
+    next` resolves 16.2.6. Treat this as an audit/lock reconciliation check,
+    not permission to upgrade Next beyond 16.2.6.
+
+Registry metadata verified during reconciliation:
+
+- `@clerk/shared` 3.47.5 exists and satisfies `@clerk/themes` and
+  `@clerk/types` `^3.47.2` ranges.
+- `@clerk/types` is deprecated, but removing it requires a source import
+  migration and is not necessary for this patch-only security plan.
+- Do not run named transitive packages from the repository root. In Bun 1.3.14,
+  `bun update @clerk/shared protobufjs ...` adds them as root direct
+  dependencies instead of refreshing their owners.
+- Do not use `bun update --recursive` for this plan. A disposable-worktree test
+  updated unrelated root tooling while leaving vulnerable workspace paths.
 
 ## Commands you will need
 
@@ -113,8 +129,13 @@ unpatched is an avoidable production risk.
 - `apps/app/package.json`
 - `apps/api/package.json`
 - `packages/auth/package.json`
+- `packages/auth/provider.tsx`
 - `packages/database/package.json`
 - `packages/jobs/package.json`
+- `apps/email/package.json`
+- `apps/web/package.json`
+- `packages/analytics/package.json`
+- `packages/observability/package.json`
 - Other workspace `package.json` files only if `bun why` proves they own a
   vulnerable direct dependency.
 - `plans/README.md` (status row)
@@ -154,25 +175,89 @@ lockfile to identify the same path.
 Clerk packages in `packages/auth/package.json` or `protobufjs` through
 `@sentry/nextjs`/`inngest`/`posthog-js`.
 
-### Step 2: Patch direct dependencies conservatively
+### Step 2: Update each vulnerable direct owner from its workspace
 
-Update direct dependencies to the nearest patched compatible versions. Start
-with these likely owners:
+Run these owner-scoped updates from the repository root:
 
-- `@clerk/nextjs`, `@clerk/themes`, `@clerk/types`
-- `@sentry/nextjs`
-- `inngest`
-- `undici`
-- `ws`
-- any package that owns `hono`, `@grpc/grpc-js`, `fast-uri`, `vite`, or
-  `protobufjs` in the live audit path
+```bash
+bun update --cwd packages/auth @clerk/nextjs
+bun update --cwd apps/web @clerk/nextjs @sentry/nextjs
+bun update --cwd apps/api @sentry/nextjs inngest @vitejs/plugin-react vitest
+bun update --cwd packages/jobs inngest
+bun update --cwd packages/analytics posthog-js
+bun update --cwd packages/observability @sentry/nextjs
+bun update --cwd packages/database undici ws prisma
+bun update --cwd apps/app @sentry/nextjs @vitejs/plugin-react vitest jsdom
+bun update --cwd apps/email react-email
+```
 
-Prefer `bun update <package...>` with explicit package names. Avoid a broad
-`bun update` unless explicit updates cannot produce a clean audit.
+These commands may advance direct dependency ranges only to their newest
+compatible versions. Review every manifest hunk and revert changes unrelated
+to an audit owner. Do not replace this list with a root-wide or recursive
+update.
 
-**Verify**: `bun install` -> exit 0. `bun run typecheck` -> exit 0.
+The relative `--cwd` form failed under Bun 1.3.14 in an isolated worktree.
+Executors must use absolute paths, for example
+`bun update --cwd /tmp/<worktree>/packages/auth ...`, while preserving the same
+workspace and package ownership shown above.
 
-### Step 3: Reconcile the Next.js audit path
+After updating Clerk, migrate `packages/auth/provider.tsx` to the current Core
+3 appearance API:
+
+- Replace `@clerk/themes` with the current compatible `@clerk/ui` release in
+  `packages/auth/package.json`, then run `bun install` to resolve it.
+- Remove deprecated `@clerk/types`.
+- Import `dark` from `@clerk/ui/themes`.
+- Derive appearance member types from
+  `NonNullable<AuthProviderProperties["appearance"]>` instead of importing
+  `Theme`.
+- Rename the appearance member `layout` to `options` and pass `options` to
+  `ClerkProvider`.
+- Rename `baseTheme` to `theme` and pass `theme` to `ClerkProvider`.
+- Preserve the existing URLs, tokens, element classes, dark-mode selection,
+  and task URL behaviour exactly. Do not redesign the authentication UI.
+
+The earlier attempted replacement `Theme` from `@clerk/nextjs/types` is known
+not to compile because that entry point does not export `Theme`; do not repeat
+it.
+
+**Verify**:
+
+- `bun install` exits 0.
+- `bun why @clerk/shared` shows the legacy branch at 3.47.5 or newer and no
+  version in the affected `3.0.0` through `3.47.4` range.
+- `bun run typecheck` exits 0.
+
+### Step 3: Resolve remaining patchable transitive paths
+
+Run `bun audit --audit-level high` again. For each remaining advisory, use
+`bun why <package>` to confirm the live installed version and owner.
+
+If a vulnerable transitive remains only because its owner pins an older patch,
+add a root `overrides` entry beside the existing `parse5` override in
+`package.json`, but only when the fixed version is semver-compatible with the
+owner's declared range. Use the minimum fixed version reported by the live
+advisory. Likely patch floors from the 2026-07-11 audit are:
+
+- `@clerk/shared`: 3.47.5 for the legacy 3.x branch
+- `js-cookie`: 3.0.6 or newer
+- `@grpc/grpc-js`: 1.14.4 or newer
+- `undici`: 8.5.0 or newer for the direct 8.x branch, and 7.28.0 or newer for
+  any 7.x branch
+- `fast-uri`: 3.1.2 or newer
+- `vite`: 8.0.16 or newer
+- `ws`: 8.21.0 or newer
+- `hono`: 4.12.25 or newer
+
+Do not override `protobufjs` across a major-version boundary. If its direct
+owners cannot select a fixed version, stop and report the remaining owner path.
+Do not add `next` as an override when `bun why next` already resolves 16.2.6.
+
+**Verify**: root `package.json` contains no new direct dependencies introduced
+solely to force a transitive resolution, and each override is backed by a live
+`bun why` path plus a compatible fixed version.
+
+### Step 4: Reconcile the Next.js audit path
 
 Because manifests already pin `next` to `16.2.6`, inspect `bun.lock` and
 `bun why next` if the audit still reports the vulnerable Next range. If the
@@ -182,7 +267,7 @@ Next further.
 
 **Verify**: `bun audit --audit-level high` no longer reports the Next advisory.
 
-### Step 4: Run the security and regression gates
+### Step 5: Run the security and regression gates
 
 Run:
 
@@ -221,9 +306,11 @@ Stop and report back if:
 - A required Clerk or Next upgrade is a major version that changes middleware,
   auth helper, or route protection APIs.
 - The audit remains high/critical after explicit direct dependency updates and
-  the remaining path is not under a direct dependency the repo controls.
+  the remaining path cannot be fixed by a semver-compatible transitive patch.
 - Typecheck failures require broad app rewrites unrelated to dependency APIs.
 - `bun update` wants to remove or rewrite workspace links.
+- A named update adds a vulnerable transitive package as a new root direct
+  dependency. Revert it and use the owner-scoped command instead.
 
 ## Maintenance notes
 
