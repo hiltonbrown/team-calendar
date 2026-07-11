@@ -45,7 +45,7 @@ per-plan branches.
 | 010 | Provision a default calendar feed for every new organisation | P1 | M | none | DONE |
 | 011 | Provision default public holidays for every new organisation | P1 | M | 010 | DONE |
 | 012 | Authorise manual availability mutations by actor and person | P1 | M | none | DONE |
-| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | TODO |
+| 013 | Repair integration database schema drift before relying on integration tests | P1 | S-M | none | BLOCKED: approved plan 021 commit `040848a` is not contained in `preview` |
 | 014 | Upgrade high-risk runtime dependencies reported by audit | P1 | M | 013 for full integration verification | TODO |
 | 015 | Align calendar event detail manager scope with calendar range scope | P1 | S | none | TODO |
 | 016 | Align region setup and marketing surfaces with AU-only launch scope | P1 | M | 003 | TODO |
@@ -53,6 +53,7 @@ per-plan branches.
 | 018 | Revoke the Xero connection on disconnect (DELETE /connections/{id}) | P2 | M | none | TODO |
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | TODO |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE |
+| 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | IN PROGRESS: approved commit `040848a` awaits integration into `preview` |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -95,6 +96,8 @@ kept for context and for understanding why the sequence is what it is.
 - 013 should land before treating `bun run test:integration` as a reliable
   verification gate. 014 can patch dependencies without 013, but its full
   verification depends on 013 if integration tests are still schema-blocked.
+- 021 removes the unrelated fixed-ID collision currently blocking 013's full
+  integration gate. After 021 is DONE, rerun 013's remaining gates.
 - 015 is a narrow calendar authorisation fix and can land independently.
 - 016 depends on 003 for the backend unsupported-region error, but covers the
   separate setup, OAuth, and marketing surfaces that currently overstate NZ/UK
