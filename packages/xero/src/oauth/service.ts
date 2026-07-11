@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
 import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
@@ -1238,17 +1238,34 @@ function payrollRegionForCountry(
   return null;
 }
 
-function signState(payload: OAuthStatePayload, secret: string): string {
+// Domain-separation label for HKDF. Scoped to this exact purpose so the derived
+// key can never be reused to forge or verify anything else, even if the same
+// Xero client secret is also used for Basic Auth against the Xero token endpoint.
+const STATE_SIGNING_KEY_INFO = "team-calendar:xero-oauth-state:v1";
+
+// The OAuth `state` parameter is a signed (not encrypted) anti-CSRF token: HMAC-SHA256
+// is the correct primitive for authenticating it, not a password hash. Deriving a
+// dedicated signing key via HKDF (rather than passing the Xero client secret straight
+// into the HMAC) keeps this key cryptographically independent of the client secret's
+// other use as a Basic Auth credential against Xero.
+function deriveStateSigningKey(clientSecret: string): Buffer {
+  return Buffer.from(
+    hkdfSync("sha256", clientSecret, "", STATE_SIGNING_KEY_INFO, 32)
+  );
+}
+
+function signState(payload: OAuthStatePayload, clientSecret: string): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = createHmac("sha256", secret)
+  const signingKey = deriveStateSigningKey(clientSecret);
+  const signature = createHmac("sha256", signingKey)
     .update(encoded)
     .digest("base64url");
   return `${encoded}.${signature}`;
 }
 
 function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
-  const secret = stateSecret();
-  if (!secret) {
+  const clientSecret = stateSecret();
+  if (!clientSecret) {
     return oauthNotConfigured();
   }
 
@@ -1257,7 +1274,8 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     return invalidState();
   }
 
-  const expected = createHmac("sha256", secret)
+  const signingKey = deriveStateSigningKey(clientSecret);
+  const expected = createHmac("sha256", signingKey)
     .update(encoded)
     .digest("base64url");
   const matches =
