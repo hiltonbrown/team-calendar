@@ -20,7 +20,7 @@ Approved leave and manual entries appear in every subscribed calendar within 60 
 
 ## How it works
 
-1. **Connect Xero.** Team Calendar links to your Xero Payroll file (AU, NZ, or UK) and syncs employees, leave records, and balances on a schedule.
+1. **Connect Xero.** Team Calendar links to Australian Xero Payroll files and syncs employees, leave records, and balances on a schedule. New Zealand and United Kingdom support is planned.
 2. **Manage leave.** Staff submit leave and log manual availability. Managers approve or decline. Approved decisions write straight back to Xero.
 3. **Publish availability.** Team Calendar combines everything into a canonical view and serves it as secure, revocable ICS feeds with the privacy level you set.
 4. **Stay informed.** In-app notifications and email keep staff and managers up to date on submissions, approvals, and sync health.

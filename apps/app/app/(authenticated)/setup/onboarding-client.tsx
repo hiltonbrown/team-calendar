@@ -18,11 +18,7 @@ import { toast } from "@repo/design-system/components/ui/sonner";
 import { useState, useTransition } from "react";
 import { createOrganisationAction } from "./_actions";
 
-const COUNTRY_OPTIONS = [
-  { label: "Australia", value: "AU" },
-  { label: "New Zealand", value: "NZ" },
-  { label: "United Kingdom", value: "UK" },
-] as const;
+const COUNTRY_OPTIONS = [{ label: "Australia", value: "AU" }] as const;
 
 interface OnboardingClientProps {
   prefillName: string;
@@ -30,7 +26,7 @@ interface OnboardingClientProps {
 
 export const OnboardingClient = ({ prefillName }: OnboardingClientProps) => {
   const [name, setName] = useState(prefillName);
-  const [countryCode, setCountryCode] = useState<"AU" | "NZ" | "UK">("AU");
+  const [countryCode, setCountryCode] = useState<"AU">("AU");
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = () => {
@@ -75,7 +71,7 @@ export const OnboardingClient = ({ prefillName }: OnboardingClientProps) => {
             <RadioGroup
               className="grid gap-2 sm:grid-cols-3"
               onValueChange={(value) => {
-                if (value === "AU" || value === "NZ" || value === "UK") {
+                if (value === "AU") {
                   setCountryCode(value);
                 }
               }}

@@ -421,7 +421,7 @@ const faqs = [
   },
   {
     q: "Which regions of Xero Payroll are supported?",
-    a: "Australia, New Zealand and the United Kingdom. We use Xero's official Payroll APIs for each.",
+    a: "Australia is supported at launch. New Zealand and United Kingdom support is planned for future releases.",
   },
   {
     q: "Does an out-of-office count against a leave balance?",

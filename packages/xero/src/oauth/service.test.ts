@@ -631,6 +631,43 @@ describe("completeXeroTenantSelection", () => {
     );
   });
 
+  it.each([
+    "NZ",
+    "UK",
+  ])("rejects an unsupported %s payroll tenant before persistence", async (countryCode) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ Organisations: [{ CountryCode: countryCode }] }),
+            { headers: { "Content-Type": "application/json" }, status: 200 }
+          )
+        )
+    );
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "invalid_country",
+        message:
+          "Team Calendar currently supports Australian Xero Payroll files only.",
+      },
+    });
+    expect(dbMock.organisation.create).not.toHaveBeenCalled();
+    expect(dbMock.$transaction).not.toHaveBeenCalled();
+    expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
+  });
+
   it("fails tenant selection when default feed provisioning fails", async () => {
     feedMock.ensureDefaultCalendarFeed.mockResolvedValueOnce({
       ok: false,

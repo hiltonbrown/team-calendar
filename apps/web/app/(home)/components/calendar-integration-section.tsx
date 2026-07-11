@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MarketingIcon } from "./marketing-icons";
 
 const integrationPoints = [
-  "Connect Xero Payroll AU, NZ, or UK.",
+  "Connect Xero Payroll Australia. New Zealand and United Kingdom support is planned.",
   "Publish secure feeds for Outlook, Google Calendar, and Apple Calendar.",
   "Keep approved leave and manual availability in one calendar view.",
 ];
