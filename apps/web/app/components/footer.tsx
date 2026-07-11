@@ -55,8 +55,8 @@ export const Footer = () => (
           calendars your people already use.
         </p>
         <p className="marketing-footer__proof">
-          Built for Xero Payroll teams in Australia, New Zealand, and the United
-          Kingdom.
+          Built for Xero Payroll teams in Australia. New Zealand and United
+          Kingdom support is planned.
         </p>
         <div className="marketing-footer__actions">
           <Link className="marketing-footer__primary-link" href={signUpHref}>

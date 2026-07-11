@@ -294,6 +294,16 @@ export async function completeXeroTenantSelection(input: {
   }
 
   const payrollRegion = payrollRegionResult.value.payrollRegion;
+  if (payrollRegion !== "AU") {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_country",
+        message:
+          "Team Calendar currently supports Australian Xero Payroll files only.",
+      },
+    };
+  }
   const organisation = await resolveOrganisationForTenantSelection({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId ?? session.organisation_id,

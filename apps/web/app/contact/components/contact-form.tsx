@@ -27,7 +27,7 @@ const contactCopy = {
     {
       title: "Xero expertise",
       description:
-        "Our team understands Xero Payroll AU, NZ, and UK. We can help with region-specific leave configurations.",
+        "Our team understands Xero Payroll Australia. We can help with region-specific leave configurations.",
     },
     {
       title: "Dedicated support",

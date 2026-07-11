@@ -128,6 +128,16 @@ export async function updateOrganisationAction(input: {
     }
 
     if (
+      parsed.data.countryCode !== undefined &&
+      parsed.data.countryCode !== "AU" &&
+      parsed.data.countryCode !== organisation.country_code
+    ) {
+      return validationError(
+        "Team Calendar currently supports Australian Xero Payroll files only."
+      );
+    }
+
+    if (
       parsed.data.countryCode &&
       parsed.data.countryCode !== organisation.country_code &&
       !parsed.data.confirmationCountryChange

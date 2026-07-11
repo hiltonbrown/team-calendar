@@ -219,11 +219,16 @@ export const GeneralClient = ({
                   key={option.value}
                 >
                   <RadioGroupItem
+                    disabled={
+                      option.value !== "AU" &&
+                      option.value !== organisation.countryCode
+                    }
                     id={`country-${option.value}`}
                     value={option.value}
                   />
                   <Label htmlFor={`country-${option.value}`}>
                     {option.label}
+                    {option.value === "AU" ? "" : " (planned)"}
                   </Label>
                 </div>
               ))}
