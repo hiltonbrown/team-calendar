@@ -168,7 +168,16 @@ these down. If they differ from the expectations above, STOP and report.
 Wrap the single GET in a page loop: request `?page=1`, accumulate mapped records,
 request `?page=2`, and so on until a page returns fewer than the page size (or
 empty). Return `{ leaveRecords: <all pages>, rawResponse: <last or first page>, complete: true }`
-on a clean finish. Set `complete: false` only if you deliberately cap the loop
+on a clean finish.
+
+Before deciding what `rawResponse` should carry, check its consumers
+(`grep -rn "rawResponse" packages/xero packages/jobs`). The per-record audit
+payload stored in `source_payload_json` comes from the mapper's per-record
+`rawPayload` (`sync-xero-leave-records.ts:578`), so each record's raw data must
+be sourced from the page it appeared on — the mappers already do this per page,
+so accumulating mapped records preserves it. If `rawResponse` itself turns out to
+have a consumer that needs the full fetch, return an array of page payloads
+instead and adjust that consumer; if it is unconsumed, the first page is fine. Set `complete: false` only if you deliberately cap the loop
 (e.g. a safety max-pages guard) or a mid-loop page errors after at least one
 successful page — in that case return what you have with `complete: false` rather
 than failing the whole fetch, OR return the error `Result`; pick one and be

@@ -66,7 +66,7 @@ export async function withdrawSubmission(input, externalWritePort) {
 ```
 
 - `loadAndAuthorise` supports two modes: `"owner_only"` and `"manager_allowed"`
-  (`submit-service.ts:564`). Admin-withdraw-any needs an admin/owner branch —
+  (`submit-service.ts:562`). Admin-withdraw-any needs an admin/owner branch —
   check whether `"manager_allowed"` already permits admin/owner or whether a new
   mode/branch is required.
 - The Xero withdraw write is `withdrawLeaveApplication` on the external write
@@ -161,8 +161,10 @@ one; add an admin/owner branch if the existing modes do not cover it.
 
 On Xero write failure, keep the existing `persistXeroFailure({ failedAction:
 "withdraw" })` path. On success, keep the `withdrawn` transition + audit event
-inside the transaction and (consistent with plan 032) treat notification dispatch
-as best-effort. Add an audit action distinguishing an admin-initiated withdrawal
+inside the transaction. Plan 032 moves withdraw's notification dispatch out of
+the state transaction (best-effort, post-commit); if 032 has landed, preserve
+that shape, and if it has not, apply the same best-effort pattern here rather
+than reintroducing a notify call inside the transaction. Add an audit action distinguishing an admin-initiated withdrawal
 of another person's leave from a self-withdrawal if the audit taxonomy supports it.
 
 **Verify**: `bun run typecheck` → exit 0.
@@ -219,7 +221,7 @@ Stop and report back (do not improvise) if:
 - Reviewer must scrutinise the authorisation matrix (owner vs admin-any) and the
   Xero reversal path for approved leave specifically — approving then withdrawing
   touches payroll and must reconcile with `reconcile-xero-approval-state`.
-- If plan 032 has landed, keep withdraw's notification dispatch best-effort
-  (outside the state transaction) for consistency.
+- Plan 032 covers withdraw's notification transaction boundary; keep dispatch
+  best-effort (outside the state transaction) either way.
 - The S-10 withdraw modal is the intended UI surface; a follow-up should wire the
   approved-withdraw affordance into it with clear confirmation copy.

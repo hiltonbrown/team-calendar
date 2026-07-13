@@ -91,9 +91,11 @@ export const resend = RESEND_TOKEN ? new Resend(RESEND_TOKEN) : undefined; // un
 ```
 
   `@react-email/render` (v2) is a dependency of `packages/email`. The sender
-  address env var is `RESEND_FROM` (per CLAUDE.md env table). Confirm how
-  `packages/email/keys.ts` exposes `RESEND_FROM`:
-  `grep -n "RESEND_FROM\|RESEND_TOKEN" packages/email/keys.ts`.
+  address env var is `RESEND_FROM` (per CLAUDE.md env table), and
+  `packages/email/keys.ts` exposes it as **optional**
+  (`RESEND_FROM: z.string().email().optional()`, keys.ts:7), same as
+  `RESEND_TOKEN`. The send helper must therefore no-op with a clear error when
+  **either** the token or the sender address is unset — never throw.
 
 - Inngest function pattern (event-triggered example — you will use a **cron**
   trigger instead):
@@ -183,8 +185,10 @@ export async function sendNotificationEmail(input: {
   to: string; title: string; body: string;
   actionUrl: string | null; unsubscribeUrl: string; idempotencyKey: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!resend) return { ok: false, error: "Resend is not configured" };
-  const from = keys().RESEND_FROM; // confirm the exact accessor name
+  const from = keys().RESEND_FROM; // optional in keys.ts — must be guarded
+  if (!(resend && from)) {
+    return { ok: false, error: "Resend transport is not configured" };
+  }
   const html = await render(NotificationEmailTemplate({
     actionUrl: input.actionUrl, body: input.body, title: input.title, unsubscribeUrl: input.unsubscribeUrl,
   }));
@@ -246,6 +250,13 @@ root (`packages/notifications/index.ts`) — add the export if missing. Register
 `sendNotificationEmailsFunction` in `packages/jobs/src/functions.ts` (import +
 add to the `functions` array).
 
+Overlapping runs: a slow batch can still be in flight when the next cron fires,
+and two runs would select the same `queued` rows. The Resend idempotency key
+(row id) is the primary double-send guard; additionally set the Inngest
+function's concurrency limit to 1 (confirm the exact option shape for inngest
+`^4.12.1` via Context7 alongside the cron trigger) so runs cannot overlap at
+all.
+
 **Verify**: `bun run typecheck` → exit 0.
 
 ### Step 4: Tests
@@ -288,8 +299,9 @@ Stop and report back (do not improvise) if:
 
 - The Inngest cron trigger shape differs from `triggers: { cron: "..." }` for
   this version (report the correct shape).
-- `packages/email/keys.ts` does not expose `RESEND_FROM` (report; the sender
-  address is required to send).
+- `packages/email/keys.ts` no longer exposes `RESEND_FROM` at all (report; the
+  sender address is required to send). Note it being optional is expected — the
+  helper guards it.
 - The Resend send API does not accept an idempotency key in this SDK version
   (report; propose an alternative dedupe before proceeding).
 - Any excerpt in "Current state" does not match live code (drift).
@@ -297,7 +309,10 @@ Stop and report back (do not improvise) if:
 ## Maintenance notes
 
 - Reviewer: confirm the worker never sends when `resend` is undefined (no token
-  configured) — it must no-op cleanly in that environment, not throw.
+  configured) or `RESEND_FROM` is unset — it must no-op cleanly in those
+  environments, not throw. Decide whether unconfigured-transport runs should
+  leave rows `queued` (recommended, so they send once configured) rather than
+  burning `attempts` toward `failed`.
 - Cron cadence (`*/2`) is a starting point; tune against Resend rate limits and
   desired latency. The `[status, queued_at]` index keeps the drain query cheap.
 - Deferred: a cleanup/retention job for old `sent`/`failed` rows, and surfacing

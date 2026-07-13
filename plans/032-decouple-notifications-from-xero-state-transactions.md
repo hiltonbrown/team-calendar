@@ -23,13 +23,13 @@
 
 ## Why this matters
 
-For submit and approve/decline, the Xero write happens **before** a local Prisma
-transaction persists the state change, and notification dispatch happens
-**inside** that transaction and **throws on failure**. So when a notification
-insert fails (or any optimistic conflict occurs), the whole transaction rolls
-back — discarding a state change that Xero has already accepted. Two concrete
-divergences result, both leaving Xero (the payroll source of truth) ahead of
-Team Calendar with no write-path reconciliation:
+For submit, withdraw, and approve/decline, the Xero write happens **before** a
+local Prisma transaction persists the state change, and notification dispatch
+happens **inside** that transaction and **throws on failure**. So when a
+notification insert fails (or any optimistic conflict occurs), the whole
+transaction rolls back — discarding a state change that Xero has already
+accepted. Three concrete divergences result, all leaving Xero (the payroll
+source of truth) ahead of Team Calendar with no write-path reconciliation:
 
 1. **Submit**: the leave application exists in Xero, but `source_remote_id` and
    the `submitted` transition are rolled back. The user retries and a **second**
@@ -38,6 +38,9 @@ Team Calendar with no write-path reconciliation:
    local record back to `submitted`. The manager re-approves and Xero returns a
    conflict; the record lands in `xero_sync_failed` for a write that in fact
    succeeded.
+3. **Withdraw**: Xero has withdrawn the leave application, but the local record
+   rolls back to `submitted`, so Team Calendar shows pending leave that no
+   longer exists in Xero; a retry withdraws an already-withdrawn application.
 
 The fix: notifications are best-effort side effects and must not be able to roll
 back a persisted, Xero-confirmed state change. Move them out of the
@@ -83,8 +86,19 @@ await database.$transaction(async (tx) => {
 // materialiseApprovalPublication(parsed.data);  // already OUTSIDE the txn — the pattern to follow
 ```
 
+- **Withdraw** — same shape in the same file as submit: after the Xero
+  `withdrawLeaveApplication` write succeeds, the transaction persists the
+  `withdrawn` transition and calls `notifyManager(tx, ...)` inside it
+  (`submit-service.ts:232`, `"leave_withdrawn"`).
+
 - `notifyUser` throws `NotificationCreateError` on failure
   (`approval-service.ts:1402`), which propagates out of the transaction.
+
+- **Deliberately untouched**: `requestMoreInfo`
+  (`approval-service.ts:503-530`) also calls `notifyUser` inside a transaction,
+  but there is **no Xero write** in that flow — a rollback loses only the
+  notification and its audit event, with no payroll divergence. Leave it alone;
+  it is excluded from this plan's done-criteria grep.
 
 - The existing best-effort pattern to imitate: `materialiseApprovalPublication`
   is called after the transaction commits and its failure does not roll the
@@ -109,7 +123,7 @@ await database.$transaction(async (tx) => {
 
 **In scope**:
 - `packages/availability/src/plans/submit-service.ts` — move `notifyManager` out
-  of the submit transaction.
+  of the submit **and withdraw** transactions.
 - `packages/availability/src/approvals/approval-service.ts` — move `notifyUser` /
   `notifyManagersIfEnabled` out of the approve and decline transactions.
 - Tests in the two co-located files.
@@ -121,7 +135,10 @@ await database.$transaction(async (tx) => {
 - The `OptimisticConflictError` mapping to `invalid_state_*` (keep it; see
   Maintenance notes for the deferred refinement).
 - `materialiseApprovalPublication` — already correctly outside the transaction.
-- The withdraw path (separate; plan 036 touches it).
+- `requestMoreInfo` — notification inside a transaction but with no Xero write;
+  no divergence risk (see Current state).
+- Widening the withdraw guard/authorisation (plan 036's concern; this plan only
+  fixes withdraw's transaction boundary).
 
 ## Git workflow
 
@@ -152,18 +169,20 @@ Repeat the identical change for `performDecline`.
 
 **Verify**: `bun run typecheck` → exit 0.
 
-### Step 2: Move notification dispatch out of the submit transaction
+### Step 2: Move notification dispatch out of the submit and withdraw transactions
 
-Same treatment in `submit-service.ts`: the transaction keeps the `updateMany`
-(persisting `source_remote_id` + `submitted` + the conflict guard) and the audit
-event; `notifyManager` moves to a best-effort post-commit call using the
-`database` client, logged-and-swallowed on failure.
+Same treatment in `submit-service.ts`, in both places: the transaction keeps the
+`updateMany` (persisting `source_remote_id` + `submitted` for submit, the
+`withdrawn` transition for withdraw, each with its conflict guard) and the audit
+event; the `notifyManager` calls (`:352` submit, `:232` withdraw) move to
+best-effort post-commit calls using the `database` client, logged-and-swallowed
+on failure.
 
 **Verify**: `bun run typecheck` → exit 0.
 
 ### Step 3: Tests
 
-For each of submit / approve / decline, add a test proving:
+For each of submit / withdraw / approve / decline, add a test proving:
 1. When notification dispatch fails, the state transition (and `source_remote_id`
    for submit) is **still persisted** and the operation returns `ok: true` (the
    regression this plan fixes).
@@ -179,8 +198,8 @@ port and a DB mock; the approval suite already asserts query counts).
 
 ## Test plan
 
-- New cases in Step 3 (notification-failure-does-not-revert for submit/approve/
-  decline; happy path; conflict still reverts).
+- New cases in Step 3 (notification-failure-does-not-revert for submit/withdraw/
+  approve/decline; happy path; conflict still reverts).
 - Structural pattern: existing submit/approve tests with injected write port + DB
   mock.
 - Verification: the vitest command in Step 3 → all pass; `bun run check`.
@@ -189,11 +208,11 @@ port and a DB mock; the approval suite already asserts query counts).
 
 ALL must hold:
 
-- [ ] Notification dispatch for submit, approve, and decline runs **after** the state-transition transaction commits, best-effort (logged, swallowed)
+- [ ] Notification dispatch for submit, withdraw, approve, and decline runs **after** the state-transition transaction commits, best-effort (logged, swallowed)
 - [ ] Audit events remain inside the transaction
-- [ ] `grep -n "notifyUser\|notifyManager\|notifyManagersIfEnabled" packages/availability/src/approvals/approval-service.ts packages/availability/src/plans/submit-service.ts` shows no notify call receiving a `tx` transaction client inside the state-transition `$transaction`
+- [ ] `grep -n "notifyUser\|notifyManager\|notifyManagersIfEnabled" packages/availability/src/approvals/approval-service.ts packages/availability/src/plans/submit-service.ts` shows no notify call receiving a `tx` transaction client inside a state-transition `$transaction` (the only permitted `tx` notify call left is `requestMoreInfo`'s, which has no Xero write)
 - [ ] `bun run typecheck` exits 0
-- [ ] Tests prove a notification failure does not revert the transition (submit + approve + decline)
+- [ ] Tests prove a notification failure does not revert the transition (submit + withdraw + approve + decline)
 - [ ] `bunx vitest run` (the two suites) passes
 - [ ] `bun run check` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)

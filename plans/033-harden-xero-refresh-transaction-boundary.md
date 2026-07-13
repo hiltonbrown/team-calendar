@@ -132,14 +132,29 @@ Proceed with the default unless told otherwise.
 
 ### Step 1: Add a compare-and-set guard to the token persist
 
-Change the rotated-token `update` in `refreshXeroOAuthConnectionWithClient` so it
+Change the rotated-token persist in `refreshXeroOAuthConnectionWithClient` so it
 only writes when the stored refresh token still equals the one that was
 exchanged. Capture the ciphertext read at the top (`connection.refresh_token_encrypted`)
-as `expectedRefreshEncrypted`, and add it to the `where` of the persist `update`
-(extended `where` on the unique row): `where: { id, refresh_token_encrypted: expectedRefreshEncrypted }`.
-If the update affects 0 rows, a concurrent winner already rotated the token —
-return a distinct non-fatal result (do **not** mark stale; the connection is
-fine, another refresh won) so callers retry cleanly.
+as `expectedRefreshEncrypted` and add it to the persist's `where`. Use
+`updateMany` for the CAS, not `update`: Prisma's `update` **throws P2025** when
+the extended `where` matches no row, whereas `updateMany` returns a count you
+can branch on — which also matches the repo's existing optimistic-guard pattern
+(`update.count !== 1` in the availability services):
+
+```ts
+const persisted = await client.xeroConnection.updateMany({
+  where: { id: connectionId, refresh_token_encrypted: expectedRefreshEncrypted },
+  data: { /* rotated token fields, status: "active", ... */ },
+});
+if (persisted.count === 0) {
+  // A concurrent winner already rotated the token. The connection is fine —
+  // do NOT mark stale; return a distinct non-fatal result so callers retry cleanly.
+}
+```
+
+Note the advisory lock should make a concurrent rotation impossible; the CAS is
+a second line of defence, so the 0-count branch existing and being non-fatal is
+the point, not an expected hot path.
 
 **Verify**: `bun run typecheck` → exit 0.
 

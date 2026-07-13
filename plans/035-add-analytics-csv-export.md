@@ -116,7 +116,8 @@ Add a low-emphasis top-right "Export CSV" control on the leave-reports screen
 (icon + label, per the catalogue). On click it must fetch the CSV for the current
 filters and trigger a browser download (`Content-Type: text/csv`,
 `Content-Disposition: attachment; filename="leave-report-<range>.csv"`). Implement
-via whichever pattern the codebase already uses for downloads (Step 0 grep); if
+via whichever pattern the codebase already uses for downloads (run the
+`text/csv`/`Content-Disposition` grep from "Current state" first); if
 none exists, a server action returning the CSV string that the client turns into a
 Blob download is acceptable. Reuse the page's existing role gate — the export
 endpoint/action must re-check the caller's role and org scope server-side (do not
