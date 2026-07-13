@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const ids = {
   clerkOrg: "org_1",
   manager: "00000000-0000-4000-8000-000000000010",
+  indirect: "00000000-0000-4000-8000-000000000013",
   org: "00000000-0000-4000-8000-000000000001",
   otherOrg: "00000000-0000-4000-8000-000000000002",
   person: "00000000-0000-4000-8000-000000000011",
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   listForOrganisation: vi.fn(),
   organisationFindFirst: vi.fn(),
   personFindMany: vi.fn(),
+  getSettings: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, organisationId: string) => ({
     clerk_org_id: clerkOrgId,
     organisation_id: organisationId,
@@ -38,6 +40,9 @@ vi.mock("@repo/database", () => ({
 vi.mock("../holidays/holiday-service", () => ({
   listForOrganisation: mocks.listForOrganisation,
 }));
+vi.mock("../settings/organisation-settings-service", () => ({
+  getSettings: mocks.getSettings,
+}));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
 }));
@@ -47,6 +52,7 @@ const { getCalendarRange, getEventDetail } = await import("./calendar-service");
 const people = [
   person(ids.manager, "Morgan", "Manager", null),
   person(ids.person, "Ari", "Report", ids.manager),
+  person(ids.indirect, "Indy", "Indirect", ids.person),
   person(ids.peer, "Pia", "Peer", null),
 ];
 
@@ -85,6 +91,13 @@ describe("calendar-service", () => {
       )
     );
     mocks.availabilityFindFirst.mockResolvedValue(record("detail", ids.person));
+    mocks.getSettings.mockResolvedValue({
+      ok: true,
+      value: {
+        managerVisibilityScope: "direct_reports_only",
+        showPendingOnCalendar: true,
+      },
+    });
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
     mocks.listForOrganisation.mockResolvedValue({
       ok: true,
@@ -222,7 +235,55 @@ describe("calendar-service", () => {
     }
     expect(result.error.code).toBe("cross_org_leak");
   });
+
+  it("denies indirect-report detail under direct-only manager visibility", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(
+      record("indirect-detail", ids.indirect)
+    );
+
+    const result = await getEventDetail(detailInput());
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.error.code).toBe("not_authorised");
+  });
+
+  it("allows indirect-report detail under all-team manager visibility", async () => {
+    mocks.getSettings.mockResolvedValue({
+      ok: true,
+      value: {
+        managerVisibilityScope: "all_team_leave",
+        showPendingOnCalendar: true,
+      },
+    });
+    mocks.availabilityFindFirst.mockResolvedValue(
+      record("indirect-detail", ids.indirect)
+    );
+
+    const result = await getEventDetail(detailInput());
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("allows direct-report detail under direct-only manager visibility", async () => {
+    const result = await getEventDetail(detailInput());
+
+    expect(result.ok).toBe(true);
+  });
 });
+
+function detailInput() {
+  return {
+    actingPersonId: ids.manager,
+    actingUserId: "user_1",
+    clerkOrgId: ids.clerkOrg,
+    organisationId: ids.org,
+    recordId: "00000000-0000-4000-8000-000000000099",
+    role: "manager",
+  } as const;
+}
 
 function person(
   id: string,

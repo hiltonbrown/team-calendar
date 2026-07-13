@@ -231,6 +231,11 @@ const baseInput = {
   workingLocation: "Brisbane",
 } as const;
 
+const adminActor = {
+  orgRole: "org:admin",
+  userId: "user_test",
+} as const;
+
 function addPerson(id: string) {
   mocks.people.push({
     display_name: null,
@@ -253,12 +258,12 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     const duplicate = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(first.ok).toBe(true);
@@ -282,7 +287,7 @@ describe("createManualAvailability duplicate guard", () => {
     const result = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(result.ok).toBe(true);
@@ -297,17 +302,17 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     const differentPerson = await createManualAvailability(
       baseTenant,
       { ...baseInput, personId: otherPersonId },
-      "user_test"
+      adminActor
     );
     const differentType = await createManualAvailability(
       baseTenant,
       { ...baseInput, recordType: "training" },
-      "user_test"
+      adminActor
     );
     const differentWindow = await createManualAvailability(
       baseTenant,
@@ -316,7 +321,7 @@ describe("createManualAvailability duplicate guard", () => {
         endsAt: new Date("2026-05-13T00:00:00.000Z"),
         startsAt: new Date("2026-05-11T00:00:00.000Z"),
       },
-      "user_test"
+      adminActor
     );
 
     expect(first.ok).toBe(true);
@@ -330,12 +335,12 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     const scopedDuplicate = await createManualAvailability(
       otherTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(first.ok).toBe(true);
@@ -357,7 +362,7 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     expect(first.ok).toBe(true);
 
@@ -371,7 +376,7 @@ describe("createManualAvailability duplicate guard", () => {
     const recreated = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(recreated.ok).toBe(true);
@@ -387,7 +392,7 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     const second = await createManualAvailability(
       baseTenant,
@@ -396,7 +401,7 @@ describe("createManualAvailability duplicate guard", () => {
         endsAt: new Date("2026-05-22T00:00:00.000Z"),
         startsAt: new Date("2026-05-20T00:00:00.000Z"),
       },
-      "user_test"
+      adminActor
     );
     expect(first.ok).toBe(true);
     if (!second.ok) {
@@ -407,7 +412,7 @@ describe("createManualAvailability duplicate guard", () => {
       baseTenant,
       second.value.id,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(result).toMatchObject({
@@ -425,7 +430,7 @@ describe("createManualAvailability duplicate guard", () => {
     const created = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     if (!created.ok) {
       throw new Error("Expected the record to be created");
@@ -439,7 +444,7 @@ describe("createManualAvailability duplicate guard", () => {
         endsAt: new Date("2026-05-13T00:00:00.000Z"),
         startsAt: new Date("2026-05-11T00:00:00.000Z"),
       },
-      "user_test"
+      adminActor
     );
 
     expect(result.ok).toBe(true);
@@ -451,7 +456,7 @@ describe("createManualAvailability duplicate guard", () => {
     const first = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
     const second = await createManualAvailability(
       baseTenant,
@@ -460,7 +465,7 @@ describe("createManualAvailability duplicate guard", () => {
         endsAt: new Date("2026-05-22T00:00:00.000Z"),
         startsAt: new Date("2026-05-20T00:00:00.000Z"),
       },
-      "user_test"
+      adminActor
     );
     expect(first.ok).toBe(true);
     if (!second.ok) {
@@ -478,7 +483,7 @@ describe("createManualAvailability duplicate guard", () => {
       baseTenant,
       second.value.id,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(result.ok).toBe(true);
@@ -496,7 +501,7 @@ describe("createManualAvailability duplicate guard", () => {
     const result = await createManualAvailability(
       baseTenant,
       baseInput,
-      "user_test"
+      adminActor
     );
 
     expect(result).toMatchObject({

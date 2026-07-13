@@ -94,6 +94,15 @@ const CreateFeedSchema = z.object({
   scopes: FeedScopesSchema,
 });
 
+const DefaultCalendarFeedSchema = z.object({
+  actingUserId: z.string().min(1).optional().nullable(),
+  clerkOrgId: z.string().min(1),
+  includesPublicHolidays: z.boolean().default(false),
+  name: z.string().trim().min(1).max(120).default("All staff"),
+  organisationId: z.string().uuid(),
+  privacyMode: PrivacyModeSchema.default("named"),
+});
+
 const UpdateFeedSchema = z.object({
   actingRole: RoleSchema,
   actingUserId: z.string().min(1),
@@ -261,6 +270,122 @@ export async function createFeed(
       return { ok: false, error: error.serviceError };
     }
     return unknownError("Failed to create feed.");
+  }
+}
+
+export async function ensureDefaultCalendarFeed(
+  input: unknown
+): Promise<
+  Result<
+    { created: boolean; feedId: string; token?: TokenDisclosure },
+    FeedServiceError
+  >
+> {
+  const parsed = DefaultCalendarFeedSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+
+  const existing = await database.feed.findFirst({
+    orderBy: { created_at: "asc" },
+    select: { id: true },
+    where: {
+      clerk_org_id: parsed.data.clerkOrgId,
+      organisation_id: parsed.data.organisationId,
+    },
+  });
+  if (existing) {
+    return {
+      ok: true,
+      value: { created: false, feedId: existing.id },
+    };
+  }
+
+  const entitlement = await withinLimit(
+    parsed.data.clerkOrgId,
+    parsed.data.organisationId,
+    "feeds"
+  );
+  if (!entitlement.ok) {
+    return {
+      ok: false,
+      error: { code: "unknown_error", message: entitlement.error.message },
+    };
+  }
+  if (!entitlement.value.allowed) {
+    return {
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+    };
+  }
+
+  const actingUserId =
+    parsed.data.actingUserId ?? "system:default-calendar-feed";
+  try {
+    const result = await database.$transaction(async (tx) => {
+      const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
+      const feed = await tx.feed.create({
+        data: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          created_by_user_id: parsed.data.actingUserId ?? null,
+          includes_public_holidays: parsed.data.includesPublicHolidays,
+          name: parsed.data.name,
+          organisation_id: parsed.data.organisationId,
+          privacy_mode: parsed.data.privacyMode,
+          slug,
+          status: "active",
+          scopes: {
+            create: createScopeRows({
+              clerkOrgId: parsed.data.clerkOrgId,
+              organisationId: parsed.data.organisationId,
+              scopes: [{ scopeType: "org", scopeValue: null }],
+            }),
+          },
+        },
+        select: { id: true },
+      });
+
+      const token = await createInitialTokenWithClient(tx, {
+        actingUserId,
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: feed.id,
+        organisationId: parsed.data.organisationId,
+      });
+      if (!token.ok) {
+        throw new RollbackError(mapTokenError(token.error));
+      }
+
+      await auditFeed(
+        tx,
+        {
+          actingUserId,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        },
+        "feeds.created",
+        feed.id,
+        {
+          defaultFeed: true,
+          feedId: feed.id,
+          name: parsed.data.name,
+          privacyMode: parsed.data.privacyMode,
+          scopeCount: 1,
+        }
+      );
+
+      return { created: true, feedId: feed.id, token: token.value };
+    });
+
+    await invalidateFeedCache({ feedId: result.feedId });
+    return { ok: true, value: result };
+  } catch (error) {
+    if (error instanceof RollbackError) {
+      return { ok: false, error: error.serviceError };
+    }
+    return unknownError("Failed to create default feed.");
   }
 }
 
@@ -746,7 +871,6 @@ async function makeUniqueSlug(
     await tx.feed.findFirst({
       where: {
         clerk_org_id: input.clerkOrgId,
-        organisation_id: input.organisationId,
         slug,
       },
       select: { id: true },

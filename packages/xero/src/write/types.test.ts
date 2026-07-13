@@ -27,6 +27,10 @@ const cases: [XeroWriteError["code"], string][] = [
     "Xero rejected this request. Check the dates and leave type and try again.",
   ],
   [
+    "region_not_supported_error",
+    "Sending leave to Xero is not yet available for this payroll region. Manage this leave directly in Xero for now.",
+  ],
+  [
     "unknown_error",
     "Something went wrong when sending this to Xero. Try again or contact support if the issue continues.",
   ],

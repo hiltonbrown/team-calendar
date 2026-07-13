@@ -22,13 +22,13 @@
     "@t3-oss/env-nextjs": "^0.13.11",
     "pg": "^8.13.1",
     "server-only": "^0.0.1",
-    "undici": "^8.3.0",
-    "ws": "^8.20.1",
+    "undici": "^8.7.0",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "25.9.1",
+    "@types/node": "26.1.1",
     "@types/pg": "^8.11.10",
     "@types/ws": "^8.18.1",
     "bufferutil": "^4.1.0",

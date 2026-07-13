@@ -20,6 +20,14 @@
 ## Status
 
 - **Priority**: P1
+- **Execution status**: DONE (executed and independently reviewed 2026-07-12 at
+  `9c17067`, immediately after plan 018 commit `11cd418`). The first isolated attempt
+  stopped after a fresh `bun install --frozen-lockfile` produced incomplete
+  dependency contents. Copying the main worktree's verified root and workspace
+  dependency trees resolved the environmental failure; a forced, uncached
+  typecheck then passed with 18/18 tasks successful. The partial Steps 1 and 2
+  edits were completed and committed in `/tmp/teamcalendar-plan-019` on branch
+  `improve/019-xero-token-refresh`.
 - **Effort**: M
 - **Risk**: MED
 - **Depends on**: none functionally, but plans 016 and 018 modify `service.ts`
@@ -235,6 +243,35 @@ if (!result.ok) {
 | Lint | `bun run check` | exit 0 |
 | Targeted test | `bunx vitest run packages/xero/src/oauth/service.test.ts` | all pass |
 | Full tests | `bun run test` | exit 0 |
+
+### Isolated worktree bootstrap
+
+This repository's main verified dependency installation is at
+`/home/hilton/Documents/teamcalendar`. The 2026-07-12 isolated
+`bun install --frozen-lockfile` attempt produced incomplete package contents
+even though Bun exited successfully. Restore both the root dependency store and
+the workspace package symlink trees from the verified main installation before
+running verification:
+
+```bash
+mkdir -p node_modules
+cp -a --reflink=auto /home/hilton/Documents/teamcalendar/node_modules/. node_modules/
+for path in /home/hilton/Documents/teamcalendar/apps/*/node_modules /home/hilton/Documents/teamcalendar/packages/*/node_modules; do
+  rel=${path#/home/hilton/Documents/teamcalendar/}
+  mkdir -p "$(dirname "$rel")"
+  cp -a "$path" "$(dirname "$rel")/"
+done
+bunx turbo typecheck --force
+```
+
+Expected result: 18/18 Turbo typecheck tasks pass with zero cached tasks. Do not
+run `turbo clean`: the repository's clean task deletes the copied dependency
+trees. This bootstrap changes only
+ignored dependency state inside the disposable worktree, so `git status`
+remains limited to in-scope source changes. It does not change source, the
+lockfile, or package manifests. If the verified installation is absent or the
+forced typecheck fails, stop and report instead of installing or changing
+dependencies as part of this plan.
 
 ## Suggested executor toolkit
 

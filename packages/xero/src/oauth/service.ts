@@ -1,9 +1,11 @@
 import "server-only";
 
-import { createHmac, timingSafeEqual } from "node:crypto";
-import type { Result } from "@repo/core";
+import { createHmac, hkdfSync, timingSafeEqual } from "node:crypto";
+import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
+import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
+import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
@@ -37,6 +39,7 @@ interface TokenResponse {
 }
 
 interface ConnectionResponse {
+  connectionId: string;
   tenantId: string;
   tenantName: string;
 }
@@ -56,6 +59,7 @@ export interface PendingXeroSessionOrganisation {
 }
 
 export interface PendingXeroSessionTenant {
+  connectionId: string;
   tenantId: string;
   tenantName: string;
 }
@@ -68,6 +72,7 @@ export type XeroOAuthError =
   | { code: "invalid_state"; message: string }
   | { code: "oauth_not_configured"; message: string }
   | { code: "organisation_not_found"; message: string }
+  | { code: "refresh_token_invalid"; message: string }
   | { code: "session_not_found"; message: string }
   | { code: "tenant_not_found"; message: string }
   | { code: "unknown_error"; message: string };
@@ -148,6 +153,7 @@ export async function completeXeroOAuth(input: {
       access_token_iv: encryptedAccessToken.iv,
       available_tenants_json: {
         tenants: connections.value.map((tenant) => ({
+          connectionId: tenant.connectionId,
           tenantId: tenant.tenantId,
           tenantName: tenant.tenantName,
         })),
@@ -292,6 +298,16 @@ export async function completeXeroTenantSelection(input: {
   }
 
   const payrollRegion = payrollRegionResult.value.payrollRegion;
+  if (payrollRegion !== "AU") {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_country",
+        message:
+          "Team Calendar currently supports Australian Xero Payroll files only.",
+      },
+    };
+  }
   const organisation = await resolveOrganisationForTenantSelection({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId ?? session.organisation_id,
@@ -330,6 +346,7 @@ export async function completeXeroTenantSelection(input: {
         status: "active",
         token_encrypted_at: encryptedAccessToken.encryptedAt,
         token_key_version: encryptedAccessToken.keyVersion,
+        xero_authorisation_connection_id: selectedTenant.connectionId,
       },
       update: {
         access_token_auth_tag: encryptedAccessToken.authTag,
@@ -351,6 +368,7 @@ export async function completeXeroTenantSelection(input: {
         status: "active",
         token_encrypted_at: encryptedAccessToken.encryptedAt,
         token_key_version: encryptedAccessToken.keyVersion,
+        xero_authorisation_connection_id: selectedTenant.connectionId,
       },
       select: { id: true },
     });
@@ -403,15 +421,34 @@ export async function refreshXeroOAuthConnection(input: {
   connectionId: string;
   organisationId: string;
 }): Promise<Result<{ refreshedAt: Date }, XeroOAuthError>> {
-  const refreshed = await refreshXeroOAuthConnectionWithClient(database, input);
-  if (!refreshed.ok) {
-    return refreshed;
+  try {
+    return await database.$transaction(
+      async (tx) => {
+        // Same lock key as ensureFreshXeroConnection so a manual refresh cannot
+        // race a scheduled refresh and consume each other's single-use tokens.
+        await tx.$queryRaw`
+          SELECT pg_advisory_xact_lock(hashtextextended(${input.connectionId}, 0))
+        `;
+        const refreshed = await refreshXeroOAuthConnectionWithClient(tx, input);
+        if (!refreshed.ok) {
+          return refreshed;
+        }
+        return {
+          ok: true,
+          value: { refreshedAt: refreshed.value.refreshedAt },
+        };
+      },
+      { timeout: 15_000 }
+    );
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to refresh the Xero connection.",
+      },
+    };
   }
-
-  return {
-    ok: true,
-    value: { refreshedAt: refreshed.value.refreshedAt },
-  };
 }
 
 async function refreshXeroOAuthConnectionWithClient(
@@ -458,6 +495,17 @@ async function refreshXeroOAuthConnectionWithClient(
     }),
   });
   if (!token.ok) {
+    if (token.error.code === "refresh_token_invalid") {
+      await client.xeroConnection.update({
+        where: { id: input.connectionId },
+        data: {
+          last_error_code: "refresh_token_invalid",
+          last_error_message: token.error.message,
+          stale_since: new Date(),
+          status: "stale",
+        },
+      });
+    }
     return token;
   }
 
@@ -686,7 +734,9 @@ export async function disconnectXeroOAuthConnection(input: {
   destructive: boolean;
   organisationId: string;
   performedByUserId?: null | string;
-}): Promise<Result<{ disconnected: true }, XeroOAuthError>> {
+}): Promise<
+  Result<{ disconnected: true; remoteRevoked: boolean }, XeroOAuthError>
+> {
   const connection = await database.xeroConnection.findFirst({
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -694,7 +744,11 @@ export async function disconnectXeroOAuthConnection(input: {
       organisation_id: input.organisationId,
     },
     select: {
+      access_token_auth_tag: true,
+      access_token_encrypted: true,
+      access_token_iv: true,
       id: true,
+      xero_authorisation_connection_id: true,
       xero_tenant: { select: { id: true } },
     },
   });
@@ -706,6 +760,29 @@ export async function disconnectXeroOAuthConnection(input: {
         message: "Xero connection not found.",
       },
     };
+  }
+
+  let remoteRevoked = false;
+  if (
+    connection.xero_authorisation_connection_id &&
+    connection.access_token_encrypted.length > 0 &&
+    connection.access_token_iv &&
+    connection.access_token_auth_tag
+  ) {
+    const accessToken = decryptXeroToken({
+      authTag: connection.access_token_auth_tag,
+      encrypted: connection.access_token_encrypted,
+      iv: connection.access_token_iv,
+    });
+    remoteRevoked = await revokeXeroConnectionAtSource({
+      accessToken,
+      orgKey: orgRateLimitKey({
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+      }),
+      xeroAuthorisationConnectionId:
+        connection.xero_authorisation_connection_id,
+    });
   }
 
   const now = new Date();
@@ -788,7 +865,27 @@ export async function disconnectXeroOAuthConnection(input: {
     }
   });
 
-  return { ok: true, value: { disconnected: true } };
+  return { ok: true, value: { disconnected: true, remoteRevoked } };
+}
+
+async function revokeXeroConnectionAtSource(input: {
+  accessToken: string;
+  orgKey: string;
+  xeroAuthorisationConnectionId: string;
+}): Promise<boolean> {
+  try {
+    const response = await xeroFetch({
+      init: {
+        headers: { Authorization: `Bearer ${input.accessToken}` },
+        method: "DELETE",
+      },
+      orgKey: input.orgKey,
+      url: `${XERO_CONNECTIONS_URL}/${input.xeroAuthorisationConnectionId}`,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function markXeroConnectionStale(input: {
@@ -844,6 +941,24 @@ async function resolveOrganisationForTenantSelection(input: {
         working_hours_per_day: defaults.workingHoursPerDay,
       },
       select: { id: true },
+    });
+    const defaultFeed = await ensureDefaultCalendarFeed({
+      clerkOrgId: input.clerkOrgId,
+      organisationId: organisation.id,
+    });
+    if (!defaultFeed.ok) {
+      return {
+        ok: false,
+        error: {
+          code: "unknown_error",
+          message: defaultFeed.error.message,
+        },
+      };
+    }
+    // Provision default public holidays; ignore errors (non-blocking)
+    await ensureDefaultPublicHolidaysForOrganisation({
+      clerkOrgId: input.clerkOrgId as ClerkOrgId,
+      organisationId: organisation.id as OrganisationId,
     });
     return { ok: true, value: { id: organisation.id } };
   }
@@ -1033,12 +1148,18 @@ function readAvailableTenants(payload: unknown): PendingXeroSessionTenant[] {
       "tenantId" in tenant && typeof tenant.tenantId === "string"
         ? tenant.tenantId
         : null;
+    const connectionId =
+      "connectionId" in tenant && typeof tenant.connectionId === "string"
+        ? tenant.connectionId
+        : null;
     const tenantName =
       "tenantName" in tenant && typeof tenant.tenantName === "string"
         ? tenant.tenantName
         : null;
 
-    return tenantId && tenantName ? [{ tenantId, tenantName }] : [];
+    return connectionId && tenantId && tenantName
+      ? [{ connectionId, tenantId, tenantName }]
+      : [];
   });
 }
 
@@ -1076,6 +1197,19 @@ async function exchangeToken(input: {
     url: XERO_TOKEN_URL,
   });
   if (!response.ok) {
+    if (input.grantType === "refresh_token") {
+      const errorCode = await readOAuthErrorCode(response);
+      if (errorCode === "invalid_grant") {
+        return {
+          ok: false,
+          error: {
+            code: "refresh_token_invalid",
+            message:
+              "The Xero refresh token is no longer valid. Reconnect Xero.",
+          },
+        };
+      }
+    }
     return {
       ok: false,
       error: {
@@ -1109,6 +1243,23 @@ async function exchangeToken(input: {
   };
 }
 
+async function readOAuthErrorCode(response: Response): Promise<null | string> {
+  try {
+    const body: unknown = await response.json();
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      "error" in body &&
+      typeof body.error === "string"
+    ) {
+      return body.error;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchConnections(
   accessToken: string,
   orgKey: string
@@ -1133,12 +1284,22 @@ async function fetchConnections(
     };
   }
 
-  const payload = (await response.json()) as Partial<ConnectionResponse>[];
+  const payload = (await response.json()) as Array<
+    Partial<ConnectionResponse> & { id?: string }
+  >;
   return {
     ok: true,
     value: payload.flatMap((item) =>
-      typeof item.tenantId === "string" && typeof item.tenantName === "string"
-        ? [{ tenantId: item.tenantId, tenantName: item.tenantName }]
+      typeof item.id === "string" &&
+      typeof item.tenantId === "string" &&
+      typeof item.tenantName === "string"
+        ? [
+            {
+              connectionId: item.id,
+              tenantId: item.tenantId,
+              tenantName: item.tenantName,
+            },
+          ]
         : []
     ),
   };
@@ -1218,17 +1379,34 @@ function payrollRegionForCountry(
   return null;
 }
 
-function signState(payload: OAuthStatePayload, secret: string): string {
+// Domain-separation label for HKDF. Scoped to this exact purpose so the derived
+// key can never be reused to forge or verify anything else, even if the same
+// Xero client secret is also used for Basic Auth against the Xero token endpoint.
+const STATE_SIGNING_KEY_INFO = "team-calendar:xero-oauth-state:v1";
+
+// The OAuth `state` parameter is a signed (not encrypted) anti-CSRF token: HMAC-SHA256
+// is the correct primitive for authenticating it, not a password hash. Deriving a
+// dedicated signing key via HKDF (rather than passing the Xero client secret straight
+// into the HMAC) keeps this key cryptographically independent of the client secret's
+// other use as a Basic Auth credential against Xero.
+function deriveStateSigningKey(clientSecret: string): Buffer {
+  return Buffer.from(
+    hkdfSync("sha256", clientSecret, "", STATE_SIGNING_KEY_INFO, 32)
+  );
+}
+
+function signState(payload: OAuthStatePayload, clientSecret: string): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const signature = createHmac("sha256", secret)
+  const signingKey = deriveStateSigningKey(clientSecret);
+  const signature = createHmac("sha256", signingKey)
     .update(encoded)
     .digest("base64url");
   return `${encoded}.${signature}`;
 }
 
 function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
-  const secret = stateSecret();
-  if (!secret) {
+  const clientSecret = stateSecret();
+  if (!clientSecret) {
     return oauthNotConfigured();
   }
 
@@ -1237,7 +1415,8 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     return invalidState();
   }
 
-  const expected = createHmac("sha256", secret)
+  const signingKey = deriveStateSigningKey(clientSecret);
+  const expected = createHmac("sha256", signingKey)
     .update(encoded)
     .digest("base64url");
   const matches =

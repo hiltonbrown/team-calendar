@@ -1,0 +1,38 @@
+/* Substitute self-hosted copies of the Google Fonts families Team Calendar
+   loads via next/font/google (packages/design-system/lib/fonts.ts) — Plus
+   Jakarta Sans and Lora. Fetched from fonts.gstatic.com (OFL-licensed, latin
+   subset) since next/font self-hosts at Next.js build time and ships no
+   static font files in the repo for design-sync to copy. See
+   .design-sync/NOTES.md for the fetch details. */
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./plus-jakarta-sans.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Lora";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./lora-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Lora";
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./lora-italic.woff2") format("woff2");
+}
+
+/* NOTE: this file is only ever scanned for @font-face blocks by
+   design-sync's extractFonts (lib/css.mjs) — any other rule here (e.g. a
+   :root custom-property definition) is silently dropped, never copied to
+   the shipped bundle. The --font-plus-jakarta-sans / --font-lora variables
+   these families need are defined instead in
+   packages/design-system/styles/compiled.css (cfg.cssEntry, copied
+   verbatim), not here. See .design-sync/NOTES.md. */

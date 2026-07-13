@@ -1,6 +1,16 @@
 import withBundleAnalyzer from "@next/bundle-analyzer";
 import type { NextConfig } from "next";
 
+export const securityHeaders = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
+];
+
 export const config: NextConfig = {
   serverExternalPackages: [
     "@prisma/client",
@@ -16,6 +26,11 @@ export const config: NextConfig = {
         hostname: "img.clerk.com",
       },
     ],
+  },
+
+  // biome-ignore lint/suspicious/useAwait: headers is async
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
   },
 
   // biome-ignore lint/suspicious/useAwait: rewrites is async

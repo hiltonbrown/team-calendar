@@ -10,15 +10,15 @@
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
+    "@repo/auth": "*",
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/observability": "*",
     "@repo/seo": "*",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "ical-generator": "^10.2.0",
+    "ical-generator": "^11.0.0",
     "server-only": "^0.0.1",
-    "zod": "^4.4.3",
-    "@repo/auth": "*"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",

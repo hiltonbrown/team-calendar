@@ -146,7 +146,10 @@ export async function disconnectXeroAction(input: {
           : "xero.connection_disconnected_soft",
       entity_id: parsed.data.connectionId,
       entity_type: "xero_connection",
-      metadata: { mode: parsed.data.mode },
+      metadata: {
+        mode: parsed.data.mode,
+        remoteRevoked: result.value.remoteRevoked,
+      },
       resource_id: parsed.data.connectionId,
       resource_type: "xero_connection",
     },

@@ -10,10 +10,16 @@ import type { Result } from "@repo/core";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-const SetupOrganisationSchema = z.object({
-  countryCode: z.enum(["AU", "NZ", "UK"]),
-  name: z.string().trim().min(1).max(128),
-});
+const SetupOrganisationSchema = z
+  .object({
+    countryCode: z.enum(["AU", "NZ", "UK"]),
+    name: z.string().trim().min(1).max(128),
+  })
+  .refine(({ countryCode }) => countryCode === "AU", {
+    message:
+      "Team Calendar currently supports Australian Xero Payroll files only.",
+    path: ["countryCode"],
+  });
 
 type ActionError =
   | { code: "conflict"; message: string }

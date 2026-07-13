@@ -6,6 +6,7 @@ export type XeroWriteError =
   | XeroWriteErrorVariant<"network_error">
   | XeroWriteErrorVariant<"not_found_error">
   | XeroWriteErrorVariant<"rate_limit_error">
+  | XeroWriteErrorVariant<"region_not_supported_error">
   | XeroWriteErrorVariant<"unknown_error">
   | XeroWriteErrorVariant<"validation_error">;
 
@@ -80,6 +81,8 @@ export function toPlainLanguageMessage(error: XeroWriteError): string {
       return "This employee or leave type is not yet set up in Xero. Ask your administrator to check the Xero configuration.";
     case "rate_limit_error":
       return "Xero is temporarily rate-limited. Try again in a few minutes.";
+    case "region_not_supported_error":
+      return "Sending leave to Xero is not yet available for this payroll region. Manage this leave directly in Xero for now.";
     case "unknown_error":
       return "Something went wrong when sending this to Xero. Try again or contact support if the issue continues.";
     case "validation_error":

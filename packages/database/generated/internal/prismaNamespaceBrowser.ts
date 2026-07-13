@@ -229,6 +229,7 @@ export const XeroConnectionScalarFieldEnum = {
   refresh_token_encrypted: 'refresh_token_encrypted',
   refresh_token_iv: 'refresh_token_iv',
   refresh_token_auth_tag: 'refresh_token_auth_tag',
+  xero_authorisation_connection_id: 'xero_authorisation_connection_id',
   token_key_version: 'token_key_version',
   token_encrypted_at: 'token_encrypted_at',
   expires_at: 'expires_at',

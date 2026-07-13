@@ -439,30 +439,31 @@ model AlternativeContact {
 }
 
 model XeroConnection {
-  id                      String                 @id @default(uuid()) @db.Uuid
-  clerk_org_id            String
-  organisation_id         String                 @unique @db.Uuid
-  status                  xero_connection_status @default(pending)
-  access_token_encrypted  String                 @default("")
-  access_token_iv         String?
-  access_token_auth_tag   String?
-  refresh_token_encrypted String                 @default("")
-  refresh_token_iv        String?
-  refresh_token_auth_tag  String?
-  token_key_version       Int                    @default(1)
-  token_encrypted_at      DateTime?
-  expires_at              DateTime
-  last_refreshed_at       DateTime?
-  last_connected_at       DateTime?
-  last_disconnected_at    DateTime?
-  last_error_code         String?
-  last_error_message      String?
-  stale_since             DateTime?
-  revoked_at              DateTime?
-  disconnected_at         DateTime?
-  disconnected_by_user_id String?
-  created_at              DateTime               @default(now())
-  updated_at              DateTime               @updatedAt
+  id                               String                 @id @default(uuid()) @db.Uuid
+  clerk_org_id                     String
+  organisation_id                  String                 @unique @db.Uuid
+  status                           xero_connection_status @default(pending)
+  access_token_encrypted           String                 @default("")
+  access_token_iv                  String?
+  access_token_auth_tag            String?
+  refresh_token_encrypted          String                 @default("")
+  refresh_token_iv                 String?
+  refresh_token_auth_tag           String?
+  xero_authorisation_connection_id String?
+  token_key_version                Int                    @default(1)
+  token_encrypted_at               DateTime?
+  expires_at                       DateTime
+  last_refreshed_at                DateTime?
+  last_connected_at                DateTime?
+  last_disconnected_at             DateTime?
+  last_error_code                  String?
+  last_error_message               String?
+  stale_since                      DateTime?
+  revoked_at                       DateTime?
+  disconnected_at                  DateTime?
+  disconnected_by_user_id          String?
+  created_at                       DateTime               @default(now())
+  updated_at                       DateTime               @updatedAt
 
   organisation Organisation @relation(fields: [organisation_id], references: [id])
   xero_tenant  XeroTenant?
