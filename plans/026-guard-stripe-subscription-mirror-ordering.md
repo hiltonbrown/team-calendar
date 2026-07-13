@@ -193,8 +193,14 @@ WHERE clerk_org_subscriptions.stripe_event_created_at IS NULL
 ```
 
 The `IS NULL` arms preserve current behaviour for rows/events without a timestamp
-(back-compat for any pre-existing row). Match the existing raw-SQL style in
-`billing.ts` (it uses tagged-template `${input.x}` parameters — keep parameterisation).
+(back-compat for any pre-existing row). The `<=` means an event with the same
+`created` second as the stored one still applies (Stripe timestamps are
+second-granularity; two events in the same second apply in arrival order, which
+is the best available tiebreak). A rejected stale event makes `$executeRaw`
+report 0 affected rows; no caller checks that count today and none should start
+to — silently dropping the stale write is the intended behaviour. Match the
+existing raw-SQL style in `billing.ts` (it uses tagged-template `${input.x}`
+parameters — keep parameterisation).
 
 **Verify**: `bun run typecheck` → exit 0.
 

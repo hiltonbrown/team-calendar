@@ -188,6 +188,24 @@ those expectations.
 
 **Verify**: `bunx vitest run packages/feeds/src/cache/feed-cache.test.ts packages/feeds/src/feed-service.test.ts` → all pass.
 
+### Step 5: Confirm the invalidation paths cover every content change
+
+With `updated_at` out of the key, feed freshness within the 1-hour TTL depends
+entirely on explicit invalidation firing on content change. Do not change any of
+these paths — just verify they exist and record the result in the PR:
+
+- Record/publication changes: `invalidateFeedCachesForPerson` is called from the
+  publication service (`packages/feeds/src/publication/publication-service.ts:89`).
+- Feed-level mutations (rename, privacy change, scope change, archive):
+  `invalidateFeedCache` calls throughout `packages/feeds/src/feed-service.ts`
+  and `tokens/token-service.ts`.
+- The rebuild job invalidates before re-warming
+  (`packages/jobs/src/handlers/rebuild-feed-cache.ts:76,83`).
+
+If any feed-content mutation path lacks an invalidation call, treat it as a STOP
+condition — landing the key change without it would serve stale bodies for up to
+an hour after that mutation.
+
 ## Test plan
 
 - New test in `feed-cache.test.ts`: key stability across differing dates; same
@@ -204,6 +222,7 @@ ALL must hold:
 - [ ] `grep -rn "feedUpdatedAt" packages/feeds packages/jobs` returns no matches
 - [ ] `grep -rn "feedCacheKey" packages apps` — every call site passes only `{ feedId, privacyMode }`
 - [ ] `bunx vitest run packages/feeds/src/cache/feed-cache.test.ts packages/feeds/src/feed-service.test.ts` passes, with the new stability test present
+- [ ] Step 5's invalidation-coverage check is recorded in the PR description
 - [ ] `bun run check` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)
 - [ ] `plans/README.md` status row updated
@@ -229,6 +248,6 @@ Stop and report back (do not improvise) if:
 - If a future change needs cache busting on feed rename/privacy change, prefer an
   explicit `invalidateFeedCache(feedId)` call over reintroducing a mutable
   timestamp into the key.
-- Related plan 030 (SEQUENCE on date edits) also touches feed publication; it
+- Related plan 028 (SEQUENCE on date edits) also touches feed publication; it
   does not touch the cache key, but a reviewer landing both should sanity-check
   that a materially-changed record still triggers invalidation.

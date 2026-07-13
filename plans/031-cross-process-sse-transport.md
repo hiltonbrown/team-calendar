@@ -106,6 +106,9 @@ export function publishOrganisationNotificationEvent(input, event): void { /* it
   registering an in-memory listener.
 - All publish call sites (they may need `await`/`void` if the publisher becomes
   async): `dispatch.ts`, `notification-service.ts`, and the four job handlers.
+- `packages/notifications/index.ts` — the package root re-exports the broker API
+  (`subscribeToNotificationStream`, `listenerCount` at index.ts:32, the publish
+  functions); update the re-exports to match the new surface.
 - Tests: `broker.test.ts`.
 
 **Out of scope**:
@@ -159,6 +162,10 @@ see Step 3.
 - `subscribeToNotificationStream` is removed/replaced: expose instead an async
   generator or a `pollChannel(input, sinceId)` the route can call. Keep
   `streamKey` unchanged.
+- `listenerCount` has no meaning without an in-memory registry. It is only used
+  by `broker.test.ts` (verify: `grep -rn "listenerCount" packages apps | grep -v broker`);
+  remove it and its `index.ts` re-export, and replace the tests that used it
+  (Step 6).
 - Preserve strict channel scoping: a user's channel key includes **both** userId
   and organisationId, so a poll never reads another org's events. Add an
   assertion/test for this (the security-critical invariant).
@@ -185,9 +192,13 @@ a different org could read.
 ### Step 4: Poll from the SSE route
 
 In `stream/route.ts`, replace the `subscribeToNotificationStream` registration
-with a poll loop inside the `ReadableStream`: track `lastId` (start at `$` /
-now), and on an interval (e.g. every 2s) call `readSince(channel, lastId)`,
-enqueue each event as `event: <type>\ndata: <json>`, and advance `lastId`. Keep
+with a poll loop inside the `ReadableStream`: track `lastId`, and on an interval
+(e.g. every 2s) call `readSince(channel, lastId)`, enqueue each event as
+`event: <type>\ndata: <json>`, and advance `lastId`. Initialise `lastId` to a
+connect-time position — note `$` is XREAD syntax and does NOT work with XRANGE;
+use a timestamp-based stream id instead (e.g. `` `${Date.now()}-0` ``, since
+Redis stream ids are `<unix-ms>-<seq>`), or read the channel's current last id
+once at connect via `XREVRANGE <channel> + - COUNT 1`. Keep
 the existing 25s keep-alive comment frames and the `cancel`/closed-controller
 cleanup (clear the poll interval there). Preserve the existing 403-on-wrong-org
 guard and CORS handling.

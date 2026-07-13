@@ -120,16 +120,26 @@ prompted. This creates `packages/database/prisma/migrations/<timestamp>_add_appr
 containing roughly:
 
 ```sql
-CREATE INDEX "availability_records_organisation_id_approval_status_submitte_idx"
+CREATE INDEX "availability_records_organisation_id_approval_status_submit_idx"
   ON "availability_records" ("organisation_id", "approval_status", "submitted_at");
 ```
+
+(The name is Prisma's convention truncated to PostgreSQL's 63-character
+identifier limit; trust whatever name `migrate dev` actually generates.)
 
 If **no dev database is available**, do NOT invent state: create the migration
 directory by hand following the dated convention
 (`<YYYYMMDDHHMMSS>_add_approval_status_index/migration.sql`) with the `CREATE
-INDEX` statement above, using the exact index name Prisma would generate (run
-`bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
-to see the precise DDL Prisma expects, and copy it verbatim).
+INDEX` statement above. Note `migrate diff --from-config-datasource` needs a
+reachable datasource, so it cannot generate the DDL for you offline. Derive the
+index name from Prisma's convention instead: `<table>_<columns joined by _>_idx`,
+with the column portion truncated so the whole name fits PostgreSQL's
+63-character identifier limit — for this index that is
+`availability_records_organisation_id_approval_status_submit_idx`. Cross-check
+against the existing truncated example in the init migration,
+`availability_records_organisation_id_publish_status_include_idx`
+(`packages/database/prisma/migrations/00000000000000_init/migration.sql:836`),
+which follows the same pattern.
 
 **Verify**: `cd packages/database && bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script`
 → prints "This is an empty migration" (schema and migrations now agree).

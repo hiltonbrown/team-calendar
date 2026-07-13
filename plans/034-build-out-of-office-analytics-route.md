@@ -80,11 +80,18 @@ apps/app/app/(authenticated)/analytics/
   Its chart component `leave-days-by-team-chart.tsx` shows the design-system chart
   usage to mirror.
 
-- The sidebar has a single Analytics entry to copy the pattern from:
+- The sidebar has a single Analytics entry to copy the pattern from — note it is
+  role-gated via `roles: ANALYTICS_NAV_ROLES`, and the new entry must carry the
+  same gating so viewers do not see a link to a page that will deny them:
 
 ```ts
-// apps/app/app/(authenticated)/components/sidebar.tsx:75-77
-{ title: "Analytics", href: "/analytics/leave-reports", icon: <...> },
+// apps/app/app/(authenticated)/components/sidebar.tsx:75-80
+{
+  title: "Analytics",
+  href: "/analytics/leave-reports",
+  icon: BarChart3Icon,
+  roles: ANALYTICS_NAV_ROLES,
+},
 ```
 
 - The categorical chart scale `--chart-1..5` exists in
@@ -108,8 +115,9 @@ apps/app/app/(authenticated)/analytics/
 
 ## Suggested executor toolkit
 
-- Invoke the `impeccable` / `frontend-design` skill when composing the layout so
-  it matches the existing analytics screen's visual system.
+- If a design/frontend skill is available in your environment, invoke it when
+  composing the layout; otherwise follow DESIGN.md and `.impeccable.md` directly
+  so the screen matches the existing analytics visual system.
 - Use the `run` skill to launch the app and confirm the route renders.
 
 ## Scope
@@ -169,7 +177,9 @@ Keep chart components as `"use client"` only where the chart library requires it
 Add an Analytics entry for `/analytics/out-of-office` in `sidebar.tsx`. If a
 single "Analytics" link exists, either add a second sibling link ("Out of
 Office") or convert Analytics into a group containing "Leave Reports" and "Out of
-Office" — match how other multi-item groups in the sidebar are structured.
+Office" — match how other multi-item groups in the sidebar are structured. The
+new entry must keep `roles: ANALYTICS_NAV_ROLES` (or the group equivalent) so
+the link stays hidden from roles the page will deny.
 
 **Verify**: `bun run typecheck` → exit 0.
 

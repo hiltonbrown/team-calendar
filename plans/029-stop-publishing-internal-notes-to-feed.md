@@ -64,6 +64,12 @@ description: record.privacy_mode === "named" ? record.notes_internal : null,
 // calendar.createEvent({ ..., description, ... })
 ```
 
+- The token-served **HTML** render shares the same projection and also emits the
+  description (`packages/feeds/src/render/render-html.ts:251` —
+  `${event.description ? `<p>${escapeHtml(event.description)}</p>` : ""}`), so
+  fixing the projection fixes both outputs; expect `render-html.test.ts` to need
+  the same expectation updates as `render-feed.test.ts`.
+
 - Confirm there are no other readers of `notes_internal` in the feeds package
   before editing: `grep -rn "notes_internal" packages/feeds`.
 
@@ -138,8 +144,10 @@ way and note it.
   `published_description` is not populated from `notes_internal`.
 - In `render-feed.test.ts` (if it asserts on DESCRIPTION): confirm the VEVENT has
   no `DESCRIPTION` carrying the internal note.
+- In `render-html.test.ts` (if it asserts on the description paragraph): confirm
+  the HTML output carries no internal note.
 
-**Verify**: `bunx vitest run packages/feeds/src/projection/feed-projection.test.ts packages/feeds/src/publication/publication-service.test.ts packages/feeds/src/render/render-feed.test.ts` → all pass.
+**Verify**: `bunx vitest run packages/feeds/src/projection/feed-projection.test.ts packages/feeds/src/publication/publication-service.test.ts packages/feeds/src/render/render-feed.test.ts packages/feeds/src/render/render-html.test.ts` → all pass.
 
 ## Test plan
 

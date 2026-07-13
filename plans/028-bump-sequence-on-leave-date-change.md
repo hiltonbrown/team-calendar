@@ -157,9 +157,15 @@ default, then backfill):
   published_ends_at      DateTime?
 ```
 
-Generate the migration. It must (a) add the columns and (b) backfill existing
-rows from the joined record so a first post-migration materialisation does not
-spuriously bump SEQUENCE for every record:
+Generate the migration with
+`cd packages/database && bunx prisma migrate dev --create-only --name add_published_dates`
+(NOT plain `bun run migrate` — Prisma only generates the DDL for the new
+columns, and the backfill must be appended to the **draft** migration before it
+is applied; the repo rule against hand-editing migrations applies to already
+generated-and-applied migrations, not to customising a `--create-only` draft,
+which is the standard Prisma workflow for data migrations). Append the backfill
+so a first post-migration materialisation does not spuriously bump SEQUENCE for
+every record, then apply with `bunx prisma migrate dev`:
 
 ```sql
 ALTER TABLE "availability_publications" ADD COLUMN "published_starts_at" TIMESTAMP(3);
