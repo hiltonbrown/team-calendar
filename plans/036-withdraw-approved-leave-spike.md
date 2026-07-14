@@ -8,7 +8,7 @@
 > update the status row for this plan in `plans/README.md` unless a reviewer
 > dispatched you and told you they maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat 123bbd8..HEAD -- packages/availability/src/plans/submit-service.ts packages/xero/src/au/write.ts packages/xero/src/adapter/xero-write-adapter.ts`
+> **Drift check (run first)**: `git diff --stat dabb529..HEAD -- packages/availability/src/plans/submit-service.ts packages/xero/src/au/write.ts packages/xero/src/adapter/xero-write-adapter.ts`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -16,12 +16,17 @@
 ## Status
 
 - **Priority**: P3
-- **Effort**: M
+- **Effort**: S-M (reduced at reconcile: authorisation already permits admins)
 - **Risk**: MED (widens a Xero write path; approved-leave reversal semantics)
-- **Depends on**: consider landing after plan 032 (notification/transaction
-  decoupling) since both touch the write path's transaction boundary
+- **Depends on**: none. Plan 032 has landed, so withdraw's notification dispatch
+  is already outside the state transaction; preserve that shape.
 - **Category**: direction (binding product decision)
 - **Planned at**: commit `123bbd8`, 2026-07-12
+- **Refreshed at**: commit `dabb529` (`preview`), 2026-07-14 — excerpts below
+  re-read against live code after plan 032 landed. Two corrections: withdraw's
+  notification is now post-commit best-effort, and `loadAndAuthorise` already
+  grants admin/owner access in every mode, so Step B2 is a verification step,
+  not a code change.
 
 ## Why this matters
 
@@ -33,25 +38,32 @@ and implementation work**:
 > Withdraw modal specified in S-10.
 
 The code under-delivers this: `withdrawSubmission` only allows `submitted` leave,
-only the record owner (`owner_only`), and only `team_calendar_leave`-sourced
-records. So an employee whose leave is approved and then needs cancelling has no
-path, and admins cannot withdraw on someone's behalf. The Xero write-back for
-withdraw already exists; the gap is the state guard, the authorisation, and
-(critically) the **Xero reversal semantics for already-approved leave**, which is
-why this is a spike first.
+and only `team_calendar_leave`-sourced records. So an employee whose leave is
+approved and then needs cancelling has no path. The Xero write-back for withdraw
+already exists; the real gap is the **state guard** and (critically) the **Xero
+reversal semantics for already-approved leave**, which is why this is a spike
+first.
+
+**Corrected at reconcile (2026-07-14)**: the "admins cannot withdraw on someone's
+behalf" half of the original diagnosis was **wrong**. `loadAndAuthorise` already
+short-circuits on admin/owner in *every* mode (see excerpt below), so an admin can
+already withdraw any person's `submitted` leave today. The only thing blocking
+admin-withdraw-any on *approved* leave is the same status guard that blocks the
+employee. Do not add an admin branch; there is already one.
 
 ## Current state
 
-- The withdraw guard and authorisation:
+- The withdraw guard (`submit-service.ts:157-179`), verified at `dabb529`:
 
 ```ts
-// packages/availability/src/plans/submit-service.ts:157-190 (abridged)
+// packages/availability/src/plans/submit-service.ts:157-179 (abridged)
 export async function withdrawSubmission(input, externalWritePort) {
-  const authorised = await loadAndAuthorise(parsed.data, "owner_only");   // owner only
+  const authorised = await loadAndAuthorise(parsed.data, "owner_only");
   if (!authorised.ok) return authorised;
   const record = authorised.value;
+
   if (
-    record.approval_status !== "submitted" ||                            // submitted only
+    record.approval_status !== "submitted" ||   // <-- the actual blocker
     !record.source_remote_id ||
     record.source_type !== "team_calendar_leave"
   ) {
@@ -61,14 +73,31 @@ export async function withdrawSubmission(input, externalWritePort) {
   // ...
   const response = await externalWritePort.withdrawLeaveApplication({ employeeId, remoteId, clerkOrgId, organisationId });
   // on failure -> persistXeroFailure({ failedAction: "withdraw", ... })
-  // on success -> $transaction: updateMany { approval_status: "withdrawn", withdrawn_at } + notifyManager + audit
+  // on success -> $transaction: updateMany { approval_status: "withdrawn", withdrawn_at } + audit
+  //               then notifyManagerBestEffort(...) AFTER the transaction (plan 032)
 }
 ```
 
-- `loadAndAuthorise` supports two modes: `"owner_only"` and `"manager_allowed"`
-  (`submit-service.ts:562`). Admin-withdraw-any needs an admin/owner branch —
-  check whether `"manager_allowed"` already permits admin/owner or whether a new
-  mode/branch is required.
+- `loadAndAuthorise` (`submit-service.ts:564-591`) takes a
+  `mode: "manager_allowed" | "owner_only"`, but the mode only gates the *manager*
+  case. Admin/owner is allowed unconditionally:
+
+```ts
+// packages/availability/src/plans/submit-service.ts:584-591
+const isOwner = record.person.clerk_user_id === input.actingUserId;
+const isManager =
+  Boolean(actingPerson) &&
+  record.person.manager_person_id === actingPerson?.id;
+const isAllowed =
+  isAdminOrOwner(input.actingOrgRole) ||        // <-- admin/owner: any record, any mode
+  isOwner ||
+  (mode === "manager_allowed" && isManager);
+```
+
+- Plan 032 has landed: withdraw's `notifyManagerBestEffort(...)` call now sits
+  **after** the state-transition transaction and swallows failures
+  (`submit-service.ts:239`, helper at `:644`). Keep that shape; do not move
+  notification back inside the transaction.
 - The Xero withdraw write is `withdrawLeaveApplication` on the external write
   port; the AU implementation is in `packages/xero/src/au/write.ts` and the
   adapter in `packages/xero/src/adapter/xero-write-adapter.ts`. **Whether
@@ -148,25 +177,28 @@ correct external write call.
 
 **Verify**: `bun run typecheck` → exit 0.
 
-### Step B2: Widen authorisation to admin-withdraw-any
+### Step B2: Verify admin-withdraw-any (expect NO code change)
 
-Change withdraw authorisation so: the record owner may withdraw their own
-submitted/approved leave, and an org admin/owner may withdraw **any** record.
-Reuse the existing authorisation helpers (`loadAndAuthorise` modes /
-`authoriseManualAvailabilityActor`-style role checks) rather than inventing a new
-one; add an admin/owner branch if the existing modes do not cover it.
+Admin-withdraw-any is **already implemented** by `loadAndAuthorise`'s
+`isAdminOrOwner(input.actingOrgRole)` short-circuit (see "Current state"). Do not
+add a new mode, branch, or role check.
 
-**Verify**: `bun run typecheck` → exit 0.
+This step is therefore a *verification* step: add the test from B4 case 2 (admin
+withdraws another person's leave) and confirm it passes against the **unchanged**
+authorisation helper. If it fails, the "Current state" reading was wrong — STOP
+and report rather than widening the helper.
+
+**Verify**: B4 case 2 passes with no diff to `loadAndAuthorise`.
 
 ### Step B3: Preserve failure + audit + notification semantics
 
 On Xero write failure, keep the existing `persistXeroFailure({ failedAction:
 "withdraw" })` path. On success, keep the `withdrawn` transition + audit event
-inside the transaction. Plan 032 moves withdraw's notification dispatch out of
-the state transaction (best-effort, post-commit); if 032 has landed, preserve
-that shape, and if it has not, apply the same best-effort pattern here rather
-than reintroducing a notify call inside the transaction. Add an audit action distinguishing an admin-initiated withdrawal
-of another person's leave from a self-withdrawal if the audit taxonomy supports it.
+inside the transaction, and keep `notifyManagerBestEffort(...)` **after** the
+transaction (plan 032 has landed; that is the current shape — preserve it, do not
+reintroduce a notify call inside the transaction). Add an audit action
+distinguishing an admin-initiated withdrawal of another person's leave from a
+self-withdrawal if the audit taxonomy supports it.
 
 **Verify**: `bun run typecheck` → exit 0.
 
@@ -198,6 +230,8 @@ ALL must hold:
 - [ ] Phase A design note exists (in the PR or appended here), including the Xero operation for approved-leave reversal
 - [ ] Withdraw accepts `submitted` and `approved` records
 - [ ] Owner can withdraw own; admin/owner can withdraw any; others cannot
+- [ ] `loadAndAuthorise` is **unchanged** (admin-any already works; a diff here means the plan's reading was wrong — report it)
+- [ ] Withdraw's notification dispatch remains post-commit best-effort (plan 032's shape preserved)
 - [ ] Xero write failure still sets `failed_action = "withdraw"` and surfaces inline
 - [ ] `bun run typecheck` exits 0
 - [ ] Tests from Step B4 pass (approved-withdraw + admin-any + unauthorised + failure)

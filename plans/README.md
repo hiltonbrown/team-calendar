@@ -11,9 +11,10 @@ to re-run it now. Keep these files as historical implementation records; new
 work must use the next monotonic plan number.
 
 **A new audit batch (plans 022-036) was added on 2026-07-12 against `preview`
-commit `123bbd8`** from a fresh `improve` run. These are TODO and described in
-their own section below ("Audit batch 2026-07-12"). All prior numbering and
-status is preserved.
+commit `123bbd8`** from a fresh `improve` run, and described in its own section
+below ("Audit batch 2026-07-12"). Reconciled on 2026-07-14 against `preview`
+commit `dabb529`: **022-032 are DONE and merged; 033-036 remain TODO.** All prior
+numbering and status is preserved.
 
 ## Record conventions
 
@@ -51,21 +52,22 @@ status is preserved.
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | DONE, implemented in `9c17067`, landed and verified at `2bba19c` |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE, implemented in `9aa0bcc`, verified at `2bba19c` |
 | 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | DONE, implemented in `040848a`, verified at `2bba19c` |
-| 022 | Make `showDeclinedOnApprovals` functional and fix the inverted service default | P1 | S-M | none | DONE, implemented in `4f3484c`, verified at `preview` |
-| 023 | Stop the ICS feed cache from invalidating its own key | P1 | S | none | DONE, implemented in `a402274` |
-| 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, implemented in `7b71d75` |
-| 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, implemented in `f6ce0cf` |
-| 026 | Guard the Stripe subscription mirror against out-of-order webhooks | P2 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | DONE, reviewed executor commit `12efa92` and merged to `preview` as `079fc97` |
-| 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 029 | Stop publishing `notes_internal` into the token-served ICS feed | P2 | S | none | DONE, implemented in `38818c9` |
-| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, implemented in `ab1be48`, verified in isolated worktree on 2026-07-14 |
-| 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 032 | Stop notification failures rolling back Xero-confirmed state transitions | P2 | M | none | DONE, implemented in `4a967cb`, independently verified in its isolated worktree |
-| 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 036 | Enable withdraw of approved leave + admin-withdraw-any (spike-first) | P3 | M | 032 (recommended) | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 022 | Make `showDeclinedOnApprovals` functional and fix the inverted service default | P1 | S-M | none | DONE, merged to `preview` (`4f3484c`), verified at `dabb529` |
+| 023 | Stop the ICS feed cache from invalidating its own key | P1 | S | none | DONE, merged to `preview` (`a402274`), verified at `dabb529` |
+| 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, merged to `preview` (`7b71d75`), verified at `dabb529` |
+| 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, merged to `preview` (`f6ce0cf`), verified at `dabb529` |
+| 026 | Guard the Stripe subscription mirror against out-of-order webhooks | P2 | S | none | DONE, merged to `preview` (`7bc1491`), verified at `dabb529` — but left `apps/api/.../payments/route.ts` failing `bun run check` (formatting only; see Open defect) |
+| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | DONE, executor commit `12efa92`, merged to `preview` as `079fc97`, verified at `dabb529` |
+| 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | DONE, merged to `preview` (`530a2cc`), verified at `dabb529` |
+| 029 | Stop publishing `notes_internal` into the token-served ICS feed | P2 | S | none | DONE, merged to `preview` (`38818c9`), verified at `dabb529` |
+| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, merged to `preview` (`ab1be48`), verified at `dabb529` |
+| 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | DONE, merged to `preview` (`6dd5d99`), verified at `dabb529` |
+| 032 | Stop notification failures rolling back Xero-confirmed state transitions | P2 | M | none | DONE, merged to `preview` (`4a967cb`), verified at `dabb529` |
+| 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
+| 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
+| 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
+| 036 | Enable withdraw of approved leave + admin-withdraw-any (spike-first) | P3 | S-M | none (032 landed) | TODO, **refreshed at `dabb529`** after drift; admin-any found already implemented |
+| 037 | Run CI on `preview`, and unbreak the formatter so it passes | P1 | S | none | TODO (added by reconcile 2026-07-14, planned at `dabb529`) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -73,6 +75,45 @@ Verification on 2026-07-12: `bun run test` passed all 10 test tasks and
 `bun run check` checked 692 files with no fixes. Plan-specific source and test
 evidence was spot-checked for every row. Integration and external-service gates
 were not rerun unless already recorded in the individual plan.
+
+## Reconciliation 2026-07-14 (against `preview` = `dabb529`)
+
+Plans 022-032 are **all merged into `preview`** and were verified as a *merged
+whole* for the first time (each had previously only been verified inside its own
+isolated executor worktree). Results at `dabb529`:
+
+- `bun run test` — **10/10 task groups pass** (jobs 32, api 92, app 148, plus
+  package suites).
+- `bun run typecheck` — **18/18 pass**.
+- `bun run check` — **FAILS**. One formatter error, see "Open defect" below.
+- Per-plan source evidence re-read against live code for 022-032 (cache key,
+  removed action file, migrations, pagination + truncation guard, SEQUENCE
+  date-change comparison, post-commit notification dispatch, queue consumer
+  registration, Redis SSE transport).
+
+Index corrections made: **029 and 032 were listed TODO but had in fact landed**
+and passed their done criteria. 036 was refreshed after drift (see below).
+No work was found stranded — every `improve/*` branch is an ancestor of
+`preview`.
+
+### Open defect (blocks a clean `bun run check`)
+
+`apps/api/app/webhooks/payments/route.ts` fails Biome's formatter at two call
+sites (~lines 117 and 139): the second argument added to `mirrorSubscription(...)`
+by plan 026 (`7bc1491`) pushed both calls over the line-width limit and they were
+never re-wrapped. It is **purely cosmetic** (formatting only, no lint rule, no
+type error) and `bun run fix` resolves it. It is present on both `preview` and the
+`improve/026-stripe-ordering-guard` branch. This is the only thing standing
+between `preview` and a fully green gate.
+
+### Structural finding: CI never runs on `preview`
+
+`.github/workflows/ci.yml` triggers only on `push`/`pull_request` to **`main`**,
+but every plan in this batch develops on and merges to `preview`. Consequently
+plans 022-032 landed on `preview` with **zero CI coverage**, which is precisely
+how the formatter regression above survived the merge. **Now planned**: plan 037
+adds `preview` to the CI triggers and fixes the formatter break first, so the
+first `preview` run is green. Execute it before the remaining backlog.
 
 Plans 017–018 added 2026-07-04 from a `plan` request scoping the Xero
 authentication functionality ("admins authenticate Xero; available to all users
@@ -87,13 +128,29 @@ strategy. See "Xero token refresh: state at 2026-07-04" below.
 Generated by the `improve` skill against `preview` commit `123bbd8`. Every
 finding was re-read against live code before planning. The batch was reviewed
 and corrected on 2026-07-13 (plan-by-plan re-verification against live code;
-see the individual plans for corrections). Recommended execution order: the
-quick correctness/security fixes 022-024 first, then 027 (the highest-impact
-data-loss bug — do not let it queue behind the P2 items just because of its
-number), then 025-026, the notification pair 030-031, the feeds pair 028-029,
-then 032-033 and the direction work 034-036. All are TODO; their status rows
-live in the single authoritative "Execution order & status" table above
-(rows 022-036).
+see the individual plans for corrections). The original execution order ran the
+correctness/security fixes 022-024 first, then 027, then 025-026, the
+notification pair 030-031, the feeds pair 028-029, and 032. **All of those have
+landed on `preview` as of 2026-07-14.**
+
+**Remaining executable work**, in recommended order (all independent of each
+other; none is blocked):
+
+1. **037** — Run CI on `preview` + unbreak the formatter. **Do this first.** It is
+   the smallest plan in the backlog and it restores the gate whose absence let the
+   formatter regression reach `preview` in the first place. `preview` currently
+   fails `bun run check`.
+2. **034** — Out-of-office analytics route (S-16). Highest user-visible value of
+   the rest; the service layer already exists, only the route is missing.
+3. **035** — CSV export for analytics. The leave-reports half stands alone; the
+   out-of-office export button needs 034 first.
+4. **036** — Withdraw approved leave. Refreshed 2026-07-14; smaller than
+   originally scoped (admin-withdraw-any already works). Still spike-first: the
+   Xero approved-leave reversal semantics remain the open unknown.
+5. **033** — Xero refresh CAS hardening. Lowest priority; a P3 hardening pass on
+   already-landed plan 019.
+
+Refer to the authoritative "Execution order & status" table above for status.
 
 ### Batch dependency notes
 
@@ -217,7 +274,10 @@ below are now satisfied or retired. These notes are historical context.
   (`packages/jobs/src/handlers/sync-xero-leave-balances.ts:265-339`); any batch
   redesign must preserve the documented record-level failure isolation rule.
 - CI has no dependency caching and runs fully sequentially
-  (`.github/workflows/ci.yml`).
+  (`.github/workflows/ci.yml`). **Reconcile 2026-07-14 adds a more serious
+  problem in the same file**: CI does not run on `preview` at all (triggers are
+  `main`-only), so the entire 022-032 batch merged without CI. See
+  "Structural finding" above.
 - `sync-xero-leave-records.ts` (1008 lines) and `sync-xero-people.ts`
   (605 lines) both suppress `noExcessiveCognitiveComplexity`; refactor is L
   effort with MED risk.
@@ -226,10 +286,11 @@ below are now satisfied or retired. These notes are historical context.
   naming will mislead new deployments.
 - Investigate: whether org-spanning public holiday changes
   (`organisation_id = null`) invalidate all affected feeds; unverified.
-- Notification emails are enqueued in `notification_email_queue`, but the plan
-  008 reconciliation found no worker that consumes the queue and sends via
-  Resend. **Now planned**: plan 030 (2026-07-12 batch) adds the queue consumer;
-  the manager digest still depends on it landing.
+- ~~Notification emails are enqueued in `notification_email_queue` with no worker
+  consuming the queue.~~ **RESOLVED** by plan 030 (`ab1be48`, verified at
+  `dabb529`): `sendNotificationEmailsFunction` is registered in
+  `packages/jobs/src/functions.ts` and drains the queue via Resend. The plan 008
+  manager digest is therefore unblocked.
 - Public pricing catalogue copy uses "Basic", while the pricing page metadata
   still says "Starter". This is a small copy follow-up, not a reason to reopen
   completed plan 020.
