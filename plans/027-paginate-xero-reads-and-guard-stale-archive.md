@@ -150,6 +150,7 @@ async function archiveStaleRecords(context, fetchedRemoteIds: string[]) {
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/027-xero-pagination-archive-guard`
 - Conventional commits (e.g. `fix(xero): paginate AU reads and guard stale-archive against truncated fetch`).
 - Do NOT push or open a PR unless the operator instructed it.

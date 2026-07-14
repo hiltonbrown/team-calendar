@@ -142,6 +142,7 @@ await database.$transaction(async (tx) => {
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/032-notify-outside-state-txn`
 - Conventional commits (e.g. `fix(availability): keep notification failures from reverting Xero-confirmed transitions`).
 - Do NOT push or open a PR unless the operator instructed it.

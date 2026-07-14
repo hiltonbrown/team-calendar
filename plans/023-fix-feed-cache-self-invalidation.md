@@ -132,6 +132,7 @@ updated_at               DateTime                  @updatedAt
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/023-feed-cache-key`
 - Conventional commits (e.g. `fix(feeds): drop mutable updated_at from feed cache key`).
 - Do NOT push or open a PR unless the operator instructed it.

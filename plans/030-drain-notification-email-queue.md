@@ -163,6 +163,7 @@ export const recountUsageFunction: InngestFunction.Any = inngest.createFunction(
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/030-notification-email-worker`
 - Conventional commits (e.g. `feat(notifications): drain notification_email_queue and send via Resend`).
 - Do NOT push or open a PR unless the operator instructed it.

@@ -84,6 +84,7 @@ only what the aggregation returns for the caller's role; never widen scope.
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/035-analytics-csv-export`
 - Conventional commits (e.g. `feat(analytics): add CSV export to leave reports`).
 - Do NOT push or open a PR unless the operator instructed it.

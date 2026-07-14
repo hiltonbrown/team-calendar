@@ -103,6 +103,7 @@ await client.xeroConnection.update({ where: { id }, data: { access_token_*, refr
 
 ## Git workflow
 
+- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
 - Branch: `improve/033-xero-refresh-boundary`
 - Conventional commits (e.g. `fix(xero): protect rotated refresh token against transaction abort`).
 - Do NOT push or open a PR unless the operator instructed it.
