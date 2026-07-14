@@ -180,7 +180,7 @@ function projectAvailabilityRecord(
   return {
     allDay: record.all_day,
     contactabilityStatus: record.contactability,
-    description: privacyMode === "named" ? record.notes_internal : null,
+    description: null,
     displayName,
     endsAt: record.ends_at,
     isPublicHoliday: false,
@@ -376,7 +376,6 @@ const recordSelect = {
   derived_sequence: true,
   derived_uid_key: true,
   id: true,
-  notes_internal: true,
   record_type: true,
   starts_at: true,
   title: true,

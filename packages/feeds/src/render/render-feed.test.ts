@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({
         {
           allDay: true,
           contactabilityStatus: "unavailable",
-          description: "Internal note",
+          description: null,
           displayName: "Jane Smith",
           endsAt: new Date("2026-05-08T00:00:00.000Z"),
           isPublicHoliday: false,
@@ -89,7 +89,7 @@ describe("renderFeedForToken", () => {
         {
           allDay: true,
           contactabilityStatus: "unavailable",
-          description: "Internal note",
+          description: null,
           displayName: "Jane Smith",
           endsAt: new Date("2026-05-08T00:00:00.000Z"),
           isPublicHoliday: false,
@@ -117,6 +117,7 @@ describe("renderFeedForToken", () => {
     expect(result.value.body).toContain("UID:stable@ical.teamcalendar.online");
     expect(result.value.body).toContain("SEQUENCE:2");
     expect(result.value.body).toContain("SUMMARY:Jane Smith: Annual Leave");
+    expect(result.value.body).not.toContain("DESCRIPTION");
     expect(result.value.body).not.toContain(
       "UID:10000000-0000-4000-8000-000000000001"
     );

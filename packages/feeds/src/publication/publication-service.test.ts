@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     privacy_mode: "named",
     published_all_day: true,
     published_at: new Date("2026-05-01T00:00:00.000Z"),
-    published_description: "Initial note",
+    published_description: null,
     published_sequence: 0,
     published_summary: "Jane Smith: Annual Leave",
     published_uid: "stable@ical.teamcalendar.online",
@@ -138,7 +138,7 @@ describe("materialiseAvailabilityPublication", () => {
     expect(result).toMatchObject({
       ok: true,
       value: {
-        publishedDescription: "Initial note",
+        publishedDescription: null,
         publishedSequence: 0,
         publishedSummary: "Jane Smith: Annual Leave",
         publishedUid: "stable@ical.teamcalendar.online",
@@ -150,17 +150,36 @@ describe("materialiseAvailabilityPublication", () => {
     const first = await materialiseAvailabilityPublication(input);
     expect(first.ok && first.value.publishedSequence).toBe(0);
 
+    mocks.record.title = "Client site";
+    const second = await materialiseAvailabilityPublication(input);
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: {
+        publishedDescription: null,
+        publishedSequence: 1,
+        publishedUid: "stable@ical.teamcalendar.online",
+      },
+    });
+  });
+
+  it("does not increment sequence or update publishedDescription when only notes_internal changes", async () => {
+    const first = await materialiseAvailabilityPublication(input);
+    expect(first.ok && first.value.publishedSequence).toBe(0);
+    expect(first.ok && first.value.publishedDescription).toBeNull();
+
     mocks.record.notes_internal = "Updated note";
     const second = await materialiseAvailabilityPublication(input);
 
     expect(second).toMatchObject({
       ok: true,
       value: {
-        publishedDescription: "Updated note",
-        publishedSequence: 1,
+        publishedDescription: null,
+        publishedSequence: 0,
         publishedUid: "stable@ical.teamcalendar.online",
       },
     });
+    expect(mocks.availabilityPublicationUpdate).not.toHaveBeenCalled();
   });
 
   it("increments sequence when only the all-day flag changes", async () => {
