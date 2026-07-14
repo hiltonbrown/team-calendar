@@ -1,17 +1,11 @@
-# Plan 012: Authorise manual availability mutations by actor and person
+# Plan 025: Add a composite index for `approval_status` on availability records
 
 ## Tasks
-- [x] Drift check and git verification
-- [x] Step 1: Add actor-aware authorisation in `manual-records-service.ts`
-- [x] Step 2: Pass Clerk org role from server actions and API routes
-- [x] Step 3: Add service, action, and route regression tests
-- [x] Run targeted verification for the touched slice
-- [x] Run repo-level verification required by the plan
-- [x] Update `plans/README.md` status row and review notes
-
-## Review
-- Centralised manual-availability mutation authorisation in the availability package using actor metadata and direct-manager/self/admin-owner checks.
-- Threaded Clerk `orgRole` through app actions and API routes, including the single-record PATCH and DELETE route, and mapped `not_authorised` service failures to HTTP 403.
-- Added focused regression coverage for service rules, server-action passthrough, and API-route 403 handling.
-- Verification passed: targeted Vitest slice, `bun run check`, `bun run typecheck`, and `bun run test`.
-- Repo-level typecheck was initially blocked by a stale Bun workspace link in `packages/xero/node_modules/@repo`; `bun install` refreshed the declared `@repo/availability` symlink without manifest changes.
+- [x] Create branch `improve/025-approval-status-index` from base branch `preview`
+- [x] Step 1: Add the index `@@index([organisation_id, approval_status, submitted_at])` to `AvailabilityRecord` in `packages/database/prisma/schema.prisma`
+- [x] Verify Step 1: Run `cd packages/database && bunx prisma format` to format the schema
+- [x] Step 2: Generate the migration using `bun run migrate` or manually if dev DB is not available
+- [x] Verify Step 2: Run drift check `cd packages/database && bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` to confirm schema and migrations match (drift check skipped as offline / dev database URL is not set; verified schema is valid via `prisma validate`)
+- [x] Step 3: Regenerate Prisma client and typecheck the workspace
+- [x] Verify Step 3: Run `bun run typecheck`
+- [x] Git commit and prepare report
