@@ -133,7 +133,7 @@ export async function dispatchNotification(
             unreadCount,
           },
         }
-      );
+      ).catch(() => undefined);
     }
 
     let emailQueued = false;

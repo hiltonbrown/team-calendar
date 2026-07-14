@@ -176,7 +176,7 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
     });
     runId = run.id;
 
-    publishRunStatusChanged(context, run.id, "running");
+    await publishRunStatusChanged(context, run.id, "running");
 
     const loadedTenant = await loadXeroTenant(context);
     if (loadedTenant?.sync_paused_at) {
@@ -630,7 +630,7 @@ async function completeRun(
     },
     where: { ...scoped(context), id: runId },
   });
-  publishRunStatusChanged(context, runId, input.status);
+  await publishRunStatusChanged(context, runId, input.status);
 }
 
 function loadXeroTenant(context: ReconcileApprovalStateInput) {
@@ -660,24 +660,35 @@ function isBlanketFailure(error: XeroWriteError): boolean {
   return error.code === "auth_error" || error.code === "rate_limit_error";
 }
 
-function publishRunStatusChanged(
+async function publishRunStatusChanged(
   context: ReconcileApprovalStateInput,
   runId: string,
   status: string
 ) {
-  publishOrganisationNotificationEvent(
-    { organisationId: context.organisationId },
-    {
-      type: "sync.run_status_changed",
-      payload: {
+  try {
+    await publishOrganisationNotificationEvent(
+      {
+        clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
-        runId,
-        runType: "approval_state_reconciliation",
-        status,
-        xeroTenantId: context.xeroTenantId,
       },
-    }
-  );
+      {
+        type: "sync.run_status_changed",
+        payload: {
+          organisationId: context.organisationId,
+          runId,
+          runType: "approval_state_reconciliation",
+          status,
+          xeroTenantId: context.xeroTenantId,
+        },
+      }
+    );
+  } catch (error) {
+    log.error("Failed to publish sync run status notification", {
+      error,
+      organisationId: context.organisationId,
+      runId,
+    });
+  }
 }
 
 function auditBase(

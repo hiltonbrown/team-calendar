@@ -1,17 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-interface NotificationStreamEvent {
-  payload: unknown;
-  type: string;
-}
-
-type NotificationStreamCallback = (event: NotificationStreamEvent) => void;
-
 const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   organisationFindFirst: vi.fn(),
+  pollNotificationStream: vi.fn(),
   requireOrg: vi.fn(),
-  subscribeToNotificationStream: vi.fn(),
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
@@ -24,7 +17,7 @@ vi.mock("@repo/database", () => ({
   },
 }));
 vi.mock("@repo/notifications", () => ({
-  subscribeToNotificationStream: mocks.subscribeToNotificationStream,
+  pollNotificationStream: mocks.pollNotificationStream,
 }));
 
 const { GET } = await import("./route");
@@ -40,7 +33,7 @@ describe("notifications stream route", () => {
     mocks.organisationFindFirst.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000001",
     });
-    mocks.subscribeToNotificationStream.mockReturnValue(() => undefined);
+    mocks.pollNotificationStream.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -123,14 +116,8 @@ describe("notifications stream route", () => {
     await response.body?.cancel();
   });
 
-  it("does not throw when enqueue is attempted after the stream is cancelled", async () => {
+  it("stops polling when the stream is cancelled", async () => {
     vi.useFakeTimers();
-    let callback: NotificationStreamCallback | null = null;
-    const unsubscribe = vi.fn();
-    mocks.subscribeToNotificationStream.mockImplementation((_context, next) => {
-      callback = next;
-      return unsubscribe;
-    });
 
     const response = await GET(
       new Request(
@@ -142,9 +129,8 @@ describe("notifications stream route", () => {
     await reader?.cancel();
 
     expect(() => {
-      callback?.({ payload: { unreadCount: 1 }, type: "notification.updated" });
       vi.advanceTimersByTime(25_001);
     }).not.toThrow();
-    expect(unsubscribe).toHaveBeenCalled();
+    expect(mocks.pollNotificationStream).toHaveBeenCalledTimes(1);
   });
 });
