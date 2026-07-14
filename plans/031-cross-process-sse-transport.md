@@ -109,7 +109,9 @@ export function publishOrganisationNotificationEvent(input, event): void { /* it
 - `packages/notifications/index.ts` — the package root re-exports the broker API
   (`subscribeToNotificationStream`, `listenerCount` at index.ts:32, the publish
   functions); update the re-exports to match the new surface.
-- Tests: `broker.test.ts`.
+- Tests: `broker.test.ts`, plus `apps/api/app/api/notifications/stream/route.test.ts`
+  to replace the removed subscription mock and retain route-level coverage of
+  polling cleanup.
 
 **Out of scope**:
 - The event shape `NotificationSseEvent` and `streamKey` format.

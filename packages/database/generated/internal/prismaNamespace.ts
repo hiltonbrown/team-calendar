@@ -3376,6 +3376,7 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   stripe_subscription_id: 'stripe_subscription_id',
   cancel_at_period_end: 'cancel_at_period_end',
   ended_at: 'ended_at',
+  stripe_event_created_at: 'stripe_event_created_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const

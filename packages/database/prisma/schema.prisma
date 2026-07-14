@@ -1077,18 +1077,19 @@ model PlanLimit {
 }
 
 model ClerkOrgSubscription {
-  id                     String    @id @default(uuid()) @db.Uuid
-  clerk_org_id           String    @unique
-  plan_key               String
-  status                 String
-  current_period_end     DateTime?
-  seats_purchased        Int       @default(1)
-  stripe_customer_id     String?
-  stripe_subscription_id String?
-  cancel_at_period_end   Boolean   @default(false)
-  ended_at               DateTime?
-  created_at             DateTime  @default(now())
-  updated_at             DateTime  @updatedAt
+  id                      String    @id @default(uuid()) @db.Uuid
+  clerk_org_id            String    @unique
+  plan_key                String
+  status                  String
+  current_period_end      DateTime?
+  seats_purchased         Int       @default(1)
+  stripe_customer_id      String?
+  stripe_subscription_id  String?
+  cancel_at_period_end    Boolean   @default(false)
+  ended_at                DateTime?
+  stripe_event_created_at DateTime?
+  created_at              DateTime  @default(now())
+  updated_at              DateTime  @updatedAt
 
   // Relation keyed on plan_key -> plans.key to avoid changing the existing column or
   // breaking billing-service.ts, which reads subscription.plan_key directly.
