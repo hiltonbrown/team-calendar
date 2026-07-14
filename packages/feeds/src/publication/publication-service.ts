@@ -196,7 +196,7 @@ function projectPublishedRecord(record: RecordRow): {
 
   return {
     allDay: record.all_day,
-    description: record.privacy_mode === "named" ? record.notes_internal : null,
+    description: null,
     privacyMode: record.privacy_mode,
     summary: projectSummaryLine({
       displayName,
@@ -249,7 +249,6 @@ const recordPublicationSelect = {
   clerk_org_id: true,
   derived_uid_key: true,
   id: true,
-  notes_internal: true,
   organisation_id: true,
   person_id: true,
   privacy_mode: true,
