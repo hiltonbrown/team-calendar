@@ -370,44 +370,6 @@ export const updateManualAvailability = async (
   }
 };
 
-export const updateAvailabilityApprovalStatus = async (
-  tenant: TenantContext,
-  recordId: string,
-  approvalStatus: "approved" | "declined",
-  userId: string
-): Promise<Result<void>> => {
-  const existing = await database.availabilityRecord.findFirst({
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      approval_status: "submitted",
-      id: recordId,
-    },
-  });
-
-  if (!existing) {
-    return {
-      ok: false,
-      error: appError("not_found", "Pending availability record not found"),
-    };
-  }
-
-  await database.availabilityRecord.update({
-    where: { id: recordId },
-    data: {
-      approval_status: approvalStatus,
-      approved_at: approvalStatus === "approved" ? new Date() : null,
-      publish_status:
-        approvalStatus === "approved" ? existing.publish_status : "suppressed",
-      updated_by_user_id: userId,
-    },
-  });
-
-  await materialisePublication(tenant, recordId);
-
-  return { ok: true, value: undefined };
-};
-
 export const archiveManualAvailability = async (
   tenant: TenantContext,
   recordId: string,

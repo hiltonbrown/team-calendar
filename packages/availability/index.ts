@@ -188,7 +188,6 @@ export {
   createManualAvailability,
   listAvailabilityRecords,
   ManualAvailabilityInputSchema,
-  updateAvailabilityApprovalStatus,
   updateManualAvailability,
 } from "./src/records/manual-records-service";
 export * from "./src/records/record-type-categories";
