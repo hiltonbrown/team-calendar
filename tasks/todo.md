@@ -1,11 +1,18 @@
-# Plan 023: Stop the ICS feed cache from invalidating its own key on every render
+# Plan 024: Remove the orphaned, unauthorised approval-write action and service function
 
 ## Tasks
 - [x] Drift check and git verification
-- [x] Step 1: Inventory every feedCacheKey caller
-- [x] Step 2: Remove feedUpdatedAt from the key
-- [x] Step 3: Update all call sites
-- [x] Step 4: Prove the render/rebuild keys match and survive an updated_at bump
-- [x] Step 5: Confirm the invalidation paths cover every content change
-- [ ] Git commit and cleanup (skip plans/README.md update)
+- [x] Step 1: Confirm the code is dead
+- [x] Step 2: Delete the orphaned action file `apps/app/app/actions/availability/approval.ts`
+- [x] Step 3: Delete the orphaned service function and its export
+- [x] Step 4: Full verification (`bun run typecheck`, `bun run test`, `bun run check`)
+- [x] Commit work on branch `improve/024-remove-orphaned-approval-action`
+
+## Review
+- Drift check completed successfully: 0 changes between `123bbd8` and `HEAD` for in-scope files.
+- Confirmed code is dead: ran grep for `updateAvailabilityApprovalAction` and `updateAvailabilityApprovalStatus`, confirming no live callers in the codebase.
+- Deleted `apps/app/app/actions/availability/approval.ts`.
+- Removed `updateAvailabilityApprovalStatus` from `manual-records-service.ts` and its re-export from `packages/availability/index.ts`.
+- Successfully ran typecheck (`bun run typecheck`), lint/format checks (`bun run check`), and unit tests (`bun run test`). All checks passed.
+- Staged and committed changes on branch `improve/024-remove-orphaned-approval-action` under commit `7b71d75`.
 
