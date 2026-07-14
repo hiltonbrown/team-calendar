@@ -229,14 +229,15 @@ export async function withdrawSubmission(
         throw new OptimisticConflictError();
       }
 
-      await notifyManager(tx, parsed.data, record, "leave_withdrawn", {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-      });
       await tx.auditEvent.create({
         data: auditData(parsed.data, "availability_records.withdrawn", {
           xeroLeaveApplicationId,
         }),
       });
+    });
+
+    await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
+      actionUrl: `/leave-approvals?recordId=${record.id}`,
     });
 
     const updated = await loadBareRecord(parsed.data);
@@ -349,14 +350,15 @@ async function performSubmission(
         throw new OptimisticConflictError();
       }
 
-      await notifyManager(tx, parsed.data, record, "leave_submitted", {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-      });
       await tx.auditEvent.create({
         data: auditData(parsed.data, options.successAuditAction, {
           xeroLeaveApplicationId: submission.value.remoteId,
         }),
       });
+    });
+
+    await notifyManagerBestEffort(parsed.data, record, "leave_submitted", {
+      actionUrl: `/leave-approvals?recordId=${record.id}`,
     });
 
     const updated = await loadBareRecord(parsed.data);
@@ -636,6 +638,25 @@ async function notifyManager(
   );
   if (!result.ok) {
     throw new NotificationCreateError();
+  }
+}
+
+async function notifyManagerBestEffort(
+  input: RecordActionInput,
+  record: LoadedRecord,
+  type: "leave_submitted" | "leave_withdrawn",
+  options: { actionUrl: string }
+): Promise<void> {
+  try {
+    await notifyManager(database, input, record, type, options);
+  } catch (error) {
+    log.error("Failed to dispatch manager notification", {
+      availabilityRecordId: record.id,
+      clerkOrgId: input.clerkOrgId,
+      error: error instanceof Error ? error.message : "Unknown error",
+      organisationId: input.organisationId,
+      type,
+    });
   }
 }
 
