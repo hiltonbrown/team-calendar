@@ -21,6 +21,7 @@ import type {
 } from "../write/types";
 
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
+const XERO_PAGE_SIZE = 100;
 
 // Xero permits 60 calls/min per connected organisation. Space the per-employee
 // detail reads at least this far apart so a full balance sync stays within that
@@ -58,37 +59,45 @@ export async function fetchEmployees(input: {
   }
 
   try {
-    const response = await xeroFetch({
-      init: {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+    const employees: XeroEmployee[] = [];
+    let page = 1;
+    let rawResponse: unknown = null;
+
+    while (true) {
+      const response = await xeroFetch({
+        init: {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${decryptedAccessToken}`,
+            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          },
+          method: "GET",
         },
-        method: "GET",
-      },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
-      url: `${baseUrl()}/payroll.xro/1.0/Employees`,
-    });
-    const rawPayload = await readXeroPayload(response);
+        orgKey: orgRateLimitKey({
+          clerkOrgId: input.xeroTenant.clerk_org_id,
+          organisationId: input.xeroTenant.organisation_id,
+        }),
+        url: `${baseUrl()}/payroll.xro/1.0/Employees?page=${page}`,
+      });
+      const rawPayload = await readXeroPayload(response);
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        error: mapXeroReadHttpError(response, rawPayload),
-      };
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: mapXeroReadHttpError(response, rawPayload),
+        };
+      }
+
+      rawResponse ??= rawPayload;
+      const employeePage = mapXeroEmployees(rawPayload);
+      employees.push(...employeePage);
+
+      if (employeePage.length < XERO_PAGE_SIZE) {
+        return { ok: true, value: { employees, rawResponse } };
+      }
+
+      page += 1;
     }
-
-    return {
-      ok: true,
-      value: {
-        rawResponse: rawPayload,
-        employees: mapXeroEmployees(rawPayload),
-      },
-    };
   } catch (error) {
     return {
       ok: false,
@@ -104,7 +113,11 @@ export async function fetchEmployees(input: {
 export async function fetchLeaveRecords(input: {
   xeroTenant: XeroTenantForWrite;
 }): Promise<
-  XeroWriteResult<{ leaveRecords: XeroLeaveRecord[]; rawResponse: unknown }>
+  XeroWriteResult<{
+    complete: boolean;
+    leaveRecords: XeroLeaveRecord[];
+    rawResponse: unknown;
+  }>
 > {
   const accessToken = input.xeroTenant.xero_connection.access_token_encrypted;
   const decryptedAccessToken = decryptXeroToken({
@@ -124,37 +137,48 @@ export async function fetchLeaveRecords(input: {
   }
 
   try {
-    const response = await xeroFetch({
-      init: {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${decryptedAccessToken}`,
-          "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+    const leaveRecords: XeroLeaveRecord[] = [];
+    let page = 1;
+    let rawResponse: unknown = null;
+
+    while (true) {
+      const response = await xeroFetch({
+        init: {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${decryptedAccessToken}`,
+            "Xero-Tenant-Id": input.xeroTenant.xero_tenant_id,
+          },
+          method: "GET",
         },
-        method: "GET",
-      },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
-      url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications`,
-    });
-    const rawPayload = await readXeroPayload(response);
+        orgKey: orgRateLimitKey({
+          clerkOrgId: input.xeroTenant.clerk_org_id,
+          organisationId: input.xeroTenant.organisation_id,
+        }),
+        url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications?page=${page}`,
+      });
+      const rawPayload = await readXeroPayload(response);
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        error: mapXeroReadHttpError(response, rawPayload),
-      };
+      if (!response.ok) {
+        return {
+          ok: false,
+          error: mapXeroReadHttpError(response, rawPayload),
+        };
+      }
+
+      rawResponse ??= rawPayload;
+      const leaveRecordPage = mapXeroLeaveRecords(rawPayload);
+      leaveRecords.push(...leaveRecordPage);
+
+      if (leaveRecordPage.length < XERO_PAGE_SIZE) {
+        return {
+          ok: true,
+          value: { complete: true, leaveRecords, rawResponse },
+        };
+      }
+
+      page += 1;
     }
-
-    return {
-      ok: true,
-      value: {
-        leaveRecords: mapXeroLeaveRecords(rawPayload),
-        rawResponse: rawPayload,
-      },
-    };
   } catch (error) {
     return {
       ok: false,

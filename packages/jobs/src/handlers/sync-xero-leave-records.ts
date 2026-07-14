@@ -179,7 +179,7 @@ export async function syncXeroLeaveRecords(
       };
     }
 
-    const fetched = leaveRecordsResult.value.leaveRecords;
+    const { complete, leaveRecords: fetched } = leaveRecordsResult.value;
     counts.fetched = fetched.length;
     const processed: ProcessedLeaveRecord[] = [];
 
@@ -238,10 +238,22 @@ export async function syncXeroLeaveRecords(
       }
     }
 
-    const stale = await archiveStaleRecords(
-      context,
-      fetched.map((record) => record.leaveApplicationId).filter(Boolean)
-    );
+    const stale = complete
+      ? await archiveStaleRecords(
+          context,
+          fetched.map((record) => record.leaveApplicationId).filter(Boolean)
+        )
+      : { archived: 0, personIds: [] };
+    if (!complete) {
+      log.warn(
+        "Skipped stale-archive because the Xero leave fetch was truncated",
+        {
+          clerkOrgId: context.clerkOrgId,
+          organisationId: context.organisationId,
+          xeroTenantId: context.xeroTenantId,
+        }
+      );
+    }
     counts.archived = stale.archived;
     const affectedPersonIds = new Set([
       ...processed

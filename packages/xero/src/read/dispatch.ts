@@ -82,7 +82,11 @@ export async function fetchLeaveRecordsForRegion(
   payrollRegion: PayrollRegion | string,
   input: { xeroTenant: XeroTenantForWrite }
 ): Promise<
-  XeroWriteResult<{ leaveRecords: XeroLeaveRecord[]; rawResponse: unknown }>
+  XeroWriteResult<{
+    complete: boolean;
+    leaveRecords: XeroLeaveRecord[];
+    rawResponse: unknown;
+  }>
 > {
   switch (payrollRegion) {
     case "AU":

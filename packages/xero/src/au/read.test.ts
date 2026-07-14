@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptXeroToken } from "../crypto/tokens";
-import { fetchLeaveBalances } from "./read";
+import { fetchLeaveBalances, fetchLeaveRecords } from "./read";
 
 const ORIGINAL_ENV = process.env.XERO_TOKEN_ENCRYPTION_KEY;
 const TEST_ENCRYPTION_KEY = Buffer.alloc(32).toString("base64");
@@ -58,6 +58,81 @@ function errorResponse(status: number, message: string): Response {
     statusText: message,
   });
 }
+
+function leaveApplicationsResponse(ids: string[]): Response {
+  return new Response(
+    JSON.stringify({
+      LeaveApplications: ids.map((id) => ({
+        EmployeeID: "00000000-0000-4000-8000-000000000001",
+        EndDate: "2026-05-08",
+        LeaveApplicationID: id,
+        LeavePeriods: [{ NumberOfUnits: 7.6 }],
+        LeaveTypeID: "annual",
+        StartDate: "2026-05-07",
+        Status: "APPROVED",
+      })),
+    }),
+    { status: 200 }
+  );
+}
+
+describe("AU leave record reads", () => {
+  beforeEach(() => {
+    process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    restoreEncryptionKey();
+  });
+
+  it("accumulates a full page and a following short page", async () => {
+    const firstPageIds = Array.from(
+      { length: 100 },
+      (_, index) => `leave-${index + 1}`
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(leaveApplicationsResponse(firstPageIds))
+      .mockResolvedValueOnce(leaveApplicationsResponse(["leave-101"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.value.complete).toBe(true);
+      expect(
+        result.value.leaveRecords.map((record) => record.leaveApplicationId)
+      ).toEqual([...firstPageIds, "leave-101"]);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      expect.stringContaining("/LeaveApplications?page=1"),
+      expect.stringContaining("/LeaveApplications?page=2"),
+    ]);
+  });
+
+  it("marks a single short page as complete", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(leaveApplicationsResponse(["leave-1"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        complete: true,
+        leaveRecords: [
+          expect.objectContaining({ leaveApplicationId: "leave-1" }),
+        ],
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("AU leave balance reads", () => {
   beforeEach(() => {
