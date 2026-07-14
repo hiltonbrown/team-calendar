@@ -54,9 +54,11 @@ const FilterSchema = z.object({
       "xero_sync_failed",
       "withdrawn",
     ])
-  ).default(["submitted"]),
+  ).optional(),
 });
-type ApprovalStatusFilter = z.infer<typeof FilterSchema>["status"][number];
+type ApprovalStatusFilter = NonNullable<
+  z.infer<typeof FilterSchema>["status"]
+>[number];
 
 const LeaveApprovalsPage = async ({
   searchParams,
@@ -95,20 +97,19 @@ const LeaveApprovalsPage = async ({
     return <PermissionDeniedState />;
   }
 
-  const parsedFilters = parseFilterParams(params, FilterSchema) ?? {
-    includeFailed: false,
-    status: ["submitted"],
-  };
-  const status: ApprovalStatusFilter[] = parsedFilters.status ?? ["submitted"];
-  const statusWithFailed: ApprovalStatusFilter[] =
-    parsedFilters.includeFailed && !status.includes("xero_sync_failed")
+  const parsedFilters = parseFilterParams(params, FilterSchema);
+  const status: ApprovalStatusFilter[] | undefined = parsedFilters?.status;
+  const statusWithFailed: ApprovalStatusFilter[] | undefined =
+    status &&
+    parsedFilters?.includeFailed &&
+    !status.includes("xero_sync_failed")
       ? [...status, "xero_sync_failed"]
       : status;
   const filters = {
-    dateFrom: parsedFilters.dateFrom,
-    dateTo: parsedFilters.dateTo,
-    personId: parsedFilters.personId,
-    recordType: parsedFilters.recordType,
+    dateFrom: parsedFilters?.dateFrom,
+    dateTo: parsedFilters?.dateTo,
+    personId: parsedFilters?.personId,
+    recordType: parsedFilters?.recordType,
     status: statusWithFailed,
   };
 
@@ -142,8 +143,8 @@ const LeaveApprovalsPage = async ({
         <LeaveApprovalsClient
           canDispatchReconciliation={role === "admin"}
           filters={{
-            includeFailed: parsedFilters.includeFailed ?? false,
-            status,
+            includeFailed: parsedFilters?.includeFailed ?? false,
+            status: parsedFilters?.status ?? ["submitted"],
           }}
           items={approvalsResult.value}
           organisationId={organisationId}
