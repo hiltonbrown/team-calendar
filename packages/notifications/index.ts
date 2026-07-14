@@ -30,12 +30,12 @@ export {
   upsertPreference,
 } from "./src/preferences-service";
 export {
-  listenerCount,
   type NotificationSseEvent,
+  notificationSseChannel,
+  pollNotificationStream,
   publishNotificationEvent,
   publishOrganisationNotificationEvent,
   streamKey,
-  subscribeToNotificationStream,
 } from "./src/sse/broker";
 export {
   categoryLabel,
