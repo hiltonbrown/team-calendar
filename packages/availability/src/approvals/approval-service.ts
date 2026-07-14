@@ -151,7 +151,7 @@ const FiltersSchema = z.object({
   dateTo: z.coerce.date().optional(),
   personId: z.array(z.string().uuid()).optional(),
   recordType: z.array(RecordTypeSchema).optional(),
-  status: z.array(ApprovalStatusSchema).default(["submitted"]),
+  status: z.array(ApprovalStatusSchema).optional(),
 });
 
 const ListSchema = z.object({
@@ -236,11 +236,14 @@ export async function listForApprover(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    const filters = parsed.data.filters ?? {
-      status:
-        settingsResult.ok && !settingsResult.value.showDeclinedOnApprovals
-          ? ["submitted", "approved", "xero_sync_failed", "withdrawn"]
-          : ["submitted"],
+    const showDeclined =
+      settingsResult.ok && settingsResult.value.showDeclinedOnApprovals;
+    const defaultStatus: z.infer<typeof ApprovalStatusSchema>[] = showDeclined
+      ? ["submitted", "approved", "xero_sync_failed", "withdrawn", "declined"]
+      : ["submitted", "approved", "xero_sync_failed", "withdrawn"];
+    const filters = {
+      ...parsed.data.filters,
+      status: parsed.data.filters?.status ?? defaultStatus,
     };
     const managedPersonIds =
       parsed.data.role === "manager" && parsed.data.actingPersonId

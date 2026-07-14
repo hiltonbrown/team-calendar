@@ -51,7 +51,7 @@ status is preserved.
 | 019 | Harden the Xero token refresh strategy (classify errors, mark stale, lock manual path) | P1 | M | none | DONE, implemented in `9c17067`, landed and verified at `2bba19c` |
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE, implemented in `9aa0bcc`, verified at `2bba19c` |
 | 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | DONE, implemented in `040848a`, verified at `2bba19c` |
-| 022 | Make `showDeclinedOnApprovals` functional and fix the inverted service default | P1 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 022 | Make `showDeclinedOnApprovals` functional and fix the inverted service default | P1 | S-M | none | DONE, implemented in `4f3484c`, verified at `preview` |
 | 023 | Stop the ICS feed cache from invalidating its own key | P1 | S | none | DONE, implemented in `a402274` |
 | 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, implemented in `7b71d75` |
 | 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, implemented in `f6ce0cf` |

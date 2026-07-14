@@ -595,4 +595,84 @@ describe("approval-service", () => {
       balanceRemainingAfterApproval: 3,
     });
   });
+
+  it("includes declined and xero_sync_failed in the default filter when showDeclinedOnApprovals is true", async () => {
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: [
+              "submitted",
+              "approved",
+              "xero_sync_failed",
+              "withdrawn",
+              "declined",
+            ],
+          },
+        }),
+      })
+    );
+  });
+
+  it("omits declined but includes xero_sync_failed in the default filter when showDeclinedOnApprovals is false", async () => {
+    mocks.getSettings.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        defaultFeedPrivacyMode: "named",
+        defaultLeaveRequestAdvanceDays: 0,
+        defaultPrivacyMode: "named",
+        feedsIncludePublicHolidaysDefault: false,
+        id: "settings_1",
+        managerVisibilityScope: "direct_reports_only",
+        notifyManagersOnStatusChange: true,
+        organisationId: input.organisationId,
+        requireDeclineReason: true,
+        showDeclinedOnApprovals: false,
+        showPendingOnCalendar: true,
+      },
+    });
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: ["submitted", "approved", "xero_sync_failed", "withdrawn"],
+          },
+        }),
+      })
+    );
+  });
+
+  it("passes explicit status filter through unchanged", async () => {
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+      filters: { status: ["submitted"] },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: ["submitted"],
+          },
+        }),
+      })
+    );
+  });
 });
