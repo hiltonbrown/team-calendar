@@ -67,7 +67,9 @@ numbering and status is preserved.
 | 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
 | 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
 | 036 | Enable withdraw of approved leave + admin-withdraw-any (spike-first) | P3 | S-M | none (032 landed) | TODO, **refreshed at `dabb529`** after drift; admin-any found already implemented |
-| 037 | Run CI on `preview`, and unbreak the formatter so it passes | P1 | S | none | TODO (added by reconcile 2026-07-14, planned at `dabb529`) |
+| 037 | Run CI on `preview`, and unbreak the formatter so it passes | P1 | S | none | DONE (executed + reviewed 2026-07-14), branch `improve/037-ci-on-preview` (`d838a9a`, `975412d`), **awaiting user merge to `preview`** — `bun run check` now 0 errors across 693 files |
+| 038 | Scope `bun run fix` to match `bun run check` (or ignore `.design-sync`) | P2 | S | none | NOT YET WRITTEN — finding surfaced during 037 execution, see below |
+| 039 | Fix flaky `apps/app` test teardown (`ReferenceError: window is not defined`) | P2 | S-M | none | NOT YET WRITTEN — finding surfaced during 037 review, see below |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -105,6 +107,35 @@ never re-wrapped. It is **purely cosmetic** (formatting only, no lint rule, no
 type error) and `bun run fix` resolves it. It is present on both `preview` and the
 `improve/026-stripe-ordering-guard` branch. This is the only thing standing
 between `preview` and a fully green gate.
+
+### New finding (2026-07-14, during 037): `check` and `fix` disagree on scope
+
+Root `package.json`:
+
+```json
+"check": "ultracite check apps packages scripts tooling tsup.config.ts next-env.d.ts",
+"fix":   "ultracite fix",
+```
+
+`check` (what CI runs) is path-scoped and never inspects `.design-sync/`. `fix` is
+repo-wide and rewrites 43 tracked `.design-sync/` files, then still exits 1 on
+`useFilenamingConvention` errors it cannot auto-fix. CLAUDE.md documents
+`bun run fix` as *the* autofix command, so anyone following it dirties their tree
+with churn the gate does not even check. Fix by scoping `fix` to match `check`, or
+by adding `.design-sync` to `files.includes` in `biome.jsonc`. Candidate plan 038.
+
+### New finding (2026-07-14, during 037 review): `apps/app` test suite is flaky
+
+On a forced (uncached) run, `app#test` intermittently exits 1 — roughly 2 runs in
+10 — with `ReferenceError: window is not defined`, **while all 48 test files and
+148 tests pass**. It is an unhandled error during jsdom teardown (async work still
+touching `window` after the environment is torn down), not a failing assertion.
+
+This matters *because* of 037: CI now runs on `preview`, so this flake will make
+the new gate intermittently red for reasons unrelated to the code under test —
+the fastest way to teach a team to ignore a gate. Verified pre-existing and
+unrelated to 037 (`apps/app` contains zero references to the file 037 changed).
+Candidate plan 039.
 
 ### Structural finding: CI never runs on `preview`
 

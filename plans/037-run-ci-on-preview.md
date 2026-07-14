@@ -94,18 +94,37 @@ on:
   last-writer-by-event-time, and that behaviour must be preserved exactly.
 
 - Conventions: Biome 2 + Ultracite enforce style; config in `biome.jsonc` at the
-  repo root. `bun run fix` auto-applies formatting fixes; `bun run check` verifies.
+  repo root.
+
+- **Important trap — `check` and `fix` do not cover the same files.** In the root
+  `package.json`:
+
+```json
+"check": "ultracite check apps packages scripts tooling tsup.config.ts next-env.d.ts",
+"fix": "ultracite fix",
+```
+
+  `check` (which is what CI runs) is **path-scoped** and never looks at
+  `.design-sync/`. `fix` takes **no path arguments** and so rewrites the entire
+  repo, including 43 tracked files under `.design-sync/` that carry pre-existing
+  formatting and `useFilenamingConvention` debt the gate does not care about.
+  **Do not run `bun run fix` for this plan.** Use the scoped command in Step 1.
+  (The `check`/`fix` scope mismatch is itself a real DX defect, but it is a
+  separate finding and explicitly out of scope here.)
 
 ## Commands you will need
 
-| Purpose   | Command                                                    | Expected on success |
-|-----------|------------------------------------------------------------|---------------------|
-| Install   | `bun install --frozen-lockfile`                            | exit 0              |
-| Autofix   | `bun run fix`                                              | exit 0              |
-| Lint      | `bun run check`                                            | exit 0              |
-| Typecheck | `bun run typecheck`                                        | exit 0              |
-| Tests     | `bun run test`                                             | all tasks pass      |
-| Targeted  | `bunx biome check apps/api/app/webhooks/payments/route.ts` | exit 0, no errors   |
+| Purpose   | Command                                                            | Expected on success |
+|-----------|--------------------------------------------------------------------|---------------------|
+| Install   | `bun install --frozen-lockfile`                                    | exit 0              |
+| Autofix   | `bunx biome check --write apps/api/app/webhooks/payments/route.ts` | exit 0, 1 file fixed |
+| Lint      | `bun run check`                                                    | exit 0              |
+| Typecheck | `bun run typecheck`                                                | exit 0              |
+| Tests     | `bun run test`                                                     | all tasks pass      |
+| Targeted  | `bunx biome check apps/api/app/webhooks/payments/route.ts`         | exit 0, no errors   |
+
+Note the autofix command is **scoped to the single file**. Do not use the repo-wide
+`bun run fix` — see the trap described in "Current state".
 
 ## Scope
 
@@ -137,9 +156,18 @@ on:
 
 ### Step 1: Unbreak the formatter (do this FIRST)
 
-Run `bun run fix`. Expect it to reformat exactly the two `mirrorSubscription(...)`
-calls in `apps/api/app/webhooks/payments/route.ts`, wrapping each across multiple
-lines as shown in "Current state".
+Run the **scoped** autofix:
+
+```
+bunx biome check --write apps/api/app/webhooks/payments/route.ts
+```
+
+Do **not** run `bun run fix` — it is unscoped and will drag 43 unrelated
+`.design-sync/` files into your diff (see "Current state").
+
+Expect it to reformat exactly the two `mirrorSubscription(...)` calls in
+`apps/api/app/webhooks/payments/route.ts`, wrapping each across multiple lines as
+shown in "Current state".
 
 Then inspect `git diff` and confirm the change is **purely formatting**: same
 arguments, same order, same `?? new Date()` fallback, no other files touched.
@@ -209,12 +237,15 @@ ALL must hold:
 
 Stop and report back (do not improvise) if:
 
-- `bun run fix` reformats files **beyond** `apps/api/app/webhooks/payments/route.ts`.
-  That means other formatting debt has accumulated; report the file list and let
-  the reviewer decide whether it belongs in this plan or a separate cleanup.
+- The scoped autofix modifies any file other than
+  `apps/api/app/webhooks/payments/route.ts`. (If you see `.design-sync/` files in
+  `git status`, you ran `bun run fix` instead of the scoped command — revert them
+  with `git checkout -- .design-sync/` and re-read Step 1.)
 - `bun run check` still fails after Step 1 with a **lint rule** error (not a
   formatter error). A lint-rule failure is a different defect than the one this
-  plan diagnosed — report the rule and file rather than suppressing it.
+  plan diagnosed — report the rule and file rather than suppressing it. Verified
+  at commit `7622868`: `bun run check` reports exactly **one** error, the payments
+  route formatter break. If you see more, that is drift — stop.
 - `bun run test` fails after the reformat. A formatting change cannot break tests;
   if it does, something else is wrong on `preview` and must be investigated first.
 - Any excerpt in "Current state" does not match live code (drift).
@@ -225,6 +256,14 @@ Stop and report back (do not improvise) if:
   an isolated executor worktree and each passed. The break existed only in the
   merged result. Per-worktree verification does not substitute for a gate on the
   integration branch — which is exactly what this plan restores.
+- **New finding surfaced during execution (not fixed here):** `bun run check` is
+  path-scoped (`apps packages scripts tooling ...`) while `bun run fix` is
+  repo-wide. CLAUDE.md documents `bun run fix` as *the* autofix command, so any
+  developer or agent who follows it dirties 43 tracked `.design-sync/` files with
+  formatting the gate never checks — and `fix` still exits 1 on
+  `useFilenamingConvention` errors there that it cannot auto-resolve. Either scope
+  `fix` to match `check`, or add `.design-sync` to the `files.includes` ignore list
+  in `biome.jsonc`. Worth its own plan.
 - Consider making the `CI` check **required** on `preview` in GitHub branch
   protection settings. That is a repo-settings change, not a file change, so it is
   out of scope here, but without it CI on `preview` is advisory only and a red run
