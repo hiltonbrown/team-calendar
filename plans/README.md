@@ -52,9 +52,9 @@ status is preserved.
 | 020 | Replace Clerk pricing table fallback with static catalogue-driven pricing cards | P1 | S | 006 | DONE, implemented in `9aa0bcc`, verified at `2bba19c` |
 | 021 | Isolate reconciliation integration fixture IDs | P1 | S | none | DONE, implemented in `040848a`, verified at `2bba19c` |
 | 022 | Make `showDeclinedOnApprovals` functional and fix the inverted service default | P1 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 023 | Stop the ICS feed cache from invalidating its own key | P1 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 023 | Stop the ICS feed cache from invalidating its own key | P1 | S | none | DONE, implemented in `a402274` |
+| 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, implemented in `7b71d75` |
+| 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, implemented in `f6ce0cf` |
 | 026 | Guard the Stripe subscription mirror against out-of-order webhooks | P2 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
