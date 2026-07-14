@@ -56,11 +56,11 @@ status is preserved.
 | 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, implemented in `7b71d75` |
 | 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, implemented in `f6ce0cf` |
 | 026 | Guard the Stripe subscription mirror against out-of-order webhooks | P2 | S | none | DONE, implemented in `7bc1491` |
-| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | DONE, reviewed executor commit `12efa92` in isolated worktree `subagent-Xero-Pagination-Executor-self-e4c7669e` |
 | 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 029 | Stop publishing `notes_internal` into the token-served ICS feed | P2 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, implemented in `ab1be48`, verified in isolated worktree on 2026-07-14 |
+| 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | DONE, reviewed executor commit `6dd5d99` in isolated worktree `improve/031-sse-cross-process-transport` |
 | 032 | Stop notification failures rolling back Xero-confirmed state transitions | P2 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
@@ -91,8 +91,8 @@ see the individual plans for corrections). Recommended execution order: the
 quick correctness/security fixes 022-024 first, then 027 (the highest-impact
 data-loss bug — do not let it queue behind the P2 items just because of its
 number), then 025-026, the notification pair 030-031, the feeds pair 028-029,
-then 032-033 and the direction work 034-036. All are TODO; their status rows
-live in the single authoritative "Execution order & status" table above
+then 032-033 and the direction work 034-036. Refer to the single authoritative
+"Execution order & status" table above for each plan's current status.
 (rows 022-036).
 
 ### Batch dependency notes

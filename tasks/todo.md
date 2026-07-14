@@ -9,3 +9,11 @@
 - [x] Step 3: Regenerate Prisma client and typecheck the workspace
 - [x] Verify Step 3: Run `bun run typecheck`
 - [x] Git commit and prepare report
+
+## Merge consolidation: preview
+
+- [x] Inventory worktrees, branches, and uncommitted changes
+- [ ] Commit outstanding worktree changes to their owning branches
+- [ ] Integrate all distinct work into `preview`, preserving existing equivalent fixes
+- [ ] Verify repository topology and targeted checks
+- [ ] Record merge result
