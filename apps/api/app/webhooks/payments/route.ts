@@ -43,7 +43,10 @@ const objectId = (value: string | { id: string } | null | undefined) =>
 const dateFromSeconds = (value: number | null | undefined) =>
   value ? new Date(value * 1000) : null;
 
-async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
+async function mirrorSubscription(
+  data: z.infer<typeof SubscriptionSchema>,
+  eventCreatedAt: Date
+) {
   const clerkOrgId = data.metadata?.clerk_org_id;
   if (!clerkOrgId) {
     log.error("Stripe subscription event missing clerk_org_id metadata.", {
@@ -68,6 +71,7 @@ async function mirrorSubscription(data: z.infer<typeof SubscriptionSchema>) {
     planKey: plan.value,
     status: data.status,
     stripeCustomerId: objectId(data.customer),
+    stripeEventCreatedAt: eventCreatedAt,
     stripeSubscriptionId: data.id,
   });
   const organisationId =
@@ -101,6 +105,7 @@ const INVOICE_EVENT_TYPES = new Set(["invoice.payment_failed", "invoice.paid"]);
 // Only the fields these handlers read; avoids importing the Stripe SDK type
 // into a route that otherwise depends on it only via @repo/billing.
 interface StripeEventLike {
+  created: number;
   data: { object: unknown };
   id: string;
   type: string;
@@ -109,7 +114,7 @@ interface StripeEventLike {
 async function handleSubscriptionEvent(event: StripeEventLike) {
   const parsed = SubscriptionSchema.safeParse(event.data.object);
   if (parsed.success) {
-    await mirrorSubscription(parsed.data);
+    await mirrorSubscription(parsed.data, dateFromSeconds(event.created) ?? new Date());
     return;
   }
   log.error("Stripe subscription event failed validation and was skipped.", {
@@ -131,7 +136,7 @@ async function handleInvoiceEvent(event: StripeEventLike) {
   }
   const subscription = parsed.data.subscription;
   if (subscription && typeof subscription !== "string") {
-    await mirrorSubscription(subscription);
+    await mirrorSubscription(subscription, dateFromSeconds(event.created) ?? new Date());
   } else if (subscription) {
     log.info(
       "Stripe invoice event carried no expanded subscription and was skipped.",

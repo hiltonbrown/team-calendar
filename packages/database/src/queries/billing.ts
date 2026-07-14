@@ -10,6 +10,7 @@ export interface SubscriptionMirrorInput {
   planKey: PlanKey;
   status: string;
   stripeCustomerId: string | null;
+  stripeEventCreatedAt: Date | null;
   stripeSubscriptionId: string | null;
 }
 
@@ -88,11 +89,12 @@ export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
   database.$executeRaw`
     INSERT INTO clerk_org_subscriptions (
       id, clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
-      stripe_subscription_id, cancel_at_period_end, ended_at, created_at, updated_at
+      stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at,
+      created_at, updated_at
     ) VALUES (
       gen_random_uuid(), ${input.clerkOrgId}, ${input.planKey}, ${input.status}, ${input.currentPeriodEnd},
       ${input.stripeCustomerId}, ${input.stripeSubscriptionId}, ${input.cancelAtPeriodEnd},
-      ${input.endedAt}, NOW(), NOW()
+      ${input.endedAt}, ${input.stripeEventCreatedAt}, NOW(), NOW()
     )
     ON CONFLICT (clerk_org_id) DO UPDATE SET
       plan_key = EXCLUDED.plan_key,
@@ -102,7 +104,11 @@ export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
       stripe_subscription_id = EXCLUDED.stripe_subscription_id,
       cancel_at_period_end = EXCLUDED.cancel_at_period_end,
       ended_at = EXCLUDED.ended_at,
+      stripe_event_created_at = EXCLUDED.stripe_event_created_at,
       updated_at = NOW()
+    WHERE clerk_org_subscriptions.stripe_event_created_at IS NULL
+       OR EXCLUDED.stripe_event_created_at IS NULL
+       OR clerk_org_subscriptions.stripe_event_created_at <= EXCLUDED.stripe_event_created_at
   `;
 
 export const isStripeEventProcessed = async (
