@@ -59,7 +59,7 @@ status is preserved.
 | 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 029 | Stop publishing `notes_internal` into the token-served ICS feed | P2 | S | none | DONE, implemented in `38818c9` |
-| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, implemented in `ab1be48`, verified in isolated worktree on 2026-07-14 |
 | 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 032 | Stop notification failures rolling back Xero-confirmed state transitions | P2 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
