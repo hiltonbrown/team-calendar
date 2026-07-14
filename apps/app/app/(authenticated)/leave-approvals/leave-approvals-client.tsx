@@ -84,7 +84,7 @@ interface LeaveApprovalsClientProps {
   canDispatchReconciliation: boolean;
   filters: {
     includeFailed: boolean;
-    status: string[];
+    status?: string[];
   };
   items: ApprovalItem[];
   organisationId: string;
@@ -212,10 +212,17 @@ export function LeaveApprovalsClient({
           <select
             className="h-10 rounded-xl bg-background px-3"
             onChange={(event) =>
-              setFilterParams({ status: event.currentTarget.value })
+              setFilterParams({
+                status: event.currentTarget.value || undefined,
+              })
             }
-            value={filters.status[0] ?? "submitted"}
+            value={
+              filters.status && filters.status.length === 1
+                ? filters.status[0]
+                : ""
+            }
           >
+            <option value="">All statuses</option>
             <option value="submitted">Pending approval</option>
             <option value="approved">Approved</option>
             <option value="declined">Declined</option>

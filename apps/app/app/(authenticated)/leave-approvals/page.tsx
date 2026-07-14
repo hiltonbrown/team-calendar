@@ -144,7 +144,7 @@ const LeaveApprovalsPage = async ({
           canDispatchReconciliation={role === "admin"}
           filters={{
             includeFailed: parsedFilters?.includeFailed ?? false,
-            status: parsedFilters?.status ?? ["submitted"],
+            status: parsedFilters?.status,
           }}
           items={approvalsResult.value}
           organisationId={organisationId}
