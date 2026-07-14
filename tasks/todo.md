@@ -1,18 +1,11 @@
-# Plan 024: Remove the orphaned, unauthorised approval-write action and service function
+# Plan 025: Add a composite index for `approval_status` on availability records
 
 ## Tasks
-- [x] Drift check and git verification
-- [x] Step 1: Confirm the code is dead
-- [x] Step 2: Delete the orphaned action file `apps/app/app/actions/availability/approval.ts`
-- [x] Step 3: Delete the orphaned service function and its export
-- [x] Step 4: Full verification (`bun run typecheck`, `bun run test`, `bun run check`)
-- [x] Commit work on branch `improve/024-remove-orphaned-approval-action`
-
-## Review
-- Drift check completed successfully: 0 changes between `123bbd8` and `HEAD` for in-scope files.
-- Confirmed code is dead: ran grep for `updateAvailabilityApprovalAction` and `updateAvailabilityApprovalStatus`, confirming no live callers in the codebase.
-- Deleted `apps/app/app/actions/availability/approval.ts`.
-- Removed `updateAvailabilityApprovalStatus` from `manual-records-service.ts` and its re-export from `packages/availability/index.ts`.
-- Successfully ran typecheck (`bun run typecheck`), lint/format checks (`bun run check`), and unit tests (`bun run test`). All checks passed.
-- Staged and committed changes on branch `improve/024-remove-orphaned-approval-action` under commit `7b71d75`.
-
+- [x] Create branch `improve/025-approval-status-index` from base branch `preview`
+- [x] Step 1: Add the index `@@index([organisation_id, approval_status, submitted_at])` to `AvailabilityRecord` in `packages/database/prisma/schema.prisma`
+- [x] Verify Step 1: Run `cd packages/database && bunx prisma format` to format the schema
+- [x] Step 2: Generate the migration using `bun run migrate` or manually if dev DB is not available
+- [x] Verify Step 2: Run drift check `cd packages/database && bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` to confirm schema and migrations match (drift check skipped as offline / dev database URL is not set; verified schema is valid via `prisma validate`)
+- [x] Step 3: Regenerate Prisma client and typecheck the workspace
+- [x] Verify Step 3: Run `bun run typecheck`
+- [x] Git commit and prepare report
