@@ -114,7 +114,10 @@ interface StripeEventLike {
 async function handleSubscriptionEvent(event: StripeEventLike) {
   const parsed = SubscriptionSchema.safeParse(event.data.object);
   if (parsed.success) {
-    await mirrorSubscription(parsed.data, dateFromSeconds(event.created) ?? new Date());
+    await mirrorSubscription(
+      parsed.data,
+      dateFromSeconds(event.created) ?? new Date()
+    );
     return;
   }
   log.error("Stripe subscription event failed validation and was skipped.", {
@@ -136,7 +139,10 @@ async function handleInvoiceEvent(event: StripeEventLike) {
   }
   const subscription = parsed.data.subscription;
   if (subscription && typeof subscription !== "string") {
-    await mirrorSubscription(subscription, dateFromSeconds(event.created) ?? new Date());
+    await mirrorSubscription(
+      subscription,
+      dateFromSeconds(event.created) ?? new Date()
+    );
   } else if (subscription) {
     log.info(
       "Stripe invoice event carried no expanded subscription and was skipped.",
