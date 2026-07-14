@@ -114,6 +114,8 @@ async function upsertPublication(
           published_sequence: 0,
           published_summary: published.summary,
           published_uid: published.uid,
+          published_starts_at: published.startsAt,
+          published_ends_at: published.endsAt,
         },
         select: publicationSelect,
       });
@@ -140,7 +142,9 @@ async function upsertPublication(
     existing.published_summary !== published.summary ||
     existing.published_description !== published.description ||
     existing.published_all_day !== published.allDay ||
-    existing.privacy_mode !== published.privacyMode;
+    existing.privacy_mode !== published.privacyMode ||
+    existing.published_starts_at?.getTime() !== published.startsAt.getTime() ||
+    existing.published_ends_at?.getTime() !== published.endsAt.getTime();
 
   if (!materiallyChanged) {
     // Nothing in the published representation changed; skip the write so we do
@@ -167,6 +171,8 @@ async function upsertPublication(
       published_sequence: { increment: 1 },
       published_summary: published.summary,
       published_uid: published.uid,
+      published_starts_at: published.startsAt,
+      published_ends_at: published.endsAt,
     },
     select: publicationSelect,
     where: { id: existing.id },
@@ -187,6 +193,8 @@ function projectPublishedRecord(record: RecordRow): {
   privacyMode: availability_privacy_mode;
   summary: string;
   uid: string;
+  startsAt: Date;
+  endsAt: Date;
 } {
   const personName =
     record.person.display_name ??
@@ -205,6 +213,8 @@ function projectPublishedRecord(record: RecordRow): {
       recordTypeLabel,
     }),
     uid: record.derived_uid_key,
+    startsAt: record.starts_at,
+    endsAt: record.ends_at,
   };
 }
 
@@ -242,6 +252,8 @@ const existingPublicationSelect = {
   published_sequence: true,
   published_summary: true,
   published_uid: true,
+  published_starts_at: true,
+  published_ends_at: true,
 } satisfies Prisma.AvailabilityPublicationSelect;
 
 const recordPublicationSelect = {
@@ -255,6 +267,8 @@ const recordPublicationSelect = {
   privacy_mode: true,
   record_type: true,
   title: true,
+  starts_at: true,
+  ends_at: true,
   person: {
     select: {
       display_name: true,

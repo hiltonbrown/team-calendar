@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => {
     published_sequence: 0,
     published_summary: "Jane Smith: Annual Leave",
     published_uid: "stable@ical.teamcalendar.online",
+    published_starts_at: new Date("2026-05-01T09:00:00.000Z"),
+    published_ends_at: new Date("2026-05-01T17:00:00.000Z"),
   };
   const record = {
     all_day: true,
@@ -29,6 +31,8 @@ const mocks = vi.hoisted(() => {
     publication: null as typeof publication | null,
     record_type: "annual_leave",
     title: null as string | null,
+    starts_at: new Date("2026-05-01T09:00:00.000Z"),
+    ends_at: new Date("2026-05-01T17:00:00.000Z"),
   };
 
   return {
@@ -53,6 +57,14 @@ const mocks = vi.hoisted(() => {
               : 0,
           published_summary: String(data.published_summary),
           published_uid: String(data.published_uid),
+          published_starts_at:
+            data.published_starts_at instanceof Date
+              ? data.published_starts_at
+              : null,
+          published_ends_at:
+            data.published_ends_at instanceof Date
+              ? data.published_ends_at
+              : null,
         };
         return record.publication;
       }
@@ -84,6 +96,14 @@ const mocks = vi.hoisted(() => {
               : Number(nextSequence),
           published_summary: String(data.published_summary),
           published_uid: String(data.published_uid),
+          published_starts_at:
+            data.published_starts_at instanceof Date
+              ? data.published_starts_at
+              : record.publication.published_starts_at,
+          published_ends_at:
+            data.published_ends_at instanceof Date
+              ? data.published_ends_at
+              : record.publication.published_ends_at,
         };
         return record.publication;
       }
@@ -98,6 +118,8 @@ const mocks = vi.hoisted(() => {
       record.privacy_mode = "named";
       record.publication = null;
       record.title = null;
+      record.starts_at = new Date("2026-05-01T09:00:00.000Z");
+      record.ends_at = new Date("2026-05-01T17:00:00.000Z");
     },
   };
 });
@@ -132,7 +154,7 @@ describe("materialiseAvailabilityPublication", () => {
     mocks.reset();
   });
 
-  it("creates publication rows with the stable UID and sequence zero", async () => {
+  it("creates publication rows with the stable UID, sequence zero, and starts_at/ends_at", async () => {
     const result = await materialiseAvailabilityPublication(input);
 
     expect(result).toMatchObject({
@@ -144,6 +166,15 @@ describe("materialiseAvailabilityPublication", () => {
         publishedUid: "stable@ical.teamcalendar.online",
       },
     });
+
+    expect(mocks.availabilityPublicationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          published_starts_at: mocks.record.starts_at,
+          published_ends_at: mocks.record.ends_at,
+        }),
+      })
+    );
   });
 
   it("keeps the UID stable and increments sequence on a prompt-scope edit", async () => {
@@ -177,6 +208,56 @@ describe("materialiseAvailabilityPublication", () => {
         publishedUid: "stable@ical.teamcalendar.online",
       },
     });
+  });
+
+  it("increments sequence when only the start date changes", async () => {
+    const first = await materialiseAvailabilityPublication(input);
+    expect(first.ok && first.value.publishedSequence).toBe(0);
+
+    mocks.record.starts_at = new Date("2026-05-02T09:00:00.000Z");
+    const second = await materialiseAvailabilityPublication(input);
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: {
+        publishedSequence: 1,
+        publishedUid: "stable@ical.teamcalendar.online",
+      },
+    });
+
+    expect(mocks.availabilityPublicationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          published_starts_at: mocks.record.starts_at,
+          published_ends_at: mocks.record.ends_at,
+        }),
+      })
+    );
+  });
+
+  it("increments sequence when only the end date changes", async () => {
+    const first = await materialiseAvailabilityPublication(input);
+    expect(first.ok && first.value.publishedSequence).toBe(0);
+
+    mocks.record.ends_at = new Date("2026-05-02T17:00:00.000Z");
+    const second = await materialiseAvailabilityPublication(input);
+
+    expect(second).toMatchObject({
+      ok: true,
+      value: {
+        publishedSequence: 1,
+        publishedUid: "stable@ical.teamcalendar.online",
+      },
+    });
+
+    expect(mocks.availabilityPublicationUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          published_starts_at: mocks.record.starts_at,
+          published_ends_at: mocks.record.ends_at,
+        }),
+      })
+    );
   });
 
   it("skips the write and keeps the sequence when nothing materially changed", async () => {

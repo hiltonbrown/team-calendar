@@ -46,6 +46,8 @@ export type AvailabilityPublicationMinAggregateOutputType = {
   published_sequence: number | null
   published_at: Date | null
   privacy_mode: $Enums.availability_privacy_mode | null
+  published_starts_at: Date | null
+  published_ends_at: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -62,6 +64,8 @@ export type AvailabilityPublicationMaxAggregateOutputType = {
   published_sequence: number | null
   published_at: Date | null
   privacy_mode: $Enums.availability_privacy_mode | null
+  published_starts_at: Date | null
+  published_ends_at: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -78,6 +82,8 @@ export type AvailabilityPublicationCountAggregateOutputType = {
   published_sequence: number
   published_at: number
   privacy_mode: number
+  published_starts_at: number
+  published_ends_at: number
   created_at: number
   updated_at: number
   _all: number
@@ -104,6 +110,8 @@ export type AvailabilityPublicationMinAggregateInputType = {
   published_sequence?: true
   published_at?: true
   privacy_mode?: true
+  published_starts_at?: true
+  published_ends_at?: true
   created_at?: true
   updated_at?: true
 }
@@ -120,6 +128,8 @@ export type AvailabilityPublicationMaxAggregateInputType = {
   published_sequence?: true
   published_at?: true
   privacy_mode?: true
+  published_starts_at?: true
+  published_ends_at?: true
   created_at?: true
   updated_at?: true
 }
@@ -136,6 +146,8 @@ export type AvailabilityPublicationCountAggregateInputType = {
   published_sequence?: true
   published_at?: true
   privacy_mode?: true
+  published_starts_at?: true
+  published_ends_at?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -239,6 +251,8 @@ export type AvailabilityPublicationGroupByOutputType = {
   published_sequence: number
   published_at: Date
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at: Date | null
+  published_ends_at: Date | null
   created_at: Date
   updated_at: Date
   _count: AvailabilityPublicationCountAggregateOutputType | null
@@ -278,6 +292,8 @@ export type AvailabilityPublicationWhereInput = {
   published_sequence?: Prisma.IntFilter<"AvailabilityPublication"> | number
   published_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"AvailabilityPublication"> | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
+  published_ends_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -296,6 +312,8 @@ export type AvailabilityPublicationOrderByWithRelationInput = {
   published_sequence?: Prisma.SortOrder
   published_at?: Prisma.SortOrder
   privacy_mode?: Prisma.SortOrder
+  published_starts_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  published_ends_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
@@ -317,6 +335,8 @@ export type AvailabilityPublicationWhereUniqueInput = Prisma.AtLeast<{
   published_sequence?: Prisma.IntFilter<"AvailabilityPublication"> | number
   published_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"AvailabilityPublication"> | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
+  published_ends_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -335,6 +355,8 @@ export type AvailabilityPublicationOrderByWithAggregationInput = {
   published_sequence?: Prisma.SortOrder
   published_at?: Prisma.SortOrder
   privacy_mode?: Prisma.SortOrder
+  published_starts_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  published_ends_at?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.AvailabilityPublicationCountOrderByAggregateInput
@@ -359,6 +381,8 @@ export type AvailabilityPublicationScalarWhereWithAggregatesInput = {
   published_sequence?: Prisma.IntWithAggregatesFilter<"AvailabilityPublication"> | number
   published_at?: Prisma.DateTimeWithAggregatesFilter<"AvailabilityPublication"> | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeWithAggregatesFilter<"AvailabilityPublication"> | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.DateTimeNullableWithAggregatesFilter<"AvailabilityPublication"> | Date | string | null
+  published_ends_at?: Prisma.DateTimeNullableWithAggregatesFilter<"AvailabilityPublication"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"AvailabilityPublication"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"AvailabilityPublication"> | Date | string
 }
@@ -373,6 +397,8 @@ export type AvailabilityPublicationCreateInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_publicationsInput
@@ -391,6 +417,8 @@ export type AvailabilityPublicationUncheckedCreateInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -405,6 +433,8 @@ export type AvailabilityPublicationUpdateInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_publicationsNestedInput
@@ -423,6 +453,8 @@ export type AvailabilityPublicationUncheckedUpdateInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -439,6 +471,8 @@ export type AvailabilityPublicationCreateManyInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -453,6 +487,8 @@ export type AvailabilityPublicationUpdateManyMutationInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -469,6 +505,8 @@ export type AvailabilityPublicationUncheckedUpdateManyInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -500,6 +538,8 @@ export type AvailabilityPublicationCountOrderByAggregateInput = {
   published_sequence?: Prisma.SortOrder
   published_at?: Prisma.SortOrder
   privacy_mode?: Prisma.SortOrder
+  published_starts_at?: Prisma.SortOrder
+  published_ends_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -520,6 +560,8 @@ export type AvailabilityPublicationMaxOrderByAggregateInput = {
   published_sequence?: Prisma.SortOrder
   published_at?: Prisma.SortOrder
   privacy_mode?: Prisma.SortOrder
+  published_starts_at?: Prisma.SortOrder
+  published_ends_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -536,6 +578,8 @@ export type AvailabilityPublicationMinOrderByAggregateInput = {
   published_sequence?: Prisma.SortOrder
   published_at?: Prisma.SortOrder
   privacy_mode?: Prisma.SortOrder
+  published_starts_at?: Prisma.SortOrder
+  published_ends_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -628,6 +672,8 @@ export type AvailabilityPublicationCreateWithoutOrganisationInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   availability_record: Prisma.AvailabilityRecordCreateNestedOneWithoutPublicationInput
@@ -644,6 +690,8 @@ export type AvailabilityPublicationUncheckedCreateWithoutOrganisationInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -689,6 +737,8 @@ export type AvailabilityPublicationScalarWhereInput = {
   published_sequence?: Prisma.IntFilter<"AvailabilityPublication"> | number
   published_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"AvailabilityPublication"> | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
+  published_ends_at?: Prisma.DateTimeNullableFilter<"AvailabilityPublication"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"AvailabilityPublication"> | Date | string
 }
@@ -703,6 +753,8 @@ export type AvailabilityPublicationCreateWithoutAvailability_recordInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_publicationsInput
@@ -719,6 +771,8 @@ export type AvailabilityPublicationUncheckedCreateWithoutAvailability_recordInpu
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -749,6 +803,8 @@ export type AvailabilityPublicationUpdateWithoutAvailability_recordInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_publicationsNestedInput
@@ -765,6 +821,8 @@ export type AvailabilityPublicationUncheckedUpdateWithoutAvailability_recordInpu
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -780,6 +838,8 @@ export type AvailabilityPublicationCreateManyOrganisationInput = {
   published_sequence?: number
   published_at: Date | string
   privacy_mode: $Enums.availability_privacy_mode
+  published_starts_at?: Date | string | null
+  published_ends_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -794,6 +854,8 @@ export type AvailabilityPublicationUpdateWithoutOrganisationInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   availability_record?: Prisma.AvailabilityRecordUpdateOneRequiredWithoutPublicationNestedInput
@@ -810,6 +872,8 @@ export type AvailabilityPublicationUncheckedUpdateWithoutOrganisationInput = {
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -825,6 +889,8 @@ export type AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationInput =
   published_sequence?: Prisma.IntFieldUpdateOperationsInput | number
   published_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  published_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  published_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -843,6 +909,8 @@ export type AvailabilityPublicationSelect<ExtArgs extends runtime.Types.Extensio
   published_sequence?: boolean
   published_at?: boolean
   privacy_mode?: boolean
+  published_starts_at?: boolean
+  published_ends_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -861,6 +929,8 @@ export type AvailabilityPublicationSelectCreateManyAndReturn<ExtArgs extends run
   published_sequence?: boolean
   published_at?: boolean
   privacy_mode?: boolean
+  published_starts_at?: boolean
+  published_ends_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -879,6 +949,8 @@ export type AvailabilityPublicationSelectUpdateManyAndReturn<ExtArgs extends run
   published_sequence?: boolean
   published_at?: boolean
   privacy_mode?: boolean
+  published_starts_at?: boolean
+  published_ends_at?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -897,11 +969,13 @@ export type AvailabilityPublicationSelectScalar = {
   published_sequence?: boolean
   published_at?: boolean
   privacy_mode?: boolean
+  published_starts_at?: boolean
+  published_ends_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type AvailabilityPublicationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "published_uid" | "published_summary" | "published_description" | "published_all_day" | "published_sequence" | "published_at" | "privacy_mode" | "created_at" | "updated_at", ExtArgs["result"]["availabilityPublication"]>
+export type AvailabilityPublicationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "published_uid" | "published_summary" | "published_description" | "published_all_day" | "published_sequence" | "published_at" | "privacy_mode" | "published_starts_at" | "published_ends_at" | "created_at" | "updated_at", ExtArgs["result"]["availabilityPublication"]>
 export type AvailabilityPublicationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   availability_record?: boolean | Prisma.AvailabilityRecordDefaultArgs<ExtArgs>
@@ -933,6 +1007,8 @@ export type $AvailabilityPublicationPayload<ExtArgs extends runtime.Types.Extens
     published_sequence: number
     published_at: Date
     privacy_mode: $Enums.availability_privacy_mode
+    published_starts_at: Date | null
+    published_ends_at: Date | null
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["availabilityPublication"]>
@@ -1371,6 +1447,8 @@ export interface AvailabilityPublicationFieldRefs {
   readonly published_sequence: Prisma.FieldRef<"AvailabilityPublication", 'Int'>
   readonly published_at: Prisma.FieldRef<"AvailabilityPublication", 'DateTime'>
   readonly privacy_mode: Prisma.FieldRef<"AvailabilityPublication", 'availability_privacy_mode'>
+  readonly published_starts_at: Prisma.FieldRef<"AvailabilityPublication", 'DateTime'>
+  readonly published_ends_at: Prisma.FieldRef<"AvailabilityPublication", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"AvailabilityPublication", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"AvailabilityPublication", 'DateTime'>
 }

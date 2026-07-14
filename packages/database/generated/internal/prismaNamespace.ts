@@ -3040,6 +3040,8 @@ export const AvailabilityPublicationScalarFieldEnum = {
   published_sequence: 'published_sequence',
   published_at: 'published_at',
   privacy_mode: 'privacy_mode',
+  published_starts_at: 'published_starts_at',
+  published_ends_at: 'published_ends_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
