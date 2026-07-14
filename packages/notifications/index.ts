@@ -8,6 +8,7 @@ export {
   type EmailQueueServiceError,
   enqueueNotificationEmail,
   preferencesUrl,
+  sendQueuedNotificationEmails,
 } from "./src/email-queue-service";
 export {
   getUnreadCount,

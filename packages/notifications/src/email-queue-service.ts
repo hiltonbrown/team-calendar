@@ -3,6 +3,8 @@ import "server-only";
 import type { Result } from "@repo/core";
 import { type Database, database } from "@repo/database";
 import { notification_type as notificationTypes } from "@repo/database/generated/enums";
+import { sendNotificationEmail } from "@repo/email";
+import { log } from "@repo/observability/log";
 import { z } from "zod";
 
 export type EmailQueueServiceError =
@@ -11,6 +13,19 @@ export type EmailQueueServiceError =
 
 export interface EmailQueueDatabase {
   notificationEmailQueue: Pick<Database["notificationEmailQueue"], "create">;
+}
+
+export interface EmailQueueDrainDatabase {
+  notificationEmailQueue: Pick<
+    Database["notificationEmailQueue"],
+    "findMany" | "update"
+  >;
+}
+
+export interface SendQueuedNotificationEmailsSummary {
+  readonly failed: number;
+  readonly processed: number;
+  readonly sent: number;
 }
 
 const QueueSchema = z.object({
@@ -66,6 +81,89 @@ export async function enqueueNotificationEmail(
   } catch {
     return unknownError("Failed to queue notification email.");
   }
+}
+
+export async function sendQueuedNotificationEmails(
+  client: EmailQueueDrainDatabase = database
+): Promise<
+  Result<SendQueuedNotificationEmailsSummary, EmailQueueServiceError>
+> {
+  try {
+    const rows = await client.notificationEmailQueue.findMany({
+      orderBy: { queued_at: "asc" },
+      take: 50,
+      where: { status: "queued" },
+    });
+    const summary = { failed: 0, processed: rows.length, sent: 0 };
+
+    for (const row of rows) {
+      try {
+        const result = await sendNotificationEmail({
+          actionUrl: row.action_url,
+          body: row.body,
+          idempotencyKey: row.id,
+          title: row.title,
+          to: row.recipient_email,
+          unsubscribeUrl: row.unsubscribe_url,
+        });
+
+        if (result.ok) {
+          await client.notificationEmailQueue.update({
+            data: {
+              attempts: { increment: 1 },
+              sent_at: new Date(),
+              status: "sent",
+            },
+            where: { id: row.id },
+          });
+          summary.sent += 1;
+          continue;
+        }
+
+        summary.failed += 1;
+        if (result.error === "Resend transport is not configured") {
+          log.error("Notification email transport is not configured", {
+            queueId: row.id,
+          });
+          continue;
+        }
+
+        await updateFailedEmail(row.id, row.attempts, result.error, client);
+      } catch (error) {
+        summary.failed += 1;
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to send notification email";
+        log.error("Failed to send notification email", {
+          error,
+          queueId: row.id,
+        });
+        await updateFailedEmail(row.id, row.attempts, message, client);
+      }
+    }
+
+    return { ok: true, value: summary };
+  } catch {
+    return unknownError("Failed to drain notification email queue.");
+  }
+}
+
+async function updateFailedEmail(
+  id: string,
+  attempts: number,
+  error: string,
+  client: EmailQueueDrainDatabase
+): Promise<void> {
+  const nextAttempts = attempts + 1;
+  await client.notificationEmailQueue.update({
+    data: {
+      attempts: { increment: 1 },
+      last_error: error,
+      status: nextAttempts >= 5 ? "failed" : "queued",
+    },
+    where: { id },
+  });
 }
 
 export function preferencesUrl(notificationType: string): string {
