@@ -1,11 +1,10 @@
-# Plan 025: Add a composite index for `approval_status` on availability records
+# Plan 027 Implementation Checklist: Paginate Xero Reads & Guard Stale Archive
 
-## Tasks
-- [x] Create branch `improve/025-approval-status-index` from base branch `preview`
-- [x] Step 1: Add the index `@@index([organisation_id, approval_status, submitted_at])` to `AvailabilityRecord` in `packages/database/prisma/schema.prisma`
-- [x] Verify Step 1: Run `cd packages/database && bunx prisma format` to format the schema
-- [x] Step 2: Generate the migration using `bun run migrate` or manually if dev DB is not available
-- [x] Verify Step 2: Run drift check `cd packages/database && bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` to confirm schema and migrations match (drift check skipped as offline / dev database URL is not set; verified schema is valid via `prisma validate`)
-- [x] Step 3: Regenerate Prisma client and typecheck the workspace
-- [x] Verify Step 3: Run `bun run typecheck`
-- [x] Git commit and prepare report
+- [ ] Step 1: Confirm Xero pagination contract (query param `page`, 1-based, page size 100, array keys `LeaveApplications` and `Employees`).
+- [ ] Step 2: Implement pagination loop in `packages/xero/src/au/read.ts` for `fetchLeaveRecords` and return `complete: boolean`.
+- [ ] Step 3: Implement pagination loop in `packages/xero/src/au/read.ts` for `fetchEmployees` (no `complete` needed, just paginated).
+- [ ] Step 4: Propagate `complete: boolean` in `packages/xero/src/read/dispatch.ts`.
+- [ ] Step 5: Update the leave sync handler `packages/jobs/src/handlers/sync-xero-leave-records.ts` to skip `archiveStaleRecords` if `complete === false`.
+- [ ] Step 6: Add unit tests in `packages/xero/src/au/read.test.ts` for multi-page behavior and the `complete` flag.
+- [ ] Step 7: Add unit tests in `packages/jobs/src/handlers/sync-xero-leave-records.test.ts` for skipping archiving when `complete === false`.
+- [ ] Step 8: Verify build/test/lint with commands (`bun run check`, `bun run typecheck`, and unit tests).
