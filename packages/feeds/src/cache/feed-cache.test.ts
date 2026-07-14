@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { feedCacheKey } from "./feed-cache";
 
 vi.mock("server-only", () => ({}));
 
@@ -43,5 +44,30 @@ describe("feed cache KV configuration", () => {
     const result = await readCache();
 
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("feedCacheKey", () => {
+  it("returns the same string for the same feedId + privacyMode regardless of any date", () => {
+    const key1 = feedCacheKey({
+      feedId: "feed-123",
+      privacyMode: "named",
+    });
+    expect(key1).toBe("feed:feed-123:named");
+  });
+
+  it("produces identical key even when legacy feedUpdatedAt differs", () => {
+    const key1 = feedCacheKey({
+      feedId: "feed-123",
+      privacyMode: "named",
+      feedUpdatedAt: new Date("2026-07-01"),
+    } as any);
+    const key2 = feedCacheKey({
+      feedId: "feed-123",
+      privacyMode: "named",
+      feedUpdatedAt: new Date("2026-07-02"),
+    } as any);
+    expect(key1).toBe(key2);
+    expect(key1).toBe("feed:feed-123:named");
   });
 });

@@ -32,10 +32,9 @@ let cacheClientResolved = false;
 
 export function feedCacheKey(input: {
   feedId: string;
-  feedUpdatedAt: Date;
   privacyMode: string;
 }): string {
-  return `feed:${input.feedId}:${input.feedUpdatedAt.toISOString()}:${input.privacyMode}`;
+  return `feed:${input.feedId}:${input.privacyMode}`;
 }
 
 export async function getCachedFeedBody(
