@@ -56,7 +56,7 @@ status is preserved.
 | 024 | Remove the orphaned, unauthorised approval-write action | P1 | S | none | DONE, implemented in `7b71d75` |
 | 025 | Add composite index on `availability_records.approval_status` | P2 | S | none | DONE, implemented in `f6ce0cf` |
 | 026 | Guard the Stripe subscription mirror against out-of-order webhooks | P2 | S | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
-| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
+| 027 | Paginate Xero reads and guard stale-archive against a truncated fetch | P1 | M | none | DONE, reviewed executor commit `12efa92` and merged to `preview` as `079fc97` |
 | 028 | Increment feed SEQUENCE when leave dates change | P2 | S-M | none | TODO (batch 2026-07-12, planned at `123bbd8`) |
 | 029 | Stop publishing `notes_internal` into the token-served ICS feed | P2 | S | none | DONE, implemented in `38818c9` |
 | 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, implemented in `ab1be48`, verified in isolated worktree on 2026-07-14 |
