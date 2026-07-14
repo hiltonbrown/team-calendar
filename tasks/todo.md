@@ -1,17 +1,11 @@
-# Plan 012: Authorise manual availability mutations by actor and person
+# Plan 023: Stop the ICS feed cache from invalidating its own key on every render
 
 ## Tasks
 - [x] Drift check and git verification
-- [x] Step 1: Add actor-aware authorisation in `manual-records-service.ts`
-- [x] Step 2: Pass Clerk org role from server actions and API routes
-- [x] Step 3: Add service, action, and route regression tests
-- [x] Run targeted verification for the touched slice
-- [x] Run repo-level verification required by the plan
-- [x] Update `plans/README.md` status row and review notes
+- [x] Step 1: Inventory every feedCacheKey caller
+- [x] Step 2: Remove feedUpdatedAt from the key
+- [x] Step 3: Update all call sites
+- [x] Step 4: Prove the render/rebuild keys match and survive an updated_at bump
+- [x] Step 5: Confirm the invalidation paths cover every content change
+- [ ] Git commit and cleanup (skip plans/README.md update)
 
-## Review
-- Centralised manual-availability mutation authorisation in the availability package using actor metadata and direct-manager/self/admin-owner checks.
-- Threaded Clerk `orgRole` through app actions and API routes, including the single-record PATCH and DELETE route, and mapped `not_authorised` service failures to HTTP 403.
-- Added focused regression coverage for service rules, server-action passthrough, and API-route 403 handling.
-- Verification passed: targeted Vitest slice, `bun run check`, `bun run typecheck`, and `bun run test`.
-- Repo-level typecheck was initially blocked by a stale Bun workspace link in `packages/xero/node_modules/@repo`; `bun install` refreshed the declared `@repo/availability` symlink without manifest changes.

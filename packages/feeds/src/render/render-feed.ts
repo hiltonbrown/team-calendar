@@ -111,7 +111,6 @@ export async function renderFeedForToken(
 
   const key = feedCacheKey({
     feedId: feedToken.feed.id,
-    feedUpdatedAt: feedToken.feed.updated_at,
     privacyMode: feedToken.feed.privacy_mode,
   });
   const cached = await getCachedFeedBody(key);
