@@ -1,3 +1,17 @@
+# Plan: Consolidate active worktrees into preview
+
+## Tasks
+
+- [x] Inventory active branches, worktrees, and uncommitted changes.
+- [x] Confirm which feature commits are already represented by `preview`.
+- [ ] Commit each remaining worktree change as a separate, scoped commit.
+- [ ] Merge all active feature and documentation branches into `preview`.
+- [ ] Verify the merged branch, worktree status, and ancestry.
+
+## Review
+
+- Pending.
+
 # Plan 028: Increment feed SEQUENCE when leave dates change
 
 ## Tasks

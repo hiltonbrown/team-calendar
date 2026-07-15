@@ -1,262 +1,215 @@
-# Plan 036: Enable withdraw of approved leave and admin-withdraw-any (Resolved Decision 3)
+# Plan 036: Widen leave withdrawal to approved status and protect sync/reconcile failures
 
-> **Executor instructions**: This is a **spike-first** plan. Phase A is
-> investigation that produces a short design note; Phase B implements only after
-> Phase A's open questions are resolved. Run every verification command and
-> confirm the expected result before moving on. If anything in the "STOP
-> conditions" section occurs, stop and report, do not improvise. When done,
-> update the status row for this plan in `plans/README.md` unless a reviewer
-> dispatched you and told you they maintain the index.
+> **Executor instructions**: Follow this plan step by step. Run every verification command and confirm the expected result before moving on. Touch only the files listed as in scope. If any STOP condition occurs, stop immediately and report. Do not improvise around obstacles. Commit your work in the worktree following the plan's git workflow section.
 >
-> **Drift check (run first)**: `git diff --stat dabb529..HEAD -- packages/availability/src/plans/submit-service.ts packages/xero/src/au/write.ts packages/xero/src/adapter/xero-write-adapter.ts`
-> If any in-scope file changed since this plan was written, compare the
-> "Current state" excerpts against the live code before proceeding; on a
-> mismatch, treat it as a STOP condition.
+> **Drift check (run first)**: `git diff --stat 99dc5f1..HEAD -- packages/availability/src/plans/submit-service.ts packages/jobs/src/handlers/sync-xero-leave-records.ts packages/jobs/src/handlers/reconcile-xero-approval-state.ts`
+> If any in-scope file changed since this plan was written, compare the "Current state" excerpts against the live code before proceeding; on a mismatch, treat it as a STOP condition.
 
 ## Status
 
+- **Status**: DONE (executed and reviewed 2026-07-15; database-backed integration cases require `DATABASE_URL` and were skipped in the isolated worktree)
 - **Priority**: P3
-- **Effort**: S-M (reduced at reconcile: authorisation already permits admins)
-- **Risk**: MED (widens a Xero write path; approved-leave reversal semantics)
-- **Depends on**: none. Plan 032 has landed, so withdraw's notification dispatch
-  is already outside the state transaction; preserve that shape.
+- **Effort**: M (reconciled 2026-07-15: requires sync/reconcile hardening)
+- **Risk**: MED (touches inbound sync and reconciliation logic; handles status transitions)
+- **Depends on**: none (Plan 032 has landed)
 - **Category**: direction (binding product decision)
 - **Planned at**: commit `123bbd8`, 2026-07-12
-- **Refreshed at**: commit `dabb529` (`preview`), 2026-07-14 — excerpts below
-  re-read against live code after plan 032 landed. Two corrections: withdraw's
-  notification is now post-commit best-effort, and `loadAndAuthorise` already
-  grants admin/owner access in every mode, so Step B2 is a verification step,
-  not a code change.
+- **Reconciled at**: commit `99dc5f1`, 2026-07-15
 
 ## Why this matters
 
-`ScreenCatalogue-v4.1.md` Resolved Decision 3 is marked **binding for all design
-and implementation work**:
+`ScreenCatalogue-v4.1.md` Resolved Decision 3 is marked **binding for all design and implementation work**:
 
-> Employees can withdraw own `submitted` **or `approved`** leave; **admins can
-> withdraw any**. Synchronous Xero write, `failed_action = withdraw` on failure.
-> Withdraw modal specified in S-10.
+> Employees can withdraw own `submitted` **or `approved`** leave; **admins can withdraw any**. Synchronous Xero write, `failed_action = withdraw` on failure. Withdraw modal specified in S-10.
 
-The code under-delivers this: `withdrawSubmission` only allows `submitted` leave,
-and only `team_calendar_leave`-sourced records. So an employee whose leave is
-approved and then needs cancelling has no path. The Xero write-back for withdraw
-already exists; the real gap is the **state guard** and (critically) the **Xero
-reversal semantics for already-approved leave**, which is why this is a spike
-first.
+However, the Xero Payroll AU API does not support deleting or rejecting leave applications that are already in a `SCHEDULED` (approved) status. Since all leave applications created via the Team Calendar integration are immediately pushed to Xero as `SCHEDULED`, trying to reject them programmatically via `/reject` will always return a 400 validation error.
 
-**Corrected at reconcile (2026-07-14)**: the "admins cannot withdraw on someone's
-behalf" half of the original diagnosis was **wrong**. `loadAndAuthorise` already
-short-circuits on admin/owner in *every* mode (see excerpt below), so an admin can
-already withdraw any person's `submitted` leave today. The only thing blocking
-admin-withdraw-any on *approved* leave is the same status guard that blocks the
-employee. Do not add an admin branch; there is already one.
+As a result, programmatic withdrawals will always trigger the `failed_action = "withdraw"` fallback path, transitioning the local record to `xero_sync_failed`. This is the designed failure behavior. To make this robust, we must:
+1. Allow withdrawing both `submitted` and `approved` records.
+2. Prevent the 15-minute inbound sync (`sync-xero-leave-records`) from overwriting a local `xero_sync_failed` record back to `approved` (since Xero will still report it as `SCHEDULED` until manual admin action is taken).
+3. Allow the nightly reconcile job (`reconcile-xero-approval-state`) to transition a `xero_sync_failed` record to `withdrawn` (or `approved`/`declined`) once the status has been manually resolved in Xero.
 
 ## Current state
 
-- The withdraw guard (`submit-service.ts:157-179`), verified at `dabb529`:
-
+- The withdraw guard in [packages/availability/src/plans/submit-service.ts](file:///home/hilton/Documents/teamcalendar/packages/availability/src/plans/submit-service.ts#L173-L179):
 ```ts
-// packages/availability/src/plans/submit-service.ts:157-179 (abridged)
-export async function withdrawSubmission(input, externalWritePort) {
-  const authorised = await loadAndAuthorise(parsed.data, "owner_only");
-  if (!authorised.ok) return authorised;
-  const record = authorised.value;
+    if (
+      record.approval_status !== "submitted" ||
+      !record.source_remote_id ||
+      record.source_type !== "team_calendar_leave"
+    ) {
+      return invalidState("invalid_state_for_withdraw");
+    }
+```
 
+- Inbound sync record loader in [packages/jobs/src/handlers/sync-xero-leave-records.ts](file:///home/hilton/Documents/teamcalendar/packages/jobs/src/handlers/sync-xero-leave-records.ts#L463-L483) only queries `xero_leave` and ignores `team_calendar_leave`:
+```ts
+async function loadExistingRecordsBySourceRemoteId(
+  context: SyncXeroLeaveRecordsInput,
+  sourceRemoteIds: string[]
+) {
+  const records = await database.availabilityRecord.findMany({
+    where: {
+      ...scoped(context),
+      source_remote_id: { in: [...new Set(sourceRemoteIds)] },
+      source_type: "xero_leave",
+    },
+    select: { id: true, source_remote_hash: true, source_remote_id: true },
+  });
+```
+
+- Reconcile job active statuses and record mapping in [packages/jobs/src/handlers/reconcile-xero-approval-state.ts](file:///home/hilton/Documents/teamcalendar/packages/jobs/src/handlers/reconcile-xero-approval-state.ts#L46):
+```ts
+const ACTIVE_STATUSES = ["submitted", "approved", "declined"] as const;
+```
+And [reconcileRecord](file:///home/hilton/Documents/teamcalendar/packages/jobs/src/handlers/reconcile-xero-approval-state.ts#L354-L410):
+```ts
+async function reconcileRecord(
+  context: ReconcileApprovalStateInput,
+  runId: string,
+  record: ReconciliationRecord,
+  xero: { ... }
+): Promise<"approved" | "declined" | "matched" | "withdrawn"> {
+  if (xero.status === "APPROVED" && record.approval_status === "submitted") { ... }
+  if (xero.status === "REJECTED" && record.approval_status === "submitted") { ... }
   if (
-    record.approval_status !== "submitted" ||   // <-- the actual blocker
-    !record.source_remote_id ||
-    record.source_type !== "team_calendar_leave"
-  ) {
-    return invalidState("invalid_state_for_withdraw");
-  }
-  const prepared = await prepareXeroWrite(parsed.data, record, externalWritePort);
-  // ...
-  const response = await externalWritePort.withdrawLeaveApplication({ employeeId, remoteId, clerkOrgId, organisationId });
-  // on failure -> persistXeroFailure({ failedAction: "withdraw", ... })
-  // on success -> $transaction: updateMany { approval_status: "withdrawn", withdrawn_at } + audit
-  //               then notifyManagerBestEffort(...) AFTER the transaction (plan 032)
-}
+    (xero.status === "WITHDRAWN" || xero.status === "DELETED") &&
+    record.approval_status !== "withdrawn"
+  ) { ... }
 ```
-
-- `loadAndAuthorise` (`submit-service.ts:564-591`) takes a
-  `mode: "manager_allowed" | "owner_only"`, but the mode only gates the *manager*
-  case. Admin/owner is allowed unconditionally:
-
-```ts
-// packages/availability/src/plans/submit-service.ts:584-591
-const isOwner = record.person.clerk_user_id === input.actingUserId;
-const isManager =
-  Boolean(actingPerson) &&
-  record.person.manager_person_id === actingPerson?.id;
-const isAllowed =
-  isAdminOrOwner(input.actingOrgRole) ||        // <-- admin/owner: any record, any mode
-  isOwner ||
-  (mode === "manager_allowed" && isManager);
-```
-
-- Plan 032 has landed: withdraw's `notifyManagerBestEffort(...)` call now sits
-  **after** the state-transition transaction and swallows failures
-  (`submit-service.ts:239`, helper at `:644`). Keep that shape; do not move
-  notification back inside the transaction.
-- The Xero withdraw write is `withdrawLeaveApplication` on the external write
-  port; the AU implementation is in `packages/xero/src/au/write.ts` and the
-  adapter in `packages/xero/src/adapter/xero-write-adapter.ts`. **Whether
-  Xero's withdraw operation is valid on an already-APPROVED leave application (vs
-  only a pending one) is the key unknown.**
-- `failed_action` already models `"withdraw"`; the failure path
-  (`persistXeroFailure`) is in place.
-- Conventions: outbound writes are synchronous, user-triggered, return
-  `Result<T, XeroWriteError>`; never queue them; failures surface inline. Tests
-  co-located (`submit-service.test.ts`, `packages/xero/src/au/write.test.ts`).
 
 ## Commands you will need
 
 | Purpose   | Command                                                                 | Expected on success |
 |-----------|-------------------------------------------------------------------------|---------------------|
-| Typecheck | `bun run typecheck`                                                      | exit 0              |
-| Unit test | `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/xero/src/au/write.test.ts` | all pass |
-| Lint      | `bun run check`                                                          | exit 0              |
-
-## Suggested executor toolkit
-
-- Use Context7 for the Xero Payroll AU `LeaveApplications` state model — confirm
-  which operation reverses/removes an **approved** leave application and whether
-  it differs from withdrawing a pending one.
+| Typecheck | `bun run typecheck`                                                     | exit 0              |
+| Unit test | `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts` | all non-database cases pass; database-backed cases require `DATABASE_URL` |
+| Lint      | `bun run check`                                                         | exit 0              |
 
 ## Scope
 
 **In scope**:
-- `packages/availability/src/plans/submit-service.ts` — widen the state guard and
-  authorisation for withdraw.
-- Possibly `packages/xero/src/au/write.ts` /
-  `packages/xero/src/adapter/xero-write-adapter.ts` — only if approved-leave
-  reversal needs a different Xero call than the current `withdrawLeaveApplication`.
-- Tests in the affected packages.
-- A short design note appended to this plan file (Phase A output) or to the PR
-  description.
+- `packages/availability/src/plans/submit-service.ts`
+- `packages/jobs/src/handlers/sync-xero-leave-records.ts`
+- `packages/jobs/src/handlers/reconcile-xero-approval-state.ts`
+- Associated tests in the same directories.
 
 **Out of scope**:
-- The S-10 withdraw modal UI redesign (surface the capability; a dedicated UI
-  polish pass is separate).
-- NZ/UK (AU-only launch).
-- Reworking the submit/approve flows (plan 032 covers their transaction boundary).
+- Direct modifications to UI components or pricing/billing rules.
+- Non-AU regions.
 
 ## Git workflow
 
-- Base branch: `preview` — all development lands on `preview`, not `main`. Create this branch from `preview` and, if you merge, merge back into `preview`. Earlier-numbered plans in this batch also land on `preview` first, so the drift-check diff may legitimately include their changes; treat a mismatch as a STOP condition only when it is not explained by an earlier plan's documented scope.
+- Base branch: `preview`
 - Branch: `improve/036-withdraw-approved-leave`
-- Conventional commits (e.g. `feat(availability): allow withdraw of approved leave and admin-withdraw-any`).
-- Do NOT push or open a PR unless the operator instructed it.
+- Conventional commit format: `feat(availability): allow withdraw of approved leave and harden sync boundaries`
 
-## Phase A — Spike (produce a design note, do not change behaviour yet)
+---
 
-### Step A1: Determine the Xero reversal semantics for approved leave
+## Step-by-step implementation
 
-Using Context7 and `packages/xero/src/au/write.ts`, answer:
-- Does `withdrawLeaveApplication` (the existing call) succeed on an **approved**
-  Xero leave application, or does approved leave require a different operation
-  (e.g. reject/delete/reverse)?
-- What Xero state does the leave end in after the reversal, and does inbound sync
-  then map it correctly (so the record does not get re-materialised)?
+### Step 1: Widen the withdraw guard in `submit-service.ts`
 
-Write a 5-10 line design note capturing: the operation to use for approved-leave
-withdrawal, the resulting local `approval_status`, the authorisation matrix
-(owner: own submitted+approved; admin/owner: any), and any open question. **If
-Xero cannot cleanly reverse an approved leave application via an available
-operation, STOP and report** — the product decision may need Xero-specific
-handling the maintainer must approve.
+Modify the status guard in `withdrawSubmission` to accept `"submitted"` **or** `"approved"`.
+Ensure `loadAndAuthorise` remains unchanged since it already permits owners/admins to act org-wide.
 
-## Phase B — Implement (only after Phase A resolves)
+**Verify**: `bun run typecheck` exits 0.
 
-### Step B1: Widen the state guard
+### Step 2: Update inbound sync record loader and process logic in `sync-xero-leave-records.ts`
 
-Allow `approval_status` `"submitted"` **or** `"approved"` in the withdraw guard.
-Keep the `source_remote_id` and `source_type` checks. If approved leave needs a
-different Xero operation (per A1), branch on the current status to choose the
-correct external write call.
+1. In `loadExistingRecordsBySourceRemoteId`, update the `where` clause to find records with either `"xero_leave"` or `"team_calendar_leave"` as `source_type`:
+```ts
+      source_type: { in: ["xero_leave", "team_calendar_leave"] },
+```
+2. Add `approval_status` and `failed_action` to the `select` block of that query so they are loaded:
+```ts
+    select: { id: true, source_remote_hash: true, source_remote_id: true, approval_status: true, failed_action: true },
+```
+3. In `processLeaveRecord`, check if the existing local record has `approval_status === "xero_sync_failed"` and `failed_action === "withdraw"`. If so, and the incoming Xero status is still `approved`, **preserve** the local `xero_sync_failed` status instead of updating it to `approved`:
+```ts
+    const existing = existingRecordsBySourceRemoteId.get(normalised.sourceRemoteId);
+    let approvalStatusToPersist = normalised.approvalStatus;
+    if (
+      existing?.approval_status === "xero_sync_failed" &&
+      existing?.failed_action === "withdraw" &&
+      normalised.approvalStatus === "approved"
+    ) {
+      approvalStatusToPersist = "xero_sync_failed";
+    }
+```
+Update the `data` block to write `approval_status: approvalStatusToPersist`.
 
-**Verify**: `bun run typecheck` → exit 0.
+**Verify**: `bun run typecheck` exits 0.
 
-### Step B2: Verify admin-withdraw-any (expect NO code change)
+### Step 3: Update reconciliation statuses and transitions in `reconcile-xero-approval-state.ts`
 
-Admin-withdraw-any is **already implemented** by `loadAndAuthorise`'s
-`isAdminOrOwner(input.actingOrgRole)` short-circuit (see "Current state"). Do not
-add a new mode, branch, or role check.
+1. Add `"xero_sync_failed"` to `ACTIVE_STATUSES` so the reconciliation job checks failed sync records:
+```ts
+const ACTIVE_STATUSES = ["submitted", "approved", "declined", "xero_sync_failed"] as const;
+```
+2. Update the `ReconciliationRecord` interface to include `failed_action`:
+```ts
+interface ReconciliationRecord {
+  approval_status: string;
+  failed_action: string | null;
+  id: string;
+  ...
+}
+```
+3. In `reconcileRecord`, update the status matchers to reconcile failed sync records when Xero reaches the correct state:
+- If `xero.status === "APPROVED"` and local is `xero_sync_failed` with `failed_action === "approve"`, transition to `approved`.
+- If `xero.status === "REJECTED"` and local is `xero_sync_failed` with `failed_action === "decline"`, transition to `declined`.
+- If `xero.status === "REJECTED"`, `WITHDRAWN`, or `DELETED` and local is `xero_sync_failed` with `failed_action === "withdraw"`, transition to `withdrawn`.
+```ts
+  if (
+    xero.status === "APPROVED" &&
+    (record.approval_status === "submitted" ||
+      (record.approval_status === "xero_sync_failed" &&
+        record.failed_action === "approve"))
+  ) { ... }
 
-This step is therefore a *verification* step: add the test from B4 case 2 (admin
-withdraws another person's leave) and confirm it passes against the **unchanged**
-authorisation helper. If it fails, the "Current state" reading was wrong — STOP
-and report rather than widening the helper.
+  if (
+    xero.status === "REJECTED" &&
+    (record.approval_status === "submitted" ||
+      (record.approval_status === "xero_sync_failed" &&
+        record.failed_action === "decline"))
+  ) { ... }
 
-**Verify**: B4 case 2 passes with no diff to `loadAndAuthorise`.
+  if (
+    (xero.status === "WITHDRAWN" ||
+      xero.status === "DELETED" ||
+      (xero.status === "REJECTED" &&
+        record.approval_status === "xero_sync_failed" &&
+        record.failed_action === "withdraw")) &&
+    record.approval_status !== "withdrawn"
+  ) { ... }
+```
 
-### Step B3: Preserve failure + audit + notification semantics
+**Verify**: `bun run typecheck` exits 0.
 
-On Xero write failure, keep the existing `persistXeroFailure({ failedAction:
-"withdraw" })` path. On success, keep the `withdrawn` transition + audit event
-inside the transaction, and keep `notifyManagerBestEffort(...)` **after** the
-transaction (plan 032 has landed; that is the current shape — preserve it, do not
-reintroduce a notify call inside the transaction). Add an audit action
-distinguishing an admin-initiated withdrawal of another person's leave from a
-self-withdrawal if the audit taxonomy supports it.
+### Step 4: Add unit and integration tests
 
-**Verify**: `bun run typecheck` → exit 0.
+1. Add test cases to `submit-service.test.ts`:
+- Owner withdraws own **approved** leave → attempts Xero reject write → handles resulting sync failure state correctly.
+- Admin withdraws another person's approved leave.
+2. Add test cases to `sync-xero-leave-records.integration.test.ts`:
+- Sync does not overwrite a local `xero_sync_failed` + `withdraw` record with `approved` when the remote Xero status is still `APPROVED`.
+- Sync correctly updates `team_calendar_leave` records idempotently instead of creating duplicate `xero_leave` records.
+3. Add test cases to `reconcile-xero-approval-state.test.ts`:
+- Reconcile job transitions `xero_sync_failed` + `withdraw` record to `withdrawn` if Xero status becomes `REJECTED`.
+- Reconcile job transitions `xero_sync_failed` + `approve` record to `approved` if Xero status becomes `APPROVED`.
 
-### Step B4: Tests
+**Verify**: `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts packages/jobs/src/handlers/reconcile-xero-approval-state.test.ts` → all pass.
 
-Add cases to `submit-service.test.ts` (and `write.test.ts` if a new Xero op was
-introduced):
-1. Owner withdraws own **approved** leave → Xero reversal called, record →
-   `withdrawn`.
-2. Admin withdraws **another** person's submitted/approved leave → succeeds.
-3. A non-owner non-admin cannot withdraw someone else's leave → authorisation
-   error.
-4. Xero write failure → record carries `failed_action = "withdraw"` and the
-   failure surfaces (unchanged path).
-
-**Verify**: `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/xero/src/au/write.test.ts` → all pass.
-
-## Test plan
-
-- Cases in Step B4 (approved-withdraw, admin-any, unauthorised, Xero-failure).
-- Structural pattern: existing withdraw/submit tests with injected external write
-  port + DB mock.
-- Verification: the vitest command in Step B4 → all pass; `bun run check`.
+---
 
 ## Done criteria
 
-ALL must hold:
-
-- [ ] Phase A design note exists (in the PR or appended here), including the Xero operation for approved-leave reversal
-- [ ] Withdraw accepts `submitted` and `approved` records
-- [ ] Owner can withdraw own; admin/owner can withdraw any; others cannot
-- [ ] `loadAndAuthorise` is **unchanged** (admin-any already works; a diff here means the plan's reading was wrong — report it)
-- [ ] Withdraw's notification dispatch remains post-commit best-effort (plan 032's shape preserved)
-- [ ] Xero write failure still sets `failed_action = "withdraw"` and surfaces inline
-- [ ] `bun run typecheck` exits 0
-- [ ] Tests from Step B4 pass (approved-withdraw + admin-any + unauthorised + failure)
-- [ ] `bun run check` exits 0
-- [ ] No files outside the in-scope list are modified (`git status`)
-- [ ] `plans/README.md` status row updated
-
-## STOP conditions
-
-Stop and report back (do not improvise) if:
-
-- Phase A finds no clean Xero operation to reverse an approved leave application
-  (maintainer decision needed on semantics).
-- Widening authorisation would require a role model change beyond the existing
-  helpers.
-- Any excerpt in "Current state" does not match live code (drift).
-- Inbound sync would re-materialise a withdrawn-approved record (the reversal must
-  map to a Xero state that inbound sync treats as gone/withdrawn).
-
-## Maintenance notes
-
-- Reviewer must scrutinise the authorisation matrix (owner vs admin-any) and the
-  Xero reversal path for approved leave specifically — approving then withdrawing
-  touches payroll and must reconcile with `reconcile-xero-approval-state`.
-- Plan 032 covers withdraw's notification transaction boundary; keep dispatch
-  best-effort (outside the state transaction) either way.
-- The S-10 withdraw modal is the intended UI surface; a follow-up should wire the
-  approved-withdraw affordance into it with clear confirmation copy.
+- [x] Withdraw accepts `submitted` and `approved` records.
+- [x] Inbound sync loads both `team_calendar_leave` and `xero_leave` records by remote ID, preventing duplicates.
+- [x] Inbound sync preserves local `xero_sync_failed` + `withdraw` status and does not overwrite it back to `approved` if Xero is still `APPROVED`.
+- [x] Reconcile job checks `xero_sync_failed` records and resolves them if the remote Xero status matches the action's target state.
+- [x] `bun run typecheck` exits 0.
+- [x] All new tests pass.
+- [x] `bun run check` exits 0.
+- [x] `plans/README.md` status row updated.

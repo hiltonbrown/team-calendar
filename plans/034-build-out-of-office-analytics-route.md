@@ -20,6 +20,7 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: commit `123bbd8`, 2026-07-12
+- **Status**: DONE, implemented in branch `improve/034-out-of-office-analytics` (`e70472e`)
 
 ## Why this matters
 
