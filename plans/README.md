@@ -66,7 +66,7 @@ numbering and status is preserved.
 | 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | DONE, executed and verified at `4de0f79` |
 | 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | DONE, implemented in `improve/034-out-of-office-analytics` (`e70472e`), verified at `e70472e` |
 | 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | DONE, implemented in branch `improve/035-analytics-csv-export` (`3edd107`) |
-| 036 | Widen withdraw to approved leave and protect sync/reconcile failures | P3 | M | none (032 landed) | TODO, **reconciled at `99dc5f1`**; handles Xero limitation via sync-failed path + sync/reconcile hardening |
+| 036 | Widen withdraw to approved leave and protect sync/reconcile failures | P3 | M | none (032 landed) | DONE, executed and reviewed 2026-07-15 in `improve/036-withdraw-approved-leave-executor` (`3adb8ed`): typecheck and check pass; 13 focused tests pass, with 14 database-backed integration cases skipped because `DATABASE_URL` is absent |
 | 037 | Run CI on `preview`, and unbreak the formatter so it passes | P1 | S | none | DONE (executed + reviewed 2026-07-14), branch `improve/037-ci-on-preview` (`d838a9a`, `975412d`), **awaiting user merge to `preview`** — `bun run check` now 0 errors across 693 files |
 | 038 | Scope `bun run fix` to match `bun run check` (or ignore `.design-sync`) | P2 | S | none | NOT YET WRITTEN — finding surfaced during 037 execution, see below |
 | 039 | Fix flaky `apps/app` test teardown (`ReferenceError: window is not defined`) | P2 | S-M | none | NOT YET WRITTEN — finding surfaced during 037 review, see below |

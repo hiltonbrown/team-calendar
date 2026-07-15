@@ -7,7 +7,7 @@
 
 ## Status
 
-- **Status**: TODO
+- **Status**: DONE (executed and reviewed 2026-07-15; database-backed integration cases require `DATABASE_URL` and were skipped in the isolated worktree)
 - **Priority**: P3
 - **Effort**: M (reconciled 2026-07-15: requires sync/reconcile hardening)
 - **Risk**: MED (touches inbound sync and reconciliation logic; handles status transitions)
@@ -83,7 +83,7 @@ async function reconcileRecord(
 | Purpose   | Command                                                                 | Expected on success |
 |-----------|-------------------------------------------------------------------------|---------------------|
 | Typecheck | `bun run typecheck`                                                     | exit 0              |
-| Unit test | `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts packages/jobs/src/handlers/reconcile-xero-approval-state.test.ts` | all pass |
+| Unit test | `bunx vitest run packages/availability/src/plans/submit-service.test.ts packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts` | all non-database cases pass; database-backed cases require `DATABASE_URL` |
 | Lint      | `bun run check`                                                         | exit 0              |
 
 ## Scope
