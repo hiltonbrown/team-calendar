@@ -63,10 +63,10 @@ numbering and status is preserved.
 | 030 | Drain `notification_email_queue` and send via Resend | P2 | M | none | DONE, merged to `preview` (`ab1be48`), verified at `dabb529` |
 | 031 | Make SSE notifications work across processes (replace in-memory broker) | P2 | L | none | DONE, merged to `preview` (`6dd5d99`), verified at `dabb529` |
 | 032 | Stop notification failures rolling back Xero-confirmed state transitions | P2 | M | none | DONE, merged to `preview` (`4a967cb`), verified at `dabb529` |
-| 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
-| 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
-| 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | TODO, no drift at `dabb529` (planned at `123bbd8`; in-scope files untouched) |
-| 036 | Enable withdraw of approved leave + admin-withdraw-any (spike-first) | P3 | S-M | none (032 landed) | TODO, **refreshed at `dabb529`** after drift; admin-any found already implemented |
+| 033 | Harden the Xero refresh transaction boundary (CAS on token persist) | P3 | M | none | DONE, executed and verified at `4de0f79` |
+| 034 | Build the S-16 Out-of-office analytics route | P3 | M | none | DONE, implemented in `improve/034-out-of-office-analytics` (`e70472e`), verified at `e70472e` |
+| 035 | Add CSV export to leave-reports (and out-of-office) analytics | P3 | S-M | 034 (for OOO screen only) | DONE, implemented in branch `improve/035-analytics-csv-export` (`3edd107`) |
+| 036 | Widen withdraw to approved leave and protect sync/reconcile failures | P3 | M | none (032 landed) | TODO, **reconciled at `99dc5f1`**; handles Xero limitation via sync-failed path + sync/reconcile hardening |
 | 037 | Run CI on `preview`, and unbreak the formatter so it passes | P1 | S | none | DONE (executed + reviewed 2026-07-14), branch `improve/037-ci-on-preview` (`d838a9a`, `975412d`), **awaiting user merge to `preview`** — `bun run check` now 0 errors across 693 files |
 | 038 | Scope `bun run fix` to match `bun run check` (or ignore `.design-sync`) | P2 | S | none | NOT YET WRITTEN — finding surfaced during 037 execution, see below |
 | 039 | Fix flaky `apps/app` test teardown (`ReferenceError: window is not defined`) | P2 | S-M | none | NOT YET WRITTEN — finding surfaced during 037 review, see below |
@@ -164,21 +164,18 @@ correctness/security fixes 022-024 first, then 027, then 025-026, the
 notification pair 030-031, the feeds pair 028-029, and 032. **All of those have
 landed on `preview` as of 2026-07-14.**
 
-**Remaining executable work**, in recommended order (all independent of each
-other; none is blocked):
+**Remaining executable work**, in recommended order:
 
 1. **037** — Run CI on `preview` + unbreak the formatter. **Do this first.** It is
    the smallest plan in the backlog and it restores the gate whose absence let the
    formatter regression reach `preview` in the first place. `preview` currently
    fails `bun run check`.
-2. **034** — Out-of-office analytics route (S-16). Highest user-visible value of
-   the rest; the service layer already exists, only the route is missing.
-3. **035** — CSV export for analytics. The leave-reports half stands alone; the
-   out-of-office export button needs 034 first.
-4. **036** — Withdraw approved leave. Refreshed 2026-07-14; smaller than
+2. **035** — CSV export for analytics. The leave-reports half stands alone; the
+   out-of-office export button requires 034.
+3. **036** — Withdraw approved leave. Refreshed 2026-07-14; smaller than
    originally scoped (admin-withdraw-any already works). Still spike-first: the
    Xero approved-leave reversal semantics remain the open unknown.
-5. **033** — Xero refresh CAS hardening. Lowest priority; a P3 hardening pass on
+4. **033** — Xero refresh CAS hardening. Lowest priority; a P3 hardening pass on
    already-landed plan 019.
 
 Refer to the authoritative "Execution order & status" table above for status.
