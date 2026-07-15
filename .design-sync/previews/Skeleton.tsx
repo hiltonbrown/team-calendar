@@ -1,7 +1,7 @@
 import { Skeleton } from "@repo/design-system/components/ui/skeleton";
 
 export const Default = () => (
-  <div className="flex items-center gap-3 w-80">
+  <div className="flex w-80 items-center gap-3">
     <Skeleton className="size-9 rounded-full" />
     <div className="flex-1 space-y-2">
       <Skeleton className="h-4 w-3/4" />

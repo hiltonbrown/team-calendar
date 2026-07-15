@@ -1,9 +1,9 @@
-import { CircleAlert, Info } from "lucide-react";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@repo/design-system/components/ui/alert";
+import { CircleAlert, Info } from "lucide-react";
 
 export const Default = () => (
   <Alert className="w-96">
@@ -20,7 +20,8 @@ export const Destructive = () => (
     <CircleAlert />
     <AlertTitle>Xero sync failed</AlertTitle>
     <AlertDescription>
-      Your leave request could not be written back to Xero. Try submitting again.
+      Your leave request could not be written back to Xero. Try submitting
+      again.
     </AlertDescription>
   </Alert>
 );

@@ -1,5 +1,5 @@
-import { CalendarPlus, Trash2 } from "lucide-react";
 import { Button } from "@repo/design-system/components/ui/button";
+import { CalendarPlus, Trash2 } from "lucide-react";
 
 export const Variants = () => (
   <div className="flex flex-wrap items-center gap-3">
@@ -17,7 +17,7 @@ export const Sizes = () => (
     <Button size="sm">Small</Button>
     <Button size="default">Default</Button>
     <Button size="lg">Large</Button>
-    <Button size="icon" aria-label="Add leave">
+    <Button aria-label="Add leave" size="icon">
       <CalendarPlus />
     </Button>
   </div>
@@ -39,7 +39,7 @@ export const WithIcon = () => (
 export const Disabled = () => (
   <div className="flex flex-wrap items-center gap-3">
     <Button disabled>Approve</Button>
-    <Button variant="outline" disabled>
+    <Button disabled variant="outline">
       Decline
     </Button>
   </div>

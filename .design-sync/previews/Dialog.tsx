@@ -18,8 +18,8 @@ export const WithdrawLeaveRequest = () => (
       <DialogHeader>
         <DialogTitle>Withdraw leave request?</DialogTitle>
         <DialogDescription>
-          This withdraws your annual leave request for 12&ndash;16 January
-          2026 and notifies your manager. Xero is updated immediately.
+          This withdraws your annual leave request for 12&ndash;16 January 2026
+          and notifies your manager. Xero is updated immediately.
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>
@@ -55,13 +55,17 @@ export const SendToXero = () => (
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
               Dates
             </dt>
-            <dd className="text-foreground">12 January 2026 to 16 January 2026</dd>
+            <dd className="text-foreground">
+              12 January 2026 to 16 January 2026
+            </dd>
           </div>
           <div className="grid gap-1">
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
               Balance impact
             </dt>
-            <dd className="text-foreground">9 days remaining after this submission</dd>
+            <dd className="text-foreground">
+              9 days remaining after this submission
+            </dd>
           </div>
         </dl>
       </div>

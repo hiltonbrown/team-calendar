@@ -1,4 +1,7 @@
-import { Avatar, AvatarFallback } from "@repo/design-system/components/ui/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+} from "@repo/design-system/components/ui/avatar";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import {
   Table,
@@ -11,11 +14,11 @@ import {
 } from "@repo/design-system/components/ui/table";
 
 interface LeaveRequestRow {
-  id: string;
+  dates: string;
   employee: string;
+  id: string;
   initials: string;
   leaveType: string;
-  dates: string;
   status: "Pending approval" | "Approved" | "Declined" | "Xero sync failed";
 }
 
@@ -63,7 +66,9 @@ const leaveRequests: LeaveRequestRow[] = [
 ];
 
 function statusVariant(status: LeaveRequestRow["status"]) {
-  if (status === "Approved") return "secondary" as const;
+  if (status === "Approved") {
+    return "secondary" as const;
+  }
   if (status === "Declined" || status === "Xero sync failed") {
     return "destructive" as const;
   }

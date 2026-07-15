@@ -32,7 +32,9 @@ export const LeaveDetails = () => (
           <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
             When
           </dt>
-          <dd className="mt-0.5 text-foreground">12 January 2026 to 16 January 2026</dd>
+          <dd className="mt-0.5 text-foreground">
+            12 January 2026 to 16 January 2026
+          </dd>
         </div>
       </dl>
       <div className="mt-4 flex justify-end">

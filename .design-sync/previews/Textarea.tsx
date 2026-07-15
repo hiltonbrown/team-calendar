@@ -15,8 +15,8 @@ export const WithValue = () => (
   <div className="flex w-80 flex-col gap-2">
     <Label htmlFor="textarea-value">Notes for manager</Label>
     <Textarea
-      id="textarea-value"
       defaultValue="Covering the Bondi store while Priya is on annual leave. Happy to swap shifts if needed."
+      id="textarea-value"
     />
   </div>
 );
@@ -25,9 +25,9 @@ export const Disabled = () => (
   <div className="flex w-80 flex-col gap-2">
     <Label htmlFor="textarea-disabled">Approval comment</Label>
     <Textarea
-      id="textarea-disabled"
-      disabled
       defaultValue="Approved. Please arrange handover with the team lead."
+      disabled
+      id="textarea-disabled"
     />
   </div>
 );

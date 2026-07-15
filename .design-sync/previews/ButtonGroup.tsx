@@ -1,10 +1,10 @@
-import { Calendar, List, Rows3 } from "lucide-react";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   ButtonGroup,
   ButtonGroupSeparator,
   ButtonGroupText,
 } from "@repo/design-system/components/ui/button-group";
+import { Calendar, List, Rows3 } from "lucide-react";
 
 export const Default = () => (
   <ButtonGroup>
@@ -41,7 +41,7 @@ export const WithSeparator = () => (
 );
 
 export const Vertical = () => (
-  <ButtonGroup orientation="vertical" className="w-40">
+  <ButtonGroup className="w-40" orientation="vertical">
     <Button variant="outline">This week</Button>
     <Button variant="outline">This month</Button>
     <Button variant="outline">This year</Button>

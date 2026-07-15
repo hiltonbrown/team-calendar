@@ -9,16 +9,28 @@
   "extraFonts": ["../../../../../.design-sync/fonts/design-system-fonts.css"],
   "readmeHeader": ".design-sync/conventions.md",
   "overrides": {
-    "AlertDialog": { "cardMode": "single", "primaryStory": "DeclineLeaveRequest" },
-    "ContextMenu": { "cardMode": "single", "primaryStory": "CalendarDayActions" },
+    "AlertDialog": {
+      "cardMode": "single",
+      "primaryStory": "DeclineLeaveRequest"
+    },
+    "ContextMenu": {
+      "cardMode": "single",
+      "primaryStory": "CalendarDayActions"
+    },
     "ContextMenuLabel": { "cardMode": "single", "primaryStory": "Default" },
     "Dialog": { "cardMode": "single", "primaryStory": "SendToXero" },
     "Drawer": { "cardMode": "single", "primaryStory": "LeaveRequestDetails" },
     "DrawerFooter": { "cardMode": "single", "primaryStory": "Default" },
     "DrawerHeader": { "cardMode": "single", "primaryStory": "Default" },
-    "DropdownMenu": { "cardMode": "single", "primaryStory": "LeaveRequestActions" },
+    "DropdownMenu": {
+      "cardMode": "single",
+      "primaryStory": "LeaveRequestActions"
+    },
     "DropdownMenuLabel": { "cardMode": "single", "primaryStory": "Default" },
-    "HoverCard": { "cardMode": "single", "primaryStory": "ColleagueAvailability" },
+    "HoverCard": {
+      "cardMode": "single",
+      "primaryStory": "ColleagueAvailability"
+    },
     "Menubar": { "cardMode": "single", "primaryStory": "AppMenubar" },
     "MenubarLabel": { "cardMode": "single", "primaryStory": "Default" },
     "Popover": { "cardMode": "single", "primaryStory": "LeaveDetails" },

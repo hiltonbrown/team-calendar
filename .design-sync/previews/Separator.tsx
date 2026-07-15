@@ -4,12 +4,16 @@ export const Horizontal = () => (
   <div className="w-80">
     <div className="space-y-1">
       <h4 className="font-medium text-sm">Priya Nair</h4>
-      <p className="text-muted-foreground text-sm">Front of house &middot; Sydney</p>
+      <p className="text-muted-foreground text-sm">
+        Front of house &middot; Sydney
+      </p>
     </div>
     <Separator className="my-4" />
     <div className="space-y-1">
       <h4 className="font-medium text-sm">Leave balance</h4>
-      <p className="text-muted-foreground text-sm">14.5 days annual leave remaining</p>
+      <p className="text-muted-foreground text-sm">
+        14.5 days annual leave remaining
+      </p>
     </div>
   </div>
 );

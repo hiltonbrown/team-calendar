@@ -40,7 +40,7 @@ export const Default = () => {
             </FormItem>
           )}
         />
-        <Button type="submit" className="self-start">
+        <Button className="self-start" type="submit">
           Submit request
         </Button>
       </form>
@@ -72,7 +72,7 @@ export const WithError = () => {
             </FormItem>
           )}
         />
-        <Button type="submit" className="self-start">
+        <Button className="self-start" type="submit">
           Submit request
         </Button>
       </form>

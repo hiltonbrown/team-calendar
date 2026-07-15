@@ -8,23 +8,25 @@ import {
 } from "@repo/design-system/components/ui/carousel";
 
 interface Announcement {
-  id: string;
-  title: string;
   detail: string;
+  id: string;
   tag: string;
+  title: string;
 }
 
 const upcomingHolidays: Announcement[] = [
   {
     id: "1",
     title: "Australia Day",
-    detail: "Monday 26 January 2026. Applies to all Sydney and Melbourne staff.",
+    detail:
+      "Monday 26 January 2026. Applies to all Sydney and Melbourne staff.",
     tag: "AU",
   },
   {
     id: "2",
     title: "Waitangi Day",
-    detail: "Friday 6 February 2026. Applies to all Auckland and Wellington staff.",
+    detail:
+      "Friday 6 February 2026. Applies to all Auckland and Wellington staff.",
     tag: "NZ",
   },
   {

@@ -1,3 +1,4 @@
+import { Button } from "@repo/design-system/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,7 +7,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@repo/design-system/components/ui/dropdown-menu";
-import { Button } from "@repo/design-system/components/ui/button";
 
 export const Default = () => (
   <DropdownMenu defaultOpen>

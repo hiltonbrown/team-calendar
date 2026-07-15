@@ -4,13 +4,7 @@ import { Slider } from "@repo/design-system/components/ui/slider";
 export const LeaveDurationDays = () => (
   <div className="flex w-72 flex-col gap-3">
     <Label htmlFor="leave-duration">Leave duration (days)</Label>
-    <Slider
-      defaultValue={[5]}
-      id="leave-duration"
-      max={20}
-      min={1}
-      step={1}
-    />
+    <Slider defaultValue={[5]} id="leave-duration" max={20} min={1} step={1} />
   </div>
 );
 

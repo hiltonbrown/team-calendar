@@ -6,7 +6,7 @@ import {
 } from "@repo/design-system/components/ui/input-otp";
 
 export const Default = () => (
-  <InputOTP maxLength={6} defaultValue="482913">
+  <InputOTP defaultValue="482913" maxLength={6}>
     <InputOTPGroup>
       <InputOTPSlot index={0} />
       <InputOTPSlot index={1} />
@@ -35,7 +35,7 @@ export const Empty = () => (
 );
 
 export const Disabled = () => (
-  <InputOTP maxLength={4} defaultValue="0192" disabled>
+  <InputOTP defaultValue="0192" disabled maxLength={4}>
     <InputOTPGroup>
       <InputOTPSlot index={0} />
       <InputOTPSlot index={1} />

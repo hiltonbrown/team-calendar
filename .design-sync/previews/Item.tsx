@@ -1,5 +1,3 @@
-import { CalendarDaysIcon } from "lucide-react";
-
 import {
   Avatar,
   AvatarFallback,
@@ -16,6 +14,7 @@ import {
   ItemSeparator,
   ItemTitle,
 } from "@repo/design-system/components/ui/item";
+import { CalendarDaysIcon } from "lucide-react";
 
 export const LeaveRequestRow = () => (
   <Item className="w-[26rem]" variant="outline">
@@ -26,7 +25,9 @@ export const LeaveRequestRow = () => (
     </ItemMedia>
     <ItemContent>
       <ItemTitle>Priya Nair &middot; Annual leave</ItemTitle>
-      <ItemDescription>12 Jan 2026 &ndash; 16 Jan 2026 &middot; 5 days</ItemDescription>
+      <ItemDescription>
+        12 Jan 2026 &ndash; 16 Jan 2026 &middot; 5 days
+      </ItemDescription>
     </ItemContent>
     <ItemActions>
       <Badge variant="secondary">Pending</Badge>

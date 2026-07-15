@@ -13,7 +13,9 @@ export const Default = () => (
   <Card className="w-96">
     <CardHeader>
       <CardTitle>Annual leave</CardTitle>
-      <CardDescription>12 Jan 2026 &ndash; 16 Jan 2026 &middot; 5 days</CardDescription>
+      <CardDescription>
+        12 Jan 2026 &ndash; 16 Jan 2026 &middot; 5 days
+      </CardDescription>
       <CardAction>
         <Button size="sm" variant="outline">
           Edit

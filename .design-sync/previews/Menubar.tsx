@@ -46,9 +46,7 @@ export const ViewOptionsMenu = () => (
     <MenubarMenu value="view">
       <MenubarTrigger>View</MenubarTrigger>
       <MenubarContent>
-        <MenubarCheckboxItem checked>
-          Show public holidays
-        </MenubarCheckboxItem>
+        <MenubarCheckboxItem checked>Show public holidays</MenubarCheckboxItem>
         <MenubarCheckboxItem>Show weekends</MenubarCheckboxItem>
         <MenubarSeparator />
         <MenubarRadioGroup value="month">

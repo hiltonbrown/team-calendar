@@ -8,11 +8,11 @@ export const States = () => (
       <Label htmlFor="cb-unchecked">Notify my manager</Label>
     </div>
     <div className="flex items-center gap-2">
-      <Checkbox id="cb-checked" defaultChecked />
+      <Checkbox defaultChecked id="cb-checked" />
       <Label htmlFor="cb-checked">Add to shared team calendar</Label>
     </div>
     <div className="flex items-center gap-2">
-      <Checkbox id="cb-disabled" disabled />
+      <Checkbox disabled id="cb-disabled" />
       <Label htmlFor="cb-disabled">Recurring leave (unavailable)</Label>
     </div>
   </div>

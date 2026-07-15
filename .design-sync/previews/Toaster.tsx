@@ -1,9 +1,7 @@
 "use client";
 
+import { Toaster, toast } from "@repo/design-system/components/ui/sonner";
 import { useEffect } from "react";
-
-import { toast } from "@repo/design-system/components/ui/sonner";
-import { Toaster } from "@repo/design-system/components/ui/sonner";
 
 export const ApprovalSuccess = () => {
   useEffect(() => {
