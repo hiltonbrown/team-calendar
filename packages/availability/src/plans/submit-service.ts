@@ -171,7 +171,8 @@ export async function withdrawSubmission(
     const record = authorised.value;
 
     if (
-      record.approval_status !== "submitted" ||
+      (record.approval_status !== "submitted" &&
+        record.approval_status !== "approved") ||
       !record.source_remote_id ||
       record.source_type !== "team_calendar_leave"
     ) {
@@ -199,7 +200,7 @@ export async function withdrawSubmission(
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
         auditAction: "availability_records.withdrawal_failed",
-        expectedStatus: "submitted",
+        expectedStatus: record.approval_status,
         input: parsed.data,
         record,
         error: response.error,
@@ -220,7 +221,7 @@ export async function withdrawSubmission(
         },
         where: {
           ...scoped(parsed.data),
-          approval_status: "submitted",
+          approval_status: { in: ["submitted", "approved"] },
           derived_sequence: record.derived_sequence,
           id: record.id,
         },

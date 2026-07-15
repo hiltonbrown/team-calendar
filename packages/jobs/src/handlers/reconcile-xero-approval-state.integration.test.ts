@@ -204,6 +204,56 @@ describeWithDatabase("reconcile-xero-approval-state database flow", () => {
     });
   });
 
+  it("transitions a failed withdrawal to withdrawn when Xero reports rejected", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    const record = await createAvailabilityRecord(tenantA, {
+      approvalStatus: "xero_sync_failed",
+      failedAction: "withdraw",
+      id: recordId("010"),
+      sourceRemoteId: leaveApplicationId("withdrawn"),
+    });
+    mockFetchLeaveApplicationStatusForRegion.mockResolvedValue(
+      xeroStatus("REJECTED")
+    );
+
+    const result = await reconcileXeroApprovalState(reconcileInput(tenantA));
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { withdrawn: 1 },
+    });
+    expect(await findRecord(record.id)).toMatchObject({
+      approval_status: "withdrawn",
+      failed_action: null,
+    });
+  });
+
+  it("transitions a failed approval to approved when Xero reports approved", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    const record = await createAvailabilityRecord(tenantA, {
+      approvalStatus: "xero_sync_failed",
+      failedAction: "approve",
+      id: recordId("011"),
+      sourceRemoteId: leaveApplicationId("approved-after-failure"),
+    });
+    mockFetchLeaveApplicationStatusForRegion.mockResolvedValue(
+      xeroStatus("APPROVED")
+    );
+
+    const result = await reconcileXeroApprovalState(reconcileInput(tenantA));
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { approved: 1 },
+    });
+    expect(await findRecord(record.id)).toMatchObject({
+      approval_status: "approved",
+      failed_action: null,
+    });
+  });
+
   it("archives a submitted record when Xero reports it missing", async () => {
     await setupTenant(tenantA);
     await setupPerson(tenantA);
@@ -484,7 +534,9 @@ async function setupPerson(tenant: TestTenant) {
 async function createAvailabilityRecord(
   tenant: TestTenant,
   input: {
+    approvalStatus?: "submitted" | "xero_sync_failed";
     endsAt?: Date;
+    failedAction?: "approve" | "withdraw";
     id: string;
     sourceRemoteId: string;
     startsAt?: Date;
@@ -493,11 +545,12 @@ async function createAvailabilityRecord(
   return await database.availabilityRecord.create({
     data: {
       all_day: true,
-      approval_status: "submitted",
+      approval_status: input.approvalStatus ?? "submitted",
       clerk_org_id: tenant.clerkOrgId,
       contactability: "unavailable",
       derived_uid_key: `${tenant.clerkOrgId}-${input.sourceRemoteId}`,
       ends_at: input.endsAt ?? new Date("2026-07-02T00:00:00.000Z"),
+      failed_action: input.failedAction ?? null,
       id: input.id,
       organisation_id: tenant.organisationId,
       person_id: tenant.personId,
