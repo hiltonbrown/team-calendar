@@ -4,13 +4,21 @@
 
 - [x] Inventory active branches, worktrees, and uncommitted changes.
 - [x] Confirm which feature commits are already represented by `preview`.
-- [ ] Commit each remaining worktree change as a separate, scoped commit.
-- [ ] Merge all active feature and documentation branches into `preview`.
-- [ ] Verify the merged branch, worktree status, and ancestry.
+- [x] Commit each remaining worktree change as a separate, scoped commit.
+- [x] Merge all active feature and documentation branches into `preview`.
+- [x] Verify the merged branch, worktree status, and ancestry.
 
 ## Review
 
-- Pending.
+- Merged `improve/033-xero-refresh-boundary`,
+  `improve/034-out-of-office-analytics`,
+  `improve/035-analytics-csv-export`, and
+  `improve/036-withdraw-approved-leave` into `preview` on 2026-07-15.
+- `improve/036-withdraw-approved-leave-executor` and all `subagent-*` branches
+  were already ancestors of `preview`.
+- Confirmed every local branch is merged into `preview` and all worktrees are
+  clean. `bun run check` could not run in the `/tmp` preview worktree because
+  it has no installed dependency tree, so Ultracite cannot resolve its package.
 
 # Plan 028: Increment feed SEQUENCE when leave dates change
 
