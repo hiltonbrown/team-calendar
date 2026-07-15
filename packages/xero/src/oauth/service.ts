@@ -65,6 +65,7 @@ export interface PendingXeroSessionTenant {
 }
 
 export type XeroOAuthError =
+  | { code: "already_refreshed"; message: string }
   | { code: "connect_disabled"; message: string }
   | { code: "connection_inactive"; message: string }
   | { code: "invalid_country"; message: string }
@@ -421,6 +422,7 @@ export async function refreshXeroOAuthConnection(input: {
   connectionId: string;
   organisationId: string;
 }): Promise<Result<{ refreshedAt: Date }, XeroOAuthError>> {
+  let exchangeSucceeded = false;
   try {
     return await database.$transaction(
       async (tx) => {
@@ -429,7 +431,13 @@ export async function refreshXeroOAuthConnection(input: {
         await tx.$queryRaw`
           SELECT pg_advisory_xact_lock(hashtextextended(${input.connectionId}, 0))
         `;
-        const refreshed = await refreshXeroOAuthConnectionWithClient(tx, input);
+        const refreshed = await refreshXeroOAuthConnectionWithClient(
+          tx,
+          input,
+          () => {
+            exchangeSucceeded = true;
+          }
+        );
         if (!refreshed.ok) {
           return refreshed;
         }
@@ -440,7 +448,29 @@ export async function refreshXeroOAuthConnection(input: {
       },
       { timeout: 15_000 }
     );
-  } catch {
+  } catch (error) {
+    if (exchangeSucceeded) {
+      try {
+        await database.xeroConnection.update({
+          where: {
+            id: input.connectionId,
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: input.organisationId,
+          },
+          data: {
+            last_error_code: "refresh_persist_failed",
+            last_error_message:
+              error instanceof Error
+                ? error.message
+                : "Transaction failed to commit after token exchange.",
+            stale_since: new Date(),
+            status: "stale",
+          },
+        });
+      } catch {
+        // Ignore secondary write errors to preserve original failure context.
+      }
+    }
     return {
       ok: false,
       error: {
@@ -457,7 +487,8 @@ async function refreshXeroOAuthConnectionWithClient(
     clerkOrgId: string;
     connectionId: string;
     organisationId: string;
-  }
+  },
+  onExchangeSuccess?: () => void
 ): Promise<Result<{ expiresAt: Date; refreshedAt: Date }, XeroOAuthError>> {
   const connection = await client.xeroConnection.findFirst({
     where: {
@@ -509,6 +540,8 @@ async function refreshXeroOAuthConnectionWithClient(
     return token;
   }
 
+  onExchangeSuccess?.();
+
   const refreshedAt = new Date();
   const encryptedAccessToken = encryptXeroToken(token.value.access_token);
   const encryptedRefreshToken = encryptXeroToken(token.value.refresh_token);
@@ -516,8 +549,11 @@ async function refreshXeroOAuthConnectionWithClient(
     refreshedAt.getTime() + token.value.expires_in * 1000
   );
 
-  await client.xeroConnection.update({
-    where: { id: input.connectionId },
+  const persisted = await client.xeroConnection.updateMany({
+    where: {
+      id: input.connectionId,
+      refresh_token_encrypted: connection.refresh_token_encrypted,
+    },
     data: {
       access_token_auth_tag: encryptedAccessToken.authTag,
       access_token_encrypted: encryptedAccessToken.encrypted,
@@ -538,6 +574,17 @@ async function refreshXeroOAuthConnectionWithClient(
       token_key_version: encryptedAccessToken.keyVersion,
     },
   });
+
+  if (persisted.count === 0) {
+    return {
+      ok: false,
+      error: {
+        code: "already_refreshed",
+        message:
+          "The connection has already been refreshed by a concurrent process.",
+      },
+    };
+  }
 
   return { ok: true, value: { expiresAt, refreshedAt } };
 }
@@ -638,6 +685,7 @@ export async function ensureFreshXeroConnection(input: {
     };
   }
 
+  let exchangeSucceeded = false;
   try {
     return await database.$transaction(
       async (tx) => {
@@ -701,11 +749,17 @@ export async function ensureFreshXeroConnection(input: {
           };
         }
 
-        const refreshed = await refreshXeroOAuthConnectionWithClient(tx, {
-          clerkOrgId: input.clerkOrgId,
-          connectionId: input.connectionId,
-          organisationId: input.organisationId,
-        });
+        const refreshed = await refreshXeroOAuthConnectionWithClient(
+          tx,
+          {
+            clerkOrgId: input.clerkOrgId,
+            connectionId: input.connectionId,
+            organisationId: input.organisationId,
+          },
+          () => {
+            exchangeSucceeded = true;
+          }
+        );
         if (!refreshed.ok) {
           return refreshed;
         }
@@ -717,7 +771,29 @@ export async function ensureFreshXeroConnection(input: {
       },
       { timeout: 15_000 }
     );
-  } catch {
+  } catch (error) {
+    if (exchangeSucceeded) {
+      try {
+        await database.xeroConnection.update({
+          where: {
+            id: input.connectionId,
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: input.organisationId,
+          },
+          data: {
+            last_error_code: "refresh_persist_failed",
+            last_error_message:
+              error instanceof Error
+                ? error.message
+                : "Transaction failed to commit after token exchange.",
+            stale_since: new Date(),
+            status: "stale",
+          },
+        });
+      } catch {
+        // Ignore secondary write errors to preserve original failure context.
+      }
+    }
     return {
       ok: false,
       error: {

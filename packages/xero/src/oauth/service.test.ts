@@ -15,6 +15,7 @@ const dbMock = vi.hoisted(() => ({
     findFirst: vi.fn(),
     upsert: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   xeroOAuthSession: {
     create: vi.fn(),
@@ -81,6 +82,8 @@ beforeEach(() => {
   dbMock.xeroConnection.findFirst.mockReset();
   dbMock.xeroConnection.upsert.mockReset();
   dbMock.xeroConnection.update.mockReset();
+  dbMock.xeroConnection.updateMany.mockReset();
+  dbMock.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
   dbMock.xeroOAuthSession.findFirst.mockReset();
   dbMock.xeroOAuthSession.create.mockReset();
   dbMock.xeroOAuthSession.update.mockReset();
@@ -404,7 +407,6 @@ describe("refreshXeroOAuthConnection", () => {
 
   it("takes the advisory lock before a successful manual refresh", async () => {
     mockStoredConnection();
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -423,6 +425,71 @@ describe("refreshXeroOAuthConnection", () => {
     expect(result.ok).toBe(true);
     expect(dbMock.$transaction).toHaveBeenCalledTimes(1);
     expect(dbMock.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns already_refreshed and does not mark the connection stale if the CAS update matches 0 rows", async () => {
+    mockStoredConnection();
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 0 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("already_refreshed");
+    }
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    mockStoredConnection();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database transaction aborted.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database transaction aborted.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
   });
 });
 
@@ -466,6 +533,66 @@ describe("ensureFreshXeroConnection", () => {
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
 
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+
   it("returns connection_inactive for a revoked connection", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
       ...buildStoredTokenFields(),
@@ -507,7 +634,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
       });
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
 
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
@@ -537,8 +664,8 @@ describe("ensureFreshXeroConnection", () => {
     if (requestBody instanceof URLSearchParams) {
       expect(requestBody.get("refresh_token")).toBe("refresh-token");
     }
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
-    const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
+    const updateArg = dbMock.xeroConnection.updateMany.mock.calls[0][0];
     expect(updateArg.data.status).toBe("active");
     expect(updateArg.data.access_token_encrypted).not.toBe("");
   });
@@ -560,7 +687,6 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
       });
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -615,6 +741,66 @@ describe("ensureFreshXeroConnection", () => {
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
 
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+
   it("refreshes inside the lock when the locked re-read is still stale", async () => {
     const storedTokens = buildStoredTokenFields();
     dbMock.xeroConnection.findFirst
@@ -636,7 +822,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
       });
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -660,8 +846,8 @@ describe("ensureFreshXeroConnection", () => {
     if (requestBody instanceof URLSearchParams) {
       expect(requestBody.get("refresh_token")).toBe("refresh-token");
     }
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
-    const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
+    const updateArg = dbMock.xeroConnection.updateMany.mock.calls[0][0];
     expect(updateArg.data.refresh_token_encrypted).not.toBe(
       storedTokens.refresh_token_encrypted
     );
@@ -692,7 +878,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
       })
       .mockResolvedValueOnce(freshConnection);
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
 
     let lockHeld = false;
     let releaseLock: (() => void) | undefined;
@@ -734,7 +920,7 @@ describe("ensureFreshXeroConnection", () => {
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("returns unknown_error when acquiring the advisory lock fails", async () => {
@@ -757,6 +943,66 @@ describe("ensureFreshXeroConnection", () => {
     }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
   });
 });
 
