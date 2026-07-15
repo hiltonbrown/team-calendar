@@ -341,6 +341,83 @@ describe("submit-service", () => {
     );
   });
 
+  it("moves an owner's approved leave to the Xero failure state when withdrawal fails", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce({
+        ...record,
+        approval_status: "approved",
+        source_remote_id: "xero-leave-1",
+      })
+      .mockResolvedValueOnce({
+        ...record,
+        approval_status: "xero_sync_failed",
+        failed_action: "withdraw",
+        source_remote_id: "xero-leave-1",
+      });
+    mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
+      ok: false,
+      error: {
+        code: "validation_error",
+        message: "Scheduled leave cannot be withdrawn",
+        userMessage: "This leave could not be withdrawn in Xero.",
+      },
+    });
+
+    const result = await withdrawSubmission(input, mockPort);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteId: "xero-leave-1" })
+    );
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          approval_status: "xero_sync_failed",
+          failed_action: "withdraw",
+        }),
+        where: expect.objectContaining({ approval_status: "approved" }),
+      })
+    );
+  });
+
+  it("allows an admin to withdraw another person's approved leave", async () => {
+    const adminInput = {
+      ...input,
+      actingOrgRole: "org:admin",
+      actingUserId: "admin_1",
+    };
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce({
+        ...record,
+        approval_status: "approved",
+        person: { ...record.person, clerk_user_id: "other_user" },
+        source_remote_id: "xero-leave-1",
+      })
+      .mockResolvedValueOnce({
+        ...record,
+        approval_status: "withdrawn",
+        source_remote_id: "xero-leave-1",
+      });
+    mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: { rawResponse: {} },
+    });
+
+    const result = await withdrawSubmission(adminInput, mockPort);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteId: "xero-leave-1" })
+    );
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: { in: ["submitted", "approved"] },
+        }),
+      })
+    );
+  });
+
   it("keeps a withdrawn transition when manager notification dispatch fails", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({

@@ -468,9 +468,15 @@ async function loadExistingRecordsBySourceRemoteId(
     where: {
       ...scoped(context),
       source_remote_id: { in: [...new Set(sourceRemoteIds)] },
-      source_type: "xero_leave",
+      source_type: { in: ["xero_leave", "team_calendar_leave"] },
     },
-    select: { id: true, source_remote_hash: true, source_remote_id: true },
+    select: {
+      approval_status: true,
+      failed_action: true,
+      id: true,
+      source_remote_hash: true,
+      source_remote_id: true,
+    },
   });
   const recordsBySourceRemoteId = new Map<string, (typeof records)[number]>();
   for (const record of records) {
@@ -571,11 +577,19 @@ async function processLeaveRecord(
     const existing = existingRecordsBySourceRemoteId.get(
       normalised.sourceRemoteId
     );
+    let approvalStatusToPersist = normalised.approvalStatus;
+    if (
+      existing?.approval_status === "xero_sync_failed" &&
+      existing.failed_action === "withdraw" &&
+      normalised.approvalStatus === "approved"
+    ) {
+      approvalStatusToPersist = "xero_sync_failed";
+    }
     const changed =
       existing?.source_remote_hash !== normalised.sourceRemoteHash;
     const data = {
       all_day: normalised.allDay,
-      approval_status: normalised.approvalStatus,
+      approval_status: approvalStatusToPersist,
       archived_at: normalised.publishStatus === "archived" ? new Date() : null,
       contactability: normalised.contactability,
       derived_uid_key: normalised.derivedUidKey,
@@ -601,6 +615,8 @@ async function processLeaveRecord(
         where: { ...scoped(context), id: recordId },
       });
       existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        approval_status: approvalStatusToPersist,
+        failed_action: existing?.failed_action ?? null,
         id: recordId,
         source_remote_hash: normalised.sourceRemoteHash,
         source_remote_id: normalised.sourceRemoteId,
@@ -617,6 +633,8 @@ async function processLeaveRecord(
         select: { id: true },
       });
       existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        approval_status: approvalStatusToPersist,
+        failed_action: null,
         id: created.id,
         source_remote_hash: normalised.sourceRemoteHash,
         source_remote_id: normalised.sourceRemoteId,

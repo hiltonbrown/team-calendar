@@ -43,7 +43,12 @@ type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-const ACTIVE_STATUSES = ["submitted", "approved", "declined"] as const;
+const ACTIVE_STATUSES = [
+  "submitted",
+  "approved",
+  "declined",
+  "xero_sync_failed",
+] as const;
 const BATCH_SIZE = 50;
 const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const FailedRecordTypeSchema = z.enum([
@@ -75,6 +80,7 @@ const FailedRecordTypeSchema = z.enum([
 
 interface ReconciliationRecord {
   approval_status: string;
+  failed_action: string | null;
   id: string;
   person: {
     clerk_user_id: string | null;
@@ -362,13 +368,19 @@ async function reconcileRecord(
     xeroLeaveApplicationId: string;
   }
 ): Promise<"approved" | "declined" | "matched" | "withdrawn"> {
-  if (xero.status === "APPROVED" && record.approval_status === "submitted") {
+  if (
+    xero.status === "APPROVED" &&
+    (record.approval_status === "submitted" ||
+      (record.approval_status === "xero_sync_failed" &&
+        record.failed_action === "approve"))
+  ) {
     await transitionRecord(context, runId, record, {
       action: "availability_records.reconciled_to_approved",
       data: {
         approval_status: "approved",
         approved_at: xero.approvedAt ?? new Date(),
         derived_sequence: { increment: 1 },
+        failed_action: null,
         xero_write_error: null,
         xero_write_error_raw: Prisma.DbNull,
       },
@@ -378,13 +390,19 @@ async function reconcileRecord(
     return "approved";
   }
 
-  if (xero.status === "REJECTED" && record.approval_status === "submitted") {
+  if (
+    xero.status === "REJECTED" &&
+    (record.approval_status === "submitted" ||
+      (record.approval_status === "xero_sync_failed" &&
+        record.failed_action === "decline"))
+  ) {
     await transitionRecord(context, runId, record, {
       action: "availability_records.reconciled_to_declined",
       data: {
         approval_note: "Declined in Xero Payroll",
         approval_status: "declined",
         derived_sequence: { increment: 1 },
+        failed_action: null,
       },
       notificationType: "leave_declined",
       xeroLeaveApplicationId: xero.xeroLeaveApplicationId,
@@ -393,8 +411,32 @@ async function reconcileRecord(
   }
 
   if (
+    (xero.status === "REJECTED" ||
+      xero.status === "WITHDRAWN" ||
+      xero.status === "DELETED") &&
+    record.approval_status === "xero_sync_failed" &&
+    record.failed_action === "withdraw"
+  ) {
+    await transitionRecord(context, runId, record, {
+      action: "availability_records.reconciled_to_withdrawn",
+      data: {
+        approval_status: "withdrawn",
+        derived_sequence: { increment: 1 },
+        failed_action: null,
+        withdrawn_at: new Date(),
+        xero_write_error: null,
+        xero_write_error_raw: Prisma.DbNull,
+      },
+      notificationType: "leave_withdrawn",
+      xeroLeaveApplicationId: xero.xeroLeaveApplicationId,
+    });
+    return "withdrawn";
+  }
+
+  if (
     (xero.status === "WITHDRAWN" || xero.status === "DELETED") &&
-    record.approval_status !== "withdrawn"
+    record.approval_status !== "withdrawn" &&
+    record.approval_status !== "xero_sync_failed"
   ) {
     await transitionRecord(context, runId, record, {
       action: "availability_records.reconciled_to_withdrawn",
