@@ -1,5 +1,28 @@
 # Plan: Consolidate active worktrees into preview
 
+# Plan: Recover failed Xero authorisation connection migration
+
+## Tasks
+
+- [x] Inspect the failed Prisma migration record and live schema.
+- [x] Confirm the intended column already exists in the target database.
+- [x] Mark the failed no-op migrations as applied in Prisma migration history.
+- [x] Re-run production migration deployment and verify no pending migrations.
+
+## Review
+
+- Confirmed three prior schema-direct changes were already present in Neon and
+  resolved their failed migration records after verifying the live objects:
+  `20260712000000_add_xero_authorisation_connection_id`,
+  `20260714091900_add_approval_status_index`, and
+  `20260714200000_add_published_dates`. The latter had no publication rows, so
+  its backfill was not required.
+- `20260714210000_add_stripe_event_created_at` applied successfully. `bun run
+  migrate:deploy` and `bunx prisma migrate status` both completed successfully
+  on 2026-07-15.
+
+---
+
 ## Tasks
 
 - [x] Inventory active branches, worktrees, and uncommitted changes.
@@ -19,6 +42,24 @@
 - Confirmed every local branch is merged into `preview` and all worktrees are
   clean. `bun run check` could not run in the `/tmp` preview worktree because
   it has no installed dependency tree, so Ultracite cannot resolve its package.
+
+# Plan: Prune old worktrees
+
+## Tasks
+
+- [x] Inventory registered git worktrees and local branch merge state.
+- [x] Check `/tmp` for leftover Team Calendar worktree directories not tracked by git.
+- [x] Prune stale git worktree metadata and remove safe leftover directories.
+- [x] Verify the remaining worktree state after cleanup.
+
+## Review
+
+- Ran `git worktree prune --verbose`; git reported no additional registered
+  worktrees beyond the active `preview` checkout.
+- Removed the empty orphaned directory `/tmp/teamcalendar-preview-merge-036`.
+- Verified `git worktree list --porcelain` still shows only
+  `/home/hilton/Documents/teamcalendar`, and the `/tmp` directory no longer
+  exists.
 
 # Plan 028: Increment feed SEQUENCE when leave dates change
 
