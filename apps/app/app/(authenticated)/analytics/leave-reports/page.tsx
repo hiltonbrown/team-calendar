@@ -21,6 +21,7 @@ import {
 } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
+import { ExportCsvButton } from "./export-csv-button";
 import {
   LeaveDaysByTeamChart,
   type LeaveDaysByTeamChartItem,
@@ -131,7 +132,9 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
 
   return (
     <>
-      <Header organisationId={organisationId} page="Leave Reports" />
+      <Header organisationId={organisationId} page="Leave Reports">
+        <ExportCsvButton organisationId={organisationId} />
+      </Header>
       <main className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <section className="rounded-2xl bg-muted p-6">
           <div className="max-w-3xl space-y-2">
