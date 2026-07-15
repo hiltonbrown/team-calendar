@@ -12,14 +12,18 @@ export const ColleagueAvailability = () => (
     <HoverCardContent className="w-64">
       <div className="flex flex-col gap-1">
         <p className="font-semibold text-foreground">Marcus Lee</p>
-        <p className="text-muted-foreground text-sm">Front of house &middot; Sydney</p>
+        <p className="text-muted-foreground text-sm">
+          Front of house &middot; Sydney
+        </p>
       </div>
       <dl className="mt-3 grid gap-2 text-sm">
         <div>
           <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
             Today
           </dt>
-          <dd className="mt-0.5 text-foreground">On annual leave until 16 Jan</dd>
+          <dd className="mt-0.5 text-foreground">
+            On annual leave until 16 Jan
+          </dd>
         </div>
         <div>
           <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">

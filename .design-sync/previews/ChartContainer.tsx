@@ -6,11 +6,19 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@repo/design-system/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 interface LeaveDaysByMonth {
-  month: string;
   annual: number;
+  month: string;
   sick: number;
 }
 
@@ -48,15 +56,30 @@ export const Default = () => (
         tickLine={false}
         tickMargin={10}
       />
-      <YAxis allowDecimals={false} axisLine={false} tickLine={false} tickMargin={10} />
+      <YAxis
+        allowDecimals={false}
+        axisLine={false}
+        tickLine={false}
+        tickMargin={10}
+      />
       <ChartTooltip
         content={({ content: _content, ...props }) => (
           <ChartTooltipContent {...props} />
         )}
       />
       <ChartLegend content={<ChartLegendContent />} />
-      <Bar dataKey="annual" fill="var(--color-annual)" isAnimationActive={false} radius={[8, 8, 0, 0]} />
-      <Bar dataKey="sick" fill="var(--color-sick)" isAnimationActive={false} radius={[8, 8, 0, 0]} />
+      <Bar
+        dataKey="annual"
+        fill="var(--color-annual)"
+        isAnimationActive={false}
+        radius={[8, 8, 0, 0]}
+      />
+      <Bar
+        dataKey="sick"
+        fill="var(--color-sick)"
+        isAnimationActive={false}
+        radius={[8, 8, 0, 0]}
+      />
     </BarChart>
   </ChartContainer>
 );

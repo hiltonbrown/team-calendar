@@ -18,9 +18,9 @@ export const Default = () => (
     <AccordionItem value="sick">
       <AccordionTrigger>Sick leave</AccordionTrigger>
       <AccordionContent>
-        10 days per year in Australia, with unused days carrying over. A
-        medical certificate may be required for absences longer than two
-        consecutive days.
+        10 days per year in Australia, with unused days carrying over. A medical
+        certificate may be required for absences longer than two consecutive
+        days.
       </AccordionContent>
     </AccordionItem>
     <AccordionItem value="parental">

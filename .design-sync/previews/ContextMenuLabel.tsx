@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 import {
   ContextMenu,
   ContextMenuContent,
@@ -10,6 +8,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@repo/design-system/components/ui/context-menu";
+import { useEffect, useRef } from "react";
 
 // See ContextMenu.tsx for why this dispatch is needed: the Root has no
 // open/defaultOpen prop, so an actual "contextmenu" event is fired at mount
@@ -18,7 +17,9 @@ function useOpenOnMount<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   useEffect(() => {
     const node = ref.current;
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     const rect = node.getBoundingClientRect();
     node.dispatchEvent(
       new MouseEvent("contextmenu", {
@@ -37,8 +38,8 @@ export const Default = () => {
   return (
     <ContextMenu>
       <ContextMenuTrigger
-        ref={ref}
         className="flex h-28 w-52 flex-col rounded-md border p-2 text-sm"
+        ref={ref}
       >
         <span className="font-medium text-foreground">21</span>
         <span className="mt-1 text-muted-foreground text-xs">

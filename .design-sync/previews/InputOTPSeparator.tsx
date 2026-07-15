@@ -6,7 +6,7 @@ import {
 } from "@repo/design-system/components/ui/input-otp";
 
 export const Default = () => (
-  <InputOTP maxLength={4} defaultValue="7042">
+  <InputOTP defaultValue="7042" maxLength={4}>
     <InputOTPGroup>
       <InputOTPSlot index={0} />
       <InputOTPSlot index={1} />

@@ -10,12 +10,12 @@ export const Default = () => (
   <FieldGroup className="w-80">
     <Field>
       <FieldLabel htmlFor="field-sep-name">Employee name</FieldLabel>
-      <Input id="field-sep-name" defaultValue="Priya Nair" />
+      <Input defaultValue="Priya Nair" id="field-sep-name" />
     </Field>
     <FieldSeparator>Leave details</FieldSeparator>
     <Field>
       <FieldLabel htmlFor="field-sep-days">Days requested</FieldLabel>
-      <Input id="field-sep-days" type="number" defaultValue={5} />
+      <Input defaultValue={5} id="field-sep-days" type="number" />
     </Field>
   </FieldGroup>
 );

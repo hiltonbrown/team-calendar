@@ -1,4 +1,3 @@
-import { CalendarIcon, SearchIcon } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
@@ -7,6 +6,7 @@ import {
   InputGroupText,
   InputGroupTextarea,
 } from "@repo/design-system/components/ui/input-group";
+import { CalendarIcon, SearchIcon } from "lucide-react";
 
 export const Default = () => (
   <InputGroup className="w-80">
@@ -31,7 +31,7 @@ export const WithTrailingButton = () => (
 
 export const WithText = () => (
   <InputGroup className="w-80">
-    <InputGroupInput placeholder="5" defaultValue="5" />
+    <InputGroupInput defaultValue="5" placeholder="5" />
     <InputGroupAddon align="inline-end">
       <InputGroupText>days requested</InputGroupText>
     </InputGroupAddon>

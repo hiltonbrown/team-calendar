@@ -37,8 +37,8 @@ export const ClosedByDefault = () => (
       </CollapsibleTrigger>
     </div>
     <CollapsibleContent className="pt-3 text-muted-foreground text-sm">
-      Declined by Sarah Chen: "Team is already short-staffed that week,
-      please resubmit for the following week."
+      Declined by Sarah Chen: "Team is already short-staffed that week, please
+      resubmit for the following week."
     </CollapsibleContent>
   </Collapsible>
 );

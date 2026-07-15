@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-
 import {
   ContextMenu,
   ContextMenuCheckboxItem,
@@ -14,6 +12,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@repo/design-system/components/ui/context-menu";
+import { useEffect, useRef } from "react";
 
 // ContextMenu only opens in response to a genuine contextmenu (right-click)
 // event and exposes no `open`/`defaultOpen` prop on its Root. To preview the
@@ -24,7 +23,9 @@ function useOpenOnMount<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   useEffect(() => {
     const node = ref.current;
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     const rect = node.getBoundingClientRect();
     node.dispatchEvent(
       new MouseEvent("contextmenu", {
@@ -43,8 +44,8 @@ export const CalendarDayActions = () => {
   return (
     <ContextMenu>
       <ContextMenuTrigger
-        ref={ref}
         className="flex h-32 w-48 flex-col rounded-md border p-2 text-sm"
+        ref={ref}
       >
         <span className="font-medium text-foreground">14</span>
         <span className="mt-1 text-muted-foreground text-xs">
@@ -66,8 +67,8 @@ export const WithViewOptionsAndSubmenu = () => {
   return (
     <ContextMenu>
       <ContextMenuTrigger
-        ref={ref}
         className="flex h-32 w-56 flex-col rounded-md border p-2 text-sm"
+        ref={ref}
       >
         <span className="font-medium text-foreground">Team calendar</span>
         <span className="mt-1 text-muted-foreground text-xs">

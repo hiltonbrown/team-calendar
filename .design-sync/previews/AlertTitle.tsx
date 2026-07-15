@@ -1,5 +1,5 @@
-import { Info } from "lucide-react";
 import { Alert, AlertTitle } from "@repo/design-system/components/ui/alert";
+import { Info } from "lucide-react";
 
 export const Default = () => (
   <Alert className="w-80">

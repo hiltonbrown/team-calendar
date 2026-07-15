@@ -14,16 +14,16 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@repo/design-system/components/ui/dropdown-menu";
-import {
-  DownloadIcon,
-  MoreHorizontalIcon,
-  PrinterIcon,
-} from "lucide-react";
+import { DownloadIcon, MoreHorizontalIcon, PrinterIcon } from "lucide-react";
 
 export const LeaveRequestActions = () => (
   <DropdownMenu defaultOpen>
     <DropdownMenuTrigger asChild>
-      <Button aria-label="More actions for Priya Nair" size="icon" variant="ghost">
+      <Button
+        aria-label="More actions for Priya Nair"
+        size="icon"
+        variant="ghost"
+      >
         <MoreHorizontalIcon className="size-4" />
       </Button>
     </DropdownMenuTrigger>

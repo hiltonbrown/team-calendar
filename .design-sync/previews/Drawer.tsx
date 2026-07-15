@@ -34,7 +34,9 @@ export const LeaveRequestDetails = () => (
             <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
               Balance impact
             </dt>
-            <dd className="mt-0.5 text-foreground">9 days remaining after approval</dd>
+            <dd className="mt-0.5 text-foreground">
+              9 days remaining after approval
+            </dd>
           </div>
         </dl>
       </div>

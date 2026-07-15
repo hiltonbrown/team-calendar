@@ -423,6 +423,7 @@
         "@repo/core": "*",
         "@repo/database": "*",
         "@repo/email": "*",
+        "@repo/observability": "*",
         "@t3-oss/env-nextjs": "^0.13.11",
         "react": "19.2.7",
         "server-only": "^0.0.1",

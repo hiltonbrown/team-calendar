@@ -3,8 +3,8 @@ import {
   TableBody,
   TableCaption,
   TableCell,
-  TableHeader,
   TableHead,
+  TableHeader,
   TableRow,
 } from "@repo/design-system/components/ui/table";
 

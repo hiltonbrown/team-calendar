@@ -27,7 +27,10 @@ export const DeclineLeaveRequest = () => (
         </AlertDialogDescription>
       </AlertDialogHeader>
       <div className="space-y-2 py-2">
-        <Label className="text-muted-foreground text-sm" htmlFor="decline-reason">
+        <Label
+          className="text-muted-foreground text-sm"
+          htmlFor="decline-reason"
+        >
           Reason for declining
         </Label>
         <Textarea
@@ -54,8 +57,7 @@ export const DiscardDraftPlan = () => (
       <AlertDialogHeader>
         <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
         <AlertDialogDescription>
-          Your unsubmitted leave request will be deleted. This cannot be
-          undone.
+          Your unsubmitted leave request will be deleted. This cannot be undone.
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
