@@ -10,6 +10,7 @@ export type {
   WithdrawLeaveInput,
 } from "@repo/core";
 export { materialiseAvailabilityPublication } from "@repo/feeds";
+export { exportAnalyticsToCsv } from "./src/analytics/analytics-csv";
 export {
   DATE_RANGE_PRESET_OPTIONS,
   type DateRangeError,
