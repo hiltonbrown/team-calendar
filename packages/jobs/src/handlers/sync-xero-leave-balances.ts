@@ -108,7 +108,7 @@ export async function syncXeroLeaveBalances(
 
     const run = await createRun(context, startedAt);
     runId = run.id;
-    publishRunStatusChanged(context, run.id, "running");
+    await publishRunStatusChanged(context, run.id, "running");
 
     const tenantReadiness = await ensureTenantReady(context, run.id);
     if (!tenantReadiness.ready) {
@@ -584,7 +584,7 @@ async function completeRun(
     },
     where: { ...scoped(context), id: runId },
   });
-  publishRunStatusChanged(context, runId, input.status);
+  await publishRunStatusChanged(context, runId, input.status);
 }
 
 function loadXeroTenant(context: SyncXeroLeaveBalancesInput) {
@@ -657,24 +657,35 @@ function isBlanketFailure(error: XeroWriteError): boolean {
   );
 }
 
-function publishRunStatusChanged(
+async function publishRunStatusChanged(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
   status: "cancelled" | "failed" | "partial_success" | "running" | "succeeded"
 ) {
-  publishOrganisationNotificationEvent(
-    { organisationId: context.organisationId },
-    {
-      payload: {
+  try {
+    await publishOrganisationNotificationEvent(
+      {
+        clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
-        runId,
-        runType: "leave_balances",
-        status,
-        xeroTenantId: context.xeroTenantId,
       },
-      type: "sync.run_status_changed",
-    }
-  );
+      {
+        payload: {
+          organisationId: context.organisationId,
+          runId,
+          runType: "leave_balances",
+          status,
+          xeroTenantId: context.xeroTenantId,
+        },
+        type: "sync.run_status_changed",
+      }
+    );
+  } catch (error) {
+    log.error("Failed to publish sync run status notification", {
+      error,
+      organisationId: context.organisationId,
+      runId,
+    });
+  }
 }
 
 function toPrismaJsonValue(

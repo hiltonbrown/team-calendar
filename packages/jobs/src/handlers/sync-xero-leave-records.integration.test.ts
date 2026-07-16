@@ -236,6 +236,64 @@ describeWithDatabase("sync-xero-leave-records database flow", () => {
     });
     expect(tenantBRecords).toHaveLength(0);
   });
+
+  it("updates a matching Team Calendar leave instead of creating a duplicate Xero leave", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    const existing = await createExistingRecord(tenantA, {
+      approvalStatus: "approved",
+      sourceRemoteId: leaveId(),
+      sourceType: "team_calendar_leave",
+    });
+    mockFetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: { leaveRecords: [xeroLeaveRecord(tenantA)], rawResponse: {} },
+    });
+
+    const result = await syncXeroLeaveRecords(syncInput(tenantA));
+
+    expect(result.ok).toBe(true);
+    const records = await database.availabilityRecord.findMany({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        source_remote_id: leaveId(),
+      },
+    });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      id: existing.id,
+      source_type: "team_calendar_leave",
+      title: "Annual leave",
+    });
+  });
+
+  it("preserves a failed withdrawal while Xero still reports the leave as approved", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    const existing = await createExistingRecord(tenantA, {
+      approvalStatus: "xero_sync_failed",
+      failedAction: "withdraw",
+      sourceRemoteId: leaveId(),
+      sourceType: "team_calendar_leave",
+    });
+    mockFetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: { leaveRecords: [xeroLeaveRecord(tenantA)], rawResponse: {} },
+    });
+
+    const result = await syncXeroLeaveRecords(syncInput(tenantA));
+
+    expect(result.ok).toBe(true);
+    expect(
+      await database.availabilityRecord.findUnique({
+        where: { id: existing.id },
+      })
+    ).toMatchObject({
+      approval_status: "xero_sync_failed",
+      failed_action: "withdraw",
+    });
+  });
 });
 
 async function setupTenant(tenant: typeof tenantA | typeof tenantB) {
@@ -329,6 +387,37 @@ async function createStaleRecord(tenant: typeof tenantA) {
       source_remote_id: staleLeaveId(),
       source_type: "xero_leave",
       starts_at: new Date("2026-05-04T00:00:00.000Z"),
+    },
+  });
+}
+
+async function createExistingRecord(
+  tenant: typeof tenantA,
+  input: {
+    approvalStatus: "approved" | "xero_sync_failed";
+    failedAction?: "withdraw";
+    sourceRemoteId: string;
+    sourceType: "team_calendar_leave" | "xero_leave";
+  }
+) {
+  return await database.availabilityRecord.create({
+    data: {
+      all_day: true,
+      approval_status: input.approvalStatus,
+      clerk_org_id: tenant.clerkOrgId,
+      contactability: "unavailable",
+      derived_uid_key: `existing-${input.sourceRemoteId}`,
+      ends_at: new Date("2026-05-08T00:00:00.000Z"),
+      failed_action: input.failedAction ?? null,
+      organisation_id: tenant.organisationId,
+      person_id: tenant.personId,
+      privacy_mode: "named",
+      publish_status: "eligible",
+      record_type: "annual_leave",
+      source_remote_id: input.sourceRemoteId,
+      source_type: input.sourceType,
+      starts_at: new Date("2026-05-07T00:00:00.000Z"),
+      title: "Previous title",
     },
   });
 }

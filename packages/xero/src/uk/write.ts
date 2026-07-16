@@ -7,12 +7,12 @@ import type {
 } from "../write/types";
 
 const writeBackNotAvailableError = {
-  code: "unknown_error" as const,
+  code: "region_not_supported_error" as const,
   message: "UK payroll write-back is not yet available.",
 };
 
 const approvalNotAvailableError = {
-  code: "unknown_error" as const,
+  code: "region_not_supported_error" as const,
   message: "UK payroll approval is not yet available.",
 };
 

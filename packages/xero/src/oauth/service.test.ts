@@ -6,20 +6,46 @@ vi.mock("server-only", () => ({}));
 const dbMock = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
+  organisation: {
+    create: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+  },
   xeroConnection: {
+    findFirst: vi.fn(),
+    upsert: vi.fn(),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
+  xeroOAuthSession: {
+    create: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn(),
   },
+  xeroTenant: {
+    upsert: vi.fn(),
+  },
+}));
+const feedMock = vi.hoisted(() => ({
+  ensureDefaultCalendarFeed: vi.fn(),
+}));
+const availabilityMock = vi.hoisted(() => ({
+  ensureDefaultPublicHolidaysForOrganisation: vi.fn(),
 }));
 vi.mock("@repo/database", () => ({
   database: dbMock,
 }));
+vi.mock("@repo/feeds", () => feedMock);
+vi.mock("@repo/availability", () => availabilityMock);
 
 const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
+  completeXeroTenantSelection,
+  disconnectXeroOAuthConnection,
   ensureFreshXeroConnection,
   isPreviewDeployment,
+  refreshXeroOAuthConnection,
   xeroConnectionRefreshDecision,
 } = await import("./service");
 
@@ -50,8 +76,35 @@ beforeEach(() => {
   dbMock.$queryRaw.mockResolvedValue([]);
   dbMock.$transaction.mockReset();
   dbMock.$transaction.mockImplementation((callback) => callback(dbMock));
+  dbMock.organisation.create.mockReset();
+  dbMock.organisation.findFirst.mockReset();
+  dbMock.organisation.findMany.mockReset();
   dbMock.xeroConnection.findFirst.mockReset();
+  dbMock.xeroConnection.upsert.mockReset();
   dbMock.xeroConnection.update.mockReset();
+  dbMock.xeroConnection.updateMany.mockReset();
+  dbMock.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
+  dbMock.xeroOAuthSession.findFirst.mockReset();
+  dbMock.xeroOAuthSession.create.mockReset();
+  dbMock.xeroOAuthSession.update.mockReset();
+  dbMock.xeroTenant.upsert.mockReset();
+  feedMock.ensureDefaultCalendarFeed.mockReset();
+  feedMock.ensureDefaultCalendarFeed.mockResolvedValue({
+    ok: true,
+    value: { created: true, feedId: "feed_1" },
+  });
+  availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockReset();
+  availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValue(
+    {
+      ok: true,
+      value: {
+        importedCount: 2,
+        skippedCount: 0,
+        importedYears: [2026, 2027],
+        skippedYears: [],
+      },
+    }
+  );
 });
 
 afterEach(() => {
@@ -138,6 +191,69 @@ describe("buildXeroOAuthStartUrl", () => {
   });
 });
 
+describe("completeXeroOAuth", () => {
+  it("stores the Xero authorisation connection id in the pending session", async () => {
+    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    expect(start.ok).toBe(true);
+    if (!start.ok) {
+      return;
+    }
+
+    const state = new URL(start.value.redirectUrl).searchParams.get("state");
+    dbMock.xeroOAuthSession.create.mockResolvedValueOnce({ id: "session_1" });
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            access_token: "access-token",
+            expires_in: 1800,
+            refresh_token: "refresh-token",
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              id: "xero-connection-1",
+              tenantId: "xero-tenant-1",
+              tenantName: "Acme Payroll",
+            },
+          ]),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await completeXeroOAuth({
+      code: "authorisation-code",
+      state: state ?? "",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { sessionId: "session_1" },
+    });
+    expect(dbMock.xeroOAuthSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          available_tenants_json: {
+            tenants: [
+              {
+                connectionId: "xero-connection-1",
+                tenantId: "xero-tenant-1",
+                tenantName: "Acme Payroll",
+              },
+            ],
+          },
+        }),
+      })
+    );
+  });
+});
+
 describe("xeroConnectionRefreshDecision", () => {
   const now = new Date("2026-06-09T12:00:00.000Z");
   const base = {
@@ -218,6 +334,165 @@ describe("xeroConnectionRefreshDecision", () => {
   });
 });
 
+describe("refreshXeroOAuthConnection", () => {
+  const input = {
+    clerkOrgId: "org_1",
+    connectionId: "conn_1",
+    organisationId: "11111111-1111-1111-1111-111111111111",
+  };
+
+  function mockStoredConnection() {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce({
+      id: input.connectionId,
+      refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+      refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+      refresh_token_iv: storedTokens.refresh_token_iv,
+    });
+  }
+
+  it("classifies an invalid refresh token and marks the connection stale", async () => {
+    mockStoredConnection();
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({ error: "invalid_grant" }),
+        ok: false,
+        status: 400,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("refresh_token_invalid");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: { id: input.connectionId },
+      data: {
+        last_error_code: "refresh_token_invalid",
+        last_error_message:
+          "The Xero refresh token is no longer valid. Reconnect Xero.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+
+  it("keeps transient refresh failures as unknown errors without marking stale", async () => {
+    mockStoredConnection();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({}),
+        ok: false,
+        status: 503,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "stale" }),
+      })
+    );
+  });
+
+  it("takes the advisory lock before a successful manual refresh", async () => {
+    mockStoredConnection();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(true);
+    expect(dbMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(dbMock.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns already_refreshed and does not mark the connection stale if the CAS update matches 0 rows", async () => {
+    mockStoredConnection();
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 0 });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("already_refreshed");
+    }
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    mockStoredConnection();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database transaction aborted.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await refreshXeroOAuthConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database transaction aborted.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+});
+
 describe("ensureFreshXeroConnection", () => {
   const input = {
     clerkOrgId: "org_1",
@@ -256,6 +531,66 @@ describe("ensureFreshXeroConnection", () => {
     }
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
+
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
   });
 
   it("returns connection_inactive for a revoked connection", async () => {
@@ -299,7 +634,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
       });
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
 
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
@@ -329,10 +664,49 @@ describe("ensureFreshXeroConnection", () => {
     if (requestBody instanceof URLSearchParams) {
       expect(requestBody.get("refresh_token")).toBe("refresh-token");
     }
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
-    const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
+    const updateArg = dbMock.xeroConnection.updateMany.mock.calls[0][0];
     expect(updateArg.data.status).toBe("active");
     expect(updateArg.data.access_token_encrypted).not.toBe("");
+  });
+
+  it("marks the connection stale when a proactive refresh gets invalid_grant", async () => {
+    const storedTokens = buildStoredTokenFields();
+    const staleConnection = {
+      ...storedTokens,
+      expires_at: new Date(input.now.getTime() + 60 * 1000),
+      revoked_at: null,
+      status: "active",
+    };
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce(staleConnection)
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({ error: "invalid_grant" }),
+        ok: false,
+        status: 400,
+      })
+    );
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("refresh_token_invalid");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "stale" }),
+      })
+    );
   });
 
   it("skips refresh inside the lock when another caller already refreshed", async () => {
@@ -367,6 +741,66 @@ describe("ensureFreshXeroConnection", () => {
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
 
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+
   it("refreshes inside the lock when the locked re-read is still stale", async () => {
     const storedTokens = buildStoredTokenFields();
     dbMock.xeroConnection.findFirst
@@ -388,7 +822,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_encrypted: storedTokens.refresh_token_encrypted,
         refresh_token_iv: storedTokens.refresh_token_iv,
       });
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
     const fetchSpy = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -412,8 +846,8 @@ describe("ensureFreshXeroConnection", () => {
     if (requestBody instanceof URLSearchParams) {
       expect(requestBody.get("refresh_token")).toBe("refresh-token");
     }
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
-    const updateArg = dbMock.xeroConnection.update.mock.calls[0][0];
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
+    const updateArg = dbMock.xeroConnection.updateMany.mock.calls[0][0];
     expect(updateArg.data.refresh_token_encrypted).not.toBe(
       storedTokens.refresh_token_encrypted
     );
@@ -444,7 +878,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
       })
       .mockResolvedValueOnce(freshConnection);
-    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
 
     let lockHeld = false;
     let releaseLock: (() => void) | undefined;
@@ -486,7 +920,7 @@ describe("ensureFreshXeroConnection", () => {
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
-    expect(dbMock.xeroConnection.update).toHaveBeenCalledTimes(1);
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it("returns unknown_error when acquiring the advisory lock fails", async () => {
@@ -510,4 +944,351 @@ describe("ensureFreshXeroConnection", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
   });
+
+  it("transitions the connection to stale if the transaction fails to commit after a successful token exchange", async () => {
+    const storedTokens = buildStoredTokenFields();
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        ...storedTokens,
+        expires_at: new Date(input.now.getTime() + 60 * 1000),
+        revoked_at: null,
+        status: "active",
+      })
+      .mockResolvedValueOnce({
+        id: input.connectionId,
+        refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+        refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+        refresh_token_iv: storedTokens.refresh_token_iv,
+      });
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        }),
+        ok: true,
+        status: 200,
+      })
+    );
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Database connection timed out.")
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+
+    const result = await ensureFreshXeroConnection(input);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
+    }
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith({
+      where: {
+        id: input.connectionId,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+      data: {
+        last_error_code: "refresh_persist_failed",
+        last_error_message: "Database connection timed out.",
+        stale_since: expect.any(Date),
+        status: "stale",
+      },
+    });
+  });
+});
+
+describe("disconnectXeroOAuthConnection", () => {
+  const input = {
+    clerkOrgId: "org_1",
+    connectionId: "11111111-1111-4111-8111-111111111111",
+    destructive: false,
+    organisationId: "22222222-2222-4222-8222-222222222222",
+  };
+
+  function buildConnection(
+    xeroAuthorisationConnectionId: null | string = "xero-connection-1"
+  ) {
+    return {
+      ...buildStoredTokenFields(),
+      id: input.connectionId,
+      xero_authorisation_connection_id: xeroAuthorisationConnectionId,
+      xero_tenant: null,
+    };
+  }
+
+  it("revokes the Xero connection before clearing local tokens", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(buildConnection());
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    const fetchSpy = vi.fn().mockResolvedValueOnce({ ok: true });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://api.xero.com/connections/xero-connection-1",
+      expect.objectContaining({ method: "DELETE" })
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: true },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          access_token_encrypted: "",
+          status: "disconnected",
+        }),
+      })
+    );
+  });
+
+  it("clears local tokens when the Xero revoke fails", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(buildConnection());
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce({ ok: false }));
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: false },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ access_token_encrypted: "" }),
+      })
+    );
+  });
+
+  it("skips the remote revoke when no authorisation connection id is stored", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValueOnce(
+      buildConnection(null)
+    );
+    dbMock.xeroConnection.update.mockResolvedValueOnce({});
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const result = await disconnectXeroOAuthConnection(input);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      value: { disconnected: true, remoteRevoked: false },
+    });
+    expect(dbMock.xeroConnection.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ access_token_encrypted: "" }),
+      })
+    );
+  });
+});
+
+describe("completeXeroTenantSelection", () => {
+  const sessionId = "90000000-0000-4000-8000-000000000001";
+  const organisationId = "90000000-0000-4000-8000-000000000002";
+  const connectionId = "90000000-0000-4000-8000-000000000003";
+  const xeroTenantRowId = "90000000-0000-4000-8000-000000000004";
+  const clerkOrgId = "org_xero_default_feed";
+  const tenantId = "xero-tenant-1";
+
+  beforeEach(() => {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue(buildPendingSession());
+    dbMock.organisation.findMany.mockResolvedValue([]);
+    dbMock.organisation.create.mockResolvedValue({ id: organisationId });
+    dbMock.xeroConnection.upsert.mockResolvedValue({ id: connectionId });
+    dbMock.xeroTenant.upsert.mockResolvedValue({ id: xeroTenantRowId });
+    dbMock.xeroOAuthSession.update.mockResolvedValue({});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            Organisations: [{ CountryCode: "AU", Name: "Acme Payroll" }],
+          }),
+          { headers: { "Content-Type": "application/json" }, status: 200 }
+        )
+      )
+    );
+  });
+
+  it("provisions the default feed when tenant selection creates an organisation", async () => {
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        connectionId,
+        organisationId,
+        xeroTenantId: xeroTenantRowId,
+      },
+    });
+    expect(dbMock.organisation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clerk_org_id: clerkOrgId,
+          country_code: "AU",
+          name: "Acme Payroll",
+        }),
+      })
+    );
+    expect(feedMock.ensureDefaultCalendarFeed).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
+    expect(
+      availabilityMock.ensureDefaultPublicHolidaysForOrganisation
+    ).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
+    expect(dbMock.xeroConnection.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          clerk_org_id: clerkOrgId,
+          organisation_id: organisationId,
+        }),
+        where: { organisation_id: organisationId },
+      })
+    );
+  });
+
+  it.each([
+    "NZ",
+    "UK",
+  ])("rejects an unsupported %s payroll tenant before persistence", async (countryCode) => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ Organisations: [{ CountryCode: countryCode }] }),
+            { headers: { "Content-Type": "application/json" }, status: 200 }
+          )
+        )
+    );
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "invalid_country",
+        message:
+          "Team Calendar currently supports Australian Xero Payroll files only.",
+      },
+    });
+    expect(dbMock.organisation.create).not.toHaveBeenCalled();
+    expect(dbMock.$transaction).not.toHaveBeenCalled();
+    expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
+  });
+
+  it("fails tenant selection when default feed provisioning fails", async () => {
+    feedMock.ensureDefaultCalendarFeed.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to create default feed.",
+      },
+    });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "unknown_error",
+        message: "Failed to create default feed.",
+      },
+    });
+    expect(dbMock.xeroConnection.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+    expect(dbMock.xeroOAuthSession.update).not.toHaveBeenCalled();
+  });
+
+  it("succeeds tenant selection even when default holiday provisioning fails", async () => {
+    availabilityMock.ensureDefaultPublicHolidaysForOrganisation.mockResolvedValueOnce(
+      {
+        ok: false,
+        error: {
+          code: "internal",
+          message: "Network error while calling Nager.Date API",
+        },
+      }
+    );
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      sessionId,
+      tenantId,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        connectionId,
+        organisationId,
+        xeroTenantId: xeroTenantRowId,
+      },
+    });
+    expect(dbMock.organisation.create).toHaveBeenCalled();
+    expect(feedMock.ensureDefaultCalendarFeed).toHaveBeenCalled();
+    expect(
+      availabilityMock.ensureDefaultPublicHolidaysForOrganisation
+    ).toHaveBeenCalledWith({
+      clerkOrgId,
+      organisationId,
+    });
+  });
+
+  function buildPendingSession() {
+    const accessToken = encryptXeroToken("access-token");
+    const refreshToken = encryptXeroToken("refresh-token");
+
+    return {
+      access_token_auth_tag: accessToken.authTag,
+      access_token_encrypted: accessToken.encrypted,
+      access_token_iv: accessToken.iv,
+      available_tenants_json: {
+        tenants: [
+          {
+            connectionId: "xero-connection-1",
+            tenantId,
+            tenantName: "Acme Payroll",
+          },
+        ],
+      },
+      expires_at: new Date("2026-07-07T00:15:00.000Z"),
+      id: sessionId,
+      organisation_id: null,
+      refresh_token_auth_tag: refreshToken.authTag,
+      refresh_token_encrypted: refreshToken.encrypted,
+      refresh_token_iv: refreshToken.iv,
+      return_to: "/settings/integrations/xero",
+      token_expires_at: new Date("2026-07-07T00:30:00.000Z"),
+    };
+  }
 });

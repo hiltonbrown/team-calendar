@@ -102,7 +102,7 @@ describe("projectFeedEvents", () => {
     });
 
     expect(named.ok && named.value[0]).toMatchObject({
-      description: "Internal note",
+      description: null,
       location: "Brisbane",
       publishedSequence: 3,
       publishedUid: "published@ical.teamcalendar.online",

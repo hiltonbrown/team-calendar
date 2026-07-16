@@ -95,7 +95,7 @@ function unsupportedRegion(): XeroWriteResult<never> {
   return {
     ok: false,
     error: {
-      code: "unknown_error",
+      code: "region_not_supported_error",
       message: "Unsupported payroll region.",
     },
   };

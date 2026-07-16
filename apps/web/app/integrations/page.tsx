@@ -19,14 +19,12 @@ const regions = [
   {
     code: "NZ",
     name: "New Zealand",
-    detail:
-      "Annual leave, sick leave, alternative leave, bereavement leave, and statutory holidays.",
+    detail: "Planned for a future release.",
   },
   {
     code: "UK",
     name: "United Kingdom",
-    detail:
-      "Annual leave, sick leave, maternity and paternity leave, and statutory leave entitlements.",
+    detail: "Planned for a future release.",
   },
 ];
 
@@ -107,7 +105,7 @@ const destinations = [
 const syncDetails = [
   {
     title: "Inbound sync",
-    copy: "Scheduled jobs keep employees, leave, balances, and approval state current across AU, NZ, and UK Payroll APIs.",
+    copy: "Scheduled jobs keep employees, leave, balances, and approval state current for Australian Xero Payroll files.",
   },
   {
     title: "Write-back",
@@ -186,12 +184,11 @@ const IntegrationsPage = () => (
       <div className="fmkt-container fmkt-integrations__split">
         <div className="fmkt-section-header">
           <h2 className="fmkt-section-title">
-            One Xero connection, three regions.
+            Australian Xero Payroll support at launch.
           </h2>
           <p className="fmkt-integrations__copy">
-            Team Calendar is built specifically for Xero Payroll AU, NZ, and UK.
-            Each region keeps its own leave rules and API behaviour, while Team
-            Calendar gives managers one consistent availability view.
+            Team Calendar currently supports Xero Payroll Australia. New Zealand
+            and United Kingdom support is planned for future releases.
           </p>
         </div>
         <div className="fmkt-integrations__region-list">

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { appError, type Result } from "@repo/core";
+import { type AppError, appError, type Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
@@ -48,6 +48,15 @@ export const ManualAvailabilityInputSchema = z
 export type ManualAvailabilityInput = z.infer<
   typeof ManualAvailabilityInputSchema
 >;
+
+export interface ManualAvailabilityActor {
+  orgRole?: string | null;
+  userId: string;
+}
+
+export type ManualAvailabilityServiceError =
+  | AppError
+  | { code: "not_authorised"; message: string };
 
 export interface AvailabilityRecordView {
   allDay: boolean;
@@ -138,8 +147,8 @@ const isUniqueConflict = (error: unknown): boolean =>
 export const createManualAvailability = async (
   tenant: TenantContext,
   input: unknown,
-  userId: string
-): Promise<Result<AvailabilityRecordView>> => {
+  actor: ManualAvailabilityActor
+): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> => {
   const parsed = ManualAvailabilityInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -161,6 +170,15 @@ export const createManualAvailability = async (
 
   if (!person) {
     return { ok: false, error: appError("not_found", "Person not found") };
+  }
+
+  const authorisation = await authoriseManualAvailabilityActor(
+    tenant,
+    actor,
+    person
+  );
+  if (!authorisation.ok) {
+    return authorisation;
   }
 
   const duplicate = await database.availabilityRecord.findFirst({
@@ -204,7 +222,7 @@ export const createManualAvailability = async (
         approval_status: "approved",
         approved_at: new Date(),
         clerk_org_id: tenant.clerkOrgId,
-        created_by_user_id: userId,
+        created_by_user_id: actor.userId,
         derived_uid_key: deriveAvailabilityUidKey({
           clerkOrgId: tenant.clerkOrgId,
           endsAt: parsed.data.endsAt,
@@ -217,7 +235,7 @@ export const createManualAvailability = async (
         }),
         organisation_id: tenant.organisationId,
         source_type: "manual",
-        updated_by_user_id: userId,
+        updated_by_user_id: actor.userId,
       },
       include: { person: true },
     });
@@ -240,8 +258,8 @@ export const updateManualAvailability = async (
   tenant: TenantContext,
   recordId: string,
   input: unknown,
-  userId: string
-): Promise<Result<AvailabilityRecordView>> => {
+  actor: ManualAvailabilityActor
+): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> => {
   const parsed = ManualAvailabilityInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -260,10 +278,29 @@ export const updateManualAvailability = async (
       id: recordId,
       source_type: "manual",
     },
+    select: {
+      person_id: true,
+      person: {
+        select: {
+          clerk_user_id: true,
+          id: true,
+          manager_person_id: true,
+        },
+      },
+    },
   });
 
   if (!existing) {
     return { ok: false, error: appError("not_found", "Record not found") };
+  }
+
+  const authorisation = await authoriseManualAvailabilityActor(
+    tenant,
+    actor,
+    existing.person
+  );
+  if (!authorisation.ok) {
+    return authorisation;
   }
 
   const duplicate = await database.availabilityRecord.findFirst({
@@ -314,7 +351,7 @@ export const updateManualAvailability = async (
         include_in_feed: parsed.data.includeInFeed,
         privacy_mode: parsed.data.privacyMode,
         derived_uid_key: derivedUidKey,
-        updated_by_user_id: userId,
+        updated_by_user_id: actor.userId,
       },
       include: { person: true },
     });
@@ -333,49 +370,11 @@ export const updateManualAvailability = async (
   }
 };
 
-export const updateAvailabilityApprovalStatus = async (
-  tenant: TenantContext,
-  recordId: string,
-  approvalStatus: "approved" | "declined",
-  userId: string
-): Promise<Result<void>> => {
-  const existing = await database.availabilityRecord.findFirst({
-    where: {
-      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
-      archived_at: null,
-      approval_status: "submitted",
-      id: recordId,
-    },
-  });
-
-  if (!existing) {
-    return {
-      ok: false,
-      error: appError("not_found", "Pending availability record not found"),
-    };
-  }
-
-  await database.availabilityRecord.update({
-    where: { id: recordId },
-    data: {
-      approval_status: approvalStatus,
-      approved_at: approvalStatus === "approved" ? new Date() : null,
-      publish_status:
-        approvalStatus === "approved" ? existing.publish_status : "suppressed",
-      updated_by_user_id: userId,
-    },
-  });
-
-  await materialisePublication(tenant, recordId);
-
-  return { ok: true, value: undefined };
-};
-
 export const archiveManualAvailability = async (
   tenant: TenantContext,
   recordId: string,
-  userId: string
-): Promise<Result<void>> => {
+  actor: ManualAvailabilityActor
+): Promise<Result<void, ManualAvailabilityServiceError>> => {
   const existing = await database.availabilityRecord.findFirst({
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
@@ -383,10 +382,28 @@ export const archiveManualAvailability = async (
       id: recordId,
       source_type: "manual",
     },
+    select: {
+      person: {
+        select: {
+          clerk_user_id: true,
+          id: true,
+          manager_person_id: true,
+        },
+      },
+    },
   });
 
   if (!existing) {
     return { ok: false, error: appError("not_found", "Record not found") };
+  }
+
+  const authorisation = await authoriseManualAvailabilityActor(
+    tenant,
+    actor,
+    existing.person
+  );
+  if (!authorisation.ok) {
+    return authorisation;
   }
 
   await database.availabilityRecord.update({
@@ -394,7 +411,7 @@ export const archiveManualAvailability = async (
     data: {
       archived_at: new Date(),
       publish_status: "archived",
-      updated_by_user_id: userId,
+      updated_by_user_id: actor.userId,
     },
   });
 
@@ -423,4 +440,46 @@ async function materialisePublication(
       organisationId: tenant.organisationId,
     });
   }
+}
+
+async function authoriseManualAvailabilityActor(
+  tenant: TenantContext,
+  actor: ManualAvailabilityActor,
+  targetPerson: {
+    clerk_user_id: string | null;
+    id: string;
+    manager_person_id: string | null;
+  }
+): Promise<Result<void, ManualAvailabilityServiceError>> {
+  if (isAdminOrOwner(actor.orgRole)) {
+    return { ok: true, value: undefined };
+  }
+
+  const actingPerson = await database.person.findFirst({
+    where: {
+      ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+      archived_at: null,
+      clerk_user_id: actor.userId,
+    },
+    select: { id: true },
+  });
+
+  const isOwner = targetPerson.clerk_user_id === actor.userId;
+  const isDirectManager = targetPerson.manager_person_id === actingPerson?.id;
+
+  if (isOwner || isDirectManager) {
+    return { ok: true, value: undefined };
+  }
+
+  return {
+    ok: false,
+    error: {
+      code: "not_authorised",
+      message: "You do not have permission to manage this availability record.",
+    },
+  };
+}
+
+function isAdminOrOwner(role?: string | null): boolean {
+  return role === "org:admin" || role === "org:owner";
 }

@@ -107,7 +107,6 @@ export async function rebuildFeedCache(
       etag: rendered.value.etag,
       key: feedCacheKey({
         feedId: feed.id,
-        feedUpdatedAt: feed.updated_at,
         privacyMode: feed.privacy_mode,
       }),
       ttlSeconds: FEED_CACHE_TTL_SECONDS,

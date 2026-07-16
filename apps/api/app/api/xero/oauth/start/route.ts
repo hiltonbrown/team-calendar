@@ -1,4 +1,4 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { currentUser, requireOrg, requireRole } from "@repo/auth/helpers";
 import { buildXeroOAuthStartUrl } from "@repo/xero";
 import { NextResponse } from "next/server";
 
@@ -13,6 +13,17 @@ export async function GET(request: Request) {
   const user = await currentUser();
   if (!user) {
     return NextResponse.json({ error: "Not authenticated." }, { status: 401 });
+  }
+
+  const [isAdmin, isOwner] = await Promise.all([
+    requireRole("org:admin"),
+    requireRole("org:owner"),
+  ]);
+  if (!(isAdmin || isOwner)) {
+    return NextResponse.json(
+      { error: "Only admins and owners can connect Xero." },
+      { status: 403 }
+    );
   }
 
   const url = new URL(request.url);

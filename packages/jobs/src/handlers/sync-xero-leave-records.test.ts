@@ -68,7 +68,7 @@ vi.mock("@repo/notifications", () => ({
     mocks.publishOrganisationNotificationEvent,
 }));
 vi.mock("@repo/observability/log", () => ({
-  log: { error: vi.fn(), info: vi.fn() },
+  log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("@repo/xero", () => ({
   ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
@@ -143,7 +143,7 @@ describe("leave records stale archival", () => {
   it("does not archive records when Xero returns an empty leave set", async () => {
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
-      value: { leaveRecords: [], rawResponse: {} },
+      value: { complete: true, leaveRecords: [], rawResponse: {} },
     });
 
     const result = await syncXeroLeaveRecords(input());
@@ -164,7 +164,11 @@ describe("leave records stale archival", () => {
   it("uses a notIn query for stale archival when Xero returns records", async () => {
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
-      value: { leaveRecords: [xeroLeaveRecord()], rawResponse: {} },
+      value: {
+        complete: true,
+        leaveRecords: [xeroLeaveRecord()],
+        rawResponse: {},
+      },
     });
 
     const result = await syncXeroLeaveRecords(input());
@@ -181,6 +185,33 @@ describe("leave records stale archival", () => {
         }),
       })
     );
+  });
+
+  it("skips stale archival when the Xero leave fetch is truncated", async () => {
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: false,
+        leaveRecords: [xeroLeaveRecord()],
+        rawResponse: {},
+      },
+    });
+
+    const result = await syncXeroLeaveRecords(input());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.archived).toBe(0);
+    }
+    expect(mocks.availabilityRecordFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          source_remote_id: { in: [LEAVE_APPLICATION_ID] },
+        }),
+      })
+    );
+    expect(mocks.availabilityRecordUpdateMany).not.toHaveBeenCalled();
   });
 
   it("uses pre-fetched maps for create, update, and unchanged records", async () => {
@@ -200,7 +231,7 @@ describe("leave records stale archival", () => {
     ];
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
-      value: { leaveRecords: records, rawResponse: {} },
+      value: { complete: true, leaveRecords: records, rawResponse: {} },
     });
     mocks.personFindMany
       .mockResolvedValueOnce([
@@ -317,7 +348,11 @@ describe("leave records stale archival", () => {
   it("records person_not_found from the pre-fetched person map", async () => {
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
-      value: { leaveRecords: [xeroLeaveRecord()], rawResponse: {} },
+      value: {
+        complete: true,
+        leaveRecords: [xeroLeaveRecord()],
+        rawResponse: {},
+      },
     });
     mocks.personFindMany.mockResolvedValue([]);
     mocks.availabilityRecordFindMany

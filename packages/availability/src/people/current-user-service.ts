@@ -8,6 +8,8 @@ import {
   type Result,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import { ensureDefaultCalendarFeed } from "@repo/feeds";
+import { ensureDefaultPublicHolidaysForOrganisation } from "../holidays/holiday-service";
 import {
   normaliseCurrentUserProfile,
   safeCurrentUserProfilePatch,
@@ -139,6 +141,20 @@ export const ensureOrganisationForClerk = async (
           working_hours_per_day: input.workingHoursPerDay ?? 7.6,
         },
       });
+
+  const defaultFeed = await ensureDefaultCalendarFeed({
+    clerkOrgId: input.clerkOrgId,
+    organisationId: organisation.id,
+  });
+  if (!defaultFeed.ok) {
+    throw new Error(defaultFeed.error.message);
+  }
+
+  // Provision default public holidays; ignore errors (non-blocking)
+  await ensureDefaultPublicHolidaysForOrganisation({
+    clerkOrgId: input.clerkOrgId as ClerkOrgId,
+    organisationId: organisation.id as OrganisationId,
+  });
 
   return {
     clerkOrgId: input.clerkOrgId as ClerkOrgId,

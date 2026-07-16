@@ -15,6 +15,7 @@
     "@repo/analytics": "*",
     "@repo/auth": "*",
     "@repo/availability": "*",
+    "@repo/billing": "*",
     "@repo/core": "*",
     "@repo/database": "*",
     "@repo/email": "*",
@@ -24,26 +25,25 @@
     "@repo/notifications": "*",
     "@repo/observability": "*",
     "@repo/xero": "*",
-    "@sentry/nextjs": "^10.53.1",
+    "@sentry/nextjs": "^10.65.0",
     "@t3-oss/env-nextjs": "^0.13.11",
-    "import-in-the-middle": "^3.0.1",
-    "inngest": "^4.5.0",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
+    "import-in-the-middle": "^3.3.1",
+    "inngest": "^4.12.1",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
     "require-in-the-middle": "8.0.1",
     "server-only": "^0.0.1",
-    "svix": "^1.94.0",
-    "zod": "^4.4.3",
-    "@repo/billing": "*"
+    "svix": "^1.96.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "25.9.1",
-    "@types/react": "19.2.15",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "^6.0.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.10"
   }
 }

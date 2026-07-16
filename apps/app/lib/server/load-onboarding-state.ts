@@ -147,7 +147,7 @@ export async function loadOnboardingState({
       ctaHref: "/settings/general",
       ctaLabel: "Review profile",
       description: organisation
-        ? `${organisation.name} is set to ${organisation.country_code}. Confirm the country, region, and timezone before importing holidays.`
+        ? `${organisation.name} is set to ${organisation.country_code}. Confirm the country, region, and timezone used for public holiday defaults.`
         : "Confirm the organisation name, country, region, and timezone.",
       id: "profile",
       status: statusForRequiredStep("profile", hasProfile, nextRequiredId),
@@ -171,9 +171,9 @@ export async function loadOnboardingState({
     },
     {
       ctaHref: "/settings/holidays",
-      ctaLabel: hasPublicHolidays ? "Review holidays" : "Set holidays",
+      ctaLabel: hasPublicHolidays ? "Review holidays" : "Review setup",
       description:
-        "Configure public holidays so calendars and working-day calculations match the organisation.",
+        "Team Calendar imports your organisation's country holidays automatically. Review regional or custom dates.",
       id: "holidays",
       status: statusForRequiredStep(
         "holidays",
@@ -184,12 +184,13 @@ export async function loadOnboardingState({
     },
     {
       ctaHref: "/feeds",
-      ctaLabel: hasFeeds ? "View feeds" : "Create feed",
-      description:
-        "Create an ICS feed when you are ready to publish availability to team calendars.",
+      ctaLabel: hasFeeds ? "View default feed" : "Create feed",
+      description: hasFeeds
+        ? "Your default all-staff feed is ready. Rotate its token when you need to copy a fresh subscribe URL."
+        : "Create an ICS feed manually if this organisation does not have a default feed available.",
       id: "feed",
       status: statusForRequiredStep("feed", hasFeeds, nextRequiredId),
-      title: "Publish a calendar feed",
+      title: "Review calendar feed",
     },
   ];
 

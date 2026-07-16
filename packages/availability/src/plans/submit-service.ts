@@ -171,7 +171,8 @@ export async function withdrawSubmission(
     const record = authorised.value;
 
     if (
-      record.approval_status !== "submitted" ||
+      (record.approval_status !== "submitted" &&
+        record.approval_status !== "approved") ||
       !record.source_remote_id ||
       record.source_type !== "team_calendar_leave"
     ) {
@@ -199,7 +200,7 @@ export async function withdrawSubmission(
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
         auditAction: "availability_records.withdrawal_failed",
-        expectedStatus: "submitted",
+        expectedStatus: record.approval_status,
         input: parsed.data,
         record,
         error: response.error,
@@ -220,7 +221,7 @@ export async function withdrawSubmission(
         },
         where: {
           ...scoped(parsed.data),
-          approval_status: "submitted",
+          approval_status: { in: ["submitted", "approved"] },
           derived_sequence: record.derived_sequence,
           id: record.id,
         },
@@ -229,14 +230,15 @@ export async function withdrawSubmission(
         throw new OptimisticConflictError();
       }
 
-      await notifyManager(tx, parsed.data, record, "leave_withdrawn", {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-      });
       await tx.auditEvent.create({
         data: auditData(parsed.data, "availability_records.withdrawn", {
           xeroLeaveApplicationId,
         }),
       });
+    });
+
+    await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
+      actionUrl: `/leave-approvals?recordId=${record.id}`,
     });
 
     const updated = await loadBareRecord(parsed.data);
@@ -349,14 +351,15 @@ async function performSubmission(
         throw new OptimisticConflictError();
       }
 
-      await notifyManager(tx, parsed.data, record, "leave_submitted", {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-      });
       await tx.auditEvent.create({
         data: auditData(parsed.data, options.successAuditAction, {
           xeroLeaveApplicationId: submission.value.remoteId,
         }),
       });
+    });
+
+    await notifyManagerBestEffort(parsed.data, record, "leave_submitted", {
+      actionUrl: `/leave-approvals?recordId=${record.id}`,
     });
 
     const updated = await loadBareRecord(parsed.data);
@@ -636,6 +639,25 @@ async function notifyManager(
   );
   if (!result.ok) {
     throw new NotificationCreateError();
+  }
+}
+
+async function notifyManagerBestEffort(
+  input: RecordActionInput,
+  record: LoadedRecord,
+  type: "leave_submitted" | "leave_withdrawn",
+  options: { actionUrl: string }
+): Promise<void> {
+  try {
+    await notifyManager(database, input, record, type, options);
+  } catch (error) {
+    log.error("Failed to dispatch manager notification", {
+      availabilityRecordId: record.id,
+      clerkOrgId: input.clerkOrgId,
+      error: error instanceof Error ? error.message : "Unknown error",
+      organisationId: input.organisationId,
+      type,
+    });
   }
 }
 

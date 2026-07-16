@@ -1,4 +1,4 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { auth, currentUser, requireOrg } from "@repo/auth/helpers";
 import { createManualAvailability } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { getOrganisationById } from "@repo/database/src/queries/organisations";
@@ -116,6 +116,8 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    const authResult = await auth();
+
     // Call availability service to create record
     const createResult = await createManualAvailability(
       {
@@ -134,7 +136,7 @@ export async function POST(request: Request): Promise<Response> {
         preferredContactMethod: data.preferredContactMethod,
         contactability: data.contactability,
       },
-      user.id
+      { orgRole: authResult.orgRole, userId: user.id }
     );
 
     if (!createResult.ok) {
@@ -174,6 +176,10 @@ function statusForCreateError(code: string): number {
 
   if (code === "conflict") {
     return 409;
+  }
+
+  if (code === "not_authorised") {
+    return 403;
   }
 
   return 500;

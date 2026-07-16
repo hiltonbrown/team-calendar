@@ -75,7 +75,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
             </Button>
           ) : null
         }
-        description="No feeds yet. Create one to start publishing availability."
+        description="New organisations normally start with a default all-staff feed. No feed is currently available for this organisation."
         title="No feeds yet"
       />
     );

@@ -2896,6 +2896,7 @@ export const XeroConnectionScalarFieldEnum = {
   refresh_token_encrypted: 'refresh_token_encrypted',
   refresh_token_iv: 'refresh_token_iv',
   refresh_token_auth_tag: 'refresh_token_auth_tag',
+  xero_authorisation_connection_id: 'xero_authorisation_connection_id',
   token_key_version: 'token_key_version',
   token_encrypted_at: 'token_encrypted_at',
   expires_at: 'expires_at',
@@ -3039,6 +3040,8 @@ export const AvailabilityPublicationScalarFieldEnum = {
   published_sequence: 'published_sequence',
   published_at: 'published_at',
   privacy_mode: 'privacy_mode',
+  published_starts_at: 'published_starts_at',
+  published_ends_at: 'published_ends_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const
@@ -3373,6 +3376,7 @@ export const ClerkOrgSubscriptionScalarFieldEnum = {
   stripe_subscription_id: 'stripe_subscription_id',
   cancel_at_period_end: 'cancel_at_period_end',
   ended_at: 'ended_at',
+  stripe_event_created_at: 'stripe_event_created_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const

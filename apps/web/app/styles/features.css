@@ -2351,67 +2351,112 @@
   margin-top: 8px;
 }
 
-.fmkt-plan-skeleton {
+.fmkt-pricing-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  margin-top: 8px;
+  gap: 24px;
+  margin-top: 24px;
 }
 
-.fmkt-plan-skeleton__card {
-  display: grid;
-  gap: 14px;
-  padding: 28px;
+.fmkt-pricing-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 32px;
   background: var(--marketing-surface-container);
   border-radius: 16px;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-.fmkt-plan-skeleton__bar {
-  width: 100%;
-  height: 13px;
-  background: var(--marketing-surface-highest);
+.fmkt-pricing-card--highlighted {
+  background: var(--marketing-surface-low);
+  border: 2px solid #336a3b;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  transform: scale(1.02);
+}
+
+.fmkt-pricing-card__badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  padding: 4px 12px;
+  font: 600 0.75rem var(--marketing-font);
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: #336a3b;
   border-radius: 999px;
-  animation: fmkt-plan-pulse 1.6s ease-in-out infinite;
+  transform: translateX(-50%);
 }
 
-.fmkt-plan-skeleton__bar--title {
-  width: 45%;
-  height: 18px;
+.fmkt-pricing-card__header {
+  margin-bottom: 24px;
 }
 
-.fmkt-plan-skeleton__bar--price {
-  width: 62%;
-  height: 30px;
-  margin-bottom: 6px;
+.fmkt-pricing-card__title {
+  margin: 0 0 8px;
+  font: 700 1.5rem var(--marketing-font);
+  color: var(--marketing-inverse-surface);
 }
 
-.fmkt-plan-skeleton__bar--short {
-  width: 70%;
+.fmkt-pricing-card__description {
+  min-height: 44px;
+  margin: 0 0 16px;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
 }
 
-.fmkt-plan-skeleton__bar--button {
+.fmkt-pricing-card__price-wrap {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+
+.fmkt-pricing-card__price {
+  font: 700 2.5rem var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-pricing-card__interval {
+  font: 400 1rem var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-card__features {
+  display: flex;
+  flex-grow: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0 0 32px;
+  list-style: none;
+}
+
+.fmkt-pricing-card__feature {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font: 400 0.9375rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-card__feature-icon {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: #336a3b;
+}
+
+.fmkt-pricing-card__footer {
+  margin-top: auto;
+}
+
+.fmkt-pricing-card__footer .marketing-btn {
+  box-sizing: border-box;
+  display: block;
   width: 100%;
-  height: 40px;
-  margin-top: 8px;
-  border-radius: 12px;
-}
-
-.fmkt-plan-skeleton__card:nth-child(2) .fmkt-plan-skeleton__bar {
-  animation-delay: 0.15s;
-}
-
-.fmkt-plan-skeleton__card:nth-child(3) .fmkt-plan-skeleton__bar {
-  animation-delay: 0.3s;
-}
-
-@keyframes fmkt-plan-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-  }
-  50% {
-    opacity: 1;
-  }
+  text-align: center;
 }
 
 .fmkt-plan-fallback {
@@ -3085,7 +3130,7 @@
   }
 
   .fmkt-pricing-setup__grid,
-  .fmkt-plan-skeleton {
+  .fmkt-pricing-cards {
     grid-template-columns: 1fr;
   }
 

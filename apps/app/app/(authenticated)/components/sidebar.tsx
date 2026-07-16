@@ -72,8 +72,14 @@ const navGroups: NavGroup[] = [
       { title: "People", href: "/people", icon: UsersIcon },
       { title: "Calendar Feeds", href: "/feeds", icon: LinkIcon },
       {
-        title: "Analytics",
+        title: "Leave Reports",
         href: "/analytics/leave-reports",
+        icon: BarChart3Icon,
+        roles: ANALYTICS_NAV_ROLES,
+      },
+      {
+        title: "Out of Office",
+        href: "/analytics/out-of-office",
         icon: BarChart3Icon,
         roles: ANALYTICS_NAV_ROLES,
       },

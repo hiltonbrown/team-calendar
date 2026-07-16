@@ -151,7 +151,7 @@ const FiltersSchema = z.object({
   dateTo: z.coerce.date().optional(),
   personId: z.array(z.string().uuid()).optional(),
   recordType: z.array(RecordTypeSchema).optional(),
-  status: z.array(ApprovalStatusSchema).default(["submitted"]),
+  status: z.array(ApprovalStatusSchema).optional(),
 });
 
 const ListSchema = z.object({
@@ -236,11 +236,14 @@ export async function listForApprover(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    const filters = parsed.data.filters ?? {
-      status:
-        settingsResult.ok && !settingsResult.value.showDeclinedOnApprovals
-          ? ["submitted", "approved", "xero_sync_failed", "withdrawn"]
-          : ["submitted"],
+    const showDeclined =
+      settingsResult.ok && settingsResult.value.showDeclinedOnApprovals;
+    const defaultStatus: z.infer<typeof ApprovalStatusSchema>[] = showDeclined
+      ? ["submitted", "approved", "xero_sync_failed", "withdrawn", "declined"]
+      : ["submitted", "approved", "xero_sync_failed", "withdrawn"];
+    const filters = {
+      ...parsed.data.filters,
+      status: parsed.data.filters?.status ?? defaultStatus,
     };
     const managedPersonIds =
       parsed.data.role === "manager" && parsed.data.actingPersonId
@@ -730,20 +733,16 @@ async function performApproval(
       if (update.count !== 1) {
         throw new OptimisticConflictError();
       }
-      await notifyUser(tx, parsed.data, record, {
-        actionUrl: `/plans?recordId=${record.id}`,
-        recipientUserId: record.person.clerk_user_id,
-        type: "leave_approved",
-      });
-      await notifyManagersIfEnabled(tx, parsed.data, record, {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-        type: "leave_approved",
-      });
       await tx.auditEvent.create({
         data: auditData(parsed.data, options.successAuditAction, {
           xeroLeaveApplicationId,
         }),
       });
+    });
+
+    await notifyApprovalBestEffort(parsed.data, record, {
+      actionUrl: `/plans?recordId=${record.id}`,
+      type: "leave_approved",
     });
 
     const updated = await loadRecord(parsed.data);
@@ -829,22 +828,18 @@ async function performDecline(
       if (update.count !== 1) {
         throw new OptimisticConflictError();
       }
-      await notifyUser(tx, input, record, {
-        actionUrl: `/plans?recordId=${record.id}`,
-        payload: { body: options.reason },
-        recipientUserId: record.person.clerk_user_id,
-        type: "leave_declined",
-      });
-      await notifyManagersIfEnabled(tx, input, record, {
-        actionUrl: `/leave-approvals?recordId=${record.id}`,
-        type: "leave_declined",
-      });
       await tx.auditEvent.create({
         data: auditData(input, options.successAuditAction, {
           reasonLength: options.reason.length,
           xeroLeaveApplicationId,
         }),
       });
+    });
+
+    await notifyApprovalBestEffort(input, record, {
+      actionUrl: `/plans?recordId=${record.id}`,
+      payload: { body: options.reason },
+      type: "leave_declined",
     });
 
     const updated = await loadRecord(input);
@@ -1443,6 +1438,51 @@ async function notifyManagersIfEnabled(
     recipientPersonId: managerPersonId,
     recipientUserId: managerUserId,
     type: options.type,
+  });
+}
+
+async function notifyApprovalBestEffort(
+  input: CommandInput,
+  record: LoadedApprovalRecord,
+  options: {
+    actionUrl: string;
+    payload?: Record<string, string | number | boolean | null>;
+    type: "leave_approved" | "leave_declined";
+  }
+): Promise<void> {
+  try {
+    await notifyUser(database, input, record, {
+      actionUrl: options.actionUrl,
+      payload: options.payload,
+      recipientUserId: record.person.clerk_user_id,
+      type: options.type,
+    });
+  } catch (error) {
+    logApprovalNotificationFailure(error, input, record, options.type);
+  }
+
+  try {
+    await notifyManagersIfEnabled(database, input, record, {
+      actionUrl: `/leave-approvals?recordId=${record.id}`,
+      type: options.type,
+    });
+  } catch (error) {
+    logApprovalNotificationFailure(error, input, record, options.type);
+  }
+}
+
+function logApprovalNotificationFailure(
+  error: unknown,
+  input: CommandInput,
+  record: LoadedApprovalRecord,
+  type: "leave_approved" | "leave_declined"
+): void {
+  log.error("Failed to dispatch approval notification", {
+    availabilityRecordId: record.id,
+    clerkOrgId: input.clerkOrgId,
+    error: error instanceof Error ? error.message : "Unknown error",
+    organisationId: input.organisationId,
+    type,
   });
 }
 

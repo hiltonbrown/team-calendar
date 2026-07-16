@@ -1,4 +1,4 @@
-import { currentUser, requireOrg } from "@repo/auth/helpers";
+import { auth, currentUser, requireOrg } from "@repo/auth/helpers";
 import {
   archiveManualAvailability,
   updateManualAvailability,
@@ -134,6 +134,7 @@ export async function PATCH(
     }
 
     const data = parseResult.data;
+    const authResult = await auth();
 
     // Call availability service to update record
     const updateResult = await updateManualAvailability(
@@ -153,13 +154,15 @@ export async function PATCH(
         preferredContactMethod: data.preferredContactMethod,
         contactability: data.contactability,
       },
-      user.id
+      { orgRole: authResult.orgRole, userId: user.id }
     );
 
     if (!updateResult.ok) {
       return Response.json(
         { ok: false, error: updateResult.error },
-        { status: 500 }
+        {
+          status: updateResult.error.code === "not_authorised" ? 403 : 500,
+        }
       );
     }
 
@@ -254,6 +257,7 @@ export async function DELETE(
     }
 
     const record = recordResult.value;
+    const authResult = await auth();
 
     // Check if record is Xero-sourced (read-only)
     if (record.sourceType !== "manual") {
@@ -276,13 +280,15 @@ export async function DELETE(
         organisationId: organisationId as OrganisationId,
       },
       recordId as AvailabilityRecordId,
-      user.id
+      { orgRole: authResult.orgRole, userId: user.id }
     );
 
     if (!deleteResult.ok) {
       return Response.json(
         { ok: false, error: deleteResult.error },
-        { status: 500 }
+        {
+          status: deleteResult.error.code === "not_authorised" ? 403 : 500,
+        }
       );
     }
 

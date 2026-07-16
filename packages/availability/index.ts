@@ -10,6 +10,7 @@ export type {
   WithdrawLeaveInput,
 } from "@repo/core";
 export { materialiseAvailabilityPublication } from "@repo/feeds";
+export { exportAnalyticsToCsv } from "./src/analytics/analytics-csv";
 export {
   DATE_RANGE_PRESET_OPTIONS,
   type DateRangeError,
@@ -97,6 +98,7 @@ export * from "./src/holidays/holiday-service";
 export {
   addCustomHoliday,
   deleteCustomHoliday,
+  ensureDefaultPublicHolidaysForOrganisation,
   importForJurisdiction,
   listForOrganisation,
   restoreHoliday,
@@ -187,7 +189,6 @@ export {
   createManualAvailability,
   listAvailabilityRecords,
   ManualAvailabilityInputSchema,
-  updateAvailabilityApprovalStatus,
   updateManualAvailability,
 } from "./src/records/manual-records-service";
 export * from "./src/records/record-type-categories";

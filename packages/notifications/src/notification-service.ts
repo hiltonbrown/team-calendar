@@ -245,7 +245,7 @@ export async function markAsRead(
           unreadCount,
         },
       }
-    );
+    ).catch(() => undefined);
 
     return { ok: true, value: { notification: item, unreadCount } };
   } catch {
@@ -281,7 +281,7 @@ export async function markAllAsRead(
         userId: parsed.data.userId,
       },
       { type: "notification.all_read", payload: { unreadCount: 0 } }
-    );
+    ).catch(() => undefined);
     return { ok: true, value: { markedCount: result.count, unreadCount: 0 } };
   } catch {
     return unknownError("Failed to mark notifications as read.");

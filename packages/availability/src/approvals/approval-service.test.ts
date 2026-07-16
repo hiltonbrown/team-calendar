@@ -257,6 +257,71 @@ describe("approval-service", () => {
     );
   });
 
+  it("keeps an approved transition when notification dispatch fails", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce({ ...record, approval_status: "approved" });
+    mocks.approveLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
+    mocks.dispatchNotification.mockResolvedValue({
+      ok: false,
+      error: { message: "Notification unavailable" },
+    });
+
+    const result = await approve(input, mockPort);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "approved" }),
+      })
+    );
+    expect(mocks.auditCreate).toHaveBeenCalled();
+    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: "employee_1",
+        type: "leave_approved",
+      }),
+      expect.anything()
+    );
+  });
+
+  it("keeps a declined transition when notification dispatch fails", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce({ ...record, approval_status: "declined" });
+    mocks.declineLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
+    mocks.dispatchNotification.mockResolvedValue({
+      ok: false,
+      error: { message: "Notification unavailable" },
+    });
+
+    const result = await decline(
+      { ...input, reason: "Too much overlap" },
+      mockPort
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "declined" }),
+      })
+    );
+    expect(mocks.auditCreate).toHaveBeenCalled();
+    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: "employee_1",
+        type: "leave_declined",
+      }),
+      expect.anything()
+    );
+  });
+
   it("persists failed approve without setting approver fields", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -465,6 +530,26 @@ describe("approval-service", () => {
     }
   });
 
+  it("keeps decline conflicts mapped to invalid state", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+    mocks.declineLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
+
+    const result = await decline(
+      { ...input, reason: "Too much overlap" },
+      mockPort
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: "invalid_state_for_decline" },
+    });
+    expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+  });
+
   it("reverts failed declines to submitted and clears approval_note", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
@@ -594,5 +679,85 @@ describe("approval-service", () => {
       balanceAvailable: 4,
       balanceRemainingAfterApproval: 3,
     });
+  });
+
+  it("includes declined and xero_sync_failed in the default filter when showDeclinedOnApprovals is true", async () => {
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: [
+              "submitted",
+              "approved",
+              "xero_sync_failed",
+              "withdrawn",
+              "declined",
+            ],
+          },
+        }),
+      })
+    );
+  });
+
+  it("omits declined but includes xero_sync_failed in the default filter when showDeclinedOnApprovals is false", async () => {
+    mocks.getSettings.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        defaultFeedPrivacyMode: "named",
+        defaultLeaveRequestAdvanceDays: 0,
+        defaultPrivacyMode: "named",
+        feedsIncludePublicHolidaysDefault: false,
+        id: "settings_1",
+        managerVisibilityScope: "direct_reports_only",
+        notifyManagersOnStatusChange: true,
+        organisationId: input.organisationId,
+        requireDeclineReason: true,
+        showDeclinedOnApprovals: false,
+        showPendingOnCalendar: true,
+      },
+    });
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: ["submitted", "approved", "xero_sync_failed", "withdrawn"],
+          },
+        }),
+      })
+    );
+  });
+
+  it("passes explicit status filter through unchanged", async () => {
+    mocks.availabilityFindMany.mockResolvedValue([record]);
+
+    const result = await listForApprover({
+      ...input,
+      filters: { status: ["submitted"] },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          approval_status: {
+            in: ["submitted"],
+          },
+        }),
+      })
+    );
   });
 });

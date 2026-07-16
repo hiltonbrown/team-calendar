@@ -1,5 +1,10 @@
+import type { Database } from "@repo/database";
 import type { notification_type } from "@repo/database/generated/enums";
 import type { NotificationCategory } from "../types/notification-type-registry";
+import {
+  getNotificationSseStreamClient,
+  type NotificationSseStreamEntry,
+} from "./redis-stream";
 
 export type NotificationSseEvent =
   | {
@@ -40,9 +45,9 @@ export type NotificationSseEvent =
       };
     };
 
-type Listener = (event: NotificationSseEvent) => void;
-
-const listeners = new Map<string, Set<Listener>>();
+export interface NotificationSseRecipientDatabase {
+  person: Pick<Database["person"], "findMany">;
+}
 
 export function streamKey(input: {
   organisationId: string;
@@ -51,57 +56,69 @@ export function streamKey(input: {
   return `${input.userId}:${input.organisationId}`;
 }
 
-export function subscribeToNotificationStream(
-  input: { organisationId: string; userId: string },
-  listener: Listener
-): () => void {
-  const key = streamKey(input);
-  const existing = listeners.get(key) ?? new Set<Listener>();
-  existing.add(listener);
-  listeners.set(key, existing);
-
-  return () => {
-    const current = listeners.get(key);
-    if (!current) {
-      return;
-    }
-    current.delete(listener);
-    if (current.size === 0) {
-      listeners.delete(key);
-    }
-  };
-}
-
-export function publishNotificationEvent(
-  input: { organisationId: string; userId: string },
-  event: NotificationSseEvent
-): void {
-  const current = listeners.get(streamKey(input));
-  if (!current) {
-    return;
-  }
-  for (const listener of current) {
-    listener(event);
-  }
-}
-
-export function publishOrganisationNotificationEvent(
-  input: { organisationId: string },
-  event: NotificationSseEvent
-): void {
-  for (const [key, current] of listeners.entries()) {
-    if (!key.endsWith(`:${input.organisationId}`)) {
-      continue;
-    }
-    for (const listener of current) {
-      listener(event);
-    }
-  }
-}
-
-export function listenerCount(input: {
+export function notificationSseChannel(input: {
   organisationId: string;
   userId: string;
-}): number {
-  return listeners.get(streamKey(input))?.size ?? 0;
+}): string {
+  return `sse:${streamKey(input)}`;
+}
+
+export function pollNotificationStream(
+  input: { organisationId: string; userId: string },
+  sinceId: string
+): Promise<NotificationSseStreamEntry[]> {
+  const client = getNotificationSseStreamClient();
+  if (!client) {
+    return Promise.resolve([]);
+  }
+  return client.readSince(notificationSseChannel(input), sinceId);
+}
+
+export async function publishNotificationEvent(
+  input: { organisationId: string; userId: string },
+  event: NotificationSseEvent
+): Promise<void> {
+  const client = getNotificationSseStreamClient();
+  if (!client) {
+    return;
+  }
+  await client.append(notificationSseChannel(input), event);
+}
+
+export async function publishOrganisationNotificationEvent(
+  input: { clerkOrgId: string; organisationId: string },
+  event: NotificationSseEvent,
+  client?: NotificationSseRecipientDatabase
+): Promise<void> {
+  const streamClient = getNotificationSseStreamClient();
+  if (!streamClient) {
+    return;
+  }
+
+  const recipientClient = client ?? (await import("@repo/database")).database;
+  const recipients = await recipientClient.person.findMany({
+    where: {
+      archived_at: null,
+      clerk_org_id: input.clerkOrgId,
+      clerk_user_id: { not: null },
+      is_active: true,
+      organisation_id: input.organisationId,
+    },
+    select: { clerk_user_id: true },
+  });
+  await Promise.all(
+    recipients.flatMap((recipient) =>
+      recipient.clerk_user_id
+        ? [
+            streamClient.append(
+              notificationSseChannel({
+                organisationId: input.organisationId,
+                userId: recipient.clerk_user_id,
+              }),
+              event
+            ),
+          ]
+        : []
+    )
+  );
 }

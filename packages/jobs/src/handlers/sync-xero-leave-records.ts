@@ -142,7 +142,7 @@ export async function syncXeroLeaveRecords(
     const run = await createRun(context, startedAt);
     runId = run.id;
 
-    publishRunStatusChanged(context, run.id, "running");
+    await publishRunStatusChanged(context, run.id, "running");
 
     const tenantReadiness = await ensureTenantReady(context, run.id);
     if (!tenantReadiness.ready) {
@@ -179,7 +179,7 @@ export async function syncXeroLeaveRecords(
       };
     }
 
-    const fetched = leaveRecordsResult.value.leaveRecords;
+    const { complete, leaveRecords: fetched } = leaveRecordsResult.value;
     counts.fetched = fetched.length;
     const processed: ProcessedLeaveRecord[] = [];
 
@@ -238,10 +238,22 @@ export async function syncXeroLeaveRecords(
       }
     }
 
-    const stale = await archiveStaleRecords(
-      context,
-      fetched.map((record) => record.leaveApplicationId).filter(Boolean)
-    );
+    const stale = complete
+      ? await archiveStaleRecords(
+          context,
+          fetched.map((record) => record.leaveApplicationId).filter(Boolean)
+        )
+      : { archived: 0, personIds: [] };
+    if (!complete) {
+      log.warn(
+        "Skipped stale-archive because the Xero leave fetch was truncated",
+        {
+          clerkOrgId: context.clerkOrgId,
+          organisationId: context.organisationId,
+          xeroTenantId: context.xeroTenantId,
+        }
+      );
+    }
     counts.archived = stale.archived;
     const affectedPersonIds = new Set([
       ...processed
@@ -456,9 +468,15 @@ async function loadExistingRecordsBySourceRemoteId(
     where: {
       ...scoped(context),
       source_remote_id: { in: [...new Set(sourceRemoteIds)] },
-      source_type: "xero_leave",
+      source_type: { in: ["xero_leave", "team_calendar_leave"] },
     },
-    select: { id: true, source_remote_hash: true, source_remote_id: true },
+    select: {
+      approval_status: true,
+      failed_action: true,
+      id: true,
+      source_remote_hash: true,
+      source_remote_id: true,
+    },
   });
   const recordsBySourceRemoteId = new Map<string, (typeof records)[number]>();
   for (const record of records) {
@@ -559,11 +577,19 @@ async function processLeaveRecord(
     const existing = existingRecordsBySourceRemoteId.get(
       normalised.sourceRemoteId
     );
+    let approvalStatusToPersist = normalised.approvalStatus;
+    if (
+      existing?.approval_status === "xero_sync_failed" &&
+      existing.failed_action === "withdraw" &&
+      normalised.approvalStatus === "approved"
+    ) {
+      approvalStatusToPersist = "xero_sync_failed";
+    }
     const changed =
       existing?.source_remote_hash !== normalised.sourceRemoteHash;
     const data = {
       all_day: normalised.allDay,
-      approval_status: normalised.approvalStatus,
+      approval_status: approvalStatusToPersist,
       archived_at: normalised.publishStatus === "archived" ? new Date() : null,
       contactability: normalised.contactability,
       derived_uid_key: normalised.derivedUidKey,
@@ -589,6 +615,8 @@ async function processLeaveRecord(
         where: { ...scoped(context), id: recordId },
       });
       existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        approval_status: approvalStatusToPersist,
+        failed_action: existing?.failed_action ?? null,
         id: recordId,
         source_remote_hash: normalised.sourceRemoteHash,
         source_remote_id: normalised.sourceRemoteId,
@@ -605,6 +633,8 @@ async function processLeaveRecord(
         select: { id: true },
       });
       existingRecordsBySourceRemoteId.set(normalised.sourceRemoteId, {
+        approval_status: approvalStatusToPersist,
+        failed_action: null,
         id: created.id,
         source_remote_hash: normalised.sourceRemoteHash,
         source_remote_id: normalised.sourceRemoteId,
@@ -876,7 +906,7 @@ async function completeRun(
     },
     where: { ...scoped(context), id: runId },
   });
-  publishRunStatusChanged(context, runId, input.status);
+  await publishRunStatusChanged(context, runId, input.status);
 }
 
 function loadXeroTenant(context: SyncXeroLeaveRecordsInput) {
@@ -906,24 +936,35 @@ function isBlanketFailure(error: XeroWriteError): boolean {
   return error.code === "auth_error" || error.code === "rate_limit_error";
 }
 
-function publishRunStatusChanged(
+async function publishRunStatusChanged(
   context: SyncXeroLeaveRecordsInput,
   runId: string,
   status: string
 ) {
-  publishOrganisationNotificationEvent(
-    { organisationId: context.organisationId },
-    {
-      type: "sync.run_status_changed",
-      payload: {
+  try {
+    await publishOrganisationNotificationEvent(
+      {
+        clerkOrgId: context.clerkOrgId,
         organisationId: context.organisationId,
-        runId,
-        runType: "leave_records",
-        status,
-        xeroTenantId: context.xeroTenantId,
       },
-    }
-  );
+      {
+        type: "sync.run_status_changed",
+        payload: {
+          organisationId: context.organisationId,
+          runId,
+          runType: "leave_records",
+          status,
+          xeroTenantId: context.xeroTenantId,
+        },
+      }
+    );
+  } catch (error) {
+    log.error("Failed to publish sync run status notification", {
+      error,
+      organisationId: context.organisationId,
+      runId,
+    });
+  }
 }
 
 function scoped(input: { clerkOrgId: string; organisationId: string }) {

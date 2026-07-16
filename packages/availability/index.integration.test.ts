@@ -5,11 +5,31 @@ import type { TenantContext } from "./index";
 
 config({ path: new URL("../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}), { virtual: true });
+vi.mock("./src/holidays/nager-client", () => ({
+  getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
+    Promise.resolve({
+      ok: true,
+      value: [
+        {
+          date: `${year}-01-01`,
+          localName: "New Year's Day",
+          name: "New Year's Day",
+          countryCode: "AU",
+          fixed: true,
+          global: true,
+          counties: null,
+          types: ["Public"],
+        },
+      ],
+    })
+  ),
+}));
 
 const {
   archiveManualAvailability,
   createManualAvailability,
   ensureCurrentUserPerson,
+  ensureOrganisationForClerk,
   listAvailabilityRecords,
   updateManualAvailability,
 } = await import("./index");
@@ -32,8 +52,13 @@ const tenantB: TenantFixture = {
   organisationId: "42000000-0000-4000-8000-000000000001",
   personId: "42000000-0000-4000-8000-000000000002",
 };
+const provisioningClerkOrgId = "org_test_default_feed_provisioning";
 
-const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
+const testClerkOrgIds = [
+  tenantA.clerkOrgId,
+  tenantB.clerkOrgId,
+  provisioningClerkOrgId,
+];
 
 const inputFor = (tenant: TenantFixture) => ({
   allDay: true,
@@ -85,6 +110,24 @@ const cleanTestData = async () => {
   await database.person.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
+  await database.auditEvent.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feedToken.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feedScope.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.feed.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.publicHoliday.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.publicHolidayJurisdiction.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
   await database.organisation.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
@@ -112,7 +155,7 @@ describe("manual availability services", () => {
     const result = await createManualAvailability(
       contextFor(tenantA),
       inputFor(tenantA),
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(result.ok).toBe(true);
@@ -149,7 +192,7 @@ describe("manual availability services", () => {
           ...inputFor(tenantA),
           endsAt: new Date("2026-05-09T00:00:00.000Z"),
         },
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "bad_request" }),
@@ -160,7 +203,7 @@ describe("manual availability services", () => {
       createManualAvailability(
         contextFor(tenantA),
         { ...inputFor(tenantA), personId: tenantB.personId },
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
@@ -172,7 +215,7 @@ describe("manual availability services", () => {
     const created = await createManualAvailability(
       contextFor(tenantA),
       inputFor(tenantA),
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(created.ok).toBe(true);
@@ -185,7 +228,7 @@ describe("manual availability services", () => {
         contextFor(tenantB),
         created.value.id,
         inputFor(tenantB),
-        "user_test"
+        { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
@@ -201,7 +244,7 @@ describe("manual availability services", () => {
         includeInFeed: false,
         title: "Training day",
       },
-      "user_test"
+      { orgRole: "org:admin", userId: "user_test" }
     );
 
     expect(updated).toMatchObject({
@@ -214,22 +257,20 @@ describe("manual availability services", () => {
     });
 
     await expect(
-      archiveManualAvailability(
-        contextFor(tenantB),
-        created.value.id,
-        "user_test"
-      )
+      archiveManualAvailability(contextFor(tenantB), created.value.id, {
+        orgRole: "org:admin",
+        userId: "user_test",
+      })
     ).resolves.toMatchObject({
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
 
     await expect(
-      archiveManualAvailability(
-        contextFor(tenantA),
-        created.value.id,
-        "user_test"
-      )
+      archiveManualAvailability(contextFor(tenantA), created.value.id, {
+        orgRole: "org:admin",
+        userId: "user_test",
+      })
     ).resolves.toMatchObject({ ok: true });
 
     await expect(
@@ -243,6 +284,133 @@ describe("manual availability services", () => {
 });
 
 describe("current user person identity", () => {
+  test("provisions one default feed when ensuring an organisation", async () => {
+    const context = await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default feed provisioning",
+    });
+
+    await expect(
+      database.organisation.count({
+        where: { clerk_org_id: provisioningClerkOrgId },
+      })
+    ).resolves.toBe(1);
+
+    const feeds = await database.feed.findMany({
+      where: {
+        archived_at: null,
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+      },
+    });
+    expect(feeds).toHaveLength(1);
+    expect(feeds[0]).toMatchObject({
+      name: "All staff",
+      privacy_mode: "named",
+      status: "active",
+    });
+
+    await expect(
+      database.feedScope.findMany({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          feed_id: feeds[0]?.id,
+          organisation_id: context.organisationId,
+        },
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({ scope_type: "org", scope_value: null }),
+    ]);
+
+    await expect(
+      database.feedToken.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          feed_id: feeds[0]?.id,
+          organisation_id: context.organisationId,
+          status: "active",
+        },
+      })
+    ).resolves.toBe(1);
+
+    await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default feed provisioning renamed",
+    });
+
+    await expect(
+      database.feed.count({
+        where: {
+          clerk_org_id: provisioningClerkOrgId,
+          organisation_id: context.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+  });
+
+  test("provisions default public holidays when ensuring an organisation", async () => {
+    const context = await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default holiday provisioning test",
+    });
+
+    const orgCount = await database.organisation.count({
+      where: { clerk_org_id: provisioningClerkOrgId },
+    });
+    expect(orgCount).toBe(1);
+
+    const jurisdictions = await database.publicHolidayJurisdiction.findMany({
+      where: {
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+        country_code: "AU",
+        region_code: null,
+      },
+    });
+    expect(jurisdictions.length).toBeGreaterThanOrEqual(1);
+
+    const currentYear = new Date().getUTCFullYear();
+    const holidays = await database.publicHoliday.findMany({
+      where: {
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+        source: "nager",
+      },
+    });
+
+    const holidayYears = holidays.map((h) => h.holiday_date.getUTCFullYear());
+    expect(holidayYears).toContain(currentYear);
+    expect(holidayYears).toContain(currentYear + 1);
+
+    const initialHolidayCount = holidays.length;
+
+    await ensureOrganisationForClerk({
+      clerkOrgId: provisioningClerkOrgId,
+      countryCode: "AU",
+      name: "Default holiday provisioning test",
+    });
+
+    const finalJurisdictions = await database.publicHolidayJurisdiction.count({
+      where: {
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+      },
+    });
+    expect(finalJurisdictions).toBe(jurisdictions.length);
+
+    const finalHolidayCount = await database.publicHoliday.count({
+      where: {
+        clerk_org_id: provisioningClerkOrgId,
+        organisation_id: context.organisationId,
+        source: "nager",
+      },
+    });
+    expect(finalHolidayCount).toBe(initialHolidayCount);
+  });
+
   test("returns an existing linked person", async () => {
     await database.person.update({
       where: { id: tenantA.personId },

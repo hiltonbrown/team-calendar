@@ -1,6 +1,6 @@
 import { currentUser, requireOrg } from "@repo/auth/helpers";
 import { database } from "@repo/database";
-import { subscribeToNotificationStream } from "@repo/notifications";
+import { pollNotificationStream } from "@repo/notifications";
 import { z } from "zod";
 
 const QuerySchema = z.object({
@@ -69,8 +69,8 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const encoder = new TextEncoder();
-  let unsubscribe: (() => void) | null = null;
   let keepAlive: ReturnType<typeof setInterval> | null = null;
+  let poll: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -79,33 +79,56 @@ export async function GET(request: Request): Promise<Response> {
           controller.enqueue(chunk);
         } catch {
           // Controller already closed; stop pushing and release resources.
-          unsubscribe?.();
           if (keepAlive) {
             clearInterval(keepAlive);
             keepAlive = null;
+          }
+          if (poll) {
+            clearInterval(poll);
+            poll = null;
           }
         }
       };
 
       safeEnqueue(encoder.encode(": connected\n\n"));
-      unsubscribe = subscribeToNotificationStream(
-        { organisationId: organisation.id, userId: user.id },
-        (event) => {
-          safeEnqueue(
-            encoder.encode(
-              `event: ${event.type}\ndata: ${JSON.stringify(event.payload)}\n\n`
-            )
-          );
+      let lastId = `${Date.now()}-0`;
+      let polling = false;
+      const pollEvents = async (): Promise<void> => {
+        if (polling) {
+          return;
         }
-      );
+        polling = true;
+        try {
+          const events = await pollNotificationStream(
+            { organisationId: organisation.id, userId: user.id },
+            lastId
+          );
+          for (const entry of events) {
+            lastId = entry.id;
+            safeEnqueue(
+              encoder.encode(
+                `event: ${entry.event.type}\ndata: ${JSON.stringify(entry.event.payload)}\n\n`
+              )
+            );
+          }
+        } finally {
+          polling = false;
+        }
+      };
+      pollEvents().catch(() => undefined);
+      poll = setInterval(() => {
+        pollEvents().catch(() => undefined);
+      }, 2000);
       keepAlive = setInterval(() => {
         safeEnqueue(encoder.encode(": keep-alive\n\n"));
       }, 25_000);
     },
     cancel() {
-      unsubscribe?.();
       if (keepAlive) {
         clearInterval(keepAlive);
+      }
+      if (poll) {
+        clearInterval(poll);
       }
     },
   });
