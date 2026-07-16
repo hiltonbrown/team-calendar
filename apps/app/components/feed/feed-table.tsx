@@ -102,7 +102,7 @@ export function FeedTable({
   return (
     <div className="overflow-hidden rounded-2xl bg-muted">
       {confirmation && (
-        <div className="m-3 rounded-2xl bg-error-container p-4 text-error text-sm">
+        <div className="m-3 rounded-2xl bg-error-container p-4 text-on-error-container text-sm">
           <p>
             {confirmation.action === "rotate"
               ? "Rotating the token invalidates the current subscribe URL. Subscribers will need the new URL to continue syncing."

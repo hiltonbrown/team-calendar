@@ -7,6 +7,13 @@ import type {
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -550,18 +557,25 @@ function BalancesPanel({
               value={balance}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs">
+          <label className="flex flex-col gap-1 text-xs" htmlFor="balance-unit">
             Unit
-            <select
-              className="rounded-xl bg-background px-3 py-2 text-sm"
-              onChange={(event) =>
-                setBalanceUnit(event.target.value === "days" ? "days" : "hours")
+            <Select
+              onValueChange={(value) =>
+                setBalanceUnit(value === "days" ? "days" : "hours")
               }
               value={balanceUnit}
             >
-              <option value="hours">Hours</option>
-              <option value="days">Days</option>
-            </select>
+              <SelectTrigger
+                className="rounded-xl bg-background text-sm"
+                id="balance-unit"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hours">Hours</SelectItem>
+                <SelectItem value="days">Days</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
           <Button
             className="self-end"

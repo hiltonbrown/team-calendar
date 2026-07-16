@@ -3,6 +3,17 @@
 import { Button } from "@repo/design-system/components/ui/button";
 import { Input } from "@repo/design-system/components/ui/input";
 import { Label } from "@repo/design-system/components/ui/label";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@repo/design-system/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
 import { Switch } from "@repo/design-system/components/ui/switch";
 import { Textarea } from "@repo/design-system/components/ui/textarea";
 import { useRouter } from "next/navigation";
@@ -83,7 +94,7 @@ export function FeedCreateForm({
   return (
     <form action={submit} className="space-y-5">
       {error && (
-        <div className="rounded-2xl bg-error-container p-3 text-error text-sm">
+        <div className="rounded-2xl bg-error-container p-3 text-on-error-container text-sm">
           {error}
         </div>
       )}
@@ -97,22 +108,25 @@ export function FeedCreateForm({
       </div>
       <fieldset className="space-y-2">
         <legend className="font-medium text-sm">Privacy mode</legend>
-        {[
-          ["named", "Subscribers see names and leave types"],
-          ["masked", "Subscribers see Team member with leave types"],
-          ["private", "Subscribers see Unavailable only"],
-        ].map(([value, label]) => (
-          <label className="flex gap-2 text-sm" key={value}>
-            <input
-              checked={privacyMode === value}
-              onChange={() =>
-                setPrivacyMode(value as "masked" | "named" | "private")
-              }
-              type="radio"
-            />
-            {label}
-          </label>
-        ))}
+        <RadioGroup
+          onValueChange={(value) =>
+            setPrivacyMode(value as "masked" | "named" | "private")
+          }
+          value={privacyMode}
+        >
+          {[
+            ["named", "Subscribers see names and leave types"],
+            ["masked", "Subscribers see Team member with leave types"],
+            ["private", "Subscribers see Unavailable only"],
+          ].map(([value, label]) => (
+            <div className="flex items-center gap-2 text-sm" key={value}>
+              <RadioGroupItem id={`privacy-${value}`} value={value} />
+              <Label className="font-normal" htmlFor={`privacy-${value}`}>
+                {label}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
       </fieldset>
       <div className="flex items-center justify-between gap-4 rounded-2xl bg-muted p-3 text-sm">
         <Label htmlFor="include-public-holidays">Include public holidays</Label>
@@ -124,44 +138,58 @@ export function FeedCreateForm({
       </div>
       <fieldset className="space-y-3">
         <legend className="font-medium text-sm">Scope</legend>
-        {[
-          ["self", "Just me"],
-          ["manager_team", "My team"],
-          ["team", "Specific teams"],
-          ["person", "Specific people"],
-          ...(canCreateOrgScope ? [["org", "All of organisation"]] : []),
-        ].map(([value, label]) => (
-          <label className="flex gap-2 text-sm" key={value}>
-            <input
-              checked={scopeChoice === value}
-              onChange={() => setScopeChoice(value as ScopeChoice)}
-              type="radio"
-            />
-            {label}
-          </label>
-        ))}
+        <RadioGroup
+          onValueChange={(value) => setScopeChoice(value as ScopeChoice)}
+          value={scopeChoice}
+        >
+          {[
+            ["self", "Just me"],
+            ["manager_team", "My team"],
+            ["team", "Specific teams"],
+            ["person", "Specific people"],
+            ...(canCreateOrgScope ? [["org", "All of organisation"]] : []),
+          ].map(([value, label]) => (
+            <div className="flex items-center gap-2 text-sm" key={value}>
+              <RadioGroupItem id={`scope-${value}`} value={value} />
+              <Label className="font-normal" htmlFor={`scope-${value}`}>
+                {label}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
         {scopeChoice === "team" && (
-          <select className="w-full rounded-xl bg-muted p-3" name="teamId">
-            <option value="">Choose team</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
+          <Select name="teamId">
+            <SelectTrigger className="w-full rounded-xl">
+              <SelectValue placeholder="Choose team" />
+            </SelectTrigger>
+            <SelectContent>
+              {teams.map((team) => (
+                <SelectItem key={team.id} value={team.id}>
+                  {team.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
         {scopeChoice === "person" && (
-          <select className="w-full rounded-xl bg-muted p-3" name="personId">
-            <option value="">Choose person</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-              </option>
-            ))}
-          </select>
+          <Select name="personId">
+            <SelectTrigger className="w-full rounded-xl">
+              <SelectValue placeholder="Choose person" />
+            </SelectTrigger>
+            <SelectContent>
+              {people.map((person) => (
+                <SelectItem key={person.id} value={person.id}>
+                  {person.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </fieldset>
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button onClick={() => router.back()} type="button" variant="ghost">
+          Cancel
+        </Button>
         <Button disabled={isPending} type="submit">
           {isPending ? "Creating" : "Create feed"}
         </Button>

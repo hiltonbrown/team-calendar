@@ -6,6 +6,14 @@ import {
 } from "@repo/design-system/components/ui/avatar";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
+import { Kbd } from "@repo/design-system/components/ui/kbd";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import {
   Table,
@@ -17,7 +25,12 @@ import {
 } from "@repo/design-system/components/ui/table";
 import { AlertTriangleIcon, ChevronDownIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Fragment, useState, useTransition } from "react";
+import {
+  Fragment,
+  type KeyboardEvent as ReactKeyboardEvent,
+  useState,
+  useTransition,
+} from "react";
 import { z } from "zod";
 import {
   dispatchApprovalReconciliationAction,
@@ -32,6 +45,10 @@ import { RequestInfoModal } from "@/components/approvals/request-info-modal";
 import { EmptyState } from "@/components/states/empty-state";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
+
+// Radix Select rejects empty-string item values, so the "no filter" option
+// carries this sentinel and maps back to undefined at the state boundary.
+const ALL_STATUSES = "all";
 
 type ApprovalAction =
   | "approve"
@@ -121,6 +138,31 @@ export function LeaveApprovalsClient({
     router.refresh();
   };
 
+  // Keyboard shortcuts on a focused row: A approves, D declines, Enter expands.
+  // Scoped to the row (not a global listener) so it never fights the filter
+  // controls or the command palette.
+  const handleRowKeyDown = (
+    event: ReactKeyboardEvent<HTMLTableRowElement>,
+    record: ApprovalItem,
+    isExpanded: boolean
+  ) => {
+    const key = event.key.toLowerCase();
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setExpandedId(isExpanded ? null : record.id);
+      return;
+    }
+    if (key === "a" && record.availableActions.includes("approve")) {
+      event.preventDefault();
+      setModal({ mode: "approve", record });
+      return;
+    }
+    if (key === "d" && record.availableActions.includes("decline")) {
+      event.preventDefault();
+      setModal({ mode: "decline", record });
+    }
+  };
+
   const runInlineAction = (
     record: ApprovalItem,
     action: "retry_approval" | "retry_decline" | "revert_to_submitted"
@@ -207,28 +249,35 @@ export function LeaveApprovalsClient({
       </div>
 
       <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 md:flex-row md:items-center">
-        <label className="grid gap-1 text-sm">
+        <label className="grid gap-1 text-sm" htmlFor="approvals-status-filter">
           <span className="font-medium">Status</span>
-          <select
-            className="h-10 rounded-xl bg-background px-3"
-            onChange={(event) =>
+          <Select
+            onValueChange={(value) =>
               setFilterParams({
-                status: event.currentTarget.value || undefined,
+                status: value === ALL_STATUSES ? undefined : value,
               })
             }
             value={
               filters.status && filters.status.length === 1
                 ? filters.status[0]
-                : ""
+                : ALL_STATUSES
             }
           >
-            <option value="">All statuses</option>
-            <option value="submitted">Pending approval</option>
-            <option value="approved">Approved</option>
-            <option value="declined">Declined</option>
-            <option value="withdrawn">Withdrawn</option>
-            <option value="xero_sync_failed">Xero sync failed</option>
-          </select>
+            <SelectTrigger
+              className="h-10 min-w-48 rounded-xl bg-background"
+              id="approvals-status-filter"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_STATUSES}>All statuses</SelectItem>
+              <SelectItem value="submitted">Pending approval</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="declined">Declined</SelectItem>
+              <SelectItem value="withdrawn">Withdrawn</SelectItem>
+              <SelectItem value="xero_sync_failed">Xero sync failed</SelectItem>
+            </SelectContent>
+          </Select>
         </label>
         <label className="mt-5 flex items-center gap-2 text-sm">
           <input
@@ -251,6 +300,15 @@ export function LeaveApprovalsClient({
         />
       ) : (
         <div className="overflow-hidden rounded-2xl bg-background">
+          <p className="flex flex-wrap items-center gap-1.5 px-4 pt-3 text-muted-foreground text-xs">
+            <span>Tab to a row, then</span>
+            <Kbd>A</Kbd>
+            <span>approve</span>
+            <Kbd>D</Kbd>
+            <span>decline</span>
+            <Kbd>Enter</Kbd>
+            <span>expand</span>
+          </p>
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
@@ -269,10 +327,15 @@ export function LeaveApprovalsClient({
                 return (
                   <Fragment key={record.id}>
                     <TableRow
-                      className="cursor-pointer"
+                      aria-expanded={isExpanded}
+                      className="cursor-pointer focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
                       onClick={() =>
                         setExpandedId(isExpanded ? null : record.id)
                       }
+                      onKeyDown={(event) =>
+                        handleRowKeyDown(event, record, isExpanded)
+                      }
+                      tabIndex={0}
                     >
                       <TableCell>
                         <PersonCell record={record} />

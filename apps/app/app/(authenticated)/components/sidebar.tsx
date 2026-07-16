@@ -17,87 +17,19 @@ import {
 } from "@repo/design-system/components/ui/sidebar";
 import { cn } from "@repo/design-system/lib/utils";
 import { brandNameDisplay } from "@repo/seo/branding";
-import {
-  ActivityIcon,
-  BarChart3Icon,
-  BellIcon,
-  CalendarDaysIcon,
-  ClipboardListIcon,
-  FlagIcon,
-  LayoutDashboardIcon,
-  LinkIcon,
-  type LucideIcon,
-  Settings2Icon,
-  UsersIcon,
-} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
+import {
+  isNavItemVisible,
+  navGroups,
+  settingsNavItem,
+} from "@/lib/navigation/nav-items";
 import { getOrgFromSearchParams, withOrg } from "@/lib/navigation/org-url";
 
 interface GlobalSidebarProperties {
   readonly children: ReactNode;
 }
-
-interface NavItem {
-  href: string;
-  icon: LucideIcon;
-  roles?: readonly string[];
-  title: string;
-}
-
-interface NavGroup {
-  items: NavItem[];
-  label: string | null;
-}
-
-const ANALYTICS_NAV_ROLES = ["org:manager", "org:admin", "org:owner"];
-
-const navGroups: NavGroup[] = [
-  {
-    label: null,
-    items: [{ title: "Dashboard", href: "/", icon: LayoutDashboardIcon }],
-  },
-  {
-    label: "My Work",
-    items: [
-      { title: "My Plans", href: "/plans", icon: ClipboardListIcon },
-      { title: "Calendar", href: "/calendar", icon: CalendarDaysIcon },
-      { title: "Notifications", href: "/notifications", icon: BellIcon },
-    ],
-  },
-  {
-    label: "Team",
-    items: [
-      { title: "People", href: "/people", icon: UsersIcon },
-      { title: "Calendar Feeds", href: "/feeds", icon: LinkIcon },
-      {
-        title: "Leave Reports",
-        href: "/analytics/leave-reports",
-        icon: BarChart3Icon,
-        roles: ANALYTICS_NAV_ROLES,
-      },
-      {
-        title: "Out of Office",
-        href: "/analytics/out-of-office",
-        icon: BarChart3Icon,
-        roles: ANALYTICS_NAV_ROLES,
-      },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      {
-        title: "Leave Approvals",
-        href: "/leave-approvals",
-        icon: ClipboardListIcon,
-      },
-      { title: "Public Holidays", href: "/public-holidays", icon: FlagIcon },
-      { title: "Sync Health", href: "/sync", icon: ActivityIcon },
-    ],
-  },
-];
 
 export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
   const sidebar = useSidebar();
@@ -207,15 +139,17 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
               <SidebarMenuButton
                 asChild
                 className="h-9 gap-3"
-                isActive={pathname.startsWith("/settings")}
-                tooltip="Settings"
+                isActive={pathname.startsWith(settingsNavItem.href)}
+                tooltip={settingsNavItem.title}
               >
-                <Link href={withOrg("/settings", orgId)}>
-                  <Settings2Icon
+                <Link href={withOrg(settingsNavItem.href, orgId)}>
+                  <settingsNavItem.icon
                     className="h-4 w-4 shrink-0"
                     strokeWidth={1.75}
                   />
-                  <span className="font-medium text-[0.8125rem]">Settings</span>
+                  <span className="font-medium text-[0.8125rem]">
+                    {settingsNavItem.title}
+                  </span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -229,10 +163,3 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
     </>
   );
 };
-
-function isNavItemVisible(
-  roles: readonly string[] | undefined,
-  orgRole: string | null | undefined
-): boolean {
-  return roles ? roles.includes(orgRole ?? "") : true;
-}

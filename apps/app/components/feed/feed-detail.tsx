@@ -116,7 +116,7 @@ export function FeedDetail({
         </div>
 
         {confirmation && (
-          <div className="rounded-2xl bg-error-container p-4 text-error text-sm">
+          <div className="rounded-2xl bg-error-container p-4 text-on-error-container text-sm">
             <p>
               {confirmation === "rotate"
                 ? "Rotating the token invalidates the current subscribe URL. Subscribers will need the new URL to continue syncing."

@@ -3,6 +3,13 @@
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -26,6 +33,10 @@ import {
   PublicHolidayFilterSchema,
   type PublicHolidayFilters,
 } from "./_schemas";
+
+// Radix Select rejects empty-string item values, so the "no filter" option
+// carries this sentinel and maps back to undefined at the state boundary.
+const ALL_LOCATIONS = "all";
 
 interface PublicHolidayFromDB {
   archived_at: Date | null;
@@ -335,24 +346,34 @@ function FilterBar({
           type="number"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm">
+      <label
+        className="flex flex-col gap-1 text-sm"
+        htmlFor="holiday-location-filter"
+      >
         <span className="font-medium">Location</span>
-        <select
-          className="min-h-11 rounded-xl bg-background px-3 py-2"
-          defaultValue={filters.locationId ?? ""}
-          onChange={(event) =>
+        <Select
+          defaultValue={filters.locationId ?? ALL_LOCATIONS}
+          onValueChange={(value) =>
             setFilterParams({
-              locationId: event.currentTarget.value || undefined,
+              locationId: value === ALL_LOCATIONS ? undefined : value,
             })
           }
         >
-          <option value="">All locations</option>
-          {locations.map((location) => (
-            <option key={location.id} value={location.id}>
-              {location.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            className="min-h-11 min-w-44 rounded-xl bg-background"
+            id="holiday-location-filter"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_LOCATIONS}>All locations</SelectItem>
+            {locations.map((location) => (
+              <SelectItem key={location.id} value={location.id}>
+                {location.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </label>
       <label className="flex min-h-11 items-center gap-2 text-sm">
         <input

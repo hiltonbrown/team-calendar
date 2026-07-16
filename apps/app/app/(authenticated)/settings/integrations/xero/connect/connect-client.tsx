@@ -9,6 +9,13 @@ import {
   CardTitle,
 } from "@repo/design-system/components/ui/card";
 import { Label } from "@repo/design-system/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import type {
   PendingXeroSessionOrganisation,
@@ -103,21 +110,25 @@ export function XeroConnectClient({
           </CardHeader>
           <CardContent className="space-y-3">
             <Label htmlFor="organisation">Organisation</Label>
-            <select
-              className="flex h-12 w-full rounded-xl border border-input bg-background px-3 text-sm"
+            <Select
               disabled={Boolean(presetOrganisationId)}
-              id="organisation"
-              onChange={(event) =>
-                setSelectedOrganisationId(event.target.value)
-              }
+              onValueChange={setSelectedOrganisationId}
               value={presetOrganisationId ?? selectedOrganisationId}
             >
-              {organisations.map((organisation) => (
-                <option key={organisation.id} value={organisation.id}>
-                  {organisation.name} ({organisation.countryCode})
-                </option>
-              ))}
-            </select>
+              <SelectTrigger
+                className="h-12 w-full rounded-xl bg-background"
+                id="organisation"
+              >
+                <SelectValue placeholder="Select an organisation" />
+              </SelectTrigger>
+              <SelectContent>
+                {organisations.map((organisation) => (
+                  <SelectItem key={organisation.id} value={organisation.id}>
+                    {organisation.name} ({organisation.countryCode})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
       ) : (

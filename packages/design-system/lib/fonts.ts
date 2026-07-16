@@ -15,8 +15,16 @@ const lora = Lora({
   style: ['normal', 'italic'],
 });
 
-export const fonts = cn(
+const base = 'touch-manipulation font-sans antialiased';
+
+// Product UI (apps/app): Plus Jakarta Sans carries every type level, so the app
+// never loads Lora. See DESIGN.md typography scale.
+export const fonts = cn(plusJakartaSans.variable, base);
+
+// Marketing surfaces (apps/web): additionally load Lora for the editorial serif
+// exposed via --marketing-serif.
+export const marketingFonts = cn(
   plusJakartaSans.variable,
   lora.variable,
-  'touch-manipulation font-sans antialiased'
+  base
 );

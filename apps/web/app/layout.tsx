@@ -1,7 +1,7 @@
 import "./styles.css";
 import { AnalyticsProvider } from "@repo/analytics/provider";
 import { DesignSystemProvider } from "@repo/design-system";
-import { fonts } from "@repo/design-system/lib/fonts";
+import { marketingFonts } from "@repo/design-system/lib/fonts";
 import { cn } from "@repo/design-system/lib/utils";
 import type { ReactNode } from "react";
 import { Footer } from "./components/footer";
@@ -13,7 +13,7 @@ interface RootLayoutProperties {
 
 const RootLayout = ({ children }: RootLayoutProperties) => (
   <html
-    className={cn(fonts, "scroll-smooth")}
+    className={cn(marketingFonts, "scroll-smooth")}
     lang="en"
     suppressHydrationWarning
   >

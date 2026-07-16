@@ -8,6 +8,7 @@ import { SidebarTrigger } from "@repo/design-system/components/ui/sidebar";
 import { getUnreadCount, listRecentUnread } from "@repo/notifications";
 import { type ReactNode, Suspense } from "react";
 import { NotificationsBell } from "@/components/notifications/bell";
+import { CommandMenuTrigger } from "./command-menu-trigger";
 import { CustomUserButton } from "./custom-user-button";
 
 interface HeaderProps {
@@ -39,6 +40,7 @@ export const Header = async ({
 
       <div className="flex items-center gap-2">
         {children}
+        <CommandMenuTrigger />
         {bell && (
           <NotificationsBell
             initialRecent={bell.recent}

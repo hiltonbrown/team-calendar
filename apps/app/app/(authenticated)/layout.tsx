@@ -7,6 +7,7 @@ import {
   SidebarProvider,
 } from "@repo/design-system/components/ui/sidebar";
 import type { ReactNode } from "react";
+import { CommandMenu } from "./components/command-menu";
 import { NotificationsProvider } from "./components/notifications-provider";
 import { GlobalSidebar } from "./components/sidebar";
 
@@ -37,6 +38,7 @@ const AppLayout = async ({ children }: AppLayoutProperties) => {
 
   return (
     <NotificationsProvider organisationId={organisationId}>
+      <CommandMenu />
       <SidebarProvider className="h-svh">
         <GlobalSidebar>
           <SidebarInset className="overflow-y-auto">

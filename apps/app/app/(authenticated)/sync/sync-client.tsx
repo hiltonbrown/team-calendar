@@ -9,6 +9,13 @@ import type {
 } from "@repo/availability";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@repo/design-system/components/ui/select";
 import { useNotificationEvents } from "@repo/notifications/components/provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -394,20 +401,25 @@ function SelectFilter({
   options: Array<{ label: string; value: string }>;
   value: string;
 }) {
+  const fieldId = `sync-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
-    <label className="grid gap-1 text-sm">
+    <label className="grid gap-1 text-sm" htmlFor={fieldId}>
       <span className="text-muted-foreground">{label}</span>
-      <select
-        className="h-9 rounded-xl bg-background px-3"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <Select onValueChange={onChange} value={value}>
+        <SelectTrigger
+          className="min-w-40 rounded-xl bg-background"
+          id={fieldId}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </label>
   );
 }
