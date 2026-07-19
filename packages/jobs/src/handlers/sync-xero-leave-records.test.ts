@@ -301,6 +301,8 @@ describe("leave records stale archival", () => {
       1,
       expect.objectContaining({
         where: expect.objectContaining({
+          clerk_org_id: CLERK_ORG_ID,
+          organisation_id: ORGANISATION_ID,
           source_remote_id: {
             in: [
               LEAVE_APPLICATION_ID,
@@ -308,7 +310,7 @@ describe("leave records stale archival", () => {
               LEAVE_APPLICATION_ID_3,
             ],
           },
-          source_type: "xero_leave",
+          source_type: { in: ["xero_leave", "team_calendar_leave"] },
         }),
       })
     );
