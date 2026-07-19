@@ -16,7 +16,7 @@ row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Restore a green `bun run test` and `bun run typecheck` baseline | P1 | S | — | TODO |
+| 001 | Restore a green `bun run test` and `bun run typecheck` baseline | P1 | S | — | DONE |
 | 002 | Require admin or owner on the Stripe checkout and portal server actions | P1 | S | 001 | TODO |
 | 003 | Stop exposing Xero write errors to peers on the team calendar | P1 | S | 001 | TODO |
 | 004 | Fail closed when the Clerk webhook secret is missing | P2 | S | 001 | TODO |
