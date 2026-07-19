@@ -746,8 +746,10 @@ function toCalendarEvent(
     renderTreatment: renderTreatment(record.approval_status),
     sourceType: record.source_type,
     startsAt: record.starts_at,
+    // Xero error text can disclose leave type and payroll context, so it is
+    // withheld from peers alongside notes and the true record type.
     xeroWriteError:
-      record.approval_status === "xero_sync_failed"
+      canSeeSensitive && record.approval_status === "xero_sync_failed"
         ? record.xero_write_error
         : null,
   };

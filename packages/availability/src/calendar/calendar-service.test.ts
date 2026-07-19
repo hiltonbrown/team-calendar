@@ -212,6 +212,23 @@ describe("calendar-service", () => {
     );
   });
 
+  it("withholds xero write errors from peers in range output", async () => {
+    const result = await getCalendarRange({
+      ...baseInput,
+      scope: { type: "team", value: ids.team },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const peerEvent = result.value.days
+      .flatMap((day) => day.events)
+      .find((event) => event.id === "private-record");
+    expect(peerEvent?.xeroWriteError).toBeNull();
+    expect(peerEvent?.notesInternal).toBeNull();
+  });
+
   it("detects cross-org record lookups", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(null)
