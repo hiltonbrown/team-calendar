@@ -229,9 +229,13 @@ test at `:195-213`. Model it on that test, but with a genuine peer actor.
 
 The new test must:
 
-- Call `getCalendarRange` with `...baseInput` and `role: "viewer"`,
-  `actingPersonId: ids.peer`, `scope: { type: "all_teams" }` — an actor who is
-  neither the record's owner, nor its manager, nor an admin or owner.
+- Call `getCalendarRange` with `...baseInput` and
+  `scope: { type: "team", value: ids.team }`. The base actor is the manager,
+  and this team includes both their direct report and `ids.peer`. Team scope is
+  therefore authorised, but `ids.peer` is neither the manager's report nor the
+  manager themselves, so `relationshipToOwner` returns `"peer"` for the failed
+  record. Do not use the previously suggested `viewer` / `all_teams` input:
+  `resolvePeopleForScope` correctly rejects it before any event is projected.
 - Target a record in `xero_sync_failed` state belonging to a different person,
   so `relationshipToOwner` returns `"peer"`.
 - Assert `event?.xeroWriteError` is `null`.

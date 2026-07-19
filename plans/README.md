@@ -17,10 +17,10 @@ row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Restore a green `bun run test` and `bun run typecheck` baseline | P1 | S | — | DONE |
-| 002 | Require admin or owner on the Stripe checkout and portal server actions | P1 | S | 001 | TODO |
-| 003 | Stop exposing Xero write errors to peers on the team calendar | P1 | S | 001 | TODO |
-| 004 | Fail closed when the Clerk webhook secret is missing | P2 | S | 001 | TODO |
-| 005 | Spike: decide how scheduled Xero syncs should run, then wire the first one | P1 | M | 001 | TODO |
+| 002 | Require admin or owner on the Stripe checkout and portal server actions | P1 | S | 001 | DONE |
+| 003 | Stop exposing Xero write errors to peers on the team calendar | P1 | S | 001 | DONE |
+| 004 | Fail closed when the Clerk webhook secret is missing | P2 | S | 001 | DONE |
+| 005 | Spike: decide how scheduled Xero syncs should run, then wire the first one | P1 | M | 001 | REJECTED: published cadence is unsafe, replacement requires product and capacity decisions |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale).

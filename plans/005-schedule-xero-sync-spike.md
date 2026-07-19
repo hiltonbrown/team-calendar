@@ -15,6 +15,11 @@
 
 ## Status
 
+- **Reconciled**: 2026-07-19 at commit `7a72522`
+- **Outcome**: REJECTED. The spike confirmed that the published cadence is
+  unsafe for medium and large organisations. No scheduled handler was added.
+- **Evidence**: executor findings committed in isolated worktree branch
+  `advisor/005-schedule-xero-sync-spike` at `3772377`.
 - **Priority**: P1
 - **Effort**: M (spike) / L (full implementation, out of scope here)
 - **Risk**: MED
@@ -364,6 +369,29 @@ Stop and report back (do not improvise) if:
   timezone-aware scheduling. Recommend and defer; do not build it.
 - `bun run test` was already failing before your change — that means
   `plans/001-restore-verification-baseline.md` has not landed. Stop and say so.
+
+## Reconciliation record
+
+The executor completed the investigative steps and stopped at the plan's
+rate-limit condition. This result remains valid at `7a72522`: the only drift
+in the plan's in-scope paths since `960c07b` is a test-only change to
+`sync-xero-leave-records.test.ts`; the scheduling handlers, Xero read loops,
+and rate limiter retain the behaviour analysed by the spike.
+
+The plan is rejected rather than rewritten because its stated `PRODUCT.md`
+cadence cannot be made safe by changing cron wiring. `fetchLeaveBalances`
+issues one request per employee, so hourly polling costs 12,000 requests per
+day at 500 employees and 48,000 at 2,000, above the 5,000 daily per-org
+budget. Approval reconciliation also remains unbounded by date and performs
+one request per candidate record. A replacement plan needs an explicit product
+decision on reduced balance freshness, together with capacity work that bounds
+or changes these request patterns, before a scheduled fan-out can be designed.
+
+- **Verification**: `bun run test --force` passed on the executor branch
+  (10/10 tasks) after the spike. No production-code diff exists.
+- **Not executable now**: do not rerun Step 4 until the replacement design has
+  a documented per-org daily request budget and a cross-instance enforcement
+  strategy for serverless execution.
 
 ## Maintenance notes
 
