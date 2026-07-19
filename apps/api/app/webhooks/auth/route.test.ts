@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
@@ -181,5 +181,26 @@ describe("Clerk webhook payload validation", () => {
     const response = await POST(webhookRequest());
 
     expect(response.status).toBe(201);
+  });
+});
+
+describe("Clerk webhook configuration", () => {
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("rejects delivery when the webhook secret is not configured", async () => {
+    vi.resetModules();
+    vi.doMock("@/env", () => ({
+      env: { CLERK_WEBHOOK_SECRET: undefined },
+    }));
+    const { POST: PostWithoutSecret } = await import("./route");
+
+    const response = await PostWithoutSecret(
+      new Request("http://localhost/webhooks/auth", { method: "POST" })
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.status).not.toBe(200);
   });
 });

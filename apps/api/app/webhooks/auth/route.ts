@@ -277,7 +277,15 @@ async function ensurePeopleForMembership(data: OrganizationMembershipJSON) {
 
 export const POST = async (request: Request): Promise<Response> => {
   if (!env.CLERK_WEBHOOK_SECRET) {
-    return NextResponse.json({ message: "Not configured", ok: false });
+    // Fail closed. A 2xx would tell Clerk the delivery succeeded and stop it
+    // retrying, silently dropping membership events that link people to Clerk
+    // users. A 5xx keeps the event in Clerk's retry queue until the secret is
+    // configured.
+    log.error("Clerk webhook secret is not configured; rejecting delivery");
+    return NextResponse.json(
+      { message: "Not configured", ok: false },
+      { status: 500 }
+    );
   }
 
   // Get the headers
