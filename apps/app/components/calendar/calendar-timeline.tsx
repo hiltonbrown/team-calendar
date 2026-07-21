@@ -60,7 +60,6 @@ export function CalendarTimeline({
   const visibleLanes = lanes.slice(0, maxVisibleLanes);
   const hiddenLaneCount = lanes.length - visibleLanes.length;
   const gridTemplateColumns = `repeat(${days.length}, minmax(3rem, 1fr))`;
-  const rangeLabel = formatRangeLabel(days);
 
   return (
     <section className="rounded-2xl bg-muted p-4">
@@ -71,8 +70,12 @@ export function CalendarTimeline({
               <CalendarRangeIcon className="size-4" />
             </span>
             <div>
-              <h2 className="font-semibold text-base">Timeline</h2>
-              <p className="text-muted-foreground text-sm">{rangeLabel}</p>
+              <h2 className="font-semibold text-base">
+                Coverage across this range
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                See who is unavailable each day, then open a day for detail.
+              </p>
             </div>
           </div>
         </div>
@@ -80,7 +83,7 @@ export function CalendarTimeline({
           <div className="flex flex-wrap gap-2 text-sm">
             <TimelinePill
               icon={<AlertTriangleIcon className="size-3.5" />}
-              label={`${data.xeroSyncFailedCount} sync ${data.xeroSyncFailedCount === 1 ? "issue" : "issues"}`}
+              label={`${data.xeroSyncFailedCount} Xero ${data.xeroSyncFailedCount === 1 ? "record needs" : "records need"} attention`}
               tone="failed"
             />
           </div>
@@ -113,7 +116,7 @@ export function CalendarTimeline({
               ))
             ) : (
               <div className="rounded-2xl bg-background p-4 text-muted-foreground text-sm">
-                No visible leave or availability across this range.
+                No one is unavailable in this range.
               </div>
             )}
           </div>
@@ -123,8 +126,8 @@ export function CalendarTimeline({
       {hiddenLaneCount > 0 ? (
         <div className="mt-3 flex justify-end">
           <span className="rounded-xl bg-background px-3 py-2 text-muted-foreground text-sm">
-            {hiddenLaneCount} more {hiddenLaneCount === 1 ? "person" : "people"}{" "}
-            hidden by this compact timeline
+            Showing {visibleLanes.length} of {lanes.length} people with leave or
+            availability
           </span>
         </div>
       ) : null}
@@ -477,23 +480,6 @@ function coverageToneClass(summary: ReturnType<typeof daySummary>): string {
     return "bg-accent-container";
   }
   return "bg-primary";
-}
-
-function formatRangeLabel(days: readonly CalendarDay[]): string {
-  const first = days[0]?.date;
-  const last = days.at(-1)?.date;
-  if (!(first && last)) {
-    return "Selected range";
-  }
-  const formatter = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "short",
-  });
-  const firstLabel = formatter.format(first);
-  const lastLabel = formatter.format(last);
-  return firstLabel === lastLabel
-    ? firstLabel
-    : `${firstLabel} to ${lastLabel}`;
 }
 
 function formatWeekday(date: Date): string {

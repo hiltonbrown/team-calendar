@@ -65,6 +65,7 @@ export const CalendarFilterSchema = z.object({
     .enum(["my_self", "my_team", "all_teams", "team", "person"])
     .optional(),
   scopeValue: z.string().uuid().optional(),
+  surface: z.enum(["calendar", "coverage"]).default("calendar"),
   view: z.enum(["day", "week", "month"]).default("week"),
 });
 

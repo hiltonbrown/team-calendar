@@ -20,7 +20,7 @@ import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
-import { CalendarFilterSchema } from "./_schemas";
+import { type CalendarFilterInput, CalendarFilterSchema } from "./_schemas";
 
 export const metadata: Metadata = {
   description: "View team leave, availability and public holidays.",
@@ -31,6 +31,13 @@ interface CalendarPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+const defaultCalendarFilters: CalendarFilterInput = {
+  includeDrafts: false,
+  recordTypeCategory: "all",
+  surface: "calendar",
+  view: "week",
+};
+
 const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   await requirePageRole("org:viewer");
 
@@ -39,14 +46,9 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   const orgParam = Array.isArray(org) ? org[0] : org;
   const { clerkOrgId, organisationId, orgQueryValue } =
     await requireActiveOrgPageContext(orgParam);
-  const parsedFilters = parseFilterParams(
-    filterParams,
-    CalendarFilterSchema
-  ) ?? {
-    includeDrafts: false,
-    recordTypeCategory: "all",
-    view: "week",
-  };
+  const parsedFilters: CalendarFilterInput =
+    parseFilterParams(filterParams, CalendarFilterSchema) ??
+    defaultCalendarFilters;
   const { orgRole } = await auth();
   const user = await currentUser();
   if (!user) {
@@ -142,7 +144,7 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   return (
     <>
       <Header page="Calendar" />
-      <main className="flex flex-1 flex-col gap-6 p-6 pt-0">
+      <main className="flex flex-1 flex-col gap-8 p-6 pt-0">
         {!dataResult.value.hasActiveXeroConnection && (
           <DisconnectedXeroBanner
             canConnect={role === "admin" || role === "owner"}
@@ -165,22 +167,25 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
           teams={teams}
         />
 
-        <CalendarScanPanel
-          data={dataResult.value}
-          orgQueryValue={orgQueryValue}
-        />
-
-        <CalendarTimeline
-          data={dataResult.value}
-          orgQueryValue={orgQueryValue}
-        />
-
-        {renderCalendarView({
-          actingPersonId: currentPerson?.id ?? null,
-          data: dataResult.value,
-          orgQueryValue,
-          selectedPersonId,
-        })}
+        {parsedFilters.surface === "coverage" ? (
+          <CalendarTimeline
+            data={dataResult.value}
+            orgQueryValue={orgQueryValue}
+          />
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+            {renderCalendarView({
+              actingPersonId: currentPerson?.id ?? null,
+              data: dataResult.value,
+              orgQueryValue,
+              selectedPersonId,
+            })}
+            <CalendarScanPanel
+              data={dataResult.value}
+              orgQueryValue={orgQueryValue}
+            />
+          </div>
+        )}
       </main>
     </>
   );

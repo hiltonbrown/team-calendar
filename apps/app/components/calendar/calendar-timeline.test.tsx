@@ -4,7 +4,7 @@ import { CalendarTimeline } from "./calendar-timeline";
 
 const AFFECTED_COPY = /affected/;
 const BUSIEST_COPY = /Busiest:/;
-const HIDDEN_PEOPLE_COPY = /2 more people hidden/;
+const HIDDEN_PEOPLE_COPY = /Showing 10 of 12 people with leave or availability/;
 
 describe("CalendarTimeline", () => {
   afterEach(() => cleanup());
@@ -12,7 +12,7 @@ describe("CalendarTimeline", () => {
   it("renders range coverage and person lanes", () => {
     render(<CalendarTimeline data={calendarRange()} orgQueryValue={null} />);
 
-    expect(screen.getByText("Timeline")).toBeDefined();
+    expect(screen.getByText("Coverage across this range")).toBeDefined();
     expect(screen.queryByText(AFFECTED_COPY)).toBeNull();
     expect(screen.queryByText(BUSIEST_COPY)).toBeNull();
     expect(screen.getByText("Ari Report")).toBeDefined();
@@ -53,7 +53,7 @@ describe("CalendarTimeline", () => {
     );
 
     expect(
-      screen.getByText("No visible leave or availability across this range.")
+      screen.getByText("No one is unavailable in this range.")
     ).toBeDefined();
   });
 });

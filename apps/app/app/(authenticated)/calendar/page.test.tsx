@@ -52,6 +52,12 @@ vi.mock("../components/header", () => ({
 vi.mock("@/components/calendar/calendar-toolbar", () => ({
   CalendarToolbar: () => <div>Toolbar</div>,
 }));
+vi.mock("@/components/calendar/calendar-scan-panel", () => ({
+  CalendarScanPanel: () => <div>Today in view</div>,
+}));
+vi.mock("@/components/calendar/calendar-timeline", () => ({
+  CalendarTimeline: () => <div>Coverage timeline</div>,
+}));
 vi.mock("@/components/calendar/calendar-day-view", () => ({
   CalendarDayView: () => <div>Day view</div>,
 }));
@@ -118,6 +124,15 @@ describe("CalendarPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText(XERO_NOT_CONNECTED_COPY)).toBeDefined();
+  });
+
+  it("shows coverage instead of the calendar canvas when selected", async () => {
+    render(
+      await Page({ searchParams: Promise.resolve({ surface: "coverage" }) })
+    );
+
+    expect(screen.getByText("Coverage timeline")).toBeDefined();
+    expect(screen.queryByText("Week view")).toBeNull();
   });
 
   it("renders FetchErrorState on loader failure", async () => {

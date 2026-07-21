@@ -2,6 +2,7 @@
 
 import type { CalendarPerson, CalendarRange } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
+import { ButtonGroup } from "@repo/design-system/components/ui/button-group";
 import {
   Select,
   SelectContent,
@@ -12,13 +13,16 @@ import {
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from "@repo/design-system/components/ui/sheet";
 import {
+  ChartNoAxesCombinedIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  Grid2X2Icon,
   PlusIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
@@ -84,12 +88,16 @@ export function CalendarToolbar({
     locations,
     teams,
   });
+  const appliedFilterCount = countAppliedFilters(filters);
+  const rangeLabel =
+    filters.surface === "coverage" ? "Coverage range" : "Calendar range";
 
   return (
     <div className="rounded-2xl bg-muted p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
+            aria-label={`Previous ${rangeUnit(filters.view)}`}
             onClick={() => shift(-1)}
             size="icon"
             type="button"
@@ -101,6 +109,7 @@ export function CalendarToolbar({
             {periodLabel(data)}
           </div>
           <Button
+            aria-label={`Next ${rangeUnit(filters.view)}`}
             onClick={() => shift(1)}
             size="icon"
             type="button"
@@ -118,11 +127,33 @@ export function CalendarToolbar({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <ButtonGroup aria-label="View">
+            <Button
+              aria-pressed={filters.surface === "calendar"}
+              onClick={() => update({ surface: "calendar" })}
+              size="sm"
+              type="button"
+              variant={filters.surface === "calendar" ? "secondary" : "ghost"}
+            >
+              <Grid2X2Icon className="size-4" />
+              Calendar
+            </Button>
+            <Button
+              aria-pressed={filters.surface === "coverage"}
+              onClick={() => update({ surface: "coverage" })}
+              size="sm"
+              type="button"
+              variant={filters.surface === "coverage" ? "secondary" : "ghost"}
+            >
+              <ChartNoAxesCombinedIcon className="size-4" />
+              Coverage
+            </Button>
+          </ButtonGroup>
           <Select
             onValueChange={(value) => update({ view: parseView(value) })}
             value={filters.view}
           >
-            <SelectTrigger className="w-32">
+            <SelectTrigger aria-label={rangeLabel} className="w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -140,6 +171,7 @@ export function CalendarToolbar({
           />
 
           <FilterSheet
+            appliedFilterCount={appliedFilterCount}
             filters={filters}
             locations={locations}
             setFilterParams={update}
@@ -196,7 +228,7 @@ function ScopeSelect({
       }}
       value={value}
     >
-      <SelectTrigger className="w-48">
+      <SelectTrigger aria-label="People shown" className="w-48">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -218,16 +250,17 @@ function ScopeSelect({
   );
 }
 
-function ActiveFilterSummary({ labels }: { labels: string[] }) {
+function ActiveFilterSummary({ labels }: { labels: ActiveFilterLabel[] }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Showing</span>
-      {labels.map((label) => (
+      <span className="text-muted-foreground">Currently showing</span>
+      {labels.map(({ label, value }) => (
         <span
           className="rounded-xl bg-background px-2.5 py-1 font-medium text-foreground"
           key={label}
         >
-          {label}
+          <span className="text-muted-foreground">{label}: </span>
+          {value}
         </span>
       ))}
     </div>
@@ -243,25 +276,38 @@ function activeFilterLabels({
   locations: Option[];
   teams: Option[];
 }) {
-  const labels = [
-    labelForValue(filters.view),
-    scopeLabel(filters, teams),
-    recordCategoryLabel(filters.recordTypeCategory),
+  const labels: ActiveFilterLabel[] = [
+    {
+      label: "View",
+      value: filters.surface === "coverage" ? "Coverage" : "Calendar",
+    },
+    { label: "Range", value: labelForValue(filters.view) },
+    { label: "People", value: scopeLabel(filters, teams) },
+    {
+      label: "Records",
+      value: recordCategoryLabel(filters.recordTypeCategory),
+    },
   ];
   if (filters.approvalStatus?.[0]) {
-    labels.push(labelForValue(filters.approvalStatus[0]));
+    labels.push({
+      label: "Status",
+      value: labelForValue(filters.approvalStatus[0]),
+    });
   }
   if (filters.personType?.[0]) {
-    labels.push(labelForValue(filters.personType[0]));
+    labels.push({
+      label: "People type",
+      value: labelForValue(filters.personType[0]),
+    });
   }
   const location = locations.find(
     (option) => option.id === filters.locationId?.[0]
   );
   if (location) {
-    labels.push(location.name);
+    labels.push({ label: "Location", value: location.name });
   }
   if (filters.includeDrafts) {
-    labels.push("Drafts included");
+    labels.push({ label: "Drafts", value: "Included" });
   }
   return labels;
 }
@@ -289,7 +335,25 @@ function recordCategoryLabel(value: CalendarFilterInput["recordTypeCategory"]) {
   if (value === "local_only") {
     return "Availability";
   }
-  return "All records";
+  return "Leave and availability";
+}
+
+function countAppliedFilters(filters: CalendarFilterInput) {
+  return [
+    filters.approvalStatus?.length,
+    filters.includeDrafts,
+    filters.locationId?.length,
+    filters.personType?.length,
+    filters.recordType?.length,
+    filters.recordTypeCategory !== "all",
+  ].filter(Boolean).length;
+}
+
+function rangeUnit(view: CalendarFilterInput["view"]) {
+  if (view === "day" || view === "month") {
+    return view;
+  }
+  return "week";
 }
 
 function parseView(value: string): CalendarFilterInput["view"] {
@@ -337,10 +401,12 @@ function parsePersonType(value: string): "contractor" | "employee" {
 }
 
 function FilterSheet({
+  appliedFilterCount,
   filters,
   locations,
   setFilterParams,
 }: {
+  appliedFilterCount: number;
   filters: CalendarFilterInput;
   locations: Option[];
   setFilterParams: (patch: Partial<CalendarFilterInput>) => void;
@@ -350,15 +416,21 @@ function FilterSheet({
       <SheetTrigger asChild>
         <Button type="button" variant="secondary">
           <SlidersHorizontalIcon className="size-4" />
-          Filters
+          {appliedFilterCount > 0
+            ? `Filters (${appliedFilterCount})`
+            : "Filters"}
         </Button>
       </SheetTrigger>
       <SheetContent className="gap-6 p-6">
         <SheetHeader className="p-0">
-          <SheetTitle>Calendar filters</SheetTitle>
+          <SheetTitle>Refine this calendar</SheetTitle>
+          <SheetDescription>
+            Choose the people and records that appear in this view.
+          </SheetDescription>
         </SheetHeader>
         <div className="grid gap-4">
           <FilterSelect
+            description="Show leave, manual availability, or both."
             label="Record category"
             onValueChange={(value) =>
               setFilterParams({
@@ -366,13 +438,14 @@ function FilterSheet({
               })
             }
             options={[
-              { id: "all", name: "All records" },
+              { id: "all", name: "Leave and availability" },
               { id: "xero_leave", name: "Leave" },
               { id: "local_only", name: "Availability" },
             ]}
             value={filters.recordTypeCategory}
           />
           <FilterSelect
+            description="Choose one status, or use the calendar's normal status rules."
             label="Approval status"
             onValueChange={(value) =>
               setFilterParams({
@@ -381,7 +454,7 @@ function FilterSheet({
               })
             }
             options={[
-              { id: "all", name: "Default statuses" },
+              { id: "all", name: "Use calendar defaults" },
               { id: "approved", name: "Approved" },
               { id: "submitted", name: "Pending" },
               { id: "xero_sync_failed", name: "Xero sync failed" },
@@ -389,6 +462,7 @@ function FilterSheet({
             value={filters.approvalStatus?.[0] ?? "all"}
           />
           <FilterSelect
+            description="Limit the view to employees or contractors."
             label="Person type"
             onValueChange={(value) =>
               setFilterParams({
@@ -404,6 +478,7 @@ function FilterSheet({
             value={filters.personType?.[0] ?? "all"}
           />
           <FilterSelect
+            description="Limit the view to one work location."
             label="Location"
             onValueChange={(value) =>
               setFilterParams({
@@ -427,7 +502,7 @@ function FilterSheet({
             type="button"
             variant="ghost"
           >
-            Clear filters
+            Reset calendar filters
           </Button>
         </div>
       </SheetContent>
@@ -436,11 +511,13 @@ function FilterSheet({
 }
 
 function FilterSelect({
+  description,
   label,
   onValueChange,
   options,
   value,
 }: {
+  description?: string;
   label: string;
   onValueChange: (value: string) => void;
   options: Option[];
@@ -448,9 +525,10 @@ function FilterSelect({
 }) {
   return (
     <div className="grid gap-2 text-sm">
-      <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-        {label}
-      </span>
+      <span className="font-medium text-muted-foreground text-xs">{label}</span>
+      {description ? (
+        <span className="text-muted-foreground text-xs">{description}</span>
+      ) : null}
       <Select onValueChange={onValueChange} value={value}>
         <SelectTrigger>
           <SelectValue />
@@ -465,6 +543,11 @@ function FilterSelect({
       </Select>
     </div>
   );
+}
+
+interface ActiveFilterLabel {
+  label: string;
+  value: string;
 }
 
 function periodLabel(data: CalendarRange): string {

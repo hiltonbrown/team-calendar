@@ -1,4 +1,88 @@
+# Plan: Audit `apps/app` accessibility, responsiveness, and component states
+
+## Tasks
+
+- [x] Load the product design context and audit criteria.
+- [x] Inspect shared UI primitives and app surfaces for accessibility, responsive rules, and state coverage.
+- [x] Run static checks and browser verification at mobile, tablet, and desktop widths (static and test verification completed; rendered browser verification was unavailable because `agent-browser` is not installed).
+- [x] Document prioritised, reproducible findings and audit score.
+
+## Review
+
+- Confirmed `bun --cwd apps/app test` passes: 163 tests across 50 files.
+- Confirmed `bun --cwd apps/app typecheck` passes.
+- Audited the token system, shared primitives, calendar, notifications, member management, and alternative-contact flows, plus an app-wide detector scan.
+- Browser automation was not available in this workspace, so responsive findings are source-verified and marked as such in the hand-off report.
+
 # Plan: Consolidate active worktrees into preview
+
+# Plan: Polish revised calendar manager workflow
+
+## Tasks
+
+- [x] Compare the revised calendar against the shared component system and critique backlog.
+- [x] Replace the semantic mismatch in the view switch with the shared button group.
+- [x] Verify the full app test suite, focused linting, type safety, and diff integrity.
+
+## Review
+
+- Read the latest `apps-app` critique snapshot and checked the calendar against
+  the documented shared button, select, sheet, spacing, and focus conventions.
+- Replaced the custom tab-like control with the shared ButtonGroup and
+  `aria-pressed` state, matching its actual URL-backed view-switch behaviour.
+- Verified 163 app tests across 50 files, app type-checking, focused Ultracite,
+  `git diff --check`, and a clean calendar-scoped detector run. Browser visual
+  inspection remains unavailable because `agent-browser` is not installed.
+
+---
+
+# Plan: Clarify calendar controls for managers
+
+## Tasks
+
+- [x] Label the selected calendar view, range, people, and record scope clearly.
+- [x] Explain the filter defaults and make applied filters visible at a glance.
+- [x] Rename and contextualise coverage states for a manager's scanning task.
+- [x] Update focused tests and verify the calendar surfaces.
+
+## Review
+
+- View, range, people, and record scope are labelled in the toolbar summary;
+  the controls now have precise accessible names.
+- The filter sheet explains each filter and its default state, while the trigger
+  surfaces the number of active refinements.
+- Coverage is titled and described for the manager's task, with direct states
+  for an empty range, Xero attention, and compacted people lanes.
+- Verified with targeted Ultracite checks, app type-checking, and 8 focused
+  calendar tests.
+
+---
+
+# Plan: Refocus the calendar for manager scanning
+
+## Tasks
+
+- [x] Assess the current calendar hierarchy and run the scoped layout pre-scan.
+- [x] Make the calendar grid the default dominant surface, with compact scan context.
+- [x] Move the coverage timeline behind an explicit, accessible view switch.
+- [x] Update focused tests and verify layout, type safety, and formatting.
+
+## Review
+
+- Calendar is now the default primary surface. The contextual Today in view
+  summary is capped at three people and sits beside the calendar on wide
+  screens, below it on narrower screens.
+- Coverage has a dedicated, URL-backed Calendar/Coverage view switch and no
+  longer competes with the default calendar canvas.
+- Two independent layout assessments ran: the structural review identified the
+  stacked-panel hierarchy issue; the scoped detector and arbitrary-spacing scan
+  found no unresolved layout findings.
+- Verified with app type-checking, focused calendar tests (8 passed), a scoped
+  Ultracite check, `git diff --check`, and the scoped layout detector. The
+  repository-wide `bun run fix` remains blocked by pre-existing filename
+  diagnostics in `.design-sync/previews`.
+
+---
 
 # Plan: Recover failed Xero authorisation connection migration
 
