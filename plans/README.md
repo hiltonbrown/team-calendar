@@ -14,9 +14,8 @@ and UK partner permission.
 the current repository baseline, open remediation, execution order, verification
 gates and readiness criteria for the next-forge, Clerk and Neon stack.
 
-Last reviewed 18 September 2026. The source remediation queue is complete apart
-from the launch-mode-dependent Plan 153. External release verification and
-production configuration work remains open.
+Last reviewed 18 September 2026. The source remediation queue is complete.
+External release verification and production configuration work remains open.
 
 ## Execution policy
 
@@ -57,7 +56,7 @@ not Australian launch blockers.
 | [150](150-restrict-xero-oauth-return-destinations.md) | Signed Xero OAuth state accepts an arbitrary external return destination | P1 | S | LOW | DONE |
 | [151](151-enforce-one-active-feed-token.md) | Concurrent token rotation can leave hidden active bearer URLs | P1 | M | MED | DONE |
 | [152](152-use-authoritative-plan-limit-counts.md) | Missing and stale usage counters bypass staff and feed limits | P1 | L | MED | DONE |
-| [153](153-prevent-parallel-stripe-subscriptions.md) | Repeated paid checkout can create parallel chargeable subscriptions | P1 paid / P2 early access | M | MED | BLOCKED |
+| [153](153-prevent-parallel-stripe-subscriptions.md) | Repeated paid checkout can create parallel chargeable subscriptions | P1 paid / P2 early access | M | MED | DONE |
 | [154](154-characterise-current-user-provisioning.md) | Critical Clerk identity binding and tenant provisioning lack direct tests | P1 | M | LOW | DONE |
 | [155](155-reconcile-production-environment-guidance.md) | README production minimums contradict executable preflight requirements | P2 | S | LOW | DONE |
 | [156](156-rate-limit-support-issue-creation.md) | Authenticated support submissions can flood the GitHub integration | P2 | S | LOW | DONE |

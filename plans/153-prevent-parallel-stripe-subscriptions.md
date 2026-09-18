@@ -7,9 +7,9 @@
 - Risk: MED
 - Confidence: HIGH
 - Category: billing, correctness
-- Depends on: actual launch mode verification
+- Depends on: operator authorisation for paid-mode hardening, granted 18 September 2026
 - Planned at: `4849878`, 2026-09-18
-- Status: BLOCKED
+- Status: DONE
 
 ## Why this matters
 
@@ -48,3 +48,16 @@ by source fallback but the release contract is not configured or verified.
 Do not implement until the operator confirms `paid` is the release mode or
 authorises paid-mode hardening during early access. Do not invent upgrade,
 downgrade or duplicate-subscription recovery policy.
+
+## Outcome
+
+Completed on 18 September 2026 in `0af2573`. Existing non-terminal mirrored
+subscriptions now return a conflict directing the organisation to the billing
+portal. Absent, cancelled and incomplete-expired subscriptions retain a fresh
+Checkout path, and identical organisation, plan and subscription transitions
+share a deterministic SHA-256 Stripe idempotency key.
+
+Verification passed 14 billing tests, 26 billing action and payment webhook
+tests, billing and app typechecks, scoped Ultracite and `git diff --check`.
+Paid-mode production preflight remains a deployment gate because production
+launch mode and Stripe configuration were not changed by this source plan.
