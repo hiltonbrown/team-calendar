@@ -175,6 +175,7 @@ export {
   restoreRecord,
   updateRecord,
 } from "./src/plans/plan-service";
+export * from "./src/plans/submit-recovery-service";
 export * from "./src/plans/submit-service";
 export {
   retrySubmission,

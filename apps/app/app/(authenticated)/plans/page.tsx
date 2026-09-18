@@ -240,6 +240,7 @@ function toClientRecord(
     recordType: record.recordType,
     sourceType: record.sourceType,
     startsAt: record.startsAt.toISOString(),
+    submissionResolutionPending: record.submissionResolutionPending,
     workingDays,
     workingDaysError,
     xeroWriteError: record.xeroWriteError,

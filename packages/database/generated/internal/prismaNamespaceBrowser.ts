@@ -62,6 +62,7 @@ export const ModelName = {
   XeroOAuthSession: 'XeroOAuthSession',
   XeroSyncCursor: 'XeroSyncCursor',
   AvailabilityRecord: 'AvailabilityRecord',
+  OutboundOperation: 'OutboundOperation',
   AvailabilityPublication: 'AvailabilityPublication',
   LeaveBalance: 'LeaveBalance',
   XeroPersonMatch: 'XeroPersonMatch',
@@ -362,6 +363,29 @@ export const AvailabilityRecordScalarFieldEnum = {
 } as const
 
 export type AvailabilityRecordScalarFieldEnum = (typeof AvailabilityRecordScalarFieldEnum)[keyof typeof AvailabilityRecordScalarFieldEnum]
+
+
+export const OutboundOperationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  availability_record_id: 'availability_record_id',
+  action: 'action',
+  status: 'status',
+  request_fingerprint: 'request_fingerprint',
+  actor_user_id: 'actor_user_id',
+  attempt_generation: 'attempt_generation',
+  safe_error_code: 'safe_error_code',
+  known_remote_id: 'known_remote_id',
+  prepared_at: 'prepared_at',
+  dispatch_started_at: 'dispatch_started_at',
+  provider_accepted_at: 'provider_accepted_at',
+  completed_at: 'completed_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type OutboundOperationScalarFieldEnum = (typeof OutboundOperationScalarFieldEnum)[keyof typeof OutboundOperationScalarFieldEnum]
 
 
 export const AvailabilityPublicationScalarFieldEnum = {
@@ -741,6 +765,13 @@ export const StripeEventScalarFieldEnum = {
   id: 'id',
   stripe_event_id: 'stripe_event_id',
   type: 'type',
+  delivery_state: 'delivery_state',
+  attempt_count: 'attempt_count',
+  clerk_org_id: 'clerk_org_id',
+  stripe_customer_id: 'stripe_customer_id',
+  event_created_at: 'event_created_at',
+  error_category: 'error_category',
+  last_attempted_at: 'last_attempted_at',
   processed_at: 'processed_at',
   created_at: 'created_at',
   updated_at: 'updated_at'

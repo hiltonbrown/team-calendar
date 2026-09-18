@@ -92,6 +92,7 @@ export type {
   ApproveLeaveInput,
   DeclineLeaveInput,
   ExternalWritePort,
+  ProviderLeaveCandidate,
   ProviderResolutionError,
   ProviderWriteError,
   SubmitLeaveInput,

@@ -108,6 +108,7 @@ export interface PlansClientRecord {
   recordType: string;
   sourceType: string;
   startsAt: string;
+  submissionResolutionPending?: boolean;
   workingDays: number | null;
   workingDaysError: string | null;
   xeroWriteError: string | null;
@@ -373,6 +374,7 @@ export function PlansClient({
               </tr>
             </thead>
             <tbody className="block space-y-3 xl:table-row-group xl:space-y-0">
+              {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each responsive plan row coordinates status, recovery, balance and role-gated actions in one accessible table row. */}
               {records.map((record) => {
                 const status = planStatusForRecord(record);
                 const rowPending = pendingRecordId === record.id;
@@ -477,7 +479,20 @@ export function PlansClient({
                           <span>{inlineError[record.id]}</span>
                         </div>
                       ) : null}
-                      {record.approvalStatus === "xero_sync_failed" &&
+                      {record.submissionResolutionPending ? (
+                        <div
+                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.leave}`}
+                          role="status"
+                        >
+                          <Clock3Icon className="mt-0.5 size-4 shrink-0" />
+                          <span>
+                            Xero may have received this request. It is locked
+                            while an administrator verifies the outcome.
+                          </span>
+                        </div>
+                      ) : null}
+                      {!record.submissionResolutionPending &&
+                        record.approvalStatus === "xero_sync_failed" &&
                         record.xeroWriteError && (
                           <div className="mt-3">
                             <XeroSyncFailedState

@@ -315,6 +315,7 @@ export type OrganisationWhereInput = {
   notifications?: Prisma.NotificationListRelationFilter
   notification_preferences?: Prisma.NotificationPreferenceListRelationFilter
   notification_email_queue?: Prisma.NotificationEmailQueueListRelationFilter
+  outbound_operations?: Prisma.OutboundOperationListRelationFilter
   organisation_settings?: Prisma.XOR<Prisma.OrganisationSettingsNullableScalarRelationFilter, Prisma.OrganisationSettingsWhereInput> | null
 }
 
@@ -356,6 +357,7 @@ export type OrganisationOrderByWithRelationInput = {
   notifications?: Prisma.NotificationOrderByRelationAggregateInput
   notification_preferences?: Prisma.NotificationPreferenceOrderByRelationAggregateInput
   notification_email_queue?: Prisma.NotificationEmailQueueOrderByRelationAggregateInput
+  outbound_operations?: Prisma.OutboundOperationOrderByRelationAggregateInput
   organisation_settings?: Prisma.OrganisationSettingsOrderByWithRelationInput
 }
 
@@ -400,6 +402,7 @@ export type OrganisationWhereUniqueInput = Prisma.AtLeast<{
   notifications?: Prisma.NotificationListRelationFilter
   notification_preferences?: Prisma.NotificationPreferenceListRelationFilter
   notification_email_queue?: Prisma.NotificationEmailQueueListRelationFilter
+  outbound_operations?: Prisma.OutboundOperationListRelationFilter
   organisation_settings?: Prisma.XOR<Prisma.OrganisationSettingsNullableScalarRelationFilter, Prisma.OrganisationSettingsWhereInput> | null
 }, "id">
 
@@ -483,6 +486,7 @@ export type OrganisationCreateInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -524,6 +528,7 @@ export type OrganisationUncheckedCreateInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -565,6 +570,7 @@ export type OrganisationUpdateInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -606,6 +612,7 @@ export type OrganisationUncheckedUpdateInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -909,6 +916,20 @@ export type OrganisationUpdateOneRequiredWithoutAvailability_recordsNestedInput 
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutAvailability_recordsInput, Prisma.OrganisationUpdateWithoutAvailability_recordsInput>, Prisma.OrganisationUncheckedUpdateWithoutAvailability_recordsInput>
 }
 
+export type OrganisationCreateNestedOneWithoutOutbound_operationsInput = {
+  create?: Prisma.XOR<Prisma.OrganisationCreateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedCreateWithoutOutbound_operationsInput>
+  connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutOutbound_operationsInput
+  connect?: Prisma.OrganisationWhereUniqueInput
+}
+
+export type OrganisationUpdateOneRequiredWithoutOutbound_operationsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganisationCreateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedCreateWithoutOutbound_operationsInput>
+  connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutOutbound_operationsInput
+  upsert?: Prisma.OrganisationUpsertWithoutOutbound_operationsInput
+  connect?: Prisma.OrganisationWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutOutbound_operationsInput, Prisma.OrganisationUpdateWithoutOutbound_operationsInput>, Prisma.OrganisationUncheckedUpdateWithoutOutbound_operationsInput>
+}
+
 export type OrganisationCreateNestedOneWithoutAvailability_publicationsInput = {
   create?: Prisma.XOR<Prisma.OrganisationCreateWithoutAvailability_publicationsInput, Prisma.OrganisationUncheckedCreateWithoutAvailability_publicationsInput>
   connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutAvailability_publicationsInput
@@ -1143,6 +1164,7 @@ export type OrganisationCreateWithoutOrganisation_settingsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
 }
 
 export type OrganisationUncheckedCreateWithoutOrganisation_settingsInput = {
@@ -1183,6 +1205,7 @@ export type OrganisationUncheckedCreateWithoutOrganisation_settingsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
 }
 
 export type OrganisationCreateOrConnectWithoutOrganisation_settingsInput = {
@@ -1239,6 +1262,7 @@ export type OrganisationUpdateWithoutOrganisation_settingsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
 }
 
 export type OrganisationUncheckedUpdateWithoutOrganisation_settingsInput = {
@@ -1279,6 +1303,7 @@ export type OrganisationUncheckedUpdateWithoutOrganisation_settingsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
 }
 
 export type OrganisationCreateWithoutTeamsInput = {
@@ -1318,6 +1343,7 @@ export type OrganisationCreateWithoutTeamsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1358,6 +1384,7 @@ export type OrganisationUncheckedCreateWithoutTeamsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1414,6 +1441,7 @@ export type OrganisationUpdateWithoutTeamsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1454,6 +1482,7 @@ export type OrganisationUncheckedUpdateWithoutTeamsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1494,6 +1523,7 @@ export type OrganisationCreateWithoutLocationsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1534,6 +1564,7 @@ export type OrganisationUncheckedCreateWithoutLocationsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1590,6 +1621,7 @@ export type OrganisationUpdateWithoutLocationsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1630,6 +1662,7 @@ export type OrganisationUncheckedUpdateWithoutLocationsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1670,6 +1703,7 @@ export type OrganisationCreateWithoutPeopleInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1710,6 +1744,7 @@ export type OrganisationUncheckedCreateWithoutPeopleInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1766,6 +1801,7 @@ export type OrganisationUpdateWithoutPeopleInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1806,6 +1842,7 @@ export type OrganisationUncheckedUpdateWithoutPeopleInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1846,6 +1883,7 @@ export type OrganisationCreateWithoutAlternative_contactsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1886,6 +1924,7 @@ export type OrganisationUncheckedCreateWithoutAlternative_contactsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -1942,6 +1981,7 @@ export type OrganisationUpdateWithoutAlternative_contactsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -1982,6 +2022,7 @@ export type OrganisationUncheckedUpdateWithoutAlternative_contactsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2022,6 +2063,7 @@ export type OrganisationCreateWithoutXero_connectionInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2062,6 +2104,7 @@ export type OrganisationUncheckedCreateWithoutXero_connectionInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2118,6 +2161,7 @@ export type OrganisationUpdateWithoutXero_connectionInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2158,6 +2202,7 @@ export type OrganisationUncheckedUpdateWithoutXero_connectionInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2198,6 +2243,7 @@ export type OrganisationCreateWithoutXero_tenantsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2238,6 +2284,7 @@ export type OrganisationUncheckedCreateWithoutXero_tenantsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2294,6 +2341,7 @@ export type OrganisationUpdateWithoutXero_tenantsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2334,6 +2382,7 @@ export type OrganisationUncheckedUpdateWithoutXero_tenantsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2374,6 +2423,7 @@ export type OrganisationCreateWithoutXero_oauth_sessionsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2414,6 +2464,7 @@ export type OrganisationUncheckedCreateWithoutXero_oauth_sessionsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2470,6 +2521,7 @@ export type OrganisationUpdateWithoutXero_oauth_sessionsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2510,6 +2562,7 @@ export type OrganisationUncheckedUpdateWithoutXero_oauth_sessionsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2550,6 +2603,7 @@ export type OrganisationCreateWithoutXero_sync_cursorsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2590,6 +2644,7 @@ export type OrganisationUncheckedCreateWithoutXero_sync_cursorsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2646,6 +2701,7 @@ export type OrganisationUpdateWithoutXero_sync_cursorsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2686,6 +2742,7 @@ export type OrganisationUncheckedUpdateWithoutXero_sync_cursorsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2726,6 +2783,7 @@ export type OrganisationCreateWithoutAvailability_recordsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2766,6 +2824,7 @@ export type OrganisationUncheckedCreateWithoutAvailability_recordsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2822,6 +2881,7 @@ export type OrganisationUpdateWithoutAvailability_recordsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -2845,6 +2905,187 @@ export type OrganisationUncheckedUpdateWithoutAvailability_recordsInput = {
   people?: Prisma.PersonUncheckedUpdateManyWithoutOrganisationNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutOrganisationNestedInput
   alternative_contacts?: Prisma.AlternativeContactUncheckedUpdateManyWithoutOrganisationNestedInput
+  availability_publications?: Prisma.AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationNestedInput
+  feeds?: Prisma.FeedUncheckedUpdateManyWithoutOrganisationNestedInput
+  feed_tokens?: Prisma.FeedTokenUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutOrganisationNestedInput
+  failed_records?: Prisma.FailedRecordUncheckedUpdateManyWithoutOrganisationNestedInput
+  audit_events?: Prisma.AuditEventUncheckedUpdateManyWithoutOrganisationNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
+  notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
+  organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
+}
+
+export type OrganisationCreateWithoutOutbound_operationsInput = {
+  id?: string
+  clerk_org_id: string
+  name: string
+  country_code: string
+  region_code?: string | null
+  is_active?: boolean
+  timezone?: string | null
+  locale?: string | null
+  fiscal_year_start?: number | null
+  working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: string | null
+  archived_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  teams?: Prisma.TeamCreateNestedManyWithoutOrganisationInput
+  locations?: Prisma.LocationCreateNestedManyWithoutOrganisationInput
+  people?: Prisma.PersonCreateNestedManyWithoutOrganisationInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutOrganisationInput
+  alternative_contacts?: Prisma.AlternativeContactCreateNestedManyWithoutOrganisationInput
+  availability_records?: Prisma.AvailabilityRecordCreateNestedManyWithoutOrganisationInput
+  availability_publications?: Prisma.AvailabilityPublicationCreateNestedManyWithoutOrganisationInput
+  feeds?: Prisma.FeedCreateNestedManyWithoutOrganisationInput
+  feed_tokens?: Prisma.FeedTokenCreateNestedManyWithoutOrganisationInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionCreateNestedManyWithoutOrganisationInput
+  public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
+  xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
+  xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutOrganisationInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutOrganisationInput
+  failed_records?: Prisma.FailedRecordCreateNestedManyWithoutOrganisationInput
+  audit_events?: Prisma.AuditEventCreateNestedManyWithoutOrganisationInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
+  notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
+  notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
+}
+
+export type OrganisationUncheckedCreateWithoutOutbound_operationsInput = {
+  id?: string
+  clerk_org_id: string
+  name: string
+  country_code: string
+  region_code?: string | null
+  is_active?: boolean
+  timezone?: string | null
+  locale?: string | null
+  fiscal_year_start?: number | null
+  working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: string | null
+  archived_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  teams?: Prisma.TeamUncheckedCreateNestedManyWithoutOrganisationInput
+  locations?: Prisma.LocationUncheckedCreateNestedManyWithoutOrganisationInput
+  people?: Prisma.PersonUncheckedCreateNestedManyWithoutOrganisationInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutOrganisationInput
+  alternative_contacts?: Prisma.AlternativeContactUncheckedCreateNestedManyWithoutOrganisationInput
+  availability_records?: Prisma.AvailabilityRecordUncheckedCreateNestedManyWithoutOrganisationInput
+  availability_publications?: Prisma.AvailabilityPublicationUncheckedCreateNestedManyWithoutOrganisationInput
+  feeds?: Prisma.FeedUncheckedCreateNestedManyWithoutOrganisationInput
+  feed_tokens?: Prisma.FeedTokenUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutOrganisationInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutOrganisationInput
+  failed_records?: Prisma.FailedRecordUncheckedCreateNestedManyWithoutOrganisationInput
+  audit_events?: Prisma.AuditEventUncheckedCreateNestedManyWithoutOrganisationInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
+  notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
+}
+
+export type OrganisationCreateOrConnectWithoutOutbound_operationsInput = {
+  where: Prisma.OrganisationWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrganisationCreateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedCreateWithoutOutbound_operationsInput>
+}
+
+export type OrganisationUpsertWithoutOutbound_operationsInput = {
+  update: Prisma.XOR<Prisma.OrganisationUpdateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedUpdateWithoutOutbound_operationsInput>
+  create: Prisma.XOR<Prisma.OrganisationCreateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedCreateWithoutOutbound_operationsInput>
+  where?: Prisma.OrganisationWhereInput
+}
+
+export type OrganisationUpdateToOneWithWhereWithoutOutbound_operationsInput = {
+  where?: Prisma.OrganisationWhereInput
+  data: Prisma.XOR<Prisma.OrganisationUpdateWithoutOutbound_operationsInput, Prisma.OrganisationUncheckedUpdateWithoutOutbound_operationsInput>
+}
+
+export type OrganisationUpdateWithoutOutbound_operationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.StringFieldUpdateOperationsInput | string
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  locale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  teams?: Prisma.TeamUpdateManyWithoutOrganisationNestedInput
+  locations?: Prisma.LocationUpdateManyWithoutOrganisationNestedInput
+  people?: Prisma.PersonUpdateManyWithoutOrganisationNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutOrganisationNestedInput
+  alternative_contacts?: Prisma.AlternativeContactUpdateManyWithoutOrganisationNestedInput
+  availability_records?: Prisma.AvailabilityRecordUpdateManyWithoutOrganisationNestedInput
+  availability_publications?: Prisma.AvailabilityPublicationUpdateManyWithoutOrganisationNestedInput
+  feeds?: Prisma.FeedUpdateManyWithoutOrganisationNestedInput
+  feed_tokens?: Prisma.FeedTokenUpdateManyWithoutOrganisationNestedInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUpdateManyWithoutOrganisationNestedInput
+  public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
+  xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutOrganisationNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutOrganisationNestedInput
+  failed_records?: Prisma.FailedRecordUpdateManyWithoutOrganisationNestedInput
+  audit_events?: Prisma.AuditEventUpdateManyWithoutOrganisationNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
+  notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
+}
+
+export type OrganisationUncheckedUpdateWithoutOutbound_operationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.StringFieldUpdateOperationsInput | string
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  locale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  teams?: Prisma.TeamUncheckedUpdateManyWithoutOrganisationNestedInput
+  locations?: Prisma.LocationUncheckedUpdateManyWithoutOrganisationNestedInput
+  people?: Prisma.PersonUncheckedUpdateManyWithoutOrganisationNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutOrganisationNestedInput
+  alternative_contacts?: Prisma.AlternativeContactUncheckedUpdateManyWithoutOrganisationNestedInput
+  availability_records?: Prisma.AvailabilityRecordUncheckedUpdateManyWithoutOrganisationNestedInput
   availability_publications?: Prisma.AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationNestedInput
   feeds?: Prisma.FeedUncheckedUpdateManyWithoutOrganisationNestedInput
   feed_tokens?: Prisma.FeedTokenUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2902,6 +3143,7 @@ export type OrganisationCreateWithoutAvailability_publicationsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2942,6 +3184,7 @@ export type OrganisationUncheckedCreateWithoutAvailability_publicationsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -2998,6 +3241,7 @@ export type OrganisationUpdateWithoutAvailability_publicationsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3038,6 +3282,7 @@ export type OrganisationUncheckedUpdateWithoutAvailability_publicationsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3078,6 +3323,7 @@ export type OrganisationCreateWithoutLeave_balancesInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3118,6 +3364,7 @@ export type OrganisationUncheckedCreateWithoutLeave_balancesInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3174,6 +3421,7 @@ export type OrganisationUpdateWithoutLeave_balancesInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3214,6 +3462,7 @@ export type OrganisationUncheckedUpdateWithoutLeave_balancesInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3254,6 +3503,7 @@ export type OrganisationCreateWithoutXero_person_matchesInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3294,6 +3544,7 @@ export type OrganisationUncheckedCreateWithoutXero_person_matchesInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3350,6 +3601,7 @@ export type OrganisationUpdateWithoutXero_person_matchesInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3390,6 +3642,7 @@ export type OrganisationUncheckedUpdateWithoutXero_person_matchesInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3430,6 +3683,7 @@ export type OrganisationCreateWithoutPublic_holiday_jurisdictionsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3470,6 +3724,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holiday_jurisdictionsInput 
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3526,6 +3781,7 @@ export type OrganisationUpdateWithoutPublic_holiday_jurisdictionsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3566,6 +3822,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holiday_jurisdictionsInput 
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3606,6 +3863,7 @@ export type OrganisationCreateWithoutPublic_holidaysInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3646,6 +3904,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holidaysInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3702,6 +3961,7 @@ export type OrganisationUpdateWithoutPublic_holidaysInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3742,6 +4002,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holidaysInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3782,6 +4043,7 @@ export type OrganisationCreateWithoutPublic_holiday_assignmentsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3822,6 +4084,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holiday_assignmentsInput = 
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3878,6 +4141,7 @@ export type OrganisationUpdateWithoutPublic_holiday_assignmentsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3918,6 +4182,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holiday_assignmentsInput = 
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -3958,6 +4223,7 @@ export type OrganisationCreateWithoutFeedsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -3998,6 +4264,7 @@ export type OrganisationUncheckedCreateWithoutFeedsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4054,6 +4321,7 @@ export type OrganisationUpdateWithoutFeedsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4094,6 +4362,7 @@ export type OrganisationUncheckedUpdateWithoutFeedsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4134,6 +4403,7 @@ export type OrganisationCreateWithoutFeed_tokensInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4174,6 +4444,7 @@ export type OrganisationUncheckedCreateWithoutFeed_tokensInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4230,6 +4501,7 @@ export type OrganisationUpdateWithoutFeed_tokensInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4270,6 +4542,7 @@ export type OrganisationUncheckedUpdateWithoutFeed_tokensInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4310,6 +4583,7 @@ export type OrganisationCreateWithoutNotificationsInput = {
   audit_events?: Prisma.AuditEventCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4350,6 +4624,7 @@ export type OrganisationUncheckedCreateWithoutNotificationsInput = {
   audit_events?: Prisma.AuditEventUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4406,6 +4681,7 @@ export type OrganisationUpdateWithoutNotificationsInput = {
   audit_events?: Prisma.AuditEventUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4446,6 +4722,7 @@ export type OrganisationUncheckedUpdateWithoutNotificationsInput = {
   audit_events?: Prisma.AuditEventUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4486,6 +4763,7 @@ export type OrganisationCreateWithoutNotification_preferencesInput = {
   audit_events?: Prisma.AuditEventCreateNestedManyWithoutOrganisationInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4526,6 +4804,7 @@ export type OrganisationUncheckedCreateWithoutNotification_preferencesInput = {
   audit_events?: Prisma.AuditEventUncheckedCreateNestedManyWithoutOrganisationInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4582,6 +4861,7 @@ export type OrganisationUpdateWithoutNotification_preferencesInput = {
   audit_events?: Prisma.AuditEventUpdateManyWithoutOrganisationNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4622,6 +4902,7 @@ export type OrganisationUncheckedUpdateWithoutNotification_preferencesInput = {
   audit_events?: Prisma.AuditEventUncheckedUpdateManyWithoutOrganisationNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4662,6 +4943,7 @@ export type OrganisationCreateWithoutNotification_email_queueInput = {
   audit_events?: Prisma.AuditEventCreateNestedManyWithoutOrganisationInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4702,6 +4984,7 @@ export type OrganisationUncheckedCreateWithoutNotification_email_queueInput = {
   audit_events?: Prisma.AuditEventUncheckedCreateNestedManyWithoutOrganisationInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4758,6 +5041,7 @@ export type OrganisationUpdateWithoutNotification_email_queueInput = {
   audit_events?: Prisma.AuditEventUpdateManyWithoutOrganisationNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4798,6 +5082,7 @@ export type OrganisationUncheckedUpdateWithoutNotification_email_queueInput = {
   audit_events?: Prisma.AuditEventUncheckedUpdateManyWithoutOrganisationNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4838,6 +5123,7 @@ export type OrganisationCreateWithoutSync_runsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4878,6 +5164,7 @@ export type OrganisationUncheckedCreateWithoutSync_runsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -4934,6 +5221,7 @@ export type OrganisationUpdateWithoutSync_runsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -4974,6 +5262,7 @@ export type OrganisationUncheckedUpdateWithoutSync_runsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -5014,6 +5303,7 @@ export type OrganisationCreateWithoutFailed_recordsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -5054,6 +5344,7 @@ export type OrganisationUncheckedCreateWithoutFailed_recordsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -5110,6 +5401,7 @@ export type OrganisationUpdateWithoutFailed_recordsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -5150,6 +5442,7 @@ export type OrganisationUncheckedUpdateWithoutFailed_recordsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -5190,6 +5483,7 @@ export type OrganisationCreateWithoutAudit_eventsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
 }
 
@@ -5230,6 +5524,7 @@ export type OrganisationUncheckedCreateWithoutAudit_eventsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
 }
 
@@ -5286,6 +5581,7 @@ export type OrganisationUpdateWithoutAudit_eventsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -5326,6 +5622,7 @@ export type OrganisationUncheckedUpdateWithoutAudit_eventsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
   organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
 }
 
@@ -5357,6 +5654,7 @@ export type OrganisationCountOutputType = {
   notifications: number
   notification_preferences: number
   notification_email_queue: number
+  outbound_operations: number
 }
 
 export type OrganisationCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -5382,6 +5680,7 @@ export type OrganisationCountOutputTypeSelect<ExtArgs extends runtime.Types.Exte
   notifications?: boolean | OrganisationCountOutputTypeCountNotificationsArgs
   notification_preferences?: boolean | OrganisationCountOutputTypeCountNotification_preferencesArgs
   notification_email_queue?: boolean | OrganisationCountOutputTypeCountNotification_email_queueArgs
+  outbound_operations?: boolean | OrganisationCountOutputTypeCountOutbound_operationsArgs
 }
 
 /**
@@ -5548,6 +5847,13 @@ export type OrganisationCountOutputTypeCountNotification_email_queueArgs<ExtArgs
   where?: Prisma.NotificationEmailQueueWhereInput
 }
 
+/**
+ * OrganisationCountOutputType without action
+ */
+export type OrganisationCountOutputTypeCountOutbound_operationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OutboundOperationWhereInput
+}
+
 
 export type OrganisationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -5587,6 +5893,7 @@ export type OrganisationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   notifications?: boolean | Prisma.Organisation$notificationsArgs<ExtArgs>
   notification_preferences?: boolean | Prisma.Organisation$notification_preferencesArgs<ExtArgs>
   notification_email_queue?: boolean | Prisma.Organisation$notification_email_queueArgs<ExtArgs>
+  outbound_operations?: boolean | Prisma.Organisation$outbound_operationsArgs<ExtArgs>
   organisation_settings?: boolean | Prisma.Organisation$organisation_settingsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganisationCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["organisation"]>
@@ -5667,6 +5974,7 @@ export type OrganisationInclude<ExtArgs extends runtime.Types.Extensions.Interna
   notifications?: boolean | Prisma.Organisation$notificationsArgs<ExtArgs>
   notification_preferences?: boolean | Prisma.Organisation$notification_preferencesArgs<ExtArgs>
   notification_email_queue?: boolean | Prisma.Organisation$notification_email_queueArgs<ExtArgs>
+  outbound_operations?: boolean | Prisma.Organisation$outbound_operationsArgs<ExtArgs>
   organisation_settings?: boolean | Prisma.Organisation$organisation_settingsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganisationCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -5699,6 +6007,7 @@ export type $OrganisationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     notifications: Prisma.$NotificationPayload<ExtArgs>[]
     notification_preferences: Prisma.$NotificationPreferencePayload<ExtArgs>[]
     notification_email_queue: Prisma.$NotificationEmailQueuePayload<ExtArgs>[]
+    outbound_operations: Prisma.$OutboundOperationPayload<ExtArgs>[]
     organisation_settings: Prisma.$OrganisationSettingsPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -6133,6 +6442,7 @@ export interface Prisma__OrganisationClient<T, Null = never, ExtArgs extends run
   notifications<T extends Prisma.Organisation$notificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$notificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notification_preferences<T extends Prisma.Organisation$notification_preferencesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$notification_preferencesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationPreferencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notification_email_queue<T extends Prisma.Organisation$notification_email_queueArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$notification_email_queueArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationEmailQueuePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  outbound_operations<T extends Prisma.Organisation$outbound_operationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$outbound_operationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OutboundOperationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   organisation_settings<T extends Prisma.Organisation$organisation_settingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$organisation_settingsArgs<ExtArgs>>): Prisma.Prisma__OrganisationSettingsClient<runtime.Types.Result.GetResult<Prisma.$OrganisationSettingsPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -7114,6 +7424,30 @@ export type Organisation$notification_email_queueArgs<ExtArgs extends runtime.Ty
   take?: number
   skip?: number
   distinct?: Prisma.NotificationEmailQueueScalarFieldEnum | Prisma.NotificationEmailQueueScalarFieldEnum[]
+}
+
+/**
+ * Organisation.outbound_operations
+ */
+export type Organisation$outbound_operationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OutboundOperation
+   */
+  select?: Prisma.OutboundOperationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OutboundOperation
+   */
+  omit?: Prisma.OutboundOperationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OutboundOperationInclude<ExtArgs> | null
+  where?: Prisma.OutboundOperationWhereInput
+  orderBy?: Prisma.OutboundOperationOrderByWithRelationInput | Prisma.OutboundOperationOrderByWithRelationInput[]
+  cursor?: Prisma.OutboundOperationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OutboundOperationScalarFieldEnum | Prisma.OutboundOperationScalarFieldEnum[]
 }
 
 /**

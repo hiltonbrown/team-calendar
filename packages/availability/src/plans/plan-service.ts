@@ -2,7 +2,12 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { getAvailabilityRecordLabel, type Result } from "@repo/core";
-import { database, scopedTo } from "@repo/database";
+import {
+  database,
+  hasUnresolvedSubmitOperation,
+  scopedTo,
+} from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
   availability_contactability,
@@ -50,6 +55,12 @@ export type PlanServiceError =
   | { code: "validation_error"; message: string }
   | { code: "unknown_error"; message: string };
 
+const unresolvedSubmitError = (): PlanServiceError => ({
+  code: "not_editable_after_submission",
+  message:
+    "Xero may have received this leave request. An administrator must resolve it before this record can be changed.",
+});
+
 export interface PlanRecord {
   allDay: boolean;
   approvalNote: string | null;
@@ -82,6 +93,7 @@ export interface PlanRecord {
   sourceRemoteId: string | null;
   sourceType: availability_source_type;
   startsAt: Date;
+  submissionResolutionPending: boolean;
   submittedAt: Date | null;
   updatedAt: Date;
   xeroWriteError: string | null;
@@ -485,6 +497,15 @@ export async function updateRecord(
       return recordNotFound();
     }
     if (
+      await hasUnresolvedSubmitOperation({
+        availabilityRecordId: existing.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      })
+    ) {
+      return { error: unresolvedSubmitError(), ok: false };
+    }
+    if (
       !canActOnPerson({
         actingOrgRole: input.actingOrgRole,
         actingPersonId: actingPerson?.id ?? null,
@@ -642,6 +663,15 @@ export async function deleteDraftRecord(
       return existing;
     }
     if (
+      await hasUnresolvedSubmitOperation({
+        availabilityRecordId: existing.value.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      })
+    ) {
+      return { error: unresolvedSubmitError(), ok: false };
+    }
+    if (
       existing.value.source_type !== "team_calendar_leave" ||
       existing.value.approval_status !== "draft"
     ) {
@@ -703,6 +733,15 @@ export async function archiveRecord(
     const existing = await loadAndAuthorise(parsed.data, input.actingOrgRole);
     if (!existing.ok) {
       return existing;
+    }
+    if (
+      await hasUnresolvedSubmitOperation({
+        availabilityRecordId: existing.value.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      })
+    ) {
+      return { error: unresolvedSubmitError(), ok: false };
     }
     if (
       existing.value.source_type === "xero_leave" ||
@@ -861,10 +900,17 @@ const personSelect = {
 } as const;
 
 const recordInclude = {
+  outbound_operations: {
+    select: { status: true },
+    where: {
+      action: "submit",
+      status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
+    },
+  },
   person: {
     select: personSelect,
   },
-} as const;
+} satisfies Prisma.AvailabilityRecordInclude;
 
 type ScopedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type SelectedPerson = ScopedRecord["person"];
@@ -1100,6 +1146,7 @@ function toPlanRecord(
     sourceRemoteId: record.source_remote_id,
     sourceType: record.source_type,
     startsAt: record.starts_at,
+    submissionResolutionPending: record.outbound_operations?.length > 0,
     submittedAt: record.submitted_at,
     updatedAt: record.updated_at,
     xeroWriteError: record.xero_write_error,
@@ -1110,6 +1157,9 @@ function deriveActions(
   record: ScopedRecord,
   hasXero: boolean
 ): EditableAction[] {
+  if (record.outbound_operations?.length > 0) {
+    return ["view"];
+  }
   if (record.archived_at && record.source_type === "manual") {
     return ["view", "restore"];
   }

@@ -154,6 +154,18 @@ enum availability_failed_action {
   withdraw
 }
 
+enum outbound_operation_action {
+  submit
+}
+
+enum outbound_operation_status {
+  prepared
+  outcome_unknown
+  provider_accepted
+  completed
+  definitive_failure
+}
+
 enum availability_privacy_mode {
   named
   masked
@@ -257,6 +269,12 @@ enum plan_limit_type {
   seats
 }
 
+enum stripe_event_delivery_state {
+  failed
+  processed
+  ignored
+}
+
 model Organisation {
   id                    String    @id @default(uuid()) @db.Uuid
   clerk_org_id          String
@@ -296,6 +314,7 @@ model Organisation {
   notifications                Notification[]
   notification_preferences     NotificationPreference[]
   notification_email_queue     NotificationEmailQueue[]
+  outbound_operations          OutboundOperation[]
   organisation_settings        OrganisationSettings?
 
   @@index([clerk_org_id])
@@ -613,6 +632,7 @@ model AvailabilityRecord {
   person       Person                   @relation(fields: [person_id], references: [id])
   approved_by  Person?                  @relation("ApprovedBy", fields: [approved_by_person_id], references: [id])
   publication  AvailabilityPublication?
+  outbound_operations OutboundOperation[]
 
   // Manual records have source_remote_id = NULL, which the composite unique above cannot
   // guard because PostgreSQL treats NULL as distinct. A partial unique index on
@@ -633,6 +653,35 @@ model AvailabilityRecord {
   @@index([organisation_id, approval_status, submitted_at])
   @@index([organisation_id, approval_status, archived_at, ends_at, xero_approval_checked_at, id])
   @@map("availability_records")
+}
+
+model OutboundOperation {
+  id                     String                    @id @default(uuid()) @db.Uuid
+  clerk_org_id           String
+  organisation_id        String                    @db.Uuid
+  availability_record_id String                    @db.Uuid
+  action                 outbound_operation_action
+  status                 outbound_operation_status
+  request_fingerprint    String
+  actor_user_id          String
+  attempt_generation     Int                       @default(1)
+  safe_error_code        String?
+  known_remote_id        String?
+  prepared_at            DateTime                  @default(now())
+  dispatch_started_at    DateTime?
+  provider_accepted_at   DateTime?
+  completed_at           DateTime?
+  created_at             DateTime                  @default(now())
+  updated_at             DateTime                  @updatedAt
+
+  availability_record AvailabilityRecord @relation(fields: [availability_record_id], references: [id])
+  organisation       Organisation       @relation(fields: [organisation_id], references: [id])
+
+  @@unique([availability_record_id, action])
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@index([organisation_id, status, updated_at])
+  @@map("outbound_operations")
 }
 
 model AvailabilityPublication {
@@ -1142,12 +1191,21 @@ model UsageCounter {
 }
 
 model StripeEvent {
-  id              String   @id @default(uuid()) @db.Uuid
-  stripe_event_id String   @unique
-  type            String
-  processed_at    DateTime @default(now())
-  created_at      DateTime @default(now())
-  updated_at      DateTime @updatedAt
+  id                 String                      @id @default(uuid()) @db.Uuid
+  stripe_event_id    String                      @unique
+  type               String
+  delivery_state     stripe_event_delivery_state @default(processed)
+  attempt_count      Int                         @default(1)
+  clerk_org_id       String?
+  stripe_customer_id String?
+  event_created_at   DateTime?
+  error_category     String?
+  last_attempted_at  DateTime                    @default(now())
+  processed_at       DateTime?
+  created_at         DateTime                    @default(now())
+  updated_at         DateTime                    @updatedAt
 
+  @@index([clerk_org_id, delivery_state, event_created_at])
+  @@index([delivery_state, updated_at])
   @@map("stripe_events")
 }

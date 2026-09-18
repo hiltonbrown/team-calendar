@@ -97,6 +97,11 @@ export type XeroSyncCursor = Prisma.XeroSyncCursorModel
  */
 export type AvailabilityRecord = Prisma.AvailabilityRecordModel
 /**
+ * Model OutboundOperation
+ * 
+ */
+export type OutboundOperation = Prisma.OutboundOperationModel
+/**
  * Model AvailabilityPublication
  * 
  */

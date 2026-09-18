@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     availabilityFindMany: vi.fn(),
     availabilityUpdateMany: vi.fn(),
     hasActiveXeroConnection: vi.fn(),
+    hasUnresolvedSubmitOperation: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
     managerScopePersonIds: vi.fn(),
     materialiseAvailabilityPublication: vi.fn(() =>
@@ -70,6 +71,7 @@ vi.mock("@repo/database", () => ({
     leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
     person: { findFirst: mocks.personFindFirst },
   },
+  hasUnresolvedSubmitOperation: mocks.hasUnresolvedSubmitOperation,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
 }));
@@ -428,6 +430,7 @@ describe("plan-service", () => {
 
   it("projects unit, currencyCode, and balance amount on balanceChip", async () => {
     mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.hasUnresolvedSubmitOperation.mockResolvedValue(false);
     mocks.availabilityFindFirst.mockResolvedValue({
       ...scopedRecordFixture({ managerPersonId: null }),
       all_day: true,

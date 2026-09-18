@@ -3,12 +3,16 @@
 import { auth, currentUser } from "@repo/auth/server";
 import {
   archiveRecord,
+  attachSubmitRecoveryCandidate,
   createRecord,
   deleteDraftRecord,
+  listSubmitRecoveryCandidates,
   type PlanServiceError,
+  resolveSubmitAsNotCreated,
   restoreRecord,
   retrySubmission,
   revertToDraft,
+  type SubmitRecoveryError,
   type SubmitServiceError,
   submitDraftRecord,
   updateRecord,
@@ -30,11 +34,73 @@ import {
 
 export type PlanActionError =
   | PlanServiceError
+  | SubmitRecoveryError
   | SubmitServiceError
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string };
 
 export type PlanActionResult<T = { id?: string }> = Result<T, PlanActionError>;
+
+export async function attachSubmitRecoveryCandidateAction(input: {
+  organisationId: string;
+  reason: string;
+  recordId: string;
+  remoteId: string;
+}): Promise<PlanActionResult<void>> {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await attachSubmitRecoveryCandidate(
+    {
+      ...context.value,
+      reason: input.reason,
+      recordId: input.recordId,
+      remoteId: input.remoteId,
+    },
+    XeroWriteAdapter
+  );
+  if (result.ok) {
+    revalidateSubmissionPaths();
+  }
+  return result;
+}
+
+export async function listSubmitRecoveryCandidatesAction(input: {
+  organisationId: string;
+  recordId: string;
+}) {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  return await listSubmitRecoveryCandidates(
+    { ...context.value, recordId: input.recordId },
+    XeroWriteAdapter
+  );
+}
+
+export async function resolveSubmitAsNotCreatedAction(input: {
+  evidenceReference: string;
+  organisationId: string;
+  reason: string;
+  recordId: string;
+}): Promise<PlanActionResult<void>> {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await resolveSubmitAsNotCreated({
+    ...context.value,
+    evidenceReference: input.evidenceReference,
+    reason: input.reason,
+    recordId: input.recordId,
+  });
+  if (result.ok) {
+    revalidateSubmissionPaths();
+  }
+  return result;
+}
 
 export async function createRecordAction(
   input: PlanRecordFormInput
@@ -350,6 +416,42 @@ function canUsePlans(role: string | null | undefined): boolean {
     role === "org:admin" ||
     role === "org:owner"
   );
+}
+
+async function resolveRecoveryContext(organisationId: string): Promise<
+  PlanActionResult<{
+    actingOrgRole: "org:admin" | "org:owner";
+    actingUserId: string;
+    clerkOrgId: string;
+    organisationId: string;
+  }>
+> {
+  const context = await resolveActionContext(organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  if (
+    context.value.orgRole !== "org:admin" &&
+    context.value.orgRole !== "org:owner"
+  ) {
+    return {
+      error: {
+        code: "not_authorised",
+        message:
+          "Administrator access is required to resolve Xero submissions.",
+      },
+      ok: false,
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    },
+  };
 }
 
 async function resolveRecordActionContext(

@@ -492,6 +492,7 @@ export type AvailabilityRecordWhereInput = {
   person?: Prisma.XOR<Prisma.PersonScalarRelationFilter, Prisma.PersonWhereInput>
   approved_by?: Prisma.XOR<Prisma.PersonNullableScalarRelationFilter, Prisma.PersonWhereInput> | null
   publication?: Prisma.XOR<Prisma.AvailabilityPublicationNullableScalarRelationFilter, Prisma.AvailabilityPublicationWhereInput> | null
+  outbound_operations?: Prisma.OutboundOperationListRelationFilter
 }
 
 export type AvailabilityRecordOrderByWithRelationInput = {
@@ -539,6 +540,7 @@ export type AvailabilityRecordOrderByWithRelationInput = {
   person?: Prisma.PersonOrderByWithRelationInput
   approved_by?: Prisma.PersonOrderByWithRelationInput
   publication?: Prisma.AvailabilityPublicationOrderByWithRelationInput
+  outbound_operations?: Prisma.OutboundOperationOrderByRelationAggregateInput
 }
 
 export type AvailabilityRecordWhereUniqueInput = Prisma.AtLeast<{
@@ -590,6 +592,7 @@ export type AvailabilityRecordWhereUniqueInput = Prisma.AtLeast<{
   person?: Prisma.XOR<Prisma.PersonScalarRelationFilter, Prisma.PersonWhereInput>
   approved_by?: Prisma.XOR<Prisma.PersonNullableScalarRelationFilter, Prisma.PersonWhereInput> | null
   publication?: Prisma.XOR<Prisma.AvailabilityPublicationNullableScalarRelationFilter, Prisma.AvailabilityPublicationWhereInput> | null
+  outbound_operations?: Prisma.OutboundOperationListRelationFilter
 }, "id" | "organisation_id_source_type_source_remote_id">
 
 export type AvailabilityRecordOrderByWithAggregationInput = {
@@ -728,6 +731,7 @@ export type AvailabilityRecordCreateInput = {
   person: Prisma.PersonCreateNestedOneWithoutAvailability_recordsInput
   approved_by?: Prisma.PersonCreateNestedOneWithoutApproved_recordsInput
   publication?: Prisma.AvailabilityPublicationCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUncheckedCreateInput = {
@@ -772,6 +776,7 @@ export type AvailabilityRecordUncheckedCreateInput = {
   created_at?: Date | string
   updated_at?: Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUpdateInput = {
@@ -816,6 +821,7 @@ export type AvailabilityRecordUpdateInput = {
   person?: Prisma.PersonUpdateOneRequiredWithoutAvailability_recordsNestedInput
   approved_by?: Prisma.PersonUpdateOneWithoutApproved_recordsNestedInput
   publication?: Prisma.AvailabilityPublicationUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateInput = {
@@ -860,6 +866,7 @@ export type AvailabilityRecordUncheckedUpdateInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordCreateManyInput = {
@@ -1288,6 +1295,20 @@ export type Enumavailability_publish_statusFieldUpdateOperationsInput = {
   set?: $Enums.availability_publish_status
 }
 
+export type AvailabilityRecordCreateNestedOneWithoutOutbound_operationsInput = {
+  create?: Prisma.XOR<Prisma.AvailabilityRecordCreateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedCreateWithoutOutbound_operationsInput>
+  connectOrCreate?: Prisma.AvailabilityRecordCreateOrConnectWithoutOutbound_operationsInput
+  connect?: Prisma.AvailabilityRecordWhereUniqueInput
+}
+
+export type AvailabilityRecordUpdateOneRequiredWithoutOutbound_operationsNestedInput = {
+  create?: Prisma.XOR<Prisma.AvailabilityRecordCreateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedCreateWithoutOutbound_operationsInput>
+  connectOrCreate?: Prisma.AvailabilityRecordCreateOrConnectWithoutOutbound_operationsInput
+  upsert?: Prisma.AvailabilityRecordUpsertWithoutOutbound_operationsInput
+  connect?: Prisma.AvailabilityRecordWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AvailabilityRecordUpdateToOneWithWhereWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUpdateWithoutOutbound_operationsInput>, Prisma.AvailabilityRecordUncheckedUpdateWithoutOutbound_operationsInput>
+}
+
 export type AvailabilityRecordCreateNestedOneWithoutPublicationInput = {
   create?: Prisma.XOR<Prisma.AvailabilityRecordCreateWithoutPublicationInput, Prisma.AvailabilityRecordUncheckedCreateWithoutPublicationInput>
   connectOrCreate?: Prisma.AvailabilityRecordCreateOrConnectWithoutPublicationInput
@@ -1343,6 +1364,7 @@ export type AvailabilityRecordCreateWithoutOrganisationInput = {
   person: Prisma.PersonCreateNestedOneWithoutAvailability_recordsInput
   approved_by?: Prisma.PersonCreateNestedOneWithoutApproved_recordsInput
   publication?: Prisma.AvailabilityPublicationCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUncheckedCreateWithoutOrganisationInput = {
@@ -1386,6 +1408,7 @@ export type AvailabilityRecordUncheckedCreateWithoutOrganisationInput = {
   created_at?: Date | string
   updated_at?: Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordCreateOrConnectWithoutOrganisationInput = {
@@ -1501,6 +1524,7 @@ export type AvailabilityRecordCreateWithoutPersonInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_recordsInput
   approved_by?: Prisma.PersonCreateNestedOneWithoutApproved_recordsInput
   publication?: Prisma.AvailabilityPublicationCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUncheckedCreateWithoutPersonInput = {
@@ -1544,6 +1568,7 @@ export type AvailabilityRecordUncheckedCreateWithoutPersonInput = {
   created_at?: Date | string
   updated_at?: Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordCreateOrConnectWithoutPersonInput = {
@@ -1597,6 +1622,7 @@ export type AvailabilityRecordCreateWithoutApproved_byInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_recordsInput
   person: Prisma.PersonCreateNestedOneWithoutAvailability_recordsInput
   publication?: Prisma.AvailabilityPublicationCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUncheckedCreateWithoutApproved_byInput = {
@@ -1640,6 +1666,7 @@ export type AvailabilityRecordUncheckedCreateWithoutApproved_byInput = {
   created_at?: Date | string
   updated_at?: Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedCreateNestedOneWithoutAvailability_recordInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordCreateOrConnectWithoutApproved_byInput = {
@@ -1684,6 +1711,198 @@ export type AvailabilityRecordUpdateManyWithWhereWithoutApproved_byInput = {
   data: Prisma.XOR<Prisma.AvailabilityRecordUpdateManyMutationInput, Prisma.AvailabilityRecordUncheckedUpdateManyWithoutApproved_byInput>
 }
 
+export type AvailabilityRecordCreateWithoutOutbound_operationsInput = {
+  id?: string
+  clerk_org_id: string
+  record_type: $Enums.availability_record_type
+  source_type: $Enums.availability_source_type
+  source_remote_id?: string | null
+  starts_at: Date | string
+  ends_at: Date | string
+  approval_status: $Enums.availability_approval_status
+  failed_action?: $Enums.availability_failed_action | null
+  privacy_mode: $Enums.availability_privacy_mode
+  contactability: $Enums.availability_contactability
+  include_in_feed?: boolean
+  publish_status?: $Enums.availability_publish_status
+  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  source_remote_hash?: string | null
+  source_remote_version?: string | null
+  source_last_modified_at?: Date | string | null
+  derived_uid_key: string
+  derived_sequence?: number
+  title?: string | null
+  all_day?: boolean
+  notes_internal?: string | null
+  working_location?: string | null
+  preferred_contact_method?: string | null
+  created_by_user_id?: string | null
+  updated_by_user_id?: string | null
+  archived_at?: Date | string | null
+  approval_note?: string | null
+  approved_at?: Date | string | null
+  xero_write_error?: string | null
+  xero_write_error_raw?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  xero_write_claimed_at?: Date | string | null
+  xero_approval_checked_at?: Date | string | null
+  submitted_at?: Date | string | null
+  withdrawn_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_recordsInput
+  person: Prisma.PersonCreateNestedOneWithoutAvailability_recordsInput
+  approved_by?: Prisma.PersonCreateNestedOneWithoutApproved_recordsInput
+  publication?: Prisma.AvailabilityPublicationCreateNestedOneWithoutAvailability_recordInput
+}
+
+export type AvailabilityRecordUncheckedCreateWithoutOutbound_operationsInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  person_id: string
+  record_type: $Enums.availability_record_type
+  source_type: $Enums.availability_source_type
+  source_remote_id?: string | null
+  starts_at: Date | string
+  ends_at: Date | string
+  approval_status: $Enums.availability_approval_status
+  failed_action?: $Enums.availability_failed_action | null
+  privacy_mode: $Enums.availability_privacy_mode
+  contactability: $Enums.availability_contactability
+  include_in_feed?: boolean
+  publish_status?: $Enums.availability_publish_status
+  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  source_remote_hash?: string | null
+  source_remote_version?: string | null
+  source_last_modified_at?: Date | string | null
+  derived_uid_key: string
+  derived_sequence?: number
+  title?: string | null
+  all_day?: boolean
+  notes_internal?: string | null
+  working_location?: string | null
+  preferred_contact_method?: string | null
+  created_by_user_id?: string | null
+  updated_by_user_id?: string | null
+  archived_at?: Date | string | null
+  approval_note?: string | null
+  approved_by_person_id?: string | null
+  approved_at?: Date | string | null
+  xero_write_error?: string | null
+  xero_write_error_raw?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  xero_write_claimed_at?: Date | string | null
+  xero_approval_checked_at?: Date | string | null
+  submitted_at?: Date | string | null
+  withdrawn_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  publication?: Prisma.AvailabilityPublicationUncheckedCreateNestedOneWithoutAvailability_recordInput
+}
+
+export type AvailabilityRecordCreateOrConnectWithoutOutbound_operationsInput = {
+  where: Prisma.AvailabilityRecordWhereUniqueInput
+  create: Prisma.XOR<Prisma.AvailabilityRecordCreateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedCreateWithoutOutbound_operationsInput>
+}
+
+export type AvailabilityRecordUpsertWithoutOutbound_operationsInput = {
+  update: Prisma.XOR<Prisma.AvailabilityRecordUpdateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedUpdateWithoutOutbound_operationsInput>
+  create: Prisma.XOR<Prisma.AvailabilityRecordCreateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedCreateWithoutOutbound_operationsInput>
+  where?: Prisma.AvailabilityRecordWhereInput
+}
+
+export type AvailabilityRecordUpdateToOneWithWhereWithoutOutbound_operationsInput = {
+  where?: Prisma.AvailabilityRecordWhereInput
+  data: Prisma.XOR<Prisma.AvailabilityRecordUpdateWithoutOutbound_operationsInput, Prisma.AvailabilityRecordUncheckedUpdateWithoutOutbound_operationsInput>
+}
+
+export type AvailabilityRecordUpdateWithoutOutbound_operationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  record_type?: Prisma.Enumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type
+  source_type?: Prisma.Enumavailability_source_typeFieldUpdateOperationsInput | $Enums.availability_source_type
+  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  starts_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ends_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  approval_status?: Prisma.Enumavailability_approval_statusFieldUpdateOperationsInput | $Enums.availability_approval_status
+  failed_action?: Prisma.NullableEnumavailability_failed_actionFieldUpdateOperationsInput | $Enums.availability_failed_action | null
+  privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
+  include_in_feed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publish_status?: Prisma.Enumavailability_publish_statusFieldUpdateOperationsInput | $Enums.availability_publish_status
+  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  source_remote_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source_remote_version?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source_last_modified_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  derived_uid_key?: Prisma.StringFieldUpdateOperationsInput | string
+  derived_sequence?: Prisma.IntFieldUpdateOperationsInput | number
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  all_day?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  working_location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  preferred_contact_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_write_error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_write_error_raw?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  xero_write_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_approval_checked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  submitted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  withdrawn_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_recordsNestedInput
+  person?: Prisma.PersonUpdateOneRequiredWithoutAvailability_recordsNestedInput
+  approved_by?: Prisma.PersonUpdateOneWithoutApproved_recordsNestedInput
+  publication?: Prisma.AvailabilityPublicationUpdateOneWithoutAvailability_recordNestedInput
+}
+
+export type AvailabilityRecordUncheckedUpdateWithoutOutbound_operationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  person_id?: Prisma.StringFieldUpdateOperationsInput | string
+  record_type?: Prisma.Enumavailability_record_typeFieldUpdateOperationsInput | $Enums.availability_record_type
+  source_type?: Prisma.Enumavailability_source_typeFieldUpdateOperationsInput | $Enums.availability_source_type
+  source_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  starts_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  ends_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  approval_status?: Prisma.Enumavailability_approval_statusFieldUpdateOperationsInput | $Enums.availability_approval_status
+  failed_action?: Prisma.NullableEnumavailability_failed_actionFieldUpdateOperationsInput | $Enums.availability_failed_action | null
+  privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
+  contactability?: Prisma.Enumavailability_contactabilityFieldUpdateOperationsInput | $Enums.availability_contactability
+  include_in_feed?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publish_status?: Prisma.Enumavailability_publish_statusFieldUpdateOperationsInput | $Enums.availability_publish_status
+  source_payload_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  source_remote_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source_remote_version?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  source_last_modified_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  derived_uid_key?: Prisma.StringFieldUpdateOperationsInput | string
+  derived_sequence?: Prisma.IntFieldUpdateOperationsInput | number
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  all_day?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  notes_internal?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  working_location?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  preferred_contact_method?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  updated_by_user_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approved_by_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approved_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_write_error?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_write_error_raw?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  xero_write_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  xero_approval_checked_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  submitted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  withdrawn_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publication?: Prisma.AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordNestedInput
+}
+
 export type AvailabilityRecordCreateWithoutPublicationInput = {
   id?: string
   clerk_org_id: string
@@ -1725,6 +1944,7 @@ export type AvailabilityRecordCreateWithoutPublicationInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutAvailability_recordsInput
   person: Prisma.PersonCreateNestedOneWithoutAvailability_recordsInput
   approved_by?: Prisma.PersonCreateNestedOneWithoutApproved_recordsInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordUncheckedCreateWithoutPublicationInput = {
@@ -1768,6 +1988,7 @@ export type AvailabilityRecordUncheckedCreateWithoutPublicationInput = {
   withdrawn_at?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutAvailability_recordInput
 }
 
 export type AvailabilityRecordCreateOrConnectWithoutPublicationInput = {
@@ -1827,6 +2048,7 @@ export type AvailabilityRecordUpdateWithoutPublicationInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_recordsNestedInput
   person?: Prisma.PersonUpdateOneRequiredWithoutAvailability_recordsNestedInput
   approved_by?: Prisma.PersonUpdateOneWithoutApproved_recordsNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateWithoutPublicationInput = {
@@ -1870,6 +2092,7 @@ export type AvailabilityRecordUncheckedUpdateWithoutPublicationInput = {
   withdrawn_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordCreateManyOrganisationInput = {
@@ -1955,6 +2178,7 @@ export type AvailabilityRecordUpdateWithoutOrganisationInput = {
   person?: Prisma.PersonUpdateOneRequiredWithoutAvailability_recordsNestedInput
   approved_by?: Prisma.PersonUpdateOneWithoutApproved_recordsNestedInput
   publication?: Prisma.AvailabilityPublicationUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateWithoutOrganisationInput = {
@@ -1998,6 +2222,7 @@ export type AvailabilityRecordUncheckedUpdateWithoutOrganisationInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateManyWithoutOrganisationInput = {
@@ -2167,6 +2392,7 @@ export type AvailabilityRecordUpdateWithoutPersonInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_recordsNestedInput
   approved_by?: Prisma.PersonUpdateOneWithoutApproved_recordsNestedInput
   publication?: Prisma.AvailabilityPublicationUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateWithoutPersonInput = {
@@ -2210,6 +2436,7 @@ export type AvailabilityRecordUncheckedUpdateWithoutPersonInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateManyWithoutPersonInput = {
@@ -2295,6 +2522,7 @@ export type AvailabilityRecordUpdateWithoutApproved_byInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutAvailability_recordsNestedInput
   person?: Prisma.PersonUpdateOneRequiredWithoutAvailability_recordsNestedInput
   publication?: Prisma.AvailabilityPublicationUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateWithoutApproved_byInput = {
@@ -2338,6 +2566,7 @@ export type AvailabilityRecordUncheckedUpdateWithoutApproved_byInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publication?: Prisma.AvailabilityPublicationUncheckedUpdateOneWithoutAvailability_recordNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutAvailability_recordNestedInput
 }
 
 export type AvailabilityRecordUncheckedUpdateManyWithoutApproved_byInput = {
@@ -2382,6 +2611,35 @@ export type AvailabilityRecordUncheckedUpdateManyWithoutApproved_byInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type AvailabilityRecordCountOutputType
+ */
+
+export type AvailabilityRecordCountOutputType = {
+  outbound_operations: number
+}
+
+export type AvailabilityRecordCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  outbound_operations?: boolean | AvailabilityRecordCountOutputTypeCountOutbound_operationsArgs
+}
+
+/**
+ * AvailabilityRecordCountOutputType without action
+ */
+export type AvailabilityRecordCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AvailabilityRecordCountOutputType
+   */
+  select?: Prisma.AvailabilityRecordCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * AvailabilityRecordCountOutputType without action
+ */
+export type AvailabilityRecordCountOutputTypeCountOutbound_operationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OutboundOperationWhereInput
+}
 
 
 export type AvailabilityRecordSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2429,6 +2687,8 @@ export type AvailabilityRecordSelect<ExtArgs extends runtime.Types.Extensions.In
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
   approved_by?: boolean | Prisma.AvailabilityRecord$approved_byArgs<ExtArgs>
   publication?: boolean | Prisma.AvailabilityRecord$publicationArgs<ExtArgs>
+  outbound_operations?: boolean | Prisma.AvailabilityRecord$outbound_operationsArgs<ExtArgs>
+  _count?: boolean | Prisma.AvailabilityRecordCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["availabilityRecord"]>
 
 export type AvailabilityRecordSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2572,6 +2832,8 @@ export type AvailabilityRecordInclude<ExtArgs extends runtime.Types.Extensions.I
   person?: boolean | Prisma.PersonDefaultArgs<ExtArgs>
   approved_by?: boolean | Prisma.AvailabilityRecord$approved_byArgs<ExtArgs>
   publication?: boolean | Prisma.AvailabilityRecord$publicationArgs<ExtArgs>
+  outbound_operations?: boolean | Prisma.AvailabilityRecord$outbound_operationsArgs<ExtArgs>
+  _count?: boolean | Prisma.AvailabilityRecordCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AvailabilityRecordIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -2591,6 +2853,7 @@ export type $AvailabilityRecordPayload<ExtArgs extends runtime.Types.Extensions.
     person: Prisma.$PersonPayload<ExtArgs>
     approved_by: Prisma.$PersonPayload<ExtArgs> | null
     publication: Prisma.$AvailabilityPublicationPayload<ExtArgs> | null
+    outbound_operations: Prisma.$OutboundOperationPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3031,6 +3294,7 @@ export interface Prisma__AvailabilityRecordClient<T, Null = never, ExtArgs exten
   person<T extends Prisma.PersonDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PersonDefaultArgs<ExtArgs>>): Prisma.Prisma__PersonClient<runtime.Types.Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   approved_by<T extends Prisma.AvailabilityRecord$approved_byArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AvailabilityRecord$approved_byArgs<ExtArgs>>): Prisma.Prisma__PersonClient<runtime.Types.Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   publication<T extends Prisma.AvailabilityRecord$publicationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AvailabilityRecord$publicationArgs<ExtArgs>>): Prisma.Prisma__AvailabilityPublicationClient<runtime.Types.Result.GetResult<Prisma.$AvailabilityPublicationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  outbound_operations<T extends Prisma.AvailabilityRecord$outbound_operationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AvailabilityRecord$outbound_operationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OutboundOperationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3536,6 +3800,30 @@ export type AvailabilityRecord$publicationArgs<ExtArgs extends runtime.Types.Ext
    */
   include?: Prisma.AvailabilityPublicationInclude<ExtArgs> | null
   where?: Prisma.AvailabilityPublicationWhereInput
+}
+
+/**
+ * AvailabilityRecord.outbound_operations
+ */
+export type AvailabilityRecord$outbound_operationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OutboundOperation
+   */
+  select?: Prisma.OutboundOperationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OutboundOperation
+   */
+  omit?: Prisma.OutboundOperationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OutboundOperationInclude<ExtArgs> | null
+  where?: Prisma.OutboundOperationWhereInput
+  orderBy?: Prisma.OutboundOperationOrderByWithRelationInput | Prisma.OutboundOperationOrderByWithRelationInput[]
+  cursor?: Prisma.OutboundOperationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OutboundOperationScalarFieldEnum | Prisma.OutboundOperationScalarFieldEnum[]
 }
 
 /**
