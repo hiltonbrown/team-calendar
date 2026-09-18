@@ -1,11 +1,4 @@
 import { analytics } from "@repo/analytics/server";
-import type {
-  DeletedObjectJSON,
-  OrganizationJSON,
-  OrganizationMembershipJSON,
-  UserJSON,
-  WebhookEvent,
-} from "@repo/auth/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { database } from "@repo/database";
@@ -50,6 +43,11 @@ const ClerkOrganizationMembershipDataSchema = z.object({
   }),
 });
 
+const ClerkWebhookEnvelopeSchema = z.object({
+  data: z.object({ id: z.string().optional() }).passthrough(),
+  type: z.string().min(1),
+});
+
 // Discriminated over the event types Team Calendar acts on. Any other event type is
 // not validated here because the switch below ignores it.
 const ClerkWebhookEventSchema = z.discriminatedUnion("type", [
@@ -87,7 +85,14 @@ const CONSUMED_EVENT_TYPES = new Set<string>([
   "organizationMembership.deleted",
 ]);
 
-const handleUserCreated = (data: UserJSON) => {
+type ClerkUserData = z.infer<typeof ClerkUserDataSchema>;
+type ClerkDeletedObjectData = z.infer<typeof ClerkDeletedObjectDataSchema>;
+type ClerkOrganizationData = z.infer<typeof ClerkOrganizationDataSchema>;
+type ClerkOrganizationMembershipData = z.infer<
+  typeof ClerkOrganizationMembershipDataSchema
+>;
+
+const handleUserCreated = (data: ClerkUserData) => {
   analytics?.identify({
     distinctId: data.id,
     properties: {
@@ -108,7 +113,7 @@ const handleUserCreated = (data: UserJSON) => {
   return new Response("User created", { status: 201 });
 };
 
-const handleUserUpdated = (data: UserJSON) => {
+const handleUserUpdated = (data: ClerkUserData) => {
   analytics?.identify({
     distinctId: data.id,
     properties: {
@@ -129,7 +134,7 @@ const handleUserUpdated = (data: UserJSON) => {
   return new Response("User updated", { status: 201 });
 };
 
-const handleUserDeleted = (data: DeletedObjectJSON) => {
+const handleUserDeleted = (data: ClerkDeletedObjectData) => {
   if (data.id) {
     analytics?.identify({
       distinctId: data.id,
@@ -147,9 +152,9 @@ const handleUserDeleted = (data: DeletedObjectJSON) => {
   return new Response("User deleted", { status: 201 });
 };
 
-const handleOrganizationCreated = (data: OrganizationJSON) => {
+const handleOrganizationCreated = (data: ClerkOrganizationData) => {
   analytics?.groupIdentify({
-    distinctId: data.created_by,
+    distinctId: data.created_by ?? undefined,
     groupKey: data.id,
     groupType: "company",
     properties: {
@@ -168,9 +173,9 @@ const handleOrganizationCreated = (data: OrganizationJSON) => {
   return new Response("Organisation created", { status: 201 });
 };
 
-const handleOrganizationUpdated = (data: OrganizationJSON) => {
+const handleOrganizationUpdated = (data: ClerkOrganizationData) => {
   analytics?.groupIdentify({
-    distinctId: data.created_by,
+    distinctId: data.created_by ?? undefined,
     groupKey: data.id,
     groupType: "company",
     properties: {
@@ -190,7 +195,7 @@ const handleOrganizationUpdated = (data: OrganizationJSON) => {
 };
 
 export const handleOrganizationMembershipCreated = async (
-  data: OrganizationMembershipJSON
+  data: ClerkOrganizationMembershipData
 ): Promise<Response> => {
   analytics?.groupIdentify({
     distinctId: data.public_user_data.user_id,
@@ -209,7 +214,7 @@ export const handleOrganizationMembershipCreated = async (
 };
 
 export const handleOrganizationMembershipDeleted = async (
-  data: OrganizationMembershipJSON
+  data: ClerkOrganizationMembershipData
 ): Promise<Response> => {
   analytics?.capture({
     distinctId: data.public_user_data.user_id,
@@ -229,7 +234,9 @@ export const handleOrganizationMembershipDeleted = async (
   return new Response("Organisation membership deleted", { status: 201 });
 };
 
-async function ensurePeopleForMembership(data: OrganizationMembershipJSON) {
+async function ensurePeopleForMembership(
+  data: ClerkOrganizationMembershipData
+) {
   const organisations = await database.organisation.findMany({
     select: {
       clerk_org_id: true,
@@ -301,22 +308,18 @@ export const POST = async (request: Request): Promise<Response> => {
     });
   }
 
-  // Get the body
-  const payload = (await request.json()) as object;
-  const body = JSON.stringify(payload);
+  const body = await request.text();
 
   // Create a new SVIX instance with your secret.
   const webhook = new Webhook(env.CLERK_WEBHOOK_SECRET);
 
-  let event: WebhookEvent | undefined;
-
   // Verify the payload with the headers
   try {
-    event = webhook.verify(body, {
+    webhook.verify(body, {
       "svix-id": svixId,
       "svix-signature": svixSignature,
       "svix-timestamp": svixTimestamp,
-    }) as WebhookEvent;
+    });
   } catch (error) {
     log.error("Error verifying webhook:", { error });
     return new Response("Error occured", {
@@ -324,30 +327,52 @@ export const POST = async (request: Request): Promise<Response> => {
     });
   }
 
-  const eventType = event.type;
-
-  // Validate the payload shape for events we act on before consuming event.data.
-  if (CONSUMED_EVENT_TYPES.has(eventType)) {
-    const parsed = ClerkWebhookEventSchema.safeParse(event);
-    if (!parsed.success) {
-      log.error("Invalid Clerk webhook payload", {
-        eventType,
-        issues: parsed.error.issues,
-      });
-      return new Response("Invalid webhook payload", { status: 400 });
-    }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch (error) {
+    log.error("Invalid Clerk webhook JSON", { error });
+    return new Response("Invalid webhook payload", { status: 400 });
   }
 
-  // Get the ID and type
-  const { id } = event.data;
+  const envelope = ClerkWebhookEnvelopeSchema.safeParse(payload);
+  if (!envelope.success) {
+    log.error("Invalid Clerk webhook envelope", {
+      issues: envelope.error.issues,
+    });
+    return new Response("Invalid webhook payload", { status: 400 });
+  }
+
+  const eventType = envelope.data.type;
+
+  // Validate the payload shape for events we act on before consuming event.data.
+  if (!CONSUMED_EVENT_TYPES.has(eventType)) {
+    log.info("Webhook received", {
+      eventType,
+      id: envelope.data.data.id,
+    });
+    await analytics?.shutdown();
+    return new Response("", { status: 201 });
+  }
+
+  const parsed = ClerkWebhookEventSchema.safeParse(payload);
+  if (!parsed.success) {
+    log.error("Invalid Clerk webhook payload", {
+      eventType,
+      issues: parsed.error.issues,
+    });
+    return new Response("Invalid webhook payload", { status: 400 });
+  }
+
+  const event = parsed.data;
 
   // Log identifiers only. The verified payload contains PII (emails, names,
   // phone numbers) and must never reach the log pipeline.
-  log.info("Webhook received", { eventType, id });
+  log.info("Webhook received", { eventType, id: envelope.data.data.id });
 
   let response: Response = new Response("", { status: 201 });
 
-  switch (eventType) {
+  switch (event.type) {
     case "user.created": {
       response = handleUserCreated(event.data);
       break;

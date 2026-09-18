@@ -137,48 +137,114 @@ describe("Clerk organisation membership webhook handling", () => {
 });
 
 describe("Clerk webhook payload validation", () => {
-  function webhookRequest() {
+  function webhookRequest(body: string) {
     return new Request("http://localhost/webhooks/auth", {
-      body: JSON.stringify({}),
+      body,
       method: "POST",
     });
   }
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.verify.mockReturnValue(undefined);
   });
 
   it("returns 400 when a consumed event has a malformed payload", async () => {
     // user.created without the required created_at field.
-    mocks.verify.mockReturnValue({
+    const body = JSON.stringify({
       data: { id: "user_1" },
       type: "user.created",
     });
 
-    const response = await POST(webhookRequest());
+    const response = await POST(webhookRequest(body));
 
     expect(response.status).toBe(400);
     expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+    expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
+    expect(mocks.analyticsIdentify).not.toHaveBeenCalled();
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.organisationFindMany).not.toHaveBeenCalled();
+    expect(mocks.personUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("accepts a valid consumed event payload", async () => {
-    mocks.verify.mockReturnValue({
+  it("passes the exact raw body to Svix and accepts a valid consumed event", async () => {
+    const body = ` {
+  "data": { "created_by": "user_1", "id": "org_1", "name": "Acme" },
+  "type": "organization.created"
+} `;
+
+    const response = await POST(webhookRequest(body));
+
+    expect(mocks.verify).toHaveBeenCalledWith(body, {
+      "svix-id": "svix-header-value",
+      "svix-signature": "svix-header-value",
+      "svix-timestamp": "svix-header-value",
+    });
+    expect(response.status).toBe(201);
+    expect(mocks.analyticsGroupIdentify).toHaveBeenCalledWith({
+      distinctId: "user_1",
+      groupKey: "org_1",
+      groupType: "company",
+      properties: {
+        avatar: undefined,
+        name: "Acme",
+      },
+    });
+  });
+
+  it("returns 400 for malformed JSON after successful verification", async () => {
+    const response = await POST(webhookRequest('{ "type":'));
+
+    expect(response.status).toBe(400);
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+    expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
+    expect(mocks.analyticsIdentify).not.toHaveBeenCalled();
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.organisationFindMany).not.toHaveBeenCalled();
+    expect(mocks.personUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a malformed webhook envelope", async () => {
+    const response = await POST(
+      webhookRequest(JSON.stringify({ type: "organization.created" }))
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+    expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
+    expect(mocks.analyticsIdentify).not.toHaveBeenCalled();
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.organisationFindMany).not.toHaveBeenCalled();
+    expect(mocks.personUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when Svix rejects the signature", async () => {
+    const body = JSON.stringify({
       data: { created_by: "user_1", id: "org_1", name: "Acme" },
       type: "organization.created",
     });
+    mocks.verify.mockImplementation(() => {
+      throw new Error("Invalid signature");
+    });
 
-    const response = await POST(webhookRequest());
+    const response = await POST(webhookRequest(body));
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(400);
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+    expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
+    expect(mocks.analyticsIdentify).not.toHaveBeenCalled();
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.organisationFindMany).not.toHaveBeenCalled();
+    expect(mocks.personUpdateMany).not.toHaveBeenCalled();
   });
 
   it("ignores unhandled event types without validation", async () => {
-    mocks.verify.mockReturnValue({
+    const body = JSON.stringify({
       data: { id: "sess_1" },
       type: "session.created",
     });
 
-    const response = await POST(webhookRequest());
+    const response = await POST(webhookRequest(body));
 
     expect(response.status).toBe(201);
   });
