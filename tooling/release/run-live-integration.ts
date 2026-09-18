@@ -1,18 +1,22 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
+import { acquireActiveRun, releaseActiveRun } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
 import { discoverIntegrationTests } from "./integration-inventory.js";
+import { buildLiveIntegrationEnvironment } from "./live-run-environment.js";
 
 const manifestFlag = process.argv.indexOf("--manifest");
-const manifestPath = manifestFlag >= 0 ? process.argv[manifestFlag + 1] : undefined;
+const manifestPath =
+  manifestFlag >= 0 ? process.argv[manifestFlag + 1] : undefined;
 const root = resolve(import.meta.dirname, "../..");
 if (!manifestPath) {
   throw new Error("A protected release manifest path is required");
 }
 const protectedManifestPath = manifestPath;
+const recoveryRequested = process.argv.includes("--recover");
 
 const manifest = assertLiveDatabaseAuthority({
   acknowledgement: process.env.ALLOW_LIVE_DATABASE_TESTS,
@@ -21,28 +25,45 @@ const manifest = assertLiveDatabaseAuthority({
   runId: process.env.TC_RELEASE_RUN_ID,
 });
 await assertDurableManifestReadBack(manifest, {
-  url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
 });
+const registryInput = {
+  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
+};
+const activeState = await acquireActiveRun(manifest, registryInput);
+if (activeState === "interrupted" && !recoveryRequested) {
+  throw new Error(
+    "Interrupted release run detected; rerun with --recover to reconcile it"
+  );
+}
+if (activeState === "acquired" && recoveryRequested) {
+  await releaseActiveRun(manifest, registryInput);
+  throw new Error("No interrupted release run exists for recovery");
+}
 
 const inventory = discoverIntegrationTests(root);
 if (inventory.length === 0) {
   throw new Error("No live integration tests were discovered");
 }
 
-const childEnvironment = {
-  ...process.env,
-  TC_RELEASE_MANIFEST: protectedManifestPath,
-  TC_RELEASE_DURABLE_VERIFIED: manifest.runId,
-};
+const childEnvironment = buildLiveIntegrationEnvironment(
+  process.env,
+  manifest,
+  protectedManifestPath
+);
 let status = 1;
+let cleanupSucceeded = false;
 try {
-  const result = spawnSync("bun", ["run", "test:integration"], {
-    cwd: root,
-    env: childEnvironment,
-    stdio: "inherit",
-  });
-  status = result.status ?? 1;
+  if (activeState === "acquired") {
+    const result = spawnSync("bun", ["run", "test:integration"], {
+      cwd: root,
+      env: childEnvironment,
+      stdio: "inherit",
+    });
+    status = result.status ?? 1;
+  }
 } finally {
   const cleanup = spawnSync(
     "bun",
@@ -55,8 +76,16 @@ try {
     ],
     { cwd: root, env: childEnvironment, stdio: "inherit" }
   );
-  if (cleanup.status !== 0) {
+  if (cleanup.status === 0) {
+    cleanupSucceeded = true;
+    if (recoveryRequested) {
+      status = 0;
+    }
+  } else {
     status = cleanup.status ?? 1;
   }
+}
+if (cleanupSucceeded) {
+  await releaseActiveRun(manifest, registryInput);
 }
 process.exit(status);

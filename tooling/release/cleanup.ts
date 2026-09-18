@@ -8,10 +8,12 @@ const manifestPath = flag >= 0 ? process.argv[flag + 1] : undefined;
 const modes = ["--dry-run", "--apply", "--assert-clean"].filter((item) =>
   process.argv.includes(item)
 );
-if (!manifestPath || modes.length !== 1) {
-  throw new Error("Usage: cleanup.ts --manifest <path> (--dry-run|--apply|--assert-clean)");
+if (!manifestPath || modes.length > 1) {
+  throw new Error(
+    "Usage: cleanup.ts --manifest <path> [--dry-run|--apply|--assert-clean]"
+  );
 }
-const mode = modes[0];
+const mode = modes[0] ?? "--dry-run";
 const manifest = assertLiveDatabaseAuthority({
   acknowledgement: process.env.ALLOW_LIVE_DATABASE_TESTS,
   databaseUrl: process.env.DATABASE_URL,
@@ -19,24 +21,43 @@ const manifest = assertLiveDatabaseAuthority({
   runId: process.env.TC_RELEASE_RUN_ID,
 });
 await assertDurableManifestReadBack(manifest, {
-  url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
 });
 process.env.TC_RELEASE_DURABLE_VERIFIED = manifest.runId;
-if (!manifest.owned.clerkOrgIds.length || !manifest.owned.organisationIds.length) {
+if (
+  !(manifest.owned.clerkOrgIds.length && manifest.owned.organisationIds.length)
+) {
   throw new Error("Cleanup requires both manifest-owned tenancy keys");
 }
 
 const { database } = await import("../../packages/database/index.js");
 const scopedTables = [
   "outbound_operations",
-  "notification_email_queue", "notification_preferences", "notifications",
-  "failed_records", "sync_runs", "availability_publications", "feed_tokens",
-  "feed_scopes", "feeds", "public_holiday_assignments", "public_holidays",
-  "public_holiday_jurisdictions", "leave_balances", "xero_person_matches",
-  "alternative_contacts", "availability_records", "xero_sync_cursors",
-  "xero_tenants", "xero_connections", "people",
-  "locations", "teams", "organisation_settings", "audit_events",
+  "notification_email_queue",
+  "notification_preferences",
+  "notifications",
+  "failed_records",
+  "sync_runs",
+  "availability_publications",
+  "feed_tokens",
+  "feed_scopes",
+  "feeds",
+  "public_holiday_assignments",
+  "public_holidays",
+  "public_holiday_jurisdictions",
+  "leave_balances",
+  "xero_person_matches",
+  "alternative_contacts",
+  "availability_records",
+  "xero_sync_cursors",
+  "xero_tenants",
+  "xero_connections",
+  "people",
+  "locations",
+  "teams",
+  "organisation_settings",
+  "audit_events",
 ] as const;
 const clerkTables = [
   "xero_oauth_sessions",
@@ -54,7 +75,10 @@ if (unknownGlobalKeys.length > 0) {
 }
 const placeholders = (offset: number, count: number) =>
   Array.from({ length: count }, (_, index) => `$${offset + index}`).join(",");
-const scopedValues = [...manifest.owned.clerkOrgIds, ...manifest.owned.organisationIds];
+const scopedValues = [
+  ...manifest.owned.clerkOrgIds,
+  ...manifest.owned.organisationIds,
+];
 const scopedSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)}) AND organisation_id IN (${placeholders(1 + manifest.owned.clerkOrgIds.length, manifest.owned.organisationIds.length)})`;
 const clerkSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)})`;
 const organisationSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)}) AND id IN (${placeholders(1 + manifest.owned.clerkOrgIds.length, manifest.owned.organisationIds.length)})`;
@@ -73,24 +97,50 @@ for (const table of scopedTables) {
 for (const table of clerkTables) {
   counts[table] = await countRows(table, clerkSql, manifest.owned.clerkOrgIds);
 }
-counts.organisations = await countRows("organisations", organisationSql, scopedValues);
+counts.organisations = await countRows(
+  "organisations",
+  organisationSql,
+  scopedValues
+);
 if (stripeEventIds.length > 0) {
   const stripeSql = `stripe_event_id IN (${placeholders(1, stripeEventIds.length)})`;
-  counts.stripe_events = await countRows("stripe_events", stripeSql, stripeEventIds);
+  counts.stripe_events = await countRows(
+    "stripe_events",
+    stripeSql,
+    stripeEventIds
+  );
 }
 
 if (mode === "--dry-run") {
-  console.log(JSON.stringify({ runId: manifest.runId, counts }));
+  console.log(JSON.stringify({ counts, runId: manifest.runId }));
   await database.$disconnect();
   process.exit(0);
 }
 if (mode === "--apply") {
+  const activeFixtureRuns = await database.syncRun.count({
+    where: {
+      clerk_org_id: { in: manifest.owned.clerkOrgIds },
+      organisation_id: { in: manifest.owned.organisationIds },
+      status: "running",
+    },
+  });
+  if (activeFixtureRuns > 0) {
+    throw new Error(
+      "Cleanup refused while manifest-owned sync runs are active"
+    );
+  }
   await database.$transaction(async (transaction) => {
     for (const table of scopedTables) {
-      await transaction.$executeRawUnsafe(`DELETE FROM "${table}" WHERE ${scopedSql}`, ...scopedValues);
+      await transaction.$executeRawUnsafe(
+        `DELETE FROM "${table}" WHERE ${scopedSql}`,
+        ...scopedValues
+      );
     }
     for (const table of clerkTables) {
-      await transaction.$executeRawUnsafe(`DELETE FROM "${table}" WHERE ${clerkSql}`, ...manifest.owned.clerkOrgIds);
+      await transaction.$executeRawUnsafe(
+        `DELETE FROM "${table}" WHERE ${clerkSql}`,
+        ...manifest.owned.clerkOrgIds
+      );
     }
     if (stripeEventIds.length > 0) {
       await transaction.$executeRawUnsafe(
@@ -98,7 +148,10 @@ if (mode === "--apply") {
         ...stripeEventIds
       );
     }
-    await transaction.$executeRawUnsafe(`DELETE FROM "organisations" WHERE ${organisationSql}`, ...scopedValues);
+    await transaction.$executeRawUnsafe(
+      `DELETE FROM "organisations" WHERE ${organisationSql}`,
+      ...scopedValues
+    );
   });
 }
 
@@ -109,7 +162,11 @@ for (const table of scopedTables) {
 for (const table of clerkTables) {
   residue[table] = await countRows(table, clerkSql, manifest.owned.clerkOrgIds);
 }
-residue.organisations = await countRows("organisations", organisationSql, scopedValues);
+residue.organisations = await countRows(
+  "organisations",
+  organisationSql,
+  scopedValues
+);
 if (stripeEventIds.length > 0) {
   residue.stripe_events = await countRows(
     "stripe_events",
@@ -118,7 +175,7 @@ if (stripeEventIds.length > 0) {
   );
 }
 await database.$disconnect();
-console.log(JSON.stringify({ runId: manifest.runId, before: counts, residue }));
+console.log(JSON.stringify({ before: counts, residue, runId: manifest.runId }));
 if (Object.values(residue).some((count) => count !== 0)) {
   throw new Error("Manifest-owned fixture residue remains");
 }

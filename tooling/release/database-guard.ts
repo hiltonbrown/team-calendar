@@ -29,6 +29,11 @@ const manifestSchema = z.object({
     globalKeys: z.array(z.string()).default([]),
   }),
   pausedConsumers: z.record(z.string(), z.boolean()).default({}),
+  pauseWindow: z.object({
+    currentlyPaused: z.array(z.string()),
+    drainedAt: z.string().datetime(),
+    establishedAt: z.string().datetime(),
+  }),
 });
 
 export type ReleaseManifest = z.infer<typeof manifestSchema>;
@@ -91,6 +96,19 @@ export const assertLiveDatabaseAuthority = (input: {
     )
   ) {
     throw new Error("Protected manifest does not inventory every registered consumer");
+  }
+  if (
+    REQUIRED_CONSUMERS.some(
+      (consumer) => !manifest.pauseWindow.currentlyPaused.includes(consumer)
+    )
+  ) {
+    throw new Error("Protected manifest does not prove every consumer is paused");
+  }
+  if (
+    new Date(manifest.pauseWindow.drainedAt) <
+    new Date(manifest.pauseWindow.establishedAt)
+  ) {
+    throw new Error("Protected manifest drain evidence predates the pause window");
   }
   const identity = parseDatabaseIdentity(input.databaseUrl);
   if (

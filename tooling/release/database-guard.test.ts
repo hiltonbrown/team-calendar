@@ -44,6 +44,21 @@ const writeManifest = (overrides: Record<string, unknown> = {}) => {
         "sync-xero-leave-records": false,
         "sync-xero-people": false,
       },
+      pauseWindow: {
+        currentlyPaused: [
+          "rebuild-feed-cache",
+          "reconcile-feed-publications",
+          "reconcile-xero-approval-state",
+          "recount-usage",
+          "schedule-xero-syncs",
+          "send-notification-emails",
+          "sync-xero-leave-balances",
+          "sync-xero-leave-records",
+          "sync-xero-people",
+        ],
+        drainedAt: "2026-09-19T00:02:00.000Z",
+        establishedAt: "2026-09-19T00:01:00.000Z",
+      },
       ...overrides,
     })
   );
@@ -81,6 +96,21 @@ describe("live database guard", () => {
         manifestPath: writeManifest({ pausedConsumers: {} }),
       })
     ).toThrow("every registered consumer");
+  });
+
+  it("rejects a manifest without a fully paused and drained consumer window", () => {
+    expect(() =>
+      assertLiveDatabaseAuthority({
+        ...validInput(),
+        manifestPath: writeManifest({
+          pauseWindow: {
+            currentlyPaused: ["sync-xero-people"],
+            drainedAt: "2026-09-19T00:02:00.000Z",
+            establishedAt: "2026-09-19T00:01:00.000Z",
+          },
+        }),
+      })
+    ).toThrow("every consumer is paused");
   });
 
   it("rejects a target identity mismatch without opening a connection", () => {
