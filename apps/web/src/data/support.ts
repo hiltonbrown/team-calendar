@@ -6,7 +6,7 @@ const supportSubject = "Team Calendar early access enquiry";
 const supportBody = [
   "Organisation name:",
   "Team size:",
-  "Xero Payroll region:",
+  "Australian Xero Payroll organisation:",
   "Help needed:",
 ].join("\n");
 

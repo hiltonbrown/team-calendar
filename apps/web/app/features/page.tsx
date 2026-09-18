@@ -184,7 +184,7 @@ const faqs = [
     q: "Can I tell which entries came from where?",
   },
   {
-    a: `${shippedRegionNames.join(" and ")} is supported at launch. ${plannedRegionNames.join(" and ")} support is planned for future releases.`,
+    a: `Early access is available for Xero Payroll ${shippedRegionNames.join(" and ")}. ${plannedRegionNames.join(" and ")} support is planned for future releases.`,
     q: "Which regions of Xero Payroll are supported?",
   },
   {

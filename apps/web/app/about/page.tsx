@@ -9,7 +9,6 @@ import {
   Laptop,
 } from "lucide-react";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import styles from "./about.module.css";
 
@@ -120,23 +119,7 @@ const AboutPage = () => (
         </div>
 
         <article className={styles.founder}>
-          <figure className={styles.portraitFigure}>
-            <Image
-              alt="Anonymous illustrative founder portrait, shown from behind at a desk"
-              className={styles.portrait}
-              height={1500}
-              priority
-              sizes="(max-width: 900px) 100vw, 42vw"
-              src="/marketing/hilton-brown.webp"
-              width={1200}
-            />
-            <figcaption>
-              Anonymous illustrative founder portrait. This image does not
-              depict Hilton Brown.
-            </figcaption>
-          </figure>
           <div className={styles.personCopy}>
-            <p className={styles.previewLabel}>Preview biography</p>
             <h3>Hilton Brown</h3>
             <p className={styles.role}>Founder, Team Calendar</p>
             <p>
@@ -155,35 +138,6 @@ const AboutPage = () => (
               <ExternalLink aria-hidden="true" size={17} strokeWidth={1.7} />
             </a>
           </div>
-        </article>
-
-        <article className={styles.connie}>
-          <div className={styles.personCopy}>
-            <p className={styles.previewLabel}>Preview profile</p>
-            <h3>Connie</h3>
-            <p className={styles.role}>Chief Availability Tester</p>
-            <p>
-              Connie is a black-and-white tuxedo cat and Team Calendar’s
-              unofficial Chief Availability Tester. She specialises in sitting
-              on the keyboard exactly when approvals need attention, and remains
-              unavailable for comment.
-            </p>
-          </div>
-          <figure className={styles.connieFigure}>
-            <Image
-              alt="Illustrative black-and-white tuxedo cat sitting on a laptop"
-              className={styles.conniePortrait}
-              height={1500}
-              loading="eager"
-              sizes="(max-width: 900px) 100vw, 34vw"
-              src="/marketing/connie.webp"
-              width={1200}
-            />
-            <figcaption>
-              Illustrative black-and-white tuxedo cat. This image does not
-              depict Connie.
-            </figcaption>
-          </figure>
         </article>
       </div>
     </section>

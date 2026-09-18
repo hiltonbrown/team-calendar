@@ -1,8 +1,8 @@
 import "./styles.css";
 import { AnalyticsProvider } from "@repo/analytics/provider";
-import { DesignSystemProvider } from "@repo/design-system";
 import { marketingFonts } from "@repo/design-system/lib/fonts";
 import { cn } from "@repo/design-system/lib/utils";
+import { PublicDesignSystemProvider } from "@repo/design-system/providers/public";
 import type { ReactNode } from "react";
 import { Footer } from "./components/footer";
 import { Header } from "./components/header";
@@ -19,11 +19,11 @@ const RootLayout = ({ children }: RootLayoutProperties) => (
   >
     <body>
       <AnalyticsProvider>
-        <DesignSystemProvider auth={false}>
+        <PublicDesignSystemProvider>
           <Header />
           {children}
           <Footer />
-        </DesignSystemProvider>
+        </PublicDesignSystemProvider>
       </AnalyticsProvider>
     </body>
   </html>
