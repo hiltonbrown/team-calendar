@@ -87,6 +87,7 @@ async function resolveEventIdentity(
     : undefined;
   const looseSubscription = z
     .object({
+      id: z.string().optional(),
       parent: z
         .object({
           subscription_details: z
@@ -102,10 +103,13 @@ async function resolveEventIdentity(
   const resolvedSubscriptionId =
     subscriptionId ??
     (looseSubscription.success
-      ? objectId(
+      ? (objectId(
           looseSubscription.data.subscription ??
             looseSubscription.data.parent?.subscription_details?.subscription
-        )
+        ) ??
+        (looseSubscription.data.id?.startsWith("sub_")
+          ? looseSubscription.data.id
+          : null))
       : null);
   const [customerBinding, subscriptionBinding] = await Promise.all([
     stripeCustomerId
@@ -116,6 +120,16 @@ async function resolveEventIdentity(
       : Promise.resolve(null),
   ]);
   const binding = customerBinding ?? subscriptionBinding;
+  if (
+    customerBinding &&
+    subscriptionBinding &&
+    customerBinding.clerk_org_id !== subscriptionBinding.clerk_org_id
+  ) {
+    return {
+      conflict: true,
+      stripeCustomerId: stripeCustomerId ?? customerBinding.stripe_customer_id,
+    };
+  }
   if (binding) {
     return {
       clerkOrgId: binding.clerk_org_id,

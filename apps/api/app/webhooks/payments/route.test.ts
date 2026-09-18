@@ -784,4 +784,81 @@ describe("Stripe payments webhook", () => {
       })
     );
   });
+
+  it("fails closed when customer and subscription bindings resolve to different tenants", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent(),
+    });
+    mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_customer",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_1",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_customer",
+    });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_subscription",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_other",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_1",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: null,
+        errorCategory: "tenant_conflict",
+      })
+    );
+  });
+
+  it("matches a malformed subscription object through its own stored subscription id", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { id: "sub_known", status: 42 } },
+        id: "evt_malformed_subscription",
+        type: "customer.subscription.updated",
+      },
+    });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_known",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_known",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.getSubscriptionForStripeSubscription).toHaveBeenCalledWith(
+      "sub_known"
+    );
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_verified",
+        errorCategory: "invalid_payload",
+        stripeCustomerId: "cus_known",
+      })
+    );
+  });
 });
