@@ -89,6 +89,9 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Repository hygiene
 
+- When asked to replace multiple documents with one, create one standalone
+  source of truth, remove the superseded files and update their references.
+  Do not retain redirect stubs or consolidation history unless requested.
 - When the operator asks an execution sequence not to block, continue through
   safe in-scope fallbacks and put concrete tooling or environment limitations
   in `plans/README.md`; do not turn a non-product constraint into a new approval

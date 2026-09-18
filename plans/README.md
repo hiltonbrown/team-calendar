@@ -4,33 +4,71 @@ This directory is the implementation backlog maintained through the `improve`
 skill. It was initially reconciled on 29 August 2026 against `preview` at
 `f79b1de`. Plans 110–143 were subsequently implemented, verified and landed on
 `preview`; the exact implementation commit for every plan is recorded below.
-Earlier completed and rejected plans remain in the historical ledger. There are
-no executable TODO plans in the current queue. The two regional activation
+Earlier completed and rejected plans remain in the historical ledger. The historical queue was complete; the current go-live audit queue is listed below. The two regional activation
 plans remain `BLOCKED` (Plans 108 and 109), pending named live Xero environments
 and UK partner permission.
 
+## Australian go-live plan
+
+[Team Calendar go-live plan](go-live.md) is the single release plan. It records
+the current repository baseline, open remediation, execution order, verification
+gates and readiness criteria for the next-forge, Clerk and Neon stack.
+
+Last reviewed 18 September 2026. Plan documentation is current; the unfinished
+implementation and external verification work below remains open.
+
 ## Execution policy
 
-Set 2026-08-26 and clarified 2026-08-30: all plan executions use and land
-directly on `preview` (`origin/preview`), not `main`, and run directly in this
-working tree. There is no isolated git worktree. This supersedes the `improve`
-skill's default
-`execute` dispatch (`isolation: "worktree"`, branch off the default branch)
-for this repo only:
+Updated 18 September 2026 for `plans/go-live.md`. The current local and
+remote default branch is `main`; the historical Git `preview` branch is retired.
+Do not recreate it. Historical entries below retain their original branch names.
 
-- Every TODO/BLOCKED plan's `## Git workflow` section names `preview` as the
-  branch and landing target. Executors do not create plan-specific feature
-  branches.
-- Executors work directly in the current working tree. Uncommitted changes
-  must be checked (`git status`) and preserved before editing, per the standing
-  git safety rules.
-- The advisor's review verdict process is unchanged: re-run done criteria,
-  check scope, read the diff. **APPROVE** still means presenting the diff for
-  the user's own push decision. The advisor and executor never push to
-  `origin/preview` without that explicit go-ahead.
-- Rejected and DONE plans are historical records; this policy does not
-  retroactively change how already-merged work landed (092 and 076 merged to
-  `main`, before this policy existed).
+- New implementation plans use isolated local feature branches/worktrees and land
+  on the active release branch after focused tests, applicable gates and advisor
+  review. The go-live task already authorises local commits and merges.
+- Preserve unrelated work and inspect working-tree status before editing.
+- Do not push or merge remote pull requests without separate authorisation.
+- The `improve` advisor remains read-only on source; executors implement fixes.
+- Vercel Preview remains a distinct deployment environment. Preserve
+  `VERCEL_ENV=preview` restrictions, including Xero OAuth restrictions.
+- Plans 108 and 109 remain deferred outside the Australian release. Their old
+  preview-branch instructions are historical and must be refreshed before future
+  regional activation, not executed during AU go-live.
+
+## Go-live audit, 18 September 2026
+
+Reconciled against `ee8c410` on `main`. Existing DONE rows retain historical
+verification evidence; they are not a claim that current full release gates or
+live provider checks have been rerun. Source spot checks confirmed prior fixes
+for API UUID validation, signed/scoped feed tokens, Stripe customer/organisation
+binding, fair scheduled sync pagination, and scoped auth/notification access.
+Plans 108/109 remain blocked on their named live regional prerequisites and are
+not Australian launch blockers.
+
+| Plan | Finding | Priority | Effort | Risk | Status |
+|---|---|---|---|---|---|
+| [144](144-repair-manual-availability-patch-contract.md) | Partial API update cannot satisfy required service input | P1 | S | MED | TODO |
+| [145](145-serialise-outbound-leave-state-writes.md) | Competing payroll state writes reach Xero before a shared claim | P1 | M | MED | TODO |
+| [146](146-make-decline-reason-policy-consistent.md) | Settings promise an optional reason that the action rejects | P2 | S | LOW | TODO |
+
+Execute 144 and 145 independently; execute 146 after 145 to avoid overlapping
+approval-service edits. Each plan includes evidence, scope, commands and done
+criteria. Baseline/dependency, database and browser verification are tracked by
+the go-live coordinator and remain separate release evidence.
+
+### Findings considered and rejected
+
+- Full active subscribe URLs are intentional user-facing credentials, not a
+  redaction defect; internal hashes/signing material must stay server-side.
+- Synchronous outbound Xero writes are the approved product contract, not work
+  to move into background jobs.
+- NZ/UK adapter presence does not authorise regional activation for AU launch.
+- Notification drain is intentionally global and serialised by Inngest;
+  its administrative cross-tenant scan alone is not an end-user leakage finding.
+- Feed rendering on a cache miss and scheduled reconciliation are existing
+  recovery paths; a cache rebuild miss alone does not prove permanent feed loss.
+- Earlier DONE plans and retired branch labels are historical evidence, not
+  fresh defects to duplicate.
 
 ## Historical verification snapshot
 
