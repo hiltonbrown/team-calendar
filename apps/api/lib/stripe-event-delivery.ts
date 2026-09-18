@@ -266,10 +266,44 @@ async function handleSubscriptionEvent(
 ): Promise<MirrorResult> {
   const parsed = SubscriptionSchema.safeParse(event.data.object);
   if (parsed.success) {
-    return await mirrorSubscription(
-      parsed.data,
-      dateFromSeconds(event.created) ?? new Date()
-    );
+    const eventCreatedAt = dateFromSeconds(event.created) ?? new Date();
+    const existing = await getSubscriptionForStripeSubscription(parsed.data.id);
+    if (
+      existing?.stripe_event_created_at?.getTime() !== eventCreatedAt.getTime()
+    ) {
+      return await mirrorSubscription(parsed.data, eventCreatedAt);
+    }
+    const retrieved = await retrieveStripeSubscription(parsed.data.id);
+    if (!retrieved.ok) {
+      const identity = await resolveEventIdentity(
+        event.data.object,
+        parsed.data.id
+      );
+      return {
+        clerkOrgId: identity.clerkOrgId,
+        error: "Stripe subscription retrieval failed",
+        errorCategory: "provider_fetch",
+        ok: false,
+        status: 503,
+        stripeCustomerId: identity.stripeCustomerId,
+      };
+    }
+    const authoritative = SubscriptionSchema.safeParse(retrieved.value);
+    if (!authoritative.success) {
+      const identity = await resolveEventIdentity(
+        event.data.object,
+        parsed.data.id
+      );
+      return {
+        clerkOrgId: identity.clerkOrgId,
+        error: "Stripe authoritative subscription payload is invalid",
+        errorCategory: "invalid_payload",
+        ok: false,
+        status: 503,
+        stripeCustomerId: identity.stripeCustomerId,
+      };
+    }
+    return await mirrorSubscription(authoritative.data, eventCreatedAt);
   }
   log.error("Stripe subscription event failed validation and was skipped.", {
     eventId: event.id,

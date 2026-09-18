@@ -461,6 +461,61 @@ describe("Stripe payments webhook", () => {
     );
   });
 
+  it.each([
+    ["active then cancelled", ["active", "canceled"]],
+    ["cancelled then active", ["canceled", "active"]],
+  ] as const)(
+    "uses the authoritative cancelled snapshot for equal-second events arriving %s",
+    async (_label, arrivalOrder) => {
+      const event = subscriptionEvent();
+      for (const [index, status] of arrivalOrder.entries()) {
+        mocks.constructEvent.mockReturnValueOnce({
+          ok: true,
+          value: {
+            ...event,
+            data: {
+              object: {
+                ...event.data.object,
+                cancel_at_period_end: status === "canceled",
+                status,
+              },
+            },
+            id: `evt_equal_${index}`,
+          },
+        });
+      }
+      mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+        clerk_org_id: "org_1",
+        stripe_event_created_at: new Date(event.created * 1000),
+      });
+      mocks.retrieveStripeSubscription.mockResolvedValue({
+        ok: true,
+        value: {
+          ...event.data.object,
+          cancel_at_period_end: true,
+          ended_at: 1_700_000_100,
+          status: "canceled",
+        },
+      });
+
+      const firstResponse = await POST(webhookRequest());
+      const secondResponse = await POST(webhookRequest());
+
+      expect([firstResponse.status, secondResponse.status]).toEqual([200, 200]);
+      expect(mocks.retrieveStripeSubscription).toHaveBeenCalledTimes(2);
+      expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledTimes(2);
+      for (const [mirrored] of mocks.upsertSubscriptionFromWebhook.mock.calls) {
+        expect(mirrored).toEqual(
+          expect.objectContaining({
+            cancelAtPeriodEnd: true,
+            status: "canceled",
+            stripeEventCreatedAt: new Date(1_700_000_100 * 1000),
+          })
+        );
+      }
+    }
+  );
+
   it("passes a later event.created for a newer event (newer-wins path)", async () => {
     const newerCreatedSeconds = 1_700_001_000;
     mocks.constructEvent.mockReturnValue({

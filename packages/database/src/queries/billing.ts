@@ -218,7 +218,7 @@ export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
       updated_at = NOW()
     WHERE clerk_org_subscriptions.stripe_event_created_at IS NULL
        OR EXCLUDED.stripe_event_created_at IS NULL
-       OR clerk_org_subscriptions.stripe_event_created_at <= EXCLUDED.stripe_event_created_at
+       OR clerk_org_subscriptions.stripe_event_created_at < EXCLUDED.stripe_event_created_at
   `;
 
 export const isStripeEventProcessed = async (
