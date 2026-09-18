@@ -717,6 +717,30 @@ describe("submit-service", () => {
       );
     });
 
+    it("normalises a missing title before fingerprint persistence and provider dispatch", async () => {
+      const untitled = { ...record, title: null };
+      mocks.availabilityFindFirst
+        .mockResolvedValueOnce(untitled)
+        .mockResolvedValueOnce({
+          ...untitled,
+          approval_status: "submitted",
+          source_remote_id: "xero-leave-1",
+        });
+      mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+        ok: true,
+        value: { rawResponse: {}, remoteId: "xero-leave-1" },
+      });
+
+      await submitDraftRecord(input, mockPort);
+
+      expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ requestTitle: "Leave request" })
+      );
+      expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Leave request" })
+      );
+    });
+
     it("blocks the write and never calls Xero when a live claim already exists", async () => {
       mocks.availabilityFindFirst.mockResolvedValueOnce(record);
       mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);

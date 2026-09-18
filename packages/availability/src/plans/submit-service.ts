@@ -375,12 +375,12 @@ async function performSubmission(
         endsAt: record.ends_at,
         leaveTypeId: prepared.value.xeroLeaveTypeId,
         startsAt: record.starts_at,
-        title: record.title,
+        title: record.title ?? "Leave request",
         units: prepared.value.units,
       }),
       requestLeaveTypeId: prepared.value.xeroLeaveTypeId,
       requestStartsAt: record.starts_at,
-      requestTitle: record.title,
+      requestTitle: record.title ?? "Leave request",
       requestUnits: prepared.value.units,
     });
     if (!preparedOperation) {
@@ -412,7 +412,7 @@ async function performSubmission(
         leaveTypeId: prepared.value.xeroLeaveTypeId,
         organisationId: parsed.data.organisationId,
         startsAt: record.starts_at,
-        title: record.title ?? undefined,
+        title: record.title ?? "Leave request",
         units: prepared.value.units,
       });
     } catch {

@@ -9,6 +9,7 @@ import {
   acquireSubmitRecoverySideEffects,
   database,
   getSubmitOperation,
+  hasSubmitRecoverySideEffectClaim,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
   markSubmitProviderAccepted,
@@ -240,7 +241,9 @@ export async function attachSubmitRecoveryCandidate(
     );
   }
   const sideEffects = await completeRecoverySideEffects({
+    attempt,
     candidate,
+    claimedAt: sideEffectClaimedAt,
     context: context.value,
     input: parsed.data,
     mergedRecordId,
@@ -265,7 +268,9 @@ type RecoveryContext = Extract<
 >["value"];
 
 async function completeRecoverySideEffects(input: {
+  attempt: ReturnType<typeof operationAttempt>;
   candidate: ProviderLeaveCandidate;
+  claimedAt: Date;
   context: RecoveryContext;
   input: z.infer<typeof AttachSchema>;
   mergedRecordId: string | null;
@@ -318,50 +323,60 @@ async function completeRecoverySideEffects(input: {
     manager?.clerk_user_id
   ) {
     const managerUserId = manager.clerk_user_id;
-    const notificationCheckpoint = await database.auditEvent.findFirst({
-      select: { id: true },
-      where: {
-        action: "availability_records.submit_recovery_notification_completed",
-        clerk_org_id: input.input.clerkOrgId,
-        organisation_id: input.input.organisationId,
-        resource_id: input.input.recordId,
-      },
-    });
-    if (!notificationCheckpoint) {
-      const notified = await database.$transaction(async (tx) => {
-        const result = await dispatchNotification(
-          {
-            actionUrl: `/plans?record=${input.input.recordId}`,
-            actorUserId: input.input.actingUserId,
-            body: "A leave request recovered from Xero is ready for review.",
-            clerkOrgId: input.input.clerkOrgId,
-            objectId: input.input.recordId,
-            objectType: "availability_record",
-            organisationId: input.input.organisationId,
-            recipientPersonId: manager.id,
-            recipientUserId: managerUserId,
-            title: "Leave submitted for approval",
-            type: "leave_submitted",
-          },
+    const notified = await database.$transaction(async (tx) => {
+      if (
+        !(await hasSubmitRecoverySideEffectClaim(
+          input.attempt,
+          input.claimedAt,
           tx
-        );
-        if (!result.ok) {
-          return false;
-        }
-        await tx.auditEvent.create({
-          data: checkpointAuditData(
-            input.input,
-            "availability_records.submit_recovery_notification_completed"
-          ),
-        });
-        return true;
-      });
-      if (!notified) {
-        return recoveryError(
-          "provider_error",
-          "The Xero record and calendar were recovered, but the notification is awaiting retry."
-        );
+        ))
+      ) {
+        return false;
       }
+      const notificationCheckpoint = await tx.auditEvent.findFirst({
+        select: { id: true },
+        where: {
+          action: "availability_records.submit_recovery_notification_completed",
+          clerk_org_id: input.input.clerkOrgId,
+          organisation_id: input.input.organisationId,
+          resource_id: input.input.recordId,
+        },
+      });
+      if (notificationCheckpoint) {
+        return true;
+      }
+      const result = await dispatchNotification(
+        {
+          actionUrl: `/plans?record=${input.input.recordId}`,
+          actorUserId: input.input.actingUserId,
+          body: "A leave request recovered from Xero is ready for review.",
+          clerkOrgId: input.input.clerkOrgId,
+          objectId: input.input.recordId,
+          objectType: "availability_record",
+          organisationId: input.input.organisationId,
+          recipientPersonId: manager.id,
+          recipientUserId: managerUserId,
+          title: "Leave submitted for approval",
+          type: "leave_submitted",
+        },
+        tx
+      );
+      if (!result.ok) {
+        return false;
+      }
+      await tx.auditEvent.create({
+        data: checkpointAuditData(
+          input.input,
+          "availability_records.submit_recovery_notification_completed"
+        ),
+      });
+      return true;
+    });
+    if (!notified) {
+      return recoveryError(
+        "provider_error",
+        "The recovery lease changed before notification. Retry recovery."
+      );
     }
   }
   return { ok: true, value: undefined };
@@ -532,7 +547,7 @@ const candidateMatches = (
   candidate.endsAt ===
     context.operation.request_ends_at.toISOString().slice(0, 10) &&
   candidate.units === context.duration &&
-  candidate.title === (context.operation.request_title ?? "Leave request") &&
+  candidate.title === context.operation.request_title &&
   submitRequestFingerprint({
     employeeId: candidate.employeeId,
     endsAt: context.operation.request_ends_at,

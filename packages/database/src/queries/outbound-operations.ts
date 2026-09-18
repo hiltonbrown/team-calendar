@@ -298,6 +298,24 @@ export const releaseSubmitRecoverySideEffects = async (
   });
 };
 
+export const hasSubmitRecoverySideEffectClaim = async (
+  scope: OutboundOperationAttemptScope,
+  claimedAt: Date,
+  client: OperationClient
+): Promise<boolean> => {
+  const count = await client.outboundOperation.count({
+    where: {
+      ...scopedTo(scope),
+      action: "submit",
+      attempt_generation: scope.attemptGeneration,
+      availability_record_id: scope.availabilityRecordId,
+      side_effect_claimed_at: claimedAt,
+      status: "provider_accepted",
+    },
+  });
+  return count === 1;
+};
+
 export const hasUnresolvedSubmitOperation = async (
   scope: OutboundOperationScope,
   client: OperationClient = database

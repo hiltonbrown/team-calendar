@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   availabilityUpdateMany: vi.fn(),
   computeWorkingDays: vi.fn(),
   getSubmitOperation: vi.fn(),
+  hasSideEffectClaim: vi.fn(),
   markSubmitCompleted: vi.fn(),
   markSubmitDefinitiveFailure: vi.fn(),
   markSubmitProviderAccepted: vi.fn(),
@@ -39,6 +40,7 @@ vi.mock("@repo/database", () => ({
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
   },
   getSubmitOperation: mocks.getSubmitOperation,
+  hasSubmitRecoverySideEffectClaim: mocks.hasSideEffectClaim,
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
@@ -137,6 +139,7 @@ describe("submit recovery service", () => {
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.getSubmitOperation.mockResolvedValue(operation);
+    mocks.hasSideEffectClaim.mockResolvedValue(true);
     mocks.acquireSideEffects.mockResolvedValue(new Date());
     mocks.persistMerge.mockResolvedValue(true);
     mocks.markSubmitCompleted.mockResolvedValue(true);
@@ -431,6 +434,35 @@ describe("submit recovery service", () => {
       error: { code: "not_recoverable" },
       ok: false,
     });
+    expect(mocks.notify).not.toHaveBeenCalled();
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+  });
+
+  it("prevents an expired claimant from notifying after a takeover", async () => {
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
+      known_remote_id: "remote_1",
+      status: "provider_accepted",
+    });
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      source_remote_id: "remote_1",
+    });
+    mocks.auditFindFirst.mockResolvedValueOnce({
+      id: "publication_checkpoint",
+    });
+    mocks.hasSideEffectClaim.mockResolvedValueOnce(false);
+
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Stale recovery worker resumed after lease takeover.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(result.ok).toBe(false);
     expect(mocks.notify).not.toHaveBeenCalled();
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
   });
