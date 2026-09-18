@@ -427,7 +427,10 @@ describe("submit recovery service", () => {
       port
     );
 
-    expect(result).toMatchObject({ error: { code: "not_recoverable" }, ok: false });
+    expect(result).toMatchObject({
+      error: { code: "not_recoverable" },
+      ok: false,
+    });
     expect(mocks.notify).not.toHaveBeenCalled();
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
   });
