@@ -9,7 +9,13 @@
 - Category: correctness, usability
 - Depends on: none (coordinate approval-service edits with Plan 145)
 - Planned at: `ee8c410`, 2026-09-18
-- Status: TODO
+- Status: DONE
+
+Implemented in `5f1c77c` and locally integrated as `4849878`. Impeccable's
+detector reported no findings. Reviewer reruns against the release dependency
+set passed 21 app action/client tests and 79 availability approval/settings
+tests. Authenticated browser verification remains in the final candidate UI
+matrix because the isolated worktree had no runtime configuration.
 
 ## Why this matters
 

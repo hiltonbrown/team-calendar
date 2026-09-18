@@ -9,7 +9,13 @@
 - Category: bug, test coverage
 - Depends on: none
 - Planned at: `ee8c410`, 2026-09-18
-- Status: TODO
+- Status: DONE
+
+Implemented in `ac39c4e` and locally integrated into the release candidate as
+`1000053`. Reviewer reruns passed 16 availability service tests and 32 API route
+tests. The executor also passed check, typecheck and unit gates in its isolated
+worktree. Database integration was not available in that worktree and remains a
+final-candidate gate.
 
 ## Why this matters
 

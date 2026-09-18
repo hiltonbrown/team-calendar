@@ -14,8 +14,9 @@ and UK partner permission.
 the current repository baseline, open remediation, execution order, verification
 gates and readiness criteria for the next-forge, Clerk and Neon stack.
 
-Last reviewed 18 September 2026. Plan documentation is current; the unfinished
-implementation and external verification work below remains open.
+Last reviewed 18 September 2026. The source remediation queue is complete apart
+from the launch-mode-dependent Plan 153. External release verification and
+production configuration work remains open.
 
 ## Execution policy
 
@@ -47,9 +48,21 @@ not Australian launch blockers.
 
 | Plan | Finding | Priority | Effort | Risk | Status |
 |---|---|---|---|---|---|
-| [144](144-repair-manual-availability-patch-contract.md) | Partial API update cannot satisfy required service input | P1 | S | MED | TODO |
-| [145](145-serialise-outbound-leave-state-writes.md) | Competing payroll state writes reach Xero before a shared claim | P1 | M | MED | TODO |
-| [146](146-make-decline-reason-policy-consistent.md) | Settings promise an optional reason that the action rejects | P2 | S | LOW | TODO |
+| [144](144-repair-manual-availability-patch-contract.md) | Partial API update cannot satisfy required service input | P1 | S | MED | DONE |
+| [145](145-serialise-outbound-leave-state-writes.md) | Competing payroll state writes reach Xero before a shared claim | P1 | L | MED | DONE |
+| [146](146-make-decline-reason-policy-consistent.md) | Settings promise an optional reason that the action rejects | P2 | S | LOW | DONE |
+| [147](147-verify-clerk-webhooks-with-svix-2.md) | Svix 2.5 verification result is cast and dereferenced as a Clerk event | P1 | S | MED | DONE |
+| [148](148-reconcile-upgrade-gates-and-docs-cli.md) | Stable upgrades expose unsafe lint suggestions, test leakage and missing docs tooling | P2 | M | LOW | DONE |
+| [149](149-protect-clerk-organisation-owners.md) | Administrators can remove or demote existing Clerk Organisation owners | P1 | S | LOW | DONE |
+| [150](150-restrict-xero-oauth-return-destinations.md) | Signed Xero OAuth state accepts an arbitrary external return destination | P1 | S | LOW | DONE |
+| [151](151-enforce-one-active-feed-token.md) | Concurrent token rotation can leave hidden active bearer URLs | P1 | M | MED | DONE |
+| [152](152-use-authoritative-plan-limit-counts.md) | Missing and stale usage counters bypass staff and feed limits | P1 | L | MED | DONE |
+| [153](153-prevent-parallel-stripe-subscriptions.md) | Repeated paid checkout can create parallel chargeable subscriptions | P1 paid / P2 early access | M | MED | BLOCKED |
+| [154](154-characterise-current-user-provisioning.md) | Critical Clerk identity binding and tenant provisioning lack direct tests | P1 | M | LOW | DONE |
+| [155](155-reconcile-production-environment-guidance.md) | README production minimums contradict executable preflight requirements | P2 | S | LOW | DONE |
+| [156](156-rate-limit-support-issue-creation.md) | Authenticated support submissions can flood the GitHub integration | P2 | S | LOW | DONE |
+| [157](157-complete-marketing-navigation-accessibility.md) | Public routes omit a navigation bypass and mobile Escape loses trigger focus | P1 | S | LOW | DONE |
+| [158](158-name-settings-radio-groups.md) | Settings radio groups lack programmatic names; recurrence chips are undersized | P1 | S | LOW | DONE |
 
 Execute 144 and 145 independently; execute 146 after 145 to avoid overlapping
 approval-service edits. Each plan includes evidence, scope, commands and done
