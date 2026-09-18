@@ -24,30 +24,32 @@ implementation changes and release verification status are preserved.
 
 ## Active plan: Australian go-live implementation and release validation
 
-Source: `plans/go-live.md`. Baseline: `main` at
-`ee8c41094a841e4d2ac6a8d4493b2b8356069bb9`, repository 6.0.2,
-Bun 1.4.0, Node v24.21.0. The supplied go-live plan was initially untracked.
-The baseline remote check found only `main`. The user has authorised committing
-and pushing the go-live planning documents; implementation remains unverified.
+Source: `plans/go-live.md`. Tested source candidate:
+`822a7c659509765df7be9fb99f22abce3d798b7a`. Documentation context:
+`17c34db41d51c47b20d0323222e77e7d0d541ee2`. Repository 6.0.2,
+Bun 1.4.0. The baseline remote check found only `main`. No remote push or
+production deployment was performed.
 
 ### Tasks
 
 - [x] Establish Git state and preserve supplied plan and unrelated changes.
 - [x] Archive historical task evidence and carry forward unresolved follow-ups.
-- [ ] Read current product, design, architecture, environment and release contracts.
-- [ ] Record baseline build, static checks, types, tests and migration state.
-- [ ] Reconcile improve plans and retired Git preview execution policies.
-- [ ] Audit all direct dependencies against current stable releases, upgrade and verify.
-- [ ] Complete deep improve audit and implement verified AU-launch P0/P1/P2 findings.
-- [ ] Verify configured Neon, migration history, empty-database construction and zero drift.
-- [ ] Verify tenant isolation, authorisation, Xero writes/sync, jobs, feeds and notifications.
-- [ ] Use Impeccable for all UI remediation and final app/web/design-system review.
+- [x] Read current product, design, architecture, environment and release contracts.
+- [x] Record build, static checks, types, tests and configured migration state.
+- [x] Reconcile improve plans and retired Git preview execution policies.
+- [x] Audit direct dependencies, complete stable upgrades and verify the lockfile.
+- [x] Complete the deep improve audit and integrate verified AU-launch source fixes.
+- [x] Verify configured Neon migration history and zero schema drift.
+- [ ] Prove the committed migration chain against an independent fresh empty database.
+- [ ] Complete end-to-end tenant, role, Xero write, feed, job and notification workflows.
+- [x] Use Impeccable for UI remediation and source-level final review.
 - [ ] Run production-like app/API/web and role-based Australian browser workflows.
 - [ ] Complete dashboard timeline and feed URL desktop/mobile/light/dark browser follow-ups.
-- [ ] Run frozen install, check, build, typecheck, boundaries, unit and integration gates.
-- [ ] Run app/API/web preflights, docs validation and React Email build.
-- [ ] Reconcile docs, inspect final diff, review fixes, merge verified work and clean temporary resources.
-- [ ] Produce the evidence-based readiness report for the exact tested candidate.
+- [x] Run frozen install, database client build, check, build, typecheck, boundaries, unit and integration gates.
+- [ ] Make app/API/web production preflights pass for the configured launch mode.
+- [x] Run docs validation and the React Email build.
+- [x] Reconcile plans and documentation, review fixes and integrate verified source work locally.
+- [x] Produce the evidence-based readiness report for the exact tested candidate.
 
 ### External security follow-ups carried forward
 
@@ -57,6 +59,15 @@ and pushing the go-live planning documents; implementation remains unverified.
 
 ### Review
 
-In progress. Historical verification in `tasks/archive.md` is not evidence for
-this release candidate. Current run logs are under `/tmp/teamcalendar-go-live`;
-durable results and constraints will be recorded in the release report.
+Source remediation and automated repository verification are complete for the
+recorded candidate. Frozen install, database client generation, repository
+checks, app/API/web builds, typecheck, boundaries, unit and integration suites,
+configured Neon migration status and drift, docs lint and React Email build
+passed. Recent live AU people, leave and balance sync runs also succeeded.
+
+The decision remains `NOT READY FOR GO-LIVE`. Production preflights fail on
+missing configuration, the latest app and web deployments are in error, and
+fresh-database migration proof, physical browser coverage, authenticated role
+workflows, outbound Xero write-back and external security follow-ups are not
+verified. See `tasks/go-live-readiness-report.md`. No remote push or deployment
+was performed.
