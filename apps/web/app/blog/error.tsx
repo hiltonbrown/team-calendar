@@ -13,7 +13,7 @@ interface BlogErrorProperties {
 export const BlogErrorContent = ({
   reset,
 }: Pick<BlogErrorProperties, "reset">) => (
-  <main className={`fmkt-page ${styles.page}`} id="blog-main" tabIndex={-1}>
+  <main className={`fmkt-page ${styles.page}`} id="main-content" tabIndex={-1}>
     <section className={styles.errorState}>
       <p className={styles.eyebrow}>Reading interrupted</p>
       <h1>This guide could not be opened.</h1>

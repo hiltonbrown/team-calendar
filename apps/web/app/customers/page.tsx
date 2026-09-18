@@ -53,7 +53,7 @@ const workflow = [
 const CustomersPage = () => (
   <main
     className={["fmkt-page", styles.root].join(" ")}
-    id="customers-main"
+    id="main-content"
     tabIndex={-1}
   >
     <section className={styles.hero}>

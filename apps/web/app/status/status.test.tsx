@@ -53,7 +53,7 @@ describe("public status page", () => {
     ];
 
     expect(html.match(/<main/g)).toHaveLength(1);
-    expect(html).toContain('id="status-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).toContain('tabindex="-1"');
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(headings.map((heading) => html.indexOf(heading))).toEqual(

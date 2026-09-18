@@ -42,7 +42,11 @@ const BlogIndex = () => {
   };
 
   return (
-    <main className={`fmkt-page ${styles.page}`} id="blog-main" tabIndex={-1}>
+    <main
+      className={`fmkt-page ${styles.page}`}
+      id="main-content"
+      tabIndex={-1}
+    >
       <JsonLd code={jsonLd} />
       <header className={styles.indexHero}>
         <div className={styles.indexHeroInner}>

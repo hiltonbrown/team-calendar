@@ -8,7 +8,7 @@ describe("Help centre task gateway", () => {
     const html = renderToStaticMarkup(React.createElement(HelpCentrePage));
 
     expect(html.match(/<main\b/g)).toHaveLength(1);
-    expect(html).toContain('id="help-centre-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).toContain('tabindex="-1"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(html).toContain("AU Early Access");

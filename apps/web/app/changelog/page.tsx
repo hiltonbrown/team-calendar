@@ -16,7 +16,7 @@ const typeLabels: Record<string, { label: string }> = {
 };
 
 const ChangelogPage = () => (
-  <div className="fmkt-page marketing-simple">
+  <main className="fmkt-page marketing-simple" id="main-content" tabIndex={-1}>
     <header className="marketing-simple__hero">
       <div className="fmkt-container">
         <div className="marketing-simple__intro">
@@ -71,7 +71,7 @@ const ChangelogPage = () => (
         </div>
       </div>
     </section>
-  </div>
+  </main>
 );
 
 export default ChangelogPage;

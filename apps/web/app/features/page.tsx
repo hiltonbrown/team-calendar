@@ -213,7 +213,7 @@ const FeaturesFAQ = () => (
 // ---- Page -------------------------------------------------------------------
 
 const FeaturesPage = () => (
-  <main className="fmkt-page">
+  <main className="fmkt-page" id="main-content" tabIndex={-1}>
     <div className="fmkt-container">
       <InteractiveHeroSection />
     </div>

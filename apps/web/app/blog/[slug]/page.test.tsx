@@ -42,7 +42,7 @@ describe("Blog article route", () => {
     );
 
     expect(html.match(/<main\b/g)).toHaveLength(1);
-    expect(html).toContain('id="blog-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).toContain('tabindex="-1"');
     expect(html).toContain("Article body");
     expect(html).toContain("Written by Team Calendar");

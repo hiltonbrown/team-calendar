@@ -15,7 +15,7 @@ export const metadata: Metadata = createMetadata({ description, title });
 
 const PrivacyPolicyPage = () => (
   <div className="fmkt-page marketing-simple marketing-legal">
-    <main className="marketing-legal__main">
+    <main className="marketing-legal__main" id="main-content" tabIndex={-1}>
       <div className="fmkt-container">
         <LegalDocument
           intro={`This policy explains what information ${brandNameDisplay} collects, how we use it, and the choices you have. It applies to people who use the service through their organisation.`}

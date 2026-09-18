@@ -6,7 +6,7 @@ import { Menu, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { signInHref, signUpHref } from "@/src/lib/auth-links";
 
 const navLinks = [
@@ -30,35 +30,11 @@ const isRouteActive = (pathname: string, href: string) => {
   );
 };
 
-const getMainContentId = (pathname: string): string | null => {
-  if (isRouteActive(pathname, "/careers")) {
-    return "careers-main";
-  }
-
-  if (isRouteActive(pathname, "/blog")) {
-    return "blog-main";
-  }
-
-  if (isRouteActive(pathname, "/help-centre")) {
-    return "help-centre-main";
-  }
-
-  if (isRouteActive(pathname, "/customers")) {
-    return "customers-main";
-  }
-
-  if (isRouteActive(pathname, "/about")) {
-    return "about-main";
-  }
-
-  return null;
-};
-
 export const Header = () => {
   const [isOpen, setOpen] = useState(false);
   const pathname = usePathname();
-  const mainContentId = getMainContentId(pathname);
   const mobileNavigationId = "marketing-mobile-navigation";
+  const mobileMenuTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -68,6 +44,7 @@ export const Header = () => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
+        mobileMenuTriggerRef.current?.focus();
       }
     };
 
@@ -77,11 +54,9 @@ export const Header = () => {
 
   return (
     <>
-      {mainContentId === null ? null : (
-        <a className="marketing-skip-link" href={`#${mainContentId}`}>
-          Skip to main content
-        </a>
-      )}
+      <a className="marketing-skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <header className="marketing-site-header">
         <div className="marketing-glass marketing-site-header__inner">
           <Link className="marketing-site-header__brand" href="/">
@@ -136,6 +111,7 @@ export const Header = () => {
               aria-label="Toggle navigation"
               className="marketing-site-header__toggle"
               onClick={() => setOpen((current) => !current)}
+              ref={mobileMenuTriggerRef}
               type="button"
             >
               {isOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}

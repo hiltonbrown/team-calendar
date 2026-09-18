@@ -12,7 +12,7 @@ describe("Blog index read surface", () => {
     const html = renderToStaticMarkup(await BlogIndex());
 
     expect(html.match(/<main\b/g)).toHaveLength(1);
-    expect(html).toContain('id="blog-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).toContain('tabindex="-1"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(html).toContain("Xero Payroll leave");

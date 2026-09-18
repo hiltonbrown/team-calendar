@@ -24,7 +24,11 @@ const pathway = [
 ];
 
 export const ContactPageContent = () => (
-  <main className="fmkt-page marketing-simple marketing-contact">
+  <main
+    className="fmkt-page marketing-simple marketing-contact"
+    id="main-content"
+    tabIndex={-1}
+  >
     <section className="marketing-simple__hero">
       <div className="fmkt-container">
         <div className="marketing-simple__grid marketing-simple__grid--two marketing-contact__grid">

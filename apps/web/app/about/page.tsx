@@ -24,7 +24,7 @@ export const metadata: Metadata = createMetadata({
 const calendarDestinations = ["Outlook", "Google Calendar", "Apple Calendar"];
 
 const AboutPage = () => (
-  <main className={`fmkt-page ${styles.root}`} id="about-main" tabIndex={-1}>
+  <main className={`fmkt-page ${styles.root}`} id="main-content" tabIndex={-1}>
     <header className={styles.hero}>
       <div className={`fmkt-container ${styles.heroGrid}`}>
         <div className={styles.heroCopy}>

@@ -157,7 +157,11 @@ export const StatusContent = ({ result }: { result: StatusResult }) => {
   const incidentsAvailable = snapshot?.incidentAvailability === "available";
 
   return (
-    <main className={`fmkt-page ${styles.root}`} id="status-main" tabIndex={-1}>
+    <main
+      className={`fmkt-page ${styles.root}`}
+      id="main-content"
+      tabIndex={-1}
+    >
       <header className={styles.hero}>
         <div className="fmkt-container">
           <p className={styles.kicker}>Status</p>

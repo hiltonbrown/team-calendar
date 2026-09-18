@@ -118,7 +118,7 @@ const syncDetails = [
 ];
 
 const IntegrationsPage = () => (
-  <main className={`fmkt-page ${styles.root}`}>
+  <main className={`fmkt-page ${styles.root}`} id="main-content" tabIndex={-1}>
     <section className={styles.hero} data-integrations-section="hero">
       <div className="fmkt-container">
         <p className="fmkt-overline">Integrations</p>

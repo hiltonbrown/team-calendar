@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({
 
 // Trigger recompilation after CSS syntax fixes
 const Home = () => (
-  <main className="fmkt-page">
+  <main className="fmkt-page" id="main-content" tabIndex={-1}>
     <HeroSection />
     <ProblemSection />
     <FeatureCardsSection />

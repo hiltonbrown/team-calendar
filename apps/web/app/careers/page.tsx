@@ -34,7 +34,7 @@ const careersMailto = `mailto:${careersEmail}?subject=Future%20Team%20Calendar%2
 const CareersPage = () => (
   <main
     className={`fmkt-page marketing-simple ${styles.page}`}
-    id="careers-main"
+    id="main-content"
     tabIndex={-1}
   >
     <header className={`marketing-simple__hero ${styles.hero}`}>

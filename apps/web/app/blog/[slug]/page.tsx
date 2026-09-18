@@ -81,7 +81,11 @@ const BlogPostPage = async ({ params }: BlogPostProperties) => {
   };
 
   return (
-    <main className={`fmkt-page ${styles.page}`} id="blog-main" tabIndex={-1}>
+    <main
+      className={`fmkt-page ${styles.page}`}
+      id="main-content"
+      tabIndex={-1}
+    >
       <JsonLd code={jsonLd} />
       <article className={styles.article}>
         <Link

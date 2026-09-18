@@ -11,7 +11,7 @@ describe("Blog error state", () => {
 
     expect(html).toContain("Try again");
     expect(html).toContain('href="/blog"');
-    expect(html).toContain('id="blog-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).not.toContain("digest");
     expect(html).not.toContain("stack");
   });

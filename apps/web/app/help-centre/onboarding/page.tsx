@@ -18,11 +18,7 @@ export const metadata: Metadata = createMetadata({
 });
 
 const GuidedOnboardingPage = () => (
-  <main
-    className={`fmkt-page ${styles.page}`}
-    id="help-centre-main"
-    tabIndex={-1}
-  >
+  <main className={`fmkt-page ${styles.page}`} id="main-content" tabIndex={-1}>
     <header className={styles.guideHero}>
       <div className={styles.guideWidth}>
         <nav aria-label="Breadcrumb" className={styles.breadcrumb}>

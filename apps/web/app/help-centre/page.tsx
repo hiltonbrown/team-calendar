@@ -26,11 +26,7 @@ export const metadata: Metadata = createMetadata({
 const taskIcons = [UsersRound, Link2, BadgeCheck, CalendarSync] as const;
 
 const HelpCentrePage = () => (
-  <main
-    className={`fmkt-page ${styles.page}`}
-    id="help-centre-main"
-    tabIndex={-1}
-  >
+  <main className={`fmkt-page ${styles.page}`} id="main-content" tabIndex={-1}>
     <header className={styles.hero}>
       <div className={styles.readingColumn}>
         <p className={styles.scope}>{helpLaunchScope}</p>

@@ -78,7 +78,7 @@ const EarlyAccessContact = () => (
 );
 
 export const PricingExperience = ({ mode }: { mode: LaunchMode }) => (
-  <main className="fmkt-page fmkt-pricing-page" id="pricing-main" tabIndex={-1}>
+  <main className="fmkt-page fmkt-pricing-page" id="main-content" tabIndex={-1}>
     <section className="fmkt-pricing-hero">
       <div className="fmkt-container fmkt-pricing-hero__grid">
         <div>

@@ -25,7 +25,7 @@ const topics = [
 ] as const;
 
 const SecurityPage = () => (
-  <main className={`fmkt-page ${styles.page}`} id="security-main" tabIndex={-1}>
+  <main className={`fmkt-page ${styles.page}`} id="main-content" tabIndex={-1}>
     <header className={styles.hero}>
       <div className="fmkt-container">
         <div className={styles.heroCopy}>

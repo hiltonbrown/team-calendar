@@ -13,7 +13,7 @@ describe("Careers applicant surface", () => {
     const html = renderToStaticMarkup(React.createElement(CareersPage));
 
     expect(html.match(/<main\b/g)).toHaveLength(1);
-    expect(html).toContain('id="careers-main"');
+    expect(html).toContain('id="main-content"');
     expect(html).toContain('tabindex="-1"');
     expect(html.match(/<h1\b/g)).toHaveLength(1);
     expect(html).toContain("We do not have open roles or a hiring timeline");

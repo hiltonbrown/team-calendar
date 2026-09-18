@@ -31,7 +31,7 @@ describe("Who it’s for page", () => {
 
     expect(html.match(/<main/g) ?? []).toHaveLength(1);
     expect(html).toContain('<main class="fmkt-page');
-    expect(html).toContain('id="customers-main" tabindex="-1"');
+    expect(html).toContain('id="main-content" tabindex="-1"');
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).toContain("Who it’s for");
     expect(html).not.toContain(">Customers<");

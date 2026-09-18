@@ -14,7 +14,7 @@ describe("About page", () => {
     const metadataJson = JSON.stringify(metadata);
 
     expect(html.match(/<main/g) ?? []).toHaveLength(1);
-    expect(html).toContain('id="about-main" tabindex="-1"');
+    expect(html).toContain('id="main-content" tabindex="-1"');
     expect(html.match(/<h1/g) ?? []).toHaveLength(1);
     expect(metadataJson).toContain('"canonical":"/about"');
     expect(metadataJson).toContain('"url":"/about"');

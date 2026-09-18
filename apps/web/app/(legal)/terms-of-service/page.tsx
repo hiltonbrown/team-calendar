@@ -16,7 +16,7 @@ export const metadata: Metadata = createMetadata({ description, title });
 
 const TermsOfServicePage = () => (
   <div className="fmkt-page marketing-simple marketing-legal">
-    <main className="marketing-legal__main">
+    <main className="marketing-legal__main" id="main-content" tabIndex={-1}>
       <div className="fmkt-container">
         <LegalDocument
           intro={`These terms govern your access to and use of ${brandNameDisplay}, a leave management and availability publishing platform. By using the service you agree to them.`}
