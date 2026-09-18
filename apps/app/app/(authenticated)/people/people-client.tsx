@@ -38,9 +38,7 @@ import {
   AlertCircleIcon,
   AlertTriangleIcon,
   CheckCircle2Icon,
-  LeafIcon,
   Loader2Icon,
-  PencilIcon,
   SearchIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -54,9 +52,9 @@ import {
 } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
 import {
-  statusToneClasses,
-  toneForStatusKey,
-} from "@/components/availability/availability-status";
+  PeopleProvenanceBadge,
+  PeopleStatusChip,
+} from "@/components/people/people-status-provenance";
 import { EmptyState } from "@/components/states/empty-state";
 import { withOrg } from "@/lib/navigation/org-url";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
@@ -158,6 +156,7 @@ function renderEmptyState({
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This directory coordinates role-gated sync, filters and responsive person rows in one URL-backed surface.
 export function PeopleClient({
   canIncludeArchived,
   canManageClerkAccess = canIncludeArchived,
@@ -189,6 +188,10 @@ export function PeopleClient({
         orgQueryValue
       ),
     [filters, nextCursor, orgQueryValue]
+  );
+  const activeFilterLabels = useMemo(
+    () => peopleActiveFilterLabels(filters, teams, locations),
+    [filters, locations, teams]
   );
 
   useEffect(() => {
@@ -347,13 +350,13 @@ export function PeopleClient({
       </div>
 
       <form
-        className="grid gap-4 rounded-2xl bg-muted p-5 lg:grid-cols-6"
+        className="grid gap-4 rounded-2xl bg-muted p-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,4fr)]"
         method="get"
       >
         {orgQueryValue ? (
           <input name="org" type="hidden" value={orgQueryValue} />
         ) : null}
-        <FilterField className="lg:col-span-2" label="Search">
+        <FilterField label="Search">
           <div className="relative">
             <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -365,106 +368,125 @@ export function PeopleClient({
             />
           </div>
         </FilterField>
-        <FilterField label="Team">
-          <Select defaultValue={filters.teamId?.[0] ?? "all"} name="teamId">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All teams</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team.id} value={team.id}>
-                  {team.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FilterField>
-        <FilterField label="Location">
-          <Select
-            defaultValue={filters.locationId?.[0] ?? "all"}
-            name="locationId"
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All locations</SelectItem>
-              {locations.map((location) => (
-                <SelectItem key={location.id} value={location.id}>
-                  {location.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </FilterField>
-        <FilterField label="Person type">
-          <Select defaultValue={filters.personType} name="personType">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Everyone</SelectItem>
-              <SelectItem value="employee">Employees</SelectItem>
-              <SelectItem value="contractor">Contractors</SelectItem>
-            </SelectContent>
-          </Select>
-        </FilterField>
-        <FilterField label="Status">
-          <Select defaultValue={filters.status?.[0] ?? "all"} name="status">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any status</SelectItem>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <SelectItem key={value} value={value}>
+        <details className="rounded-2xl bg-surface-container-low p-4">
+          <summary className="cursor-pointer font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+            More filters
+            {activeFilterLabels.length > 0
+              ? ` (${activeFilterLabels.length} active)`
+              : ""}
+          </summary>
+          {activeFilterLabels.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeFilterLabels.map((label) => (
+                <Badge key={label} variant="secondary">
                   {label}
-                </SelectItem>
+                </Badge>
               ))}
-            </SelectContent>
-          </Select>
-        </FilterField>
-        <FilterField label="Xero link">
-          <Select defaultValue={filters.xeroLinked} name="xeroLinked">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any</SelectItem>
-              <SelectItem value="true">Linked</SelectItem>
-              <SelectItem value="false">Manual</SelectItem>
-            </SelectContent>
-          </Select>
-        </FilterField>
-        <div className="flex flex-wrap items-center gap-4 lg:col-span-5">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              defaultChecked={filters.xeroSyncFailedOnly}
-              name="xeroSyncFailedOnly"
-              type="checkbox"
-              value="true"
-            />
-            Xero sync failed only
-          </label>
-          {canIncludeArchived ? (
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                defaultChecked={filters.includeArchived}
-                name="includeArchived"
-                type="checkbox"
-                value="true"
-              />
-              Include archived
-            </label>
+            </div>
           ) : null}
-        </div>
-        <div className="flex items-end gap-2">
-          <Button type="submit">Apply</Button>
-          <Button asChild type="button" variant="ghost">
-            <Link href={withOrg("/people", orgQueryValue)}>Clear</Link>
-          </Button>
-        </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <FilterField label="Team">
+              <Select defaultValue={filters.teamId?.[0] ?? "all"} name="teamId">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All teams</SelectItem>
+                  {teams.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Location">
+              <Select
+                defaultValue={filters.locationId?.[0] ?? "all"}
+                name="locationId"
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All locations</SelectItem>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={location.id}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Person type">
+              <Select defaultValue={filters.personType} name="personType">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Everyone</SelectItem>
+                  <SelectItem value="employee">Employees</SelectItem>
+                  <SelectItem value="contractor">Contractors</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Status">
+              <Select defaultValue={filters.status?.[0] ?? "all"} name="status">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any status</SelectItem>
+                  {Object.entries(statusLabels).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label="Xero link">
+              <Select defaultValue={filters.xeroLinked} name="xeroLinked">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any</SelectItem>
+                  <SelectItem value="true">Linked</SelectItem>
+                  <SelectItem value="false">Manual</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <div className="flex flex-wrap items-center gap-4 lg:col-span-5">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  defaultChecked={filters.xeroSyncFailedOnly}
+                  name="xeroSyncFailedOnly"
+                  type="checkbox"
+                  value="true"
+                />
+                Xero sync failed only
+              </label>
+              {canIncludeArchived ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    defaultChecked={filters.includeArchived}
+                    name="includeArchived"
+                    type="checkbox"
+                    value="true"
+                  />
+                  Include archived
+                </label>
+              ) : null}
+            </div>
+            <div className="flex items-end gap-2">
+              <Button type="submit">Apply</Button>
+              <Button asChild type="button" variant="ghost">
+                <Link href={withOrg("/people", orgQueryValue)}>Clear</Link>
+              </Button>
+            </div>
+          </div>
+        </details>
       </form>
 
       {people.length === 0 ? (
@@ -478,104 +500,98 @@ export function PeopleClient({
           xeroTenantId,
         })
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-muted">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Person</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Team</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Xero</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {
-                // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: table row renders provenance chip, status, and sync count
-                people.map((person) => (
-                  <TableRow className="bg-background/50" key={person.id}>
-                    <TableCell>
-                      <Link
-                        className="flex items-center gap-3"
-                        href={withOrg(`/people/${person.id}`, orgQueryValue)}
-                      >
-                        <Avatar person={person} />
-                        <span className="min-w-0">
-                          <span className="block truncate text-foreground">
-                            <span className="font-normal">
-                              {person.firstName}
-                            </span>{" "}
-                            <span className="font-semibold">
-                              {person.lastName}
-                            </span>
-                          </span>
-                          <span className="block truncate text-muted-foreground text-xs">
-                            {person.email}
+        <div className="rounded-2xl bg-muted">
+          <table aria-label="People directory" className="block w-full">
+            <thead className="hidden lg:block">
+              <tr className="grid grid-cols-[1.4fr_1fr_1fr_1fr_0.9fr_0.8fr] gap-4 px-4 py-3 text-left text-muted-foreground text-xs">
+                <th className="font-normal" scope="col">
+                  Person
+                </th>
+                <th className="font-normal" scope="col">
+                  Role
+                </th>
+                <th className="font-normal" scope="col">
+                  Team
+                </th>
+                <th className="font-normal" scope="col">
+                  Location
+                </th>
+                <th className="font-normal" scope="col">
+                  Status
+                </th>
+                <th className="font-normal" scope="col">
+                  Source
+                </th>
+              </tr>
+            </thead>
+            <tbody className="block space-y-3 p-3 pt-0">
+              {people.map((person) => (
+                <tr
+                  className="grid gap-4 rounded-2xl bg-background/50 p-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_0.9fr_0.8fr] lg:items-center"
+                  key={person.id}
+                >
+                  <td className="block">
+                    <Link
+                      className="flex items-center gap-3 rounded-xl focus-visible:outline-[3px] focus-visible:outline-ring"
+                      href={withOrg(`/people/${person.id}`, orgQueryValue)}
+                    >
+                      <Avatar person={person} />
+                      <span className="min-w-0">
+                        <span className="block break-words text-foreground">
+                          <span className="font-normal">
+                            {person.firstName}
+                          </span>{" "}
+                          <span className="font-semibold">
+                            {person.lastName}
                           </span>
                         </span>
-                      </Link>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {person.jobTitle ?? labelForPersonType(person.personType)}
-                      {person.archivedAt ? (
-                        <Badge className="ml-2" variant="outline">
-                          Archived
-                        </Badge>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {person.team?.name ?? "Unassigned"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {locationLabel(person)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusChip
-                        label={person.currentStatus.label}
-                        statusKey={person.currentStatus.statusKey}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          className={
-                            person.xeroLinked
-                              ? "border-transparent bg-secondary text-secondary-foreground ring-1 ring-secondary/60"
-                              : "border-transparent bg-accent-container text-on-accent-container ring-1 ring-accent-container/60"
-                          }
-                          variant="secondary"
+                        <span className="block break-all text-muted-foreground text-xs">
+                          {person.email}
+                        </span>
+                      </span>
+                    </Link>
+                  </td>
+                  <PeopleDatum label="Role">
+                    {person.jobTitle ?? labelForPersonType(person.personType)}
+                    {person.archivedAt ? (
+                      <Badge className="ml-2" variant="outline">
+                        Archived
+                      </Badge>
+                    ) : null}
+                  </PeopleDatum>
+                  <PeopleDatum label="Team">
+                    {person.team?.name ?? "Unassigned"}
+                  </PeopleDatum>
+                  <PeopleDatum label="Location">
+                    {locationLabel(person)}
+                  </PeopleDatum>
+                  <PeopleDatum label="Status">
+                    <PeopleStatusChip
+                      label={person.currentStatus.label}
+                      statusKey={person.currentStatus.statusKey}
+                    />
+                  </PeopleDatum>
+                  <PeopleDatum label="Source">
+                    <div className="flex items-center gap-2">
+                      <PeopleProvenanceBadge xeroLinked={person.xeroLinked} />
+                      {person.xeroSyncFailedCount > 0 ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-2 py-1 font-medium text-destructive text-xs"
+                          title={`${person.xeroSyncFailedCount} failed record${person.xeroSyncFailedCount === 1 ? "" : "s"}`}
                         >
-                          {person.xeroLinked ? (
-                            <LeafIcon aria-hidden="true" className="size-3" />
-                          ) : (
-                            <PencilIcon aria-hidden="true" className="size-3" />
-                          )}
-                          {person.xeroLinked ? "Linked" : "Manual"}
-                          <span className="sr-only">
-                            Source:{" "}
-                            {person.xeroLinked
-                              ? "Synced from Xero"
-                              : "Manual entry"}
-                            .
-                          </span>
-                        </Badge>
-                        {person.xeroSyncFailedCount > 0 && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-2 py-1 font-medium text-destructive text-xs"
-                            title={`${person.xeroSyncFailedCount} failed record${person.xeroSyncFailedCount === 1 ? "" : "s"}`}
-                          >
-                            <AlertTriangleIcon className="size-3" />
-                            {person.xeroSyncFailedCount}
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              }
-            </TableBody>
-          </Table>
+                          <AlertTriangleIcon
+                            aria-hidden="true"
+                            className="size-3"
+                          />
+                          {person.xeroSyncFailedCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </PeopleDatum>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -957,26 +973,19 @@ function Avatar({ person }: { person: PersonListItem }) {
   );
 }
 
-function StatusChip({
+function PeopleDatum({
+  children,
   label,
-  statusKey,
 }: {
+  children: React.ReactNode;
   label: string;
-  statusKey: string;
 }) {
-  const tone = statusTone(statusKey);
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-sm px-3 py-1 font-medium text-xs ring-1 ${tone}`}
-    >
-      <span className="size-1.5 rounded-full bg-current" />
-      {label}
-    </span>
+    <td className="block min-w-0 text-muted-foreground text-sm">
+      <span className="mb-1 block text-xs lg:hidden">{label}</span>
+      {children}
+    </td>
   );
-}
-
-function statusTone(statusKey: string): string {
-  return statusToneClasses[toneForStatusKey({ statusKey })];
 }
 
 function locationLabel(person: PersonListItem): string {
@@ -985,6 +994,40 @@ function locationLabel(person: PersonListItem): string {
   }
   const suffix = person.location.regionCode ?? person.location.countryCode;
   return suffix ? `${person.location.name} (${suffix})` : person.location.name;
+}
+
+function peopleActiveFilterLabels(
+  filters: PeopleFilterInput,
+  teams: FilterOption[],
+  locations: FilterOption[]
+): string[] {
+  const labels: string[] = [];
+  const team = teams.find((item) => item.id === filters.teamId?.[0]);
+  if (team) {
+    labels.push(`Team: ${team.name}`);
+  }
+  const location = locations.find(
+    (item) => item.id === filters.locationId?.[0]
+  );
+  if (location) {
+    labels.push(`Location: ${location.name}`);
+  }
+  if (filters.personType !== "all") {
+    labels.push(labelForPersonType(filters.personType));
+  }
+  if (filters.status?.[0]) {
+    labels.push(statusLabels[filters.status[0]] ?? filters.status[0]);
+  }
+  if (filters.xeroLinked !== "all") {
+    labels.push(filters.xeroLinked === "true" ? "Xero linked" : "Manual");
+  }
+  if (filters.xeroSyncFailedOnly) {
+    labels.push("Xero sync failed");
+  }
+  if (filters.includeArchived) {
+    labels.push("Archived included");
+  }
+  return labels;
 }
 
 function labelForPersonType(personType: string): string {

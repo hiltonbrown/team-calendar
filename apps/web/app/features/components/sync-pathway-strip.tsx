@@ -97,6 +97,43 @@ const steps: PathwayStep[] = [
   },
 ];
 
+interface SyncPacketProps {
+  readonly className: string;
+  readonly delay: number;
+  readonly duration: number;
+  readonly pathId: string;
+  readonly radius: number;
+}
+
+const SyncPacket = ({
+  className,
+  delay,
+  duration,
+  pathId,
+  radius,
+}: SyncPacketProps) => (
+  <circle className={className} r={radius}>
+    <animateMotion
+      begin={`${delay}s`}
+      calcMode="linear"
+      dur={`${duration}s`}
+      keyPoints="0;0;1;1"
+      keyTimes="0;0.08;0.88;1"
+      repeatCount="indefinite"
+    >
+      <mpath href={`#${pathId}`} />
+    </animateMotion>
+    <animate
+      attributeName="opacity"
+      begin={`${delay}s`}
+      dur={`${duration}s`}
+      keyTimes="0;0.08;0.76;0.88;1"
+      repeatCount="indefinite"
+      values="0;0.82;0.82;0;0"
+    />
+  </circle>
+);
+
 export const SyncPathwayStrip = () => (
   <div className="fmkt-pathway">
     <div className="fmkt-container">
@@ -113,16 +150,19 @@ export const SyncPathwayStrip = () => (
             className="fmkt-sync-path fmkt-sync-path--primary"
             d="M 168,138 C 188,176 280,190 282,228"
             id="sync-path-xero"
+            pathLength={1}
           />
           <path
             className="fmkt-sync-path fmkt-sync-path--team"
             d="M 270,318 C 266,356 194,372 188,402"
             id="sync-path-team"
+            pathLength={1}
           />
           <path
             className="fmkt-sync-path fmkt-sync-path--return"
             d="M 120,138 C 50,218 54,330 142,402"
             id="sync-path-return"
+            pathLength={1}
           />
 
           <g className="fmkt-sync-node fmkt-sync-node--source">
@@ -184,11 +224,26 @@ export const SyncPathwayStrip = () => (
             </text>
           </g>
 
-          <circle className="fmkt-sync-packet fmkt-sync-packet--xero" r="6.5" />
-          <circle className="fmkt-sync-packet fmkt-sync-packet--team" r="6.5" />
-          <circle
+          <SyncPacket
+            className="fmkt-sync-packet fmkt-sync-packet--xero"
+            delay={0}
+            duration={5.8}
+            pathId="sync-path-xero"
+            radius={6.5}
+          />
+          <SyncPacket
+            className="fmkt-sync-packet fmkt-sync-packet--team"
+            delay={1.5}
+            duration={5.8}
+            pathId="sync-path-team"
+            radius={6.5}
+          />
+          <SyncPacket
             className="fmkt-sync-packet fmkt-sync-packet--return"
-            r="5.5"
+            delay={2.8}
+            duration={6.4}
+            pathId="sync-path-return"
+            radius={5.5}
           />
         </svg>
       </div>

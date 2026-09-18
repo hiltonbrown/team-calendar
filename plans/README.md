@@ -1,15 +1,13 @@
 # Team Calendar implementation plans
 
 This directory is the implementation backlog maintained through the `improve`
-skill. It was fully reconciled on 29 August 2026 against `preview` at `f79b1de`.
-All 48 completed plans (Plans 001–023, 025–030, 032–040, 042–061, 066, 069, 075–107)
-have been implemented, tested and verified. All completed plan files have been removed
-from `plans/` into the completed-plan ledger below. All 14 rejected plan files
-(Plans 024, 031, 051, 058, 062, 063, 064, 065, 067, 068, 070, 071, 072, 073, 074)
-have also been removed, with their decision rationales and superseding plan linkages
-preserved in the Reconciliation decisions section below. The execution queue contains
-16 TODO plans. The two regional activation plans remain `BLOCKED` (Plans 108 and 109),
-pending named live Xero environments and UK partner permission.
+skill. It was initially reconciled on 29 August 2026 against `preview` at
+`f79b1de`. Plans 110–143 were subsequently implemented, verified and landed on
+`preview`; the exact implementation commit for every plan is recorded below.
+Earlier completed and rejected plans remain in the historical ledger. There are
+no executable TODO plans in the current queue. The two regional activation
+plans remain `BLOCKED` (Plans 108 and 109), pending named live Xero environments
+and UK partner permission.
 
 ## Execution policy
 
@@ -34,9 +32,10 @@ for this repo only:
   retroactively change how already-merged work landed (092 and 076 merged to
   `main`, before this policy existed).
 
-## Verification snapshot
+## Historical verification snapshot
 
-This reconciliation was read-only outside `plans/`.
+The following snapshot belongs to the 29 August reconciliation and was
+read-only outside `plans/`.
 
 | Evidence | Result |
 |---|---|
@@ -89,7 +88,22 @@ This reconciliation was read-only outside `plans/`.
 | Plan 105 execution | approved at `22c69b2`; employee-aware regional approval reconciliation for NZ and UK tenants, missing employee ID validation failure |
 | Plan 106 execution | approved at `bd8248c`; orchestrated 40-person regional balance pages for NZ and UK tenants, per-employee cursor CAS updates, NZD currency mapping |
 | Plan 107 execution | approved at `6b66916`; formatLeaveBalance helper with Intl.NumberFormat NZD and unit handling, services restricted to day subtraction only |
-| Current indexed plans | 98: 32 TODO, 50 DONE (including queue completions), 14 REJECTED (ledgered decisions), 2 BLOCKED |
+| Current indexed plans | 98: 0 TODO, 82 DONE, 14 REJECTED (ledgered decisions), 2 BLOCKED |
+
+## Final preview audit, 31 August 2026
+
+- Every implementation commit for Plans 110–143 is an ancestor of the current
+  `preview` branch, and `origin/preview` matched the audited head before this
+  record was committed.
+- `bun run check` checked 916 files with no fixes. `bun run typecheck` passed
+  all 19 tasks. `bun run test` passed all 17 unit workspaces and 1,969 tests.
+- Production builds passed for both `app` and `web`.
+- `bun run test:integration` passed all 119 configured checks. The two
+  credential-bound live-Xero checks remain skipped and are not represented as
+  live integration evidence.
+- Per-plan browser, provider and copy follow-ups remain documented below. They
+  do not erase the source, test or build evidence, and they are not presented
+  as completed visual or live-provider verification.
 
 ## Execution queue
 
@@ -113,29 +127,149 @@ Plan 124 rolls the full `/help-centre` critique into one Impeccable Read-mode
 plan. It keeps content truth, task architecture, accessibility, responsive
 reading, sitemap discovery and contract tests together as one page-level change.
 
+Execution decision recorded 30 August 2026: Plan 124 uses the PRODUCT privacy
+labels (`Out of office` for Masked and `Busy` for Private), and describes
+calendar refreshes as client-controlled rather than promising a numeric delay.
+The shipped decline action requires a reason between 3 and 1000 characters.
+The remaining mismatch between that action and the configurable `Require decline
+reason` setting is documented for follow-up and does not block this plan.
+Verification note: headless Chromium ignored browser zoom shortcuts, so 720 CSS
+pixels verified the equivalent 200% reflow of a 1440-pixel viewport. The guide's
+static phase navigation does not claim saved progress, and its intentionally
+expanded mobile procedure remains a monitoring item rather than a launch block.
+
 Plan 125 rolls the full Blog critique into one Impeccable Read-mode publishing
 plan. It keeps the MDX pipeline, editorial model, content truth, interface,
 accessibility, discovery, metadata, RSS and verification in one vertical slice.
+
+Execution note recorded 30 August 2026: Plan 125 uses official `@next/mdx`
+Server Components and one validated static catalogue. Focused tests passed 7
+files and 15 tests; the production build prerendered the Blog, both articles,
+the social image, RSS and sitemap. All five public endpoints returned HTTP 200,
+server-rendered article prose remained available without JavaScript, and the
+390×844, 820×1180 and 1440×1000 light/dark Chromium matrix was visually clean.
+The Impeccable detector returned no findings and the critique improved from
+18/32 to 32/32 with zero P0/P1 issues. Full check, typecheck, unit and
+integration gates passed. The first integration invocation collected no tests
+because Turborepo strict environment filtering dropped this host's Linux temp
+override; the unchanged `--env-mode=loose` rerun passed 119 tests with the two
+configured credential-bound Xero skips. The packaged `agent-browser` executable
+and Node bridge were unavailable, so the installed headless Chromium supplied
+the visual and JavaScript-disabled evidence directly.
 
 Plan 126 consolidates the full `/careers` critique into one Impeccable-shaped
 page plan. It follows Plan 122 so Careers extends the established route-aware
 skip-link and route-owned stylesheet seams rather than creating competing
 shared-shell mechanisms.
 
+Execution note recorded 30 August 2026: Plan 126 now leads with the truthful
+no-role and no-timeline state, explains three concrete working practices and
+offers one bounded, low-data email introduction path. Focused verification
+passed 4 files and 25 tests; the production build prerendered `/careers`.
+Axe 4.12.1 reported 36 passes, zero violations and zero incomplete checks at
+desktop and mobile. Browser checks confirmed first-focus bypass transfer, a
+44px CTA, zero overflow at 320px and 720px reflow, and a direct one-to-three
+column switch at 64rem across the light/dark matrix. Impeccable scored 32/32
+with zero P0/P1 issues. Full check, typecheck, 75 web tests and all 119
+integration tests passed, with the two configured Xero skips. The mandated
+`127.0.0.1` Axe sessions generated Next development cross-origin warnings and
+eventually an HMR-only Turbopack panic after evidence collection; the process
+was stopped, port 3001 was freed and a clean production build passed. Unit and
+integration gates used `--env-mode=loose` so this host's Linux temp-directory
+override reached Turborepo workers.
+
 Plan 127 rolls the full `/security` critique into one release-gated control and
 trust-page plan. It follows Plan 120 so the page reuses the settled marketing
 focus, metadata and scoped-stylesheet conventions. Its security remediations
 must land before its public claims are published.
+
+Execution note recorded 30 August 2026: Plan 127 now applies the stricter feed
+and record privacy mode, centralises direct-person visibility, restricts owner
+invitations to owners, admits owners to holiday administration, scrubs all
+Sentry runtimes and protects future app/API routes by default. The rebuilt
+`/security` page uses only verified or qualified claims and the confirmed
+private GitHub Security Advisory route; the unverified security mailbox was
+removed. Provider region and replication settings were not available locally,
+so the page deliberately describes them as deployment-dependent.
+
+Focused verification passed 9 files and 91 tests. App, API and web production
+builds passed, as did check, typecheck, all unit tests and all 119 integration
+tests with the two configured Xero skips. Impeccable returned no findings after
+removing its flagged side-stripe treatment. Windows Chrome CDP captured true
+1440px and 390px full-page light/dark renders; both widths reported zero
+horizontal overflow, one main, one H1 and four topic sections. The visible
+actions measured at least 44px.
+
+Residual notes: the existing platform keep-alive route has no data payload and
+remains on the explicit public operator-probe allowlist. The shared marketing
+header does not yet map `/security` to its route-aware bypass link, so first Tab
+focuses the brand link even though `security-main` is focusable; that header is
+outside this plan's scope. `axe-core` is not installed in the workspace, so no
+Axe result is claimed. The web-focused test command was run through the web
+workspace configuration because a root-level direct Vitest invocation does not
+load its React transform.
 
 Plan 128 rolls the full `/status` critique into one Better Stack-backed
 operational Read surface. It follows Plans 121 and 122 so it consumes canonical
 support values and shared marketing style-loading contracts without duplicating
 them.
 
+Execution note recorded 30 August 2026: Plan 128 landed at `ad3df8a`. The public
+adapter now reads only Zod-validated status-page resources, reports and updates;
+it cannot report Operational unless the five required public resources are
+present exactly once and all five are operational. The route renders an explicit
+Unknown recovery state when the provider, configuration, publication state or
+incident history is not trustworthy. The status-report contract has no report
+`updated_at` field, so active reports use the newest published update timestamp,
+falling back to their start time, for deterministic recent-first ordering.
+
+Focused verification passed 28 provider/configuration tests and 23 web contract
+tests. The production build prerendered `/status` with a one-minute revalidation
+window; the route loaded 155,164 bytes of production CSS across the global,
+shell and 7,007-byte route-owned chunks, without homepage or feature-demo style
+imports. Impeccable returned no findings. Windows Chrome verified 1440×1000 and
+390×844 in light and dark modes, reduced motion, 200% zoom, forced colours, long
+incident copy, one main and h1, five services, 3px focus and no horizontal
+overflow. State variants are covered by static-render and provider fixtures; the
+unconfigured Unknown state was the live browser state.
+
+Residual operator issue: no Better Stack status-page trio or live five-resource
+configuration is present in this workspace, so preview correctly remains
+Unknown until `BETTERSTACK_API_KEY`, `BETTERSTACK_STATUS_PAGE_ID` and
+`BETTERSTACK_STATUS_PAGE_URL` are configured together on the web deployment and
+the five exact public resource names exist. No credentials or resource IDs were
+invented. A pre-change production CSS artefact was not retained, so the current
+route size is recorded rather than claiming an unevidenced before/after delta.
+`axe-core` is not installed; semantic, keyboard, reflow and forced-colour checks
+were performed directly in Chrome instead. All repository check, typecheck,
+unit and 119 integration tests passed, with the two configured Xero credential
+checks skipped.
+
 Plan 129 rolls the full `/pricing` critique into one Impeccable Persuade-mode
 plan. It centralises the approved Australian Starter/Premium/Enterprise offer,
 adds truthful AUD/NZD/GBP availability selection, and rebuilds both launch modes
 as coherent, static-first, accessible pricing experiences.
+
+Execution note recorded 30 August 2026: Plan 129 landed through `c03bc44`,
+`f63ddc4` and `ddef650`. One public catalogue now drives database seed limits
+and public plan names: internal `basic` is Starter with 9 staff, Premium has 50
+staff, and both purchasable plans have one Xero connection. Paid AUD renders the
+approved $9/$19 offers; Enterprise, NZD and GBP remain non-purchase Coming soon
+states. Early access is a closed Australian cohort with one primary enquiry.
+The page is static in both deployment modes, native FAQ disclosure replaces the
+broad client boundary, and only the labelled currency selector hydrates.
+
+Focused core, database and pricing tests passed, as did Impeccable (`[]`), both
+mode production builds, repository check/typecheck/unit gates and all 119
+integration tests, with the two configured Xero credential checks skipped.
+Chrome verified 1440×1000, 1024×768 and 390×844 light/dark coverage, one main
+and h1, native FAQ, mobile comparison cards, 44px primary actions, 3px focus and
+zero page overflow. The selector kept focus and changed its native selected
+AUD/NZD/GBP value under headless keyboard automation, but that harness did not
+observe React replacing the dependent panel. Pure projection tests prove the
+three truthful outputs; this automation limitation is recorded without claiming
+an interactive panel screenshot. No live purchase, NZD/GBP amount, tax claim or
+checkout behaviour was invented.
 
 Plans 130–143 were added on 30 August 2026 from a read-only Improve survey of
 the requested authenticated product routes, shaped by the Impeccable Operate
@@ -147,40 +281,40 @@ itself redirects to `/settings/general`.
 
 | Plan | Outcome | Priority | Depends on | Status |
 |---|---|---:|---|---|
-| [110](110-correct-calendar-refresh-claim.md) | Describe calendar refresh timing accurately | P1 | — | APPROVED at `45357d92`; PREVIEW PENDING |
-| [111](111-correct-token-handling-copy.md) | Separate collection scope from credential protection | P1 | 110 | APPROVED at `5fa417a1`; PREVIEW PENDING |
-| [112](112-align-advertised-xero-reads.md) | Align advertised Xero reads with the AU adapter | P1 | 111 | APPROVED at `83ed611`; PREVIEW PENDING |
-| [113](113-centralise-integration-capabilities.md) | Centralise public integration capability status | P1 | 112 | APPROVED at `b50f42b`; PREVIEW PENDING |
-| [114](114-strengthen-integration-contract-tests.md) | Test the public integration contract | P1 | 113 | APPROVED at `ddbebd0`; PREVIEW PENDING |
-| [115](115-show-region-launch-status.md) | Make shipped and planned regions unmistakable | P2 | 113, 114 | APPROVED at `d8f84cf`; PREVIEW PENDING; visual capture blocked |
-| [116](116-clarify-integrations-hero.md) | Clarify integrations hero hierarchy and copy | P2 | 115 | APPROVED at `ce5a1c4`; PREVIEW PENDING; visual capture blocked |
-| [117](117-restore-marketing-focus-ring.md) | Restore the documented 3px marketing focus ring | P2 | 116 | APPROVED at `d29f65b`; PREVIEW PENDING; browser pass blocked |
-| [118](118-use-australian-open-graph-locale.md) | Default public metadata to Australian English | P2 | 117 | APPROVED at `5dcaa72`; PREVIEW PENDING |
-| [119](119-extract-integrations-css.md) | Scope integrations CSS to its route | P3 | 118 | APPROVED at `a65db00`; PREVIEW PENDING; build/visual evidence blocked |
-| [120](120-align-integrations-shape-scale.md) | Align integrations surfaces with the shape scale | P3 | 119 | TODO; must branch from and land on `preview` |
-| [121](121-refine-contact-page.md) | Make the contact page a clear, specific and maintainable enquiry path | P1 | 120 | TODO |
-| [122](122-reshape-customers-page-as-who-its-for.md) | Reshape `/customers` into an honest, specific “Who it’s for” page | P1 | 120 | TODO |
-| [123](123-reshape-about-as-founder-led-trust-page.md) | Reshape `/about` as a founder-led trust page | P1 | 122, approved human content and assets | TODO |
-| [124](124-rebuild-help-centre-read-surface.md) | Rebuild help centre as an accurate task-led Read surface | P1 | 121, 122, 123 | TODO |
-| [125](125-rebuild-blog-read-mode.md) | Rebuild Blog as a validated, accessible Read-mode publishing surface | P1 | — | TODO |
-| [126](126-reshape-careers-page.md) | Turn Careers into a candid, accessible applicant page | P1 | 122 | TODO |
-| [127](127-harden-security-controls-and-trust-page.md) | Close verified control gaps and rebuild `/security` from evidence | P0 | 120 | TODO |
-| [128](128-build-betterstack-status-page.md) | Publish validated Better Stack component health and incident history | P1 | 121, 122 | TODO |
-| [129](129-rebuild-pricing-as-coherent-launch-mode-experience.md) | Rebuild pricing with approved AU plans and NZ/UK currency states | P1 | 120, 121 | TODO |
-| [130](130-refine-leave-reports.md) | Make leave reports trustworthy, accessible and decision-led | P1 | — | TODO |
-| [131](131-refine-out-of-office-analytics.md) | Make out-of-office analytics accessible and insight-led | P1 | 130 | TODO |
-| [132](132-harden-calendar-experience.md) | Make the calendar timezone-correct and mobile-operable | P1 | — | TODO |
-| [133](133-distill-feed-management.md) | Make feed subscription primary and administration progressive | P1 | — | TODO |
-| [134](134-clarify-leave-approvals.md) | Make leave approvals scan-fast and action-safe | P1 | — | TODO |
-| [135](135-refine-notification-centre.md) | Make notifications calmer, accessible and mobile-first | P1 | — | TODO |
-| [136](136-refine-people-and-balances.md) | Make People responsive and restore profile source-of-truth cues | P1 | — | TODO |
-| [137](137-distill-plans-experience.md) | Make plans clear, responsive and truthful about provenance | P1 | — | TODO |
-| [138](138-shape-public-holiday-management.md) | Give public-holiday management one safe, responsive home | P1 | — | TODO |
-| [139](139-restructure-settings-shell.md) | Make Settings responsive, context-safe and goal-grouped | P1 | — | TODO |
-| [140](140-distill-sync-health.md) | Make sync status truthful, accessible and easier to operate | P1 | — | TODO |
-| [141](141-harden-availability-compatibility-route.md) | Keep availability deep links correct and remove legacy UI ambiguity | P2 | 137 | TODO |
-| [142](142-harden-leave-balances-redirect.md) | Preserve leave-balance deep links and orient users at the person profile | P2 | 136 | TODO |
-| [143](143-distill-setup-checklist.md) | Make setup a single, confident next-step experience | P2 | 139 | TODO |
+| [110](110-correct-calendar-refresh-claim.md) | Describe calendar refresh timing accurately | P1 | — | DONE at `45357d92`; LANDED ON PREVIEW |
+| [111](111-correct-token-handling-copy.md) | Separate collection scope from credential protection | P1 | 110 | DONE at `5fa417a1`; LANDED ON PREVIEW |
+| [112](112-align-advertised-xero-reads.md) | Align advertised Xero reads with the AU adapter | P1 | 111 | DONE at `83ed611`; LANDED ON PREVIEW |
+| [113](113-centralise-integration-capabilities.md) | Centralise public integration capability status | P1 | 112 | DONE at `b50f42b`; LANDED ON PREVIEW |
+| [114](114-strengthen-integration-contract-tests.md) | Test the public integration contract | P1 | 113 | DONE at `ddbebd0`; LANDED ON PREVIEW |
+| [115](115-show-region-launch-status.md) | Make shipped and planned regions unmistakable | P2 | 113, 114 | DONE at `d8f84cf`; LANDED ON PREVIEW; visual capture confirmed with Plan 120 |
+| [116](116-clarify-integrations-hero.md) | Clarify integrations hero hierarchy and copy | P2 | 115 | DONE at `ce5a1c4`; LANDED ON PREVIEW; visual capture confirmed with Plan 120 |
+| [117](117-restore-marketing-focus-ring.md) | Restore the documented 3px marketing focus ring | P2 | 116 | DONE at `d29f65b`; LANDED ON PREVIEW; browser pass confirmed with Plan 120 |
+| [118](118-use-australian-open-graph-locale.md) | Default public metadata to Australian English | P2 | 117 | DONE at `5dcaa72`; LANDED ON PREVIEW |
+| [119](119-extract-integrations-css.md) | Scope integrations CSS to its route | P3 | 118 | DONE at `a65db00`; LANDED ON PREVIEW; build and visual parity confirmed with Plan 120 |
+| [120](120-align-integrations-shape-scale.md) | Align integrations surfaces with the shape scale | P3 | 119 | DONE at `b8b791f`; LANDED ON PREVIEW |
+| [121](121-refine-contact-page.md) | Make the contact page a clear, specific and maintainable enquiry path | P1 | 120 | DONE at `61d351c`; LANDED ON PREVIEW |
+| [122](122-reshape-customers-page-as-who-its-for.md) | Reshape `/customers` into an honest, specific “Who it’s for” page | P1 | 120 | DONE at `ccf1caf`; LANDED ON PREVIEW |
+| [123](123-reshape-about-as-founder-led-trust-page.md) | Reshape `/about` as a founder-led trust page | P1 | 122, approved human content and assets | DONE at `d31a0f3`; LANDED ON PREVIEW; PREVIEW PLACEHOLDERS, production identity assets remain release-gated |
+| [124](124-rebuild-help-centre-read-surface.md) | Rebuild help centre as an accurate task-led Read surface | P1 | 121, 122, 123 | DONE at `2beed1a`; LANDED ON PREVIEW; browser matrix and 37/40 Impeccable critique confirmed |
+| [125](125-rebuild-blog-read-mode.md) | Rebuild Blog as a validated, accessible Read-mode publishing surface | P1 | — | DONE at `2502bcf`; LANDED ON PREVIEW |
+| [126](126-reshape-careers-page.md) | Turn Careers into a candid, accessible applicant page | P1 | 122 | DONE at `3debb01`; LANDED ON PREVIEW |
+| [127](127-harden-security-controls-and-trust-page.md) | Close verified control gaps and rebuild `/security` from evidence | P0 | 120 | DONE at `6e8bdb5`; LANDED ON PREVIEW |
+| [128](128-build-betterstack-status-page.md) | Publish validated Better Stack component health and incident history | P1 | 121, 122 | DONE at `ad3df8a`; LANDED ON PREVIEW |
+| [129](129-rebuild-pricing-as-coherent-launch-mode-experience.md) | Rebuild pricing with approved AU plans and NZ/UK currency states | P1 | 120, 121 | DONE at `ddef650`; LANDED ON PREVIEW |
+| [130](130-refine-leave-reports.md) | Make leave reports trustworthy, accessible and decision-led | P1 | — | DONE at `4d726fa`; LANDED ON PREVIEW |
+| [131](131-refine-out-of-office-analytics.md) | Make out-of-office analytics accessible and insight-led | P1 | 130 | DONE at `b5031c9`; LANDED ON PREVIEW |
+| [132](132-harden-calendar-experience.md) | Make the calendar timezone-correct and mobile-operable | P1 | — | DONE at `e159764`; LANDED ON PREVIEW |
+| [133](133-distill-feed-management.md) | Make feed subscription primary and administration progressive | P1 | — | DONE at `69cacf3`; LANDED ON PREVIEW |
+| [134](134-clarify-leave-approvals.md) | Make leave approvals scan-fast and action-safe | P1 | — | DONE at `c48d8f6`; LANDED ON PREVIEW |
+| [135](135-refine-notification-centre.md) | Make notifications calmer, accessible and mobile-first | P1 | — | DONE at `3a965e8`; LANDED ON PREVIEW |
+| [136](136-refine-people-and-balances.md) | Make People responsive and restore profile source-of-truth cues | P1 | — | DONE at `9b2a7c9`; LANDED ON PREVIEW |
+| [137](137-distill-plans-experience.md) | Make plans clear, responsive and truthful about provenance | P1 | — | DONE at `ef6469f`; LANDED ON PREVIEW |
+| [138](138-shape-public-holiday-management.md) | Give public-holiday management one safe, responsive home | P1 | — | DONE at `b7f037a`; LANDED ON PREVIEW |
+| [139](139-restructure-settings-shell.md) | Make Settings responsive, context-safe and goal-grouped | P1 | — | DONE at `26b60f2`; LANDED ON PREVIEW |
+| [140](140-distill-sync-health.md) | Make sync status truthful, accessible and easier to operate | P1 | — | DONE at `1af2433`; LANDED ON PREVIEW |
+| [141](141-harden-availability-compatibility-route.md) | Keep availability deep links correct and remove legacy UI ambiguity | P2 | 137 | DONE at `42f0d7c`; LANDED ON PREVIEW |
+| [142](142-harden-leave-balances-redirect.md) | Preserve leave-balance deep links and orient users at the person profile | P2 | 136 | DONE at `9b8e677`; LANDED ON PREVIEW |
+| [143](143-distill-setup-checklist.md) | Make setup a single, confident next-step experience | P2 | 139 | DONE at `63fee49`; LANDED ON PREVIEW |
 | [108](108-activate-new-zealand-xero-sync.md) | Activate New Zealand Xero sync | P1 | 076, 100, 102, 104, 105, 106, 107 DONE; live NZ tenant & credentials | BLOCKED |
 | [109](109-activate-united-kingdom-xero-sync.md) | Validate and activate UK Xero sync | P1 | 076, 100, 101, 103, 104, 105, 106, 107 DONE; live UK partner & tenant | BLOCKED |
 
@@ -215,6 +349,176 @@ itself redirects to `/settings/general`.
   incident history and recovery path land as one vertical slice.
 - 130 establishes the shared analytics filter and summary treatment before 131
   extends it with person-type segmentation and multi-series accessibility.
+- Plan 130 verified the selected-range export contract, organisation-timezone
+  filenames, linked custom-range errors, semantic chart values and the compact
+  decision summary through 19 focused tests, 434 app tests, production build,
+  Impeccable detection and all repository gates. The protected production route
+  correctly redirected the signed-out local browser to Clerk with
+  `dev-browser-missing`; no authenticated browser state was available, so its
+  desktop, mobile, dark-mode and 200% visual checks remain explicitly unclaimed.
+- Plan 131 verified employee and contractor segmentation, labelled non-colour
+  chart series, exact semantic values and the decision-led presence summary
+  through nine focused tests, 439 app tests, production build, Impeccable
+  detection and all repository gates. The protected route also redirected the
+  signed-out local browser with `dev-browser-missing`, so authenticated desktop,
+  mobile, dark-mode and 200% visual evidence remains explicitly unclaimed.
+- Plan 132 verified Brisbane and New York wall-clock placement, date-boundary
+  and off-hours discovery, complete event names, mobile month agenda, safe-area
+  creation, loading and retry through 23 focused tests, 447 app tests,
+  production build, Impeccable detection and all repository gates. Turbopack
+  twice panicked while generating a cached source map; moving only the generated
+  `.next` cache aside produced a clean canonical build. The protected route
+  redirected the signed-out local browser with `dev-browser-missing`, so
+  authenticated desktop/mobile/dark/200% evidence remains unclaimed.
+- Plan 133 keeps the complete active URL as the primary feed task, gates both
+  create routes before loading form data, distinguishes filtered empty results,
+  and progressively discloses lifecycle controls. Seventeen focused tests, 453
+  app tests, the production build, Impeccable detection and all 119 integration
+  tests passed; the two configured live-Xero checks remain skipped. The
+  protected `/feeds/new` route redirected the signed-out local browser to Clerk
+  with `dev-browser-missing`, so authenticated desktop, mobile, dark-mode and
+  200% rendered checks remain explicitly unclaimed.
+- Plan 134 replaces horizontal approval panning with one responsive semantic
+  decision row, preserves A/D/Enter shortcuts, differentiates every status and
+  names failed approval versus decline recovery. Sixteen focused tests, 461 app
+  tests, the production build, Impeccable detection and all 119 integration
+  tests passed; the two configured live-Xero checks remain skipped. The
+  protected route redirected the signed-out local browser to Clerk with
+  `dev-browser-missing`, so authenticated desktop, mobile, dark-mode and 200%
+  rendered checks remain explicitly unclaimed.
+- Plan 135 promotes unread and four exhaustive categories, discloses event-type
+  filters, removes duplicate row navigation, labels and describes every switch,
+  focuses deep links and announces optimistic save outcomes. Nine focused tests,
+  466 app tests, the production build, Impeccable detection and all 119
+  integration tests passed; the two configured live-Xero checks remain skipped.
+  The protected route redirected the signed-out local browser to Clerk with
+  `dev-browser-missing`, so authenticated desktop, mobile, dark-mode and 200%
+  rendered checks remain explicitly unclaimed.
+- Plan 136 shares 12px status and Xero/manual provenance across list and profile,
+  gates manual balance editing, gives unlinked profiles role-aware recovery,
+  distils filters and replaces horizontal directory panning. Nineteen focused
+  tests, 473 app tests, the production build, Impeccable detection and all 119
+  integration tests passed; the two configured live-Xero checks remain skipped.
+  The protected route redirected the signed-out local browser to Clerk with
+  `dev-browser-missing`, so authenticated list/profile desktop, mobile,
+  dark-mode and 200% rendered checks remain explicitly unclaimed.
+- Plan 137 separates Leave/Availability category from Xero/Manual provenance,
+  converts the wide table into a responsive semantic plan list, adds labelled
+  source filtering, active chips, context-preserving reset, route loading/error
+  states and record-scoped pending feedback. Fourteen focused tests, 479 app
+  tests, the production build, Impeccable detection and all 119 integration
+  tests passed; the two configured live-Xero checks remain skipped. A 25-record
+  characterisation proved exactly one working-day computation per record, so a
+  caching or batching change was rejected as unnecessary. The protected route
+  redirected the signed-out local browser to Clerk with
+  `dev-browser-missing`, so authenticated desktop, mobile, dark-mode and 200%
+  rendered checks remain explicitly unclaimed.
+
+  Failed submissions now expose submission-specific retry and revert controls.
+  Failed withdrawals receive truthful withdrawal-specific copy but no retry
+  button because the existing write service rejects withdrawal from
+  `xero_sync_failed`; extending that state transition is outside Plan 137 and
+  remains a named recovery gap rather than a non-functional UI action.
+- Plan 138 makes Public Holidays the single operational home, adds selected-year
+  refresh for the organisation and location jurisdictions, server-resolved
+  organisation-wide or imported-jurisdiction custom scope, consequence-aware
+  destructive confirmation, explicit suppressed state and responsive labelled
+  rows. Settings Holidays is now a truthful summary with one launch action.
+  Nine focused UI tests, 16 focused service tests, 486 app tests, the production
+  build, Impeccable detection and all 119 integration tests passed; the two
+  configured live-Xero checks remain skipped. The protected route redirected
+  the signed-out browser with `dev-browser-missing`, so authenticated desktop,
+  mobile, dark-mode and 200% rendered checks remain explicitly unclaimed.
+
+  Location-specific custom-holiday assignments are not exposed because the
+  current create-action contract persists organisation-wide or jurisdiction
+  scope only; inventing a client-only location choice would be unsafe. Live
+  Nager.Date network refresh was not exercised by the repository integration
+  suite, so action dispatch is covered with mocks and the existing adapter
+  contract rather than claimed as live verification. Impeccable context also
+  identified the deprecated `PRODUCT.md` `Register` section; Plan 138 did not
+  rely on it and leaves its deletion for explicit documentation maintenance.
+- Plan 139 groups every Settings destination under Organisation, Publishing or
+  Operations, preserves the exact active payroll organisation, and replaces the
+  fixed small-screen sidebar with a labelled sheet that restores focus. Feed
+  and leave-approval defaults now have associated labels, descriptions and
+  setting-scoped auto-save receipts. General presents country as immutable
+  context, while Xero promotes one recommended sync and progressively discloses
+  manual sync, audited pause/resume and consequence-aware disconnect controls.
+  Eighteen focused tests, 497 app tests, the production build, zero Impeccable
+  detector findings and all 119 integration tests passed; the two configured
+  live-Xero checks remain skipped.
+
+  The first integration attempt ran concurrently with the production build and
+  unit suite; Xero's setup import exceeded its 10-second hook timeout before any
+  tests executed. The unchanged gate passed when rerun alone, so Settings did
+  not alter that integration path, but integration remains sensitive to local
+  CPU contention. Representative General, Xero, Feeds and Leave approval routes
+  redirected the signed-out browser with `dev-browser-missing`, so authenticated
+  desktop, mobile, dark-mode and 200% rendered checks remain unclaimed.
+- Plan 140 keys pending sync dispatch by both Xero tenant and operation,
+  preserves all four registered run types behind one recommended action,
+  exposes connection, pause and active-run constraints as visible accessible
+  copy, adds organisation-preserving filter recovery and projects run history
+  into complete mobile records plus a labelled keyboard-scrollable wide table.
+  Re-run, cancellation and CSV export now expose operation-specific progress;
+  re-run and cancellation reject duplicate submissions. Fourteen focused tests,
+  504 app tests, the production build, repository check, full typecheck, zero
+  Impeccable detector findings and all 119 integration tests passed; the two
+  configured live-Xero checks remain skipped.
+
+  The first focused invocation inherited an unavailable Windows temporary path
+  and failed before loading any tests; the established `/tmp` override passed
+  the unchanged suites. The optional `agent-browser` executable was not
+  installed, and the protected `/sync` route returned Clerk's signed-out 404
+  with `x-clerk-auth-reason: dev-browser-missing`. Authenticated desktop,
+  mobile, dark-mode and 200% rendered checks therefore remain explicitly
+  unclaimed; component tests and the deterministic detector provide the bounded
+  local evidence without substituting for an authenticated visual claim.
+- Plan 141 centralises all three legacy availability redirects behind one
+  first-valid UUID organisation normaliser while preserving repeated non-org
+  query values, person/date create links and record edit links exactly. The
+  command palette now has one canonical New plan action searchable by both
+  Leave and Availability intent, and the fresh zero-import proof allowed the
+  superseded manual availability form to be deleted. Fifteen focused tests, 513
+  app tests, the production build, repository check, full typecheck and all 119
+  integration tests passed; the two configured live-Xero checks remain skipped.
+  No visual screenshot is claimed for redirect-only routes; Plan 137 owns the
+  rendered `/plans` destination.
+
+  `apps/web/app/help-centre/content.ts` still tells readers to choose the former
+  command label “New leave request”. Updating public Help centre content and
+  its onboarding assertions is outside Plan 141's explicit app-only scope, so
+  this wording remains a named documentation follow-up rather than preserving
+  duplicate application actions.
+- Plan 142 validates scalar or repeated organisation and person identifiers,
+  preserves arbitrary repeated non-routing query values and sends valid person
+  links to the canonical profile with `tab=balances`. Full-page and intercepted
+  profile routes now share one typed parser for all four existing profile tabs,
+  so Balances is rendered immediately rather than requiring manual hunting.
+  Fifteen focused tests, 525 app tests, the production build, repository check,
+  full typecheck and all 119 integration tests passed; the two configured
+  live-Xero checks remain skipped. No visual screenshot or design-health claim
+  is made for the redirect shim; completed Plan 136 remains the profile visual
+  source of truth.
+- Plan 143 keeps the full Getting Started checklist in Settings and reduces the
+  Dashboard surface to a dismissible progress summary. The checklist promotes
+  exactly one required next action, treats Xero as optional, labels progress,
+  discloses completed and deferred work, and gives completed setup one direct
+  return to the Dashboard. Every action preserves the active organisation.
+  The legacy `/setup` redirect now chooses the first valid organisation UUID
+  while preserving repeated non-routing values, and the zero-import legacy
+  client was deleted. Sixteen focused tests, 537 app tests, the production
+  build, repository check, full typecheck, zero general and layout Impeccable
+  detector findings and all 119 integration tests passed; the two configured
+  live-Xero checks remain skipped.
+
+  The optional `agent-browser` executable is absent. Signed-out requests to `/`
+  and `/settings/getting-started` redirect to Clerk with
+  `x-clerk-auth-reason: dev-browser-missing`, so authenticated desktop, mobile,
+  dark-mode and 200% rendered checks remain explicitly unclaimed. Component
+  tests, source review and deterministic detector passes provide the bounded
+  local evidence without being presented as authenticated visual proof.
 - 141 follows 137 because `/availability` is a redirect to Plans and must not
   create a second availability interface.
 - 142 follows 136 because `/leave-balances` redirects into People and depends
@@ -631,7 +935,7 @@ when needed. The following outcomes across the full plan series remain key archi
 | 106 | 40-person paginated regional balance synchronization for NZ and UK tenants |
 | 107 | Currency-safe leave balance presentation (`formatLeaveBalance` with NZD formatting) |
 
-## What this reconciliation did not verify
+## What the 29 August reconciliation did not verify
 
 - Current full `check`, `typecheck`, unit and integration gates as one release
   run. Focused suites passed; database integration could not run without

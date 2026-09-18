@@ -19,12 +19,9 @@ interface PublicHolidaysPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-// S-11 Public holidays is the member-view surface: read access from viewer
-// upward, with the admin action column and suppressed rows shown only to
-// admins and owners. The admin-config counterpart that suppresses, restores,
-// adds custom days, and refreshes from source is S-23 at `/settings/holidays`
-// (admin and owner only). This split is intentional per ScreenCatalogue v4.1;
-// keep the two in sync.
+// Public Holidays is the single operational list. Everyone may review it;
+// admins and owners receive the source refresh and mutation controls. Settings
+// Holidays remains a summary and launch surface only.
 const PublicHolidaysPage = async ({
   searchParams,
 }: PublicHolidaysPageProps) => {
@@ -40,7 +37,7 @@ const PublicHolidaysPage = async ({
     parseFilterParams(filterParams, PublicHolidayFilterSchema) ??
     PublicHolidayFilterSchema.parse({});
 
-  const [holidaysResult, locations] = await Promise.all([
+  const [holidaysResult, locations, organisation] = await Promise.all([
     listForOrganisation(clerkOrgId, organisationId, {
       includeSuppressed: filters.includeSuppressed,
       locationId: filters.locationId,
@@ -48,7 +45,16 @@ const PublicHolidaysPage = async ({
     }),
     database.location.findMany({
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: {
+        country_code: true,
+        id: true,
+        name: true,
+        region_code: true,
+      },
+      where: scopedQuery(clerkOrgId, organisationId),
+    }),
+    database.organisation.findFirst({
+      select: { country_code: true, region_code: true },
       where: scopedQuery(clerkOrgId, organisationId),
     }),
   ]);
@@ -72,7 +78,9 @@ const PublicHolidaysPage = async ({
           canManage={canManage}
           filters={filters}
           holidays={holidaysResult.value}
-          locations={locations}
+          locations={locations.map(({ id, name }) => ({ id, name }))}
+          organisationId={organisationId}
+          refreshTargets={buildRefreshTargets(organisation, locations)}
         />
       </div>
     </>
@@ -80,3 +88,50 @@ const PublicHolidaysPage = async ({
 };
 
 export default PublicHolidaysPage;
+
+function buildRefreshTargets(
+  organisation: { country_code: string; region_code: string | null } | null,
+  locations: Array<{
+    country_code: string | null;
+    name: string;
+    region_code: string | null;
+  }>
+) {
+  if (!organisation) {
+    return [];
+  }
+  const targets = new Map<
+    string,
+    { countryCode: string; label: string; regionCode: string | null }
+  >();
+  const addTarget = (
+    countryCode: string,
+    regionCode: string | null,
+    label: string
+  ) => {
+    targets.set(`${countryCode}:${regionCode ?? "national"}`, {
+      countryCode,
+      label,
+      regionCode,
+    });
+  };
+  addTarget(
+    organisation.country_code,
+    organisation.region_code,
+    organisation.region_code
+      ? `${organisation.country_code}-${organisation.region_code}`
+      : `${organisation.country_code} national holidays`
+  );
+  for (const location of locations) {
+    if (location.country_code) {
+      addTarget(
+        location.country_code,
+        location.region_code,
+        location.region_code
+          ? `${location.name} (${location.country_code}-${location.region_code})`
+          : `${location.name} (${location.country_code})`
+      );
+    }
+  }
+  return [...targets.values()];
+}

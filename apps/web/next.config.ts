@@ -1,3 +1,4 @@
+import createMDX from "@next/mdx";
 import { config, withAnalyzer } from "@repo/next-config";
 import { withLogging, withSentry } from "@repo/observability/next-config";
 import type { NextConfig } from "next";
@@ -10,6 +11,7 @@ const { signInHref, signUpHref } = resolveAuthLinks({
 
 const webConfig: NextConfig = {
   ...config,
+  pageExtensions: ["js", "jsx", "md", "mdx", "ts", "tsx"],
   async redirects() {
     return [
       {
@@ -46,4 +48,6 @@ if (process.env.ANALYZE === "true") {
   nextConfig = withAnalyzer(nextConfig);
 }
 
-export default nextConfig;
+const withMDX = createMDX();
+
+export default withMDX(nextConfig);

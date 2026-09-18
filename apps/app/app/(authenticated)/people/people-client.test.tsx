@@ -54,6 +54,8 @@ vi.mock("./_actions", () => ({
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const xeroTenantId = "00000000-0000-4000-8000-000000000002";
 const personId = "00000000-0000-4000-8000-000000000003";
+const teamId = "00000000-0000-4000-8000-000000000004";
+const JANE_DOE_PATTERN = /Jane Doe/;
 
 const defaultFilters: PeopleFilterInput = PeopleFilterSchema.parse({});
 
@@ -619,5 +621,36 @@ describe("PeopleClient", () => {
 
       expect(mocks.refresh).toHaveBeenCalled();
     });
+  });
+
+  it("keeps search primary and exposes a wrapping mobile profile path", () => {
+    const filters = PeopleFilterSchema.parse({
+      search: "Jane",
+      teamId: [teamId],
+    });
+    render(
+      <PeopleClient
+        canIncludeArchived
+        filters={filters}
+        hasActiveXeroConnection
+        locations={[]}
+        nextCursor={null}
+        organisationId={organisationId}
+        orgQueryValue={organisationId}
+        people={[samplePerson]}
+        teams={[{ id: teamId, name: "Engineering" }]}
+        totalCount={1}
+        xeroTenantId={xeroTenantId}
+      />
+    );
+
+    expect(screen.getByDisplayValue("Jane")).toBeDefined();
+    expect(screen.getByText("More filters (1 active)")).toBeDefined();
+    expect(screen.getByText("Team: Engineering")).toBeDefined();
+    const directory = screen.getByRole("table", { name: "People directory" });
+    expect(directory.className).toContain("block");
+    expect(
+      screen.getByRole("link", { name: JANE_DOE_PATTERN }).getAttribute("href")
+    ).toBe(`/people/${personId}?org=${organisationId}`);
   });
 });

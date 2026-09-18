@@ -59,4 +59,35 @@ describe("inviteMember", () => {
       role: "org:viewer",
     });
   });
+
+  it("allows only owners to invite another owner", async () => {
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:admin",
+      userId: "user_1",
+    });
+
+    const denied = await inviteMember({
+      emailAddress: "owner@example.com",
+      role: "org:owner",
+    });
+
+    expect(denied).toEqual({
+      error: "Only owners can invite another owner",
+      ok: false,
+    });
+    expect(mocks.createOrganizationInvitation).not.toHaveBeenCalled();
+
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:owner",
+      userId: "user_1",
+    });
+    const allowed = await inviteMember({
+      emailAddress: "owner@example.com",
+      role: "org:owner",
+    });
+
+    expect(allowed.ok).toBe(true);
+  });
 });

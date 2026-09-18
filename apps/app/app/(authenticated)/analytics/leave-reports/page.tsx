@@ -2,6 +2,7 @@ import { auth, currentUser } from "@repo/auth/server";
 import {
   type AnalyticsRole,
   aggregateLeaveReports,
+  type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
 import { database } from "@repo/database";
@@ -88,7 +89,7 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
     : params.preset;
   const fromParam = Array.isArray(params.from) ? params.from[0] : params.from;
   const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
-  const validPresets = new Set([
+  const validPresets = new Set<DateRangePreset>([
     "this_month",
     "last_month",
     "this_quarter",
@@ -98,13 +99,15 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
     "last_12_months",
     "custom",
   ]);
-  const preset =
-    presetParam && validPresets.has(presetParam) ? presetParam : "this_year";
+  const preset: DateRangePreset =
+    presetParam && isDateRangePreset(presetParam, validPresets)
+      ? presetParam
+      : "this_year";
 
   const rangeResult = resolveDateRange({
     customEnd: toParam,
     customStart: fromParam,
-    preset: preset as Parameters<typeof resolveDateRange>[0]["preset"],
+    preset,
     timezone: organisation.timezone ?? "UTC",
   });
   if (!rangeResult.ok) {
@@ -154,7 +157,12 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
   return (
     <>
       <Header organisationId={organisationId} page="Leave Reports">
-        <ExportCsvButton organisationId={organisationId} />
+        <ExportCsvButton
+          from={fromParam}
+          organisationId={organisationId}
+          preset={preset}
+          to={toParam}
+        />
       </Header>
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <AnalyticsFilters
@@ -162,7 +170,7 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
           customStart={fromParam}
           preset={preset}
         />
-        <section className="rounded-2xl bg-muted p-6">
+        <section className="rounded-[20px] bg-muted p-6">
           <div className="max-w-3xl space-y-2">
             <p className="font-medium text-muted-foreground text-sm">
               Analytics
@@ -177,28 +185,32 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <StatCard
-            label="Leave days"
-            value={formatNumber(report.summaryStats.totalLeaveDays)}
-          />
-          <StatCard
-            label="Approved records"
-            value={formatNumber(report.summaryStats.totalLeaveRecords)}
-          />
-          <StatCard
-            label="People with leave"
-            value={formatNumber(report.summaryStats.peopleWithLeaveInPeriod)}
-          />
-          <StatCard
-            label="Average days"
-            value={formatNumber(
-              report.summaryStats.averageDaysPerPersonWithLeave
-            )}
-          />
+        <section className="grid gap-6 rounded-[20px] bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
+          <div>
+            <p className="text-muted-foreground text-sm">
+              Leave days · {report.range.label}
+            </p>
+            <p className="mt-2 font-semibold text-4xl tabular-nums">
+              {formatNumber(report.summaryStats.totalLeaveDays)}
+            </p>
+          </div>
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <SummaryFact
+              label="Approved records"
+              value={report.summaryStats.totalLeaveRecords}
+            />
+            <SummaryFact
+              label="People with leave"
+              value={report.summaryStats.peopleWithLeaveInPeriod}
+            />
+            <SummaryFact
+              label="Average days"
+              value={report.summaryStats.averageDaysPerPersonWithLeave}
+            />
+          </dl>
         </section>
 
-        <Card className="rounded-xl">
+        <Card className="rounded-[20px]">
           <CardHeader>
             <CardTitle>Leave days by team</CardTitle>
             <p className="text-muted-foreground text-sm">
@@ -225,15 +237,23 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
   );
 };
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function SummaryFact({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="rounded-xl">
-      <CardContent className="p-5">
-        <p className="text-muted-foreground text-sm">{label}</p>
-        <p className="mt-2 font-semibold text-2xl tabular-nums">{value}</p>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl bg-background p-4">
+      <dt className="text-muted-foreground text-sm">{label}</dt>
+      <dd className="mt-1 font-semibold text-xl tabular-nums">
+        {formatNumber(value)}
+      </dd>
+    </div>
   );
+}
+
+function isDateRangePreset(
+  value: string,
+  presets: Set<DateRangePreset>
+): value is DateRangePreset {
+  // The Set is constructed from the complete DateRangePreset union above.
+  return presets.has(value as DateRangePreset);
 }
 
 function analyticsRole(role: string | null | undefined): AnalyticsRole | null {

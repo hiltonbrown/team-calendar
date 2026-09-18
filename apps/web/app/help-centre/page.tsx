@@ -1,87 +1,92 @@
-import { primaryDomain } from "@repo/seo/branding";
 import { createMetadata } from "@repo/seo/metadata";
 import {
-  BookOpen,
-  CalendarDays,
-  CircleHelp,
-  KeyRound,
-  Mail,
-  ShieldCheck,
+  ArrowRight,
+  BadgeCheck,
+  CalendarSync,
+  LifeBuoy,
+  Link2,
+  UsersRound,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  helpLastReviewed,
+  helpLaunchScope,
+  helpSupport,
+  helpTasks,
+} from "./content";
+import styles from "./help-centre.module.css";
 
 export const metadata: Metadata = createMetadata({
   description:
-    "Help resources for setting up Team Calendar, connecting Xero Payroll, securing feeds, and getting support.",
+    "Task-led help for setting up Team Calendar with Australian Xero Payroll, verifying leave workflows and publishing secure calendar feeds.",
   title: "Help centre",
 });
 
-const resources = [
-  {
-    copy: "Follow our 8-step guided onboarding path covering Clerk Organisation setup, Xero AU connection, leave approvals, feeds, and support.",
-    href: "/help-centre/onboarding",
-    icon: BookOpen,
-    link: "View onboarding guide",
-    title: "AU Early Access Onboarding",
-  },
-  {
-    copy: "Understand the Xero connection flow, supported payroll regions, and how Team Calendar keeps leave data current.",
-    href: "/integrations",
-    icon: KeyRound,
-    link: "Read integration notes",
-    title: "Connect Xero Payroll",
-  },
-  {
-    copy: "Learn how approved leave and manual availability become read-only calendar subscriptions for the tools your team already uses.",
-    href: "/features#ics-feeds",
-    icon: CalendarDays,
-    link: "View calendar feed features",
-    title: "Publish calendar feeds",
-  },
-  {
-    copy: "See how authentication, tenant isolation, encrypted Xero tokens, and feed token revocation are handled.",
-    href: "/security",
-    icon: ShieldCheck,
-    link: "Open security overview",
-    title: "Review security controls",
-  },
-];
+const taskIcons = [UsersRound, Link2, BadgeCheck, CalendarSync] as const;
 
 const HelpCentrePage = () => (
-  <div className="fmkt-page marketing-simple">
-    <header className="marketing-simple__hero">
-      <div className="fmkt-container">
-        <div className="marketing-simple__intro">
-          <p className="marketing-simple__kicker">Help centre</p>
-          <h1 className="marketing-simple__title">
-            Practical help for setting up Team Calendar.
-          </h1>
-          <p className="marketing-simple__lead">
-            Start with the guides below, or contact us directly if your question
-            involves Xero Payroll setup, privacy rules, or feed publishing.
-          </p>
+  <main
+    className={`fmkt-page ${styles.page}`}
+    id="help-centre-main"
+    tabIndex={-1}
+  >
+    <header className={styles.hero}>
+      <div className={styles.readingColumn}>
+        <p className={styles.scope}>{helpLaunchScope}</p>
+        <h1>Set up, verify and recover with confidence.</h1>
+        <p className={styles.lead}>
+          Start with the task in front of you. Each phase names the person who
+          can act, the exact control to use and the receipt that proves it
+          worked.
+        </p>
+        <div className={styles.heroMeta}>
+          <span>Customer help for launch</span>
+          <span>Last reviewed {helpLastReviewed}</span>
         </div>
       </div>
     </header>
 
-    <section className="marketing-simple__section">
-      <div className="fmkt-container">
-        <div className="marketing-simple__grid marketing-simple__grid--two">
-          {resources.map((resource) => {
-            const Icon = resource.icon;
+    <section aria-labelledby="recommended-heading" className={styles.section}>
+      <div className={styles.layout}>
+        <div className={styles.recommended}>
+          <p className={styles.eyebrow}>Recommended setup</p>
+          <h2 id="recommended-heading">Begin with the eight-step AU guide.</h2>
+          <p>
+            Move from invitation and roles through Xero connection, a test leave
+            decision and a privacy-safe calendar subscription.
+          </p>
+          <Link
+            className={`marketing-content-link ${styles.primaryLink}`}
+            href="/help-centre/onboarding#prepare"
+          >
+            Start onboarding <ArrowRight aria-hidden="true" size={18} />
+          </Link>
+        </div>
+
+        <div className={styles.taskList}>
+          {helpTasks.map((task, index) => {
+            const Icon = taskIcons[index];
+
             return (
-              <article className="marketing-simple__panel" key={resource.title}>
-                <div className="marketing-simple__icon">
-                  <Icon size={22} strokeWidth={1.5} />
+              <article className={styles.task} key={task.href}>
+                <Icon
+                  aria-hidden="true"
+                  className={styles.taskIcon}
+                  size={21}
+                />
+                <div>
+                  <p className={styles.taskLabel}>{task.label}</p>
+                  <h2>{task.title}</h2>
+                  <p>{task.description}</p>
                 </div>
-                <h2>{resource.title}</h2>
-                <p>{resource.copy}</p>
-                <p>
-                  <Link className="marketing-simple__link" href={resource.href}>
-                    {resource.link}
-                  </Link>
-                </p>
+                <Link
+                  aria-label={`${task.label}: ${task.title}`}
+                  className={`marketing-content-link ${styles.taskLink}`}
+                  href={task.href}
+                >
+                  Open phase <ArrowRight aria-hidden="true" size={17} />
+                </Link>
               </article>
             );
           })}
@@ -89,34 +94,28 @@ const HelpCentrePage = () => (
       </div>
     </section>
 
-    <section className="marketing-simple__section marketing-simple__section--tonal">
-      <div className="fmkt-container">
-        <div className="marketing-simple__callout">
-          <div className="marketing-simple__icon">
-            <CircleHelp size={22} strokeWidth={1.5} />
-          </div>
-          <div className="marketing-simple__intro">
-            <h2 className="marketing-simple__section-title">
-              Need a direct answer?
-            </h2>
-            <p className="marketing-simple__section-copy">
-              Send the question, your organisation name, and the Xero Payroll
-              region you use. We will route it to the right person.
-            </p>
-            <p className="marketing-simple__section-copy">
-              <Mail aria-hidden="true" size={16} strokeWidth={1.8} /> Contact:{" "}
-              <a
-                className="marketing-simple__link"
-                href={`mailto:support@${primaryDomain}`}
-              >
-                support@{primaryDomain}
-              </a>
-            </p>
-          </div>
+    <section aria-labelledby="support-heading" className={styles.supportBand}>
+      <div className={styles.supportInner}>
+        <LifeBuoy aria-hidden="true" size={24} />
+        <div>
+          <p className={styles.eyebrow}>Escalation</p>
+          <h2 id="support-heading">Still seeing the wrong result?</h2>
+          <p>
+            Contact support for sync discrepancies, Xero write failures, privacy
+            concerns or unresolved feed-token incidents. Include your
+            organisation name and the visible error, but never send a subscribe
+            URL.
+          </p>
+          <p className={styles.supportDetails}>
+            <a className="marketing-content-link" href={helpSupport.mailtoHref}>
+              {helpSupport.email}
+            </a>
+            <span>{helpSupport.hours}</span>
+          </p>
         </div>
       </div>
     </section>
-  </div>
+  </main>
 );
 
 export default HelpCentrePage;

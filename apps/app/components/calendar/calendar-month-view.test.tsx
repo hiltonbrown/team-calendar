@@ -43,13 +43,15 @@ describe("CalendarMonthView", () => {
       />
     );
 
-    const createBtn = screen.getByRole("button", {
+    const createButtons = screen.getAllByRole("button", {
       name: "Add availability for 15 April 2026",
     });
-    const interactiveDescendants = createBtn.querySelectorAll(
-      'button, a[href], [tabindex]:not([tabindex="-1"])'
-    );
-    expect(interactiveDescendants).toHaveLength(0);
+    for (const createButton of createButtons) {
+      const interactiveDescendants = createButton.querySelectorAll(
+        'button, a[href], [tabindex]:not([tabindex="-1"])'
+      );
+      expect(interactiveDescendants).toHaveLength(0);
+    }
   });
 
   it("renders the truncation banner", () => {
@@ -67,6 +69,26 @@ describe("CalendarMonthView", () => {
     );
 
     expect(screen.getByText(TRUNCATION_COPY)).toBeDefined();
+  });
+
+  it("renders a chronological mobile agenda with a day-detail path", () => {
+    render(
+      <CalendarMonthView
+        actingPersonId={null}
+        data={calendarRange({ eventCount: 1 })}
+        orgQueryValue="org_1"
+        selectedPersonId={null}
+      />
+    );
+
+    const agenda = screen.getByRole("region", { name: "Month agenda" });
+    expect(agenda.className).not.toContain("overflow-x-auto");
+    expect(
+      screen.getByRole("heading", { name: "Wednesday 15 April 2026" })
+    ).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "View day" }).getAttribute("href")
+    ).toBe("/calendar?view=day&anchor=2026-04-15&org=org_1");
   });
 });
 

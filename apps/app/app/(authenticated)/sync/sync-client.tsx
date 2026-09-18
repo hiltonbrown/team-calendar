@@ -20,7 +20,7 @@ import { useNotificationEvents } from "@repo/notifications/components/provider";
 import { AlertTriangleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { EmptyState } from "@/components/states/empty-state";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
@@ -51,6 +51,19 @@ const runTypeOptions: Array<{
     wired: true,
   },
 ];
+const syncRunStatuses: SyncRunStatus[] = [
+  "running",
+  "succeeded",
+  "partial_success",
+  "failed",
+  "cancelled",
+];
+const syncTriggerTypes: SyncTriggerType[] = ["scheduled", "manual", "webhook"];
+
+interface PendingDispatch {
+  runType: SyncRunType;
+  xeroTenantId: string;
+}
 
 export function SyncClient({
   filters,
@@ -66,8 +79,11 @@ export function SyncClient({
     text: string;
     tone: "error" | "status";
   } | null>(null);
-  const [isPending, startTransition] = useTransition();
-  const [activeRunType, setActiveRunType] = useState<SyncRunType | null>(null);
+  const [, startTransition] = useTransition();
+  const pendingDispatchesRef = useRef(new Map<string, PendingDispatch>());
+  const [pendingDispatches, setPendingDispatches] = useState<PendingDispatch[]>(
+    []
+  );
 
   useEffect(
     () =>
@@ -93,7 +109,12 @@ export function SyncClient({
   }, [filters, nextCursor, orgQueryValue]);
 
   const dispatch = (xeroTenantId: string, runType: SyncRunType) => {
-    setActiveRunType(runType);
+    const key = pendingDispatchKey({ runType, xeroTenantId });
+    if (pendingDispatchesRef.current.has(key)) {
+      return;
+    }
+    pendingDispatchesRef.current.set(key, { runType, xeroTenantId });
+    setPendingDispatches([...pendingDispatchesRef.current.values()]);
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sync dispatch handles queued/failed/succeeded branching with counts
     startTransition(async () => {
       try {
@@ -156,7 +177,8 @@ export function SyncClient({
           tone: "error",
         });
       } finally {
-        setActiveRunType(null);
+        pendingDispatchesRef.current.delete(key);
+        setPendingDispatches([...pendingDispatchesRef.current.values()]);
       }
     });
   };
@@ -182,11 +204,14 @@ export function SyncClient({
         <section className="grid gap-4 xl:grid-cols-2">
           {summaries.map((summary) => (
             <TenantCard
-              activeRunType={activeRunType}
-              disabled={isPending}
               key={summary.xeroTenantId}
               onDispatch={dispatch}
               orgQueryValue={orgQueryValue}
+              pendingRunTypes={pendingDispatches
+                .filter(
+                  (pending) => pending.xeroTenantId === summary.xeroTenantId
+                )
+                .map((pending) => pending.runType)}
               summary={summary}
             />
           ))}
@@ -210,12 +235,45 @@ export function SyncClient({
 
         {runs.length === 0 ? (
           <EmptyState
-            description="No sync runs match the current filters."
-            title="No runs found"
+            actionSlot={
+              hasActiveFilters(filters) ? (
+                <Button asChild variant="secondary">
+                  <Link href={withOrg("/sync", orgQueryValue)}>
+                    Clear filters
+                  </Link>
+                </Button>
+              ) : undefined
+            }
+            description={
+              hasActiveFilters(filters)
+                ? "No sync runs match these filters. Clear them to return to the full history."
+                : "Completed and active sync runs will appear here."
+            }
+            title={
+              hasActiveFilters(filters) ? "No matching runs" : "No runs yet"
+            }
           />
         ) : (
           <div className="overflow-hidden rounded-2xl bg-muted">
-            <section aria-label="Sync run history" className="overflow-x-auto">
+            <div className="space-y-3 p-3 md:hidden">
+              {runs.map((run) => (
+                <RunHistoryCard
+                  key={run.id}
+                  orgQueryValue={orgQueryValue}
+                  run={run}
+                />
+              ))}
+            </div>
+            <section
+              aria-describedby="sync-history-scroll-hint"
+              aria-label="Sync run history table"
+              className="hidden overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:block"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users need to scroll the wide history table
+              tabIndex={0}
+            >
+              <p className="sr-only" id="sync-history-scroll-hint">
+                Scroll horizontally to review every run detail column.
+              </p>
               <table className="w-full min-w-[920px] text-left text-sm">
                 <thead className="text-muted-foreground">
                   <tr>
@@ -286,30 +344,46 @@ export function SyncClient({
 }
 
 function TenantCard({
-  activeRunType,
-  disabled,
   onDispatch,
   orgQueryValue,
+  pendingRunTypes,
   summary,
 }: {
-  activeRunType: SyncRunType | null;
-  disabled: boolean;
   onDispatch: (xeroTenantId: string, runType: SyncRunType) => void;
   orgQueryValue: string | null;
+  pendingRunTypes: SyncRunType[];
   summary: TenantSummary;
 }) {
+  const [selectedRunType, setSelectedRunType] = useState<SyncRunType>("people");
   const hasCurrentFailure =
     summary.currentFailedRuns > 0 ||
     (summary.pendingFailedRecords > 0 &&
       summary.currentPartialSuccessRuns === 0);
   const hasPartialSuccessWarning =
     !hasCurrentFailure && summary.currentPartialSuccessRuns > 0;
+  const pendingSelected = pendingRunTypes.includes(selectedRunType);
+  const runningSelected = summary.currentRun?.runType === selectedRunType;
+  const connectionInactive = summary.connectionStatus !== "active";
+  const syncPaused = summary.syncPausedAt !== null;
+  const disabledReason = tenantActionDisabledReason({
+    connectionInactive,
+    runningSelected,
+    syncPaused,
+  });
+  const actionDescriptionId = `sync-action-description-${summary.xeroTenantId}`;
+  const selectId = `sync-type-${summary.xeroTenantId}`;
+  const titleId = `sync-tenant-${summary.xeroTenantId}`;
 
   return (
-    <article className="space-y-4 rounded-2xl bg-muted p-5">
+    <article
+      aria-labelledby={titleId}
+      className="space-y-4 rounded-2xl bg-muted p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold">{summary.tenantName}</h2>
+          <h2 className="font-semibold" id={titleId}>
+            {summary.tenantName}
+          </h2>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="secondary">{summary.payrollRegion}</Badge>
             <ConnectionDot status={summary.connectionStatus} />
@@ -391,38 +465,88 @@ function TenantCard({
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
-        {runTypeOptions.map((option) => {
-          const running = summary.currentRun?.runType === option.value;
-          const pendingThis = activeRunType === option.value && disabled;
-          const connectionInactive = summary.connectionStatus !== "active";
-          const buttonDisabled =
-            disabled || running || connectionInactive || !option.wired;
-          if (running || pendingThis) {
-            return (
-              <span
-                className="inline-flex h-9 items-center rounded-xl bg-primary/10 px-3 font-medium text-primary text-sm motion-safe:animate-pulse"
-                key={option.value}
-              >
-                Running
-              </span>
-            );
-          }
-          return (
-            <Button
-              disabled={buttonDisabled}
-              key={option.value}
-              onClick={() => onDispatch(summary.xeroTenantId, option.value)}
-              size="sm"
-              title={buttonTitle(option.wired, connectionInactive)}
-              type="button"
-              variant="secondary"
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="grid flex-1 gap-1 text-sm" htmlFor={selectId}>
+            <span className="text-muted-foreground">Sync type</span>
+            <select
+              className="h-9 w-full rounded-xl bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-2"
+              disabled={pendingSelected}
+              id={selectId}
+              onChange={(event) => {
+                if (isSyncRunType(event.target.value)) {
+                  setSelectedRunType(event.target.value);
+                }
+              }}
+              value={selectedRunType}
             >
-              {option.label}
-            </Button>
-          );
-        })}
+              {runTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {runTypeOptionLabel(option.value)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <Button
+            aria-busy={pendingSelected || runningSelected}
+            aria-describedby={actionDescriptionId}
+            className="sm:min-w-28"
+            disabled={pendingSelected || disabledReason !== null}
+            onClick={() => onDispatch(summary.xeroTenantId, selectedRunType)}
+            type="button"
+          >
+            {pendingSelected || runningSelected ? "Running" : "Run sync"}
+          </Button>
+        </div>
+        <p className="text-muted-foreground text-sm" id={actionDescriptionId}>
+          {disabledReason ??
+            `Runs ${runTypeLabel(selectedRunType).toLowerCase()} for ${summary.tenantName}.`}
+        </p>
+        {summary.currentRun && !runningSelected ? (
+          <p className="text-muted-foreground text-sm" role="status">
+            Currently running: {runTypeLabel(summary.currentRun.runType)}.
+          </p>
+        ) : null}
       </div>
+    </article>
+  );
+}
+
+function RunHistoryCard({
+  orgQueryValue,
+  run,
+}: {
+  orgQueryValue: string | null;
+  run: RunListItem;
+}) {
+  return (
+    <article className="space-y-3 rounded-xl bg-background p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate font-medium">{run.tenantName}</h3>
+          <p className="text-muted-foreground text-sm">
+            {runTypeLabel(run.runType)}
+          </p>
+        </div>
+        <StatusBadge status={run.status} />
+      </div>
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="text-muted-foreground">Started</dt>
+          <dd>{formatDateTime(run.startedAt)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Failed records</dt>
+          <dd className={run.recordsFailed > 0 ? "text-destructive" : ""}>
+            {run.recordsFailed}
+          </dd>
+        </div>
+      </dl>
+      <Button asChild className="w-full" size="sm" variant="secondary">
+        <Link href={withOrg(`/sync/${run.id}`, orgQueryValue)}>
+          View run details
+        </Link>
+      </Button>
     </article>
   );
 }
@@ -495,6 +619,7 @@ function FilterBar({
   const [triggerType, setTriggerType] = useState(
     filters.triggerType?.[0] ?? "all"
   );
+  const activeFilterCount = countActiveFilters(filters);
 
   const apply = () => {
     router.push(
@@ -510,63 +635,79 @@ function FilterBar({
     );
   };
 
+  const clear = () => {
+    setTenant("all");
+    setRunType("all");
+    setStatus("all");
+    setTriggerType("all");
+    router.push(withOrg("/sync", orgQueryValue));
+  };
+
   return (
-    <div className="flex flex-wrap items-end gap-2 rounded-2xl bg-muted p-3">
-      <SelectFilter
-        label="Tenant"
-        onChange={setTenant}
-        options={[
-          { label: "All tenants", value: "all" },
-          ...summaries.map((summary) => ({
-            label: summary.tenantName,
-            value: summary.xeroTenantId,
-          })),
-        ]}
-        value={tenant}
-      />
-      <SelectFilter
-        label="Run type"
-        onChange={setRunType}
-        options={[
-          { label: "All types", value: "all" },
-          ...runTypeOptions.map((option) => ({
-            label: runTypeLabel(option.value),
-            value: option.value,
-          })),
-        ]}
-        value={runType}
-      />
-      <SelectFilter
-        label="Status"
-        onChange={setStatus}
-        options={[
-          { label: "All statuses", value: "all" },
-          ...(
-            [
-              "running",
-              "succeeded",
-              "partial_success",
-              "failed",
-              "cancelled",
-            ] as SyncRunStatus[]
-          ).map((value) => ({ label: statusLabel(value), value })),
-        ]}
-        value={status}
-      />
-      <SelectFilter
-        label="Trigger"
-        onChange={setTriggerType}
-        options={[
-          { label: "All triggers", value: "all" },
-          ...(["scheduled", "manual", "webhook"] as SyncTriggerType[]).map(
-            (value) => ({ label: triggerTypeLabel(value), value })
-          ),
-        ]}
-        value={triggerType}
-      />
-      <Button onClick={apply} type="button">
-        Apply
-      </Button>
+    <div className="space-y-3 rounded-2xl bg-muted p-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <SelectFilter
+          label="Tenant"
+          onChange={setTenant}
+          options={[
+            { label: "All tenants", value: "all" },
+            ...summaries.map((summary) => ({
+              label: summary.tenantName,
+              value: summary.xeroTenantId,
+            })),
+          ]}
+          value={tenant}
+        />
+        <SelectFilter
+          label="Run type"
+          onChange={setRunType}
+          options={[
+            { label: "All types", value: "all" },
+            ...runTypeOptions.map((option) => ({
+              label: runTypeLabel(option.value),
+              value: option.value,
+            })),
+          ]}
+          value={runType}
+        />
+        <SelectFilter
+          label="Status"
+          onChange={setStatus}
+          options={[
+            { label: "All statuses", value: "all" },
+            ...syncRunStatuses.map((value) => ({
+              label: statusLabel(value),
+              value,
+            })),
+          ]}
+          value={status}
+        />
+        <SelectFilter
+          label="Trigger"
+          onChange={setTriggerType}
+          options={[
+            { label: "All triggers", value: "all" },
+            ...syncTriggerTypes.map((value) => ({
+              label: triggerTypeLabel(value),
+              value,
+            })),
+          ]}
+          value={triggerType}
+        />
+        <Button onClick={apply} type="button">
+          Apply filters
+        </Button>
+        {activeFilterCount > 0 ? (
+          <Button onClick={clear} type="button" variant="secondary">
+            Clear filters
+          </Button>
+        ) : null}
+      </div>
+      <p aria-live="polite" className="text-muted-foreground text-sm">
+        {activeFilterCount === 0
+          ? "Showing all sync runs."
+          : `${activeFilterCount} ${activeFilterCount === 1 ? "filter" : "filters"} active.`}
+      </p>
     </div>
   );
 }
@@ -680,16 +821,51 @@ function buildQuery(input: {
   return params.toString();
 }
 
-function buttonTitle(
-  wired: boolean,
-  connectionInactive: boolean
-): string | undefined {
-  if (!wired) {
-    return "This sync job is not registered yet.";
+function countActiveFilters(filters: SyncRunFiltersInput): number {
+  return [
+    filters.dateFrom,
+    filters.dateTo,
+    filters.runType?.length ? filters.runType : undefined,
+    filters.status?.length ? filters.status : undefined,
+    filters.triggerType?.length ? filters.triggerType : undefined,
+    filters.xeroTenantId?.length ? filters.xeroTenantId : undefined,
+  ].filter(Boolean).length;
+}
+
+function hasActiveFilters(filters: SyncRunFiltersInput): boolean {
+  return countActiveFilters(filters) > 0;
+}
+
+function pendingDispatchKey(dispatch: PendingDispatch): string {
+  return `${dispatch.xeroTenantId}:${dispatch.runType}`;
+}
+
+function runTypeOptionLabel(runType: SyncRunType): string {
+  if (runType === "people") {
+    return "People (recommended)";
   }
-  if (connectionInactive) {
-    return "Reconnect Xero before running this sync.";
+  return runTypeLabel(runType);
+}
+
+function isSyncRunType(value: string): value is SyncRunType {
+  return runTypeOptions.some((option) => option.value === value);
+}
+
+function tenantActionDisabledReason(input: {
+  connectionInactive: boolean;
+  runningSelected: boolean;
+  syncPaused: boolean;
+}): string | null {
+  if (input.connectionInactive) {
+    return "Reconnect Xero in Settings before running a sync.";
   }
+  if (input.syncPaused) {
+    return "Resume Xero syncing in Settings before running a sync.";
+  }
+  if (input.runningSelected) {
+    return "This sync type is already running for this tenant.";
+  }
+  return null;
 }
 
 function reasonLabel(reason?: string): string {

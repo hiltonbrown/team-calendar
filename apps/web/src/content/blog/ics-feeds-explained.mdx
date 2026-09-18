@@ -1,59 +1,75 @@
----
-title: ICS feeds explained
-description: What an ICS calendar feed is, how Team Calendar generates them, and how to subscribe in Outlook, Google Calendar, and Apple Calendar.
-date: 2026-02-20
-author: Team Calendar Team
----
+import { CalendarFlowDiagram } from "@/app/blog/components/calendar-flow-diagram";
 
-## What is an ICS feed?
+export const metadata = {
+  title: "ICS calendar feeds explained",
+  description:
+    "How a secure Team Calendar subscription carries approved Xero Payroll leave into Outlook, Google Calendar and Apple Calendar.",
+  author: "Team Calendar",
+  authorRole: "Product team, Gold Coast",
+  category: "guide",
+  status: "published",
+  publishedAt: "2026-02-20",
+  updatedAt: "2026-08-30",
+  regions: ["AU"],
+  featured: true,
+};
 
-An ICS feed (also called a calendar subscription or iCalendar feed) is a URL that calendar applications can subscribe to. When the data behind the URL changes, the calendar app fetches a fresh copy and updates the events it shows.
+## A calendar subscription, in everyday language
 
-The format is standardised in [RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545). Every major calendar application supports it: Outlook, Google Calendar, Apple Calendar, and many others.
+An ICS feed is a read-only calendar subscription. You add its secure URL to a calendar app once. The app then checks that URL on its own schedule and updates the events it displays.
 
-## How Team Calendar generates feeds
+Team Calendar uses this standard format to carry approved Xero Payroll leave and manual availability into Outlook, Google Calendar and Apple Calendar. The subscription does not let those calendar apps edit Team Calendar or Xero.
 
-Team Calendar generates one ICS feed per person. The feed contains that person's:
+<CalendarFlowDiagram />
+
+The technical standard is called [iCalendar, or RFC 5545](https://datatracker.ietf.org/doc/html/rfc5545). You do not need to understand the specification to subscribe.
+
+## What Team Calendar publishes
+
+A feed can include:
 
 - Approved leave synced from Xero Payroll
-- Manual availability entries (WFH, travelling, training, client site)
-- Events filtered by the privacy rules configured by the administrator
+- Manual availability such as working from home, travelling, training or client site
+- Public holidays when the feed owner includes them
+- Event detail transformed by the selected privacy mode
 
-Feeds are generated at request time and cached. When leave is approved, declined, or cancelled, the cache is invalidated and the feed is regenerated on the next request.
+The feed owner also chooses its audience: **Just me**, **My team**, **Specific teams**, **Specific people** or, for authorised administrators, **All of organisation**.
 
-## Stable event UIDs
+## Why events do not duplicate
 
-Each event in the feed has a stable, deterministic UID. This ensures that when leave is updated (for example, dates are changed), the calendar app updates the existing event rather than creating a duplicate.
+Each published event receives a stable identifier. When a leave record changes, the next feed representation updates the existing calendar event instead of inventing another one.
 
-UIDs are generated from a combination of the person ID, the availability record ID, and the feed ID. They are consistent across cache invalidations and token regenerations.
+The identifier combines Team Calendar records and feed context. It does not rely on a Xero leave ID alone.
 
-## Secure token URLs
+## Protect the subscribe URL
 
-Feed URLs are not guessable. Each URL contains a signed token that is specific to the person and the feed configuration. If a URL is shared outside the intended audience, the token can be revoked and regenerated. Existing calendar subscriptions using the old URL will stop receiving updates.
+The complete subscribe URL is a credential. Anyone who receives it may be able to read the privacy-safe events published by that feed.
 
-Authorised users can always view and copy the complete active feed URL. Team Calendar never masks, truncates, or replaces the subscribe URL with a hash. Pausing a feed keeps the URL available, while rotating or revoking its token invalidates the old URL.
+Authorised users can view and copy the complete active URL. Team Calendar never replaces the usable address with a token hint or internal hash. If the URL is exposed, use **Rotate token**. The old URL stops working and Team Calendar presents the replacement.
 
-Internal signing and verification material remains server-only and is never shown in place of the usable URL. A feed's **Masked** privacy setting affects event details, not the feed URL.
+Pausing a feed stops publication without hiding its URL. A feed’s **Masked** privacy mode affects event details, not the credential itself.
 
-## Subscribing in your calendar app
+## Subscribe from your calendar app
 
-### Outlook (desktop or web)
+### Outlook
 
 1. Open Calendar.
-2. Select **Add calendar** and then **Subscribe from web**.
-3. Paste the ICS feed URL and select **Import**.
+2. Choose **Add calendar**, then **Subscribe from web**.
+3. Paste the complete subscribe URL and confirm.
 
 ### Google Calendar
 
-1. Open [calendar.google.com](https://calendar.google.com).
-2. Click the **+** next to **Other calendars** and select **From URL**.
-3. Paste the ICS feed URL and click **Add calendar**.
+1. Open Google Calendar.
+2. Beside **Other calendars**, choose **Add other calendars**, then **From URL**.
+3. Paste the complete subscribe URL and choose **Add calendar**.
 
-Note: Google Calendar refreshes subscribed calendars every 12 to 24 hours.
+### Apple Calendar on Mac
 
-### Apple Calendar
+1. Open Calendar.
+2. From **File**, choose **New Calendar Subscription**.
+3. Paste the complete subscribe URL and choose **Subscribe**.
+4. Select the refresh preference that suits your team.
 
-1. Open Calendar on Mac.
-2. Go to **File** and select **New Calendar Subscription**.
-3. Paste the ICS feed URL and click **Subscribe**.
-4. Configure the refresh interval (every hour is recommended).
+Calendar clients control when subscribed feeds refresh. Team Calendar cannot promise the same delivery interval across Outlook, Google Calendar and Apple Calendar.
+
+If a subscription shows unexpected detail, check the feed’s scope and privacy mode before rotating its token. The [AU onboarding guide](/help-centre/onboarding#publish) provides the full verification path.

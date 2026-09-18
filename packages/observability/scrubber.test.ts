@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isSensitiveKey, sanitizeObject } from "./scrubber";
+import {
+  isSensitiveKey,
+  sanitizeObject,
+  scrubSentryBreadcrumb,
+  scrubSentryEvent,
+  scrubSentryLog,
+} from "./scrubber";
 
 describe("observability scrubber", () => {
   it("allows the exact operational keys", () => {
@@ -100,5 +106,35 @@ describe("observability scrubber", () => {
     const before = structuredClone(input);
     sanitizeObject(input);
     expect(input).toEqual(before);
+  });
+
+  it("scrubs event requests, users and breadcrumb messages", () => {
+    const result = scrubSentryEvent({
+      breadcrumbs: [{ data: { token: "LEAK" }, message: "LEAK" }],
+      request: {
+        data: { password: "LEAK" },
+        headers: { authorization: "LEAK" },
+      },
+      user: { email: "LEAK", ip_address: "LEAK", username: "LEAK" },
+    });
+
+    expect(JSON.stringify(result)).not.toContain("LEAK");
+  });
+
+  it("scrubs standalone breadcrumbs and structured logs", () => {
+    expect(
+      scrubSentryBreadcrumb({ data: { token: "LEAK" }, message: "LEAK" })
+    ).toEqual({ data: { token: "[SCRUBBED]" }, message: "[SCRUBBED]" });
+    expect(
+      scrubSentryLog({
+        attributes: { email: "LEAK", statusCode: 500 },
+        level: "error",
+        message: "LEAK",
+      })
+    ).toEqual({
+      attributes: { email: "[SCRUBBED]", statusCode: 500 },
+      level: "error",
+      message: "[SCRUBBED]",
+    });
   });
 });

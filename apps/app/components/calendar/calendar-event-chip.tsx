@@ -1,4 +1,5 @@
 import type { CalendarEvent } from "@repo/availability";
+import { getAvailabilityRecordLabel } from "@repo/core";
 import { cn } from "@repo/design-system/lib/utils";
 import { AlertTriangleIcon, LeafIcon, PencilIcon } from "lucide-react";
 import {
@@ -24,10 +25,12 @@ export function CalendarEventChip({
   const microLabel = treatmentLabel(event.renderTreatment);
   const isManual = isManualCalendarEvent(event);
   const ProvenanceIcon = isManual ? PencilIcon : LeafIcon;
+  const accessibleLabel = calendarEventAccessibleLabel(event);
 
   return (
     <CalendarEventPopover event={event} orgQueryValue={orgQueryValue}>
       <button
+        aria-label={accessibleLabel}
         className={cn(
           "flex pointer-coarse:min-h-11 w-full min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-left text-xs ring-1 transition hover:brightness-95",
           style,
@@ -45,9 +48,6 @@ export function CalendarEventChip({
         <span className="min-w-0 flex-1 truncate font-medium">
           {event.displayName}
         </span>
-        <span className="sr-only">
-          Source: {calendarEventSourceLabel(event)}.
-        </span>
         {microLabel && (
           <span className="shrink-0 rounded-lg bg-background/60 px-1.5 py-0.5 font-medium">
             {microLabel}
@@ -56,6 +56,23 @@ export function CalendarEventChip({
       </button>
     </CalendarEventPopover>
   );
+}
+
+export function calendarEventAccessibleLabel(event: CalendarEvent): string {
+  const recordType =
+    event.recordType === "private"
+      ? "Private"
+      : getAvailabilityRecordLabel(event.recordType);
+  const status =
+    treatmentLabel(event.renderTreatment) ?? statusLabel(event.approvalStatus);
+  return `${event.displayName}, ${recordType}. Source: ${calendarEventSourceLabel(event)}. Status: ${status}.`;
+}
+
+function statusLabel(status: CalendarEvent["approvalStatus"]): string {
+  if (status === "xero_sync_failed") {
+    return "Xero sync failed";
+  }
+  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 function treatmentLabel(treatment: CalendarEvent["renderTreatment"]) {

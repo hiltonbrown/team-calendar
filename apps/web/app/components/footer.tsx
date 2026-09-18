@@ -25,7 +25,7 @@ const footerColumns = [
   {
     items: [
       { href: "/about", title: "About" },
-      { href: "/customers", title: "Customers" },
+      { href: "/customers", title: "Who it’s for" },
       { href: "/blog", title: "Blog" },
       { href: "/careers", title: "Careers" },
     ],

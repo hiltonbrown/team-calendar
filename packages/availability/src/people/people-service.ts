@@ -207,12 +207,38 @@ const PersonProfileSchema = z.object({
 });
 
 const HistorySchema = z.object({
+  actingPersonId: z.string().uuid().nullable().optional(),
   clerkOrgId: z.string().min(1),
   cursor: z.string().nullable().optional(),
   organisationId: z.string().uuid(),
   pageSize: z.number().int().min(1).max(100).default(25),
   personId: z.string().uuid(),
+  role: RoleSchema,
 });
+
+export async function canAccessPerson(input: {
+  actingPersonId?: null | string;
+  clerkOrgId: string;
+  organisationId: string;
+  personId: string;
+  role: PeopleRole;
+}): Promise<boolean> {
+  if (input.role === "owner" || input.role === "admin") {
+    return true;
+  }
+  if (!input.actingPersonId) {
+    return false;
+  }
+  if (input.role === "viewer") {
+    return input.actingPersonId === input.personId;
+  }
+  const visiblePersonIds = await managerScopePersonIds({
+    actingPersonId: input.actingPersonId,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+  });
+  return visiblePersonIds.includes(input.personId);
+}
 
 const UpcomingSchema = z.object({
   clerkOrgId: z.string().min(1),
@@ -441,6 +467,10 @@ export async function getPersonProfile(input: {
     return notAuthorised();
   }
 
+  if (!(await canAccessPerson(parsed.data))) {
+    return notAuthorised();
+  }
+
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
@@ -579,11 +609,13 @@ export async function getPersonProfile(input: {
 }
 
 export async function listHistoryPage(input: {
+  actingPersonId?: null | string;
   clerkOrgId: string;
   cursor?: null | string;
   organisationId: string;
   pageSize?: number;
   personId: string;
+  role: PeopleRole;
 }): Promise<
   Result<
     { nextCursor: string | null; records: AvailabilityRecordSummary[] },
@@ -593,6 +625,10 @@ export async function listHistoryPage(input: {
   const parsed = HistorySchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
+  }
+
+  if (!(await canAccessPerson(parsed.data))) {
+    return notAuthorised();
   }
 
   try {

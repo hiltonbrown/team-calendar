@@ -136,7 +136,7 @@ export async function loadOnboardingState({
           description:
             "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place.",
           id: "xero",
-          status: hasActiveXeroConnection ? "complete" : "next",
+          status: hasActiveXeroConnection ? "complete" : "optional",
           title: "Connect Xero",
         },
       ]

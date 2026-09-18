@@ -115,8 +115,8 @@ describe("Slice 14 cohesion flows", () => {
       (record) => record.approvalStatus === "approved"
     );
 
-    expect(previewLabel("masked", approved)).toBe("Team member: Annual leave");
-    expect(icsSummary("masked", approved)).toBe("Team member: Annual leave");
+    expect(previewLabel("masked", approved)).toBe("Out of office");
+    expect(icsSummary("masked", approved)).toBe("Out of office");
     expect(
       previewLabel(
         "masked",
@@ -298,10 +298,10 @@ function previewLabel(
     return null;
   }
   if (privacyMode === "masked") {
-    return "Team member: Annual leave";
+    return "Out of office";
   }
   if (privacyMode === "private") {
-    return "Unavailable";
+    return "Busy";
   }
   return "Person Fixture: Annual leave";
 }

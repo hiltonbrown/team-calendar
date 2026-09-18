@@ -13,10 +13,10 @@ Security fixes are applied to the default branch (`main`) and included in the ne
 
 If you discover a security issue, do not create a public GitHub issue.
 
-Use one of these channels:
+Use one of these private channels:
 
-1. Preferred: open a private GitHub Security Advisory for this repository.
-2. Alternative: contact the maintainers directly through your established private support channel.
+1. Preferred: [open a private GitHub Security Advisory](https://github.com/hiltonbrown/team-calendar/security/advisories/new) for this repository.
+2. Alternative: contact the maintainers through your organisation's established private Team Calendar support channel.
 
 If your organisation has a dedicated account manager or support contact for Team Calendar, use that private channel and mark the report as **Security: Confidential**.
 

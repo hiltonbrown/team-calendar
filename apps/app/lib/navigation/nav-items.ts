@@ -3,7 +3,6 @@ import {
   BarChart3Icon,
   BellIcon,
   CalendarDaysIcon,
-  CalendarPlusIcon,
   ClipboardListIcon,
   FilePlusIcon,
   FlagIcon,
@@ -102,15 +101,17 @@ export interface QuickAction {
 /** Create actions surfaced in the command palette's "Create" group. */
 export const quickActions: QuickAction[] = [
   {
-    href: "/availability/new",
-    icon: CalendarPlusIcon,
-    keywords: ["leave", "request", "time off", "annual", "sick"],
-    title: "New leave request",
-  },
-  {
     href: "/plans/new",
     icon: FilePlusIcon,
-    keywords: ["plan", "availability"],
+    keywords: [
+      "plan",
+      "availability",
+      "leave",
+      "request",
+      "time off",
+      "annual",
+      "sick",
+    ],
     title: "New plan",
   },
   {

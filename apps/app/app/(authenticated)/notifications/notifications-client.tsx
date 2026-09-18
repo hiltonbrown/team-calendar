@@ -114,6 +114,7 @@ export function usePrefersReducedMotion(): boolean {
   return prefersReducedMotion;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This route intentionally coordinates mutually exclusive feed and preference surfaces while sharing URL and SSE state.
 export function NotificationsClient({
   filters,
   nextCursor,
@@ -130,8 +131,8 @@ export function NotificationsClient({
   const [isPending, startTransition] = useTransition();
   const [notifications, setNotifications] = useState(initialNotifications);
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
-  const [preferenceRows, setPreferenceRows] = useState(preferences);
-  const focusRef = useRef<HTMLDivElement | null>(null);
+  const { preferenceRows, preferenceStatus, updatePreference } =
+    usePreferenceUpdates(preferences, organisationId);
 
   useEffect(
     () =>
@@ -183,16 +184,10 @@ export function NotificationsClient({
   );
 
   const prefersReducedMotion = usePrefersReducedMotion();
-
-  useEffect(() => {
-    if (!(filters.focus && focusRef.current)) {
-      return;
-    }
-    focusRef.current.scrollIntoView({
-      behavior: prefersReducedMotion ? "instant" : "smooth",
-      block: "center",
-    });
-  }, [filters.focus, prefersReducedMotion]);
+  const { focusAnnouncement, setFocusRef } = useDeepLinkFocus(
+    filters.focus,
+    prefersReducedMotion
+  );
 
   const groupedTypes = useMemo(
     () =>
@@ -254,39 +249,6 @@ export function NotificationsClient({
     });
   };
 
-  const updatePreference = (
-    row: NotificationPreferenceRow,
-    channel: "email" | "in_app",
-    enabled: boolean
-  ) => {
-    const next = {
-      ...row,
-      emailEnabled: channel === "email" ? enabled : row.emailEnabled,
-      inAppEnabled: channel === "in_app" ? enabled : row.inAppEnabled,
-      isDefault: false,
-    };
-    if (!(next.inAppEnabled || next.emailEnabled)) {
-      return;
-    }
-    setPreferenceRows((rows) =>
-      rows.map((item) => (item.type === row.type ? next : item))
-    );
-    startTransition(async () => {
-      const result = await updatePreferenceAction({
-        emailEnabled: next.emailEnabled,
-        inAppEnabled: next.inAppEnabled,
-        notificationType: row.type,
-        organisationId,
-      });
-      if (!result.ok) {
-        toast.error(result.error.message);
-        setPreferenceRows((rows) =>
-          rows.map((item) => (item.type === row.type ? row : item))
-        );
-      }
-    });
-  };
-
   const hasFilters =
     filters.unreadOnly ||
     filters.type.length > 0 ||
@@ -301,6 +263,11 @@ export function NotificationsClient({
 
   return (
     <div className="flex flex-col gap-6">
+      {focusAnnouncement ? (
+        <p className="sr-only" role="status">
+          {focusAnnouncement}
+        </p>
+      ) : null}
       <section className="flex flex-col justify-between gap-4 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end">
         <div>
           <p className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
@@ -323,7 +290,7 @@ export function NotificationsClient({
             </p>
           ) : null}
         </div>
-        <div className="flex gap-2">
+        <nav aria-label="Notification page" className="flex gap-2">
           <TabLink
             active={filters.tab === "feed"}
             href={hrefFor({ tab: "feed" })}
@@ -336,13 +303,14 @@ export function NotificationsClient({
           >
             Preferences
           </TabLink>
-        </div>
+        </nav>
       </section>
 
       {filters.tab === "feed" ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted p-4">
-            <div className="flex flex-wrap gap-2">
+            <fieldset className="flex flex-wrap gap-2">
+              <legend className="sr-only">Notification filters</legend>
               <Button
                 onClick={() => pushFilters({ unreadOnly: !filters.unreadOnly })}
                 size="sm"
@@ -350,6 +318,41 @@ export function NotificationsClient({
               >
                 Unread only
               </Button>
+              {CATEGORY_ORDER.map((category) => (
+                <Button
+                  key={category}
+                  onClick={() => toggleCategory(category)}
+                  size="sm"
+                  variant={
+                    filters.category.includes(category)
+                      ? "default"
+                      : "secondary"
+                  }
+                >
+                  {categoryLabel(category)}
+                </Button>
+              ))}
+              {hasFilters ? (
+                <Button onClick={clearFilters} size="sm" variant="ghost">
+                  Clear filters
+                </Button>
+              ) : null}
+            </fieldset>
+            <Button
+              disabled={isPending || unreadCount === 0}
+              onClick={markAll}
+              size="sm"
+              variant="ghost"
+            >
+              Mark all as read
+            </Button>
+          </div>
+
+          <details className="rounded-2xl bg-muted px-4 py-3">
+            <summary className="cursor-pointer font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+              Filter by event type
+            </summary>
+            <div className="mt-3 flex flex-wrap gap-2">
               {notificationTypes.map((type) => (
                 <Button
                   key={type.type}
@@ -363,15 +366,7 @@ export function NotificationsClient({
                 </Button>
               ))}
             </div>
-            <Button
-              disabled={isPending || unreadCount === 0}
-              onClick={markAll}
-              size="sm"
-              variant="ghost"
-            >
-              Mark all as read
-            </Button>
-          </div>
+          </details>
 
           {notifications.length === 0 ? (
             <EmptyState
@@ -386,37 +381,37 @@ export function NotificationsClient({
             <div className="space-y-3">
               {notifications.map((item) => (
                 <article
-                  className={`flex gap-4 rounded-2xl p-4 ${
+                  className={`flex flex-col gap-4 rounded-2xl p-4 sm:flex-row ${
                     item.isUnread ? "bg-primary/10" : "bg-muted"
                   }`}
                   key={item.id}
+                  ref={(node) => setFocusRef(item.id, node)}
+                  tabIndex={-1}
                 >
-                  <NotificationIcon iconKey={item.iconKey} />
-                  <button
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => markOne(item, true)}
-                    type="button"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-sm">{item.title}</p>
-                      {item.isUnread ? <Badge>Unread</Badge> : null}
-                    </div>
-                    <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
-                      {item.body}
-                    </p>
-                    <p
-                      className="mt-2 text-muted-foreground text-xs"
-                      title={formatFullDate(item.createdAt)}
+                  <div className="flex min-w-0 flex-1 gap-4">
+                    <NotificationIcon iconKey={item.iconKey} />
+                    <button
+                      aria-label={`${item.title}${item.actionUrl ? ", open notification" : ""}`}
+                      className="min-w-0 flex-1 rounded-xl text-left focus-visible:outline-[3px] focus-visible:outline-ring"
+                      onClick={() => markOne(item, true)}
+                      type="button"
                     >
-                      {relativeTime(item.createdAt)}
-                    </p>
-                  </button>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
-                    {item.actionUrl ? (
-                      <Button asChild size="sm" variant="secondary">
-                        <Link href={item.actionUrl}>{item.actionLabel}</Link>
-                      </Button>
-                    ) : null}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-sm">{item.title}</p>
+                        {item.isUnread ? <Badge>Unread</Badge> : null}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
+                        {item.body}
+                      </p>
+                      <p
+                        className="mt-2 text-muted-foreground text-xs"
+                        title={formatFullDate(item.createdAt)}
+                      >
+                        {relativeTime(item.createdAt)}
+                      </p>
+                    </button>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2 sm:items-end">
                     {item.isUnread ? (
                       <Button
                         disabled={isPending}
@@ -460,7 +455,8 @@ export function NotificationsClient({
                       filters.focus === row.type ? "ring-2 ring-primary" : ""
                     }`}
                     key={row.type}
-                    ref={filters.focus === row.type ? focusRef : undefined}
+                    ref={(node) => setFocusRef(row.type, node)}
+                    tabIndex={-1}
                   >
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -475,10 +471,12 @@ export function NotificationsClient({
                         {row.description}
                       </p>
                     </div>
-                    <div className="flex gap-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
                       <Toggle
                         checked={row.inAppEnabled}
+                        descriptionId={`${row.type}-in-app-description`}
                         disabled={inAppIsLast}
+                        id={`${row.type}-in-app`}
                         label="In-app"
                         onChange={(checked) =>
                           updatePreference(row, "in_app", checked)
@@ -486,12 +484,15 @@ export function NotificationsClient({
                       />
                       <Toggle
                         checked={row.emailEnabled}
+                        descriptionId={`${row.type}-email-description`}
                         disabled={emailIsLast}
+                        id={`${row.type}-email`}
                         label="Email"
                         onChange={(checked) =>
                           updatePreference(row, "email", checked)
                         }
                       />
+                      <PreferenceReceipt status={preferenceStatus[row.type]} />
                     </div>
                   </div>
                 );
@@ -538,6 +539,9 @@ export function NotificationsClient({
     for (const type of merged.type) {
       params.append("type", type);
     }
+    for (const category of merged.category) {
+      params.append("category", category);
+    }
     if (merged.cursor) {
       params.set("cursor", merged.cursor);
     }
@@ -551,6 +555,111 @@ export function NotificationsClient({
         : [...filters.type, type],
     });
   }
+
+  function toggleCategory(category: NotificationCategory) {
+    pushFilters({
+      category: filters.category.includes(category)
+        ? filters.category.filter((item) => item !== category)
+        : [...filters.category, category],
+    });
+  }
+
+  function clearFilters() {
+    pushFilters({ category: [], type: [], unreadOnly: false });
+  }
+}
+
+function useDeepLinkFocus(focus: string | null, prefersReducedMotion: boolean) {
+  const [focusAnnouncement, setFocusAnnouncement] = useState<string | null>(
+    null
+  );
+  const focusRefs = useRef(new Map<string, HTMLElement>());
+
+  useEffect(() => {
+    if (!focus) {
+      return;
+    }
+    const target = focusRefs.current.get(focus);
+    if (!target) {
+      return;
+    }
+    target.scrollIntoView({
+      behavior: prefersReducedMotion ? "instant" : "smooth",
+      block: "center",
+    });
+    target.focus({ preventScroll: true });
+    setFocusAnnouncement("Focused the linked notification setting.");
+  }, [focus, prefersReducedMotion]);
+
+  return {
+    focusAnnouncement,
+    setFocusRef: (key: string, node: HTMLElement | null) => {
+      if (node) {
+        focusRefs.current.set(key, node);
+      } else {
+        focusRefs.current.delete(key);
+      }
+    },
+  };
+}
+
+function usePreferenceUpdates(
+  initialRows: NotificationPreferenceRow[],
+  organisationId: string
+) {
+  const [preferenceRows, setPreferenceRows] = useState(initialRows);
+  const [preferenceStatus, setPreferenceStatus] = useState<
+    Record<string, "error" | "saved" | "saving">
+  >({});
+  const [, startPreferenceTransition] = useTransition();
+
+  const updatePreference = (
+    row: NotificationPreferenceRow,
+    channel: "email" | "in_app",
+    enabled: boolean
+  ) => {
+    const next = {
+      ...row,
+      emailEnabled: channel === "email" ? enabled : row.emailEnabled,
+      inAppEnabled: channel === "in_app" ? enabled : row.inAppEnabled,
+      isDefault: false,
+    };
+    if (!(next.inAppEnabled || next.emailEnabled)) {
+      return;
+    }
+    setPreferenceRows((rows) =>
+      rows.map((item) => (item.type === row.type ? next : item))
+    );
+    setPreferenceStatus((statuses) => ({
+      ...statuses,
+      [row.type]: "saving",
+    }));
+    startPreferenceTransition(async () => {
+      const result = await updatePreferenceAction({
+        emailEnabled: next.emailEnabled,
+        inAppEnabled: next.inAppEnabled,
+        notificationType: row.type,
+        organisationId,
+      });
+      if (!result.ok) {
+        toast.error(result.error.message);
+        setPreferenceRows((rows) =>
+          rows.map((item) => (item.type === row.type ? row : item))
+        );
+        setPreferenceStatus((statuses) => ({
+          ...statuses,
+          [row.type]: "error",
+        }));
+        return;
+      }
+      setPreferenceStatus((statuses) => ({
+        ...statuses,
+        [row.type]: "saved",
+      }));
+    });
+  };
+
+  return { preferenceRows, preferenceStatus, updatePreference };
 }
 
 function TabLink({
@@ -564,34 +673,78 @@ function TabLink({
 }) {
   return (
     <Button asChild size="sm" variant={active ? "default" : "secondary"}>
-      <Link href={href}>{children}</Link>
+      <Link aria-current={active ? "page" : undefined} href={href}>
+        {children}
+      </Link>
     </Button>
   );
 }
 
 function Toggle({
   checked,
+  descriptionId,
   disabled,
+  id,
   label,
   onChange,
 }: {
   checked: boolean;
+  descriptionId: string;
   disabled: boolean;
+  id: string;
   label: string;
   onChange: (checked: boolean) => void;
 }) {
+  const disabledReason = "At least one delivery channel must stay enabled.";
   return (
-    <div
-      className="flex items-center gap-2 text-sm"
-      title={disabled ? "At least one channel must be enabled" : undefined}
-    >
-      <Switch
-        checked={checked}
-        disabled={disabled}
-        onCheckedChange={onChange}
-      />
-      {label}
+    <div className="text-sm">
+      <div className="flex items-center gap-2">
+        <Switch
+          aria-describedby={disabled ? descriptionId : undefined}
+          checked={checked}
+          disabled={disabled}
+          id={id}
+          onCheckedChange={onChange}
+        />
+        <label htmlFor={id}>{label}</label>
+      </div>
+      {disabled ? (
+        <p
+          className="mt-1 max-w-52 text-muted-foreground text-xs"
+          id={descriptionId}
+        >
+          {disabledReason}
+        </p>
+      ) : null}
     </div>
+  );
+}
+
+function PreferenceReceipt({
+  status,
+}: {
+  status: "error" | "saved" | "saving" | undefined;
+}) {
+  if (!status) {
+    return null;
+  }
+  const copy = {
+    error: "Could not save. Previous setting restored.",
+    saved: "Saved",
+    saving: "Saving…",
+  }[status];
+  return (
+    <p
+      aria-live="polite"
+      className={
+        status === "error"
+          ? "text-destructive text-xs"
+          : "text-muted-foreground text-xs"
+      }
+      role={status === "error" ? "alert" : "status"}
+    >
+      {copy}
+    </p>
   );
 }
 

@@ -231,6 +231,10 @@ function toClientRecord(
     balanceChip: record.balanceChip,
     editableActions: record.editableActions,
     endsAt: record.endsAt.toISOString(),
+    failedAction:
+      record.failedAction === "submit" || record.failedAction === "withdraw"
+        ? record.failedAction
+        : null,
     id: record.id,
     personName: `${record.person.firstName} ${record.person.lastName}`,
     recordType: record.recordType,

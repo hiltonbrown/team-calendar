@@ -1,10 +1,24 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OrganisationWithConnectionView } from "../_connection-view";
 import { XeroClient } from "./xero-client";
 
+const mocks = vi.hoisted(() => ({
+  disconnectXeroAction: vi.fn(),
+  pauseTenantSyncAction: vi.fn(),
+  refresh: vi.fn(),
+  resumeTenantSyncAction: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }),
 }));
 
 vi.mock("@/app/(authenticated)/sync/_actions", () => ({
@@ -13,15 +27,19 @@ vi.mock("@/app/(authenticated)/sync/_actions", () => ({
 
 vi.mock("./_actions", () => ({
   connectXeroAction: vi.fn(),
-  disconnectXeroAction: vi.fn(),
+  disconnectXeroAction: mocks.disconnectXeroAction,
+  pauseTenantSyncAction: mocks.pauseTenantSyncAction,
   refreshXeroConnectionAction: vi.fn(),
+  resumeTenantSyncAction: mocks.resumeTenantSyncAction,
 }));
 
 const ROLLING_REFRESH_REGEX = /Rolling refresh in progress since/i;
+const DISCONNECT_CONFIRMATION_REGEX = /Type Acme Corp to confirm/i;
 
 describe("XeroClient component", () => {
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   const baseTenant = {
@@ -32,6 +50,7 @@ describe("XeroClient component", () => {
     last_people_sync_at: null,
     leave_balances_stale_since: null,
     payroll_region: "AU" as const,
+    sync_paused_at: null,
     tenant_name: "Acme Payroll AU",
     xero_tenant_id: "xero-tenant-1",
   };
@@ -86,6 +105,7 @@ describe("XeroClient component", () => {
   it("offers manual token refresh only for an active connection", () => {
     render(<XeroClient organisations={[baseOrg]} />);
 
+    fireEvent.click(screen.getByText("Connection controls"));
     expect(
       screen.getByRole("button", { name: "Refresh tokens" })
     ).toBeDefined();
@@ -111,6 +131,76 @@ describe("XeroClient component", () => {
 
     render(<XeroClient organisations={[organisation]} />);
 
+    fireEvent.click(screen.getByText("Connection controls"));
     expect(screen.queryByRole("button", { name: "Refresh tokens" })).toBeNull();
+  });
+
+  it("promotes one recommended sync and progressively discloses the rest", () => {
+    render(<XeroClient organisations={[baseOrg]} />);
+
+    expect(
+      screen.getByRole("button", { name: "Sync people now" })
+    ).toBeDefined();
+    const details = screen.getByText("Manual sync options").closest("details");
+    expect(details?.open).toBe(false);
+    fireEvent.click(screen.getByText("Manual sync options"));
+    expect(details?.open).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Sync leave records" })
+    ).toBeDefined();
+    expect(screen.getByRole("button", { name: "Sync balances" })).toBeDefined();
+  });
+
+  it("requires consequence-aware confirmation before disconnect", async () => {
+    mocks.disconnectXeroAction.mockResolvedValue({
+      ok: true,
+      value: { disconnected: true },
+    });
+    render(<XeroClient organisations={[baseOrg]} />);
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect Xero" }));
+
+    const dialog = screen.getByRole("alertdialog", {
+      name: "Disconnect Xero?",
+    });
+    const confirm = within(dialog).getByRole("button", {
+      name: "Disconnect Xero",
+    });
+    expect(confirm.hasAttribute("disabled")).toBe(true);
+    fireEvent.change(
+      within(dialog).getByLabelText(DISCONNECT_CONFIRMATION_REGEX),
+      {
+        target: { value: "Acme Corp" },
+      }
+    );
+    fireEvent.click(confirm);
+
+    await waitFor(() =>
+      expect(mocks.disconnectXeroAction).toHaveBeenCalledWith({
+        confirmationText: "Acme Corp",
+        connectionId: baseConnection.id,
+        mode: "soft",
+        organisationId: baseOrg.id,
+      })
+    );
+  });
+
+  it("exposes the existing audited pause action", async () => {
+    mocks.pauseTenantSyncAction.mockResolvedValue({
+      ok: true,
+      value: { paused: true },
+    });
+    render(<XeroClient organisations={[baseOrg]} />);
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pause automatic sync" })
+    );
+
+    await waitFor(() =>
+      expect(mocks.pauseTenantSyncAction).toHaveBeenCalledWith({
+        organisationId: baseOrg.id,
+        xeroTenantId: baseTenant.id,
+      })
+    );
   });
 });

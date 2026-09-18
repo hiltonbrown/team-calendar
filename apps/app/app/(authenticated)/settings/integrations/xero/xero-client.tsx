@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
@@ -8,19 +9,20 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/design-system/components/ui/card";
-import { Input } from "@repo/design-system/components/ui/input";
-import { Label } from "@repo/design-system/components/ui/label";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
+import { ConfirmActionDialog } from "../../components/confirm-action-dialog";
 import { ProviderStatusBadge } from "../../components/provider-status-badge";
 import { SettingsSectionHeader } from "../../components/settings-section-header";
 import type { OrganisationWithConnectionView } from "../_connection-view";
 import {
   connectXeroAction,
   disconnectXeroAction,
+  pauseTenantSyncAction,
   refreshXeroConnectionAction,
+  resumeTenantSyncAction,
 } from "./_actions";
 
 interface XeroClientProps {
@@ -30,8 +32,12 @@ interface XeroClientProps {
 export const XeroClient = ({ organisations }: XeroClientProps) => {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [confirmationTextByOrganisation, setConfirmationTextByOrganisation] =
-    useState<Record<string, string>>({});
+  const [disconnectTarget, setDisconnectTarget] = useState<{
+    connectionId: string;
+    mode: "destructive" | "soft";
+    organisationId: string;
+    organisationName: string;
+  } | null>(null);
 
   const handleConnect = (organisationId: string) => {
     startTransition(async () => {
@@ -56,21 +62,19 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
     });
   };
 
-  const handleDisconnect = (
-    connectionId: string,
-    organisationId: string,
-    organisationName: string,
-    mode: "destructive" | "soft"
-  ) => {
+  const handleDisconnect = () => {
+    if (!disconnectTarget) {
+      return;
+    }
     startTransition(async () => {
       const result = await disconnectXeroAction({
-        confirmationText: confirmationTextByOrganisation[organisationId] ?? "",
-        connectionId,
-        mode,
-        organisationId,
+        confirmationText: disconnectTarget.organisationName,
+        connectionId: disconnectTarget.connectionId,
+        mode: disconnectTarget.mode,
+        organisationId: disconnectTarget.organisationId,
       });
       const successMessage =
-        mode === "destructive"
+        disconnectTarget.mode === "destructive"
           ? "Xero disconnected and Xero-linked data purged."
           : "Xero disconnected. Historical data is now read-only.";
       toast[result.ok ? "success" : "error"](
@@ -78,11 +82,29 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       );
 
       if (result.ok) {
-        setConfirmationTextByOrganisation((current) => ({
-          ...current,
-          [organisationId]: organisationName,
-        }));
+        setDisconnectTarget(null);
+        router.refresh();
       }
+    });
+  };
+
+  const updatePauseState = (
+    organisationId: string,
+    xeroTenantId: string,
+    paused: boolean
+  ) => {
+    startTransition(async () => {
+      const result = paused
+        ? await pauseTenantSyncAction({ organisationId, xeroTenantId })
+        : await resumeTenantSyncAction({ organisationId, xeroTenantId });
+      if (!result.ok) {
+        toast.error(result.error.message);
+        return;
+      }
+      toast.success(
+        paused ? "Automatic Xero sync paused." : "Automatic Xero sync resumed."
+      );
+      router.refresh();
     });
   };
 
@@ -125,7 +147,7 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="Each payroll organisation owns one Xero connection and one Xero tenant. Status is shared across everyone in this Clerk Organisation."
+        description="Each payroll organisation has one Xero connection and tenant. Connection status is shared with every administrator in this account."
         title="Xero Payroll"
       />
 
@@ -138,8 +160,9 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
           connection?.status === "active" &&
           connection.disconnected_at === null &&
           connection.revoked_at === null;
-        const confirmationText =
-          confirmationTextByOrganisation[organisation.id] ?? "";
+        const recommendedSync = tenant
+          ? recommendedSyncForTenant(tenant)
+          : null;
 
         return (
           <Card className="rounded-2xl" key={organisation.id}>
@@ -153,7 +176,12 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                       : `${organisation.country_code} payroll organisation`}
                   </CardDescription>
                 </div>
-                <ProviderStatusBadge status={status} />
+                <div className="flex flex-wrap justify-end gap-2">
+                  {tenant?.sync_paused_at ? (
+                    <Badge variant="secondary">Sync paused</Badge>
+                  ) : null}
+                  <ProviderStatusBadge status={status} />
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -196,126 +224,187 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
               ) : null}
 
               <div className="flex flex-wrap gap-3">
-                <Button
-                  disabled={isPending}
-                  onClick={() => handleConnect(organisation.id)}
-                >
-                  {connection ? "Reconnect Xero" : "Connect Xero"}
-                </Button>
-                {canRefresh ? (
+                {status === "connected" && tenant && recommendedSync ? (
+                  <Button
+                    disabled={isPending || Boolean(tenant.sync_paused_at)}
+                    onClick={() =>
+                      runSync(
+                        organisation.id,
+                        tenant.id,
+                        recommendedSync.runType
+                      )
+                    }
+                  >
+                    {recommendedSync.label} now
+                  </Button>
+                ) : (
                   <Button
                     disabled={isPending}
-                    onClick={() =>
-                      handleRefresh(connection.id, organisation.id)
-                    }
-                    variant="outline"
+                    onClick={() => handleConnect(organisation.id)}
                   >
-                    Refresh tokens
+                    {connection ? "Reconnect Xero" : "Connect Xero"}
                   </Button>
-                ) : null}
-                {tenant ? (
-                  <>
-                    <Button
-                      disabled={isPending}
-                      onClick={() =>
-                        runSync(organisation.id, tenant.id, "people")
-                      }
-                      variant="outline"
-                    >
-                      Sync people
-                    </Button>
-                    <Button
-                      disabled={isPending}
-                      onClick={() =>
-                        runSync(organisation.id, tenant.id, "leave_records")
-                      }
-                      variant="outline"
-                    >
-                      Sync leave records
-                    </Button>
-                    <Button
-                      disabled={isPending}
-                      onClick={() =>
-                        runSync(organisation.id, tenant.id, "leave_balances")
-                      }
-                      variant="outline"
-                    >
-                      Sync balances
-                    </Button>
-                    <Button
-                      disabled={isPending}
-                      onClick={() =>
-                        runSync(
-                          organisation.id,
-                          tenant.id,
-                          "approval_state_reconciliation"
-                        )
-                      }
-                      variant="outline"
-                    >
-                      Reconcile approval state
-                    </Button>
-                  </>
-                ) : null}
+                )}
               </div>
 
-              {connection ? (
-                <div className="space-y-3 rounded-2xl bg-muted/30 p-4">
-                  <div className="space-y-2">
-                    <Label htmlFor={`disconnect-${organisation.id}`}>
-                      Type the organisation name to confirm disconnect
-                    </Label>
-                    <Input
-                      id={`disconnect-${organisation.id}`}
-                      onChange={(event) =>
-                        setConfirmationTextByOrganisation((current) => ({
-                          ...current,
-                          [organisation.id]: event.target.value,
-                        }))
-                      }
-                      placeholder={organisation.name}
-                      value={confirmationText}
-                    />
+              {tenant ? (
+                <details className="rounded-xl bg-muted/30 p-4">
+                  <summary className="cursor-pointer rounded-xl font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+                    Manual sync options
+                  </summary>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {SYNC_OPTIONS.filter(
+                      (option) => option.runType !== recommendedSync?.runType
+                    ).map((option) => (
+                      <Button
+                        disabled={isPending || Boolean(tenant.sync_paused_at)}
+                        key={option.runType}
+                        onClick={() =>
+                          runSync(organisation.id, tenant.id, option.runType)
+                        }
+                        variant="outline"
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
-                  <div className="flex flex-wrap gap-3">
+                </details>
+              ) : null}
+
+              {connection ? (
+                <details className="rounded-xl bg-muted/30 p-4">
+                  <summary className="cursor-pointer rounded-xl font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+                    Connection controls
+                  </summary>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    {canRefresh ? (
+                      <Button
+                        disabled={isPending}
+                        onClick={() =>
+                          handleRefresh(connection.id, organisation.id)
+                        }
+                        variant="outline"
+                      >
+                        Refresh tokens
+                      </Button>
+                    ) : null}
+                    {tenant ? (
+                      <Button
+                        disabled={isPending}
+                        onClick={() =>
+                          updatePauseState(
+                            organisation.id,
+                            tenant.id,
+                            !tenant.sync_paused_at
+                          )
+                        }
+                        variant="outline"
+                      >
+                        {tenant.sync_paused_at
+                          ? "Resume automatic sync"
+                          : "Pause automatic sync"}
+                      </Button>
+                    ) : null}
                     <Button
                       disabled={isPending}
                       onClick={() =>
-                        handleDisconnect(
-                          connection.id,
-                          organisation.id,
-                          organisation.name,
-                          "soft"
-                        )
+                        setDisconnectTarget({
+                          connectionId: connection.id,
+                          mode: "soft",
+                          organisationId: organisation.id,
+                          organisationName: organisation.name,
+                        })
                       }
                       variant="outline"
                     >
-                      Standard disconnect
+                      Disconnect Xero
                     </Button>
                     <Button
                       disabled={isPending}
                       onClick={() =>
-                        handleDisconnect(
-                          connection.id,
-                          organisation.id,
-                          organisation.name,
-                          "destructive"
-                        )
+                        setDisconnectTarget({
+                          connectionId: connection.id,
+                          mode: "destructive",
+                          organisationId: organisation.id,
+                          organisationName: organisation.name,
+                        })
                       }
                       variant="destructive"
                     >
-                      Destructive disconnect
+                      Disconnect and purge data
                     </Button>
                   </div>
-                </div>
+                </details>
               ) : null}
             </CardContent>
           </Card>
         );
       })}
+
+      <ConfirmActionDialog
+        confirmLabel={
+          disconnectTarget?.mode === "destructive"
+            ? "Disconnect and purge"
+            : "Disconnect Xero"
+        }
+        description={
+          disconnectTarget?.mode === "destructive"
+            ? "This disconnects Xero and permanently purges Xero-linked data. This cannot be undone."
+            : "This stops future Xero access. Historical Xero data remains read-only, and you can reconnect later."
+        }
+        destructive
+        onConfirm={handleDisconnect}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDisconnectTarget(null);
+          }
+        }}
+        open={disconnectTarget !== null}
+        pending={isPending}
+        requireTyping={disconnectTarget?.organisationName}
+        title={
+          disconnectTarget?.mode === "destructive"
+            ? "Disconnect Xero and purge data?"
+            : "Disconnect Xero?"
+        }
+      />
     </div>
   );
 };
+
+const SYNC_OPTIONS = [
+  { label: "Sync people", runType: "people" },
+  { label: "Sync leave records", runType: "leave_records" },
+  { label: "Sync balances", runType: "leave_balances" },
+  {
+    label: "Reconcile approval state",
+    runType: "approval_state_reconciliation",
+  },
+] as const;
+
+function recommendedSyncForTenant(
+  tenant: NonNullable<
+    NonNullable<
+      OrganisationWithConnectionView["xero_connection"]
+    >["xero_tenant"]
+  >
+) {
+  const timestamps = {
+    approval_state_reconciliation: tenant.last_approval_state_reconciled_at,
+    leave_balances: tenant.last_leave_balances_sync_at,
+    leave_records: tenant.last_leave_records_sync_at,
+    people: tenant.last_people_sync_at,
+  };
+  return [...SYNC_OPTIONS].sort(
+    (first, second) =>
+      timestampPriority(timestamps[first.runType]) -
+      timestampPriority(timestamps[second.runType])
+  )[0];
+}
+
+function timestampPriority(value: Date | null) {
+  return value?.getTime() ?? Number.NEGATIVE_INFINITY;
+}
 
 function statusForConnection(
   connection: OrganisationWithConnectionView["xero_connection"]

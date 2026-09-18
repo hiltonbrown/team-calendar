@@ -36,11 +36,7 @@ const GettingStartedSettingsPage = async ({
         description="Return to setup guidance at any time. These steps help you publish availability, but they do not block normal app use."
         title="Getting Started"
       />
-      <OnboardingChecklist
-        orgQueryValue={orgQueryValue}
-        state={onboarding}
-        variant="settings"
-      />
+      <OnboardingChecklist orgQueryValue={orgQueryValue} state={onboarding} />
     </div>
   );
 };

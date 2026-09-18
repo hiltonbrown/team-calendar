@@ -229,6 +229,33 @@ export async function addCustomHoliday(
       };
     }
 
+    if (!input.appliesToAllJurisdictions) {
+      if (!input.jurisdictionId) {
+        return {
+          error: appError("bad_request", "Choose a holiday jurisdiction"),
+          ok: false,
+        };
+      }
+      const jurisdiction = await database.publicHolidayJurisdiction.findFirst({
+        select: { id: true },
+        where: {
+          ...scopedQuery(input.clerkOrgId, input.organisationId),
+          archived_at: null,
+          id: input.jurisdictionId,
+          is_enabled: true,
+        },
+      });
+      if (!jurisdiction) {
+        return {
+          error: appError(
+            "bad_request",
+            "Choose a jurisdiction from this organisation"
+          ),
+          ok: false,
+        };
+      }
+    }
+
     const holiday = await database.publicHoliday.create({
       data: {
         clerk_org_id: input.clerkOrgId,

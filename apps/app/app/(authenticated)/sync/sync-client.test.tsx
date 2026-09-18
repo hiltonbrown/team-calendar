@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SyncClient } from "./sync-client";
@@ -81,7 +82,7 @@ describe("SyncClient", () => {
     vi.clearAllMocks();
   });
 
-  it("enables every registered run type and announces successful dispatch", async () => {
+  it("offers every registered run type through one recommended action", async () => {
     mocks.dispatchManualSyncAction.mockResolvedValueOnce({
       ok: true,
       value: { queued: true },
@@ -98,26 +99,146 @@ describe("SyncClient", () => {
     );
 
     for (const name of [
-      "Sync people",
-      "Sync leave records",
-      "Sync balances",
-      "Reconcile approvals",
+      "People (recommended)",
+      "Leave records",
+      "Leave balances",
+      "Approval reconciliation",
     ]) {
-      expect(
-        (screen.getByRole("button", { name }) as HTMLButtonElement).disabled
-      ).toBe(false);
+      expect(screen.getByRole("option", { name })).toBeDefined();
     }
 
-    fireEvent.click(screen.getByRole("button", { name: "Sync people" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Sync type" }), {
+      target: { value: "leave_balances" },
+    });
+    const runButton = screen.getByRole("button", { name: "Run sync" });
+    expect((runButton as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(runButton);
 
     expect((await screen.findByRole("status")).textContent).toContain(
       "Sync queued."
     );
     expect(mocks.dispatchManualSyncAction).toHaveBeenCalledWith({
       organisationId,
-      runType: "people",
+      runType: "leave_balances",
       xeroTenantId: tenantId,
     });
+  });
+
+  it("keeps pending state scoped to the selected tenant and operation", async () => {
+    const pending = deferred<{
+      ok: true;
+      value: { queued: true };
+    }>();
+    mocks.dispatchManualSyncAction.mockReturnValueOnce(pending.promise);
+    const secondTenantId = "00000000-0000-4000-8000-000000000012";
+    render(
+      <SyncClient
+        filters={{}}
+        nextCursor={null}
+        organisationId={organisationId}
+        orgQueryValue={organisationId}
+        runs={[]}
+        summaries={[
+          summary,
+          {
+            ...summary,
+            tenantName: "Team Calendar NZ",
+            xeroTenantId: secondTenantId,
+          },
+        ]}
+      />
+    );
+
+    const firstTenant = screen.getByRole("article", {
+      name: "Team Calendar AU",
+    });
+    const secondTenant = screen.getByRole("article", {
+      name: "Team Calendar NZ",
+    });
+    fireEvent.click(
+      within(firstTenant).getByRole("button", { name: "Run sync" })
+    );
+
+    const firstAction = within(firstTenant).getByRole("button", {
+      name: "Running",
+    });
+    expect(firstAction.getAttribute("aria-busy")).toBe("true");
+    expect((firstAction as HTMLButtonElement).disabled).toBe(true);
+    const secondAction = within(secondTenant).getByRole("button", {
+      name: "Run sync",
+    });
+    expect(secondAction.getAttribute("aria-busy")).toBe("false");
+    expect((secondAction as HTMLButtonElement).disabled).toBe(false);
+
+    pending.resolve({ ok: true, value: { queued: true } });
+    await screen.findByText("Sync queued.");
+  });
+
+  it("exposes connection and pause reasons without relying on title text", () => {
+    render(
+      <SyncClient
+        filters={{}}
+        nextCursor={null}
+        organisationId={organisationId}
+        orgQueryValue={organisationId}
+        runs={[]}
+        summaries={[{ ...summary, connectionStatus: "revoked" }]}
+      />
+    );
+
+    const action = screen.getByRole("button", { name: "Run sync" });
+    const descriptionId = action.getAttribute("aria-describedby");
+    expect((action as HTMLButtonElement).disabled).toBe(true);
+    expect(descriptionId).not.toBeNull();
+    expect(document.getElementById(descriptionId ?? "")?.textContent).toBe(
+      "Reconnect Xero in Settings before running a sync."
+    );
+    expect(action.getAttribute("title")).toBeNull();
+  });
+
+  it("clears active filters while preserving the organisation", () => {
+    render(
+      <SyncClient
+        filters={{ status: ["failed"] }}
+        nextCursor={null}
+        organisationId={organisationId}
+        orgQueryValue={organisationId}
+        runs={[]}
+        summaries={[summary]}
+      />
+    );
+
+    expect(screen.getByText("1 filter active.")).toBeDefined();
+    expect(screen.getByText("No matching runs")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(mocks.push).toHaveBeenCalledWith(`/sync?org=${organisationId}`);
+  });
+
+  it("provides complete mobile history and a focusable wide table", () => {
+    render(
+      <SyncClient
+        filters={{}}
+        nextCursor={null}
+        organisationId={organisationId}
+        orgQueryValue={organisationId}
+        runs={[{ ...run, recordsFailed: 2 }]}
+        summaries={[summary]}
+      />
+    );
+
+    expect(
+      screen
+        .getByRole("link", { name: "View run details" })
+        .getAttribute("href")
+    ).toBe(`/sync/${runId}?org=${organisationId}`);
+    expect(
+      screen.getByText("Failed records").nextElementSibling?.textContent
+    ).toBe("2");
+    expect(
+      screen
+        .getByRole("region", { name: "Sync run history table" })
+        .getAttribute("tabindex")
+    ).toBe("0");
   });
 
   it("preserves organisation context in run links", () => {
@@ -314,3 +435,14 @@ describe("SyncClient", () => {
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledTimes(1));
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve: (value: T) => void = (_value) => undefined;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}

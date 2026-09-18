@@ -40,54 +40,49 @@ export const HolidaysClient = ({
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
-        description="A thin admin wrapper over the public holiday service and public holiday screens."
+        description="Review holiday coverage here, then open Public Holidays to refresh sources, add custom dates, or suppress calendar publication."
         title="Holidays"
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Imported holidays</CardTitle>
-          </CardHeader>
-          <CardContent>{importedCount}</CardContent>
-        </Card>
-        <Card className="rounded-2xl">
-          <CardHeader>
-            <CardTitle>Custom holidays</CardTitle>
-          </CardHeader>
-          <CardContent>{customCount}</CardContent>
-        </Card>
-      </div>
-
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-4 rounded-2xl bg-muted p-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm">
+          <span className="font-semibold text-lg tabular-nums">
+            {importedCount}
+          </span>{" "}
+          imported and{" "}
+          <span className="font-semibold text-lg tabular-nums">
+            {customCount}
+          </span>{" "}
+          custom holidays are recorded for this organisation.
+        </p>
         <Button asChild>
-          <Link href={`/public-holidays/holidays/new?org=${organisationId}`}>
-            Add custom holiday
+          <Link href={`/public-holidays?org=${organisationId}`}>
+            Manage public holidays
           </Link>
         </Button>
       </div>
 
       <Card className="rounded-2xl">
         <CardHeader>
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle>Upcoming holidays</CardTitle>
-            <Button asChild variant="outline">
-              <Link href={`/public-holidays?org=${organisationId}`}>
-                View all
-              </Link>
-            </Button>
-          </div>
+          <CardTitle>Upcoming holidays</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {upcoming.map((holiday) => (
-            <div
-              className="rounded-xl bg-muted/30 p-3 text-sm"
-              key={holiday.name + holiday.holiday_date.toISOString()}
-            >
-              {holiday.name} · {holiday.country_code} ·{" "}
-              {holiday.holiday_date.toLocaleDateString("en-AU")}
-            </div>
-          ))}
+          {upcoming.length > 0 ? (
+            upcoming.map((holiday) => (
+              <div
+                className="rounded-xl bg-muted/30 p-3 text-sm"
+                key={holiday.name + holiday.holiday_date.toISOString()}
+              >
+                {holiday.name} · {holiday.country_code} ·{" "}
+                {holiday.holiday_date.toLocaleDateString("en-AU")}
+              </div>
+            ))
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No upcoming holidays are recorded. Open Public Holidays to refresh
+              the source or add a custom date.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

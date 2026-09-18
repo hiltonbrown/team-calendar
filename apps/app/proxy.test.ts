@@ -4,6 +4,7 @@ import {
   buildContentSecurityPolicy,
   generateNonce,
   handleProxyWithNonce,
+  isPublicAppRoute,
   REPORTING_ENDPOINTS_HEADER,
 } from "./proxy";
 
@@ -11,6 +12,20 @@ const BASE64_PATTERN = /^[A-Za-z0-9+/=]+$/;
 const NONCE_EXTRACTION_PATTERN = /'nonce-([A-Za-z0-9+/=]+)'/;
 
 describe("Proxy nonce and CSP generation", () => {
+  it.each([
+    ["/sign-in", true],
+    ["/sign-in/factor-one", true],
+    ["/sign-up", true],
+    ["/api/csp-report", true],
+    ["/__clerk/v1/client", true],
+    ["/calendar", false],
+    ["/api/future-sensitive-route", false],
+  ])("classifies %s public=%s", (path, expected) => {
+    expect(
+      isPublicAppRoute(new NextRequest(`http://localhost:3000${path}`))
+    ).toBe(expected);
+  });
+
   it("generates unique base64 nonces per request", () => {
     const nonce1 = generateNonce();
     const nonce2 = generateNonce();

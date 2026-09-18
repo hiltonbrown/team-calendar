@@ -2,8 +2,11 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { CalendarEventChip } from "./calendar-event-chip";
 
-const LEAVE_EVENT_NAME = /Ari Report.*Source: Team Calendar leave/i;
-const MANUAL_EVENT_NAME = /Kai Manual.*Source: Manual availability/i;
+const LEAVE_EVENT_NAME =
+  /Ari Report, Annual leave.*Source: Team Calendar leave.*Status: Approved/i;
+const MANUAL_EVENT_NAME =
+  /Kai Manual, Training.*Source: Manual availability.*Status: Approved/i;
+const FAILED_EVENT_NAME = /Ari Report, Annual leave.*Status: Sync failed/i;
 
 describe("CalendarEventChip", () => {
   afterEach(() => cleanup());
@@ -79,6 +82,21 @@ describe("CalendarEventChip", () => {
 
     expect(leave.querySelector(".lucide-leaf")).not.toBeNull();
     expect(manual.querySelector(".lucide-pencil")).not.toBeNull();
+  });
+
+  it("includes failed exception state in the complete accessible name", () => {
+    render(
+      <CalendarEventChip
+        event={event({ renderTreatment: "failed" })}
+        orgQueryValue={null}
+      />
+    );
+
+    expect(
+      screen.getByRole("button", {
+        name: FAILED_EVENT_NAME,
+      })
+    ).toBeDefined();
   });
 });
 

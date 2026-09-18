@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 import { PersonProfileContent } from "@/components/people/person-profile-content";
 import { requirePageRole } from "@/lib/auth/require-page-role";
+import { parsePersonProfileTab } from "@/lib/navigation/person-profile-tab";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 
@@ -92,11 +93,13 @@ async function loadProfileViewModel(
   }
 
   const historyResult = await listHistoryPage({
+    actingPersonId: actingPerson?.id ?? null,
     clerkOrgId,
     cursor: firstString(searchParams.historyCursor),
     organisationId,
     pageSize: 25,
     personId,
+    role,
   });
 
   return {
@@ -110,8 +113,7 @@ async function loadProfileViewModel(
     history: historyResult.ok
       ? historyResult.value
       : { nextCursor: null, records: [] },
-    initialTab:
-      firstString(searchParams.tab) === "history" ? "history" : "upcoming",
+    initialTab: parsePersonProfileTab(searchParams.tab),
     organisationId,
     orgQueryValue,
     profile: profileResult.value,

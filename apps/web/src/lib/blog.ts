@@ -1,59 +1,143 @@
-import { readdir, readFile } from "node:fs/promises";
-import path from "node:path";
-import { bundleMDX } from "mdx-bundler";
+import type { MDXContent } from "mdx/types";
+import { z } from "zod";
+import {
+  type BlogRegistryEntry,
+  blogPostRegistry,
+} from "@/src/content/blog/posts";
 
-const contentDir = path.join(process.cwd(), "src/content/blog");
+const calendarDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+const blogDateFormatter = new Intl.DateTimeFormat("en-AU", {
+  day: "numeric",
+  month: "long",
+  timeZone: "UTC",
+  year: "numeric",
+});
 
-export interface PostFrontmatter {
-  author?: string;
-  date: string;
-  description: string;
-  title: string;
-}
-
-export interface PostMeta {
-  frontmatter: PostFrontmatter;
-  slug: string;
-}
-
-export interface Post extends PostMeta {
-  code: string;
-}
-
-export async function getPost(slug: string): Promise<Post | null> {
-  try {
-    const filePath = path.join(contentDir, `${slug}.mdx`);
-    const source = await readFile(filePath, "utf-8");
-    const { code, frontmatter } = await bundleMDX<PostFrontmatter>({ source });
-    return { code, frontmatter, slug };
-  } catch {
-    return null;
-  }
-}
-
-export async function getAllPosts(): Promise<PostMeta[]> {
-  try {
-    const files = await readdir(contentDir);
-    const posts = await Promise.all(
-      files
-        .filter((f) => f.endsWith(".mdx"))
-        .map(async (file) => {
-          const slug = file.replace(".mdx", "");
-          const post = await getPost(slug);
-          if (!post) {
-            return null;
-          }
-          return { frontmatter: post.frontmatter, slug };
-        })
-    );
-    return posts
-      .filter((p): p is PostMeta => p !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.frontmatter.date).getTime() -
-          new Date(a.frontmatter.date).getTime()
+const calendarDate = z
+  .string()
+  .regex(calendarDatePattern)
+  .refine(
+    (value) => {
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      return (
+        !Number.isNaN(parsed.getTime()) &&
+        parsed.toISOString().startsWith(value)
       );
-  } catch {
+    },
+    { message: "must be a real YYYY-MM-DD calendar date" }
+  );
+
+const blogMetadataSchema = z
+  .object({
+    author: z.string().trim().min(1).max(80),
+    authorRole: z.string().trim().min(1).max(120),
+    category: z.enum(["guide", "update"]),
+    description: z.string().trim().min(1).max(280),
+    featured: z.boolean().default(false),
+    publishedAt: calendarDate,
+    regions: z.array(z.enum(["AU", "NZ", "UK"])).min(1),
+    status: z.enum(["draft", "published"]),
+    title: z.string().trim().min(1).max(120),
+    updatedAt: calendarDate.optional(),
+  })
+  .strict()
+  .superRefine((metadata, context) => {
+    if (metadata.updatedAt && metadata.updatedAt < metadata.publishedAt) {
+      context.addIssue({
+        code: "custom",
+        message: "cannot predate publishedAt",
+        path: ["updatedAt"],
+      });
+    }
+  });
+
+export type BlogPostMetadata = z.infer<typeof blogMetadataSchema>;
+
+export interface BlogPost extends BlogPostMetadata {
+  readonly Component: MDXContent;
+  readonly slug: string;
+}
+
+export type BlogPostSummary = Omit<BlogPost, "Component">;
+
+const comparePosts = (left: BlogPost, right: BlogPost): number => {
+  const dateOrder = right.publishedAt.localeCompare(left.publishedAt);
+  return dateOrder === 0 ? left.slug.localeCompare(right.slug) : dateOrder;
+};
+
+const parseMetadata = (slug: string, metadata: unknown): BlogPostMetadata => {
+  const result = blogMetadataSchema.safeParse(metadata);
+
+  if (result.success) {
+    return result.data;
+  }
+
+  const [issue] = result.error.issues;
+  const field = issue?.path.join(".") || "metadata";
+  throw new Error(
+    `Invalid blog metadata for "${slug}" at "${field}": ${issue?.message ?? "unknown validation error"}`
+  );
+};
+
+export const parseBlogRegistry = (
+  entries: readonly BlogRegistryEntry[]
+): readonly BlogPost[] => {
+  const slugs = new Set<string>();
+  const posts = entries.map((entry) => {
+    if (slugs.has(entry.slug)) {
+      throw new Error(`Duplicate blog slug: "${entry.slug}"`);
+    }
+
+    slugs.add(entry.slug);
+    return {
+      Component: entry.Component,
+      slug: entry.slug,
+      ...parseMetadata(entry.slug, entry.metadata),
+    };
+  });
+
+  const featuredPublished = posts.filter(
+    (post) => post.status === "published" && post.featured
+  );
+  if (featuredPublished.length > 1) {
+    throw new Error(
+      `Only one published blog post may be featured; found ${featuredPublished.length}`
+    );
+  }
+
+  return posts.sort(comparePosts);
+};
+
+const catalogue = parseBlogRegistry(blogPostRegistry);
+
+export const formatBlogDate = (value: string): string =>
+  blogDateFormatter.format(new Date(`${value}T00:00:00.000Z`));
+
+const withoutComponent = ({ Component: _component, ...post }: BlogPost) => post;
+
+export const getAllPosts = (): readonly BlogPostSummary[] =>
+  catalogue.filter((post) => post.status === "published").map(withoutComponent);
+
+export const getPost = (slug: string): BlogPost | null =>
+  catalogue.find((post) => post.status === "published" && post.slug === slug) ??
+  null;
+
+export const getRelatedPosts = (
+  slug: string,
+  limit = 2
+): readonly BlogPostSummary[] => {
+  const current = getPost(slug);
+  if (!current || limit <= 0) {
     return [];
   }
-}
+
+  return catalogue
+    .filter((post) => post.status === "published" && post.slug !== slug)
+    .sort((left, right) => {
+      const leftCategory = left.category === current.category ? 0 : 1;
+      const rightCategory = right.category === current.category ? 0 : 1;
+      return leftCategory - rightCategory || comparePosts(left, right);
+    })
+    .slice(0, limit)
+    .map(withoutComponent);
+};

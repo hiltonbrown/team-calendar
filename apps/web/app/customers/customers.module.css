@@ -1,0 +1,289 @@
+.root {
+  overflow: clip;
+}
+
+.hero {
+  padding: clamp(72px, 9vw, 120px) 0 clamp(64px, 8vw, 104px);
+  background:
+    radial-gradient(
+      circle at 78% 20%,
+      color-mix(in srgb, var(--marketing-primary) 13%, transparent),
+      transparent 35%
+    ),
+    var(--marketing-surface);
+}
+
+.heroInner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(280px, 0.68fr);
+  gap: clamp(48px, 7vw, 96px);
+  align-items: end;
+}
+
+.heroCopy {
+  max-width: 760px;
+}
+
+.title {
+  max-width: 12ch;
+  margin: 0;
+  font: 600 clamp(3.4rem, 7vw, 6.6rem) / 0.98 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+
+.lead {
+  max-width: 61ch;
+  margin: 28px 0 0;
+  font: 400 var(--text-title-md) / 1.55 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.launchNote {
+  max-width: 58ch;
+  margin: 18px 0 0;
+  font: 600 var(--text-body-lg) / 1.55 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.heroAside {
+  display: grid;
+  gap: 14px;
+  padding: clamp(28px, 4vw, 44px);
+  color: var(--marketing-on-primary-container);
+  background: var(--marketing-primary-container);
+  border-radius: 20px;
+}
+
+.heroAside > svg {
+  color: var(--marketing-primary);
+}
+
+.heroAside p {
+  margin: 8px 0 0;
+  font: 700 var(--text-label-md) / 1.3 var(--marketing-font);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.heroAside h2 {
+  margin: 0;
+  font: 600 var(--text-display-sm) / 1.18 var(--marketing-font);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.heroAside span {
+  font: 400 var(--text-body-lg) / 1.55 var(--marketing-font);
+}
+
+.section {
+  padding: clamp(72px, 9vw, 116px) 0;
+}
+
+.tonal {
+  background: var(--marketing-surface-low);
+}
+
+.sectionIntro {
+  max-width: 760px;
+}
+
+.sectionIntro > p:last-child {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  font: 400 var(--text-body-lg) / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fitSurface,
+.workflowSurface {
+  padding: 0;
+  margin: 48px 0 0;
+  list-style: none;
+  background: var(--marketing-surface-low);
+  border-radius: 20px;
+}
+
+.fitRow {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 32px;
+}
+
+.fitRow + .fitRow {
+  background: var(--marketing-surface-container);
+}
+
+.fitRow:first-child {
+  border-radius: 20px 20px 0 0;
+}
+
+.fitRow:last-child {
+  border-radius: 0 0 20px 20px;
+}
+
+.fitRow > svg {
+  color: var(--marketing-primary);
+}
+
+.fitRow h3,
+.workflow h3 {
+  margin: 0;
+  font: 600 var(--text-title-md) / 1.3 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.015em;
+}
+
+.fitRow p,
+.workflow p {
+  max-width: 68ch;
+  margin: 8px 0 0;
+  font: 400 var(--text-body-lg) / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fitLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(420px, 1fr);
+  gap: clamp(48px, 7vw, 96px);
+  align-items: start;
+}
+
+.workflowSurface {
+  margin: 0;
+  background: var(--marketing-surface);
+}
+
+.workflow {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 20px;
+  padding: 28px 32px;
+}
+
+.workflow + .workflow {
+  padding-top: 0;
+}
+
+.workflow > span {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  font: 700 var(--text-label-lg) / 1 var(--marketing-font);
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+  border-radius: 50%;
+}
+
+.callout {
+  display: flex;
+  gap: 48px;
+  align-items: end;
+  justify-content: space-between;
+  padding: clamp(36px, 5vw, 64px);
+  background: var(--marketing-primary-container);
+  border-radius: 20px;
+}
+
+.callout > div {
+  max-width: 760px;
+}
+
+.calloutOverline {
+  color: var(--marketing-on-primary-container);
+}
+
+.calloutOverline::before {
+  background: var(--marketing-on-primary-container);
+}
+
+.callout p:last-child {
+  max-width: 62ch;
+  margin: 18px 0 0;
+  font: 400 var(--text-body-lg) / 1.65 var(--marketing-font);
+  color: var(--marketing-on-primary-container);
+}
+
+.callout > a {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 900px) {
+  .heroInner,
+  .fitLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .heroAside {
+    max-width: 580px;
+  }
+
+  .workflowSurface {
+    margin-top: 0;
+  }
+
+  .callout {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 56px 0 64px;
+  }
+
+  .title {
+    font-size: clamp(3rem, 15vw, 4.25rem);
+  }
+
+  .actions,
+  .actions > a,
+  .callout > a {
+    width: 100%;
+  }
+
+  .actions > a,
+  .callout > a {
+    justify-content: center;
+  }
+
+  .fitRow {
+    grid-template-columns: 1fr;
+    padding: 24px;
+  }
+
+  .workflow {
+    padding: 24px;
+  }
+
+  .workflow + .workflow {
+    padding-top: 0;
+  }
+
+  .callout {
+    gap: 32px;
+    padding: 28px;
+  }
+}
+
+@media (forced-colors: active) {
+  .heroAside,
+  .fitSurface,
+  .workflowSurface,
+  .callout {
+    border: 1px solid CanvasText;
+  }
+}

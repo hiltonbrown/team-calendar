@@ -1,90 +1,120 @@
+import { resolveCanonicalWebUrl } from "@repo/seo/canonical-url";
 import type { Blog, WithContext } from "@repo/seo/json-ld";
 import { JsonLd } from "@repo/seo/json-ld";
 import { createMetadata } from "@repo/seo/metadata";
+import { ArrowRight, Rss } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getAllPosts } from "@/src/lib/blog";
+import { formatBlogDate, getAllPosts } from "@/src/lib/blog";
+import styles from "./blog.module.css";
 
-const blogMeta = {
-  description: "Updates, guides, and articles from the Team Calendar team.",
-  title: "Blog",
-};
+const blogDescription =
+  "Practical guides to Xero Payroll leave, secure calendar feeds and dependable team availability.";
+const blogUrl = new URL("/blog", resolveCanonicalWebUrl()).href;
 
-export const generateMetadata = (): Metadata => createMetadata(blogMeta);
+export const metadata: Metadata = createMetadata({
+  alternates: {
+    canonical: blogUrl,
+    types: { "application/rss+xml": "/rss.xml" },
+  },
+  description: blogDescription,
+  title: "Xero Payroll leave and calendar guides",
+});
 
-const BlogIndex = async () => {
-  const posts = await getAllPosts();
-
+const BlogIndex = () => {
+  const posts = getAllPosts();
   const jsonLd: WithContext<Blog> = {
     "@context": "https://schema.org",
     "@type": "Blog",
+    blogPost: posts.map((post) => ({
+      "@type": "BlogPosting",
+      headline: post.title,
+      url: new URL(`/blog/${post.slug}`, blogUrl).href,
+    })),
+    description: blogDescription,
+    name: "Team Calendar guides",
+    publisher: {
+      "@type": "Organization",
+      name: "Team Calendar",
+      url: resolveCanonicalWebUrl().href,
+    },
+    url: blogUrl,
   };
 
   return (
-    <>
+    <main className={`fmkt-page ${styles.page}`} id="blog-main" tabIndex={-1}>
       <JsonLd code={jsonLd} />
-      <div className="fmkt-page marketing-simple">
-        <header className="marketing-simple__hero">
-          <div className="fmkt-container">
-            <div className="marketing-simple__intro">
-              <p className="marketing-simple__kicker">Updates</p>
-              <h1 className="marketing-simple__title">{blogMeta.title}</h1>
-              <p className="marketing-simple__lead">{blogMeta.description}</p>
-            </div>
-          </div>
-        </header>
+      <header className={styles.indexHero}>
+        <div className={styles.indexHeroInner}>
+          <p className={styles.eyebrow}>Team Calendar guides</p>
+          <h1>Make leave and calendars easier to trust.</h1>
+          <p>
+            Practical explanations for Xero Payroll leave, secure calendar feeds
+            and the availability decisions Australian teams make every week.
+          </p>
+          <a
+            className={`marketing-content-link ${styles.rssLink}`}
+            href="/rss.xml"
+          >
+            <Rss aria-hidden="true" size={16} /> Subscribe with RSS
+          </a>
+        </div>
+      </header>
 
-        <section className="marketing-simple__section">
-          <div className="fmkt-container">
-            {posts.length === 0 ? (
-              <div className="marketing-simple__panel">
-                <h2>No posts yet</h2>
-                <p>
-                  Check back soon for updates, guides, and articles from the
-                  Team Calendar team.
-                </p>
-              </div>
-            ) : (
-              <div className="marketing-simple__grid marketing-simple__grid--two">
-                {posts.map((post, index) => (
-                  <Link
-                    className={[
-                      "marketing-simple__panel",
-                      index === 0 ? "md:col-span-2" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    href={`/blog/${post.slug}`}
-                    key={post.slug}
-                  >
-                    <div className="marketing-simple__meta">
-                      <time dateTime={post.frontmatter.date}>
-                        {new Date(post.frontmatter.date).toLocaleDateString(
-                          "en-AU",
-                          {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          }
-                        )}
-                      </time>
-                      {post.frontmatter.author ? (
-                        <>
-                          <span>&middot;</span>
-                          <span>{post.frontmatter.author}</span>
-                        </>
-                      ) : null}
-                    </div>
-                    <h2>{post.frontmatter.title}</h2>
-                    <p>{post.frontmatter.description}</p>
-                  </Link>
-                ))}
-              </div>
-            )}
+      <section
+        aria-labelledby="articles-heading"
+        className={styles.indexSection}
+      >
+        <div className={styles.indexWidth}>
+          <div className={styles.sectionHeading}>
+            <p>Read and apply</p>
+            <h2 id="articles-heading">Guides and product updates</h2>
           </div>
-        </section>
-      </div>
-    </>
+
+          {posts.length === 0 ? (
+            <div className={styles.emptyState}>
+              <h2>No guides published yet</h2>
+              <p>
+                Setup help is still available while the first practical guides
+                are prepared.
+              </p>
+              <Link className="marketing-content-link" href="/help-centre">
+                Open the Help centre <ArrowRight aria-hidden="true" size={17} />
+              </Link>
+            </div>
+          ) : (
+            <div className={styles.postGrid}>
+              {posts.map((post) => (
+                <article
+                  className={post.featured ? styles.featuredPost : styles.post}
+                  key={post.slug}
+                >
+                  <div className={styles.postMeta}>
+                    <span>{post.category}</span>
+                    <time dateTime={post.publishedAt}>
+                      {formatBlogDate(post.publishedAt)}
+                    </time>
+                  </div>
+                  <h2>{post.title}</h2>
+                  <p>{post.description}</p>
+                  <div className={styles.postAuthor}>
+                    {post.author} · {post.authorRole}
+                  </div>
+                  <Link
+                    aria-label={`Read ${post.title}`}
+                    className={`marketing-content-link ${styles.postLink}`}
+                    href={`/blog/${post.slug}`}
+                  >
+                    Read {post.category}{" "}
+                    <ArrowRight aria-hidden="true" size={17} />
+                  </Link>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
   );
 };
 

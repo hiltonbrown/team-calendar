@@ -20,6 +20,9 @@ const ImportHolidaySchema = z.object({
   year: z.number().int().min(2000).max(2100),
 });
 
+const canManageHolidays = async (): Promise<boolean> =>
+  (await requireRole("org:admin")) || (await requireRole("org:owner"));
+
 export async function importFromSourceAction(
   input: z.infer<typeof ImportHolidaySchema>
 ) {
@@ -31,7 +34,7 @@ export async function importFromSourceAction(
     };
   }
 
-  const hasAccess = await requireRole("org:admin");
+  const hasAccess = await canManageHolidays();
   if (!hasAccess) {
     return { error: "Permission denied", ok: false as const };
   }
@@ -86,7 +89,7 @@ export async function addCustomHolidayAction(
     };
   }
 
-  const hasAccess = await requireRole("org:admin");
+  const hasAccess = await canManageHolidays();
   if (!hasAccess) {
     return { error: "Permission denied", ok: false as const };
   }
@@ -136,7 +139,7 @@ export async function suppressHolidayAction(
     return { error: "Invalid input", ok: false as const };
   }
 
-  const hasAccess = await requireRole("org:admin");
+  const hasAccess = await canManageHolidays();
   if (!hasAccess) {
     return { error: "Permission denied", ok: false as const };
   }
@@ -177,7 +180,7 @@ export async function restoreHolidayAction(
     return { error: "Invalid input", ok: false as const };
   }
 
-  const hasAccess = await requireRole("org:admin");
+  const hasAccess = await canManageHolidays();
   if (!hasAccess) {
     return { error: "Permission denied", ok: false as const };
   }
@@ -218,7 +221,7 @@ export async function deleteCustomHolidayAction(
     return { error: "Invalid input", ok: false as const };
   }
 
-  const hasAccess = await requireRole("org:admin");
+  const hasAccess = await canManageHolidays();
   if (!hasAccess) {
     return { error: "Permission denied", ok: false as const };
   }

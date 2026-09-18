@@ -140,12 +140,13 @@ export const FeatureCardsSection = () => (
       <div className="fmkt-section-header">
         <h2 className="fmkt-section-title">
           From a leave request to everyone&rsquo;s calendar,{" "}
-          <em>in under a minute.</em>
+          <em>without another handover.</em>
         </h2>
         <p className="fmkt-cards-section__lead">
           Staff submit once. Approved leave writes back to Xero Payroll and
-          publishes to the calendars your team already opens, within 60 seconds.
-          No re-keying, no separate planner to maintain.
+          republishes to the calendars your team already opens. Each calendar
+          app refreshes its subscribed feeds on its own schedule. No re-keying,
+          no separate planner to maintain.
         </p>
       </div>
       <div className="fmkt-card-grid">

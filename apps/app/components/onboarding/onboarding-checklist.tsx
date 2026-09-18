@@ -9,67 +9,135 @@ import type {
 interface OnboardingChecklistProps {
   orgQueryValue: string | null;
   state: OnboardingState;
-  variant: "dashboard" | "settings";
 }
 
 export function OnboardingChecklist({
   state,
   orgQueryValue,
-  variant,
 }: OnboardingChecklistProps) {
-  const isDashboard = variant === "dashboard";
+  const nextStep = state.steps.find((step) => step.status === "next");
+  const completedSteps = state.steps.filter(
+    (step) => step.status === "complete"
+  );
+  const deferredSteps = state.steps.filter(
+    (step) => step.status === "optional" || step.status === "pending"
+  );
+  const progressLabel = state.isComplete
+    ? `Setup complete. ${state.requiredCount} of ${state.requiredCount} required steps complete.`
+    : `${state.completedRequiredCount} of ${state.requiredCount} required steps complete.`;
 
   return (
-    <section className="rounded-2xl bg-muted p-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
-            Getting started
-          </p>
-          <h2 className="mt-1 font-semibold text-2xl tracking-tight">
-            Publish availability when you are ready
-          </h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground text-sm">
-            Team Calendar works without Xero or completed onboarding. Use these
-            steps when they are useful, or continue using the dashboard.
-          </p>
-        </div>
-        <div className="rounded-xl bg-background/70 px-4 py-3 text-sm">
-          <span className="font-semibold">
-            {state.completedRequiredCount}/{state.requiredCount}
-          </span>{" "}
-          required steps complete
+    <section
+      aria-labelledby="setup-checklist-title"
+      className="rounded-2xl bg-muted p-5 sm:p-6"
+    >
+      <div className="max-w-2xl">
+        <h2
+          className="font-semibold text-2xl tracking-tight"
+          id="setup-checklist-title"
+        >
+          {state.isComplete ? "Setup complete" : "Finish the essentials"}
+        </h2>
+        <p className="mt-2 text-muted-foreground text-sm">
+          Team Calendar works without Xero or completed onboarding. Complete the
+          useful steps now, or return whenever you are ready.
+        </p>
+        <div className="mt-5 space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="font-medium">Required setup progress</span>
+            <span className="text-muted-foreground">{progressLabel}</span>
+          </div>
+          <progress
+            aria-label="Required setup progress"
+            className="h-2 w-full overflow-hidden rounded-full accent-primary"
+            max={state.requiredCount}
+            value={state.completedRequiredCount}
+          />
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3">
-        {state.steps.map((step) => (
-          <div
-            className="flex flex-col gap-4 rounded-2xl bg-background/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+      {nextStep ? (
+        <div className="mt-6 grid gap-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+          <div className="flex min-w-0 gap-3">
+            <StatusBadge status={nextStep.status} />
+            <div className="min-w-0">
+              <h3 className="font-semibold text-base">{nextStep.title}</h3>
+              <p className="mt-1 text-muted-foreground text-sm">
+                {nextStep.description}
+              </p>
+            </div>
+          </div>
+          <Button asChild>
+            <Link href={withOrg(nextStep.ctaHref, orgQueryValue)}>
+              {nextStep.ctaLabel}
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-6">
+          <Button asChild>
+            <Link href={withOrg("/", orgQueryValue)}>Return to dashboard</Link>
+          </Button>
+        </div>
+      )}
+
+      {completedSteps.length > 0 ? (
+        <StepGroup
+          label={`Completed (${completedSteps.length})`}
+          orgQueryValue={orgQueryValue}
+          steps={completedSteps}
+        />
+      ) : null}
+
+      {deferredSteps.length > 0 ? (
+        <StepGroup
+          label={`Optional and later (${deferredSteps.length})`}
+          orgQueryValue={orgQueryValue}
+          steps={deferredSteps}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function StepGroup({
+  label,
+  orgQueryValue,
+  steps,
+}: {
+  label: string;
+  orgQueryValue: string | null;
+  steps: OnboardingState["steps"];
+}) {
+  return (
+    <details className="mt-4">
+      <summary className="flex min-h-11 cursor-pointer items-center font-medium text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {label}
+      </summary>
+      <ul className="space-y-1 pb-2">
+        {steps.map((step) => (
+          <li
+            className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
             key={step.id}
           >
-            <div className="flex gap-3">
+            <div className="flex min-w-0 gap-3">
               <StatusBadge status={step.status} />
-              <div>
-                <h3 className="font-semibold text-base">{step.title}</h3>
+              <div className="min-w-0">
+                <h3 className="font-medium text-sm">{step.title}</h3>
                 <p className="mt-1 text-muted-foreground text-sm">
                   {step.description}
                 </p>
               </div>
             </div>
-            <Button
-              asChild
-              size={isDashboard ? "sm" : "default"}
-              variant="outline"
-            >
+            <Button asChild size="sm" variant="ghost">
               <Link href={withOrg(step.ctaHref, orgQueryValue)}>
                 {step.ctaLabel}
               </Link>
             </Button>
-          </div>
+          </li>
         ))}
-      </div>
-    </section>
+      </ul>
+    </details>
   );
 }
 
@@ -82,10 +150,10 @@ function StatusBadge({ status }: { status: OnboardingStepStatus }) {
   }[status];
 
   const className = {
-    complete: "bg-primary text-primary-foreground",
-    next: "bg-foreground text-background",
-    optional: "bg-muted text-muted-foreground",
-    pending: "bg-muted text-muted-foreground",
+    complete: "bg-surface-container-high text-muted-foreground",
+    next: "bg-primary text-primary-foreground",
+    optional: "bg-background text-muted-foreground",
+    pending: "bg-background text-muted-foreground",
   }[status];
 
   return (

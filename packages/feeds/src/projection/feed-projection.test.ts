@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => {
       last_name: "Smith",
       location: { name: "Brisbane" },
     },
+    privacy_mode: "named",
     publication: {
       published_sequence: 3,
       published_uid: "published@ical.teamcalendar.online",
@@ -35,6 +36,7 @@ const mocks = vi.hoisted(() => {
       })
     ),
     publicHolidayFindMany: vi.fn(() => Promise.resolve([])),
+    record,
     resolvePeopleForFeed: vi.fn(() =>
       Promise.resolve({
         ok: true,
@@ -138,14 +140,35 @@ describe("projectFeedEvents", () => {
     expect(masked.ok && masked.value[0]).toMatchObject({
       description: null,
       location: "Brisbane",
-      summary: "Team member: Annual Leave",
+      summary: "Out of office",
     });
     expect(privateFeed.ok && privateFeed.value[0]).toMatchObject({
       description: null,
       location: null,
-      summary: "Unavailable",
+      summary: "Busy",
     });
   });
+
+  it.each([
+    ["named", "masked", "Out of office", "Brisbane"],
+    ["masked", "named", "Out of office", "Brisbane"],
+    ["named", "private", "Busy", null],
+    ["private", "named", "Busy", null],
+  ] as const)(
+    "uses the stricter of %s record privacy and %s feed privacy",
+    async (recordPrivacy, feedPrivacy, summary, location) => {
+      mocks.availabilityRecordFindMany.mockResolvedValueOnce([
+        { ...mocks.record, privacy_mode: recordPrivacy },
+      ]);
+
+      const result = await projectFeedEvents({
+        ...baseInput,
+        privacyMode: feedPrivacy,
+      });
+
+      expect(result.ok && result.value[0]).toMatchObject({ location, summary });
+    }
+  );
 
   it("projects public holidays for matching locations and deduplicates by id and date", async () => {
     vi.useFakeTimers();

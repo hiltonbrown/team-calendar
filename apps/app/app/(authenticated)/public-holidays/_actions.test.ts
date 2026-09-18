@@ -103,6 +103,18 @@ describe("public-holidays server actions", () => {
       expect(mocks.suppressHoliday).not.toHaveBeenCalled();
     });
 
+    it("allows owners to manage holidays", async () => {
+      mocks.requireRole.mockImplementation(async (role: string) =>
+        Promise.resolve(role === "org:owner")
+      );
+
+      const result = await suppressHolidayAction({ holidayId, organisationId });
+
+      expect(result).toEqual({ ok: true, value: { id: holidayId } });
+      expect(mocks.requireRole).toHaveBeenNthCalledWith(1, "org:admin");
+      expect(mocks.requireRole).toHaveBeenNthCalledWith(2, "org:owner");
+    });
+
     it("rejects malformed inputs", async () => {
       const result = await importFromSourceAction({
         countryCode: "INVALID", // length !== 2

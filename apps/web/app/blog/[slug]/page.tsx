@@ -1,91 +1,121 @@
-import { ArrowLeftIcon } from "@radix-ui/react-icons";
+import { resolveCanonicalWebUrl } from "@repo/seo/canonical-url";
+import type { BlogPosting, WithContext } from "@repo/seo/json-ld";
+import { JsonLd } from "@repo/seo/json-ld";
 import { createMetadata } from "@repo/seo/metadata";
+import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MdxContent } from "@/src/components/mdx-content";
-import { getAllPosts, getPost } from "@/src/lib/blog";
+import {
+  formatBlogDate,
+  getAllPosts,
+  getPost,
+  getRelatedPosts,
+} from "@/src/lib/blog";
+import styles from "../blog.module.css";
+import { ArticleFooter } from "../components/article-footer";
 
 interface BlogPostProperties {
-  readonly params: Promise<{
-    slug: string;
-  }>;
+  readonly params: Promise<{ slug: string }>;
 }
+
+export const dynamicParams = false;
 
 export const generateMetadata = async ({
   params,
 }: BlogPostProperties): Promise<Metadata> => {
   const { slug } = await params;
-  const post = await getPost(slug);
+  const post = getPost(slug);
 
   if (!post) {
-    return {};
+    return { robots: { follow: false, index: false } };
   }
 
+  const canonical = new URL(`/blog/${post.slug}`, resolveCanonicalWebUrl())
+    .href;
   return createMetadata({
-    description: post.frontmatter.description,
-    title: post.frontmatter.title,
+    alternates: { canonical },
+    description: post.description,
+    image: new URL("/blog/opengraph-image", resolveCanonicalWebUrl()).href,
+    openGraph: {
+      authors: [post.author],
+      modifiedTime: post.updatedAt,
+      publishedTime: post.publishedAt,
+      type: "article",
+      url: canonical,
+    },
+    title: post.title,
   });
 };
 
-export const generateStaticParams = async (): Promise<{ slug: string }[]> => {
-  const posts = await getAllPosts();
-  return posts.map(({ slug }) => ({ slug }));
-};
+export const generateStaticParams = (): { slug: string }[] =>
+  getAllPosts().map(({ slug }) => ({ slug }));
 
-const BlogPost = async ({ params }: BlogPostProperties) => {
+const BlogPostPage = async ({ params }: BlogPostProperties) => {
   const { slug } = await params;
-  const post = await getPost(slug);
+  const post = getPost(slug);
 
   if (!post) {
     notFound();
   }
 
-  return (
-    <div className="container mx-auto py-16">
-      <Link
-        className="mb-8 inline-flex items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground focus:underline focus:outline-none"
-        href="/blog"
-      >
-        <ArrowLeftIcon className="h-4 w-4" />
-        Back to Blog
-      </Link>
+  const { Component, ...summary } = post;
+  const related = getRelatedPosts(post.slug);
+  const canonical = new URL(`/blog/${post.slug}`, resolveCanonicalWebUrl())
+    .href;
+  const jsonLd: WithContext<BlogPosting> = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    author: { "@type": "Organization", name: post.author },
+    dateModified: post.updatedAt ?? post.publishedAt,
+    datePublished: post.publishedAt,
+    description: post.description,
+    headline: post.title,
+    mainEntityOfPage: canonical,
+    publisher: {
+      "@type": "Organization",
+      name: "Team Calendar",
+      url: resolveCanonicalWebUrl().href,
+    },
+    url: canonical,
+  };
 
-      <div className="mt-8 flex flex-col gap-6 lg:max-w-2xl">
-        <div className="flex items-center gap-3">
-          <time
-            className="text-muted-foreground text-sm"
-            dateTime={post.frontmatter.date}
-          >
-            {new Date(post.frontmatter.date).toLocaleDateString("en-AU", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </time>
-          {post.frontmatter.author ? (
-            <>
-              <span className="text-muted-foreground text-sm">&middot;</span>
-              <span className="text-muted-foreground text-sm">
-                {post.frontmatter.author}
-              </span>
-            </>
-          ) : null}
+  return (
+    <main className={`fmkt-page ${styles.page}`} id="blog-main" tabIndex={-1}>
+      <JsonLd code={jsonLd} />
+      <article className={styles.article}>
+        <Link
+          className={`marketing-content-link ${styles.backLink}`}
+          href="/blog"
+        >
+          <ArrowLeft aria-hidden="true" size={17} /> Back to Blog
+        </Link>
+
+        <header className={styles.articleHeader}>
+          <div className={styles.postMeta}>
+            <span>{post.category}</span>
+            <time dateTime={post.publishedAt}>
+              {formatBlogDate(post.publishedAt)}
+            </time>
+            {post.updatedAt ? (
+              <span>Updated {formatBlogDate(post.updatedAt)}</span>
+            ) : null}
+          </div>
+          <h1>{post.title}</h1>
+          <p>{post.description}</p>
+          <div className={styles.postAuthor}>
+            {post.author} · {post.authorRole}
+          </div>
+        </header>
+
+        <div className={styles.articleBody}>
+          <Component />
         </div>
 
-        <h1 className="font-semibold text-4xl tracking-tight lg:text-5xl">
-          {post.frontmatter.title}
-        </h1>
-        <p className="text-lg text-muted-foreground leading-relaxed">
-          {post.frontmatter.description}
-        </p>
-
-        <hr className="border-border" />
-
-        <MdxContent code={post.code} />
-      </div>
-    </div>
+        <ArticleFooter post={summary} related={related} />
+      </article>
+    </main>
   );
 };
 
-export default BlogPost;
+export default BlogPostPage;

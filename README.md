@@ -208,6 +208,7 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | `api` | Required pair | Required pair |
 | `RESEND_TOKEN` (or `RESEND_API_KEY`) | `api` | Required | Required |
 | `SUPPORT_EMAIL` | `web` | Required (email) | Required (email) |
+| `BETTERSTACK_API_KEY` / `BETTERSTACK_STATUS_PAGE_ID` / `BETTERSTACK_STATUS_PAGE_URL` | `web` | Optional complete trio (status is Unknown when absent) | Optional complete trio (status is Unknown when absent) |
 | `STRIPE_SECRET_KEY` | `app`, `api` | Optional (disabled) | Required |
 | `STRIPE_WEBHOOK_SECRET` | `api` | Optional (disabled) | Required |
 | `STRIPE_PRICE_BASIC` / `STRIPE_PRICE_PREMIUM` | `app`, `api` | Optional (disabled) | Required |
@@ -227,7 +228,7 @@ Copy each app's `.env.example` for the full, annotated list. Optional variables 
 
 - **`app`**: `DATABASE_URL`, `XERO_TOKEN_ENCRYPTION_KEY`, Clerk keys (`CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`), the public URLs (`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WEB_URL`), and, to enable feed caching, both `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
 - **`api`**: everything `app` needs plus the Xero OAuth credentials (`XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`), the Inngest keys (`INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY`, required together), and the KV pair for feed caching. `GITHUB_TOKEN`/`GITHUB_OWNER`/`GITHUB_REPO` are api-only and optional.
-- **`web`**: the public URLs plus optional Resend and observability values. It does not need the database, Clerk, Xero, Inngest, or KV variables.
+- **`web`**: the public URLs plus optional Resend and observability values. To publish live service health, configure the Better Stack API key, status-page ID, and HTTPS public status-page URL together. The Better Stack page must contain exactly five public resources named `App access`, `Xero connection and synchronisation`, `Calendar feed delivery`, `In-app notifications`, and `Email notifications`. If the trio or a required resource is absent, `/status` reports Unknown rather than assuming the service is operational. The web project does not need the database, Clerk, Xero, Inngest, or KV variables.
 
 `KV_REST_API_URL`/`KV_REST_API_TOKEN` and `INNGEST_EVENT_KEY`/`INNGEST_SIGNING_KEY` are validated as pairs: setting one without the other fails fast at boot rather than silently disabling caching or leaving jobs unsigned.
 

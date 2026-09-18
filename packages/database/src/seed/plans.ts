@@ -1,4 +1,9 @@
-import type { FeatureKey, LimitType, PlanKey } from "@repo/core";
+import {
+  type FeatureKey,
+  type LimitType,
+  type PlanKey,
+  PUBLIC_PLAN_CATALOGUE,
+} from "@repo/core";
 
 export interface PlanDefinition {
   readonly features: Record<FeatureKey, boolean>;
@@ -9,34 +14,21 @@ export interface PlanDefinition {
   readonly priceId: string | null;
 }
 
-// NOTE: If plan features or limits change here, ensure to synchronize the public
-// marketing constants in apps/web/app/pricing/constants.ts.
-export const PLAN_CATALOGUE = [
-  {
-    features: { analytics: false, priority_support: false },
-    is_custom: false,
-    limits: { feeds: 2, payroll_entities: 1, seats: 10 },
-    name: "Basic",
-    plan_key: "basic",
-    priceId: process.env.STRIPE_PRICE_BASIC ?? null,
-  },
-  {
-    features: { analytics: true, priority_support: true },
-    is_custom: false,
-    limits: { feeds: -1, payroll_entities: 2, seats: 50 },
-    name: "Premium",
-    plan_key: "premium",
-    priceId: process.env.STRIPE_PRICE_PREMIUM ?? null,
-  },
-  {
-    features: { analytics: true, priority_support: true },
-    is_custom: true,
-    limits: { feeds: -1, payroll_entities: -1, seats: -1 },
-    name: "Enterprise",
-    plan_key: "enterprise",
-    priceId: null,
-  },
-] as const satisfies readonly PlanDefinition[];
+const priceIdFor = (planKey: PlanKey): string | null => {
+  if (planKey === "basic") {
+    return process.env.STRIPE_PRICE_BASIC ?? null;
+  }
+  if (planKey === "premium") {
+    return process.env.STRIPE_PRICE_PREMIUM ?? null;
+  }
+  return null;
+};
+
+export const PLAN_CATALOGUE = PUBLIC_PLAN_CATALOGUE.map((plan) => ({
+  ...plan,
+  is_custom: plan.plan_key === "enterprise",
+  priceId: priceIdFor(plan.plan_key),
+})) satisfies readonly PlanDefinition[];
 
 export const getPlanDefinition = (planKey: PlanKey): PlanDefinition => {
   const plan = PLAN_CATALOGUE.find((item) => item.plan_key === planKey);

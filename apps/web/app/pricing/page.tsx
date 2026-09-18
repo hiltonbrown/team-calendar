@@ -1,17 +1,21 @@
+import { getLaunchMode } from "@repo/next-config/launch-mode";
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
+import "../styles/features.css";
+import "../styles/motion.css";
 import { PricingExperience } from "./components/pricing-experience";
 
-// Pricing content depends on NEXT_PUBLIC_LAUNCH_MODE at runtime.
-// Static prerendering fails when the env var is unavailable at build time.
-export const dynamic = "force-dynamic";
+const launchMode = getLaunchMode();
 
 export const metadata: Metadata = createMetadata({
+  alternates: { canonical: "/pricing" },
   description:
-    "Team Calendar pricing for Xero Payroll teams. Compare Starter, Premium, and Enterprise plans for calendar availability publishing.",
-  title: "Pricing",
+    launchMode === "early_access"
+      ? "Eligibility and inclusions for Team Calendar’s closed Australian early-access cohort."
+      : "Compare Team Calendar Starter and Premium pricing for Australian Xero Payroll teams.",
+  openGraph: { url: "/pricing" },
+  title: launchMode === "early_access" ? "Australian early access" : "Pricing",
 });
 
-const Pricing = () => <PricingExperience />;
-
+const Pricing = () => <PricingExperience mode={launchMode} />;
 export default Pricing;

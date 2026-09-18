@@ -39,7 +39,7 @@ export function CalendarMonthView({
 
       <section
         aria-label="Month calendar"
-        className="overflow-x-auto rounded-2xl bg-muted p-1"
+        className="hidden overflow-x-auto rounded-2xl bg-muted p-1 md:block"
       >
         <div className="grid min-w-[56rem] grid-cols-7 gap-1">
           {dayLabels.map((label) => (
@@ -119,6 +119,73 @@ export function CalendarMonthView({
             );
           })}
         </div>
+      </section>
+      <section
+        aria-label="Month agenda"
+        className="space-y-3 rounded-[20px] bg-muted p-3 md:hidden"
+      >
+        {data.days.map((day) => {
+          const dateOnly = day.date.toISOString().slice(0, 10);
+          const dateLabel = new Intl.DateTimeFormat("en-AU", {
+            day: "numeric",
+            month: "long",
+            timeZone: "UTC",
+            weekday: "long",
+            year: "numeric",
+          }).format(day.date);
+          return (
+            <article
+              className={cn(
+                "min-w-0 rounded-xl bg-background p-3",
+                day.isToday && "ring-2 ring-primary/30"
+              )}
+              key={dateOnly}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-semibold text-sm">{dateLabel}</h3>
+                <Button asChild size="sm" variant="ghost">
+                  <Link
+                    href={withOrg(
+                      `/calendar?view=day&anchor=${dateOnly}`,
+                      orgQueryValue
+                    )}
+                  >
+                    View day
+                  </Link>
+                </Button>
+              </div>
+              {day.publicHolidays.map((holiday) => (
+                <p
+                  className={`mt-2 rounded-xl px-2.5 py-1.5 text-sm ${statusToneClasses.holiday}`}
+                  key={holiday.name}
+                >
+                  {holiday.name}
+                </p>
+              ))}
+              <div className="mt-2 space-y-2">
+                {day.events.length > 0 ? (
+                  day.events.map((event) => (
+                    <CalendarEventChip
+                      event={event}
+                      key={`${event.id}-${dateOnly}-agenda`}
+                      orgQueryValue={orgQueryValue}
+                    />
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">
+                    No leave or availability
+                  </p>
+                )}
+              </div>
+              <CalendarCreateLauncher
+                className="mt-3 w-full"
+                date={day.date}
+                personId={createPersonId}
+                startsAt={dateOnly}
+              />
+            </article>
+          );
+        })}
       </section>
     </section>
   );

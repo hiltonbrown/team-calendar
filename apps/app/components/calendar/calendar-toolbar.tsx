@@ -86,8 +86,16 @@ export function CalendarToolbar({
     teams,
   });
   const appliedFilterCount = countAppliedFilters(filters);
+  const addRecord = () => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()));
+    params.set("startsAt", today);
+    if (selectedPersonId) {
+      params.set("personId", selectedPersonId);
+    }
+    router.push(withOrg(`/plans/new?${params.toString()}`, orgQueryValue));
+  };
   return (
-    <div className="rounded-2xl bg-muted p-4">
+    <div className="rounded-[20px] bg-muted p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -150,18 +158,8 @@ export function CalendarToolbar({
           />
 
           <Button
-            onClick={() => {
-              const params = new URLSearchParams(
-                Array.from(searchParams.entries())
-              );
-              params.set("startsAt", today);
-              if (selectedPersonId) {
-                params.set("personId", selectedPersonId);
-              }
-              router.push(
-                withOrg(`/plans/new?${params.toString()}`, orgQueryValue)
-              );
-            }}
+            className="hidden md:inline-flex"
+            onClick={addRecord}
             type="button"
           >
             <PlusIcon className="size-4" />
@@ -170,6 +168,14 @@ export function CalendarToolbar({
         </div>
       </div>
       <ActiveFilterSummary labels={activeFilters} />
+      <Button
+        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 shadow-lg md:hidden"
+        onClick={addRecord}
+        type="button"
+      >
+        <PlusIcon className="size-4" />
+        Add leave or availability
+      </Button>
     </div>
   );
 }

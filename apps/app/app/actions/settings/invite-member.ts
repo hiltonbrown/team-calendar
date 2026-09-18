@@ -27,6 +27,9 @@ export const inviteMember = async (input: unknown): Promise<Result<void>> => {
       ok: false,
     };
   }
+  if (parsed.data.role === "org:owner" && orgRole !== "org:owner") {
+    return { error: "Only owners can invite another owner", ok: false };
+  }
 
   try {
     const clerk = await clerkClient();

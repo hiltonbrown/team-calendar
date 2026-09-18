@@ -70,6 +70,45 @@ describe("CalendarDayView", () => {
       screen.getByText("No leave or availability for this day")
     ).toBeDefined();
   });
+
+  it("places Brisbane events by local hour and keeps off-hours discoverable", () => {
+    const base = rangeWithEvents();
+    render(
+      <CalendarDayView
+        actingPersonId={null}
+        data={{
+          ...base,
+          days: [
+            {
+              ...base.days[0],
+              events: [
+                timedEvent(),
+                timedEvent({
+                  displayName: "Early Kai",
+                  id: "early",
+                  startsAt: new Date("2026-04-14T19:30:00.000Z"),
+                }),
+                timedEvent({
+                  displayName: "Late Kai",
+                  id: "late",
+                  startsAt: new Date("2026-04-15T11:30:00.000Z"),
+                }),
+              ],
+            },
+          ],
+        }}
+        orgQueryValue={null}
+        selectedPersonId={null}
+      />
+    );
+
+    expect(screen.getByText("Earlier than 06:00")).toBeDefined();
+    expect(screen.getByText("Early Kai")).toBeDefined();
+    expect(screen.getByText("Later than 20:59")).toBeDefined();
+    expect(screen.getByText("Late Kai")).toBeDefined();
+    const nineRow = screen.getByText("09:00").closest("div");
+    expect(nineRow?.textContent).toContain("Kai Timed");
+  });
 });
 
 function rangeWithEvents() {
@@ -104,14 +143,15 @@ function rangeWithEvents() {
   } as const;
 }
 
-function timedEvent() {
+function timedEvent(overrides = {}) {
   return {
     ...event(),
     allDay: false,
     displayName: "Kai Timed",
-    endsAt: new Date("2026-04-15T10:00:00.000Z"),
+    endsAt: new Date("2026-04-15T00:00:00.000Z"),
     id: "timed-event",
-    startsAt: new Date("2026-04-15T09:30:00.000Z"),
+    startsAt: new Date("2026-04-14T23:30:00.000Z"),
+    ...overrides,
   } as const;
 }
 

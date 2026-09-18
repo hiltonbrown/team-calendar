@@ -44,6 +44,13 @@ const feed: FeedTableItem = {
   subscribeUrl: "https://calendar.example/ical/tc1.feed-token.signature.ics",
 };
 
+function openManageMenu(feedName = feed.name) {
+  fireEvent.pointerDown(
+    screen.getByRole("button", { name: `Manage ${feedName}` }),
+    { button: 0, ctrlKey: false }
+  );
+}
+
 describe("FeedTable", () => {
   beforeEach(() => {
     Object.defineProperty(navigator, "clipboard", {
@@ -86,7 +93,8 @@ describe("FeedTable", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Archive" }));
+    openManageMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
     fireEvent.click(screen.getByRole("button", { name: "Archive feed" }));
 
     expect((await screen.findByRole("alert")).textContent).toContain(
@@ -181,7 +189,8 @@ describe("FeedTable", () => {
       />
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
+    openManageMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Restore" }));
 
     await waitFor(() => {
       expect(mocks.restoreFeedAction).toHaveBeenCalledWith({
@@ -191,6 +200,28 @@ describe("FeedTable", () => {
       expect(screen.getByRole("status").textContent).toContain(
         "Feed restored in a paused state"
       );
+    });
+  });
+
+  it("returns focus to the management menu after cancelling confirmation", async () => {
+    render(
+      <FeedTable
+        canManage
+        feeds={[feed]}
+        organisationId="00000000-0000-4000-8000-000000000001"
+        orgQueryValue={null}
+      />
+    );
+
+    const manageButton = screen.getByRole("button", {
+      name: `Manage ${feed.name}`,
+    });
+    openManageMenu();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rotate token" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(manageButton);
     });
   });
 });

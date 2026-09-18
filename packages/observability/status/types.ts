@@ -1,62 +1,65 @@
-export interface BetterStackResponse {
-  data: {
-    id: string;
-    type: string;
-    attributes: {
-      url: string;
-      pronounceable_name: string;
-      auth_username: string;
-      auth_password: string;
-      monitor_type: string;
-      monitor_group_id: unknown;
-      last_checked_at: string;
-      status:
-        | "down"
-        | "maintenance"
-        | "paused"
-        | "pending"
-        | "up"
-        | "validating";
-      policy_id: unknown;
-      required_keyword: unknown;
-      verify_ssl: boolean;
-      check_frequency: number;
-      call: boolean;
-      sms: boolean;
-      email: boolean;
-      push: boolean;
-      team_wait: unknown;
-      http_method: string;
-      request_timeout: number;
-      recovery_period: number;
-      request_headers: unknown[];
-      request_body: string;
-      follow_redirects: boolean;
-      remember_cookies: boolean;
-      created_at: string;
-      updated_at: string;
-      ssl_expiration: unknown;
-      domain_expiration: unknown;
-      regions: string[];
-      expected_status_codes: unknown[];
-      port: unknown;
-      confirmation_period: number;
-      paused_at: unknown;
-      paused: boolean;
-      maintenance_from: unknown;
-      maintenance_to: unknown;
-      maintenance_timezone: string;
-    };
-    relationships: {
-      policy: {
-        data: unknown;
-      };
-    };
-  }[];
-  pagination: {
-    first: string;
-    last: string;
-    prev: unknown;
-    next: unknown;
-  };
+export const publicComponentNames = [
+  "App access",
+  "Xero connection and synchronisation",
+  "Calendar feed delivery",
+  "In-app notifications",
+  "Email notifications",
+] as const;
+
+export type PublicComponentName = (typeof publicComponentNames)[number];
+export type PublicComponentState =
+  | "operational"
+  | "degraded"
+  | "outage"
+  | "maintenance"
+  | "unknown";
+export type PublicOverallState =
+  | "operational"
+  | "degraded"
+  | "partial_outage"
+  | "major_outage"
+  | "maintenance"
+  | "unknown";
+
+export interface PublicStatusComponent {
+  name: PublicComponentName;
+  state: PublicComponentState;
+}
+export interface PublicStatusUpdate {
+  message: string;
+  publishedAt: string;
+}
+export type PublicIncidentState = "active" | "maintenance" | "resolved";
+export interface PublicStatusIncident {
+  affectedComponents: PublicComponentName[];
+  resolvedAt: string | null;
+  startedAt: string;
+  state: PublicIncidentState;
+  title: string;
+  updates: PublicStatusUpdate[];
+}
+export interface PublicStatusSnapshot {
+  activeIncidents: PublicStatusIncident[];
+  checkedAt: string;
+  components: PublicStatusComponent[];
+  hostedStatusPageUrl: string;
+  incidentAvailability: "available" | "unavailable";
+  overallState: PublicOverallState;
+  recentIncidents: PublicStatusIncident[];
+  subscribable: boolean;
+}
+export type PublicStatusErrorCode =
+  | "configuration"
+  | "authentication"
+  | "not_found"
+  | "rate_limit"
+  | "timeout"
+  | "network"
+  | "provider"
+  | "invalid_response"
+  | "unknown";
+export interface PublicStatusError {
+  code: PublicStatusErrorCode;
+  hostedStatusPageUrl?: string;
+  message: string;
 }

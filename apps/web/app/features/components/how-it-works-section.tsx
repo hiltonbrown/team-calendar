@@ -21,7 +21,7 @@ const steps: ProcessStep[] = [
     title: "Update the source of truth",
   },
   {
-    copy: "Shared calendars show who is available and when, updated within 60 seconds of approval.",
+    copy: "Team Calendar republishes approved changes; calendar apps refresh subscribed feeds on their own schedules.",
     number: 4,
     title: "Publish to calendars",
   },
@@ -31,7 +31,7 @@ export const HowItWorksSection = () => (
   <section className="fmkt-how" id="how-it-works">
     <div className="fmkt-container">
       <div className="fmkt-section-header">
-        <h2 className="fmkt-section-title">Four steps. One calm workflow.</h2>
+        <h2 className="fmkt-section-title">One easy workflow</h2>
       </div>
       <div className="fmkt-how__steps">
         {steps.map((step) => (

@@ -8,6 +8,13 @@ import {
 } from "@repo/design-system/components/ui/avatar";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@repo/design-system/components/ui/dropdown-menu";
 import { Kbd } from "@repo/design-system/components/ui/kbd";
 import {
   Select,
@@ -18,14 +25,14 @@ import {
 } from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/design-system/components/ui/table";
-import { AlertTriangleIcon, ChevronDownIcon } from "lucide-react";
+  AlertTriangleIcon,
+  CheckCircle2Icon,
+  ChevronDownIcon,
+  CircleXIcon,
+  Clock3Icon,
+  MoreHorizontalIcon,
+  Undo2Icon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   Fragment,
@@ -45,6 +52,7 @@ import { ApproveConfirmationModal } from "@/components/approvals/approve-confirm
 import { DeclineModal } from "@/components/approvals/decline-modal";
 import { RequestInfoModal } from "@/components/approvals/request-info-modal";
 import { EmptyState } from "@/components/states/empty-state";
+import type { XeroFailedAction } from "@/components/states/xero-sync-failed-state";
 import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
 import { formatLeaveBalance } from "@/lib/format-leave-balance";
 import { useFilterParams } from "@/lib/url-state/use-filter-params";
@@ -249,18 +257,7 @@ export function LeaveApprovalsClient({
         ) : null}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <SummaryCell label="Pending" value={summary.pending} />
-        <SummaryCell label="Failed sync" value={summary.failedSync} />
-        <SummaryCell
-          label="Approved this month"
-          value={summary.approvedThisMonth}
-        />
-        <SummaryCell
-          label="Declined this month"
-          value={summary.declinedThisMonth}
-        />
-      </div>
+      <QueueSummary summary={summary} />
 
       <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 md:flex-row md:items-center">
         <label className="grid gap-1 text-sm" htmlFor="approvals-status-filter">
@@ -313,7 +310,7 @@ export function LeaveApprovalsClient({
           title="No approvals to review"
         />
       ) : (
-        <div className="overflow-hidden rounded-2xl bg-background">
+        <div className="rounded-2xl bg-background">
           <p className="flex flex-wrap items-center gap-1.5 px-4 pt-3 text-muted-foreground text-xs">
             <span>Tab to a row, then</span>
             <Kbd>A</Kbd>
@@ -323,102 +320,126 @@ export function LeaveApprovalsClient({
             <Kbd>Enter</Kbd>
             <span>expand</span>
           </p>
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Person</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Submitted</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <table aria-label="Leave approval queue" className="block w-full">
+            <thead className="hidden lg:block">
+              <tr className="hidden grid-cols-[1.2fr_0.8fr_1fr_1.1fr_0.8fr_auto] gap-4 px-4 py-3 text-muted-foreground text-xs lg:grid">
+                <th className="text-left font-normal" scope="col">
+                  Person
+                </th>
+                <th className="text-left font-normal" scope="col">
+                  Type
+                </th>
+                <th className="text-left font-normal" scope="col">
+                  Dates
+                </th>
+                <th className="text-left font-normal" scope="col">
+                  Balance
+                </th>
+                <th className="text-left font-normal" scope="col">
+                  Status
+                </th>
+                <th className="text-right font-normal" scope="col">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="block">
               {items.map((record) => {
                 const isExpanded = expandedId === record.id;
                 const detailId = `approval-details-${record.id}`;
                 const name = personName(record);
+                const isRecordPending =
+                  isPending && pendingRecordId === record.id;
                 return (
                   <Fragment key={record.id}>
-                    <TableRow
+                    <tr
+                      aria-busy={isRecordPending}
                       aria-controls={detailId}
                       aria-expanded={isExpanded}
-                      className="cursor-pointer focus-visible:bg-accent focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2"
-                      onClick={() =>
-                        setExpandedId(isExpanded ? null : record.id)
-                      }
+                      className="grid cursor-pointer gap-4 px-4 py-5 focus-visible:bg-accent focus-visible:outline-[3px] focus-visible:outline-ring focus-visible:-outline-offset-2 lg:grid-cols-[1.2fr_0.8fr_1fr_1.1fr_0.8fr_auto] lg:items-center"
+                      onClick={(event) => {
+                        if (
+                          event.target instanceof Element &&
+                          event.target.closest("button, a, input, select")
+                        ) {
+                          return;
+                        }
+                        setExpandedId(isExpanded ? null : record.id);
+                      }}
                       onKeyDown={(event) =>
                         handleRowKeyDown(event, record, isExpanded)
                       }
                       tabIndex={0}
                     >
-                      <TableCell>
+                      <td className="block">
                         <PersonCell record={record} />
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <QueueDatum label="Type">
                         {getAvailabilityRecordLabel(record.recordType)}
-                      </TableCell>
-                      <TableCell>
+                      </QueueDatum>
+                      <QueueDatum label="Dates">
                         {formatDateRange(record.startsAt, record.endsAt)}
-                        <div className="text-muted-foreground text-xs">
+                        <span className="block text-muted-foreground text-xs">
                           {record.durationWorkingDays === null
                             ? "Duration unavailable"
                             : `${record.durationWorkingDays} working days`}
-                        </div>
-                      </TableCell>
-                      <TableCell>{balanceLabel(record)}</TableCell>
-                      <TableCell>
-                        {submittedLabel(record.submittedAt)}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={record.approvalStatus} />
-                      </TableCell>
-                      <TableCell onClick={(event) => event.stopPropagation()}>
-                        <div className="flex justify-end gap-2">
-                          <ActionButtons
-                            disabled={
-                              isPending && pendingRecordId === record.id
-                            }
-                            onInlineAction={runInlineAction}
-                            onOpen={setModal}
-                            record={record}
+                        </span>
+                      </QueueDatum>
+                      <QueueDatum label="Balance">
+                        {balanceLabel(record)}
+                      </QueueDatum>
+                      <QueueDatum label="Status">
+                        <ApprovalStatusBadge status={record.approvalStatus} />
+                      </QueueDatum>
+                      <td className="flex flex-wrap items-center gap-2 lg:justify-end">
+                        <ActionButtons
+                          disabled={isRecordPending}
+                          onInlineAction={runInlineAction}
+                          onOpen={setModal}
+                          record={record}
+                        />
+                        <Button
+                          aria-controls={detailId}
+                          aria-expanded={isExpanded}
+                          aria-label={`${isExpanded ? "Collapse" : "Expand"} details for ${name}`}
+                          onClick={() =>
+                            setExpandedId(isExpanded ? null : record.id)
+                          }
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <ChevronDownIcon
+                            aria-hidden="true"
+                            className="size-4"
                           />
-                          <Button
-                            aria-controls={detailId}
-                            aria-expanded={isExpanded}
-                            aria-label={`${isExpanded ? "Collapse" : "Expand"} details for ${name}`}
-                            onClick={() =>
-                              setExpandedId(isExpanded ? null : record.id)
-                            }
-                            size="sm"
-                            type="button"
-                            variant="ghost"
+                        </Button>
+                        {isRecordPending ? (
+                          <span
+                            aria-live="polite"
+                            className="text-muted-foreground text-xs"
+                            role="status"
                           >
-                            <ChevronDownIcon
-                              aria-hidden="true"
-                              className="size-4"
-                            />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && (
-                      <TableRow id={detailId} key={`${record.id}-detail`}>
-                        <TableCell colSpan={7}>
+                            Updating {name}…
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                    {isExpanded ? (
+                      <tr className="block" id={detailId}>
+                        <td className="block px-4 pb-4">
                           <DetailPanel
                             onInlineAction={runInlineAction}
                             record={record}
                           />
-                        </TableCell>
-                      </TableRow>
-                    )}
+                        </td>
+                      </tr>
+                    ) : null}
                   </Fragment>
                 );
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
           {nextCursor ? (
             <div className="flex justify-center border-t p-4">
               <Button
@@ -470,12 +491,59 @@ function inlineActionSuccessMessage(
   return "Leave declined in Xero";
 }
 
-function SummaryCell({ label, value }: { label: string; value: number }) {
+function QueueSummary({ summary }: { summary: ApprovalSummaryCounts }) {
   return (
-    <div className="rounded-2xl bg-muted p-4">
-      <div className="font-semibold text-2xl">{value}</div>
-      <div className="text-muted-foreground text-sm">{label}</div>
-    </div>
+    <section
+      aria-labelledby="approval-queue-summary"
+      className="flex flex-col gap-4 rounded-[20px] bg-muted p-5 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <div>
+        <h3 className="font-semibold text-sm" id="approval-queue-summary">
+          Approval queue
+        </h3>
+        <p className="mt-1 font-semibold text-3xl tabular-nums">
+          {summary.pending}
+          <span className="ml-2 font-normal text-muted-foreground text-sm">
+            pending
+          </span>
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        {summary.failedSync > 0 ? (
+          <span className="rounded-xl bg-error-container px-3 py-2 font-medium text-on-error-container text-sm">
+            {summary.failedSync} failed sync
+          </span>
+        ) : (
+          <span className="text-muted-foreground text-sm">No failed syncs</span>
+        )}
+        <details className="text-sm">
+          <summary className="cursor-pointer rounded-xl px-3 py-2 font-medium focus-visible:outline-[3px] focus-visible:outline-ring">
+            This month
+          </summary>
+          <p className="mt-2 text-muted-foreground">
+            {summary.approvedThisMonth} approved, {summary.declinedThisMonth}{" "}
+            declined
+          </p>
+        </details>
+      </div>
+    </section>
+  );
+}
+
+function QueueDatum({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <td className="block min-w-0 text-sm">
+      <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+        {label}
+      </span>
+      {children}
+    </td>
   );
 }
 
@@ -524,6 +592,7 @@ function ActionButtons({
     <>
       {record.availableActions.includes("approve") && (
         <Button
+          disabled={disabled}
           onClick={() => onOpen({ mode: "approve", record })}
           size="sm"
           type="button"
@@ -533,6 +602,7 @@ function ActionButtons({
       )}
       {record.availableActions.includes("decline") && (
         <Button
+          disabled={disabled}
           onClick={() => onOpen({ mode: "decline", record })}
           size="sm"
           type="button"
@@ -541,48 +611,77 @@ function ActionButtons({
           Decline
         </Button>
       )}
-      {record.availableActions.includes("request_more_info") && (
+      <SecondaryActions
+        disabled={disabled}
+        onInlineAction={onInlineAction}
+        onOpen={onOpen}
+        record={record}
+      />
+    </>
+  );
+}
+
+function SecondaryActions({
+  disabled,
+  onInlineAction,
+  onOpen,
+  record,
+}: Parameters<typeof ActionButtons>[0]) {
+  const hasSecondaryAction = record.availableActions.some((action) =>
+    [
+      "request_more_info",
+      "retry_approval",
+      "retry_decline",
+      "revert_to_submitted",
+    ].includes(action)
+  );
+  if (!hasSecondaryAction) {
+    return null;
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
-          onClick={() => onOpen({ mode: "info", record })}
-          size="sm"
-          type="button"
-          variant="ghost"
-        >
-          Request more info
-        </Button>
-      )}
-      {record.availableActions.includes("retry_approval") && (
-        <Button
+          aria-label={`More actions for ${personName(record)}`}
           disabled={disabled}
-          onClick={() => onInlineAction(record, "retry_approval")}
-          size="sm"
-          type="button"
-        >
-          Try again
-        </Button>
-      )}
-      {record.availableActions.includes("retry_decline") && (
-        <Button
-          disabled={disabled}
-          onClick={() => onInlineAction(record, "retry_decline")}
-          size="sm"
-          type="button"
-        >
-          Try again
-        </Button>
-      )}
-      {record.availableActions.includes("revert_to_submitted") && (
-        <Button
-          disabled={disabled}
-          onClick={() => onInlineAction(record, "revert_to_submitted")}
           size="sm"
           type="button"
           variant="secondary"
         >
-          Revert to pending
+          <MoreHorizontalIcon aria-hidden="true" className="size-4" />
+          More
         </Button>
-      )}
-    </>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Request actions</DropdownMenuLabel>
+        {record.availableActions.includes("request_more_info") ? (
+          <DropdownMenuItem onSelect={() => onOpen({ mode: "info", record })}>
+            Request more information
+          </DropdownMenuItem>
+        ) : null}
+        {record.availableActions.includes("retry_approval") ? (
+          <DropdownMenuItem
+            onSelect={() => onInlineAction(record, "retry_approval")}
+          >
+            Retry approval
+          </DropdownMenuItem>
+        ) : null}
+        {record.availableActions.includes("retry_decline") ? (
+          <DropdownMenuItem
+            onSelect={() => onInlineAction(record, "retry_decline")}
+          >
+            Retry decline
+          </DropdownMenuItem>
+        ) : null}
+        {record.availableActions.includes("revert_to_submitted") ? (
+          <DropdownMenuItem
+            onSelect={() => onInlineAction(record, "revert_to_submitted")}
+          >
+            Revert to pending
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -601,6 +700,7 @@ function DetailPanel({
     <div className="grid gap-4 rounded-2xl bg-muted p-4">
       {record.xeroWriteError ? (
         <XeroSyncFailedState
+          failedAction={normaliseFailedAction(record.failedAction)}
           message={record.xeroWriteError}
           retrySlot={retrySlot}
           revertSlot={
@@ -644,7 +744,7 @@ function retrySlotForRecord(
         size="sm"
         type="button"
       >
-        Try again
+        Retry approval
       </Button>
     );
   }
@@ -655,7 +755,7 @@ function retrySlotForRecord(
         size="sm"
         type="button"
       >
-        Try again
+        Retry decline
       </Button>
     );
   }
@@ -678,15 +778,63 @@ function DetailItem({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+export function ApprovalStatusBadge({ status }: { status: string }) {
   const label = statusLabel(status);
-  const isFailed = status === "xero_sync_failed";
+  const presentation = statusPresentation(status);
   return (
-    <Badge className="gap-1" variant={isFailed ? "destructive" : "secondary"}>
-      {isFailed && <AlertTriangleIcon className="size-3" />}
+    <Badge
+      className={`gap-1 border-transparent shadow-none ${presentation.className}`}
+      data-status={status}
+      variant="secondary"
+    >
+      {presentation.icon}
       {label}
     </Badge>
   );
+}
+
+function statusPresentation(status: string) {
+  if (status === "approved") {
+    return {
+      className: "bg-secondary text-secondary-foreground",
+      icon: <CheckCircle2Icon aria-hidden="true" className="size-3" />,
+    };
+  }
+  if (status === "declined") {
+    return {
+      className: "bg-surface-container-high text-on-surface",
+      icon: <CircleXIcon aria-hidden="true" className="size-3" />,
+    };
+  }
+  if (status === "withdrawn") {
+    return {
+      className: "bg-accent-container text-on-accent-container",
+      icon: <Undo2Icon aria-hidden="true" className="size-3" />,
+    };
+  }
+  if (status === "xero_sync_failed") {
+    return {
+      className: "bg-error-container text-on-error-container",
+      icon: <AlertTriangleIcon aria-hidden="true" className="size-3" />,
+    };
+  }
+  return {
+    className: "bg-warning-container text-on-warning-container",
+    icon: <Clock3Icon aria-hidden="true" className="size-3" />,
+  };
+}
+
+function normaliseFailedAction(value: string | null): XeroFailedAction | null {
+  if (
+    value === "approve" ||
+    value === "decline" ||
+    value === "submit" ||
+    value === "sync" ||
+    value === "withdraw"
+  ) {
+    return value;
+  }
+  return null;
 }
 
 function modalRecord(record: ApprovalItem): ApprovalModalRecord {

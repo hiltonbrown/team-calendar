@@ -2,6 +2,7 @@ import { auth, currentUser } from "@repo/auth/server";
 import {
   type AnalyticsRole,
   aggregateOutOfOffice,
+  type DateRangePreset,
   resolveDateRange,
 } from "@repo/availability";
 import { getAvailabilityRecordLabel } from "@repo/core";
@@ -22,7 +23,10 @@ import {
 } from "@/lib/auth/require-page-role";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
-import { AnalyticsFilters } from "../analytics-filters";
+import {
+  AnalyticsFilters,
+  type AnalyticsPersonType,
+} from "../analytics-filters";
 import { OooDaysByTypeChart } from "./ooo-days-by-type-chart";
 import { OooDaysMonthlyChart } from "./ooo-days-monthly-chart";
 
@@ -86,7 +90,11 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
     : params.preset;
   const fromParam = Array.isArray(params.from) ? params.from[0] : params.from;
   const toParam = Array.isArray(params.to) ? params.to[0] : params.to;
-  const validPresets = new Set([
+  const personTypeParam = Array.isArray(params.personType)
+    ? params.personType[0]
+    : params.personType;
+  const personType = resolvePersonType(personTypeParam);
+  const validPresets = new Set<DateRangePreset>([
     "this_month",
     "last_month",
     "this_quarter",
@@ -96,13 +104,15 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
     "last_12_months",
     "custom",
   ]);
-  const preset =
-    presetParam && validPresets.has(presetParam) ? presetParam : "this_year";
+  const preset: DateRangePreset =
+    presetParam && isDateRangePreset(presetParam, validPresets)
+      ? presetParam
+      : "this_year";
 
   const rangeResult = resolveDateRange({
     customEnd: toParam,
     customStart: fromParam,
-    preset: preset as Parameters<typeof resolveDateRange>[0]["preset"],
+    preset,
     timezone: organisation.timezone ?? "UTC",
   });
   if (!rangeResult.ok) {
@@ -122,7 +132,7 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
     dateRange: rangeResult.value,
     filters: {
       includeArchivedPeople: false,
-      personType: "all",
+      personType,
     },
     organisationId,
     role,
@@ -172,9 +182,10 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
         <AnalyticsFilters
           customEnd={toParam}
           customStart={fromParam}
+          personType={personType}
           preset={preset}
         />
-        <section className="rounded-2xl bg-muted p-6">
+        <section className="rounded-[20px] bg-muted p-6">
           <div className="max-w-3xl space-y-2">
             <p className="font-medium text-muted-foreground text-sm">
               Analytics
@@ -189,34 +200,40 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-5">
-          <StatCard
-            label="Out-of-office days"
-            value={formatNumber(report.summaryStats.totalOooDays)}
-          />
-          <StatCard
-            label="Approved records"
-            value={formatNumber(report.summaryStats.totalRecords)}
-          />
-          <StatCard
-            label="People out-of-office"
-            value={formatNumber(report.summaryStats.peopleWithOooInPeriod)}
-          />
-          <StatCard
-            label="Average days"
-            value={formatNumber(
-              report.summaryStats.averageDaysPerPersonWithOoo
-            )}
-          />
-          <StatCard label="Most common type" value={mostCommonTypeLabel} />
+        <section className="grid gap-6 rounded-[20px] bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
+          <div>
+            <p className="text-muted-foreground text-sm">
+              Out-of-office days · {report.range.label}
+            </p>
+            <p className="mt-2 font-semibold text-4xl tabular-nums">
+              {formatNumber(report.summaryStats.totalOooDays)}
+            </p>
+          </div>
+          <dl className="grid gap-4 sm:grid-cols-3">
+            <SummaryFact
+              label="Approved records"
+              value={report.summaryStats.totalRecords}
+            />
+            <SummaryFact
+              label="People out-of-office"
+              value={report.summaryStats.peopleWithOooInPeriod}
+            />
+            <SummaryFact
+              label="Average days"
+              value={report.summaryStats.averageDaysPerPersonWithOoo}
+            />
+          </dl>
         </section>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="rounded-xl">
+        <div className="grid gap-6 xl:grid-cols-2">
+          <Card className="rounded-[20px]">
             <CardHeader>
               <CardTitle>Out-of-office by type</CardTitle>
               <p className="text-muted-foreground text-sm">
                 Approved out-of-office days by type in the selected period.
+              </p>
+              <p className="font-medium text-sm">
+                Most common: {mostCommonTypeLabel}
               </p>
             </CardHeader>
             <CardContent>
@@ -230,7 +247,7 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
             </CardContent>
           </Card>
 
-          <Card className="rounded-xl">
+          <Card className="rounded-[20px]">
             <CardHeader>
               <CardTitle>Monthly trends</CardTitle>
               <p className="text-muted-foreground text-sm">
@@ -261,15 +278,30 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
   );
 };
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function SummaryFact({ label, value }: { label: string; value: number }) {
   return (
-    <Card className="rounded-xl">
-      <CardContent className="p-5">
-        <p className="text-muted-foreground text-sm">{label}</p>
-        <p className="mt-2 font-semibold text-2xl tabular-nums">{value}</p>
-      </CardContent>
-    </Card>
+    <div className="rounded-xl bg-background p-4">
+      <dt className="text-muted-foreground text-sm">{label}</dt>
+      <dd className="mt-1 font-semibold text-xl tabular-nums">
+        {formatNumber(value)}
+      </dd>
+    </div>
   );
+}
+
+function resolvePersonType(value: string | undefined): AnalyticsPersonType {
+  if (value === "employee" || value === "contractor") {
+    return value;
+  }
+  return "all";
+}
+
+function isDateRangePreset(
+  value: string,
+  presets: Set<DateRangePreset>
+): value is DateRangePreset {
+  // The Set is constructed from the complete DateRangePreset union above.
+  return presets.has(value as DateRangePreset);
 }
 
 function analyticsRole(role: string | null | undefined): AnalyticsRole | null {

@@ -275,7 +275,7 @@
   min-width: 0;
   padding: 24px;
   background: var(--marketing-surface-lowest);
-  border-radius: 16px;
+  border-radius: 20px;
 }
 
 .dataPanel h3 {

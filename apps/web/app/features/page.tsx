@@ -1,11 +1,14 @@
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
-import Image from "next/image";
 import type { ReactNode } from "react";
+import "../styles/home.css";
+import "../styles/features.css";
+import "../styles/motion.css";
 import { MarketingIcon } from "../(home)/components/marketing-icons";
 import { integrationCapabilities } from "../integrations/capabilities";
 import { FinalCtaSection } from "./components/final-cta-section";
 import { InteractiveHeroSection } from "./components/interactive-hero";
+import { LivingCalendarStory } from "./components/living-calendar-story";
 import { ScrollReveal } from "./components/scroll-reveal";
 
 export const metadata: Metadata = createMetadata({
@@ -13,259 +16,6 @@ export const metadata: Metadata = createMetadata({
     "Every absence, every person on the calendar. Employees, contractors and directors enter leave or out-of-office once. Team Calendar publishes the combined view to Outlook, Google Calendar and Apple Calendar.",
   title: "Team Calendar: Features",
 });
-
-// ---- Personas ----------------------------------------------------------------
-
-interface Persona {
-  readonly copy: string;
-  readonly mod: string;
-  readonly role: string;
-  readonly source: {
-    readonly label: string;
-    readonly mod: string;
-    readonly sub: string;
-  };
-  readonly title: string;
-}
-
-const personas: Persona[] = [
-  {
-    copy: "Your Xero Payroll people request leave once. Approvals route to their manager, balances stay accurate, and the approved dates ship straight to every calendar they share.",
-    mod: "employee",
-    role: "Employee · on payroll",
-    source: {
-      label: "Synced from Xero Payroll",
-      mod: "sage",
-      sub: "Two-way · live",
-    },
-    title: "Annual, sick, parental, TOIL.",
-  },
-  {
-    copy: "Contractors don't need a Xero record. Add them as a non-payroll teammate and they can mark unavailable days, project work and out-of-office, visible to everyone they collaborate with.",
-    mod: "contractor",
-    role: "Contractor · off payroll",
-    source: {
-      label: "Added in Team Calendar",
-      mod: "purple",
-      sub: "Manual entry",
-    },
-    title: "Unavailable days, WFH, deep work.",
-  },
-  {
-    copy: "Directors who draw fees rather than wages stay invisible to payroll-only tools. In Team Calendar they get the same calendar presence as the rest of the team, without showing up in pay runs.",
-    mod: "director",
-    role: "Director · off payroll",
-    source: {
-      label: "Added in Team Calendar",
-      mod: "purple",
-      sub: "No payroll impact",
-    },
-    title: "Board days, travel, out of office.",
-  },
-];
-
-const FeaturesPersonas = () => (
-  <section className="ft-section" id="coverage">
-    <div className="fmkt-container">
-      <p className="fmkt-overline">Built for everyone you work with</p>
-      <h2>Everyone who affects cover, on one calendar.</h2>
-      <p className="ft-section__lead">
-        Most leave tools only see your payroll list. Team Calendar covers the
-        whole team and keeps the source of each entry obvious. Sage came from
-        Xero. Purple was added by hand.
-      </p>
-      <div className="ft-personas">
-        {personas.map((p) => (
-          <article className={`ft-persona ft-persona--${p.mod}`} key={p.mod}>
-            <span className="ft-persona__role">{p.role}</span>
-            <h3 className="ft-persona__title">{p.title}</h3>
-            <p className="ft-persona__copy">{p.copy}</p>
-            <div
-              className={`ft-persona__source ft-persona__source--${p.source.mod}`}
-            >
-              <span className="ft-persona__source__dot" />
-              {p.source.label}
-              <span className="ft-persona__source__sub">{p.source.sub}</span>
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-// ---- Capabilities ------------------------------------------------------------
-
-type CapIcon = "calendar" | "check" | "leaf" | "link" | "shield" | "sync";
-
-interface Cap {
-  readonly accent?: boolean;
-  readonly copy: string;
-  readonly icon: CapIcon;
-  readonly title: string;
-}
-
-const caps: Cap[] = [
-  {
-    copy: "Annual leave, sick, parental, TOIL, WFH, training, jury duty, conferences, out-of-office. If it removes you from a team's plan, it belongs here.",
-    icon: "calendar",
-    title: "One entry box for every kind of away",
-  },
-  {
-    copy: "Approved payroll leave writes back to Xero in the right type. Anything already in Xero shows up in Team Calendar. You only key it once, whichever side you keyed it on.",
-    icon: "sync",
-    title: "Two-way sync with Xero Payroll",
-  },
-  {
-    copy: "Each person and team gets a read-only calendar feed. Subscribe once in the app you already use; Team Calendar keeps it current.",
-    icon: "link",
-    title: "Outlook · Google · Apple",
-  },
-  {
-    accent: true,
-    copy: "Contractors, directors, board members, advisors. Anyone whose availability affects the team can sit on the calendar, without showing up in pay runs.",
-    icon: "leaf",
-    title: "Covers off-payroll people",
-  },
-  {
-    copy: "Managers see who else is away before they approve. No more rubber-stamping a fourth person off the same week.",
-    icon: "check",
-    title: "Approvals in context",
-  },
-  {
-    copy: "Every entry is colour-coded by where it came from, synced from Xero or added manually, so you always know what's authoritative.",
-    icon: "shield",
-    title: "Source-of-record, visible",
-  },
-];
-
-const FeaturesCaps = () => (
-  <section className="ft-section" id="leave-workflow">
-    <div className="fmkt-container">
-      <p className="fmkt-overline">Capabilities</p>
-      <h2>The work the calendar tab can&apos;t do.</h2>
-      <p className="ft-section__lead">
-        Email threads, spreadsheets and Xero alone leave gaps. Team Calendar
-        closes them with one place to enter, approve, sync and publish.
-      </p>
-      <div className="ft-caps">
-        {caps.map((cap) => (
-          <article
-            className={cap.accent ? "ft-cap ft-cap--accent" : "ft-cap"}
-            key={cap.title}
-          >
-            <div className="ft-cap__icon">
-              <MarketingIcon id={cap.icon} size={20} />
-            </div>
-            <h3 className="ft-cap__title">{cap.title}</h3>
-            <p className="ft-cap__copy">{cap.copy}</p>
-          </article>
-        ))}
-      </div>
-    </div>
-  </section>
-);
-
-// ---- Sync flow diagram -------------------------------------------------------
-
-const FeaturesFlow = () => (
-  <section className="ft-section" id="ics-feeds">
-    <div className="fmkt-container">
-      <p className="fmkt-overline">Sync model</p>
-      <h2>Xero is the source. Calendars are the destination.</h2>
-      <p className="ft-section__lead">
-        You keep Xero as your system of record. Team Calendar adds the people
-        and detail it cannot carry, then publishes one view your whole team can
-        see.
-      </p>
-
-      <div className="ft-flow">
-        <div className="ft-flow__col">
-          <span className="ft-flow__label">Inputs</span>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon">
-              <MarketingIcon id="leaf" size={16} />
-            </span>
-            Xero Payroll leave
-            <span className="ft-flow__chip__sub">two-way</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon">
-              <MarketingIcon id="calendar" size={16} />
-            </span>
-            Contractor entries
-            <span className="ft-flow__chip__sub">manual</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon">
-              <MarketingIcon id="shield" size={16} />
-            </span>
-            Director time
-            <span className="ft-flow__chip__sub">manual</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon">
-              <MarketingIcon id="check" size={16} />
-            </span>
-            Out of office &amp; WFH
-            <span className="ft-flow__chip__sub">anyone</span>
-          </div>
-        </div>
-
-        <div className="ft-flow__hub">
-          <div className="ft-flow__hub__brand">
-            <Image
-              alt=""
-              height={28}
-              src="/marketing/brand-mark.svg"
-              width={28}
-            />
-            <span>Team Calendar</span>
-          </div>
-          <p className="ft-flow__hub__body">
-            One reconciled record per person per day. Approvals applied.
-            Conflicts flagged. Source labelled.
-          </p>
-          <span className="ft-flow__hub__rule">
-            <MarketingIcon id="sync" size={12} /> Publishes within 60s
-          </span>
-        </div>
-
-        <div className="ft-flow__col">
-          <span className="ft-flow__label">Destinations</span>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon ft-flow__icon--accent">
-              <MarketingIcon id="outlook" size={16} />
-            </span>
-            Outlook subscription
-            <span className="ft-flow__chip__sub">.ics</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon ft-flow__icon--accent">
-              <MarketingIcon id="gcal" size={16} />
-            </span>
-            Google Calendar feed
-            <span className="ft-flow__chip__sub">.ics</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon ft-flow__icon--accent">
-              <MarketingIcon id="applecal" size={16} />
-            </span>
-            Apple Calendar feed
-            <span className="ft-flow__chip__sub">.ics</span>
-          </div>
-          <div className="ft-flow__chip">
-            <span className="ft-input-card__icon ft-flow__icon--accent">
-              <MarketingIcon id="arrowUpRight" size={16} />
-            </span>
-            In-app team view
-            <span className="ft-flow__chip__sub">live</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-);
 
 // ---- Coverage matrix ---------------------------------------------------------
 
@@ -426,7 +176,7 @@ const faqs = [
     q: "What happens to leave I've already keyed into Xero?",
   },
   {
-    a: "Yes. Outlook, Google and Apple subscribe to a .ics feed per person or per team. Edits happen in Team Calendar; calendars refresh within a minute.",
+    a: "Yes. Outlook, Google and Apple subscribe to a read-only .ics feed per person or team. Edits happen in Team Calendar; each calendar app refreshes the subscription on its own schedule.",
     q: "Is the calendar feed read-only?",
   },
   {
@@ -467,15 +217,7 @@ const FeaturesPage = () => (
     <div className="fmkt-container">
       <InteractiveHeroSection />
     </div>
-    <ScrollReveal>
-      <FeaturesPersonas />
-    </ScrollReveal>
-    <ScrollReveal delayMs={100}>
-      <FeaturesCaps />
-    </ScrollReveal>
-    <ScrollReveal>
-      <FeaturesFlow />
-    </ScrollReveal>
+    <LivingCalendarStory />
     <ScrollReveal>
       <FeaturesMatrix />
     </ScrollReveal>

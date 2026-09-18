@@ -31,14 +31,6 @@ import {
 } from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@repo/design-system/components/ui/table";
-import {
   AlertCircleIcon,
   AlertTriangleIcon,
   ArchiveIcon,
@@ -57,7 +49,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { SubmitConfirmationModal } from "@/components/plans/submit-confirmation-modal";
-import { XeroSyncFailedState } from "@/components/states/xero-sync-failed-state";
+import {
+  type XeroFailedAction,
+  XeroSyncFailedState,
+} from "@/components/states/xero-sync-failed-state";
 import { formatLeaveBalance } from "@/lib/format-leave-balance";
 import { withOrg } from "@/lib/navigation/org-url";
 import {
@@ -107,6 +102,7 @@ export interface PlansClientRecord {
   balanceChip: BalanceChip | null;
   editableActions: EditableAction[];
   endsAt: string;
+  failedAction: "submit" | "withdraw" | null;
   id: string;
   personName: string;
   recordType: string;
@@ -145,6 +141,15 @@ const recordTypeLabels: Record<string, string> = {
   wfh: "Working from home",
 };
 
+const leaveRecordTypes = new Set([
+  "annual_leave",
+  "holiday",
+  "long_service_leave",
+  "personal_leave",
+  "sick_leave",
+  "unpaid_leave",
+]);
+
 const primaryActionOrder: RowAction[] = [
   "retry_submission",
   "submit_for_approval",
@@ -166,6 +171,7 @@ export function PlansClient({
 }: PlansClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [pendingRecordId, setPendingRecordId] = useState<string | null>(null);
   const [inlineError, setInlineError] = useState<Record<string, string>>({});
   const [submissionModal, setSubmissionModal] = useState<{
     mode: "retry" | "submit";
@@ -198,26 +204,31 @@ export function PlansClient({
   };
 
   const executeAction = (recordId: string, action: RunnableAction) => {
+    setPendingRecordId(recordId);
+    setInlineError((current) => ({ ...current, [recordId]: "" }));
     startTransition(async () => {
-      setInlineError((current) => ({ ...current, [recordId]: "" }));
-      const result = await runRecordAction(action, {
-        organisationId,
-        recordId,
-      });
+      try {
+        const result = await runRecordAction(action, {
+          organisationId,
+          recordId,
+        });
 
-      if (!result.ok) {
-        setInlineError((current) => ({
-          ...current,
-          [recordId]: result.error.message,
-        }));
-        return;
-      }
+        if (!result.ok) {
+          setInlineError((current) => ({
+            ...current,
+            [recordId]: result.error.message,
+          }));
+          return;
+        }
 
-      setConfirmationAction(null);
-      if (action === "withdraw") {
-        toast.success("Submission withdrawn.");
+        setConfirmationAction(null);
+        if (action === "withdraw") {
+          toast.success("Submission withdrawn.");
+        }
+        router.refresh();
+      } finally {
+        setPendingRecordId(null);
       }
-      router.refresh();
     });
   };
 
@@ -264,19 +275,19 @@ export function PlansClient({
       {records.length > 0 && <StatusOverview records={records} />}
 
       <form
-        className="grid gap-4 rounded-2xl bg-muted p-5 md:grid-cols-5"
+        className="grid gap-4 rounded-2xl bg-muted p-5 md:grid-cols-3 xl:grid-cols-6"
         method="get"
       >
         {orgQueryValue ? (
           <input name="org" type="hidden" value={orgQueryValue} />
         ) : null}
         <input name="tab" type="hidden" value={filters.tab} />
-        <FilterField label="Category">
+        <FilterField htmlFor="plans-category" label="Category">
           <Select
             defaultValue={filters.recordTypeCategory}
             name="recordTypeCategory"
           >
-            <SelectTrigger>
+            <SelectTrigger id="plans-category">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -286,12 +297,27 @@ export function PlansClient({
             </SelectContent>
           </Select>
         </FilterField>
-        <FilterField label="Status">
+        <FilterField htmlFor="plans-source" label="Source">
+          <Select
+            defaultValue={filters.sourceType?.[0] ?? "all"}
+            name="sourceType"
+          >
+            <SelectTrigger id="plans-source">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All sources</SelectItem>
+              <SelectItem value="team_calendar_leave">Xero</SelectItem>
+              <SelectItem value="manual">Manual</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
+        <FilterField htmlFor="plans-status" label="Status">
           <Select
             defaultValue={filters.approvalStatus?.[0] ?? "all"}
             name="approvalStatus"
           >
-            <SelectTrigger>
+            <SelectTrigger id="plans-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -305,11 +331,21 @@ export function PlansClient({
             </SelectContent>
           </Select>
         </FilterField>
-        <FilterField label="From">
-          <Input defaultValue={filters.dateFrom} name="dateFrom" type="date" />
+        <FilterField htmlFor="plans-date-from" label="From">
+          <Input
+            defaultValue={filters.dateFrom}
+            id="plans-date-from"
+            name="dateFrom"
+            type="date"
+          />
         </FilterField>
-        <FilterField label="To">
-          <Input defaultValue={filters.dateTo} name="dateTo" type="date" />
+        <FilterField htmlFor="plans-date-to" label="To">
+          <Input
+            defaultValue={filters.dateTo}
+            id="plans-date-to"
+            name="dateTo"
+            type="date"
+          />
         </FilterField>
         <div className="flex items-end">
           <Button className="w-full" type="submit" variant="secondary">
@@ -318,59 +354,120 @@ export function PlansClient({
         </div>
       </form>
 
+      <ActiveFilters filters={filters} orgQueryValue={orgQueryValue} />
+
       {records.length > 0 && (
-        <div className="rounded-2xl bg-muted">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {filters.tab === "team" && <TableHead>Person</TableHead>}
-                <TableHead>Plan</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+        <div className="rounded-2xl bg-muted p-3 xl:p-0">
+          <table className="block w-full text-sm xl:table">
+            <thead className="sr-only xl:table-header-group">
+              <tr>
+                {filters.tab === "team" && (
+                  <th className="p-3 text-left">Person</th>
+                )}
+                <th className="p-3 text-left">Plan</th>
+                <th className="p-3 text-left">Dates</th>
+                <th className="p-3 text-left">Duration</th>
+                <th className="p-3 text-left">Status</th>
+                <th className="p-3 text-left">Balance</th>
+                <th className="p-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="block space-y-3 xl:table-row-group xl:space-y-0">
               {records.map((record) => {
                 const status = planStatusForRecord(record);
+                const rowPending = pendingRecordId === record.id;
                 return (
-                  <TableRow className={status.rowClassName} key={record.id}>
+                  <tr
+                    aria-busy={rowPending}
+                    className={`grid gap-4 rounded-2xl bg-background p-4 xl:table-row xl:rounded-none xl:bg-transparent xl:p-0 ${status.rowClassName}`}
+                    key={record.id}
+                  >
                     {filters.tab === "team" && (
-                      <TableCell>{record.personName}</TableCell>
+                      <td className="xl:p-3">
+                        <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                          Person
+                        </span>
+                        {record.personName}
+                      </td>
                     )}
-                    <TableCell>
-                      <div className="flex flex-col gap-1">
+                    <td className="xl:p-3">
+                      <div className="flex flex-col gap-2">
                         <span className="font-medium">
                           {recordTypeLabels[record.recordType] ??
                             getAvailabilityRecordLabel(record.recordType)}
                         </span>
-                        <SourceBadge sourceType={record.sourceType} />
+                        <div className="flex flex-wrap gap-2">
+                          <CategoryBadge recordType={record.recordType} />
+                          <SourceBadge sourceType={record.sourceType} />
+                        </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="xl:p-3">
+                      <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                        Dates
+                      </span>
                       {formatDateRange(record.startsAt, record.endsAt)}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="hidden xl:table-cell xl:p-3">
                       {record.workingDays === null
                         ? (record.workingDaysError ?? "Unavailable")
                         : `${record.workingDays} working days`}
-                    </TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="xl:p-3">
                       <div className="flex flex-col items-start gap-1.5">
                         <StatusBadge status={status} />
-                        <StatusCue status={status} />
+                        <span className="hidden xl:inline">
+                          <StatusCue status={status} />
+                        </span>
                       </div>
-                    </TableCell>
-                    <TableCell>{renderBalance(record)}</TableCell>
-                    <TableCell>
+                    </td>
+                    <td className="xl:p-3">
+                      <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                        Balance
+                      </span>
+                      {renderBalance(record) || "Not applicable"}
+                    </td>
+                    <td className="xl:p-3">
                       <RowActions
-                        disabled={isPending}
+                        disabled={rowPending}
                         onRunAction={runAction}
                         orgQueryValue={orgQueryValue}
                         record={record}
                       />
+                      {rowPending ? (
+                        <p
+                          className="mt-2 text-right text-muted-foreground text-xs"
+                          role="status"
+                        >
+                          Updating this plan…
+                        </p>
+                      ) : null}
+                      <details className="mt-3 rounded-xl bg-muted p-3 xl:hidden">
+                        <summary className="cursor-pointer font-medium">
+                          Plan details
+                        </summary>
+                        <dl className="mt-3 grid gap-2">
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              Duration
+                            </dt>
+                            <dd>
+                              {record.workingDays === null
+                                ? (record.workingDaysError ?? "Unavailable")
+                                : `${record.workingDays} working days`}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground text-xs">
+                              Status detail
+                            </dt>
+                            <dd>
+                              {statusCueForTone(status.tone) ??
+                                "No further action is needed."}
+                            </dd>
+                          </div>
+                        </dl>
+                      </details>
                       {inlineError[record.id] ? (
                         <div
                           className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
@@ -384,44 +481,51 @@ export function PlansClient({
                         record.xeroWriteError && (
                           <div className="mt-3">
                             <XeroSyncFailedState
+                              failedAction={normalisePlanFailedAction(
+                                record.failedAction
+                              )}
                               message={record.xeroWriteError}
                               retrySlot={
-                                <Button
-                                  disabled={isPending}
-                                  onClick={() =>
-                                    setSubmissionModal({
-                                      mode: "retry",
-                                      record,
-                                    })
-                                  }
-                                  size="sm"
-                                  type="button"
-                                >
-                                  Retry
-                                </Button>
+                                record.failedAction === "submit" ? (
+                                  <Button
+                                    disabled={rowPending}
+                                    onClick={() =>
+                                      setSubmissionModal({
+                                        mode: "retry",
+                                        record,
+                                      })
+                                    }
+                                    size="sm"
+                                    type="button"
+                                  >
+                                    Retry submission
+                                  </Button>
+                                ) : undefined
                               }
                               revertSlot={
-                                <Button
-                                  disabled={isPending}
-                                  onClick={() =>
-                                    runAction(record.id, "revert_to_draft")
-                                  }
-                                  size="sm"
-                                  type="button"
-                                  variant="secondary"
-                                >
-                                  Revert to draft
-                                </Button>
+                                record.failedAction === "submit" ? (
+                                  <Button
+                                    disabled={rowPending}
+                                    onClick={() =>
+                                      runAction(record.id, "revert_to_draft")
+                                    }
+                                    size="sm"
+                                    type="button"
+                                    variant="secondary"
+                                  >
+                                    Revert to draft
+                                  </Button>
+                                ) : undefined
                               }
                             />
                           </div>
                         )}
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -477,14 +581,18 @@ export function PlansClient({
 
 function FilterField({
   children,
+  htmlFor,
   label,
 }: {
   children: React.ReactNode;
+  htmlFor: string;
   label: string;
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs">{label}</Label>
+      <Label className="text-xs" htmlFor={htmlFor}>
+        {label}
+      </Label>
       {children}
     </div>
   );
@@ -503,6 +611,38 @@ function TabLink({
     <Button asChild variant={active ? "default" : "secondary"}>
       <Link href={href}>{children}</Link>
     </Button>
+  );
+}
+
+function ActiveFilters({
+  filters,
+  orgQueryValue,
+}: {
+  filters: PlansFilterInput;
+  orgQueryValue: string | null;
+}) {
+  const labels = activeFilterLabels(filters);
+  if (labels.length === 0) {
+    return null;
+  }
+
+  return (
+    <fieldset className="flex flex-wrap items-center gap-2">
+      <legend className="sr-only">Active filters</legend>
+      <span className="text-muted-foreground text-sm">
+        {labels.length === 1
+          ? "1 filter active"
+          : `${labels.length} filters active`}
+      </span>
+      {labels.map((label) => (
+        <Badge key={label} variant="secondary">
+          {label}
+        </Badge>
+      ))}
+      <Button asChild size="sm" variant="ghost">
+        <Link href={tabHref(filters.tab, orgQueryValue)}>Clear filters</Link>
+      </Button>
+    </fieldset>
   );
 }
 
@@ -651,30 +791,38 @@ function StatusOverview({ records }: { records: PlansClientRecord[] }) {
   }));
 
   return (
-    <div className="grid gap-3 md:grid-cols-4">
-      {summary.map((item) => (
-        <div
-          className={`rounded-2xl p-4 ${item.style.badgeClassName}`}
-          key={item.label}
-        >
-          <div className="flex items-center justify-between gap-3">
-            <span className="flex items-center gap-2 font-medium text-sm">
-              <span
-                aria-hidden="true"
-                className={`${item.style.dotClassName} size-2 rounded-full`}
-              />
-              {item.label}
-            </span>
-            <span className="font-semibold text-lg leading-none">
-              {item.count}
-            </span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed opacity-80">
-            {item.description}
-          </p>
-        </div>
-      ))}
+    <div className="flex flex-col gap-4 rounded-2xl bg-muted p-5 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <p className="font-medium text-sm">Current view</p>
+        <p className="mt-1 text-muted-foreground text-sm">
+          Review pending or failed plans first; approved plans need no action.
+        </p>
+      </div>
+      <ul aria-label="Plan status summary" className="flex flex-wrap gap-2">
+        {summary.map((item) => (
+          <li
+            className={`flex items-center gap-2 rounded-xl px-3 py-2 ${item.style.badgeClassName}`}
+            key={item.label}
+            title={item.description}
+          >
+            <span
+              aria-hidden="true"
+              className={`${item.style.dotClassName} size-2 rounded-full`}
+            />
+            <span className="font-medium text-xs">{item.label}</span>
+            <span className="font-semibold text-sm">{item.count}</span>
+          </li>
+        ))}
+      </ul>
     </div>
+  );
+}
+
+function CategoryBadge({ recordType }: { recordType: string }) {
+  return (
+    <Badge variant="secondary">
+      {leaveRecordTypes.has(recordType) ? "Leave" : "Availability"}
+    </Badge>
   );
 }
 
@@ -694,7 +842,7 @@ function SourceBadge({ sourceType }: { sourceType: string }) {
       ) : (
         <LeafIcon className="size-3" />
       )}
-      {isManual ? "Availability" : "Leave"}
+      {isManual ? "Manual" : "Xero"}
     </Badge>
   );
 }
@@ -762,6 +910,45 @@ function formatDate(value: string): string {
     timeZone: "UTC",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function activeFilterLabels(filters: PlansFilterInput): string[] {
+  const labels: string[] = [];
+  if (filters.recordTypeCategory === "xero_leave") {
+    labels.push("Category: Leave");
+  } else if (filters.recordTypeCategory === "local_only") {
+    labels.push("Category: Availability");
+  }
+  const sourceType = filters.sourceType?.[0];
+  if (sourceType) {
+    labels.push(`Source: ${sourceType === "manual" ? "Manual" : "Xero"}`);
+  }
+  const approvalStatus = filters.approvalStatus?.[0];
+  if (approvalStatus) {
+    labels.push(`Status: ${approvalStatus.replaceAll("_", " ")}`);
+  }
+  if (filters.dateFrom) {
+    labels.push(`From: ${filters.dateFrom}`);
+  }
+  if (filters.dateTo) {
+    labels.push(`To: ${filters.dateTo}`);
+  }
+  if (filters.includeArchived) {
+    labels.push("Archived included");
+  }
+  if (filters.recordType?.[0]) {
+    labels.push(`Type: ${recordTypeLabel(filters.recordType[0])}`);
+  }
+  if (filters.personId?.length) {
+    labels.push("People filtered");
+  }
+  return labels;
+}
+
+function normalisePlanFailedAction(
+  value: PlansClientRecord["failedAction"]
+): XeroFailedAction | null {
+  return value === "submit" || value === "withdraw" ? value : null;
 }
 
 function actionLabel(action: EditableAction): string {

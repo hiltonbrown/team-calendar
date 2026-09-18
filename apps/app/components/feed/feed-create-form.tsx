@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createFeedAction } from "@/app/(authenticated)/feeds/_actions";
 import { withOrg } from "@/lib/navigation/org-url";
+import { feedPrivacyOptions } from "./privacy-mode-copy";
 import { SubscribeUrlPanel } from "./subscribe-url-panel";
 
 type ScopeChoice = "manager_team" | "org" | "person" | "self" | "team";
@@ -118,15 +119,17 @@ export function FeedCreateForm({
           }
           value={privacyMode}
         >
-          {[
-            ["named", "Subscribers see names and leave types"],
-            ["masked", "Subscribers see Team member with leave types"],
-            ["private", "Subscribers see Unavailable only"],
-          ].map(([value, label]) => (
-            <div className="flex items-center gap-2 text-sm" key={value}>
-              <RadioGroupItem id={`privacy-${value}`} value={value} />
-              <Label className="font-normal" htmlFor={`privacy-${value}`}>
-                {label}
+          {feedPrivacyOptions.map((option) => (
+            <div className="flex items-center gap-2 text-sm" key={option.value}>
+              <RadioGroupItem
+                id={`privacy-${option.value}`}
+                value={option.value}
+              />
+              <Label
+                className="font-normal"
+                htmlFor={`privacy-${option.value}`}
+              >
+                {option.description}
               </Label>
             </div>
           ))}

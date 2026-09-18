@@ -7,6 +7,15 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Product and design
 
+- When a page's authored scrollytelling already demonstrates the product, keep
+  the hero to one promise, one proof sentence and one action. Do not make the
+  visitor decode a second full interactive demo before the narrative begins.
+- For homepage hero copy, default to the shortest complete message hierarchy:
+  one outcome, one scope statement and one proof sentence. Do not repeat product
+  concepts across the heading and body.
+- When a restoration request names `main` or a live surface as the reference,
+  treat that explicit reference as authoritative. Do not substitute an older
+  historical snapshot merely because the request also says “previous”.
 - Keep internal design-direction names out of product chrome. User-facing
   surface titles should use the established route or product name unless the
   user explicitly approves a rename.
@@ -19,6 +28,13 @@ actionable; keep one-off task evidence in the review for that task.
 - Do not silently restyle vendored or governance files solely to satisfy product
   language or presentation rules. Flag the difference and change the canonical
   source when appropriate.
+- Before splitting route CSS, identify shared selector ownership as well as
+  route consumers. If a route stylesheet owns global layout primitives, expand
+  the approved scope explicitly and extract those primitives before changing
+  imports.
+- Before generating a placeholder for a real personal subject or pet, confirm
+  distinctive appearance details first. Treat a later correction as an asset
+  invariant and preserve it in the prompt, alt text and visible disclosure.
 
 ## Xero integration
 
@@ -73,6 +89,13 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Repository hygiene
 
+- When the operator asks an execution sequence not to block, continue through
+  safe in-scope fallbacks and put concrete tooling or environment limitations
+  in `plans/README.md`; do not turn a non-product constraint into a new approval
+  stop.
+- When the user authorises a concrete resolution for a plan's documented truth
+  conflict, record the decision and residual issue in `plans/README.md`, then
+  continue execution. Do not reopen the same STOP condition as a blocker.
 - Stop every persistent development process used for verification, then confirm
   the expected ports are free before hand-off.
 - Before calling a repository tidy, inspect registered worktrees, branch tracking,

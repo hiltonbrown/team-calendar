@@ -1,71 +1,67 @@
+import type { PlanKey } from "@repo/core";
 import { signUpHref } from "@/src/lib/auth-links";
 
-/**
- * NOTE: If plans, features, or limits change in the database seed catalogue
- * (packages/database/src/seed/plans.ts), update these constants accordingly.
- */
-export interface PlanCardDetails {
-  readonly ctaHref: string;
-  readonly ctaText: string;
-  readonly description: string;
-  readonly features: string[];
-  readonly highlighted: boolean;
-  readonly interval: string;
-  readonly name: string;
-  readonly price: string;
-}
+export type PricingCurrency = "AUD" | "NZD" | "GBP";
 
-export const MARKETING_PLANS: readonly PlanCardDetails[] = [
-  {
+export const isPricingCurrency = (value: string): value is PricingCurrency =>
+  value === "AUD" || value === "NZD" || value === "GBP";
+
+export const pricingCurrencies = {
+  AUD: { country: "Australia", label: "AUD" },
+  GBP: { country: "United Kingdom", label: "GBP" },
+  NZD: { country: "New Zealand", label: "NZD" },
+} as const satisfies Record<
+  PricingCurrency,
+  { country: string; label: string }
+>;
+
+export const pricingCurrencyOptions = ["AUD", "NZD", "GBP"] as const;
+
+export const paidPlanPresentation = {
+  basic: {
     ctaHref: signUpHref,
-    ctaText: "Get started",
-    description: "For small teams starting with calendar publishing",
-    features: [
-      "1 Xero Payroll organisation",
-      "Up to 2 calendar feeds",
-      "Up to 10 user seats",
-      "Manual availability entries",
-      "Basic sync health dashboard",
-    ],
-    highlighted: false,
-    interval: "mo",
-    name: "Basic",
+    description:
+      "For small Australian teams publishing one trusted calendar view.",
+    feedLabel: "Core Feed",
+    price: "$9",
+  },
+  enterprise: {
+    ctaHref: null,
+    description:
+      "For organisations that need multiple Xero Payroll connections.",
+    feedLabel: null,
+    price: null,
+  },
+  premium: {
+    ctaHref: signUpHref,
+    description:
+      "For growing teams that need richer feeds, reporting and support.",
+    feedLabel: "Team and location feeds",
     price: "$19",
   },
+} as const satisfies Record<
+  PlanKey,
   {
-    ctaHref: signUpHref,
-    ctaText: "Get started",
-    description: "For growing teams needing advanced coverage",
-    features: [
-      "2 Xero Payroll organisations",
-      "Unlimited calendar feeds",
-      "Up to 50 user seats",
-      "Manual availability entries",
-      "Advanced sync health dashboard",
-      "Analytics & leave reports",
-      "Priority support",
-    ],
-    highlighted: true,
-    interval: "mo",
-    name: "Premium",
-    price: "$49",
-  },
-  {
-    ctaHref: "#contact",
-    ctaText: "Talk to us",
-    description: "For multi-entity payroll and guided rollout support",
-    features: [
-      "Multiple Xero Payroll organisations",
-      "Custom calendar feeds",
-      "Unlimited user seats",
-      "Manual availability entries",
-      "Advanced sync health dashboard",
-      "Implementation partner support",
-      "Guided rollout & onboarding",
-    ],
-    highlighted: false,
-    interval: "",
-    name: "Enterprise",
-    price: "Custom",
-  },
-] as const;
+    ctaHref: string | null;
+    description: string;
+    feedLabel: string | null;
+    price: string | null;
+  }
+>;
+
+export const getCurrencyPricingState = (currency: PricingCurrency) => {
+  const region = pricingCurrencies[currency];
+  return currency === "AUD"
+    ? {
+        available: true as const,
+        currency,
+        heading: "Australian plans",
+        region,
+      }
+    : {
+        available: false as const,
+        currency,
+        heading: `${region.country} pricing is coming soon`,
+        region,
+      };
+};

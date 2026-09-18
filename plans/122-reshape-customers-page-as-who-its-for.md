@@ -7,7 +7,7 @@
 > rather than improvising. The reviewer maintains `plans/README.md`.
 >
 > **Drift check (run first)**:
-> `git diff --stat e7ee7c7..HEAD -- apps/web/app/customers/page.tsx apps/web/app/customers/customers.module.css apps/web/app/customers/customers.test.ts apps/web/app/components/header/index.tsx apps/web/app/components/header/header.test.tsx apps/web/app/components/footer.tsx apps/web/app/components/footer.test.tsx apps/web/app/styles.css apps/web/app/styles/shell.css apps/web/app/styles/style-loading.test.ts apps/web/app/'(home)'/layout.tsx apps/web/app/features/page.tsx apps/web/app/integrations/page.tsx apps/web/app/pricing/page.tsx`
+> `git diff --stat e7ee7c7..HEAD -- apps/web/app/customers/page.tsx apps/web/app/customers/customers.module.css apps/web/app/customers/customers.test.ts apps/web/app/components/header/index.tsx apps/web/app/components/header/header.test.tsx apps/web/app/components/footer.tsx apps/web/app/components/footer.test.tsx apps/web/app/styles.css apps/web/app/styles/shell.css apps/web/app/styles/features.css apps/web/app/styles/style-loading.test.ts apps/web/app/'(home)'/layout.tsx apps/web/app/features/page.tsx apps/web/app/integrations/page.tsx apps/web/app/pricing/page.tsx`
 > Compare every changed in-scope file with **Current state**. Changes from Plans
 > 117–120 are expected only after those plans are DONE; any other material
 > mismatch is a STOP condition.
@@ -192,7 +192,7 @@ one import order, and never duplicate rule bodies.
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Focused tests | `TMPDIR=/tmp bunx vitest run apps/web/app/customers/customers.test.ts apps/web/app/components/header/header.test.tsx apps/web/app/components/footer.test.tsx apps/web/app/styles/style-loading.test.ts` | all new tests pass |
-| Focused lint | `bunx ultracite check apps/web/app/customers apps/web/app/components/header apps/web/app/components/footer.tsx apps/web/app/components/footer.test.tsx apps/web/app/styles/style-loading.test.ts apps/web/app/'(home)'/layout.tsx apps/web/app/features/page.tsx apps/web/app/integrations/page.tsx apps/web/app/pricing/page.tsx` | exit 0, no fixes |
+| Focused lint | `bunx ultracite check apps/web/app/customers apps/web/app/components/header apps/web/app/components/footer.tsx apps/web/app/components/footer.test.tsx apps/web/app/styles/features.css apps/web/app/styles/style-loading.test.ts apps/web/app/'(home)'/layout.tsx apps/web/app/features/page.tsx apps/web/app/integrations/page.tsx apps/web/app/pricing/page.tsx` | exit 0, no fixes |
 | Web typecheck | `bun run --cwd apps/web typecheck` | exit 0, no errors |
 | Web tests | `TMPDIR=/tmp bun run --cwd apps/web test` | all web tests pass |
 | Production build | `bun run --cwd apps/web build` | exit 0; `/customers`, `/`, `/features`, `/integrations` and `/pricing` build |
@@ -228,6 +228,7 @@ Vitest targets an unavailable Windows temporary directory.
 - `apps/web/app/components/footer.test.tsx` (create)
 - `apps/web/app/styles.css`
 - `apps/web/app/styles/shell.css`
+- `apps/web/app/styles/features.css` (shared-rule extraction only)
 - `apps/web/app/styles/style-loading.test.ts` (create)
 - `apps/web/app/(home)/layout.tsx` (create only if needed for scoped imports)
 - `apps/web/app/features/page.tsx` (CSS import only)
@@ -365,7 +366,10 @@ rg -n "fmkt-|tl-|marketing-" apps/web/app \
 Reconcile the result with Plans 119–120, then:
 
 1. Keep design-system globals, `tokens.css` and genuinely shared `shell.css` in
-   root `styles.css`.
+   root `styles.css`. Move the shared `.fmkt-page`, `.fmkt-container`,
+   `.fmkt-overline`, `.fmkt-section-header` and `.fmkt-section-title` rule
+   families from `features.css` into `shell.css`; do not duplicate their rule
+   bodies.
 2. Import any remaining `home.css`, `features.css` and `motion.css` only from
    layouts/pages that consume them. Use one consistent import order.
 3. Do not alter markup or copy in home, features, integrations or pricing.

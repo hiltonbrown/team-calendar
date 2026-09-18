@@ -26,4 +26,19 @@ describe("XeroSyncFailedState", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Revert" })).toBeDefined();
   });
+
+  it.each([
+    ["approve", "Approval failed", "Approval failed in Xero: Timed out."],
+    ["decline", "Decline failed", "Decline failed in Xero: Timed out."],
+  ] as const)(
+    "uses recovery copy for a failed %s action",
+    (action, badge, copy) => {
+      render(
+        <XeroSyncFailedState failedAction={action} message="Timed out." />
+      );
+
+      expect(screen.getByText(badge)).toBeDefined();
+      expect(screen.getByText(copy)).toBeDefined();
+    }
+  );
 });

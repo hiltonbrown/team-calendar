@@ -1,6 +1,3 @@
 @import "@repo/design-system/styles/globals.css";
 @import "./styles/tokens.css";
 @import "./styles/shell.css";
-@import "./styles/home.css";
-@import "./styles/features.css";
-@import "./styles/motion.css";

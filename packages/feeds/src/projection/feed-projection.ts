@@ -120,7 +120,10 @@ export async function projectFeedEvents(
           });
 
     const events = records.map((record) =>
-      projectAvailabilityRecord(record, privacyMode)
+      projectAvailabilityRecord(
+        record,
+        stricterPrivacyMode(record.privacy_mode, privacyMode)
+      )
     );
 
     if (feed.includes_public_holidays) {
@@ -167,10 +170,28 @@ export function projectSummaryLine(input: {
     }
     return `Public holiday: ${input.recordTypeLabel}`;
   }
+  if (input.privacyMode === "masked") {
+    return "Out of office";
+  }
   if (input.privacyMode === "private") {
-    return "Unavailable";
+    return "Busy";
   }
   return `${input.displayName}: ${input.recordTypeLabel}`;
+}
+
+const PRIVACY_RANK: Record<availability_privacy_mode, number> = {
+  masked: 1,
+  named: 0,
+  private: 2,
+};
+
+export function stricterPrivacyMode(
+  recordMode: availability_privacy_mode,
+  feedMode: availability_privacy_mode
+): availability_privacy_mode {
+  return PRIVACY_RANK[recordMode] >= PRIVACY_RANK[feedMode]
+    ? recordMode
+    : feedMode;
 }
 
 function exclusiveAllDayEnd(inclusiveEnd: Date): Date {
@@ -330,10 +351,10 @@ export function displayNameForPrivacy(
   personName: string
 ): string {
   if (privacyMode === "private") {
-    return "Unavailable";
+    return "Busy";
   }
   if (privacyMode === "masked") {
-    return "Team member";
+    return "Out of office";
   }
   return personName;
 }
@@ -379,6 +400,7 @@ const recordSelect = {
       },
     },
   },
+  privacy_mode: true,
   publication: {
     select: {
       published_sequence: true,

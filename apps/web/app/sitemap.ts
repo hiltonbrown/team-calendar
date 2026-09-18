@@ -1,34 +1,45 @@
-import fs from "node:fs";
 import { resolveCanonicalWebUrl } from "@repo/seo/canonical-url";
 import type { MetadataRoute } from "next";
 import { env } from "@/env";
 import { getAllPosts } from "@/src/lib/blog";
 
-const appFolders = fs.readdirSync("app", { withFileTypes: true });
-const pages = appFolders
-  .filter((file) => file.isDirectory())
-  .filter((folder) => !folder.name.startsWith("_"))
-  .filter((folder) => !folder.name.startsWith("("))
-  .map((folder) => folder.name);
-const blogs = (await getAllPosts()).map((post) => post.slug);
-const url = resolveCanonicalWebUrl({
-  vercelProjectProductionUrl: env.VERCEL_PROJECT_PRODUCTION_URL,
-  webUrl: env.NEXT_PUBLIC_WEB_URL,
-});
+export const publicRoutes = [
+  "/",
+  "/about",
+  "/blog",
+  "/careers",
+  "/changelog",
+  "/contact",
+  "/customers",
+  "/features",
+  "/help-centre",
+  "/help-centre/onboarding",
+  "/integrations",
+  "/pricing",
+  "/privacy-policy",
+  "/security",
+  "/status",
+  "/terms-of-service",
+] as const;
 
-const sitemap = async (): Promise<MetadataRoute.Sitemap> => [
-  {
-    lastModified: new Date(),
-    url: new URL("/", url).href,
-  },
-  ...pages.map((page) => ({
-    lastModified: new Date(),
-    url: new URL(page, url).href,
-  })),
-  ...blogs.map((slug) => ({
-    lastModified: new Date(),
-    url: new URL(`blog/${slug}`, url).href,
-  })),
-];
+const sitemap = (): MetadataRoute.Sitemap => {
+  const url = resolveCanonicalWebUrl({
+    vercelProjectProductionUrl: env.VERCEL_PROJECT_PRODUCTION_URL,
+    webUrl: env.NEXT_PUBLIC_WEB_URL,
+  });
+  const blogs = getAllPosts();
+
+  return [
+    ...publicRoutes.map((route) => ({
+      url: new URL(route, url).href,
+    })),
+    ...blogs.map((post) => ({
+      lastModified: new Date(
+        `${post.updatedAt ?? post.publishedAt}T00:00:00.000Z`
+      ),
+      url: new URL(`/blog/${post.slug}`, url).href,
+    })),
+  ];
+};
 
 export default sitemap;

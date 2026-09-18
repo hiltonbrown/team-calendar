@@ -122,4 +122,27 @@ describe("loadOnboardingState", () => {
       title: "Review public holidays",
     });
   });
+
+  it("keeps a disconnected Xero task optional so one required step leads", async () => {
+    mocks.clerkOrgConnectionCount.mockResolvedValue(0);
+    mocks.activeXeroConnectionFindFirst.mockResolvedValue(null);
+    mocks.peopleCount.mockResolvedValue(0);
+    mocks.currentUserPersonFindFirst.mockResolvedValue(null);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    expect(state.steps.find((step) => step.id === "xero")?.status).toBe(
+      "optional"
+    );
+    expect(state.steps.filter((step) => step.status === "next")).toHaveLength(
+      1
+    );
+    expect(state.steps.find((step) => step.status === "next")?.id).toBe(
+      "people"
+    );
+  });
 });

@@ -1,148 +1,191 @@
-import { primaryDomain } from "@repo/seo/branding";
 import { createMetadata } from "@repo/seo/metadata";
-import {
-  Building2,
-  CalendarDays,
-  CheckCircle2,
-  FileCheck,
-  Globe,
-  Lock,
-  ShieldAlert,
-  Users,
-} from "lucide-react";
+import { AlertTriangle, Check, LifeBuoy, MapPin, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  helpCompletionChecks,
+  helpLastReviewed,
+  helpLaunchScope,
+  helpPhases,
+  helpSupport,
+} from "../content";
+import styles from "../help-centre.module.css";
 
 export const metadata: Metadata = createMetadata({
   description:
-    "Complete step-by-step onboarding guide for closed AU Early Access on Team Calendar.",
-  title: "AU Early Access Onboarding Guide - Help Centre",
+    "An eight-step guide to setting up Team Calendar with Australian Xero Payroll and secure calendar feeds.",
+  title: "AU onboarding guide - Help centre",
 });
 
-const steps = [
-  {
-    copy: "Accept your invitation email or select your organisation from the organisation switcher in the top navigation bar. Every payroll entity, team member, and leave record belongs to a specific Clerk Organisation boundary.",
-    icon: Building2,
-    number: "1",
-    title: "Join the correct Clerk Organisation",
-  },
-  {
-    copy: "Navigate to Settings > Integrations > Xero. Click 'Connect Xero' to authenticate with your Xero Payroll Australia file. Grant access to your organisation. Note: Launch scope is Australian Xero Payroll only.",
-    icon: Globe,
-    number: "2",
-    title: "Connect an Australian Xero organisation",
-  },
-  {
-    copy: "Navigate to Sync to review initial inbound sync status. Verify that employee names, historical leave applications, and current leave balances have imported accurately from Xero Payroll.",
-    icon: CheckCircle2,
-    number: "3",
-    title: "Confirm the first people, leave, and balance sync",
-  },
-  {
-    copy: "In Settings > Members, assign roles (Owner, Admin, Manager, Member). In People, match unlinked Clerk users to Xero employee records so staff can submit leave and managers can review approvals.",
-    icon: Users,
-    number: "4",
-    title: "Link people and assign manager roles",
-  },
-  {
-    copy: "Staff submit leave from the top navigation CTA or Calendar page. Managers review pending requests in Leave Approvals. Approved leave writes back synchronously to Xero Payroll within 60 seconds; declines require a reason if configured.",
-    icon: FileCheck,
-    number: "5",
-    title: "Submit, approve, and decline leave",
-  },
-  {
-    copy: "Navigate to Feeds and click 'New Feed'. Select team or location filters and copy the secure ICS URL into Outlook, Google Calendar, or Apple Calendar. If a token is compromised, click 'Revoke Token' to invalidate it instantly.",
-    icon: CalendarDays,
-    number: "6",
-    title: "Create and revoke calendar feeds",
-  },
-  {
-    copy: "Configure feed privacy levels: Named (shows employee name and leave type), Masked (shows generic 'Out of Office'), or Private (shows simple 'Busy'). Sensitive leave details are never published unless configured by an admin.",
-    icon: Lock,
-    number: "7",
-    title: "Understand privacy modes & visibility",
-  },
-  {
-    copy: `If you observe a sync discrepancy, Xero write error, or privacy concern, email our support team immediately at support@${primaryDomain} with your organisation name and details. Business hours response target: Mon-Fri 9am-5pm AEST.`,
-    icon: ShieldAlert,
-    number: "8",
-    title: "Reporting sync, payroll-write, or privacy incidents",
-  },
-];
-
 const GuidedOnboardingPage = () => (
-  <div className="fmkt-page marketing-simple">
-    <header className="marketing-simple__hero">
-      <div className="fmkt-container">
-        <div className="marketing-simple__intro">
-          <p className="marketing-simple__kicker">
-            <Link className="underline" href="/help-centre">
-              Help centre
-            </Link>{" "}
-            / Onboarding
-          </p>
-          <h1 className="marketing-simple__title">
-            AU Early Access Guided Onboarding Guide
-          </h1>
-          <p className="marketing-simple__lead">
-            Follow this 8-step guide to get your Australian team set up on Team
-            Calendar with Xero Payroll, manager roles, and secure calendar
-            feeds.
-          </p>
-        </div>
+  <main
+    className={`fmkt-page ${styles.page}`}
+    id="help-centre-main"
+    tabIndex={-1}
+  >
+    <header className={styles.guideHero}>
+      <div className={styles.guideWidth}>
+        <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
+          <ol>
+            <li>
+              <Link className="marketing-content-link" href="/help-centre">
+                Help centre
+              </Link>
+            </li>
+            <li aria-current="page">AU onboarding</li>
+          </ol>
+        </nav>
+        <p className={styles.scope}>{helpLaunchScope}</p>
+        <h1>Onboard your team in four verified phases.</h1>
+        <p className={styles.lead}>
+          Complete these eight steps in order. Stop at each expected result and
+          resolve any mismatch before moving payroll data or widening a calendar
+          audience.
+        </p>
+
+        <dl className={styles.guideFacts}>
+          <div>
+            <dt>For</dt>
+            <dd>Owners, Admins, Managers and Viewers</dd>
+          </div>
+          <div>
+            <dt>Before you start</dt>
+            <dd>A Team Calendar invitation and Xero Payroll AU access</dd>
+          </div>
+          <div>
+            <dt>Last reviewed</dt>
+            <dd>{helpLastReviewed}</dd>
+          </div>
+        </dl>
       </div>
     </header>
 
-    <section className="marketing-simple__section">
-      <div className="fmkt-container">
-        <div className="space-y-6">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <article
-                className="marketing-simple__panel flex items-start gap-4"
-                key={step.number}
-              >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
-                  {step.number}
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold text-xl">{step.title}</h2>
-                  </div>
-                  <p className="marketing-simple__section-copy">{step.copy}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-
-    <section className="marketing-simple__section marketing-simple__section--tonal">
-      <div className="fmkt-container">
-        <div className="marketing-simple__callout">
-          <div className="marketing-simple__intro">
-            <h2 className="marketing-simple__section-title">
-              Need assistance with your setup?
-            </h2>
-            <p className="marketing-simple__section-copy">
-              Our team provides direct guided setup for early access accounts.
-              Contact us at{" "}
-              <a
-                className="marketing-simple__link"
-                href={`mailto:support@${primaryDomain}`}
-              >
-                support@{primaryDomain}
+    <div className={styles.guideLayout}>
+      <nav aria-label="Onboarding phases" className={styles.phaseNavigation}>
+        <p>Jump to phase</p>
+        <ol>
+          {helpPhases.map((phase) => (
+            <li key={phase.id}>
+              <a className="marketing-content-link" href={`#${phase.id}`}>
+                <span>{phase.label}</span>
+                {phase.title}
               </a>
-              .
-            </p>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      <div className={styles.procedure}>
+        <ol className={styles.phaseList}>
+          {helpPhases.map((phase) => (
+            <li className={styles.phase} id={phase.id} key={phase.id}>
+              <div className={styles.phaseHeading}>
+                <p>{phase.label}</p>
+                <h2>{phase.title}</h2>
+                <span className={styles.phaseDescription}>
+                  {phase.description}
+                </span>
+              </div>
+
+              <ol className={styles.stepList}>
+                {phase.steps.map((step) => (
+                  <li
+                    className={styles.step}
+                    id={step.anchor}
+                    key={step.anchor}
+                  >
+                    <div className={styles.stepHeading}>
+                      <h3>{step.title}</h3>
+                      <div className={styles.roles}>
+                        <Users aria-hidden="true" size={15} />
+                        {step.roles.map((role) => (
+                          <span className={styles.roleChip} key={role}>
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {step.productPath ? (
+                      <p className={styles.productPath}>
+                        In Team Calendar: <code>{step.productPath}</code>
+                      </p>
+                    ) : null}
+
+                    <div className={styles.instruction}>
+                      <h4>What to do</h4>
+                      <p>{step.action}</p>
+                    </div>
+
+                    <div className={styles.receipt}>
+                      <Check aria-hidden="true" size={18} />
+                      <div>
+                        <h4>Success looks like</h4>
+                        <p>{step.expectedResult}</p>
+                      </div>
+                    </div>
+
+                    {step.caution ? (
+                      <div className={styles.caution}>
+                        <AlertTriangle aria-hidden="true" size={18} />
+                        <div>
+                          <h4>Check before continuing</h4>
+                          <p>{step.caution}</p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {step.troubleshooting ? (
+                      <div className={styles.troubleshooting}>
+                        <LifeBuoy aria-hidden="true" size={18} />
+                        <div>
+                          <h4>If this does not match</h4>
+                          <p>{step.troubleshooting}</p>
+                        </div>
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </li>
+          ))}
+        </ol>
+
+        <section
+          aria-labelledby="completion-heading"
+          className={styles.completion}
+        >
+          <MapPin aria-hidden="true" size={24} />
+          <div>
+            <p className={styles.eyebrow}>Completion receipt</p>
+            <h2 id="completion-heading">Your launch path is ready when:</h2>
+            <ul>
+              {helpCompletionChecks.map((check) => (
+                <li key={check}>
+                  <Check aria-hidden="true" size={16} /> {check}
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        </section>
+
+        <aside className={styles.guideSupport}>
+          <h2>Escalate an unresolved issue</h2>
+          <p>
+            Email {helpSupport.email} during {helpSupport.hours}. Include the
+            organisation name, affected person or feed name, and the visible
+            receipt or error. Never include a subscribe URL.
+          </p>
+          <a
+            className={`marketing-content-link ${styles.primaryLink}`}
+            href={helpSupport.mailtoHref}
+          >
+            Contact support
+          </a>
+        </aside>
       </div>
-    </section>
-  </div>
+    </div>
+  </main>
 );
 
 export default GuidedOnboardingPage;

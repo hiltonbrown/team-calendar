@@ -1,0 +1,393 @@
+.root {
+  overflow: clip;
+}
+
+.hero {
+  padding: clamp(5rem, 10vw, 9rem) 0 clamp(4rem, 8vw, 7rem);
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(16rem, 0.55fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  align-items: end;
+}
+
+.heroCopy {
+  max-width: 58rem;
+}
+
+.heroCopy h1 {
+  font-size: clamp(3.2rem, 7.6vw, 5.8rem);
+  font-weight: 650;
+  line-height: 0.99;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.heroCopy > p {
+  max-width: 42rem;
+  margin-top: 2rem;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.65;
+  color: var(--marketing-on-surface-muted);
+}
+
+.heroAside {
+  max-width: 20rem;
+  font-family: var(--font-lora), Georgia, serif;
+  font-size: clamp(1.4rem, 2.5vw, 2rem);
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--marketing-primary);
+}
+
+.section {
+  padding: clamp(4.5rem, 8vw, 7.5rem) 0;
+}
+
+.peopleSection {
+  background: var(--marketing-surface-low);
+}
+
+.sectionIntro {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 48rem;
+  margin-bottom: clamp(2.5rem, 5vw, 4.5rem);
+}
+
+.sectionIntro h2,
+.finalCallout h2 {
+  font-size: clamp(2.2rem, 4.8vw, 4rem);
+  font-weight: 650;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.sectionIntro p,
+.finalCallout p {
+  max-width: 65ch;
+  font-size: 1.08rem;
+  line-height: 1.75;
+  color: var(--marketing-on-surface-muted);
+}
+
+.boundary {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) auto minmax(0, 1.15fr);
+  gap: 1.5rem;
+  align-items: stretch;
+  padding: clamp(1.25rem, 3.5vw, 2.5rem);
+  background: var(--marketing-surface-high);
+  border-radius: 20px;
+}
+
+.sources {
+  display: grid;
+  gap: 1rem;
+}
+
+.source {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.35rem;
+  border-radius: 14px;
+}
+
+.xeroSource {
+  color: var(--marketing-on-primary-container);
+  background: var(--marketing-primary-container);
+}
+
+.manualSource {
+  background: color-mix(
+    in oklch,
+    var(--marketing-editorial-accent) 18%,
+    var(--marketing-surface)
+  );
+}
+
+.source h3,
+.output h3,
+.personCopy h3 {
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-weight: 650;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.source div > p:last-child {
+  margin-top: 0.55rem;
+  line-height: 1.6;
+}
+
+.meta,
+.previewLabel {
+  margin-bottom: 0.45rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--marketing-primary);
+}
+
+.flowNarrow {
+  display: none;
+}
+
+.output {
+  padding: clamp(1.35rem, 3vw, 2rem);
+  background: var(--marketing-surface-lowest);
+  border-radius: 14px;
+}
+
+.outputHeading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.exampleNote {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 0.8rem;
+  color: var(--marketing-on-surface-muted);
+}
+
+.exampleRows {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.exampleRow {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.9rem;
+  background: var(--marketing-surface-low);
+  border-radius: 12px;
+}
+
+.exampleRow span:last-child {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--marketing-on-surface-muted);
+  text-transform: uppercase;
+}
+
+.destinations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0;
+  margin: 1.25rem 0 0;
+  list-style: none;
+}
+
+.destinations li {
+  padding: 0.55rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  background: var(--marketing-surface-high);
+  border-radius: 12px;
+}
+
+.founder {
+  display: grid;
+  grid-template-columns: minmax(17rem, 5fr) minmax(0, 7fr);
+  gap: clamp(2rem, 6vw, 6rem);
+  align-items: center;
+}
+
+.portraitFigure,
+.connieFigure {
+  margin: 0;
+}
+
+.portrait,
+.conniePortrait {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  background: var(--marketing-surface-high);
+  border-radius: 20px;
+}
+
+.portrait {
+  aspect-ratio: 4 / 5;
+}
+
+.portraitFigure figcaption,
+.connieFigure figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  color: var(--marketing-on-surface-muted);
+}
+
+.personCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 40rem;
+}
+
+.previewLabel {
+  padding: 0.45rem 0.65rem;
+  color: var(--marketing-on-surface-muted);
+  background: var(--marketing-surface-high);
+  border-radius: 12px;
+}
+
+.role {
+  margin-top: 0.45rem;
+  font-weight: 650;
+  color: var(--marketing-primary);
+}
+
+.personCopy > p:not(.previewLabel, .role) {
+  margin: 1.5rem 0 1.75rem;
+  line-height: 1.75;
+  color: var(--marketing-on-surface-muted);
+}
+
+.personCopy a {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.connie {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(15rem, 4fr);
+  gap: clamp(2rem, 5vw, 5rem);
+  align-items: center;
+  max-width: 66rem;
+  margin: clamp(5rem, 10vw, 9rem) 0 0 auto;
+}
+
+.conniePortrait {
+  aspect-ratio: 4 / 5;
+}
+
+.finalCallout {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(1.75rem, 5vw, 3.5rem);
+  color: var(--marketing-on-primary-container);
+  background: var(--marketing-primary-container);
+  border-radius: 16px;
+}
+
+.finalCallout p {
+  margin-top: 1rem;
+  color: inherit;
+}
+
+.finalActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.finalSecondary {
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-lowest);
+}
+
+@media (max-width: 900px) {
+  .heroGrid,
+  .founder,
+  .connie {
+    grid-template-columns: 1fr;
+  }
+
+  .heroAside {
+    max-width: 28rem;
+  }
+
+  .boundary {
+    grid-template-columns: 1fr;
+  }
+
+  .flowWide {
+    display: none;
+  }
+
+  .flowNarrow {
+    display: block;
+  }
+
+  .connie {
+    max-width: none;
+  }
+
+  .connieFigure {
+    order: -1;
+    max-width: 30rem;
+  }
+
+  .finalCallout {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-top: 4rem;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(2.7rem, 14vw, 4rem);
+  }
+
+  .source,
+  .outputHeading {
+    grid-template-columns: 1fr;
+  }
+
+  .exampleRow {
+    flex-direction: column;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+
+  .finalActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .finalActions a {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+@media (forced-colors: active) {
+  .boundary,
+  .source,
+  .output,
+  .portrait,
+  .conniePortrait,
+  .finalCallout {
+    border: 1px solid CanvasText;
+  }
+}

@@ -1,8 +1,15 @@
-import { authMiddleware } from "@repo/auth/proxy";
+import { authMiddleware, createRouteMatcher } from "@repo/auth/proxy";
 import { type NextRequest, NextResponse } from "next/server";
 import { getPublicApiOrigin } from "./lib/public-api-url";
 
 export const REPORTING_ENDPOINTS_HEADER = 'csp-endpoint="/api/csp-report"';
+
+export const isPublicAppRoute = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/api/csp-report",
+  "/__clerk(.*)",
+]);
 
 export function generateNonce(): string {
   return Buffer.from(crypto.randomUUID()).toString("base64");
@@ -91,9 +98,12 @@ export function handleProxyWithNonce(request: NextRequest): NextResponse {
   return response;
 }
 
-export default authMiddleware((_auth, request) =>
-  handleProxyWithNonce(request)
-);
+export default authMiddleware(async (auth, request) => {
+  if (!isPublicAppRoute(request)) {
+    await auth.protect();
+  }
+  return handleProxyWithNonce(request);
+});
 
 export const config = {
   matcher: [

@@ -103,6 +103,58 @@ describe("holiday-service", () => {
         expect(result.error.code).toBe("conflict");
       }
     });
+
+    it("creates a jurisdiction-scoped holiday for an active scoped jurisdiction", async () => {
+      vi.mocked(database.publicHoliday.findFirst).mockResolvedValue(null);
+      vi.mocked(database.publicHolidayJurisdiction.findFirst).mockResolvedValue(
+        { id: "jurisdiction_123" } as never
+      );
+      vi.mocked(database.publicHoliday.create).mockResolvedValue({
+        id: "holiday_123",
+      } as never);
+
+      const result = await addCustomHoliday({
+        appliesToAllJurisdictions: false,
+        clerkOrgId: mockClerkOrgId,
+        date: new Date("2024-12-25"),
+        jurisdictionId: "jurisdiction_123",
+        name: "State holiday",
+        organisationId: mockOrgId,
+        recursAnnually: false,
+        userId: mockUserId,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(database.publicHolidayJurisdiction.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: "jurisdiction_123" }),
+        })
+      );
+    });
+
+    it("rejects a jurisdiction outside the active organisation", async () => {
+      vi.mocked(database.publicHoliday.findFirst).mockResolvedValue(null);
+      vi.mocked(database.publicHolidayJurisdiction.findFirst).mockResolvedValue(
+        null
+      );
+
+      const result = await addCustomHoliday({
+        appliesToAllJurisdictions: false,
+        clerkOrgId: mockClerkOrgId,
+        date: new Date("2024-12-25"),
+        jurisdictionId: "jurisdiction_other",
+        name: "State holiday",
+        organisationId: mockOrgId,
+        recursAnnually: false,
+        userId: mockUserId,
+      });
+
+      expect(result).toMatchObject({
+        error: { code: "bad_request" },
+        ok: false,
+      });
+      expect(database.publicHoliday.create).not.toHaveBeenCalled();
+    });
   });
 
   describe("suppressHoliday", () => {

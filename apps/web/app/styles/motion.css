@@ -612,28 +612,6 @@
   animation: sync-spin 0.9s linear infinite;
 }
 
-/* Sync diagram keyframes */
-@keyframes fmkt-packet-travel {
-  0% {
-    offset-distance: 0%;
-    opacity: 0;
-  }
-
-  8% {
-    opacity: 0.82;
-  }
-
-  76% {
-    opacity: 0.82;
-  }
-
-  88%,
-  100% {
-    opacity: 0;
-    offset-distance: 100%;
-  }
-}
-
 /* Scroll-driven path draw: animates CSS custom properties on the HTML container
    which cascade down to SVG paths via stroke-dashoffset: var(--fmkt-sync-draw-*) */
 @supports (animation-timeline: view()) {
@@ -653,7 +631,7 @@
 
   @keyframes fmkt-draw-path-1 {
     from {
-      --fmkt-sync-draw-1: 320;
+      --fmkt-sync-draw-1: 1;
     }
 
     to {
@@ -663,7 +641,7 @@
 
   @keyframes fmkt-draw-path-2 {
     from {
-      --fmkt-sync-draw-2: 300;
+      --fmkt-sync-draw-2: 1;
     }
 
     to {
@@ -673,7 +651,7 @@
 
   @keyframes fmkt-draw-path-3 {
     from {
-      --fmkt-sync-draw-3: 420;
+      --fmkt-sync-draw-3: 1;
     }
 
     to {

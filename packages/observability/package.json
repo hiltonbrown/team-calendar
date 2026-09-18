@@ -40,8 +40,8 @@
       "default": "./server.ts"
     },
     "./status": {
-      "types": "./status/index.tsx",
-      "default": "./status/index.tsx"
+      "types": "./status/index.ts",
+      "default": "./status/index.ts"
     }
   },
   "scripts": {
@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@logtail/next": "^0.4.0",
+    "@repo/core": "*",
     "@sentry/nextjs": "^10.71.0",
     "@t3-oss/env-nextjs": "^0.13.11",
     "react": "19.2.8",

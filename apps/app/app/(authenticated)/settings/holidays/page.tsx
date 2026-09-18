@@ -13,11 +13,8 @@ interface HolidaysPageProps {
   searchParams: Promise<{ org?: string }>;
 }
 
-// S-23 Settings > Holidays is the admin-config counterpart to the S-11 member
-// view at `/public-holidays`. It suppresses, restores, adds custom days, and
-// refreshes holidays from the source API, so it is restricted to admins and
-// owners. The read-only member surface lives at `/public-holidays`. This split
-// is intentional per ScreenCatalogue v4.1; keep the two in sync.
+// Settings > Holidays is a summary and launch surface for admins and owners.
+// `/public-holidays` is the single operational list for review and mutations.
 const HolidaysPage = async ({ searchParams }: HolidaysPageProps) => {
   await requirePageRole("org:admin");
   const { org } = await searchParams;

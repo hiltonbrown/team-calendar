@@ -1,142 +1,86 @@
-"use client";
-
-import { isEarlyAccess } from "@repo/next-config/launch-mode";
+import { PUBLIC_PLAN_CATALOGUE } from "@repo/core";
 import Link from "next/link";
-import { signUpHref } from "@/src/lib/auth-links";
-import { MARKETING_PLANS } from "../constants";
+import { paidPlanPresentation } from "../constants";
 
-export const PricingPlans = () => {
-  const earlyAccess = isEarlyAccess();
+const formatLimit = (value: number, singular: string, plural: string) =>
+  value === -1
+    ? `Multiple ${plural}`
+    : `${value} ${value === 1 ? singular : plural}`;
 
-  if (earlyAccess) {
-    return (
-      <div className="fmkt-pricing-cards">
-        <div className="fmkt-pricing-card fmkt-pricing-card--highlighted">
-          <div className="fmkt-pricing-card__badge">Closed Early Access</div>
-          <div className="fmkt-pricing-card__header">
-            <h3 className="fmkt-pricing-card__title">AU Early Access</h3>
-            <p className="fmkt-pricing-card__description">
-              Closed early access for Australian businesses using Xero Payroll.
-              Guided onboarding provided by the Team Calendar team.
-            </p>
-            <div className="fmkt-pricing-card__price-wrap">
-              <span className="fmkt-pricing-card__price">Early Access</span>
-            </div>
-          </div>
-          <ul className="fmkt-pricing-card__features">
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              1 Xero Payroll organisation (Australia)
-            </li>
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              Unlimited secure calendar feeds
-            </li>
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              Leave management & manual availability
-            </li>
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              Guided onboarding & setup assistance
-            </li>
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              Support during business hours (Mon-Fri 9am-5pm AEST)
-            </li>
-            <li className="fmkt-pricing-card__feature">
-              <span
-                aria-hidden="true"
-                className="fmkt-pricing-card__feature-icon"
-              >
-                ✓
-              </span>
-              Pricing confirmed before any future paid billing
-            </li>
-          </ul>
-          <div className="fmkt-pricing-card__footer">
-            <Link
-              className="marketing-btn marketing-btn--primary"
-              href={signUpHref}
-            >
-              Get early access
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fmkt-pricing-cards">
-      {MARKETING_PLANS.map((plan) => (
-        <div
-          className={`fmkt-pricing-card ${plan.highlighted ? "fmkt-pricing-card--highlighted" : ""}`}
-          key={plan.name}
+export const PricingPlans = () => (
+  <div className="fmkt-pricing-cards">
+    {PUBLIC_PLAN_CATALOGUE.map((plan) => {
+      const presentation = paidPlanPresentation[plan.plan_key];
+      const highlighted = plan.plan_key === "premium";
+      const enterprise = plan.plan_key === "enterprise";
+      const features = enterprise
+        ? ["Multiple Xero connections", "Coming soon"]
+        : [
+            `Up to ${plan.limits.seats} staff`,
+            formatLimit(
+              plan.limits.payroll_entities,
+              "Xero connection",
+              "Xero connections"
+            ),
+            presentation.feedLabel,
+            plan.features.analytics ? "Advanced Analytics" : "Basic Analytics",
+            plan.features.priority_support
+              ? "Priority support"
+              : "Standard Support",
+          ];
+      return (
+        <article
+          className={`fmkt-pricing-card${highlighted ? "fmkt-pricing-card--highlighted" : ""}`}
+          key={plan.plan_key}
         >
-          {plan.highlighted ? (
-            <div className="fmkt-pricing-card__badge">Most Popular</div>
+          {highlighted ? (
+            <p className="fmkt-pricing-card__badge">Recommended</p>
           ) : null}
           <div className="fmkt-pricing-card__header">
             <h3 className="fmkt-pricing-card__title">{plan.name}</h3>
-            <p className="fmkt-pricing-card__description">{plan.description}</p>
-            <div className="fmkt-pricing-card__price-wrap">
-              <span className="fmkt-pricing-card__price">{plan.price}</span>
-              {plan.interval ? (
-                <span className="fmkt-pricing-card__interval">
-                  /{plan.interval}
+            <p className="fmkt-pricing-card__description">
+              {presentation.description}
+            </p>
+            {presentation.price ? (
+              <p className="fmkt-pricing-card__price-wrap">
+                <span className="fmkt-pricing-card__price">
+                  {presentation.price}
                 </span>
-              ) : null}
-            </div>
+                <span className="fmkt-pricing-card__interval">/month</span>
+              </p>
+            ) : (
+              <p className="fmkt-pricing-card__price-wrap">
+                <span className="fmkt-pricing-card__price">Coming soon</span>
+              </p>
+            )}
           </div>
           <ul className="fmkt-pricing-card__features">
-            {plan.features.map((feature) => (
-              <li className="fmkt-pricing-card__feature" key={feature}>
-                <span
-                  aria-hidden="true"
-                  className="fmkt-pricing-card__feature-icon"
-                >
-                  ✓
-                </span>
-                {feature}
-              </li>
-            ))}
+            {features
+              .filter((feature): feature is string => feature !== null)
+              .map((feature) => (
+                <li className="fmkt-pricing-card__feature" key={feature}>
+                  <span
+                    aria-hidden="true"
+                    className="fmkt-pricing-card__feature-icon"
+                  >
+                    ✓
+                  </span>
+                  {feature}
+                </li>
+              ))}
           </ul>
-          <div className="fmkt-pricing-card__footer">
-            <Link
-              className={`marketing-btn ${plan.highlighted ? "marketing-btn--primary" : "marketing-btn--secondary"}`}
-              href={plan.ctaHref}
-            >
-              {plan.ctaText}
-            </Link>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
+          {presentation.ctaHref ? (
+            <div className="fmkt-pricing-card__footer">
+              <Link
+                className={`marketing-btn ${highlighted ? "marketing-btn--primary" : "marketing-btn--secondary"}`}
+                href={presentation.ctaHref}
+              >
+                Get started
+              </Link>
+            </div>
+          ) : null}
+        </article>
+      );
+    })}
+  </div>
+);

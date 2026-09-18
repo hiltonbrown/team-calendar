@@ -147,4 +147,51 @@ describe("Plans page server data", () => {
     expect(mocks.listTeamRecords).not.toHaveBeenCalled();
     expect(screen.getByText("Plans client: 0")).toBeDefined();
   });
+
+  it("computes working days once per returned record without amplification", async () => {
+    const records = Array.from({ length: 25 }, (_, index) => ({
+      allDay: true,
+      approvalNote: null,
+      approvalStatus: "draft",
+      approvedAt: null,
+      archivedAt: null,
+      balanceChip: null,
+      clerkOrgId: "org_1",
+      contactabilityStatus: "unavailable",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      createdByUserId: "user_1",
+      derivedSequence: 0,
+      derivedUidKey: `record-${index}`,
+      editableActions: ["edit"],
+      endsAt: new Date("2026-05-05T23:59:59.999Z"),
+      failedAction: null,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+      notesInternal: null,
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      person: {
+        email: "person@example.com",
+        firstName: "Test",
+        id: "00000000-0000-4000-8000-000000000011",
+        lastName: "Person",
+        locationId: null,
+        managerPersonId: null,
+      },
+      personId: "00000000-0000-4000-8000-000000000011",
+      privacyMode: "named",
+      recordType: "annual_leave",
+      sourceRemoteId: null,
+      sourceType: "team_calendar_leave",
+      startsAt: new Date("2026-05-04T00:00:00.000Z"),
+      submittedAt: null,
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      xeroWriteError: null,
+    }));
+    mocks.listMyRecords.mockResolvedValue({ ok: true, value: records });
+    mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
+
+    render(await PlansPage({ searchParams: Promise.resolve({}) }));
+
+    expect(mocks.computeWorkingDays).toHaveBeenCalledTimes(records.length);
+    expect(screen.getByText("Plans client: 25")).toBeDefined();
+  });
 });

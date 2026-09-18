@@ -1,232 +1,128 @@
-"use client";
-
-import { useState } from "react";
-import { MarketingIcon } from "../../(home)/components/marketing-icons";
+import type { LaunchMode } from "@repo/next-config/launch-mode";
+import {
+  supportEmail,
+  supportHoursLong,
+  supportMailtoHref,
+} from "@/src/data/support";
+import { PricingComparison } from "./pricing-comparison";
+import { PricingCurrencySelector } from "./pricing-currency-selector";
+import { PricingFaq } from "./pricing-faq";
 import { PricingPlans } from "./pricing-plans";
 
-const comparisonRows = [
-  {
-    capability: "Xero Payroll connection",
-    enterprise: "Multiple",
-    premium: "1",
-    starter: "1",
-  },
-  {
-    capability: "Calendar feeds",
-    enterprise: "Custom",
-    premium: "Team and location feeds",
-    starter: "Core feeds",
-  },
-  {
-    capability: "Manual availability",
-    enterprise: "Included",
-    premium: "Included",
-    starter: "Included",
-  },
-  {
-    capability: "Sync health",
-    enterprise: "Advanced",
-    premium: "Advanced",
-    starter: "Basic",
-  },
-  {
-    capability: "Support",
-    enterprise: "Implementation partner",
-    premium: "Priority",
-    starter: "Standard",
-  },
-] as const;
-
-const setupOptions = [
-  {
-    copy: "Connect Xero, choose your organisation, and publish the first secure feed in minutes.",
-    icon: "sync",
-    title: "Self-serve setup",
-  },
-  {
-    copy: "We help map teams, locations, privacy settings, and calendar feed structure before launch.",
-    icon: "shieldCheck",
-    title: "Guided rollout",
-  },
-  {
-    copy: "Structured planning for multi-entity payroll, governance, and internal change management.",
-    icon: "briefcase",
-    title: "Enterprise onboarding",
-  },
-] as const;
-
-const faqs = [
-  {
-    answer:
-      "Team Calendar bills per organisation plan, not per seat. Each plan covers your whole Xero Payroll organisation, so adding people never changes the price.",
-    question: "How does billing work?",
-  },
-  {
-    answer:
-      "Each Xero Payroll file is its own organisation. Multi-entity teams run on Enterprise, which covers several organisations under one agreement.",
-    question: "What if we run more than one Xero file?",
-  },
-  {
-    answer:
-      "Yes. You can start smaller and move to a larger plan when your feed structure or support needs change.",
-    question: "Can we change plans later?",
-  },
-  {
-    answer:
-      "No. Early access teams can connect Xero and validate their calendar workflow before paid billing begins.",
-    question: "Is a credit card required for early access?",
-  },
-] as const;
-
-export const PricingExperience = () => {
-  const [openFaq, setOpenFaq] = useState(0);
-
-  return (
-    <main className="fmkt-page fmkt-pricing-page">
-      <section className="fmkt-pricing-hero">
-        <div className="fmkt-container fmkt-pricing-hero__grid">
-          <div>
-            <h1>
-              One plan per organisation. <em>No per-seat maths.</em>
-            </h1>
+const EarlyAccess = () => (
+  <>
+    <section className="fmkt-pricing-plans">
+      <div className="fmkt-container">
+        <div className="fmkt-section-header">
+          <h2 className="fmkt-section-title">
+            A focused Australian early-access cohort
+          </h2>
+          <p>
+            We are admitting a small number of Australian Xero Payroll teams for
+            guided setup and product feedback.
+          </p>
+        </div>
+        <div className="fmkt-pricing-cohort">
+          <article>
+            <h3>What is included</h3>
+            <ul>
+              <li>One Australian Xero Payroll connection</li>
+              <li>Approved leave and manual availability</li>
+              <li>Secure Outlook, Google and Apple calendar feeds</li>
+              <li>Guided setup during {supportHoursLong}</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Who it suits</h3>
             <p>
-              Flat plans for Xero Payroll teams that want approved leave and
-              availability in shared calendars without manual re-entry. Add as
-              many people as your payroll file holds; the price stays the same.
+              Australian small businesses ready to test their real leave and
+              availability workflow with our team.
             </p>
-          </div>
-          <div className="fmkt-pricing-hero__summary">
-            <span>No per-seat billing</span>
             <p>
-              Every plan covers your whole Xero Payroll organisation. Early
-              access is open now while plans are finalised.
+              Future commercial terms will be confirmed before paid billing
+              begins.
             </p>
-          </div>
+            <a
+              className="marketing-btn marketing-btn--primary"
+              href={supportMailtoHref}
+            >
+              Enquire about early access
+            </a>
+          </article>
         </div>
-      </section>
+      </div>
+    </section>
+  </>
+);
 
-      <section className="fmkt-pricing-plans">
-        <div className="fmkt-container">
-          <div className="fmkt-section-header">
-            <h2 className="fmkt-section-title">
-              Plans that scale with your rollout, not your headcount.
-            </h2>
-          </div>
-          <div className="fmkt-pricing-plans__table">
-            <PricingPlans />
-          </div>
+const EarlyAccessContact = () => (
+  <section className="fmkt-pricing-contact">
+    <div className="fmkt-container fmkt-pricing-contact__grid">
+      <div>
+        <h2 className="fmkt-section-title">One clear next step</h2>
+        <p>
+          Tell us your organisation name, team size, Xero Payroll region and the
+          help you need.
+        </p>
+      </div>
+      <div className="fmkt-pricing-form">
+        <h3>Email the Team Calendar team</h3>
+        <a href={supportMailtoHref}>{supportEmail}</a>
+        <p>
+          Staffed {supportHoursLong}. This is a response window, not a
+          guaranteed resolution time.
+        </p>
+      </div>
+    </div>
+  </section>
+);
+
+export const PricingExperience = ({ mode }: { mode: LaunchMode }) => (
+  <main className="fmkt-page fmkt-pricing-page" id="pricing-main" tabIndex={-1}>
+    <section className="fmkt-pricing-hero">
+      <div className="fmkt-container fmkt-pricing-hero__grid">
+        <div>
+          <h1>
+            {mode === "early_access"
+              ? "Join Team Calendar’s Australian early access."
+              : "Straightforward plans for Australian Xero Payroll teams."}
+          </h1>
+          <p>
+            {mode === "early_access"
+              ? "A closed, guided cohort for teams ready to publish trusted leave and availability into the calendars they already use."
+              : "Choose by staff coverage, feed flexibility, analytics and support. AUD is selected by default."}
+          </p>
         </div>
-      </section>
-
-      <section className="fmkt-pricing-compare">
-        <div className="fmkt-container">
-          <div className="fmkt-section-header">
-            <h2 className="fmkt-section-title">
-              The same calendar foundation, more control as you grow.
-            </h2>
-          </div>
-          <div className="fmkt-pricing-table-wrap">
-            <table className="fmkt-pricing-table">
-              <thead>
-                <tr>
-                  <th>Capability</th>
-                  <th>Starter</th>
-                  <th>Premium</th>
-                  <th>Enterprise</th>
-                </tr>
-              </thead>
-              <tbody>
-                {comparisonRows.map((row) => (
-                  <tr key={row.capability}>
-                    <td>{row.capability}</td>
-                    <td>{row.starter}</td>
-                    <td>{row.premium}</td>
-                    <td>{row.enterprise}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="fmkt-pricing-hero__summary">
+          <span>
+            {mode === "early_access" ? "Closed cohort" : "Australia first"}
+          </span>
+          <strong>{mode === "early_access" ? "Guided" : "AUD"}</strong>
+          <p>
+            {mode === "early_access"
+              ? "Eligibility and onboarding are confirmed directly with our team."
+              : "Starter is $9/month. Premium is $19/month."}
+          </p>
         </div>
-      </section>
-
-      <section className="fmkt-pricing-setup">
-        <div className="fmkt-container">
-          <div className="fmkt-section-header">
-            <h2 className="fmkt-section-title">
-              Start light, add guidance when the rollout needs it.
-            </h2>
-          </div>
-          <div className="fmkt-pricing-setup__grid">
-            {setupOptions.map((option) => (
-              <article className="fmkt-pricing-setup-card" key={option.title}>
-                <span>
-                  <MarketingIcon id={option.icon} size={22} />
-                </span>
-                <h3>{option.title}</h3>
-                <p>{option.copy}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="fmkt-pricing-faq">
-        <div className="fmkt-container fmkt-pricing-faq__grid">
-          <div>
-            <h2 className="fmkt-section-title">Common pricing questions.</h2>
-          </div>
-          <div className="fmkt-pricing-faq__list">
-            {faqs.map((faq, index) => (
-              <div className="fmkt-pricing-faq__item" key={faq.question}>
-                <button
-                  aria-expanded={openFaq === index}
-                  onClick={() => setOpenFaq(openFaq === index ? -1 : index)}
-                  type="button"
-                >
-                  {faq.question}
-                  <span>{openFaq === index ? "−" : "+"}</span>
-                </button>
-                {openFaq === index ? <p>{faq.answer}</p> : null}
+      </div>
+    </section>
+    {mode === "early_access" ? (
+      <EarlyAccess />
+    ) : (
+      <PricingCurrencySelector
+        audPricing={
+          <>
+            <section className="fmkt-pricing-plans">
+              <div className="fmkt-container">
+                <PricingPlans />
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="fmkt-pricing-contact" id="contact">
-        <div className="fmkt-container fmkt-pricing-contact__grid">
-          <div>
-            <h2 className="fmkt-section-title">Early access support</h2>
-            <p>
-              Team Calendar is currently in closed early access for Australian
-              organisations running Xero Payroll. Our team provides guided setup
-              and onboarding assistance.
-            </p>
-          </div>
-          <div className="fmkt-pricing-form">
-            <h3 className="mb-2 font-semibold text-lg">
-              Monitored Support Address
-            </h3>
-            <p className="marketing-simple__section-copy mb-3">
-              To join the early access cohort or ask questions about rollout and
-              configuration, email our team:
-            </p>
-            <p className="mb-3">
-              <a
-                className="marketing-simple__link font-semibold"
-                href="mailto:support@teamcalendar.online"
-              >
-                support@teamcalendar.online
-              </a>
-            </p>
-            <p className="marketing-simple__section-copy text-muted-foreground text-xs">
-              Support hours: Monday to Friday, 9:00 AM – 5:00 PM AEST. Pricing
-              will be confirmed before any future paid billing begins.
-            </p>
-          </div>
-        </div>
-      </section>
-    </main>
-  );
-};
+            </section>
+            <PricingComparison />
+          </>
+        }
+      />
+    )}
+    <PricingFaq mode={mode} />
+    {mode === "early_access" ? <EarlyAccessContact /> : null}
+  </main>
+);

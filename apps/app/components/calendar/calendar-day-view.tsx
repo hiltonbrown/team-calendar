@@ -2,6 +2,7 @@ import type { CalendarRange } from "@repo/availability";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
+import { hourInTimeZone } from "./calendar-local-time";
 
 interface CalendarDayViewProps {
   actingPersonId: string | null;
@@ -24,6 +25,13 @@ export function CalendarDayView({
   }
   const allDayEvents = day.events.filter((event) => event.allDay);
   const timedEvents = day.events.filter((event) => !event.allDay);
+  const earlierEvents = timedEvents.filter(
+    (event) => hourInTimeZone(new Date(event.startsAt), data.range.timezone) < 6
+  );
+  const laterEvents = timedEvents.filter(
+    (event) =>
+      hourInTimeZone(new Date(event.startsAt), data.range.timezone) > 20
+  );
   const createPersonId = selectedPersonId ?? actingPersonId;
   const dateOnly = day.date.toISOString().slice(0, 10);
   const accessibleDate = new Intl.DateTimeFormat("en-AU", {
@@ -83,12 +91,22 @@ export function CalendarDayView({
             </div>
           )}
 
+          <OffHoursGroup
+            events={earlierEvents}
+            label="Earlier than 06:00"
+            orgQueryValue={orgQueryValue}
+          />
+
           <div className="overflow-hidden rounded-2xl bg-background">
             {hours.map((hour) => {
               const hourLabel = `${String(hour).padStart(2, "0")}:00`;
               const startsAt = `${dateOnly}T${hourLabel}:00.000Z`;
               const hourEvents = timedEvents.filter(
-                (event) => new Date(event.startsAt).getUTCHours() === hour
+                (event) =>
+                  hourInTimeZone(
+                    new Date(event.startsAt),
+                    data.range.timezone
+                  ) === hour
               );
               return (
                 <div
@@ -121,8 +139,43 @@ export function CalendarDayView({
               );
             })}
           </div>
+          <OffHoursGroup
+            events={laterEvents}
+            label="Later than 20:59"
+            orgQueryValue={orgQueryValue}
+          />
         </div>
       )}
+    </section>
+  );
+}
+
+function OffHoursGroup({
+  events,
+  label,
+  orgQueryValue,
+}: {
+  events: CalendarRange["days"][number]["events"];
+  label: string;
+  orgQueryValue: string | null;
+}) {
+  if (events.length === 0) {
+    return null;
+  }
+  return (
+    <section className="space-y-2 rounded-2xl bg-background p-3">
+      <h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        {label}
+      </h3>
+      <div className="grid gap-2 md:grid-cols-2">
+        {events.map((event) => (
+          <CalendarEventChip
+            event={event}
+            key={event.id}
+            orgQueryValue={orgQueryValue}
+          />
+        ))}
+      </div>
     </section>
   );
 }

@@ -20,6 +20,7 @@ import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-pag
 import { parseFilterParams } from "@/lib/url-state/parse-filter-params";
 import { Header } from "../components/header";
 import { type CalendarFilterInput, CalendarFilterSchema } from "./_schemas";
+import { CalendarRetryButton } from "./calendar-retry-button";
 
 export const metadata: Metadata = {
   description: "View team leave, availability and public holidays.",
@@ -131,7 +132,10 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
       <>
         <Header page="Calendar" />
         <div className="flex flex-1 flex-col p-6 pt-0">
-          <FetchErrorState entityName="calendar" />
+          <FetchErrorState
+            entityName="calendar"
+            retrySlot={<CalendarRetryButton />}
+          />
         </div>
       </>
     );

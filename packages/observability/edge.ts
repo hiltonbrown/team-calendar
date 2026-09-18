@@ -7,9 +7,17 @@
 // biome-ignore lint/performance/noNamespaceImport: Sentry SDK convention
 import * as Sentry from "@sentry/nextjs";
 import { keys } from "./keys";
+import {
+  scrubSentryBreadcrumb,
+  scrubSentryEvent,
+  scrubSentryLog,
+} from "./scrubber";
 
 export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
   Sentry.init({
+    beforeBreadcrumb: scrubSentryBreadcrumb,
+    beforeSend: scrubSentryEvent,
+    beforeSendLog: scrubSentryLog,
     // Setting this option to true will print useful information to the console while you're setting up Sentry.
     debug: false,
     dsn: keys().NEXT_PUBLIC_SENTRY_DSN,
@@ -18,10 +26,7 @@ export const initializeSentry = (): ReturnType<typeof Sentry.init> =>
     enableLogs: true,
 
     // Integrations for console logging
-    integrations: [
-      // Send console.log, console.error, and console.warn calls as logs to Sentry
-      Sentry.consoleLoggingIntegration({ levels: ["log", "error", "warn"] }),
-    ],
+    integrations: [],
 
     // Adjust this value in production, or use tracesSampler for greater control
     tracesSampleRate: 1,

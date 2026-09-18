@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import nextConfig from "../../next.config";
 
 describe("web next.config", () => {
+  it("composes MDX page support into the final config", () => {
+    expect(nextConfig.pageExtensions).toEqual(
+      expect.arrayContaining(["md", "mdx", "ts", "tsx"])
+    );
+  });
+
   it("defines redirects for /sign-in, /login, /sign-up, and /register", async () => {
     expect(nextConfig.redirects).toBeDefined();
     if (!nextConfig.redirects) {

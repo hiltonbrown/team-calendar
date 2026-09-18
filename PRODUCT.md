@@ -246,11 +246,11 @@ Authenticated UI for team calendar, person profiles, leave submission, leave app
 
 ### `apps/web`
 
-Public site: marketing pages, Xero integration detail, pricing, security and privacy, blog and changelog, help centre.
+Public site: marketing pages, Xero integration detail, pricing, security and privacy, blog and changelog. Its help centre is the canonical customer-facing setup and operational help surface at launch.
 
 ### `apps/docs`
 
-Xero setup guide, ICS subscription instructions, admin handbook, API integration notes.
+Reserved for future developer and API documentation. It is not the launch customer-help surface and is not currently deployed.
 
 ### `apps/email`
 

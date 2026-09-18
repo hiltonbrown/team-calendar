@@ -55,10 +55,18 @@ describe("navigation registry", () => {
   });
 
   it("lets any role reach the everyday create actions", () => {
-    const newLeave = quickActions.find(
-      (action) => action.href === "/availability/new"
+    const newPlan = quickActions.find((action) => action.href === "/plans/new");
+    expect(newPlan?.roles).toBeUndefined();
+    expect(newPlan?.keywords).toContain("leave");
+    expect(isNavItemVisible(newPlan?.roles, "org:viewer")).toBe(true);
+  });
+
+  it("uses one canonical plan action for leave and availability", () => {
+    const planActions = quickActions.filter((action) =>
+      ["/availability/new", "/plans/new"].includes(action.href)
     );
-    expect(newLeave?.roles).toBeUndefined();
-    expect(isNavItemVisible(newLeave?.roles, "org:viewer")).toBe(true);
+    expect(planActions).toHaveLength(1);
+    expect(planActions[0]?.href).toBe("/plans/new");
+    expect(planActions[0]?.title).toBe("New plan");
   });
 });

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   listForOrganisation: vi.fn(),
   locationFindMany: vi.fn(),
+  organisationFindFirst: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
   scopedQuery: vi.fn((clerkOrgId: string, scopedOrganisationId: string) => ({
@@ -18,6 +19,7 @@ vi.mock("@repo/availability", () => ({
 vi.mock("@repo/database", () => ({
   database: {
     location: { findMany: mocks.locationFindMany },
+    organisation: { findFirst: mocks.organisationFindFirst },
   },
   scopedQuery: mocks.scopedQuery,
 }));
@@ -64,6 +66,10 @@ describe("PublicHolidaysPage", () => {
     });
     mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
     mocks.locationFindMany.mockResolvedValue([]);
+    mocks.organisationFindFirst.mockResolvedValue({
+      country_code: "AU",
+      region_code: null,
+    });
   });
 
   it("requires viewer access and passes URL filters to the service", async () => {

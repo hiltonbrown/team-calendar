@@ -45,6 +45,7 @@ vi.mock("next/navigation", () => ({
   redirect: (href: string) => {
     throw new Error(`redirect:${href}`);
   },
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
@@ -160,6 +161,7 @@ describe("CalendarPage", () => {
     render(await Page({ searchParams: Promise.resolve({}) }));
 
     expect(screen.getByText("Unable to load calendar")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
   });
 });
 

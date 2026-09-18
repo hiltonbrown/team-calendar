@@ -37,7 +37,7 @@ jobs:
       XERO_TOKEN_ENCRYPTION_KEY: WE552bw0+Wd6mi3TXcaj5P72E2x7gA7UPna73SevrmE=
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:

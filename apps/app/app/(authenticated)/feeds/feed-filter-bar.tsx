@@ -31,6 +31,22 @@ export function FeedFilterBar({
   const [searchValue, setSearchValue] = useState(search);
   const [statusValue, setStatusValue] = useState(status.join(","));
   const [privacyValue, setPrivacyValue] = useState(privacyMode.join(","));
+  const activeFilterCount =
+    Number(searchValue.trim().length > 0) +
+    Number(privacyValue.length > 0) +
+    Number(statusValue !== "active,paused");
+
+  const clearFilters = () => {
+    setSearchValue("");
+    setStatusValue("active,paused");
+    setPrivacyValue("");
+    setFilterParams({
+      cursor: undefined,
+      privacyMode: undefined,
+      search: undefined,
+      status: ["active", "paused"],
+    });
+  };
 
   return (
     <form
@@ -111,6 +127,16 @@ export function FeedFilterBar({
       <Button type="submit" variant="secondary">
         Apply filters
       </Button>
+      {activeFilterCount > 0 ? (
+        <Button onClick={clearFilters} type="button" variant="ghost">
+          Clear filters
+        </Button>
+      ) : null}
+      <p aria-live="polite" className="w-full text-muted-foreground text-xs">
+        {activeFilterCount > 0
+          ? `${activeFilterCount} ${activeFilterCount === 1 ? "filter" : "filters"} active.`
+          : "Showing active and paused feeds."}
+      </p>
     </form>
   );
 }

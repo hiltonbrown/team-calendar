@@ -6,7 +6,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LeaveApprovalsClient } from "./leave-approvals-client";
+import {
+  ApprovalStatusBadge,
+  LeaveApprovalsClient,
+} from "./leave-approvals-client";
 
 const mocks = vi.hoisted(() => ({
   dispatchXeroLeaveSyncAction: vi.fn(),
@@ -211,6 +214,35 @@ describe("LeaveApprovalsClient", () => {
     expect(screen.getAllByText("$1,500.00 available").length).toBeGreaterThan(
       0
     );
+  });
+
+  it.each([
+    ["submitted", "Pending approval"],
+    ["approved", "Approved"],
+    ["declined", "Declined"],
+    ["withdrawn", "Withdrawn"],
+    ["xero_sync_failed", "Xero sync failed"],
+  ])("gives %s a labelled icon treatment", (status, label) => {
+    render(<ApprovalStatusBadge status={status} />);
+
+    const badge = screen.getByText(label);
+    expect(badge.getAttribute("data-status")).toBe(status);
+    expect(badge.querySelector("svg")).not.toBeNull();
+  });
+
+  it("keeps the complete mobile decision path in one wrapping row", () => {
+    renderClient();
+
+    const queue = screen.getByRole("table", { name: "Leave approval queue" });
+    const row = screen.getByRole("row", { name: APPROVAL_ROW_NAME });
+    expect(queue.className).toContain("block");
+    expect(row.className).toContain("grid");
+    expect(row.className).not.toContain("overflow-x");
+    expect(screen.getByRole("button", { name: "Approve" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Decline" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "More actions for Ari Report" })
+    ).toBeDefined();
   });
 });
 

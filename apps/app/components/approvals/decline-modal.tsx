@@ -141,6 +141,7 @@ export function DeclineModal({
         </p>
         {message ? (
           <XeroSyncFailedState
+            failedAction="decline"
             message={message}
             retrySlot={
               <Button
@@ -149,7 +150,7 @@ export function DeclineModal({
                 size="sm"
                 type="button"
               >
-                Try again
+                Retry decline
               </Button>
             }
             revertSlot={

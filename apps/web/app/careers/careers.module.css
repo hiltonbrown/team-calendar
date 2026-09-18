@@ -1,0 +1,200 @@
+.page {
+  overflow: clip;
+}
+
+.hero {
+  background: var(--marketing-surface);
+}
+
+.heroCopy {
+  max-width: 920px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 12px;
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--marketing-on-secondary-container);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: var(--marketing-secondary-container);
+  border-radius: 12px;
+}
+
+.practices {
+  background: var(--marketing-surface-low);
+}
+
+.sectionHeading {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin-bottom: clamp(32px, 5vw, 52px);
+}
+
+.sectionHeading > p:first-child {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sectionHeading h2,
+.futureCopy h2 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  font-weight: 650;
+  line-height: 1.08;
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.sectionHeading > p:last-child,
+.futureCopy p,
+.futureAction p {
+  margin: 0;
+  line-height: 1.68;
+  color: var(--marketing-on-surface-variant);
+}
+
+.sectionHeading > p:last-child {
+  max-width: 65ch;
+  font-size: 1.05rem;
+}
+
+.practiceGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.practice {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 16px;
+  align-content: start;
+}
+
+.practice h3 {
+  max-width: 22ch;
+  margin: 0;
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.practice p {
+  max-width: 58ch;
+  margin: 0;
+  line-height: 1.65;
+  color: var(--marketing-on-surface-variant);
+}
+
+.futureCallout {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+  padding: clamp(26px, 5vw, 52px);
+  color: var(--marketing-inverse-on-surface);
+  background: var(--marketing-inverse-surface);
+  border-radius: 20px;
+}
+
+.futureIcon {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.futureCopy {
+  display: grid;
+  gap: 16px;
+  max-width: 70ch;
+}
+
+.futureCopy h2 {
+  color: var(--marketing-inverse-on-surface);
+}
+
+.futureCopy p {
+  color: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 78%,
+    transparent
+  );
+}
+
+.futureAction {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 2;
+  gap: 14px 22px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.futureAction > a {
+  min-height: 44px;
+}
+
+.futureAction p {
+  color: color-mix(
+    in srgb,
+    var(--marketing-inverse-on-surface) 76%,
+    transparent
+  );
+  overflow-wrap: anywhere;
+}
+
+.futureAction p a {
+  font-weight: 650;
+  color: var(--marketing-inverse-on-surface);
+  text-decoration-thickness: 0.09em;
+  text-underline-offset: 0.18em;
+}
+
+.futureAction p a:focus-visible {
+  outline: 3px solid var(--marketing-primary-container);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+@media (min-width: 64rem) {
+  .practiceGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .futureCallout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .futureIcon,
+  .futureAction {
+    grid-column: 1;
+  }
+}
+
+@media (forced-colors: active) {
+  .status,
+  .practice,
+  .futureCallout {
+    border: 1px solid CanvasText;
+  }
+
+  .futureAction p a:focus-visible {
+    outline-color: Highlight;
+  }
+}

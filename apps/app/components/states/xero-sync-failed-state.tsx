@@ -11,11 +11,11 @@ export type XeroFailedAction =
   | "sync";
 
 const actionLabel: Record<XeroFailedAction, string> = {
-  approve: "Approve",
+  approve: "Approval",
   decline: "Decline",
-  submit: "Submit",
+  submit: "Submission",
   sync: "Sync",
-  withdraw: "Withdraw",
+  withdraw: "Withdrawal",
 };
 
 interface XeroSyncFailedStateProps {
@@ -32,10 +32,10 @@ export const XeroSyncFailedState = ({
   revertSlot,
 }: XeroSyncFailedStateProps) => {
   const badgeText = failedAction
-    ? `${actionLabel[failedAction]} to Xero failed`
+    ? `${actionLabel[failedAction]} failed`
     : "Xero sync failed";
   const displayMessage = failedAction
-    ? `${actionLabel[failedAction]} to Xero failed: ${message}`
+    ? `${actionLabel[failedAction]} failed in Xero: ${message}`
     : message;
   return (
     <div

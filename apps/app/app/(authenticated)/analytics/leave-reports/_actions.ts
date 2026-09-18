@@ -14,7 +14,19 @@ import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
 
 const ExportSchema = z.object({
+  from: z.string().optional(),
   organisationId: z.string().uuid(),
+  preset: z.enum([
+    "this_month",
+    "last_month",
+    "this_quarter",
+    "last_quarter",
+    "this_year",
+    "last_year",
+    "last_12_months",
+    "custom",
+  ]),
+  to: z.string().optional(),
 });
 
 type ActionError =
@@ -25,7 +37,10 @@ type ActionError =
 type ActionResult<T> = Result<T, ActionError>;
 
 export async function exportLeaveReportsCsvAction(input: {
+  from?: string;
   organisationId: string;
+  preset: z.infer<typeof ExportSchema>["preset"];
+  to?: string;
 }): Promise<ActionResult<{ csvContent: string; filename: string }>> {
   const parsed = ExportSchema.safeParse(input);
   if (!parsed.success) {
@@ -66,7 +81,9 @@ export async function exportLeaveReportsCsvAction(input: {
     }
 
     const rangeResult = resolveDateRange({
-      preset: "this_year",
+      customEnd: parsed.data.to,
+      customStart: parsed.data.from,
+      preset: parsed.data.preset,
       timezone: organisation.timezone ?? "UTC",
     });
 
@@ -123,7 +140,7 @@ export async function exportLeaveReportsCsvAction(input: {
       ok: true,
       value: {
         csvContent,
-        filename: "leave-report-this-year.csv",
+        filename: `leave-report-${dateOnly(rangeResult.value.start, organisation.timezone ?? "UTC")}-to-${dateOnly(new Date(rangeResult.value.end.getTime() - 1), organisation.timezone ?? "UTC")}.csv`,
       },
     };
   } catch {
@@ -135,6 +152,18 @@ export async function exportLeaveReportsCsvAction(input: {
       ok: false,
     };
   }
+}
+
+function dateOnly(value: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: timezone,
+    year: "numeric",
+  }).formatToParts(value);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function notAuthorised(): ActionResult<never> {

@@ -47,6 +47,12 @@ export const featureKeys = [
   "priority_support",
 ] as const satisfies readonly FeatureKey[];
 
+export type { PublicPlanDefinition } from "./src/plan-catalogue";
+export {
+  getPublicPlanDefinition,
+  PUBLIC_PLAN_CATALOGUE,
+} from "./src/plan-catalogue";
+
 export const toDateOnly = (date: Date): string =>
   date.toISOString().slice(0, 10);
 

@@ -1,7 +1,22 @@
-import { authMiddleware } from "@repo/auth/proxy";
+import { authMiddleware, createRouteMatcher } from "@repo/auth/proxy";
 import type { NextProxy } from "next/server";
 
-export default authMiddleware() as unknown as NextProxy;
+export const isPublicApiRoute = createRouteMatcher([
+  "/ical(.*)",
+  "/api/inngest(.*)",
+  "/webhooks/auth",
+  "/webhooks/payments",
+  "/api/xero/oauth/callback",
+  "/cron/keep-alive",
+  "/health",
+  "/__clerk(.*)",
+]);
+
+export default authMiddleware(async (auth, request) => {
+  if (!isPublicApiRoute(request)) {
+    await auth.protect();
+  }
+}) as unknown as NextProxy;
 
 export const config = {
   matcher: [

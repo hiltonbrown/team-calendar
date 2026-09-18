@@ -1,6 +1,7 @@
-import { brandNameDisplay, primaryDomain } from "@repo/seo/branding";
+import { brandNameDisplay } from "@repo/seo/branding";
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
+import { supportEmail } from "@/src/data/support";
 import {
   LegalDocument,
   LegalList,
@@ -97,7 +98,7 @@ const TermsOfServicePage = () => (
 
           <LegalSection heading="Contact">
             <LegalParagraph>
-              {`Questions about these terms can be sent to support@${primaryDomain}.`}
+              {`Questions about these terms can be sent to ${supportEmail}.`}
             </LegalParagraph>
           </LegalSection>
         </LegalDocument>

@@ -53,7 +53,9 @@ vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: vi.fn(),
 }));
 
-const { listPeople, toBalanceRow } = await import("./people-service");
+const { canAccessPerson, listPeople, toBalanceRow } = await import(
+  "./people-service"
+);
 
 const managerId = "00000000-0000-4000-8000-000000000010";
 const directReportId = "00000000-0000-4000-8000-000000000011";
@@ -76,6 +78,48 @@ describe("people-service", () => {
         )
     );
     mocks.availabilityCount.mockResolvedValue(0);
+  });
+
+  it.each([
+    ["owner", null, directReportId, true],
+    ["admin", null, directReportId, true],
+    ["viewer", managerId, managerId, true],
+    ["viewer", managerId, directReportId, false],
+    ["viewer", null, directReportId, false],
+  ] as const)(
+    "applies %s direct-person access for actor %s and target %s",
+    async (role, actingPersonId, personId, expected) => {
+      await expect(
+        canAccessPerson({
+          actingPersonId,
+          clerkOrgId: "org_1",
+          organisationId,
+          personId,
+          role,
+        })
+      ).resolves.toBe(expected);
+    }
+  );
+
+  it("limits a manager to the central visibility scope", async () => {
+    await expect(
+      canAccessPerson({
+        actingPersonId: managerId,
+        clerkOrgId: "org_1",
+        organisationId,
+        personId: directReportId,
+        role: "manager",
+      })
+    ).resolves.toBe(true);
+    await expect(
+      canAccessPerson({
+        actingPersonId: managerId,
+        clerkOrgId: "org_1",
+        organisationId,
+        personId: "00000000-0000-4000-8000-000000000099",
+        role: "manager",
+      })
+    ).resolves.toBe(false);
   });
 
   it("applies settings-aware manager visibility to the people directory", async () => {

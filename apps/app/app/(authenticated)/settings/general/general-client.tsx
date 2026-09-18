@@ -8,13 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@repo/design-system/components/ui/card";
-import { Checkbox } from "@repo/design-system/components/ui/checkbox";
 import { Input } from "@repo/design-system/components/ui/input";
 import { Label } from "@repo/design-system/components/ui/label";
-import {
-  RadioGroup,
-  RadioGroupItem,
-} from "@repo/design-system/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -23,15 +18,15 @@ import {
   SelectValue,
 } from "@repo/design-system/components/ui/select";
 import { toast } from "@repo/design-system/components/ui/sonner";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { SettingsSectionHeader } from "../components/settings-section-header";
 import { updateAccountNameAction, updateOrganisationAction } from "./_actions";
 
-const COUNTRY_OPTIONS = [
-  { label: "Australia", value: "AU" },
-  { label: "New Zealand", value: "NZ" },
-  { label: "United Kingdom", value: "UK" },
-] as const;
+const COUNTRY_LABELS = {
+  AU: "Australia",
+  NZ: "New Zealand",
+  UK: "United Kingdom",
+} as const;
 
 const REGION_OPTIONS: Record<
   string,
@@ -90,18 +85,12 @@ export const GeneralClient = ({
 }: GeneralClientProps) => {
   const [accountName, setAccountName] = useState(account.name);
   const [organisationName, setOrganisationName] = useState(organisation.name);
-  const [confirmCountryChange, setConfirmCountryChange] = useState(false);
-  const [countryCode, setCountryCode] = useState(organisation.countryCode);
   const [regionCode, setRegionCode] = useState(organisation.regionCode ?? "");
   const [timezone, setTimezone] = useState(organisation.timezone);
   const [savingAccount, startAccountTransition] = useTransition();
   const [savingOrganisation, startOrganisationTransition] = useTransition();
 
-  const regionOptions = useMemo(
-    () => REGION_OPTIONS[countryCode] ?? [],
-    [countryCode]
-  );
-  const countryChanged = countryCode !== organisation.countryCode;
+  const regionOptions = REGION_OPTIONS[organisation.countryCode] ?? [];
 
   const saveAccount = () => {
     startAccountTransition(async () => {
@@ -122,8 +111,8 @@ export const GeneralClient = ({
   const saveOrganisation = () => {
     startOrganisationTransition(async () => {
       const result = await updateOrganisationAction({
-        confirmationCountryChange: confirmCountryChange,
-        countryCode,
+        confirmationCountryChange: false,
+        countryCode: organisation.countryCode,
         name: organisationName,
         organisationId: organisation.id,
         regionCode: regionCode || null,
@@ -200,39 +189,21 @@ export const GeneralClient = ({
             />
           </div>
 
-          <div className="space-y-3">
-            <Label>Country</Label>
-            <RadioGroup
-              className="grid gap-2 sm:grid-cols-3"
-              onValueChange={(value) => {
-                if (value === "AU" || value === "NZ" || value === "UK") {
-                  setCountryCode(value);
-                }
-                setConfirmCountryChange(false);
-                setRegionCode("");
-              }}
-              value={countryCode}
+          <div className="space-y-2">
+            <Label htmlFor="country">Country</Label>
+            <Input
+              aria-describedby="country-description"
+              id="country"
+              readOnly
+              value={COUNTRY_LABELS[organisation.countryCode]}
+            />
+            <p
+              className="text-muted-foreground text-xs"
+              id="country-description"
             >
-              {COUNTRY_OPTIONS.map((option) => (
-                <div
-                  className="flex items-center gap-2 rounded-xl bg-muted/40 px-4 py-3 text-sm"
-                  key={option.value}
-                >
-                  <RadioGroupItem
-                    disabled={
-                      option.value !== "AU" &&
-                      option.value !== organisation.countryCode
-                    }
-                    id={`country-${option.value}`}
-                    value={option.value}
-                  />
-                  <Label htmlFor={`country-${option.value}`}>
-                    {option.label}
-                    {option.value === "AU" ? "" : " (planned)"}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
+              Country cannot be changed here. New Zealand and United Kingdom
+              payroll sync remain planned.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -270,46 +241,15 @@ export const GeneralClient = ({
             </Select>
           </div>
 
-          {(countryChanged ||
-            regionCode !== (organisation.regionCode ?? "")) && (
+          {regionCode !== (organisation.regionCode ?? "") && (
             <div className="rounded-xl bg-muted/50 p-3 text-sm">
-              Changing your country or region affects which public holidays and
-              Xero payroll regions are available. Team Calendar imports
-              available public holidays automatically and existing
-              custom/suppressed records are preserved.
-            </div>
-          )}
-
-          {countryChanged && (
-            <div className="space-y-3 rounded-xl bg-muted/40 p-3 text-sm">
-              <p>
-                Confirm changing the organisation&apos;s country to{" "}
-                {countryCode}. This affects future Xero connections and
-                automatic holiday defaults. Existing data is preserved.
-                Continue?
-              </p>
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  checked={confirmCountryChange}
-                  id="confirm-country-change"
-                  onCheckedChange={(checked) =>
-                    setConfirmCountryChange(checked === true)
-                  }
-                />
-                <Label htmlFor="confirm-country-change">
-                  I understand and want to continue
-                </Label>
-              </div>
+              Changing the region affects public-holiday coverage. Existing
+              custom and suppressed records are preserved.
             </div>
           )}
 
           <div className="flex justify-end">
-            <Button
-              disabled={
-                savingOrganisation || (countryChanged && !confirmCountryChange)
-              }
-              onClick={saveOrganisation}
-            >
+            <Button disabled={savingOrganisation} onClick={saveOrganisation}>
               {savingOrganisation ? "Saving..." : "Save"}
             </Button>
           </div>

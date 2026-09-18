@@ -12,7 +12,15 @@ import {
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@repo/design-system/components/ui/dropdown-menu";
+import {
   ArchiveIcon,
+  MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
   RotateCcwIcon,
@@ -20,7 +28,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   archiveFeedAction,
   pauseFeedAction,
@@ -68,6 +76,15 @@ export function FeedTable({
     text: string;
     tone: "error" | "status";
   } | null>(null);
+  const actionTriggerRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  const closeConfirmation = () => {
+    const feedId = confirmation?.feed.id;
+    setConfirmation(null);
+    if (feedId) {
+      window.setTimeout(() => actionTriggerRefs.current.get(feedId)?.focus());
+    }
+  };
 
   const rotate = (feedId: string) => {
     startTransition(async () => {
@@ -80,7 +97,7 @@ export function FeedTable({
         text: "Feed token rotated. The subscribe URL has been updated.",
         tone: "status",
       });
-      setConfirmation(null);
+      closeConfirmation();
       router.refresh();
     });
   };
@@ -123,7 +140,7 @@ export function FeedTable({
       <AlertDialog
         onOpenChange={(open) => {
           if (!(open || isPending)) {
-            setConfirmation(null);
+            closeConfirmation();
           }
         }}
         open={confirmation !== null}
@@ -226,35 +243,49 @@ export function FeedTable({
             <div className="mt-5">
               <SubscribeUrlField feedName={feed.name} url={feed.subscribeUrl} />
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
               {canManage ? (
-                <>
-                  <Button
-                    disabled={isPending || feed.status === "archived"}
-                    onClick={() => setConfirmation({ action: "rotate", feed })}
-                    size="sm"
-                    type="button"
-                    variant="secondary"
-                  >
-                    <RotateCwIcon className="mr-2 size-4" />
-                    Rotate token
-                  </Button>
-                  <FeedStatusActionButton
-                    feed={feed}
-                    isPending={isPending}
-                    onTransition={transition}
-                  />
-                  <Button
-                    disabled={isPending || feed.status === "archived"}
-                    onClick={() => transition("archive", feed)}
-                    size="sm"
-                    type="button"
-                    variant="destructive"
-                  >
-                    <ArchiveIcon className="mr-2 size-4" />
-                    Archive
-                  </Button>
-                </>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-label={`Manage ${feed.name}`}
+                      disabled={isPending}
+                      ref={(node) => {
+                        if (node) {
+                          actionTriggerRefs.current.set(feed.id, node);
+                        } else {
+                          actionTriggerRefs.current.delete(feed.id);
+                        }
+                      }}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <MoreHorizontalIcon className="size-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Manage {feed.name}</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      disabled={feed.status === "archived"}
+                      onSelect={() =>
+                        setConfirmation({ action: "rotate", feed })
+                      }
+                    >
+                      <RotateCwIcon />
+                      Rotate token
+                    </DropdownMenuItem>
+                    <FeedStatusMenuItem feed={feed} onTransition={transition} />
+                    <DropdownMenuItem
+                      disabled={feed.status === "archived"}
+                      onSelect={() => transition("archive", feed)}
+                      variant="destructive"
+                    >
+                      <ArchiveIcon />
+                      Archive
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : null}
             </div>
           </article>
@@ -264,13 +295,11 @@ export function FeedTable({
   );
 }
 
-function FeedStatusActionButton({
+function FeedStatusMenuItem({
   feed,
-  isPending,
   onTransition,
 }: {
   feed: FeedTableItem;
-  isPending: boolean;
   onTransition: (
     action: "archive" | "pause" | "restore" | "resume",
     feed: FeedTableItem
@@ -278,43 +307,25 @@ function FeedStatusActionButton({
 }) {
   if (feed.status === "active") {
     return (
-      <Button
-        disabled={isPending}
-        onClick={() => onTransition("pause", feed)}
-        size="sm"
-        type="button"
-        variant="ghost"
-      >
-        <PauseIcon className="mr-2 size-4" />
+      <DropdownMenuItem onSelect={() => onTransition("pause", feed)}>
+        <PauseIcon />
         Pause
-      </Button>
+      </DropdownMenuItem>
     );
   }
   if (feed.status === "archived") {
     return (
-      <Button
-        disabled={isPending}
-        onClick={() => onTransition("restore", feed)}
-        size="sm"
-        type="button"
-        variant="secondary"
-      >
-        <RotateCcwIcon className="mr-2 size-4" />
+      <DropdownMenuItem onSelect={() => onTransition("restore", feed)}>
+        <RotateCcwIcon />
         Restore
-      </Button>
+      </DropdownMenuItem>
     );
   }
   return (
-    <Button
-      disabled={isPending}
-      onClick={() => onTransition("resume", feed)}
-      size="sm"
-      type="button"
-      variant="ghost"
-    >
-      <PlayIcon className="mr-2 size-4" />
+    <DropdownMenuItem onSelect={() => onTransition("resume", feed)}>
+      <PlayIcon />
       Resume
-    </Button>
+    </DropdownMenuItem>
   );
 }
 

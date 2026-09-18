@@ -1,0 +1,364 @@
+.root {
+  overflow: clip;
+}
+
+.hero {
+  padding: clamp(4.5rem, 9vw, 7.5rem) 0 clamp(3rem, 6vw, 5rem);
+}
+
+.kicker {
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+  font-weight: 750;
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.hero h1 {
+  max-width: 18ch;
+  font-size: clamp(2.8rem, 7vw, 5rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.overall {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.15rem;
+  align-items: flex-start;
+  max-width: 55rem;
+  padding: clamp(1.35rem, 3vw, 2rem);
+  margin-top: clamp(2rem, 5vw, 3.5rem);
+  background: var(--marketing-surface-high);
+  border-radius: 20px;
+}
+
+.overall > svg {
+  margin-top: 0.1rem;
+}
+
+.overallLabel {
+  margin-bottom: 0.4rem;
+  font-size: clamp(1.25rem, 2.4vw, 1.65rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.overall div > p:last-child,
+.sectionIntro p,
+.reportCopy > p {
+  max-width: 65ch;
+  line-height: 1.65;
+  color: var(--marketing-on-surface-variant);
+}
+
+.utilityRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem 2rem;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 55rem;
+  margin-top: 1.25rem;
+}
+
+.checkedTime,
+.actions,
+.primaryAction,
+.secondaryAction,
+.stateLabel {
+  display: inline-flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.checkedTime {
+  font-size: 0.92rem;
+  color: var(--marketing-on-surface-variant);
+}
+
+.actions {
+  flex-wrap: wrap;
+}
+
+.primaryAction,
+.secondaryAction {
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 14px;
+}
+
+.primaryAction {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.secondaryAction {
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-high);
+}
+
+.primaryAction:focus-visible,
+.secondaryAction:focus-visible,
+.reportCopy a:focus-visible,
+.emptyState a:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 3px;
+}
+
+.section {
+  padding: clamp(3.5rem, 7vw, 6rem) 0;
+}
+
+.tonalSection,
+.reportSection {
+  background: var(--marketing-surface-low);
+}
+
+.sectionInner {
+  max-width: 70rem;
+}
+
+.sectionIntro {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 48rem;
+  margin-bottom: 2rem;
+}
+
+.sectionIntro h2,
+.reportCopy h2 {
+  font-size: clamp(1.85rem, 4vw, 2.8rem);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+}
+
+.componentList {
+  display: grid;
+  gap: 0.65rem;
+  padding: clamp(0.8rem, 2vw, 1.25rem);
+  list-style: none;
+  background: var(--marketing-surface-high);
+  border-radius: 16px;
+}
+
+.componentList li {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0.75rem 0.9rem;
+  background: var(--marketing-surface-lowest);
+  border-radius: 12px;
+}
+
+.componentList li > span:first-child {
+  font-weight: 650;
+}
+
+.stateLabel,
+.incidentState {
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.stateLabel {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.7rem;
+  background: var(--marketing-surface-high);
+  border-radius: 12px;
+}
+
+.operational {
+  color: var(--marketing-success);
+}
+
+.degraded,
+.maintenance {
+  color: var(--marketing-on-warning-container);
+}
+
+.outage,
+.partial_outage,
+.major_outage,
+.active {
+  color: var(--marketing-error);
+}
+
+.unknown,
+.resolved {
+  color: var(--marketing-on-surface-variant);
+}
+
+.incidentList {
+  display: grid;
+  gap: 1rem;
+}
+
+.incidentCard {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: var(--marketing-surface-lowest);
+  border-radius: 20px;
+}
+
+.incidentHeading {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.incidentState {
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.incidentHeading h3 {
+  max-width: 45rem;
+  font-size: clamp(1.2rem, 2.5vw, 1.55rem);
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.incidentTiming,
+.resolvedTime,
+.affected,
+.mutedCopy {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--marketing-on-surface-variant);
+}
+
+.incidentTiming {
+  flex: 0 0 auto;
+  max-width: 15rem;
+  text-align: right;
+}
+
+.affected,
+.resolvedTime {
+  margin-top: 1rem;
+}
+
+.updateList {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  margin-top: 1.25rem;
+  list-style: none;
+  background: var(--marketing-surface-low);
+  border-radius: 16px;
+}
+
+.updateList li {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.25fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.updateList time {
+  font-size: 0.82rem;
+  color: var(--marketing-on-surface-variant);
+}
+
+.updateList p {
+  max-width: 65ch;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.emptyState {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 1.2rem;
+  line-height: 1.6;
+  background: var(--marketing-surface-lowest);
+  border-radius: 16px;
+}
+
+.emptyState svg {
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.emptyState a,
+.reportCopy a {
+  font-weight: 700;
+  color: var(--marketing-primary);
+  text-underline-offset: 0.2em;
+}
+
+.reportCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  background: var(--marketing-surface-high);
+  border-radius: 20px;
+}
+
+.reportCopy {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.sensitiveWarning {
+  font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .utilityRow,
+  .componentList li,
+  .incidentHeading {
+    align-items: flex-start;
+  }
+
+  .componentList li,
+  .incidentHeading {
+    flex-direction: column;
+  }
+
+  .actions,
+  .primaryAction,
+  .secondaryAction {
+    width: 100%;
+  }
+
+  .incidentTiming {
+    max-width: none;
+    text-align: left;
+  }
+
+  .updateList li,
+  .reportCard {
+    grid-template-columns: 1fr;
+  }
+
+  .reportCard > svg {
+    color: var(--marketing-primary);
+  }
+}
+
+@media (forced-colors: active) {
+  .overall,
+  .componentList,
+  .componentList li,
+  .incidentCard,
+  .emptyState,
+  .reportCard {
+    border: 1px solid CanvasText;
+  }
+}

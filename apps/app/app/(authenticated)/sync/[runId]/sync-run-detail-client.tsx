@@ -12,7 +12,7 @@ import { Button } from "@repo/design-system/components/ui/button";
 import { useNotificationEvents } from "@repo/notifications/components/provider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { EmptyState } from "@/components/states/empty-state";
 import { withOrg } from "@/lib/navigation/org-url";
@@ -23,6 +23,7 @@ import {
 } from "../_actions";
 
 const FIRST_LINE_PATTERN = /\r?\n/;
+type PendingAction = "cancel" | "export" | "rerun" | null;
 
 interface SyncRunDetailClientProperties {
   detail: RunDetail;
@@ -47,10 +48,30 @@ export function SyncRunDetailClient({
   } | null>(null);
   const [confirmRerun, setConfirmRerun] = useState(false);
   const [timelineOpen, setTimelineOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const pendingActionRef = useRef<PendingAction>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const { run } = detail;
   const runningSameType = tenantSummary?.currentRun?.runType === run.runType;
   const connectionInactive = tenantSummary?.connectionStatus !== "active";
+  const rerunDisabledReason = actionDisabledReason(
+    connectionInactive,
+    runningSameType
+  );
+
+  const beginAction = (action: Exclude<PendingAction, null>): boolean => {
+    if (pendingActionRef.current !== null) {
+      return false;
+    }
+    pendingActionRef.current = action;
+    setPendingAction(action);
+    return true;
+  };
+
+  const finishAction = () => {
+    pendingActionRef.current = null;
+    setPendingAction(null);
+  };
 
   useEffect(
     () =>
@@ -82,59 +103,92 @@ export function SyncRunDetailClient({
       });
       return;
     }
+    if (!beginAction("rerun")) {
+      return;
+    }
     startTransition(async () => {
-      setConfirmRerun(false);
-      const result = await dispatchManualSyncAction({
-        organisationId,
-        runType: run.runType,
-        xeroTenantId: run.xeroTenantId ?? "",
-      });
-      if (!result.ok) {
-        setMessage({ text: result.error.message, tone: "error" });
-        return;
+      try {
+        setConfirmRerun(false);
+        const result = await dispatchManualSyncAction({
+          organisationId,
+          runType: run.runType,
+          xeroTenantId: run.xeroTenantId ?? "",
+        });
+        if (!result.ok) {
+          setMessage({ text: result.error.message, tone: "error" });
+          return;
+        }
+        setMessage({
+          text: result.value.queued
+            ? "Sync queued."
+            : reasonLabel(result.value.reason),
+          tone: result.value.queued ? "status" : "error",
+        });
+        router.refresh();
+      } catch {
+        setMessage({
+          text: "The sync could not be queued. Try again.",
+          tone: "error",
+        });
+      } finally {
+        finishAction();
       }
-      setMessage({
-        text: result.value.queued
-          ? "Sync queued."
-          : reasonLabel(result.value.reason),
-        tone: result.value.queued ? "status" : "error",
-      });
-      router.refresh();
     });
   };
 
   const cancel = () => {
+    if (!beginAction("cancel")) {
+      return;
+    }
     startTransition(async () => {
-      const result = await cancelRunAction({ organisationId, runId: run.id });
-      if (!result.ok) {
-        setMessage({ text: result.error.message, tone: "error" });
-        return;
+      try {
+        const result = await cancelRunAction({ organisationId, runId: run.id });
+        if (!result.ok) {
+          setMessage({ text: result.error.message, tone: "error" });
+          return;
+        }
+        setMessage({ text: "Cancellation requested.", tone: "status" });
+        router.refresh();
+      } catch {
+        setMessage({
+          text: "Cancellation could not be requested. Try again.",
+          tone: "error",
+        });
+      } finally {
+        finishAction();
       }
-      setMessage({ text: "Cancellation requested.", tone: "status" });
-      router.refresh();
     });
   };
 
   const exportCsv = () => {
+    if (!beginAction("export")) {
+      return;
+    }
     startTransition(async () => {
-      const result = await exportFailedRecordsCsvAction({
-        organisationId,
-        runId: run.id,
-      });
-      if (!result.ok) {
-        setMessage({ text: result.error.message, tone: "error" });
-        return;
+      try {
+        const result = await exportFailedRecordsCsvAction({
+          organisationId,
+          runId: run.id,
+        });
+        if (!result.ok) {
+          setMessage({ text: result.error.message, tone: "error" });
+          return;
+        }
+        const blob = new Blob([result.value.csvContent], {
+          type: "text/csv;charset=utf-8",
+        });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = result.value.filename;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        setMessage({ text: "CSV export ready.", tone: "status" });
+      } catch {
+        setMessage({ text: "CSV export failed. Try again.", tone: "error" });
+      } finally {
+        finishAction();
       }
-      const blob = new Blob([result.value.csvContent], {
-        type: "text/csv;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = result.value.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setMessage({ text: "CSV export ready.", tone: "status" });
     });
   };
 
@@ -196,12 +250,15 @@ export function SyncRunDetailClient({
             </div>
             {detail.failedRecords.length > 0 && (
               <Button
-                disabled={isPending}
+                aria-busy={pendingAction === "export"}
+                disabled={pendingAction !== null}
                 onClick={exportCsv}
                 type="button"
                 variant="secondary"
               >
-                Export as CSV
+                {pendingAction === "export"
+                  ? "Preparing CSV…"
+                  : "Export as CSV"}
               </Button>
             )}
           </div>
@@ -284,24 +341,45 @@ export function SyncRunDetailClient({
           </p>
         ) : null}
         <Button
+          aria-busy={pendingAction === "rerun"}
+          aria-describedby="rerun-sync-description"
           className="w-full"
-          disabled={isPending || connectionInactive || runningSameType}
+          disabled={pendingAction !== null || rerunDisabledReason !== null}
           onClick={rerun}
-          title={actionDisabledTitle(connectionInactive, runningSameType)}
           type="button"
         >
-          {confirmRerun ? "Continue re-run" : "Re-run this sync"}
+          {rerunActionLabel(pendingAction, confirmRerun)}
         </Button>
+        <p
+          className="text-muted-foreground text-sm"
+          id="rerun-sync-description"
+        >
+          {rerunDisabledReason ??
+            "Starts a fresh sync and keeps this run in the audit trail."}
+        </p>
         {run.status === "running" && (
-          <Button
-            className="w-full"
-            disabled={isPending}
-            onClick={cancel}
-            type="button"
-            variant="secondary"
-          >
-            Cancel running sync
-          </Button>
+          <div className="space-y-2">
+            <Button
+              aria-busy={pendingAction === "cancel"}
+              aria-describedby="cancel-sync-description"
+              className="w-full"
+              disabled={pendingAction !== null}
+              onClick={cancel}
+              type="button"
+              variant="secondary"
+            >
+              {pendingAction === "cancel"
+                ? "Requesting cancellation…"
+                : "Cancel running sync"}
+            </Button>
+            <p
+              className="text-muted-foreground text-sm"
+              id="cancel-sync-description"
+            >
+              Stops future work after the current operation reaches a safe
+              point.
+            </p>
+          </div>
         )}
         {detail.timeline.length > 0 && (
           <Button
@@ -382,16 +460,30 @@ function triggerTypeLabel(triggerType: SyncTriggerType): string {
   }[triggerType];
 }
 
-function actionDisabledTitle(
+function actionDisabledReason(
   connectionInactive: boolean,
   runningSameType: boolean
-): string | undefined {
+): string | null {
   if (connectionInactive) {
-    return "Reconnect Xero before re-running this sync.";
+    return "Reconnect Xero in Settings before re-running this sync.";
   }
   if (runningSameType) {
     return "Another run of this type is already running.";
   }
+  return null;
+}
+
+function rerunActionLabel(
+  pendingAction: PendingAction,
+  confirmRerun: boolean
+): string {
+  if (pendingAction === "rerun") {
+    return "Queuing re-run…";
+  }
+  if (confirmRerun) {
+    return "Continue re-run";
+  }
+  return "Re-run this sync";
 }
 
 function reasonLabel(reason?: string): string {

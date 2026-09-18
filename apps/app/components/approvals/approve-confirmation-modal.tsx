@@ -102,6 +102,7 @@ export function ApproveConfirmationModal({
         </p>
         {message ? (
           <XeroSyncFailedState
+            failedAction="approve"
             message={message}
             retrySlot={
               <Button
@@ -110,7 +111,7 @@ export function ApproveConfirmationModal({
                 size="sm"
                 type="button"
               >
-                Try again
+                Retry approval
               </Button>
             }
             revertSlot={

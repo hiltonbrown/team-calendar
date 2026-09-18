@@ -34,7 +34,8 @@ import {
   rotateTokenAction,
 } from "@/app/(authenticated)/feeds/_actions";
 import { FeedStatusDot } from "./feed-status-dot";
-import { SubscribeUrlField } from "./subscribe-url-field";
+import { feedPrivacyDescription, feedPrivacyLabel } from "./privacy-mode-copy";
+import { SubscribeInstructions } from "./subscribe-instructions";
 
 interface PreviewEvent {
   description: string | null;
@@ -80,7 +81,6 @@ export function FeedDetail({
   const [confirmation, setConfirmation] = useState<"archive" | "rotate" | null>(
     null
   );
-  const [showScope, setShowScope] = useState(false);
   const [subscribeUrl, setSubscribeUrl] = useState(detail.subscribeUrl);
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{
@@ -130,137 +130,131 @@ export function FeedDetail({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="space-y-5">
-        {message && !confirmation ? (
-          <p
-            aria-live={message.tone === "error" ? "assertive" : "polite"}
-            className="rounded-2xl bg-muted p-3 text-sm"
-            role={message.tone === "error" ? "alert" : "status"}
-          >
-            {message.text}
+    <div className="space-y-6">
+      {message && !confirmation ? (
+        <p
+          aria-live={message.tone === "error" ? "assertive" : "polite"}
+          className="rounded-[20px] bg-muted p-3 text-sm"
+          role={message.tone === "error" ? "alert" : "status"}
+        >
+          {message.text}
+        </p>
+      ) : null}
+      <header>
+        <div className="flex items-center gap-2">
+          <FeedStatusDot status={detail.status} />
+          <Badge variant="secondary">
+            {feedPrivacyLabel(detail.privacyMode)}
+          </Badge>
+        </div>
+        <h2 className="mt-3 font-semibold text-foreground text-title-lg">
+          {detail.name}
+        </h2>
+        {detail.description ? (
+          <p className="mt-1 text-muted-foreground text-sm">
+            {detail.description}
           </p>
         ) : null}
-        <div>
-          <div className="flex items-center gap-2">
-            <FeedStatusDot status={detail.status} />
-            <Badge variant="secondary">
-              {privacyLabel(detail.privacyMode)}
-            </Badge>
-          </div>
-          <h2 className="mt-3 font-semibold text-foreground text-title-lg">
-            {detail.name}
-          </h2>
-          {detail.description ? (
-            <p className="mt-1 text-muted-foreground text-sm">
-              {detail.description}
-            </p>
-          ) : null}
-        </div>
+      </header>
 
-        <FeedConfirmationDialog
-          confirmation={confirmation}
-          errorMessage={message?.tone === "error" ? message.text : null}
-          feedName={detail.name}
-          isPending={isPending}
-          onArchive={() => transition("archive")}
-          onClose={() => setConfirmation(null)}
-          onRotate={rotate}
-        />
+      <FeedConfirmationDialog
+        confirmation={confirmation}
+        errorMessage={message?.tone === "error" ? message.text : null}
+        feedName={detail.name}
+        isPending={isPending}
+        onArchive={() => transition("archive")}
+        onClose={() => setConfirmation(null)}
+        onRotate={rotate}
+      />
 
-        <div className="rounded-2xl bg-muted p-4">
-          <div className="font-medium text-sm">Scope</div>
-          <p className="mt-1 text-sm">{detail.scopeSummary}</p>
-          <Button
-            className="mt-2"
-            onClick={() => setShowScope((value) => !value)}
-            size="sm"
-            type="button"
-            variant="ghost"
-          >
-            View full scope
-          </Button>
-          {showScope ? (
-            <ul className="mt-3 space-y-2 text-sm">
+      <SubscribeInstructions
+        feeds={
+          subscribeUrl
+            ? [{ id: detail.id, name: detail.name, subscribeUrl }]
+            : []
+        }
+      />
+
+      <section className="rounded-[20px] bg-muted p-5">
+        <h3 className="font-semibold text-title-md">Preview and visibility</h3>
+        <PreviewTabs previews={previews} />
+      </section>
+
+      <details className="rounded-[20px] bg-muted p-5 text-sm">
+        <summary className="cursor-pointer font-semibold">
+          Scope and privacy
+        </summary>
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
+          <section>
+            <h3 className="font-medium">Scope</h3>
+            <p className="mt-1">{detail.scopeSummary}</p>
+            <ul className="mt-3 space-y-2">
               {detail.scopes.map((scope) => (
                 <li key={scope.id}>{scope.label}</li>
               ))}
             </ul>
-          ) : null}
+          </section>
+          <section>
+            <h3 className="font-medium">Privacy</h3>
+            <p className="mt-1 text-muted-foreground">
+              {feedPrivacyDescription(detail.privacyMode)}
+            </p>
+            <p className="mt-1 text-muted-foreground">
+              Public holidays are{" "}
+              {detail.includesPublicHolidays ? "included" : "not included"}.
+            </p>
+          </section>
         </div>
+      </details>
 
-        <div className="rounded-2xl bg-muted p-4 text-sm">
-          <div className="font-medium">Privacy</div>
-          <p className="mt-1 text-muted-foreground">
-            {privacyExplanation(detail.privacyMode)}
-          </p>
-          <p className="mt-1 text-muted-foreground">
-            Public holidays are{" "}
-            {detail.includesPublicHolidays ? "included" : "not included"}.
-          </p>
-        </div>
-
-        <div className="rounded-2xl bg-muted p-4 text-sm">
-          <SubscribeUrlField
-            description="Anyone with this URL can subscribe. Pause the feed to stop publishing, or rotate the token to replace the URL."
-            feedName={detail.name}
-            url={subscribeUrl}
-          />
-          <p className="mt-3 text-muted-foreground text-xs">
+      {canManage ? (
+        <details className="rounded-[20px] bg-muted p-5 text-sm">
+          <summary className="cursor-pointer font-semibold">
+            Token history and lifecycle
+          </summary>
+          {detail.tokenHistory && detail.tokenHistory.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {detail.tokenHistory.map((token) => (
+                <li
+                  className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                  key={token.id}
+                >
+                  <span className="font-mono">••••{token.id.slice(-4)}</span>
+                  <span className="flex items-center gap-2">
+                    <Badge variant="secondary">{token.status}</Badge>
+                    <span className="text-muted-foreground">
+                      {formatDate(token.createdAt)}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-4 text-muted-foreground">No prior tokens.</p>
+          )}
+          <p className="mt-4 text-muted-foreground text-xs">
             {detail.activeTokenHint
-              ? `Created ${formatDate(detail.activeTokenHint.createdAt)}${detail.activeTokenHint.lastUsedAt ? `, last used ${formatDate(detail.activeTokenHint.lastUsedAt)}` : ", never used"}`
+              ? `Active token created ${formatDate(detail.activeTokenHint.createdAt)}${detail.activeTokenHint.lastUsedAt ? `, last used ${formatDate(detail.activeTokenHint.lastUsedAt)}` : ", never used"}`
               : "This feed has no active token."}
           </p>
-          {canManage ? (
+          <div className="mt-5 flex flex-wrap gap-2">
             <Button
-              className="mt-3"
               disabled={isPending || detail.status === "archived"}
               onClick={() => setConfirmation("rotate")}
-              size="sm"
               type="button"
               variant="secondary"
             >
               <RotateCwIcon className="mr-2 size-4" />
               Rotate token
             </Button>
-          ) : null}
-        </div>
-
-        {detail.tokenHistory && detail.tokenHistory.length > 0 ? (
-          <div className="rounded-2xl bg-muted p-4 text-sm">
-            <div className="font-medium">Token history</div>
-            <ul className="mt-2 space-y-1">
-              {detail.tokenHistory.map((t) => (
-                <li
-                  className="flex items-center justify-between text-xs"
-                  key={t.id}
-                >
-                  <span className="font-mono">••••{t.id.slice(-4)}</span>
-                  <span className="flex items-center gap-2">
-                    <Badge variant="secondary">{t.status}</Badge>
-                    <span className="text-muted-foreground">
-                      {formatDate(t.createdAt)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <FeedLifecycleActions
+              isPending={isPending}
+              onTransition={transition}
+              status={detail.status}
+            />
           </div>
-        ) : null}
-
-        {canManage ? (
-          <FeedLifecycleActions
-            isPending={isPending}
-            onTransition={transition}
-            status={detail.status}
-          />
-        ) : null}
-      </section>
-
-      <section className="rounded-2xl bg-muted p-4">
-        <h3 className="font-semibold text-title-md">Preview</h3>
-        <PreviewTabs previews={previews} />
-      </section>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -446,7 +440,7 @@ function PreviewTabs({
       <TabsList>
         {modes.map((mode) => (
           <TabsTrigger key={mode} value={mode}>
-            {privacyLabel(mode)}
+            {feedPrivacyLabel(mode)}
           </TabsTrigger>
         ))}
       </TabsList>
@@ -480,26 +474,6 @@ function PreviewTabs({
       ))}
     </Tabs>
   );
-}
-
-function privacyLabel(value: "masked" | "named" | "private"): string {
-  if (value === "named") {
-    return "Named";
-  }
-  if (value === "masked") {
-    return "Masked";
-  }
-  return "Private";
-}
-
-function privacyExplanation(value: "masked" | "named" | "private"): string {
-  if (value === "named") {
-    return "Subscribers see names and leave types";
-  }
-  if (value === "masked") {
-    return "Subscribers see Team member with leave types";
-  }
-  return "Subscribers see Unavailable only";
 }
 
 function formatDate(date: Date): string {

@@ -1,4 +1,4 @@
-import type { Event, EventHint } from "@sentry/nextjs";
+import type { Breadcrumb, Event, EventHint, Log } from "@sentry/nextjs";
 
 const SENSITIVE_PATTERNS = [
   /token/i,
@@ -80,12 +80,17 @@ export const sanitizeObject = (
   return sanitized;
 };
 
-export const scrubSentryEvent = (event: Event, _hint?: EventHint): Event => {
+export const scrubSentryEvent = <T extends Event>(
+  event: T,
+  _hint?: EventHint
+): T => {
   if (!event) {
     return event;
   }
 
   if (event.request) {
+    event.request.url = undefined;
+    event.request.query_string = undefined;
     if (event.request.headers) {
       event.request.headers = sanitizeObject(
         event.request.headers as Record<string, unknown>
@@ -112,13 +117,19 @@ export const scrubSentryEvent = (event: Event, _hint?: EventHint): Event => {
   }
 
   if (event.breadcrumbs) {
-    event.breadcrumbs = event.breadcrumbs.map((b) => ({
-      ...b,
-      data: b.data ? sanitizeObject(b.data) : undefined,
+    event.breadcrumbs = event.breadcrumbs.map(scrubSentryBreadcrumb);
+  }
+
+  event.message = event.message ? "[SCRUBBED]" : event.message;
+  if (event.exception?.values) {
+    event.exception.values = event.exception.values.map((value) => ({
+      ...value,
+      value: value.value ? "[SCRUBBED]" : value.value,
     }));
   }
 
   if (event.user) {
+    event.user.id = undefined;
     event.user.email = undefined;
     event.user.username = undefined;
     event.user.ip_address = undefined;
@@ -126,3 +137,15 @@ export const scrubSentryEvent = (event: Event, _hint?: EventHint): Event => {
 
   return event;
 };
+
+export const scrubSentryBreadcrumb = (breadcrumb: Breadcrumb): Breadcrumb => ({
+  ...breadcrumb,
+  data: breadcrumb.data ? sanitizeObject(breadcrumb.data) : undefined,
+  message: breadcrumb.message ? "[SCRUBBED]" : breadcrumb.message,
+});
+
+export const scrubSentryLog = (log: Log): Log => ({
+  ...log,
+  attributes: log.attributes ? sanitizeObject(log.attributes) : undefined,
+  message: "[SCRUBBED]",
+});

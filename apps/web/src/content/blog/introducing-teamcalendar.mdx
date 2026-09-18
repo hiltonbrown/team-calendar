@@ -1,48 +1,50 @@
----
-title: Introducing Team Calendar
-description: Team Calendar connects to Xero Payroll and publishes secure ICS calendar feeds so your team's leave and availability are always visible in Outlook, Google Calendar, and Apple Calendar.
-date: 2026-01-10
-author: Team Calendar Team
----
+export const metadata = {
+  title: "Introducing Team Calendar",
+  description:
+    "How Team Calendar brings Australian Xero Payroll leave and manual availability into one calendar-ready view.",
+  author: "Team Calendar",
+  authorRole: "Product team, Gold Coast",
+  category: "update",
+  status: "published",
+  publishedAt: "2026-01-10",
+  updatedAt: "2026-08-30",
+  regions: ["AU"],
+  featured: false,
+};
 
-## What is Team Calendar?
+## One place to understand who is available
 
-Team Calendar is a leave management and availability publishing platform built exclusively for teams using Xero Payroll. It connects to Xero Payroll AU, NZ, and UK via OAuth, syncs approved leave continuously, and publishes secure ICS calendar feeds per person.
+Team Calendar is a leave management and availability publishing platform for Australian teams using Xero Payroll. It brings approved payroll leave and calendar-only plans into one dependable view, then publishes read-only subscriptions for Outlook, Google Calendar and Apple Calendar.
 
-If your team uses Xero Payroll and you have ever struggled to know who is on leave without checking Xero or a spreadsheet, Team Calendar is built for you.
+New Zealand and United Kingdom support is planned. Australia is the supported Early Access region today.
 
-## How it works
+If your team checks Xero, spreadsheets and messages before answering “Who is away?”, Team Calendar gives that question one practical home.
 
-The architecture is straightforward:
+## How the workflow fits together
 
-1. **Connect your Xero Payroll account** via OAuth. Team Calendar reads your employees and their approved leave.
-2. **Submit and approve leave inside Team Calendar.** Employees request leave, managers approve or decline. Every decision writes back to Xero synchronously.
-3. **Subscribe to the ICS feed.** Each employee has a personal ICS feed URL, secured with a signed token. Add it to Outlook, Google Calendar, or Apple Calendar once. It updates automatically.
+1. **Connect Australian Xero Payroll.** Team Calendar reads employees, approved leave and leave balances from the payroll organisation you authorise.
+2. **Submit and decide leave in Team Calendar.** Employees submit requests and managers approve, decline or ask a question with team availability in view. Submit, approve, decline and withdraw actions write to Xero synchronously and show failures inline.
+3. **Publish a secure calendar feed.** Authorised users create a scoped, read-only subscribe URL for a person or team. Calendar apps refresh subscribed feeds on their own schedules.
 
-## Beyond leave
+Xero remains the payroll source of truth for balances and accruals. Team Calendar does not calculate them.
 
-Leave is not the only reason someone is unavailable or working differently. Team Calendar supports four manual availability entry types alongside approved leave:
+## Availability beyond payroll leave
 
-- **WFH** (working from home)
-- **Travelling**
-- **Training**
-- **Client site**
+Formal leave is only part of a team’s availability. Team Calendar also records calendar-only plans that never enter Xero or a pay run:
 
-These appear in ICS feeds alongside approved leave, so managers see the full picture, not just formal leave.
+- Working from home
+- Travelling
+- Training
+- Client site
 
-## Privacy controls
+The published calendar can include both sources, with each record’s meaning kept clear.
 
-Not all leave should be visible to everyone. Team Calendar lets administrators configure privacy rules per leave category. Sensitive categories can be hidden from published feeds entirely, or shown as unavailable without category detail.
+## Privacy belongs to the feed
 
-The employee whose feed it is always sees their own leave in full. Privacy rules apply only to what other people see when they subscribe.
+Feed owners choose how much detail subscribers receive. **Named** includes the person’s name and allowed availability detail. **Masked** publishes **Out of office**. **Private** publishes **Busy**.
 
-## What is next
+These privacy modes change event details, not the subscribe URL. The complete active URL remains available to authorised viewers and should be protected like a credential.
 
-The next releases will add:
+## Follow current product changes
 
-- Feed preview panel in the admin UI
-- Team calendar view for managers
-- Sync health reporting and audit log
-- Leave balance visibility
-
-Stay up to date on the [changelog](/changelog).
+The [changelog](/changelog) records shipped product updates. For a practical setup path, follow the [AU onboarding guide](/help-centre/onboarding).

@@ -2,6 +2,8 @@ import { auth } from "@repo/auth/server";
 import { database } from "@repo/database";
 import { normaliseRole } from "@repo/feeds";
 import { FeedCreateForm } from "@/components/feed/feed-create-form";
+import { PermissionDeniedState } from "@/components/states/permission-denied-state";
+import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import { Header } from "../../components/header";
 
@@ -15,6 +17,26 @@ const NewFeedPage = async ({ searchParams }: NewFeedPageProps) => {
   const role = normaliseRole(orgRole);
   const { clerkOrgId, organisationId, orgQueryValue } =
     await requireActiveOrgPageContext(org);
+  const canManage =
+    role === "admin" ||
+    role === "owner" ||
+    role === "org:admin" ||
+    role === "org:owner";
+  if (!canManage) {
+    return (
+      <>
+        <Header organisationId={organisationId} page="New feed" />
+        <div className="flex flex-1 flex-col p-6 pt-0">
+          <PermissionDeniedState
+            ctaHref={withOrg("/feeds", orgQueryValue)}
+            ctaLabel="Return to feeds"
+            description="Only organisation admins and owners can create calendar feeds. You can still view and copy feeds shared with you."
+            title="Feed creation is read-only"
+          />
+        </div>
+      </>
+    );
+  }
   const [teams, people] = await Promise.all([
     database.team.findMany({
       orderBy: { name: "asc" },
@@ -39,7 +61,7 @@ const NewFeedPage = async ({ searchParams }: NewFeedPageProps) => {
       <div className="flex flex-1 flex-col p-6 pt-0">
         <div className="max-w-3xl rounded-2xl bg-background p-6">
           <FeedCreateForm
-            canCreateOrgScope={role === "org:admin" || role === "org:owner"}
+            canCreateOrgScope
             organisationId={organisationId}
             orgQueryValue={orgQueryValue}
             people={people.map((person) => ({

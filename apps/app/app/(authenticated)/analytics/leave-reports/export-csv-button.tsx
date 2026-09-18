@@ -7,10 +7,18 @@ import { useState, useTransition } from "react";
 import { exportLeaveReportsCsvAction } from "./_actions";
 
 interface ExportCsvButtonProps {
+  from?: string;
   organisationId: string;
+  preset: Parameters<typeof exportLeaveReportsCsvAction>[0]["preset"];
+  to?: string;
 }
 
-export const ExportCsvButton = ({ organisationId }: ExportCsvButtonProps) => {
+export const ExportCsvButton = ({
+  from,
+  organisationId,
+  preset,
+  to,
+}: ExportCsvButtonProps) => {
   const [isPending, startTransition] = useTransition();
   const [exporting, setExporting] = useState(false);
 
@@ -18,9 +26,16 @@ export const ExportCsvButton = ({ organisationId }: ExportCsvButtonProps) => {
     setExporting(true);
     startTransition(async () => {
       try {
-        const result = await exportLeaveReportsCsvAction({ organisationId });
+        const result = await exportLeaveReportsCsvAction({
+          from,
+          organisationId,
+          preset,
+          to,
+        });
         if (!result.ok) {
-          toast.error(result.error.message);
+          toast.error(
+            `${result.error.message} Check the selected period and try again.`
+          );
           return;
         }
 
@@ -33,9 +48,11 @@ export const ExportCsvButton = ({ organisationId }: ExportCsvButtonProps) => {
         link.download = result.value.filename;
         link.click();
         URL.revokeObjectURL(url);
-        toast.success("Leave report exported successfully.");
+        toast.success(`Leave report exported as ${result.value.filename}.`);
       } catch {
-        toast.error("Failed to export leave report.");
+        toast.error(
+          "Failed to export leave report. Check the selected period and try again."
+        );
       } finally {
         setExporting(false);
       }
@@ -44,6 +61,7 @@ export const ExportCsvButton = ({ organisationId }: ExportCsvButtonProps) => {
 
   return (
     <Button
+      aria-busy={exporting || isPending}
       className="gap-1.5"
       disabled={exporting || isPending}
       onClick={handleExport}
@@ -55,7 +73,7 @@ export const ExportCsvButton = ({ organisationId }: ExportCsvButtonProps) => {
       ) : (
         <DownloadIcon className="h-4 w-4" />
       )}
-      <span>Export CSV</span>
+      <span>{exporting || isPending ? "Preparing CSV…" : "Export CSV"}</span>
     </Button>
   );
 };

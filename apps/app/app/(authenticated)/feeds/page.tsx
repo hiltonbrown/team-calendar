@@ -48,6 +48,10 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
     role === "owner" ||
     role === "org:admin" ||
     role === "org:owner";
+  const hasActiveFilters =
+    Boolean(filters.search) ||
+    Boolean(filters.privacyMode?.length) ||
+    filters.status.join(",") !== "active,paused";
 
   const unauthorisedResult = {
     error: {
@@ -81,7 +85,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
     content = (
       <EmptyState
         actionSlot={
-          canManage ? (
+          canManage && !hasActiveFilters ? (
             <Button asChild>
               <Link href={withOrg("/feeds/new", orgQueryValue)}>
                 Create feed
@@ -89,8 +93,14 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
             </Button>
           ) : null
         }
-        description="New organisations normally start with a default all-staff feed. No feed is currently available for this organisation."
-        title="No feeds yet"
+        description={
+          hasActiveFilters
+            ? "Clear or change the current filters to see other calendar feeds."
+            : "New organisations normally start with a default all-staff feed. No feed is currently available for this organisation."
+        }
+        title={
+          hasActiveFilters ? "No feeds match these filters" : "No feeds yet"
+        }
       />
     );
   } else if (feedsResult.ok) {

@@ -30,14 +30,13 @@ export const ProblemSection = () => (
       <div className="fmkt-section-header">
         <p className="fmkt-overline">Why teams switch</p>
         <h2 className="fmkt-section-title">
-          The admin is small until it costs you a shift.
+          Leave admin feels small until it costs you a shift.
         </h2>
         <p className="fmkt-problem__lead">
-          A text here, a leave form there, a calendar invite someone forgot to
-          send. On a small team it holds together until it doesn&rsquo;t: two
-          people book the same week, someone is away and nobody covered, or a
-          leave day never made it into Xero and payroll is wrong. The bigger the
-          team gets, the more Monday morning is spent reconstructing who is
+          A text here, a leave form there, a missed calendar invite. The
+          patchwork holds until it doesn&rsquo;t: leave clashes, uncovered
+          shifts, leave missing from Xero and payroll errors. As your team
+          grows, more of Monday morning disappears into working out who&rsquo;s
           actually in.
         </p>
       </div>
