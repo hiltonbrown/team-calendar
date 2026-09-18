@@ -8,6 +8,7 @@ import {
   type Result,
 } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
+import { Prisma } from "@repo/database/generated/client";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { ensureDefaultPublicHolidaysForOrganisation } from "../holidays/holiday-service";
 import {
@@ -257,7 +258,26 @@ export const ensureCurrentUserPerson = async (
     });
 
     return { ok: true, value: mapPerson(person) };
-  } catch {
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const concurrentlyLinkedPerson = await database.person
+        .findFirst({
+          include: { location: true, team: true },
+          where: {
+            ...scoped,
+            archived_at: null,
+            clerk_user_id: input.clerkUserId,
+          },
+        })
+        .catch(() => null);
+      if (concurrentlyLinkedPerson) {
+        return { ok: true, value: mapPerson(concurrentlyLinkedPerson) };
+      }
+    }
+
     return {
       error: appError(
         "internal",
