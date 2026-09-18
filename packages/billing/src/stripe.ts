@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { type AppError, appError, type PlanKey, type Result } from "@repo/core";
 import { getSubscriptionForOrg, PLAN_CATALOGUE } from "@repo/database";
 import Stripe from "stripe";
@@ -46,6 +47,20 @@ const urlEnv = (key: string): Result<string> => {
   return { ok: true, value };
 };
 
+const TERMINAL_SUBSCRIPTION_STATUSES = new Set([
+  "canceled",
+  "incomplete_expired",
+]);
+
+const checkoutIdempotencyKey = (
+  clerkOrgId: string,
+  planKey: PlanKey,
+  subscriptionId: string | null
+): string =>
+  `team-calendar:checkout:${createHash("sha256")
+    .update(`${clerkOrgId}:${planKey}:${subscriptionId ?? "initial"}`)
+    .digest("hex")}`;
+
 export const createCheckoutSession = async (
   clerkOrgId: string,
   planKey: PlanKey
@@ -70,16 +85,37 @@ export const createCheckoutSession = async (
     return cancel;
   }
   const subscription = await getSubscriptionForOrg(clerkOrgId);
-  const session = await stripe.value.checkout.sessions.create({
-    automatic_tax: { enabled: true },
-    cancel_url: cancel.value,
-    customer: subscription?.stripe_customer_id ?? undefined,
-    line_items: [{ price: plan.priceId, quantity: 1 }],
-    metadata: { clerk_org_id: clerkOrgId },
-    mode: "subscription",
-    subscription_data: { metadata: { clerk_org_id: clerkOrgId } },
-    success_url: success.value,
-  });
+  if (
+    subscription &&
+    !TERMINAL_SUBSCRIPTION_STATUSES.has(subscription.status)
+  ) {
+    return {
+      error: appError(
+        "conflict",
+        "This organisation already has a subscription. Manage it in the billing portal."
+      ),
+      ok: false,
+    };
+  }
+  const session = await stripe.value.checkout.sessions.create(
+    {
+      automatic_tax: { enabled: true },
+      cancel_url: cancel.value,
+      customer: subscription?.stripe_customer_id ?? undefined,
+      line_items: [{ price: plan.priceId, quantity: 1 }],
+      metadata: { clerk_org_id: clerkOrgId },
+      mode: "subscription",
+      subscription_data: { metadata: { clerk_org_id: clerkOrgId } },
+      success_url: success.value,
+    },
+    {
+      idempotencyKey: checkoutIdempotencyKey(
+        clerkOrgId,
+        planKey,
+        subscription?.stripe_subscription_id ?? null
+      ),
+    }
+  );
   return session.url
     ? { ok: true, value: session.url }
     : {
