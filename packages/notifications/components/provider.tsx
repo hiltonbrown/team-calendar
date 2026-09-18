@@ -57,7 +57,6 @@ export const NotificationsProvider = ({
     let cancelled = false;
 
     const close = () => {
-      // biome-ignore lint/suspicious/noUnnecessaryConditions: retryTimer.current is mutated imperatively elsewhere in this closure (connect's retry scheduling); this guard is load-bearing at runtime even though Biome cannot see those assignments.
       if (retryTimer.current) {
         clearTimeout(retryTimer.current);
         retryTimer.current = null;

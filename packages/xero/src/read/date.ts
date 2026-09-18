@@ -21,6 +21,7 @@ function parseXeroDate(value: string | null | undefined): Date | null {
   }
 
   const dotNetDate = XERO_DOT_NET_DATE_REGEX.exec(trimmed);
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: RegExp.exec returns null for ISO and other non-.NET dates; Biome 2.5.14 incorrectly narrows this match as non-null here.
   const parsed = dotNetDate
     ? new Date(Number(dotNetDate[1]))
     : new Date(trimmed);

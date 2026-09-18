@@ -64,11 +64,13 @@ const IPV4_WITH_PORT_REGEX = /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/;
 
 function normaliseIp(ip: string): string {
   const bracketMatch = IPV6_BRACKET_WITH_PORT_REGEX.exec(ip);
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: RegExp.exec returns null for unmatched runtime input; Biome 2.5.14 incorrectly narrows this match as non-null here.
   if (bracketMatch?.[1]) {
     return bracketMatch[1].toLowerCase();
   }
 
   const ipv4Match = IPV4_WITH_PORT_REGEX.exec(ip);
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: RegExp.exec returns null for unmatched runtime input; Biome 2.5.14 incorrectly narrows this match as non-null here.
   if (ipv4Match?.[1]) {
     return ipv4Match[1];
   }

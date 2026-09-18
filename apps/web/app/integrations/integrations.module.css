@@ -322,6 +322,7 @@
   border-radius: 12px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: This step marker cannot overlap the earlier destination selector; their component trees are unrelated. */
 .steps span {
   display: inline-flex;
   align-items: center;
@@ -355,6 +356,7 @@
   align-items: start;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: This sync icon cannot overlap the earlier destination selector; their component trees are unrelated. */
 .syncHeading > span {
   display: inline-flex;
   align-items: center;

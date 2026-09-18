@@ -33,8 +33,13 @@ describe("SubscribeInstructions", () => {
     Element.prototype.scrollIntoView = vi.fn();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanup();
+    await waitFor(() => {
+      expect(document.body.childElementCount).toBe(0);
+      expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+      expect(document.body.style.pointerEvents).toBe("");
+    });
     vi.clearAllMocks();
   });
 
@@ -80,29 +85,6 @@ describe("SubscribeInstructions", () => {
       name: "Managers",
       subscribeUrl: "https://calendar.example/ical/tc1.managers.signature.ics",
     };
-    render(<SubscribeInstructions feeds={[feed, managersFeed]} />);
-
-    fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
-    fireEvent.click(
-      await screen.findByRole("option", { name: managersFeed.name })
-    );
-
-    expect(
-      screen.getByRole("textbox", {
-        name: `Subscribe URL for ${managersFeed.name}`,
-      })
-    ).toHaveProperty("value", managersFeed.subscribeUrl);
-    expect(
-      screen.getByRole("link", { name: "Open Apple Calendar" })
-    ).toHaveProperty("href", toWebcalUrl(managersFeed.subscribeUrl));
-  });
-
-  it("clears stale URL copy feedback when the selected feed changes", async () => {
-    const managersFeed: SubscribableFeed = {
-      id: "feed-2",
-      name: "Managers",
-      subscribeUrl: "https://calendar.example/ical/tc1.managers.signature.ics",
-    };
     writeText.mockResolvedValueOnce(undefined);
     render(<SubscribeInstructions feeds={[feed, managersFeed]} />);
 
@@ -110,11 +92,31 @@ describe("SubscribeInstructions", () => {
     expect(await screen.findByText("Subscribe URL copied.")).toBeDefined();
 
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "ArrowDown" });
-    fireEvent.click(
-      await screen.findByRole("option", { name: managersFeed.name })
-    );
+    const managersOption = await screen.findByRole("option", {
+      name: managersFeed.name,
+    });
+    managersOption.focus();
+    fireEvent.click(managersOption);
 
-    expect(screen.queryByText("Subscribe URL copied.")).toBeNull();
+    await waitFor(() => {
+      const combobox = screen.getByRole("combobox");
+      expect(
+        screen.getByRole("textbox", {
+          name: `Subscribe URL for ${managersFeed.name}`,
+        })
+      ).toHaveProperty("value", managersFeed.subscribeUrl);
+      expect(
+        screen.queryByRole("option", { name: managersFeed.name })
+      ).toBeNull();
+      expect(combobox.getAttribute("aria-expanded")).toBe("false");
+      expect(document.activeElement).toBe(combobox);
+      expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+      expect(document.body.style.pointerEvents).toBe("");
+      expect(screen.queryByText("Subscribe URL copied.")).toBeNull();
+    });
+    expect(
+      screen.getByRole("link", { name: "Open Apple Calendar" })
+    ).toHaveProperty("href", toWebcalUrl(managersFeed.subscribeUrl));
     expect(screen.getByRole("button", { name: "Copy URL" })).toBeDefined();
   });
 

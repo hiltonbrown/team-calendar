@@ -26,6 +26,7 @@ function formatAccessibleStart(startsAt: string, date?: Date): string {
       }).format(date)
     : formatDatePart(startsAt);
   const timeMatch = TIME_PART_PATTERN.exec(startsAt);
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: RegExp.exec returns null when startsAt has no time component; Biome 2.5.14 incorrectly narrows this match as non-null here.
   return timeMatch
     ? `${dateLabel} at ${timeMatch[1]}:${timeMatch[2]}`
     : dateLabel;

@@ -2919,7 +2919,9 @@
   border-spacing: 0;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
 .fmkt-pricing-table th,
+/* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
 .fmkt-pricing-table td {
   padding: 18px 20px;
   font: 500 0.875rem / 1.45 var(--marketing-font);
@@ -2927,6 +2929,7 @@
   text-align: left;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
 .fmkt-pricing-table th {
   color: var(--marketing-on-surface-variant);
   text-transform: uppercase;
@@ -3066,6 +3069,7 @@
 }
 
 .fmkt-pricing-cohort h3,
+/* biome-ignore lint/style/noDescendingSpecificity: This regional panel heading is outside the earlier pricing story panel, so the selectors cannot overlap. */
 .fmkt-pricing-region__panel > h2 {
   font: 650 var(--text-headline-md) / 1.2 var(--marketing-font);
   color: var(--marketing-on-surface);
@@ -3105,6 +3109,7 @@
   outline-offset: 3px;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: This regional panel heading is outside the earlier pricing story panel, so the selectors cannot overlap. */
 .fmkt-pricing-region__panel > h2 {
   width: min(100% - 32px, 1160px);
   margin: 32px auto 0;

@@ -263,6 +263,7 @@
   text-decoration: none;
 }
 
+/* biome-ignore lint/style/noDescendingSpecificity: Marketing brand text and Shiki spans are in unrelated component trees and cannot overlap. */
 .marketing-site-header__brand span {
   overflow: hidden;
   text-overflow: ellipsis;

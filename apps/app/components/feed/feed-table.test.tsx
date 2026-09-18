@@ -44,11 +44,24 @@ const feed: FeedTableItem = {
   subscribeUrl: "https://calendar.example/ical/tc1.feed-token.signature.ics",
 };
 
-function openManageMenu(feedName = feed.name) {
-  fireEvent.pointerDown(
-    screen.getByRole("button", { name: `Manage ${feedName}` }),
-    { button: 0, ctrlKey: false }
-  );
+async function openManageMenu(feedName = feed.name) {
+  const trigger = screen.getByRole("button", { name: `Manage ${feedName}` });
+  trigger.focus();
+  fireEvent.pointerDown(trigger, {
+    button: 0,
+    ctrlKey: false,
+    pointerType: "mouse",
+  });
+  await screen.findByRole("menu");
+}
+
+async function waitForPortalCleanup() {
+  await waitFor(() => {
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+    expect(document.body.style.pointerEvents).toBe("");
+  });
 }
 
 describe("FeedTable", () => {
@@ -93,7 +106,7 @@ describe("FeedTable", () => {
       />
     );
 
-    openManageMenu();
+    await openManageMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "Archive" }));
     fireEvent.click(screen.getByRole("button", { name: "Archive feed" }));
 
@@ -101,6 +114,13 @@ describe("FeedTable", () => {
       "Archive failed."
     );
     expect(screen.getByRole("button", { name: "Archive feed" })).toBeDefined();
+
+    const cancelButton = screen.getByRole("button", { name: "Cancel" });
+    await waitFor(() => {
+      expect(cancelButton.hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(cancelButton);
+    await waitForPortalCleanup();
   });
 
   it("announces clipboard rejection", async () => {
@@ -189,7 +209,7 @@ describe("FeedTable", () => {
       />
     );
 
-    openManageMenu();
+    await openManageMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "Restore" }));
 
     await waitFor(() => {
@@ -201,6 +221,7 @@ describe("FeedTable", () => {
         "Feed restored in a paused state"
       );
     });
+    await waitForPortalCleanup();
   });
 
   it("returns focus to the management menu after cancelling confirmation", async () => {
@@ -216,12 +237,14 @@ describe("FeedTable", () => {
     const manageButton = screen.getByRole("button", {
       name: `Manage ${feed.name}`,
     });
-    openManageMenu();
+    await openManageMenu();
     fireEvent.click(screen.getByRole("menuitem", { name: "Rotate token" }));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     await waitFor(() => {
+      expect(screen.queryByRole("alertdialog")).toBeNull();
       expect(document.activeElement).toBe(manageButton);
     });
+    await waitForPortalCleanup();
   });
 });

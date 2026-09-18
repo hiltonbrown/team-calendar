@@ -96,9 +96,7 @@ async function resolveCallerContext(
         "Organisation not found or not accessible in your context."
       );
     }
-    return unknownError(
-      context.error.message ?? "Failed to resolve organisation context."
-    );
+    return unknownError(context.error.message);
   }
 
   return { ok: true, value: { context: context.value, orgId, user } };
