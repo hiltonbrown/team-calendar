@@ -291,6 +291,116 @@ describeWithDatabase("feed services", () => {
     ).resolves.toBe(1);
   });
 
+  test("serialises concurrent default-feed provisioning", async () => {
+    const results = await Promise.all([
+      ensureDefaultCalendarFeed({
+        clerkOrgId: tenant.clerkOrgId,
+        organisationId: tenant.organisationId,
+      }),
+      ensureDefaultCalendarFeed({
+        clerkOrgId: tenant.clerkOrgId,
+        organisationId: tenant.organisationId,
+      }),
+    ]);
+
+    expect(results.every((result) => result.ok)).toBe(true);
+    expect(
+      results.filter((result) => result.ok && result.value.created)
+    ).toHaveLength(1);
+    await expect(
+      database.feed.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        },
+      })
+    ).resolves.toBe(1);
+  });
+
+  test("rejects at the exact feed limit despite a stale reporting counter", async () => {
+    await Promise.all([
+      seedActiveFeed("61000000-0000-4000-8000-000000000001", "first-limit"),
+      seedActiveFeed("61000000-0000-4000-8000-000000000002", "second-limit"),
+    ]);
+    await database.usageCounter.create({
+      data: {
+        clerk_org_id: tenant.clerkOrgId,
+        counter_type: "feeds",
+        current_value: 0,
+        metric_key: "feeds",
+        period_end: new Date("9999-12-31T23:59:59.999Z"),
+        period_start: new Date("1970-01-01T00:00:00.000Z"),
+      },
+    });
+
+    await expect(
+      createFeed({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: tenant.clerkOrgId,
+        includesPublicHolidays: false,
+        name: "Blocked feed",
+        organisationId: tenant.organisationId,
+        privacyMode: "named",
+        scopes: [{ scopeType: "org", scopeValue: null }],
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+      ok: false,
+    });
+  });
+
+  test("serialises concurrent feed creation at the final available slot", async () => {
+    await seedActiveFeed(
+      "61000000-0000-4000-8000-000000000003",
+      "existing-limit"
+    );
+
+    const results = await Promise.all([
+      createFeed({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: tenant.clerkOrgId,
+        includesPublicHolidays: false,
+        name: "Concurrent one",
+        organisationId: tenant.organisationId,
+        privacyMode: "named",
+        scopes: [{ scopeType: "org", scopeValue: null }],
+      }),
+      createFeed({
+        actingRole: "org:admin",
+        actingUserId: "user_admin",
+        clerkOrgId: tenant.clerkOrgId,
+        includesPublicHolidays: false,
+        name: "Concurrent two",
+        organisationId: tenant.organisationId,
+        privacyMode: "named",
+        scopes: [{ scopeType: "org", scopeValue: null }],
+      }),
+    ]);
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results).toContainEqual({
+      error: {
+        code: "validation_error",
+        message: "Your current plan has reached its active feed limit.",
+      },
+      ok: false,
+    });
+    await expect(
+      database.feed.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: tenant.clerkOrgId,
+          status: "active",
+        },
+      })
+    ).resolves.toBe(2);
+  }, 20_000);
+
   test("suffixes default feed slugs across organisations in one Clerk org", async () => {
     const secondOrganisationId = "51000000-0000-4000-8000-000000000002";
     await createTenant({
@@ -564,6 +674,20 @@ async function createFeedWithoutToken() {
   });
 }
 
+async function seedActiveFeed(id: string, slug: string) {
+  await database.feed.create({
+    data: {
+      clerk_org_id: tenant.clerkOrgId,
+      id,
+      name: slug,
+      organisation_id: tenant.organisationId,
+      privacy_mode: "named",
+      slug,
+      status: "active",
+    },
+  });
+}
+
 async function createTenant(input: typeof tenant) {
   await database.organisation.create({
     data: {
@@ -576,6 +700,12 @@ async function createTenant(input: typeof tenant) {
 }
 
 async function cleanTestData() {
+  await database.clerkOrgSubscription.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.usageCounter.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
   await database.auditEvent.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });

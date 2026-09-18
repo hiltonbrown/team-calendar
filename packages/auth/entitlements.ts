@@ -9,10 +9,11 @@ import {
   type Result,
 } from "@repo/core";
 import {
+  type AuthoritativeUsageClient,
+  getAuthoritativeUsageCount,
   getPlanFeatures,
   getPlanLimits,
   getSubscriptionForOrg,
-  getUsageCounter,
 } from "@repo/database";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
@@ -35,16 +36,16 @@ const activePlanKey = async (clerkOrgId: string): Promise<PlanKey> => {
 export const withinLimit = async (
   clerkOrgId: string,
   _organisationId: string,
-  limitType: LimitType
+  limitType: LimitType,
+  usageClient?: AuthoritativeUsageClient
 ): Promise<Result<{ allowed: boolean; current: number; limit: number }>> => {
   try {
     const planKey = await activePlanKey(clerkOrgId);
-    const [limits, usage] = await Promise.all([
+    const [limits, current] = await Promise.all([
       getPlanLimits(planKey),
-      getUsageCounter(clerkOrgId, limitType),
+      getAuthoritativeUsageCount(clerkOrgId, limitType, usageClient),
     ]);
     const limit = limits[limitType];
-    const current = usage?.current_value ?? 0;
     return {
       ok: true,
       value: { allowed: limit === -1 || current < limit, current, limit },

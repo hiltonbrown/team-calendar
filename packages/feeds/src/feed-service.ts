@@ -3,7 +3,7 @@ import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
 import type { Result } from "@repo/core";
-import { database } from "@repo/database";
+import { database, lockPlanLimitMutations } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_privacy_mode,
@@ -181,6 +181,38 @@ class RollbackError extends Error {
   }
 }
 
+const assertWithinFeedLimit = async (
+  tx: Prisma.TransactionClient,
+  input: { clerkOrgId: string; organisationId: string }
+): Promise<void> => {
+  const entitlement = await withinLimit(
+    input.clerkOrgId,
+    input.organisationId,
+    "feeds",
+    tx
+  );
+  if (!entitlement.ok) {
+    throw new RollbackError({
+      code: "unknown_error",
+      message: entitlement.error.message,
+    });
+  }
+  if (!entitlement.value.allowed) {
+    throw new RollbackError({
+      code: "validation_error",
+      message: "Your current plan has reached its active feed limit.",
+    });
+  }
+};
+
+const enforceFeedLimit = async (
+  tx: Prisma.TransactionClient,
+  input: { clerkOrgId: string; organisationId: string }
+): Promise<void> => {
+  await lockPlanLimitMutations(tx, input.clerkOrgId);
+  await assertWithinFeedLimit(tx, input);
+};
+
 export async function createFeed(
   input: unknown
 ): Promise<
@@ -194,27 +226,6 @@ export async function createFeed(
     return notAuthorised();
   }
 
-  const entitlement = await withinLimit(
-    parsed.data.clerkOrgId,
-    parsed.data.organisationId,
-    "feeds"
-  );
-  if (!entitlement.ok) {
-    return {
-      error: { code: "unknown_error", message: entitlement.error.message },
-      ok: false,
-    };
-  }
-  if (!entitlement.value.allowed) {
-    return {
-      error: {
-        code: "validation_error",
-        message: "Your current plan has reached its active feed limit.",
-      },
-      ok: false,
-    };
-  }
-
   const scopes = await validateScopes(parsed.data);
   if (!scopes.ok) {
     return { error: scopes.error, ok: false };
@@ -222,6 +233,7 @@ export async function createFeed(
 
   try {
     const result = await database.$transaction(async (tx) => {
+      await enforceFeedLimit(tx, parsed.data);
       const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
       const feed = await tx.feed.create({
         data: {
@@ -289,46 +301,24 @@ export async function ensureDefaultCalendarFeed(
     return validationError(parsed.error);
   }
 
-  const existing = await database.feed.findFirst({
-    orderBy: { created_at: "asc" },
-    select: { id: true },
-    where: {
-      clerk_org_id: parsed.data.clerkOrgId,
-      organisation_id: parsed.data.organisationId,
-    },
-  });
-  if (existing) {
-    return {
-      ok: true,
-      value: { created: false, feedId: existing.id },
-    };
-  }
-
-  const entitlement = await withinLimit(
-    parsed.data.clerkOrgId,
-    parsed.data.organisationId,
-    "feeds"
-  );
-  if (!entitlement.ok) {
-    return {
-      error: { code: "unknown_error", message: entitlement.error.message },
-      ok: false,
-    };
-  }
-  if (!entitlement.value.allowed) {
-    return {
-      error: {
-        code: "validation_error",
-        message: "Your current plan has reached its active feed limit.",
-      },
-      ok: false,
-    };
-  }
-
   const actingUserId =
     parsed.data.actingUserId ?? "system:default-calendar-feed";
   try {
     const result = await database.$transaction(async (tx) => {
+      await lockPlanLimitMutations(tx, parsed.data.clerkOrgId);
+      const existing = await tx.feed.findFirst({
+        orderBy: { created_at: "asc" },
+        select: { id: true },
+        where: {
+          clerk_org_id: parsed.data.clerkOrgId,
+          organisation_id: parsed.data.organisationId,
+        },
+      });
+      if (existing) {
+        return { created: false, feedId: existing.id };
+      }
+
+      await assertWithinFeedLimit(tx, parsed.data);
       const slug = await makeUniqueSlug(tx, parsed.data, parsed.data.name);
       const feed = await tx.feed.create({
         data: {
@@ -382,7 +372,9 @@ export async function ensureDefaultCalendarFeed(
       return { created: true, feedId: feed.id, token: token.value };
     });
 
-    await invalidateFeedCache({ feedId: result.feedId });
+    if (result.created) {
+      await invalidateFeedCache({ feedId: result.feedId });
+    }
     return { ok: true, value: result };
   } catch (error) {
     if (error instanceof RollbackError) {

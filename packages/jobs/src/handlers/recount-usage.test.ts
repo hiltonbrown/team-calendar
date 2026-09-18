@@ -49,10 +49,18 @@ describe("recountUsage", () => {
 
     expect(result).toEqual({ feeds: 3, payrollEntities: 2, seats: 7 });
     expect(mocks.personCount).toHaveBeenCalledWith({
-      where: { archived_at: null, clerk_org_id: CLERK_ORG_ID },
+      where: {
+        archived_at: null,
+        clerk_org_id: CLERK_ORG_ID,
+        is_active: true,
+      },
     });
     expect(mocks.organisationCount).toHaveBeenCalledWith({
-      where: { archived_at: null, clerk_org_id: CLERK_ORG_ID },
+      where: {
+        archived_at: null,
+        clerk_org_id: CLERK_ORG_ID,
+        is_active: true,
+      },
     });
     expect(mocks.feedCount).toHaveBeenCalledWith({
       where: {

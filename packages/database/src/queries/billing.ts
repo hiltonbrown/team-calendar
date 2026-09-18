@@ -1,6 +1,19 @@
 import type { LimitType, PlanKey } from "@repo/core";
+import type { Prisma } from "../../generated/client";
 import { database } from "../client";
 import { getPlanDefinition } from "../seed/plans";
+
+export type AuthoritativeUsageType =
+  | LimitType
+  | "connections"
+  | "organisations";
+
+export type AuthoritativeUsageClient = Pick<
+  Prisma.TransactionClient,
+  "feed" | "organisation" | "person" | "xeroConnection"
+>;
+
+type PlanLimitLockClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
 export interface SubscriptionMirrorInput {
   cancelAtPeriodEnd: boolean;
@@ -99,6 +112,73 @@ export const getUsageCounter = async (
     ORDER BY updated_at DESC LIMIT 1
   `;
   return rows[0] ?? null;
+};
+
+/**
+ * Reads the product's authoritative, current usage rather than its asynchronous
+ * reporting projection in usage_counters.
+ */
+export const getAuthoritativeUsageCount = (
+  clerkOrgId: string,
+  usageType: AuthoritativeUsageType,
+  client: AuthoritativeUsageClient = database
+): Promise<number> => {
+  switch (usageType) {
+    case "seats":
+      return client.person.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          is_active: true,
+        },
+      });
+    case "feeds":
+      return client.feed.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          status: "active",
+        },
+      });
+    case "organisations":
+    case "payroll_entities":
+      return client.organisation.count({
+        where: {
+          archived_at: null,
+          clerk_org_id: clerkOrgId,
+          is_active: true,
+        },
+      });
+    case "connections":
+      return client.xeroConnection.count({
+        where: {
+          clerk_org_id: clerkOrgId,
+          disconnected_at: null,
+          revoked_at: null,
+          status: "active",
+        },
+      });
+    default: {
+      const exhaustiveUsageType: never = usageType;
+      return exhaustiveUsageType;
+    }
+  }
+};
+
+/**
+ * Serialises plan-limited mutations for one Clerk Organisation for the life of
+ * the surrounding transaction. A hash collision can only cause harmless extra
+ * serialisation because every subsequent count remains tenant-scoped.
+ */
+export const lockPlanLimitMutations = async (
+  client: PlanLimitLockClient,
+  clerkOrgId: string
+): Promise<void> => {
+  await client.$queryRaw<Array<{ acquired: string }>>`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended(${`team-calendar:plan-limits:${clerkOrgId}`}, 0)
+    )::text AS acquired
+  `;
 };
 
 export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>

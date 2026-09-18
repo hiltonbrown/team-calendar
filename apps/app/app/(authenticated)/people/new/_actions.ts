@@ -1,8 +1,8 @@
 "use server";
 
-import { auth } from "@repo/auth/server";
+import { auth, withinLimit } from "@repo/auth/server";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import { database } from "@repo/database";
+import { database, lockPlanLimitMutations } from "@repo/database";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -50,19 +50,42 @@ export async function createManualPersonAction(input: {
   const { clerkOrgId, organisationId } = contextResult.value;
 
   try {
-    await database.person.create({
-      data: {
-        clerk_org_id: clerkOrgId as ClerkOrgId,
-        email: parsed.data.email.toLowerCase(),
-        employment_type: parsed.data.employmentType,
-        first_name: parsed.data.firstName,
-        job_title: parsed.data.jobTitle ?? null,
-        last_name: parsed.data.lastName,
-        organisation_id: organisationId as OrganisationId,
-        source_system: "MANUAL",
-      },
-      select: { id: true },
+    const result = await database.$transaction(async (tx) => {
+      await lockPlanLimitMutations(tx, clerkOrgId);
+      const entitlement = await withinLimit(
+        clerkOrgId,
+        organisationId,
+        "seats",
+        tx
+      );
+      if (!entitlement.ok) {
+        return unknownError(entitlement.error.message);
+      }
+      if (!entitlement.value.allowed) {
+        return validationError(
+          "Your current plan has reached its active people limit."
+        );
+      }
+
+      await tx.person.create({
+        data: {
+          clerk_org_id: clerkOrgId as ClerkOrgId,
+          email: parsed.data.email.toLowerCase(),
+          employment_type: parsed.data.employmentType,
+          first_name: parsed.data.firstName,
+          job_title: parsed.data.jobTitle ?? null,
+          last_name: parsed.data.lastName,
+          organisation_id: organisationId as OrganisationId,
+          source_system: "MANUAL",
+        },
+        select: { id: true },
+      });
+      return creationAllowed();
     });
+
+    if (!result.ok) {
+      return result;
+    }
   } catch {
     return unknownError("Failed to create person. Please try again.");
   }
@@ -93,4 +116,8 @@ function validationError(message?: string): ActionResult<never> {
     },
     ok: false,
   };
+}
+
+function creationAllowed(): { ok: true } {
+  return { ok: true };
 }

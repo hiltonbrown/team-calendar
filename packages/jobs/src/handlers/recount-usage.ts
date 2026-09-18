@@ -14,10 +14,18 @@ export const recountUsage = async (input: unknown) => {
   const parsed = RecountUsageSchema.parse(input);
   const [seats, payrollEntities, feeds] = await Promise.all([
     database.person.count({
-      where: { archived_at: null, clerk_org_id: parsed.clerkOrgId },
+      where: {
+        archived_at: null,
+        clerk_org_id: parsed.clerkOrgId,
+        is_active: true,
+      },
     }),
     database.organisation.count({
-      where: { archived_at: null, clerk_org_id: parsed.clerkOrgId },
+      where: {
+        archived_at: null,
+        clerk_org_id: parsed.clerkOrgId,
+        is_active: true,
+      },
     }),
     database.feed.count({
       where: {

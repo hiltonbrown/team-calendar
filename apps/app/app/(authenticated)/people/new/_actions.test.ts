@@ -3,18 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   database: {
+    $transaction: vi.fn(),
     person: { create: vi.fn() },
   },
   getActiveOrgContext: vi.fn(),
+  lockPlanLimitMutations: vi.fn(),
   redirect: vi.fn(),
   revalidatePath: vi.fn(),
+  withinLimit: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
+  withinLimit: mocks.withinLimit,
 }));
 vi.mock("@repo/database", () => ({
   database: mocks.database,
+  lockPlanLimitMutations: mocks.lockPlanLimitMutations,
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -41,6 +46,14 @@ describe("people/new manual person creation action", () => {
     });
     mocks.database.person.create.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000002",
+    });
+    mocks.database.$transaction.mockImplementation(
+      (callback: (tx: typeof mocks.database) => unknown) =>
+        callback(mocks.database)
+    );
+    mocks.withinLimit.mockResolvedValue({
+      ok: true,
+      value: { allowed: true, current: 1, limit: 9 },
     });
   });
 
@@ -107,6 +120,65 @@ describe("people/new manual person creation action", () => {
       });
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/people");
       expect(mocks.redirect).toHaveBeenCalledWith("/people");
+    });
+
+    it("rejects creation at the active people limit", async () => {
+      mocks.withinLimit.mockResolvedValue({
+        ok: true,
+        value: { allowed: false, current: 9, limit: 9 },
+      });
+
+      const result = await createManualPersonAction({
+        email: "jane@example.com",
+        employmentType: "employee",
+        firstName: "Jane",
+        lastName: "Smith",
+        organisationId,
+      });
+
+      expect(result).toEqual({
+        error: {
+          code: "validation_error",
+          message: "Your current plan has reached its active people limit.",
+        },
+        ok: false,
+      });
+      expect(mocks.lockPlanLimitMutations).toHaveBeenCalledWith(
+        mocks.database,
+        clerkOrgId
+      );
+      expect(mocks.withinLimit).toHaveBeenCalledWith(
+        clerkOrgId,
+        organisationId,
+        "seats",
+        mocks.database
+      );
+      expect(mocks.database.person.create).not.toHaveBeenCalled();
+      expect(mocks.redirect).not.toHaveBeenCalled();
+    });
+
+    it("fails closed when authoritative usage cannot be read", async () => {
+      mocks.withinLimit.mockResolvedValue({
+        error: { code: "internal", message: "Failed to check billing limits." },
+        ok: false,
+      });
+
+      const result = await createManualPersonAction({
+        email: "jane@example.com",
+        employmentType: "employee",
+        firstName: "Jane",
+        lastName: "Smith",
+        organisationId,
+      });
+
+      expect(result).toEqual({
+        error: {
+          code: "unknown_error",
+          message: "Failed to check billing limits.",
+        },
+        ok: false,
+      });
+      expect(mocks.database.person.create).not.toHaveBeenCalled();
     });
   });
 });
