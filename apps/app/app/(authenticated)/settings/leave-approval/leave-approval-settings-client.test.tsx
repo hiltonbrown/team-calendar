@@ -74,6 +74,16 @@ describe("LeaveApprovalSettingsClient", () => {
     expect(
       screen.queryByRole("switch", { name: "Require decline reason" })
     ).toBeNull();
+    expect(
+      screen
+        .getByRole("radiogroup", { name: "Manager visibility scope" })
+        .getAttribute("aria-describedby")
+    ).toBe("manager-visibility-description manager-visibility-status");
+    expect(
+      screen
+        .getByRole("radiogroup", { name: "Default privacy mode" })
+        .getAttribute("aria-describedby")
+    ).toBe("privacy-mode-description privacy-mode-status");
   });
 
   it("announces the receipt beside the setting that saved", async () => {

@@ -151,7 +151,9 @@ export const LeaveApprovalSettingsClient = ({
 
       <Card className="rounded-xl">
         <CardHeader>
-          <CardTitle>Manager visibility scope</CardTitle>
+          <CardTitle id="manager-visibility-label">
+            Manager visibility scope
+          </CardTitle>
           <CardDescription id="manager-visibility-description">
             Controls whether managers see only direct reports or indirect
             reports as well.
@@ -160,6 +162,7 @@ export const LeaveApprovalSettingsClient = ({
         <CardContent>
           <RadioGroup
             aria-describedby="manager-visibility-description manager-visibility-status"
+            aria-labelledby="manager-visibility-label"
             className="space-y-3"
             disabled={isPending}
             onValueChange={(value) => {
@@ -251,7 +254,7 @@ export const LeaveApprovalSettingsClient = ({
 
       <Card className="rounded-xl">
         <CardHeader>
-          <CardTitle>Default privacy mode</CardTitle>
+          <CardTitle id="privacy-mode-label">Default privacy mode</CardTitle>
           <CardDescription id="privacy-mode-description">
             Applies when new records are created without an explicit privacy
             choice.
@@ -260,6 +263,7 @@ export const LeaveApprovalSettingsClient = ({
         <CardContent>
           <RadioGroup
             aria-describedby="privacy-mode-description privacy-mode-status"
+            aria-labelledby="privacy-mode-label"
             className="space-y-3"
             disabled={isPending}
             onValueChange={(value) => {

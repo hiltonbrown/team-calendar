@@ -199,7 +199,7 @@ export const RecurrenceFields = ({
                         <button
                           aria-pressed={active}
                           className={cn(
-                            "h-9 rounded-lg border px-2 font-bold text-[11px] uppercase tracking-wider transition-colors",
+                            "h-9 rounded-lg border px-2 font-bold text-label-sm uppercase tracking-wider transition-colors",
                             active
                               ? "border-primary bg-primary text-primary-foreground"
                               : "border-border bg-background text-muted-foreground hover:bg-accent"
@@ -339,7 +339,7 @@ export const RecurrenceFields = ({
                 <div className="flex flex-wrap gap-1.5">
                   {preview.occurrences.slice(0, 5).map((occurrence) => (
                     <span
-                      className="rounded-sm bg-muted px-2 py-1 font-bold text-[10px] text-muted-foreground uppercase tracking-wider"
+                      className="rounded-sm bg-muted px-2 py-1 font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                       key={occurrence.startDate}
                     >
                       {formatPreviewDate(occurrence.startDate)}

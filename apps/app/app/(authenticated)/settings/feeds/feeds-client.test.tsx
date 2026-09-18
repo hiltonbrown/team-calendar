@@ -62,6 +62,13 @@ describe("FeedsClient", () => {
         name: "Public holidays enabled by default",
       })
     ).toBeDefined();
+    expect(
+      screen
+        .getByRole("radiogroup", {
+          name: "Default privacy mode for new feeds",
+        })
+        .getAttribute("aria-describedby")
+    ).toBe("feed-privacy-description feed-privacy-status");
 
     fireEvent.click(screen.getByRole("radio", { name: "Masked" }));
     await waitFor(() => expect(screen.getByText("Saved")).toBeDefined());

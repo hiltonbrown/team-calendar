@@ -84,7 +84,9 @@ export const FeedsClient = ({
 
       <Card className="rounded-xl">
         <CardHeader>
-          <CardTitle>Default privacy mode for new feeds</CardTitle>
+          <CardTitle id="feed-privacy-label">
+            Default privacy mode for new feeds
+          </CardTitle>
           <CardDescription id="feed-privacy-description">
             Choose how much event detail a newly created feed publishes.
           </CardDescription>
@@ -92,6 +94,7 @@ export const FeedsClient = ({
         <CardContent>
           <RadioGroup
             aria-describedby="feed-privacy-description feed-privacy-status"
+            aria-labelledby="feed-privacy-label"
             className="space-y-3"
             disabled={isPending}
             onValueChange={(value) =>
