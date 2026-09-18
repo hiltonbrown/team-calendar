@@ -258,7 +258,9 @@ describe("buildXeroOAuthStartUrl", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(readStatePayload(result.value.redirectUrl).returnTo).toBe(returnTo);
+      expect(readStatePayload(result.value.redirectUrl).returnTo).toBe(
+        returnTo
+      );
     }
   });
 

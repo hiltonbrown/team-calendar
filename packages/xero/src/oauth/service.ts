@@ -244,13 +244,20 @@ export async function completeXeroOAuth(input: {
 }
 
 export function isLocalApplicationPath(value: string): boolean {
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
     return false;
   }
 
   for (const character of value) {
     const codePoint = character.codePointAt(0);
-    if (codePoint !== undefined && (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159))) {
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159))
+    ) {
       return false;
     }
   }

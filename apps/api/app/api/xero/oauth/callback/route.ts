@@ -45,9 +45,7 @@ export async function GET(request: Request) {
   const redirectTo = isLocalApplicationPath(result.value.redirectTo)
     ? result.value.redirectTo
     : "/settings/integrations/xero";
-  const response = NextResponse.redirect(
-    new URL(redirectTo, appBaseUrl)
-  );
+  const response = NextResponse.redirect(new URL(redirectTo, appBaseUrl));
   response.cookies.delete({
     name: "xero_oauth_nonce",
     path: "/api/xero/oauth",
