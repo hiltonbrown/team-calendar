@@ -94,7 +94,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "26.6.1",
+    "@types/node": "^22.20.3",
     "@types/pg": "^8.23.1",
     "@types/ws": "^8.18.1",
     "bufferutil": "^4.1.0",

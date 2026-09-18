@@ -4,10 +4,18 @@ import { type AppName, runProductionPreflight } from "../preflight";
 
 const args = process.argv.slice(2);
 const appNameArg = args[0] as AppName;
-const launchModeArg = args[1] as LaunchMode | undefined;
+const [, launchModeValue] = args;
+const launchModeArg = ["early_access", "paid"].includes(launchModeValue ?? "")
+  ? (launchModeValue as LaunchMode)
+  : undefined;
 
 if (!["app", "api", "web"].includes(appNameArg)) {
   console.error("Usage: bun run preflight <app|api|web> [early_access|paid]");
+  process.exit(1);
+}
+
+if (launchModeValue && !launchModeArg) {
+  console.error('Launch mode assertion must be "early_access" or "paid".');
   process.exit(1);
 }
 
