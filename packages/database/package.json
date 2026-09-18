@@ -88,19 +88,19 @@
     "@t3-oss/env-nextjs": "^0.13.11",
     "pg": "^8.23.0",
     "server-only": "^0.0.1",
-    "undici": "^8.10.0",
+    "undici": "^8.10.2",
     "ws": "^8.21.3",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@repo/typescript-config": "*",
-    "@types/node": "26.4.0",
+    "@types/node": "26.6.1",
     "@types/pg": "^8.23.1",
     "@types/ws": "^8.18.1",
     "bufferutil": "^4.1.0",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.0",
     "prisma": "7.10.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.1"
   }
 }

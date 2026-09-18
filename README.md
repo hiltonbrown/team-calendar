@@ -16,7 +16,7 @@ Team Calendar closes the gap:
 - **One calendar your team can trust.** Approved leave and manual out-of-office states combine into a single view, published as secure calendar feeds your team subscribes to once, then never updates by hand again.
 - **Privacy by default.** Choose how much each feed reveals: full detail, a neutral "out of office", or a simple "busy". Sensitive leave reasons are never exposed unless an admin chooses to.
 
-Approved leave and manual entries appear in every subscribed calendar within 60 seconds of approval.
+Approved leave and manual entries are published through Team Calendar's feeds. Outlook, Google Calendar and Apple Calendar fetch updates on their own polling schedules, so changes may appear later in subscribed calendars.
 
 ## How it works
 
@@ -34,7 +34,7 @@ Xero remains the source of truth for balances. Team Calendar never calculates ac
 | Inbound | Pull-first, scheduled Inngest jobs | Employees, leave records, leave balances. Xero provides no leave webhooks. |
 | Outbound | Synchronous, user-triggered API write | Submit, approve, decline, withdraw. No background queue. Failures surfaced inline. |
 
-Outbound writes and feed publishing are fast (within 60 seconds); inbound Xero sync is pull-first and periodic, since Xero provides no leave webhooks.
+Outbound writes are synchronous; feed publication and cache rebuilds follow successful changes. Inbound Xero sync is pull-first and periodic, since Xero provides no leave webhooks. External calendar refresh timing is controlled by each calendar provider.
 
 ## Covers everyone who affects cover, not just payroll
 
@@ -82,7 +82,8 @@ Team Calendar is under active development and pre-launch. Core infrastructure, C
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (v1.x)
+- [Bun](https://bun.sh/) at the version pinned in root `packageManager` (also used by CI)
+- Node.js 22 or 24 and later, matching root `engines`
 - Neon database URL
 - Clerk API keys (publishable and secret)
 - Resend, Inngest, and Vercel KV keys (if running specific jobs or feeds locally)
@@ -119,10 +120,10 @@ Team Calendar is under active development and pre-launch. Core infrastructure, C
 
 3. **Set up the database:**
    ```bash
-   bun run db:push
-   # OR for formal migrations:
-   bun run migrate
+   bun run migrate:deploy
    ```
+
+   This applies the committed migration chain. Use `bun run migrate` when developing a schema change; `db:push` is only for disposable development databases and is not release verification.
 
 4. **Seed development data (optional):**
    ```bash
@@ -172,16 +173,16 @@ Team Calendar uses co-located tests and strict linting to maintain code quality:
   bun run fix
   ```
 
-## Deploying to Vercel (Hobby)
+## Deploying to Vercel
 
-Team Calendar deploys as three Vercel projects, one per deployable app. This fits the Vercel Hobby three-project limit, so `docs` and `email` are not deployed (`email` is a dev-only preview surface and `docs` is published separately). Each app already carries its own `vercel.json`.
+Team Calendar deploys as three Vercel projects, one per deployable app. Each carries its own `vercel.json`. `email` is a development preview workspace. `apps/docs` retains the Mintlify starter and validation tooling; this repository does not establish a published documentation deployment. Customer help is implemented in `apps/web` at `/help-centre`.
 
 | Vercel project | Root directory | Notes |
 |---|---|---|
 | `app` | `apps/app` | Authenticated product UI |
 | `api` | `apps/api` | Xero OAuth, sync, feeds (`/ical/:token.ics`), SSE, Inngest handler. Runs a daily cron on `/cron/keep-alive` (see `apps/api/vercel.json`). |
 | `web` | `apps/web` | Public marketing site |
-| `docs` | not deployed | Mintlify docs, published outside Vercel |
+| `docs` | no deployment configured | Retained Mintlify starter tooling |
 | `email` | not deployed | React Email dev preview only |
 
 Set the Root Directory for each project to the relevant `apps/*` folder. Turborepo builds the dependent packages automatically.

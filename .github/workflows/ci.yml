@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, preview]
+    branches: [main]
   pull_request:
-    branches: [main, preview]
+    branches: [main]
 
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: package.json
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -63,21 +63,19 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Package boundaries
+        run: bun run boundaries
+
       - name: Run migrate deploy
         run: bun run migrate:deploy
 
       - name: Drift check (schema must match deployed migrations)
         run: |
           cd packages/database
-          output=$(DATABASE_URL=$DATABASE_URL bunx prisma migrate diff \
+          bunx prisma migrate diff \
             --from-config-datasource \
             --to-schema prisma/schema.prisma \
-            --script 2>&1)
-          echo "$output"
-          if ! echo "$output" | grep -q "This is an empty migration"; then
-            echo "ERROR: schema drift detected between migrations and schema.prisma"
-            exit 1
-          fi
+            --exit-code
 
       - name: Guard against untestable workspaces
         run: |
