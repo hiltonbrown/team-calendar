@@ -9,7 +9,6 @@ import {
   acquireSubmitRecoverySideEffects,
   database,
   getSubmitOperation,
-  hasSubmitRecoverySideEffectClaim,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
   markSubmitProviderAccepted,
@@ -19,10 +18,10 @@ import {
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
-import { dispatchNotification } from "@repo/notifications";
 import { z } from "zod";
 import { XERO_WRITE_CLAIM_LEASE_MS } from "../xero-write-claim";
 import { submitRequestFingerprint } from "./submit-service";
+import { completeSubmitSideEffects } from "./submit-side-effects";
 
 const RecoveryScopeSchema = z.object({
   actingOrgRole: z.enum(["org:owner", "org:admin"]),
@@ -275,33 +274,21 @@ async function completeRecoverySideEffects(input: {
   input: z.infer<typeof AttachSchema>;
   mergedRecordId: string | null;
 }): Promise<Result<void, SubmitRecoveryError>> {
-  const publicationCheckpoint = await database.auditEvent.findFirst({
-    select: { id: true },
-    where: {
-      action: "availability_records.submit_recovery_publication_completed",
-      clerk_org_id: input.input.clerkOrgId,
-      organisation_id: input.input.organisationId,
-      resource_id: input.input.recordId,
-    },
+  const { manager } = input.context.record.person;
+  const primary = await completeSubmitSideEffects({
+    actorUserId: input.input.actingUserId,
+    attempt: input.attempt,
+    claimedAt: input.claimedAt,
+    clerkOrgId: input.input.clerkOrgId,
+    manager: manager?.clerk_user_id
+      ? { clerkUserId: manager.clerk_user_id, personId: manager.id }
+      : null,
+    notifyManager: input.candidate.approvalStatus === "submitted",
+    organisationId: input.input.organisationId,
+    recordId: input.input.recordId,
   });
-  if (!publicationCheckpoint) {
-    const targetPublication = await materialiseAvailabilityPublication({
-      availabilityRecordId: input.input.recordId,
-      clerkOrgId: input.input.clerkOrgId,
-      organisationId: input.input.organisationId,
-    });
-    if (!targetPublication.ok) {
-      return recoveryError(
-        "provider_error",
-        "The Xero record was attached, but calendar publication is awaiting retry."
-      );
-    }
-    await database.auditEvent.create({
-      data: checkpointAuditData(
-        input.input,
-        "availability_records.submit_recovery_publication_completed"
-      ),
-    });
+  if (!primary.ok) {
+    return recoveryError("provider_error", primary.error.message);
   }
   if (input.mergedRecordId) {
     const duplicatePublication = await materialiseAvailabilityPublication({
@@ -317,83 +304,7 @@ async function completeRecoverySideEffects(input: {
     }
   }
 
-  const { manager } = input.context.record.person;
-  if (
-    input.candidate.approvalStatus === "submitted" &&
-    manager?.clerk_user_id
-  ) {
-    const managerUserId = manager.clerk_user_id;
-    const notified = await database.$transaction(async (tx) => {
-      if (
-        !(await hasSubmitRecoverySideEffectClaim(
-          input.attempt,
-          input.claimedAt,
-          tx
-        ))
-      ) {
-        return false;
-      }
-      const notificationCheckpoint = await tx.auditEvent.findFirst({
-        select: { id: true },
-        where: {
-          action: "availability_records.submit_recovery_notification_completed",
-          clerk_org_id: input.input.clerkOrgId,
-          organisation_id: input.input.organisationId,
-          resource_id: input.input.recordId,
-        },
-      });
-      if (notificationCheckpoint) {
-        return true;
-      }
-      const result = await dispatchNotification(
-        {
-          actionUrl: `/plans?record=${input.input.recordId}`,
-          actorUserId: input.input.actingUserId,
-          body: "A leave request recovered from Xero is ready for review.",
-          clerkOrgId: input.input.clerkOrgId,
-          objectId: input.input.recordId,
-          objectType: "availability_record",
-          organisationId: input.input.organisationId,
-          recipientPersonId: manager.id,
-          recipientUserId: managerUserId,
-          title: "Leave submitted for approval",
-          type: "leave_submitted",
-        },
-        tx
-      );
-      if (!result.ok) {
-        return false;
-      }
-      await tx.auditEvent.create({
-        data: checkpointAuditData(
-          input.input,
-          "availability_records.submit_recovery_notification_completed"
-        ),
-      });
-      return true;
-    });
-    if (!notified) {
-      return recoveryError(
-        "provider_error",
-        "The recovery lease changed before notification. Retry recovery."
-      );
-    }
-  }
   return { ok: true, value: undefined };
-}
-
-function checkpointAuditData(
-  input: z.infer<typeof RecoveryScopeSchema>,
-  action: string
-) {
-  return {
-    action,
-    actor_user_id: input.actingUserId,
-    clerk_org_id: input.clerkOrgId,
-    organisation_id: input.organisationId,
-    resource_id: input.recordId,
-    resource_type: "availability_record",
-  };
 }
 
 export async function resolveSubmitAsNotCreated(

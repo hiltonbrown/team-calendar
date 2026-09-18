@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  acquireSideEffects: vi.fn(),
   auditCreate: vi.fn(),
   // The xero-write claim/release helpers call database.availabilityRecord.
   // updateMany directly (outside any $transaction), so they need their own
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   availabilityClaimUpdateMany: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityUpdateMany: vi.fn(),
+  completeSideEffects: vi.fn(),
   computeWorkingDays: vi.fn(),
   dispatchNotification: vi.fn(),
   hasActiveXeroConnection: vi.fn(),
@@ -21,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   ),
   personFindFirst: vi.fn(),
   prepareAndClaimSubmitOperation: vi.fn(),
+  releaseSideEffects: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
@@ -34,6 +37,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
+  acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   database: {
     $transaction: async (callback: (tx: unknown) => unknown) =>
       await callback({
@@ -54,6 +58,7 @@ vi.mock("@repo/database", () => ({
   markSubmitOutcomeUnknown: mocks.markSubmitOutcomeUnknown,
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
   prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
+  releaseSubmitRecoverySideEffects: mocks.releaseSideEffects,
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../duration/working-days", () => ({
@@ -67,6 +72,9 @@ vi.mock("@repo/notifications", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
+}));
+vi.mock("./submit-side-effects", () => ({
+  completeSubmitSideEffects: mocks.completeSideEffects,
 }));
 
 const mockPort = {
@@ -141,6 +149,8 @@ describe("submit-service", () => {
     mocks.availabilityFindFirst.mockReset();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.acquireSideEffects.mockResolvedValue(new Date());
+    mocks.completeSideEffects.mockResolvedValue({ ok: true, value: undefined });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.hasActiveXeroConnection.mockResolvedValue(true);
     mocks.markSubmitCompleted.mockResolvedValue(true);
@@ -202,12 +212,11 @@ describe("submit-service", () => {
         }),
       })
     );
-    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+    expect(mocks.completeSideEffects).toHaveBeenCalledWith(
       expect.objectContaining({
-        recipientUserId: "manager_1",
-        type: "leave_submitted",
-      }),
-      expect.anything()
+        manager: expect.objectContaining({ clerkUserId: "manager_1" }),
+        notifyManager: true,
+      })
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -739,6 +748,27 @@ describe("submit-service", () => {
       expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledWith(
         expect.objectContaining({ title: "Leave request" })
       );
+    });
+
+    it("leaves an accepted operation recoverable when durable side effects fail", async () => {
+      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+      mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+        ok: true,
+        value: { rawResponse: {}, remoteId: "xero-leave-1" },
+      });
+      mocks.completeSideEffects.mockResolvedValueOnce({
+        error: { message: "publication failed" },
+        ok: false,
+      });
+
+      const result = await submitDraftRecord(input, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "submission_outcome_unknown" },
+        ok: false,
+      });
+      expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+      expect(mocks.releaseSideEffects).toHaveBeenCalledOnce();
     });
 
     it("blocks the write and never calls Xero when a live claim already exists", async () => {

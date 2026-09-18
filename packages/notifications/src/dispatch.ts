@@ -49,7 +49,8 @@ const DispatchSchema = z.object({
 
 export async function dispatchNotification(
   input: z.input<typeof DispatchSchema>,
-  client: NotificationDispatchDatabase = database
+  client: NotificationDispatchDatabase = database,
+  options: { publishRealtime?: boolean } = {}
 ): Promise<Result<DispatchNotificationResult, DispatchNotificationError>> {
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
@@ -115,25 +116,27 @@ export async function dispatchNotification(
           recipient_user_id: parsed.data.recipientUserId,
         },
       });
-      publishNotificationEvent(
-        {
-          organisationId: parsed.data.organisationId,
-          userId: parsed.data.recipientUserId,
-        },
-        {
-          payload: {
-            actionUrl: parsed.data.actionUrl ?? null,
-            body: parsed.data.body,
-            category: config.userFacingCategory,
-            createdAt: row.created_at.toISOString(),
-            notificationId: row.id,
-            title: parsed.data.title,
-            type: notificationType,
-            unreadCount,
+      if (options.publishRealtime !== false) {
+        publishNotificationEvent(
+          {
+            organisationId: parsed.data.organisationId,
+            userId: parsed.data.recipientUserId,
           },
-          type: "notification.created",
-        }
-      ).catch(() => undefined);
+          {
+            payload: {
+              actionUrl: parsed.data.actionUrl ?? null,
+              body: parsed.data.body,
+              category: config.userFacingCategory,
+              createdAt: row.created_at.toISOString(),
+              notificationId: row.id,
+              title: parsed.data.title,
+              type: notificationType,
+              unreadCount,
+            },
+            type: "notification.created",
+          }
+        ).catch(() => undefined);
+      }
     }
 
     let emailQueued = false;

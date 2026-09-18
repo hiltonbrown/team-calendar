@@ -298,12 +298,13 @@ export const releaseSubmitRecoverySideEffects = async (
   });
 };
 
-export const hasSubmitRecoverySideEffectClaim = async (
+export const fenceSubmitRecoverySideEffectClaim = async (
   scope: OutboundOperationAttemptScope,
   claimedAt: Date,
   client: OperationClient
 ): Promise<boolean> => {
-  const count = await client.outboundOperation.count({
+  const updated = await client.outboundOperation.updateMany({
+    data: { side_effect_claimed_at: claimedAt },
     where: {
       ...scopedTo(scope),
       action: "submit",
@@ -313,7 +314,7 @@ export const hasSubmitRecoverySideEffectClaim = async (
       status: "provider_accepted",
     },
   });
-  return count === 1;
+  return updated.count === 1;
 };
 
 export const hasUnresolvedSubmitOperation = async (

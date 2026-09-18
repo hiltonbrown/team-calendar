@@ -9,6 +9,7 @@ import type {
   Result,
 } from "@repo/core";
 import {
+  acquireSubmitRecoverySideEffects,
   database,
   hasUnresolvedSubmitOperation,
   markSubmitCompleted,
@@ -17,6 +18,7 @@ import {
   markSubmitOutcomeUnknown,
   markSubmitProviderAccepted,
   prepareAndClaimSubmitOperation,
+  releaseSubmitRecoverySideEffects,
   scopedTo as scoped,
 } from "@repo/database";
 import {
@@ -40,6 +42,7 @@ import {
   unclaimedOrExpiredXeroWriteWhere,
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
+import { completeSubmitSideEffects } from "./submit-side-effects";
 
 export type SubmitServiceError =
   | { code: "invalid_state_for_retry"; message: string }
@@ -482,11 +485,6 @@ async function performSubmission(
         throw new OptimisticConflictError();
       }
 
-      const completed = await markSubmitCompleted(operationAttempt, tx);
-      if (!completed) {
-        throw new OptimisticConflictError();
-      }
-
       await tx.auditEvent.create({
         data: auditData(parsed.data, options.successAuditAction, {
           xeroLeaveApplicationId: submission.value.remoteId,
@@ -495,15 +493,43 @@ async function performSubmission(
     });
     claimedAt = null;
 
-    await notifyManagerBestEffort(parsed.data, record, "leave_submitted", {
-      actionUrl: `/leave-approvals?recordId=${record.id}`,
+    const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
+      operationAttempt,
+      new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+    );
+    if (!sideEffectClaimedAt) {
+      return submissionOutcomeUnknown();
+    }
+    const sideEffects = await completeSubmitSideEffects({
+      actorUserId: parsed.data.actingUserId,
+      attempt: operationAttempt,
+      claimedAt: sideEffectClaimedAt,
+      clerkOrgId: parsed.data.clerkOrgId,
+      manager: record.person.manager?.clerk_user_id
+        ? {
+            clerkUserId: record.person.manager.clerk_user_id,
+            personId: record.person.manager.id,
+          }
+        : null,
+      notifyManager: true,
+      organisationId: parsed.data.organisationId,
+      recordId: record.id,
     });
+    if (!sideEffects.ok) {
+      await releaseSubmitRecoverySideEffects(
+        operationAttempt,
+        sideEffectClaimedAt
+      );
+      return submissionOutcomeUnknown();
+    }
+    if (!(await markSubmitCompleted(operationAttempt, database))) {
+      return submissionOutcomeUnknown();
+    }
 
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
     }
-    await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
     if (record && dispatchStarted && attemptGeneration !== null) {
