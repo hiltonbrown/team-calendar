@@ -57,7 +57,13 @@ describe("outbound operation repository", () => {
         expectedFailedAction: null,
         expectedSequence: 2,
         expectedStatus: "draft",
+        requestEmployeeId: "employee_1",
+        requestEndsAt: new Date("2026-05-02T00:00:00.000Z"),
         requestFingerprint: "fingerprint",
+        requestLeaveTypeId: "leave_type_1",
+        requestStartsAt: new Date("2026-05-01T00:00:00.000Z"),
+        requestTitle: "Annual leave",
+        requestUnits: 2,
       })
     ).resolves.toEqual({
       attemptGeneration: 1,
@@ -89,7 +95,13 @@ describe("outbound operation repository", () => {
         expectedFailedAction: null,
         expectedSequence: 2,
         expectedStatus: "draft",
+        requestEmployeeId: "employee_1",
+        requestEndsAt: new Date("2026-05-02T00:00:00.000Z"),
         requestFingerprint: "fingerprint",
+        requestLeaveTypeId: "leave_type_1",
+        requestStartsAt: new Date("2026-05-01T00:00:00.000Z"),
+        requestTitle: "Annual leave",
+        requestUnits: 2,
       })
     ).resolves.toBeNull();
     expect(mocks.create).not.toHaveBeenCalled();
@@ -114,7 +126,13 @@ describe("outbound operation repository", () => {
         expectedFailedAction: null,
         expectedSequence: 2,
         expectedStatus: "draft",
+        requestEmployeeId: "employee_1",
+        requestEndsAt: new Date("2026-05-02T00:00:00.000Z"),
         requestFingerprint: "same-request-fingerprint",
+        requestLeaveTypeId: "leave_type_1",
+        requestStartsAt: new Date("2026-05-01T00:00:00.000Z"),
+        requestTitle: "Annual leave",
+        requestUnits: 2,
       })
     ).resolves.toEqual({
       attemptGeneration: 2,

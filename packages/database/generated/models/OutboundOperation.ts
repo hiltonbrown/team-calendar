@@ -27,10 +27,12 @@ export type AggregateOutboundOperation = {
 }
 
 export type OutboundOperationAvgAggregateOutputType = {
+  request_units: runtime.Decimal | null
   attempt_generation: number | null
 }
 
 export type OutboundOperationSumAggregateOutputType = {
+  request_units: runtime.Decimal | null
   attempt_generation: number | null
 }
 
@@ -42,10 +44,18 @@ export type OutboundOperationMinAggregateOutputType = {
   action: $Enums.outbound_operation_action | null
   status: $Enums.outbound_operation_status | null
   request_fingerprint: string | null
+  request_employee_id: string | null
+  request_leave_type_id: string | null
+  request_starts_at: Date | null
+  request_ends_at: Date | null
+  request_title: string | null
+  request_units: runtime.Decimal | null
   actor_user_id: string | null
   attempt_generation: number | null
   safe_error_code: string | null
   known_remote_id: string | null
+  merged_record_id: string | null
+  side_effect_claimed_at: Date | null
   prepared_at: Date | null
   dispatch_started_at: Date | null
   provider_accepted_at: Date | null
@@ -62,10 +72,18 @@ export type OutboundOperationMaxAggregateOutputType = {
   action: $Enums.outbound_operation_action | null
   status: $Enums.outbound_operation_status | null
   request_fingerprint: string | null
+  request_employee_id: string | null
+  request_leave_type_id: string | null
+  request_starts_at: Date | null
+  request_ends_at: Date | null
+  request_title: string | null
+  request_units: runtime.Decimal | null
   actor_user_id: string | null
   attempt_generation: number | null
   safe_error_code: string | null
   known_remote_id: string | null
+  merged_record_id: string | null
+  side_effect_claimed_at: Date | null
   prepared_at: Date | null
   dispatch_started_at: Date | null
   provider_accepted_at: Date | null
@@ -82,10 +100,18 @@ export type OutboundOperationCountAggregateOutputType = {
   action: number
   status: number
   request_fingerprint: number
+  request_employee_id: number
+  request_leave_type_id: number
+  request_starts_at: number
+  request_ends_at: number
+  request_title: number
+  request_units: number
   actor_user_id: number
   attempt_generation: number
   safe_error_code: number
   known_remote_id: number
+  merged_record_id: number
+  side_effect_claimed_at: number
   prepared_at: number
   dispatch_started_at: number
   provider_accepted_at: number
@@ -97,10 +123,12 @@ export type OutboundOperationCountAggregateOutputType = {
 
 
 export type OutboundOperationAvgAggregateInputType = {
+  request_units?: true
   attempt_generation?: true
 }
 
 export type OutboundOperationSumAggregateInputType = {
+  request_units?: true
   attempt_generation?: true
 }
 
@@ -112,10 +140,18 @@ export type OutboundOperationMinAggregateInputType = {
   action?: true
   status?: true
   request_fingerprint?: true
+  request_employee_id?: true
+  request_leave_type_id?: true
+  request_starts_at?: true
+  request_ends_at?: true
+  request_title?: true
+  request_units?: true
   actor_user_id?: true
   attempt_generation?: true
   safe_error_code?: true
   known_remote_id?: true
+  merged_record_id?: true
+  side_effect_claimed_at?: true
   prepared_at?: true
   dispatch_started_at?: true
   provider_accepted_at?: true
@@ -132,10 +168,18 @@ export type OutboundOperationMaxAggregateInputType = {
   action?: true
   status?: true
   request_fingerprint?: true
+  request_employee_id?: true
+  request_leave_type_id?: true
+  request_starts_at?: true
+  request_ends_at?: true
+  request_title?: true
+  request_units?: true
   actor_user_id?: true
   attempt_generation?: true
   safe_error_code?: true
   known_remote_id?: true
+  merged_record_id?: true
+  side_effect_claimed_at?: true
   prepared_at?: true
   dispatch_started_at?: true
   provider_accepted_at?: true
@@ -152,10 +196,18 @@ export type OutboundOperationCountAggregateInputType = {
   action?: true
   status?: true
   request_fingerprint?: true
+  request_employee_id?: true
+  request_leave_type_id?: true
+  request_starts_at?: true
+  request_ends_at?: true
+  request_title?: true
+  request_units?: true
   actor_user_id?: true
   attempt_generation?: true
   safe_error_code?: true
   known_remote_id?: true
+  merged_record_id?: true
+  side_effect_claimed_at?: true
   prepared_at?: true
   dispatch_started_at?: true
   provider_accepted_at?: true
@@ -259,10 +311,18 @@ export type OutboundOperationGroupByOutputType = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id: string | null
+  request_leave_type_id: string | null
+  request_starts_at: Date | null
+  request_ends_at: Date | null
+  request_title: string | null
+  request_units: runtime.Decimal | null
   actor_user_id: string
   attempt_generation: number
   safe_error_code: string | null
   known_remote_id: string | null
+  merged_record_id: string | null
+  side_effect_claimed_at: Date | null
   prepared_at: Date
   dispatch_started_at: Date | null
   provider_accepted_at: Date | null
@@ -302,10 +362,18 @@ export type OutboundOperationWhereInput = {
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
+  request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_starts_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_ends_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_title?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_units?: Prisma.DecimalNullableFilter<"OutboundOperation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFilter<"OutboundOperation"> | string
   attempt_generation?: Prisma.IntFilter<"OutboundOperation"> | number
   safe_error_code?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   known_remote_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  merged_record_id?: Prisma.UuidNullableFilter<"OutboundOperation"> | string | null
+  side_effect_claimed_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   prepared_at?: Prisma.DateTimeFilter<"OutboundOperation"> | Date | string
   dispatch_started_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   provider_accepted_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
@@ -324,10 +392,18 @@ export type OutboundOperationOrderByWithRelationInput = {
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
+  request_employee_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_leave_type_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_starts_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_ends_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_title?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_units?: Prisma.SortOrderInput | Prisma.SortOrder
   actor_user_id?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
   safe_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
   known_remote_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  merged_record_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  side_effect_claimed_at?: Prisma.SortOrderInput | Prisma.SortOrder
   prepared_at?: Prisma.SortOrder
   dispatch_started_at?: Prisma.SortOrderInput | Prisma.SortOrder
   provider_accepted_at?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -350,10 +426,18 @@ export type OutboundOperationWhereUniqueInput = Prisma.AtLeast<{
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
+  request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_starts_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_ends_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_title?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_units?: Prisma.DecimalNullableFilter<"OutboundOperation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFilter<"OutboundOperation"> | string
   attempt_generation?: Prisma.IntFilter<"OutboundOperation"> | number
   safe_error_code?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   known_remote_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  merged_record_id?: Prisma.UuidNullableFilter<"OutboundOperation"> | string | null
+  side_effect_claimed_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   prepared_at?: Prisma.DateTimeFilter<"OutboundOperation"> | Date | string
   dispatch_started_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   provider_accepted_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
@@ -372,10 +456,18 @@ export type OutboundOperationOrderByWithAggregationInput = {
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
+  request_employee_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_leave_type_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_starts_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_ends_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_title?: Prisma.SortOrderInput | Prisma.SortOrder
+  request_units?: Prisma.SortOrderInput | Prisma.SortOrder
   actor_user_id?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
   safe_error_code?: Prisma.SortOrderInput | Prisma.SortOrder
   known_remote_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  merged_record_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  side_effect_claimed_at?: Prisma.SortOrderInput | Prisma.SortOrder
   prepared_at?: Prisma.SortOrder
   dispatch_started_at?: Prisma.SortOrderInput | Prisma.SortOrder
   provider_accepted_at?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -400,10 +492,18 @@ export type OutboundOperationScalarWhereWithAggregatesInput = {
   action?: Prisma.Enumoutbound_operation_actionWithAggregatesFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusWithAggregatesFilter<"OutboundOperation"> | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringWithAggregatesFilter<"OutboundOperation"> | string
+  request_employee_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_leave_type_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_starts_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
+  request_ends_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
+  request_title?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  request_units?: Prisma.DecimalNullableWithAggregatesFilter<"OutboundOperation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringWithAggregatesFilter<"OutboundOperation"> | string
   attempt_generation?: Prisma.IntWithAggregatesFilter<"OutboundOperation"> | number
   safe_error_code?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
   known_remote_id?: Prisma.StringNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  merged_record_id?: Prisma.UuidNullableWithAggregatesFilter<"OutboundOperation"> | string | null
+  side_effect_claimed_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
   prepared_at?: Prisma.DateTimeWithAggregatesFilter<"OutboundOperation"> | Date | string
   dispatch_started_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
   provider_accepted_at?: Prisma.DateTimeNullableWithAggregatesFilter<"OutboundOperation"> | Date | string | null
@@ -418,10 +518,18 @@ export type OutboundOperationCreateInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -440,10 +548,18 @@ export type OutboundOperationUncheckedCreateInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -458,10 +574,18 @@ export type OutboundOperationUpdateInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -480,10 +604,18 @@ export type OutboundOperationUncheckedUpdateInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -500,10 +632,18 @@ export type OutboundOperationCreateManyInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -518,10 +658,18 @@ export type OutboundOperationUpdateManyMutationInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -538,10 +686,18 @@ export type OutboundOperationUncheckedUpdateManyInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -573,10 +729,18 @@ export type OutboundOperationCountOrderByAggregateInput = {
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
+  request_employee_id?: Prisma.SortOrder
+  request_leave_type_id?: Prisma.SortOrder
+  request_starts_at?: Prisma.SortOrder
+  request_ends_at?: Prisma.SortOrder
+  request_title?: Prisma.SortOrder
+  request_units?: Prisma.SortOrder
   actor_user_id?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
   safe_error_code?: Prisma.SortOrder
   known_remote_id?: Prisma.SortOrder
+  merged_record_id?: Prisma.SortOrder
+  side_effect_claimed_at?: Prisma.SortOrder
   prepared_at?: Prisma.SortOrder
   dispatch_started_at?: Prisma.SortOrder
   provider_accepted_at?: Prisma.SortOrder
@@ -586,6 +750,7 @@ export type OutboundOperationCountOrderByAggregateInput = {
 }
 
 export type OutboundOperationAvgOrderByAggregateInput = {
+  request_units?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
 }
 
@@ -597,10 +762,18 @@ export type OutboundOperationMaxOrderByAggregateInput = {
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
+  request_employee_id?: Prisma.SortOrder
+  request_leave_type_id?: Prisma.SortOrder
+  request_starts_at?: Prisma.SortOrder
+  request_ends_at?: Prisma.SortOrder
+  request_title?: Prisma.SortOrder
+  request_units?: Prisma.SortOrder
   actor_user_id?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
   safe_error_code?: Prisma.SortOrder
   known_remote_id?: Prisma.SortOrder
+  merged_record_id?: Prisma.SortOrder
+  side_effect_claimed_at?: Prisma.SortOrder
   prepared_at?: Prisma.SortOrder
   dispatch_started_at?: Prisma.SortOrder
   provider_accepted_at?: Prisma.SortOrder
@@ -617,10 +790,18 @@ export type OutboundOperationMinOrderByAggregateInput = {
   action?: Prisma.SortOrder
   status?: Prisma.SortOrder
   request_fingerprint?: Prisma.SortOrder
+  request_employee_id?: Prisma.SortOrder
+  request_leave_type_id?: Prisma.SortOrder
+  request_starts_at?: Prisma.SortOrder
+  request_ends_at?: Prisma.SortOrder
+  request_title?: Prisma.SortOrder
+  request_units?: Prisma.SortOrder
   actor_user_id?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
   safe_error_code?: Prisma.SortOrder
   known_remote_id?: Prisma.SortOrder
+  merged_record_id?: Prisma.SortOrder
+  side_effect_claimed_at?: Prisma.SortOrder
   prepared_at?: Prisma.SortOrder
   dispatch_started_at?: Prisma.SortOrder
   provider_accepted_at?: Prisma.SortOrder
@@ -630,6 +811,7 @@ export type OutboundOperationMinOrderByAggregateInput = {
 }
 
 export type OutboundOperationSumOrderByAggregateInput = {
+  request_units?: Prisma.SortOrder
   attempt_generation?: Prisma.SortOrder
 }
 
@@ -731,10 +913,18 @@ export type OutboundOperationCreateWithoutOrganisationInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -751,10 +941,18 @@ export type OutboundOperationUncheckedCreateWithoutOrganisationInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -800,10 +998,18 @@ export type OutboundOperationScalarWhereInput = {
   action?: Prisma.Enumoutbound_operation_actionFilter<"OutboundOperation"> | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFilter<"OutboundOperation"> | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFilter<"OutboundOperation"> | string
+  request_employee_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_leave_type_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_starts_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_ends_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
+  request_title?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  request_units?: Prisma.DecimalNullableFilter<"OutboundOperation"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFilter<"OutboundOperation"> | string
   attempt_generation?: Prisma.IntFilter<"OutboundOperation"> | number
   safe_error_code?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
   known_remote_id?: Prisma.StringNullableFilter<"OutboundOperation"> | string | null
+  merged_record_id?: Prisma.UuidNullableFilter<"OutboundOperation"> | string | null
+  side_effect_claimed_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   prepared_at?: Prisma.DateTimeFilter<"OutboundOperation"> | Date | string
   dispatch_started_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
   provider_accepted_at?: Prisma.DateTimeNullableFilter<"OutboundOperation"> | Date | string | null
@@ -818,10 +1024,18 @@ export type OutboundOperationCreateWithoutAvailability_recordInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -838,10 +1052,18 @@ export type OutboundOperationUncheckedCreateWithoutAvailability_recordInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -883,10 +1105,18 @@ export type OutboundOperationCreateManyOrganisationInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -901,10 +1131,18 @@ export type OutboundOperationUpdateWithoutOrganisationInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -921,10 +1159,18 @@ export type OutboundOperationUncheckedUpdateWithoutOrganisationInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -940,10 +1186,18 @@ export type OutboundOperationUncheckedUpdateManyWithoutOrganisationInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -959,10 +1213,18 @@ export type OutboundOperationCreateManyAvailability_recordInput = {
   action: $Enums.outbound_operation_action
   status: $Enums.outbound_operation_status
   request_fingerprint: string
+  request_employee_id?: string | null
+  request_leave_type_id?: string | null
+  request_starts_at?: Date | string | null
+  request_ends_at?: Date | string | null
+  request_title?: string | null
+  request_units?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id: string
   attempt_generation?: number
   safe_error_code?: string | null
   known_remote_id?: string | null
+  merged_record_id?: string | null
+  side_effect_claimed_at?: Date | string | null
   prepared_at?: Date | string
   dispatch_started_at?: Date | string | null
   provider_accepted_at?: Date | string | null
@@ -977,10 +1239,18 @@ export type OutboundOperationUpdateWithoutAvailability_recordInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -997,10 +1267,18 @@ export type OutboundOperationUncheckedUpdateWithoutAvailability_recordInput = {
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1016,10 +1294,18 @@ export type OutboundOperationUncheckedUpdateManyWithoutAvailability_recordInput 
   action?: Prisma.Enumoutbound_operation_actionFieldUpdateOperationsInput | $Enums.outbound_operation_action
   status?: Prisma.Enumoutbound_operation_statusFieldUpdateOperationsInput | $Enums.outbound_operation_status
   request_fingerprint?: Prisma.StringFieldUpdateOperationsInput | string
+  request_employee_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_leave_type_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_starts_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_ends_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  request_title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  request_units?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   actor_user_id?: Prisma.StringFieldUpdateOperationsInput | string
   attempt_generation?: Prisma.IntFieldUpdateOperationsInput | number
   safe_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   known_remote_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  merged_record_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side_effect_claimed_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   prepared_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   dispatch_started_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   provider_accepted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1038,10 +1324,18 @@ export type OutboundOperationSelect<ExtArgs extends runtime.Types.Extensions.Int
   action?: boolean
   status?: boolean
   request_fingerprint?: boolean
+  request_employee_id?: boolean
+  request_leave_type_id?: boolean
+  request_starts_at?: boolean
+  request_ends_at?: boolean
+  request_title?: boolean
+  request_units?: boolean
   actor_user_id?: boolean
   attempt_generation?: boolean
   safe_error_code?: boolean
   known_remote_id?: boolean
+  merged_record_id?: boolean
+  side_effect_claimed_at?: boolean
   prepared_at?: boolean
   dispatch_started_at?: boolean
   provider_accepted_at?: boolean
@@ -1060,10 +1354,18 @@ export type OutboundOperationSelectCreateManyAndReturn<ExtArgs extends runtime.T
   action?: boolean
   status?: boolean
   request_fingerprint?: boolean
+  request_employee_id?: boolean
+  request_leave_type_id?: boolean
+  request_starts_at?: boolean
+  request_ends_at?: boolean
+  request_title?: boolean
+  request_units?: boolean
   actor_user_id?: boolean
   attempt_generation?: boolean
   safe_error_code?: boolean
   known_remote_id?: boolean
+  merged_record_id?: boolean
+  side_effect_claimed_at?: boolean
   prepared_at?: boolean
   dispatch_started_at?: boolean
   provider_accepted_at?: boolean
@@ -1082,10 +1384,18 @@ export type OutboundOperationSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   action?: boolean
   status?: boolean
   request_fingerprint?: boolean
+  request_employee_id?: boolean
+  request_leave_type_id?: boolean
+  request_starts_at?: boolean
+  request_ends_at?: boolean
+  request_title?: boolean
+  request_units?: boolean
   actor_user_id?: boolean
   attempt_generation?: boolean
   safe_error_code?: boolean
   known_remote_id?: boolean
+  merged_record_id?: boolean
+  side_effect_claimed_at?: boolean
   prepared_at?: boolean
   dispatch_started_at?: boolean
   provider_accepted_at?: boolean
@@ -1104,10 +1414,18 @@ export type OutboundOperationSelectScalar = {
   action?: boolean
   status?: boolean
   request_fingerprint?: boolean
+  request_employee_id?: boolean
+  request_leave_type_id?: boolean
+  request_starts_at?: boolean
+  request_ends_at?: boolean
+  request_title?: boolean
+  request_units?: boolean
   actor_user_id?: boolean
   attempt_generation?: boolean
   safe_error_code?: boolean
   known_remote_id?: boolean
+  merged_record_id?: boolean
+  side_effect_claimed_at?: boolean
   prepared_at?: boolean
   dispatch_started_at?: boolean
   provider_accepted_at?: boolean
@@ -1116,7 +1434,7 @@ export type OutboundOperationSelectScalar = {
   updated_at?: boolean
 }
 
-export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "request_fingerprint" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
+export type OutboundOperationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "availability_record_id" | "action" | "status" | "request_fingerprint" | "request_employee_id" | "request_leave_type_id" | "request_starts_at" | "request_ends_at" | "request_title" | "request_units" | "actor_user_id" | "attempt_generation" | "safe_error_code" | "known_remote_id" | "merged_record_id" | "side_effect_claimed_at" | "prepared_at" | "dispatch_started_at" | "provider_accepted_at" | "completed_at" | "created_at" | "updated_at", ExtArgs["result"]["outboundOperation"]>
 export type OutboundOperationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   availability_record?: boolean | Prisma.AvailabilityRecordDefaultArgs<ExtArgs>
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -1144,10 +1462,18 @@ export type $OutboundOperationPayload<ExtArgs extends runtime.Types.Extensions.I
     action: $Enums.outbound_operation_action
     status: $Enums.outbound_operation_status
     request_fingerprint: string
+    request_employee_id: string | null
+    request_leave_type_id: string | null
+    request_starts_at: Date | null
+    request_ends_at: Date | null
+    request_title: string | null
+    request_units: runtime.Decimal | null
     actor_user_id: string
     attempt_generation: number
     safe_error_code: string | null
     known_remote_id: string | null
+    merged_record_id: string | null
+    side_effect_claimed_at: Date | null
     prepared_at: Date
     dispatch_started_at: Date | null
     provider_accepted_at: Date | null
@@ -1586,10 +1912,18 @@ export interface OutboundOperationFieldRefs {
   readonly action: Prisma.FieldRef<"OutboundOperation", 'outbound_operation_action'>
   readonly status: Prisma.FieldRef<"OutboundOperation", 'outbound_operation_status'>
   readonly request_fingerprint: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_employee_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_leave_type_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_starts_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
+  readonly request_ends_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
+  readonly request_title: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly request_units: Prisma.FieldRef<"OutboundOperation", 'Decimal'>
   readonly actor_user_id: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly attempt_generation: Prisma.FieldRef<"OutboundOperation", 'Int'>
   readonly safe_error_code: Prisma.FieldRef<"OutboundOperation", 'String'>
   readonly known_remote_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly merged_record_id: Prisma.FieldRef<"OutboundOperation", 'String'>
+  readonly side_effect_claimed_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
   readonly prepared_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
   readonly dispatch_started_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>
   readonly provider_accepted_at: Prisma.FieldRef<"OutboundOperation", 'DateTime'>

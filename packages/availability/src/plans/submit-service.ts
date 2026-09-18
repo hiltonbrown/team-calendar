@@ -368,6 +368,8 @@ async function performSubmission(
         options.validStatus === "xero_sync_failed" ? "submit" : null,
       expectedSequence: record.derived_sequence,
       expectedStatus: options.validStatus,
+      requestEmployeeId: prepared.value.xeroEmployeeId,
+      requestEndsAt: record.ends_at,
       requestFingerprint: submitRequestFingerprint({
         employeeId: prepared.value.xeroEmployeeId,
         endsAt: record.ends_at,
@@ -376,6 +378,10 @@ async function performSubmission(
         title: record.title,
         units: prepared.value.units,
       }),
+      requestLeaveTypeId: prepared.value.xeroLeaveTypeId,
+      requestStartsAt: record.starts_at,
+      requestTitle: record.title,
+      requestUnits: prepared.value.units,
     });
     if (!preparedOperation) {
       return submissionOutcomeUnknown();
@@ -521,7 +527,7 @@ async function performSubmission(
   }
 }
 
-const submitRequestFingerprint = (input: {
+export const submitRequestFingerprint = (input: {
   employeeId: string;
   endsAt: Date;
   leaveTypeId: string;

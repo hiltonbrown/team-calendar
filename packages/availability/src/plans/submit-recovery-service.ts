@@ -6,18 +6,22 @@ import type {
   Result,
 } from "@repo/core";
 import {
+  acquireSubmitRecoverySideEffects,
   database,
   getSubmitOperation,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
   markSubmitProviderAccepted,
+  persistSubmitRecoveryMerge,
+  releaseSubmitRecoverySideEffects,
   scopedTo,
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
 import { dispatchNotification } from "@repo/notifications";
 import { z } from "zod";
-import { computeWorkingDays } from "../duration/working-days";
+import { XERO_WRITE_CLAIM_LEASE_MS } from "../xero-write-claim";
+import { submitRequestFingerprint } from "./submit-service";
 
 const RecoveryScopeSchema = z.object({
   actingOrgRole: z.enum(["org:owner", "org:admin"]),
@@ -69,7 +73,7 @@ export async function listSubmitRecoveryCandidates(
     SubmitRecoveryError
   >
 > {
-  const context = await loadRecoveryContext(input, externalWritePort);
+  const context = await loadRecoveryContext(input);
   if (!context.ok) {
     return context;
   }
@@ -101,7 +105,7 @@ export async function attachSubmitRecoveryCandidate(
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const context = await loadRecoveryContext(parsed.data, externalWritePort);
+  const context = await loadRecoveryContext(parsed.data);
   if (!context.ok) {
     return context;
   }
@@ -145,7 +149,7 @@ export async function attachSubmitRecoveryCandidate(
     );
   }
 
-  let mergedRecordId: string | null = null;
+  let mergedRecordId: string | null = context.value.operation.merged_record_id;
   const alreadyAttached =
     context.value.record.source_remote_id === candidate.remoteId;
   if (!alreadyAttached) {
@@ -191,6 +195,18 @@ export async function attachSubmitRecoveryCandidate(
       if (updated.count !== 1) {
         throw new Error("Recovery target changed");
       }
+      if (
+        !(await persistSubmitRecoveryMerge(
+          operationAttempt(
+            parsed.data,
+            context.value.operation.attempt_generation
+          ),
+          mergedRecordId,
+          tx
+        ))
+      ) {
+        throw new Error("Recovery operation changed");
+      }
       await tx.auditEvent.create({
         data: {
           action: "availability_records.submit_recovery_attached",
@@ -209,6 +225,20 @@ export async function attachSubmitRecoveryCandidate(
     });
   }
 
+  const attempt = operationAttempt(
+    parsed.data,
+    context.value.operation.attempt_generation
+  );
+  const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
+    attempt,
+    new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+  );
+  if (!sideEffectClaimedAt) {
+    return recoveryError(
+      "not_recoverable",
+      "Recovery side effects are already being processed."
+    );
+  }
   const sideEffects = await completeRecoverySideEffects({
     candidate,
     context: context.value,
@@ -216,15 +246,11 @@ export async function attachSubmitRecoveryCandidate(
     mergedRecordId,
   });
   if (!sideEffects.ok) {
+    await releaseSubmitRecoverySideEffects(attempt, sideEffectClaimedAt);
     return sideEffects;
   }
 
-  if (
-    !(await markSubmitCompleted(
-      operationAttempt(parsed.data, context.value.operation.attempt_generation),
-      database
-    ))
-  ) {
+  if (!(await markSubmitCompleted(attempt, database))) {
     return recoveryError(
       "not_recoverable",
       "This operation changed. Reload and try again."
@@ -287,7 +313,10 @@ async function completeRecoverySideEffects(input: {
   }
 
   const { manager } = input.context.record.person;
-  if (manager?.clerk_user_id) {
+  if (
+    input.candidate.approvalStatus === "submitted" &&
+    manager?.clerk_user_id
+  ) {
     const managerUserId = manager.clerk_user_id;
     const notificationCheckpoint = await database.auditEvent.findFirst({
       select: { id: true },
@@ -401,10 +430,7 @@ export async function resolveSubmitAsNotCreated(
   return { ok: true, value: undefined };
 }
 
-async function loadRecoveryContext(
-  input: z.input<typeof RecoveryScopeSchema>,
-  externalWritePort: ExternalWritePort
-) {
+async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
   const parsed = RecoveryScopeSchema.safeParse(input);
   if (!parsed.success) {
     return recoveryError("not_authorised", "Administrator access is required.");
@@ -437,41 +463,49 @@ async function loadRecoveryContext(
       "This submission does not require recovery."
     );
   }
-  const [employee, leaveType, duration] = await Promise.all([
-    externalWritePort.resolveEmployeeId({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-      personId: record.person_id,
-    }),
-    externalWritePort.resolveLeaveTypeId({
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
-      personId: record.person_id,
-      recordType: record.record_type,
-    }),
-    computeWorkingDays({
-      allDay: record.all_day,
-      clerkOrgId: parsed.data.clerkOrgId,
-      endsAt: record.ends_at,
-      locationId: record.person.location_id,
-      organisationId: parsed.data.organisationId,
-      startsAt: record.starts_at,
-    }),
-  ]);
-  if (!(employee.ok && leaveType.ok && duration.ok)) {
+  if (
+    !(
+      operation.request_employee_id &&
+      operation.request_leave_type_id &&
+      operation.request_starts_at &&
+      operation.request_ends_at
+    ) ||
+    operation.request_units === null
+  ) {
     return recoveryError(
       "provider_error",
-      "Could not resolve the original Xero request."
+      "The original immutable Xero request is unavailable."
+    );
+  }
+  const immutableFingerprint = submitRequestFingerprint({
+    employeeId: operation.request_employee_id,
+    endsAt: operation.request_ends_at,
+    leaveTypeId: operation.request_leave_type_id,
+    startsAt: operation.request_starts_at,
+    title: operation.request_title,
+    units: Number(operation.request_units),
+  });
+  if (immutableFingerprint !== operation.request_fingerprint) {
+    return recoveryError(
+      "not_recoverable",
+      "The original request fingerprint is invalid."
     );
   }
   return {
     ok: true as const,
     value: {
-      duration: duration.value,
-      employeeId: employee.value,
+      duration: Number(operation.request_units),
+      employeeId: operation.request_employee_id,
       input: parsed.data,
-      leaveTypeId: leaveType.value,
-      operation,
+      leaveTypeId: operation.request_leave_type_id,
+      operation: {
+        ...operation,
+        request_employee_id: operation.request_employee_id,
+        request_ends_at: operation.request_ends_at,
+        request_leave_type_id: operation.request_leave_type_id,
+        request_starts_at: operation.request_starts_at,
+        request_units: operation.request_units,
+      },
       record,
     },
   };
@@ -482,16 +516,31 @@ const candidateMatches = (
     duration: number;
     employeeId: string;
     leaveTypeId: string;
-    record: { ends_at: Date; starts_at: Date; title: string | null };
+    operation: {
+      request_ends_at: Date;
+      request_fingerprint: string;
+      request_starts_at: Date;
+      request_title: string | null;
+    };
   },
   candidate: ProviderLeaveCandidate
 ): boolean =>
   candidate.employeeId === context.employeeId &&
   candidate.leaveTypeId === context.leaveTypeId &&
-  candidate.startsAt === context.record.starts_at.toISOString().slice(0, 10) &&
-  candidate.endsAt === context.record.ends_at.toISOString().slice(0, 10) &&
+  candidate.startsAt ===
+    context.operation.request_starts_at.toISOString().slice(0, 10) &&
+  candidate.endsAt ===
+    context.operation.request_ends_at.toISOString().slice(0, 10) &&
   candidate.units === context.duration &&
-  candidate.title === (context.record.title ?? "Leave request");
+  candidate.title === (context.operation.request_title ?? "Leave request") &&
+  submitRequestFingerprint({
+    employeeId: candidate.employeeId,
+    endsAt: context.operation.request_ends_at,
+    leaveTypeId: candidate.leaveTypeId,
+    startsAt: context.operation.request_starts_at,
+    title: candidate.title,
+    units: candidate.units,
+  }) === context.operation.request_fingerprint;
 
 const operationScope = (input: {
   clerkOrgId: string;

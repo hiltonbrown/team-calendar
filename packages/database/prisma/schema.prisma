@@ -663,10 +663,18 @@ model OutboundOperation {
   action                 outbound_operation_action
   status                 outbound_operation_status
   request_fingerprint    String
+  request_employee_id    String?
+  request_leave_type_id  String?
+  request_starts_at      DateTime?
+  request_ends_at        DateTime?
+  request_title          String?
+  request_units          Decimal?                  @db.Decimal(12, 4)
   actor_user_id          String
   attempt_generation     Int                       @default(1)
   safe_error_code        String?
   known_remote_id        String?
+  merged_record_id       String?                   @db.Uuid
+  side_effect_claimed_at DateTime?
   prepared_at            DateTime                  @default(now())
   dispatch_started_at    DateTime?
   provider_accepted_at   DateTime?

@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  acquireSideEffects: vi.fn(),
   auditCreate: vi.fn(),
   auditFindFirst: vi.fn(),
   availabilityFindFirst: vi.fn(),
@@ -13,10 +15,13 @@ const mocks = vi.hoisted(() => ({
   markSubmitProviderAccepted: vi.fn(),
   materialise: vi.fn(),
   notify: vi.fn(),
+  persistMerge: vi.fn(),
+  releaseSideEffects: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
+  acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   database: {
     $transaction: async (callback: (client: unknown) => unknown) =>
       await callback({
@@ -37,6 +42,8 @@ vi.mock("@repo/database", () => ({
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
+  persistSubmitRecoveryMerge: mocks.persistMerge,
+  releaseSubmitRecoverySideEffects: mocks.releaseSideEffects,
   scopedTo: (scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -89,6 +96,30 @@ const candidate = {
   title: "Annual leave",
   units: 2,
 };
+const requestFingerprint = createHash("sha256")
+  .update(
+    JSON.stringify({
+      employeeId: candidate.employeeId,
+      endsAt: record.ends_at.toISOString(),
+      leaveTypeId: candidate.leaveTypeId,
+      startsAt: record.starts_at.toISOString(),
+      title: candidate.title,
+      units: candidate.units,
+    })
+  )
+  .digest("hex");
+const operation = {
+  attempt_generation: 1,
+  merged_record_id: null,
+  request_employee_id: candidate.employeeId,
+  request_ends_at: record.ends_at,
+  request_fingerprint: requestFingerprint,
+  request_leave_type_id: candidate.leaveTypeId,
+  request_starts_at: record.starts_at,
+  request_title: candidate.title,
+  request_units: candidate.units,
+  status: "outcome_unknown",
+};
 const port = {
   approveLeaveApplication: vi.fn(),
   declineLeaveApplication: vi.fn(),
@@ -105,10 +136,9 @@ describe("submit recovery service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
-    mocks.getSubmitOperation.mockResolvedValue({
-      attempt_generation: 1,
-      status: "outcome_unknown",
-    });
+    mocks.getSubmitOperation.mockResolvedValue(operation);
+    mocks.acquireSideEffects.mockResolvedValue(new Date());
+    mocks.persistMerge.mockResolvedValue(true);
     mocks.markSubmitCompleted.mockResolvedValue(true);
     mocks.markSubmitDefinitiveFailure.mockResolvedValue(true);
     mocks.markSubmitProviderAccepted.mockResolvedValue(true);
@@ -249,6 +279,7 @@ describe("submit recovery service", () => {
 
   it("cannot attach a different candidate after Xero accepted a known remote ID", async () => {
     mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
       attempt_generation: 1,
       known_remote_id: "remote_accepted",
       status: "provider_accepted",
@@ -297,6 +328,108 @@ describe("submit recovery service", () => {
         data: expect.objectContaining({ approval_status: "approved" }),
       })
     );
+    expect(mocks.notify).not.toHaveBeenCalled();
+  });
+
+  it("resumes duplicate publication cancellation from the persisted merge checkpoint", async () => {
+    const duplicate = { id: "00000000-0000-4000-8000-000000000077" };
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(duplicate);
+    mocks.materialise
+      .mockResolvedValueOnce({ ok: true, value: undefined })
+      .mockResolvedValueOnce({
+        error: { code: "internal", message: "duplicate cancellation failed" },
+        ok: false,
+      });
+
+    const first = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified the imported duplicate in Xero.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+    expect(first.ok).toBe(false);
+    expect(mocks.persistMerge).toHaveBeenCalledWith(
+      expect.anything(),
+      duplicate.id,
+      expect.anything()
+    );
+
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
+      known_remote_id: "remote_1",
+      merged_record_id: duplicate.id,
+      status: "provider_accepted",
+    });
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      source_remote_id: "remote_1",
+    });
+    mocks.auditFindFirst.mockResolvedValueOnce({
+      id: "publication_checkpoint",
+    });
+
+    const retry = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Retry duplicate calendar cancellation.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+    expect(retry.ok).toBe(true);
+    expect(mocks.materialise).toHaveBeenLastCalledWith(
+      expect.objectContaining({ availabilityRecordId: duplicate.id })
+    );
+  });
+
+  it("uses immutable persisted request fields rather than current mappings", async () => {
+    port.resolveEmployeeId.mockResolvedValueOnce({
+      ok: true,
+      value: "changed_employee",
+    });
+    port.resolveLeaveTypeId.mockResolvedValueOnce({
+      ok: true,
+      value: "changed_leave_type",
+    });
+
+    const result = await listSubmitRecoveryCandidates(input, port);
+
+    expect(result.ok).toBe(true);
+    expect(port.resolveEmployeeId).not.toHaveBeenCalled();
+    expect(port.resolveLeaveTypeId).not.toHaveBeenCalled();
+    expect(port.findLeaveApplicationCandidates).toHaveBeenCalledWith(
+      expect.objectContaining({ employeeId: candidate.employeeId })
+    );
+  });
+
+  it("does not run notification effects when another recovery owns the lease", async () => {
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
+      known_remote_id: "remote_1",
+      status: "provider_accepted",
+    });
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      source_remote_id: "remote_1",
+    });
+    mocks.acquireSideEffects.mockResolvedValueOnce(null);
+
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Retry recovery while another worker owns the lease.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(result).toMatchObject({ error: { code: "not_recoverable" }, ok: false });
+    expect(mocks.notify).not.toHaveBeenCalled();
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
   });
 
   it("keeps the operation recoverable until a failed publication succeeds", async () => {
@@ -324,6 +457,7 @@ describe("submit recovery service", () => {
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
 
     mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
       attempt_generation: 1,
       known_remote_id: "remote_1",
       status: "provider_accepted",
@@ -370,6 +504,7 @@ describe("submit recovery service", () => {
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
 
     mocks.getSubmitOperation.mockResolvedValueOnce({
+      ...operation,
       attempt_generation: 1,
       known_remote_id: "remote_1",
       status: "provider_accepted",

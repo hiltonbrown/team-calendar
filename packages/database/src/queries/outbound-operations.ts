@@ -16,7 +16,13 @@ export interface PrepareSubmitOperationInput extends OutboundOperationScope {
   expectedFailedAction: "submit" | null;
   expectedSequence: number;
   expectedStatus: "draft" | "xero_sync_failed";
+  requestEmployeeId: string;
+  requestEndsAt: Date;
   requestFingerprint: string;
+  requestLeaveTypeId: string;
+  requestStartsAt: Date;
+  requestTitle: string | null;
+  requestUnits: number;
 }
 
 export interface OutboundOperationAttemptScope extends OutboundOperationScope {
@@ -69,7 +75,13 @@ export const prepareAndClaimSubmitOperation = async (
             known_remote_id: null,
             prepared_at: new Date(),
             provider_accepted_at: null,
+            request_employee_id: input.requestEmployeeId,
+            request_ends_at: input.requestEndsAt,
             request_fingerprint: input.requestFingerprint,
+            request_leave_type_id: input.requestLeaveTypeId,
+            request_starts_at: input.requestStartsAt,
+            request_title: input.requestTitle,
+            request_units: input.requestUnits,
             safe_error_code: null,
             status: "prepared",
           },
@@ -92,7 +104,13 @@ export const prepareAndClaimSubmitOperation = async (
             availability_record_id: input.availabilityRecordId,
             clerk_org_id: input.clerkOrgId,
             organisation_id: input.organisationId,
+            request_employee_id: input.requestEmployeeId,
+            request_ends_at: input.requestEndsAt,
             request_fingerprint: input.requestFingerprint,
+            request_leave_type_id: input.requestLeaveTypeId,
+            request_starts_at: input.requestStartsAt,
+            request_title: input.requestTitle,
+            request_units: input.requestUnits,
             status: "prepared",
           },
         });
@@ -222,6 +240,62 @@ export const markSubmitCompleted = async (
     },
   });
   return updated.count === 1;
+};
+
+export const persistSubmitRecoveryMerge = async (
+  scope: OutboundOperationAttemptScope,
+  mergedRecordId: string | null,
+  client: OperationClient
+): Promise<boolean> => {
+  const updated = await client.outboundOperation.updateMany({
+    data: { merged_record_id: mergedRecordId },
+    where: {
+      ...scopedTo(scope),
+      action: "submit",
+      attempt_generation: scope.attemptGeneration,
+      availability_record_id: scope.availabilityRecordId,
+      status: "provider_accepted",
+    },
+  });
+  return updated.count === 1;
+};
+
+export const acquireSubmitRecoverySideEffects = async (
+  scope: OutboundOperationAttemptScope,
+  claimableBefore: Date
+): Promise<Date | null> => {
+  const claimedAt = new Date();
+  const updated = await database.outboundOperation.updateMany({
+    data: { side_effect_claimed_at: claimedAt },
+    where: {
+      ...scopedTo(scope),
+      action: "submit",
+      attempt_generation: scope.attemptGeneration,
+      availability_record_id: scope.availabilityRecordId,
+      OR: [
+        { side_effect_claimed_at: null },
+        { side_effect_claimed_at: { lt: claimableBefore } },
+      ],
+      status: "provider_accepted",
+    },
+  });
+  return updated.count === 1 ? claimedAt : null;
+};
+
+export const releaseSubmitRecoverySideEffects = async (
+  scope: OutboundOperationAttemptScope,
+  claimedAt: Date
+): Promise<void> => {
+  await database.outboundOperation.updateMany({
+    data: { side_effect_claimed_at: null },
+    where: {
+      ...scopedTo(scope),
+      attempt_generation: scope.attemptGeneration,
+      availability_record_id: scope.availabilityRecordId,
+      side_effect_claimed_at: claimedAt,
+      status: "provider_accepted",
+    },
+  });
 };
 
 export const hasUnresolvedSubmitOperation = async (
