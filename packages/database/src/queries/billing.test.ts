@@ -22,9 +22,12 @@ vi.mock("../client", () => ({
 
 const {
   getAuthoritativeUsageCount,
+  getFailedStripeEventsForOperators,
+  getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg,
   isStripeEventProcessed,
   lockPlanLimitMutations,
+  recordStripeEventFailure,
 } = await import("./billing");
 
 const usageCases = [
@@ -146,5 +149,67 @@ describe("Stripe event receipt health", () => {
         new Date("2026-09-18T00:00:00Z")
       )
     ).resolves.toBe(true);
+  });
+
+  it("returns safe operator receipt summaries", async () => {
+    const attemptedAt = new Date("2026-09-19T00:00:00.000Z");
+    mocks.queryRaw.mockResolvedValue([
+      {
+        error_category: "provider_fetch",
+        last_attempted_at: attemptedAt,
+        stripe_event_id: "evt_operator",
+      },
+    ]);
+
+    await expect(getUnresolvedStripeEventsForOrg("org_123")).resolves.toEqual([
+      {
+        errorCategory: "provider_fetch",
+        eventId: "evt_operator",
+        lastAttemptedAt: attemptedAt,
+      },
+    ]);
+  });
+
+  it.each([
+    [1, true],
+    [2, true],
+    [3, false],
+    [4, true],
+  ])(
+    "throttles operator alerts at attempt %i",
+    async (attemptCount, expected) => {
+      mocks.queryRaw.mockResolvedValue([{ attempt_count: attemptCount }]);
+      await expect(
+        recordStripeEventFailure({
+          clerkOrgId: "org_123",
+          errorCategory: "provider_fetch",
+          eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+          eventId: "evt_operator",
+          stripeCustomerId: "cus_123",
+          type: "invoice.paid",
+        })
+      ).resolves.toBe(expected);
+    }
+  );
+
+  it("includes unmatched failed events in the operator view", async () => {
+    const attemptedAt = new Date("2026-09-19T00:00:00.000Z");
+    mocks.queryRaw.mockResolvedValue([
+      {
+        clerk_org_id: null,
+        error_category: "invalid_payload",
+        last_attempted_at: attemptedAt,
+        stripe_event_id: "evt_unmatched",
+      },
+    ]);
+
+    await expect(getFailedStripeEventsForOperators()).resolves.toEqual([
+      {
+        clerkOrgId: null,
+        errorCategory: "invalid_payload",
+        eventId: "evt_unmatched",
+        lastAttemptedAt: attemptedAt,
+      },
+    ]);
   });
 });

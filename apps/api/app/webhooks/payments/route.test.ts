@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   logInfo: vi.fn(),
   logWarn: vi.fn(),
   recordStripeEvent: vi.fn(() => Promise.resolve()),
-  recordStripeEventFailure: vi.fn(() => Promise.resolve()),
+  recordStripeEventFailure: vi.fn(async (): Promise<boolean> => false),
   recordStripeEventIgnored: vi.fn(() => Promise.resolve()),
   resolvePlanKey: vi.fn(),
   retrieveStripeSubscription: vi.fn(),
@@ -38,6 +38,9 @@ vi.mock("@repo/database", () => ({
   upsertSubscriptionFromWebhook: mocks.upsertSubscriptionFromWebhook,
 }));
 vi.mock("@repo/jobs", () => ({
+  inngest: { send: mocks.inngestSend },
+}));
+vi.mock("@repo/jobs/src/client", () => ({
   inngest: { send: mocks.inngestSend },
 }));
 vi.mock("@repo/observability/log", () => ({
@@ -567,9 +570,33 @@ describe("Stripe payments webhook", () => {
     expect(response.status).toBe(503);
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
     expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
-      expect.objectContaining({ errorCategory: "processing_exception" })
+      expect.objectContaining({
+        clerkOrgId: "org_1",
+        errorCategory: "processing_exception",
+        stripeCustomerId: "cus_1",
+      })
     );
   });
+
+  it("emits a safe operator alert when the receipt throttle opens", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent(),
+    });
+    mocks.resolvePlanKey.mockReturnValue({
+      error: { code: "bad_request", message: "Unknown Stripe price." },
+      ok: false,
+    });
+    mocks.recordStripeEventFailure.mockResolvedValueOnce(true);
+
+    await POST(webhookRequest());
+
+    expect(mocks.logError).toHaveBeenCalledWith(
+      "Stripe event delivery requires operator attention.",
+      { errorCategory: "unknown_price", eventId: "evt_1" }
+    );
+  });
+
   it("assigns conflicting metadata failures to the verified customer tenant", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
@@ -674,6 +701,67 @@ describe("Stripe payments webhook", () => {
       },
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_known",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_known",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_verified",
+        errorCategory: "invalid_payload",
+        stripeCustomerId: "cus_known",
+      })
+    );
+  });
+
+  it("rejects an unclassified empty invoice instead of ignoring it", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: {} },
+        id: "evt_empty_invoice",
+        type: "invoice.paid",
+      },
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventIgnored).not.toHaveBeenCalled();
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCategory: "invalid_payload",
+        eventId: "evt_empty_invoice",
+      })
+    );
+  });
+
+  it("preserves stored tenant identity when authoritative subscription validation fails", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { subscription: "sub_known" } },
+        id: "evt_invalid_authoritative",
+        type: "invoice.paid",
+      },
+    });
+    mocks.retrieveStripeSubscription.mockResolvedValue({
+      ok: true,
+      value: { id: "sub_known" },
+    });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
       cancel_at_period_end: false,
       clerk_org_id: "org_verified",
       current_period_end: null,

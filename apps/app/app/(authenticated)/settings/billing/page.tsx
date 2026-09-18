@@ -4,6 +4,7 @@ import { getBillingSummary } from "@repo/availability";
 import {
   database,
   getSubscriptionForOrg,
+  getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg,
 } from "@repo/database";
 import type { Metadata } from "next";
@@ -52,10 +53,13 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
   }
 
   const subscription = await getSubscriptionForOrg(clerkOrgId);
-  const billingSyncUnhealthy = await hasUnresolvedStripeEventForOrg(
-    clerkOrgId,
-    subscription?.stripe_event_created_at ?? null
-  );
+  const [billingSyncUnhealthy, failedStripeEvents] = await Promise.all([
+    hasUnresolvedStripeEventForOrg(
+      clerkOrgId,
+      subscription?.stripe_event_created_at ?? null
+    ),
+    getUnresolvedStripeEventsForOrg(clerkOrgId),
+  ]);
 
   await database.auditEvent.create({
     data: {
@@ -79,6 +83,7 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
     <BillingClient
       summary={{
         billingSyncUnhealthy,
+        failedStripeEvents,
         hasContactFlow: summary.value.hasContactFlow,
         hasUpgradeFlow: summary.value.hasUpgradeFlow,
         isOverLimit: summary.value.isOverLimit,

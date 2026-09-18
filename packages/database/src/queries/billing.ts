@@ -289,8 +289,8 @@ export const recordStripeEventFailure = async (input: {
   eventId: string;
   stripeCustomerId: string | null;
   type: string;
-}): Promise<void> => {
-  await database.$executeRaw`
+}): Promise<boolean> => {
+  const rows = await database.$queryRaw<Array<{ attempt_count: number }>>`
     INSERT INTO stripe_events (
       id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
       stripe_customer_id, event_created_at, error_category, last_attempted_at,
@@ -308,7 +308,71 @@ export const recordStripeEventFailure = async (input: {
       error_category = EXCLUDED.error_category, last_attempted_at = NOW(),
       processed_at = NULL, updated_at = NOW()
     WHERE stripe_events.delivery_state = 'failed'
+    RETURNING attempt_count
   `;
+  const attemptCount = rows[0]?.attempt_count;
+  return Boolean(
+    attemptCount &&
+      (attemptCount === 1 || Number.isInteger(Math.log2(attemptCount)))
+  );
+};
+
+export interface FailedStripeEventSummary {
+  clerkOrgId?: string | null;
+  errorCategory: string;
+  eventId: string;
+  lastAttemptedAt: Date;
+}
+
+const mapFailedStripeEvent = (row: {
+  clerk_org_id?: string | null;
+  error_category: string;
+  last_attempted_at: Date;
+  stripe_event_id: string;
+}): FailedStripeEventSummary => ({
+  ...(row.clerk_org_id === undefined ? {} : { clerkOrgId: row.clerk_org_id }),
+  errorCategory: row.error_category,
+  eventId: row.stripe_event_id,
+  lastAttemptedAt: row.last_attempted_at,
+});
+
+export const getUnresolvedStripeEventsForOrg = async (
+  clerkOrgId: string
+): Promise<FailedStripeEventSummary[]> => {
+  const rows = await database.$queryRaw<
+    Array<{
+      error_category: string;
+      last_attempted_at: Date;
+      stripe_event_id: string;
+    }>
+  >`
+    SELECT stripe_event_id, error_category, last_attempted_at
+    FROM stripe_events
+    WHERE clerk_org_id = ${clerkOrgId} AND delivery_state = 'failed'
+    ORDER BY last_attempted_at DESC
+    LIMIT 20
+  `;
+  return rows.map(mapFailedStripeEvent);
+};
+
+export const getFailedStripeEventsForOperators = async (): Promise<
+  FailedStripeEventSummary[]
+> => {
+  const rows = await database.$queryRaw<
+    Array<{
+      clerk_org_id: string | null;
+      error_category: string;
+      last_attempted_at: Date;
+      stripe_event_id: string;
+    }>
+  >`
+    SELECT stripe_event_id, clerk_org_id, error_category, last_attempted_at
+    FROM stripe_events
+    WHERE delivery_state = 'failed'
+    ORDER BY last_attempted_at DESC
+    LIMIT 100
+  `;
+  return rows.map(mapFailedStripeEvent);
 };
 
 export const hasUnresolvedStripeEventForOrg = async (
