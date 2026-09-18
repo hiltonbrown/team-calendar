@@ -5,6 +5,7 @@ import { getOrganisationById } from "@repo/database/queries/organisations";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { createSupportGitHubIssue } from "@/lib/github/create-support-issue-service";
+import { checkSupportRateLimit } from "@/lib/rate-limit/support-rate-limit";
 import { persistSupportSubmissionAudit } from "@/lib/support/persist-support-submission-audit";
 
 const OrganisationQueryParamSchema = z.string().uuid();
@@ -14,6 +15,7 @@ type SupportGitHubIssueFailureCode =
   | "configuration_error"
   | "forbidden"
   | "integration_error"
+  | "rate_limit"
   | "unauthorised"
   | "validation_error";
 
@@ -41,6 +43,22 @@ export async function POST(request: Request): Promise<Response> {
     const user = await currentUser();
     if (!user) {
       return jsonFailure(401, "unauthorised", "User not found");
+    }
+
+    const rateLimitResult = await checkSupportRateLimit({
+      clerkOrgId,
+      userId: user.id,
+    });
+
+    if (!rateLimitResult.allowed) {
+      return jsonFailure(
+        429,
+        "rate_limit",
+        "Too many support requests. Try again later.",
+        {
+          "Retry-After": String(rateLimitResult.retryAfter ?? 15 * 60),
+        }
+      );
     }
 
     const body = await request.json().catch(() => null);
@@ -210,7 +228,8 @@ function getRuntimeEnvironment(): string | undefined {
 function jsonFailure(
   status: number,
   code: SupportGitHubIssueFailureCode,
-  message: string
+  message: string,
+  headers?: HeadersInit
 ): Response {
   const response: SupportGitHubIssueFailureResponse = {
     code,
@@ -218,7 +237,7 @@ function jsonFailure(
     ok: false,
   };
 
-  return Response.json(response, { status });
+  return Response.json(response, { headers, status });
 }
 
 function unhandledSupportIssueError(_error: never): Response {

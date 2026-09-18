@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  checkSupportRateLimit: vi.fn(),
   createSupportGitHubIssue: vi.fn(),
   currentUser: vi.fn(),
   getOrganisationById: vi.fn(),
@@ -28,6 +29,10 @@ vi.mock("@/lib/github/create-support-issue-service", () => ({
   createSupportGitHubIssue: mocks.createSupportGitHubIssue,
 }));
 
+vi.mock("@/lib/rate-limit/support-rate-limit", () => ({
+  checkSupportRateLimit: mocks.checkSupportRateLimit,
+}));
+
 vi.mock("@/lib/support/persist-support-submission-audit", () => ({
   persistSupportSubmissionAudit: mocks.persistSupportSubmissionAudit,
 }));
@@ -48,6 +53,7 @@ describe("support GitHub issue route", () => {
       id: "user_123",
       lastName: "Example",
     });
+    mocks.checkSupportRateLimit.mockResolvedValue({ allowed: true });
     mocks.getOrganisationById.mockResolvedValue({
       ok: true,
       value: {
@@ -209,6 +215,46 @@ describe("support GitHub issue route", () => {
       message: "User not found",
       ok: false,
     });
+    expect(mocks.checkSupportRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("returns Retry-After without calling downstream services when the rate limit is exceeded", async () => {
+    mocks.checkSupportRateLimit.mockResolvedValue({
+      allowed: false,
+      retryAfter: 321,
+    });
+
+    const response = await POST(
+      new Request("http://api.test/api/support/github-issue", {
+        body: JSON.stringify({
+          category: "support",
+          message: "Need help",
+          page_url:
+            "https://app.teamcalendar.test/support?org=00000000-0000-4000-8000-000000000001",
+          priority: "normal",
+          subject: "Help",
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("321");
+    await expect(response.json()).resolves.toEqual({
+      code: "rate_limit",
+      message: "Too many support requests. Try again later.",
+      ok: false,
+    });
+    expect(mocks.checkSupportRateLimit).toHaveBeenCalledWith({
+      clerkOrgId: "org_clerk_123",
+      userId: "user_123",
+    });
+    expect(mocks.getOrganisationById).not.toHaveBeenCalled();
+    expect(mocks.createSupportGitHubIssue).not.toHaveBeenCalled();
+    expect(mocks.persistSupportSubmissionAudit).not.toHaveBeenCalled();
   });
 
   it("returns forbidden when the organisation query param is not a UUID", async () => {
