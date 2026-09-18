@@ -70,6 +70,10 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Verification and CI
 
+- When the user explicitly authorises live database verification, that authority
+  persists for the scoped release run. Build and enforce identity, ownership and
+  cleanup safeguards as implementation work; do not turn incomplete safeguards
+  into another permission gate.
 - Initialise expensive module registries once after mocks are declared. A fast
   cached import is not evidence that repeated initialisation will fit CI worker
   timeouts.

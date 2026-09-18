@@ -11,6 +11,8 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "test:integration": "turbo test:integration",
+    "test:release-tools": "vitest run --config tooling/release/vitest.config.ts",
+    "typecheck:release-tools": "tsc -p tooling/release/tsconfig.json --noEmit",
     "analyze": "turbo analyze",
     "translate": "turbo translate",
     "boundaries": "turbo boundaries",
@@ -32,7 +34,8 @@
     "turbo": "^2.10.13",
     "typescript": "^7.0.2",
     "ultracite": "7.12.0",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
   },
   "engines": {
     "node": "22 || >=24.0.0"
@@ -44,11 +47,14 @@
     "nypm": "^0.6.10"
   },
   "overrides": {
+    "adm-zip": "0.6.1",
     "@grpc/grpc-js": "1.14.4",
-    "fast-uri": "3.1.5",
+    "fast-uri": "3.1.6",
     "hono": "4.12.34",
     "import-in-the-middle": "3.5.1",
     "next": "16.3.5",
+    "js-yaml": "4.3.2",
+    "nanoid": "3.3.18",
     "parse5": "^7.2.1",
     "protobufjs": "7.6.5",
     "require-in-the-middle": "8.0.1",
