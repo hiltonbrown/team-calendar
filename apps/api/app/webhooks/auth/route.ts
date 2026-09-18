@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { analytics } from "@repo/analytics/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
@@ -195,8 +196,16 @@ const handleOrganizationUpdated = (data: ClerkOrganizationData) => {
 };
 
 export const handleOrganizationMembershipCreated = async (
-  data: ClerkOrganizationMembershipData
+  data: ClerkOrganizationMembershipData,
+  deliveryId: string
 ): Promise<Response> => {
+  const provisioned = await ensurePeopleForMembership(data);
+  if (!provisioned) {
+    return new Response("Membership provisioning temporarily unavailable", {
+      status: 503,
+    });
+  }
+
   analytics?.groupIdentify({
     distinctId: data.public_user_data.user_id,
     groupKey: data.organization.id,
@@ -206,9 +215,8 @@ export const handleOrganizationMembershipCreated = async (
   analytics?.capture({
     distinctId: data.public_user_data.user_id,
     event: "Organisation Member Created",
+    uuid: deliveryUuid(deliveryId),
   });
-
-  await ensurePeopleForMembership(data);
 
   return new Response("Organisation membership created", { status: 201 });
 };
@@ -236,7 +244,7 @@ export const handleOrganizationMembershipDeleted = async (
 
 async function ensurePeopleForMembership(
   data: ClerkOrganizationMembershipData
-) {
+): Promise<boolean> {
   const organisations = await database.organisation.findMany({
     select: {
       clerk_org_id: true,
@@ -248,39 +256,67 @@ async function ensurePeopleForMembership(
     },
   });
 
-  await Promise.all(
+  const outcomes = await Promise.all(
     organisations.map(async (organisation) => {
-      const result = await ensureCurrentUserPerson(
-        {
-          clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
-          organisationId: organisation.id as OrganisationId,
-        },
-        {
-          avatarUrl: data.public_user_data.image_url,
-          clerkUserId: data.public_user_data.user_id,
-          displayName:
-            [data.public_user_data.first_name, data.public_user_data.last_name]
-              .filter(Boolean)
-              .join(" ") ||
-            data.public_user_data.identifier ||
-            data.public_user_data.user_id,
-          email: data.public_user_data.identifier,
-          firstName: data.public_user_data.first_name,
-          lastName: data.public_user_data.last_name,
-        }
-      );
+      try {
+        const result = await ensureCurrentUserPerson(
+          {
+            clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
+            organisationId: organisation.id as OrganisationId,
+          },
+          {
+            avatarUrl: data.public_user_data.image_url,
+            clerkUserId: data.public_user_data.user_id,
+            displayName:
+              [
+                data.public_user_data.first_name,
+                data.public_user_data.last_name,
+              ]
+                .filter(Boolean)
+                .join(" ") ||
+              data.public_user_data.identifier ||
+              data.public_user_data.user_id,
+            email: data.public_user_data.identifier,
+            firstName: data.public_user_data.first_name,
+            lastName: data.public_user_data.last_name,
+          }
+        );
 
-      if (!result.ok) {
-        log.error("Failed to link Clerk organisation member to person", {
+        if (!result.ok) {
+          log.error("Failed to link Clerk organisation member to person", {
+            clerkOrgId: data.organization.id,
+            errorCode: result.error.code,
+            organisationId: organisation.id,
+            userId: data.public_user_data.user_id,
+          });
+          return false;
+        }
+        return true;
+      } catch (error) {
+        log.error("Clerk organisation member provisioning failed", {
           clerkOrgId: data.organization.id,
-          error: result.error,
+          error,
           organisationId: organisation.id,
           userId: data.public_user_data.user_id,
         });
+        return false;
       }
     })
   );
+
+  return outcomes.every(Boolean);
 }
+
+const deliveryUuid = (deliveryId: string): string => {
+  const hash = createHash("sha256")
+    .update(`clerk-membership:${deliveryId}`)
+    .digest("hex")
+    .slice(0, 32);
+  const variant =
+    ["8", "9", "a", "b"][Number.parseInt(hash[16] ?? "0", 16) % 4] ?? "8";
+  const uuidHex = `${hash.slice(0, 12)}5${hash.slice(13, 16)}${variant}${hash.slice(17)}`;
+  return `${uuidHex.slice(0, 8)}-${uuidHex.slice(8, 12)}-${uuidHex.slice(12, 16)}-${uuidHex.slice(16, 20)}-${uuidHex.slice(20)}`;
+};
 
 export const POST = async (request: Request): Promise<Response> => {
   if (!env.CLERK_WEBHOOK_SECRET) {
@@ -394,7 +430,7 @@ export const POST = async (request: Request): Promise<Response> => {
       break;
     }
     case "organizationMembership.created": {
-      response = await handleOrganizationMembershipCreated(event.data);
+      response = await handleOrganizationMembershipCreated(event.data, svixId);
       break;
     }
     case "organizationMembership.deleted": {
