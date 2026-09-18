@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 const originalEnvironment = { ...process.env };
@@ -35,7 +35,10 @@ describe("database unit-test isolation", () => {
 
   it("denies direct live invocation without the runner-verified active lock", () => {
     const runId = "00000000-0000-4000-8000-000000000001";
-    const manifestPath = join(mkdtempSync(join(tmpdir(), "tc-guard-")), "manifest.json");
+    const manifestPath = join(
+      mkdtempSync(join(tmpdir(), "tc-guard-")),
+      "manifest.json"
+    );
     writeFileSync(
       manifestPath,
       JSON.stringify({

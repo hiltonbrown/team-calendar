@@ -10,29 +10,18 @@ import {
 
 const runId = "018f47d8-3c0a-7f95-8c77-44f4be5c3210";
 const writeManifest = (overrides: Record<string, unknown> = {}) => {
-  const path = join(mkdtempSync(join(tmpdir(), "tc-release-")), "manifest.json");
+  const path = join(
+    mkdtempSync(join(tmpdir(), "tc-release-")),
+    "manifest.json"
+  );
   writeFileSync(
     path,
     JSON.stringify({
-      version: 1,
-      runId,
-      candidateSha: "80ac9f7",
-      target: {
-        projectId: "project-id",
-        branchId: "branch-id",
-        endpointId: "endpoint-id",
-        hostname: "endpoint-id.example.neon.tech",
-        database: "teamcalendar",
-        role: "release_role",
-      },
-      restoreEvidence: {
-        observedAt: "2026-09-19T00:00:00.000Z",
-        reference: "restore-reference",
-      },
-      namespace: `release:run:${runId}`,
-      durableManifestConfirmed: true,
       active: true,
-      owned: { clerkOrgIds: [], organisationIds: [], globalKeys: [] },
+      candidateSha: "80ac9f7",
+      durableManifestConfirmed: true,
+      namespace: `release:run:${runId}`,
+      owned: { clerkOrgIds: [], globalKeys: [], organisationIds: [] },
       pausedConsumers: {
         "rebuild-feed-cache": false,
         "reconcile-feed-publications": false,
@@ -59,6 +48,20 @@ const writeManifest = (overrides: Record<string, unknown> = {}) => {
         drainedAt: "2026-09-19T00:02:00.000Z",
         establishedAt: "2026-09-19T00:01:00.000Z",
       },
+      restoreEvidence: {
+        observedAt: "2026-09-19T00:00:00.000Z",
+        reference: "restore-reference",
+      },
+      runId,
+      target: {
+        branchId: "branch-id",
+        database: "teamcalendar",
+        endpointId: "endpoint-id",
+        hostname: "endpoint-id.example.neon.tech",
+        projectId: "project-id",
+        role: "release_role",
+      },
+      version: 1,
       ...overrides,
     })
   );
@@ -76,7 +79,10 @@ const validInput = () => ({
 describe("live database guard", () => {
   it("rejects missing acknowledgement before authority is granted", () => {
     expect(() =>
-      assertLiveDatabaseAuthority({ ...validInput(), acknowledgement: undefined })
+      assertLiveDatabaseAuthority({
+        ...validInput(),
+        acknowledgement: undefined,
+      })
     ).toThrow("acknowledgement");
   });
 
@@ -141,12 +147,12 @@ describe("live database guard", () => {
     const manifest = assertLiveDatabaseAuthority(validInput());
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () =>
-      new Response(JSON.stringify({ result: JSON.stringify(manifest) }));
+      Response.json({ result: JSON.stringify(manifest) });
     try {
       await expect(
         assertDurableManifestReadBack(manifest, {
-          url: "https://kv.example.test",
           token: "test-token",
+          url: "https://kv.example.test",
         })
       ).resolves.toBeUndefined();
     } finally {

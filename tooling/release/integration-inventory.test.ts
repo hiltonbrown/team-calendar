@@ -28,8 +28,8 @@ const EXPECTED = [
 
 describe("live integration inventory", () => {
   it("fails when a database-backed suite is added or silently removed", () => {
-    expect(discoverIntegrationTests(resolve(import.meta.dirname, "../.."))).toEqual(
-      EXPECTED
-    );
+    expect(
+      discoverIntegrationTests(resolve(import.meta.dirname, "../.."))
+    ).toEqual(EXPECTED);
   });
 });

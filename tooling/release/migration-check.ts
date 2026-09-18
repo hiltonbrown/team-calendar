@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 
 const baseFlag = process.argv.indexOf("--base");
 const base = baseFlag >= 0 ? process.argv[baseFlag + 1] : undefined;
-if (!base || !/^[0-9a-f]{7,40}$/.test(base)) {
+if (!(base && /^[0-9a-f]{7,40}$/.test(base))) {
   throw new Error("Usage: migration-check.ts --base <trusted-commit>");
 }
 const root = resolve(import.meta.dirname, "../..");
@@ -17,7 +17,14 @@ const runGit = (args: string[]) => {
   return result.stdout.trim();
 };
 
-const baseFiles = runGit(["ls-tree", "-r", "--name-only", base, "--", migrationRoot])
+const baseFiles = runGit([
+  "ls-tree",
+  "-r",
+  "--name-only",
+  base,
+  "--",
+  migrationRoot,
+])
   .split("\n")
   .filter(Boolean);
 const immutable = spawnSync(
@@ -42,7 +49,9 @@ const currentDirectories = readdirSync(resolve(root, migrationRoot), {
 const baseDirectorySet = new Set(baseDirectories);
 for (const directory of baseDirectorySet) {
   if (!currentDirectories.includes(directory)) {
-    throw new Error(`Trusted migration ${directory} is missing from the candidate`);
+    throw new Error(
+      `Trusted migration ${directory} is missing from the candidate`
+    );
   }
 }
 const addedDirectories = currentDirectories.filter(
@@ -50,7 +59,9 @@ const addedDirectories = currentDirectories.filter(
 );
 for (const directory of addedDirectories) {
   if (directory <= newestBase) {
-    throw new Error(`New migration ${directory} is not ordered after ${newestBase}`);
+    throw new Error(
+      `New migration ${directory} is not ordered after ${newestBase}`
+    );
   }
   if (!existsSync(resolve(root, migrationRoot, directory, "migration.sql"))) {
     throw new Error(`New migration ${directory} has no migration.sql`);
@@ -58,8 +69,8 @@ for (const directory of addedDirectories) {
 }
 console.log(
   JSON.stringify({
+    addedMigrations: addedDirectories,
     base,
     immutableMigrations: new Set(baseDirectories).size,
-    addedMigrations: addedDirectories,
   })
 );

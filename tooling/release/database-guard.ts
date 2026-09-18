@@ -42,8 +42,8 @@ const manifestSchema = z.object({
 export type ReleaseManifest = z.infer<typeof manifestSchema>;
 
 export interface DatabaseIdentity {
-  hostname: string;
   database: string;
+  hostname: string;
   role: string;
 }
 
