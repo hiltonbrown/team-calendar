@@ -5,27 +5,36 @@ const mocks = vi.hoisted(() => ({
   getFirstActiveOrganisationIdForClerkOrg: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
   getSubscriptionForStripeCustomer: vi.fn(),
+  getSubscriptionForStripeSubscription: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve()),
   isStripeEventProcessed: vi.fn(),
   logError: vi.fn(),
   logInfo: vi.fn(),
   logWarn: vi.fn(),
   recordStripeEvent: vi.fn(() => Promise.resolve()),
+  recordStripeEventFailure: vi.fn(() => Promise.resolve()),
+  recordStripeEventIgnored: vi.fn(() => Promise.resolve()),
   resolvePlanKey: vi.fn(),
+  retrieveStripeSubscription: vi.fn(),
   upsertSubscriptionFromWebhook: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock("@repo/billing", () => ({
   constructEvent: mocks.constructEvent,
   resolvePlanKey: mocks.resolvePlanKey,
+  retrieveStripeSubscription: mocks.retrieveStripeSubscription,
 }));
 vi.mock("@repo/database", () => ({
   getFirstActiveOrganisationIdForClerkOrg:
     mocks.getFirstActiveOrganisationIdForClerkOrg,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   getSubscriptionForStripeCustomer: mocks.getSubscriptionForStripeCustomer,
+  getSubscriptionForStripeSubscription:
+    mocks.getSubscriptionForStripeSubscription,
   isStripeEventProcessed: mocks.isStripeEventProcessed,
   recordStripeEvent: mocks.recordStripeEvent,
+  recordStripeEventFailure: mocks.recordStripeEventFailure,
+  recordStripeEventIgnored: mocks.recordStripeEventIgnored,
   upsertSubscriptionFromWebhook: mocks.upsertSubscriptionFromWebhook,
 }));
 vi.mock("@repo/jobs", () => ({
@@ -76,8 +85,13 @@ describe("Stripe payments webhook", () => {
     );
     mocks.getSubscriptionForOrg.mockResolvedValue(null);
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue(null);
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue(null);
     mocks.isStripeEventProcessed.mockResolvedValue(false);
     mocks.resolvePlanKey.mockReturnValue({ ok: true, value: "basic" });
+    mocks.retrieveStripeSubscription.mockResolvedValue({
+      ok: true,
+      value: subscriptionEvent().data.object,
+    });
   });
 
   it("returns 400 when the signature cannot be verified", async () => {
@@ -138,7 +152,8 @@ describe("Stripe payments webhook", () => {
     );
     expect(mocks.recordStripeEvent).toHaveBeenCalledWith(
       "evt_1",
-      "customer.subscription.updated"
+      "customer.subscription.updated",
+      expect.objectContaining({ clerkOrgId: "org_1" })
     );
 
     // The event must only be recorded once the mirror write has completed, so
@@ -170,15 +185,18 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCategory: "tenant_conflict" })
+    );
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
     expect(mocks.inngestSend).not.toHaveBeenCalled();
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
     expect(mocks.logError).toHaveBeenCalledWith(
       "Stripe subscription tenant cross-check conflict detected.",
       expect.objectContaining({
-        clerkOrgId: "org_1",
-        orgBoundCustomerId: "cus_existing",
+        metadataOrgId: "org_1",
+        resolvedClerkOrgId: null,
         stripeCustomerId: "cus_different",
       })
     );
@@ -205,15 +223,15 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
     expect(mocks.inngestSend).not.toHaveBeenCalled();
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
     expect(mocks.logError).toHaveBeenCalledWith(
       "Stripe subscription tenant cross-check conflict detected.",
       expect.objectContaining({
-        clerkOrgId: "org_different",
-        customerBoundOrgId: "org_bound_to_cus_1",
+        metadataOrgId: "org_different",
+        resolvedClerkOrgId: "org_bound_to_cus_1",
         stripeCustomerId: "cus_1",
       })
     );
@@ -275,6 +293,7 @@ describe("Stripe payments webhook", () => {
       stripe_subscription_id: null,
     });
     mocks.getSubscriptionForStripeCustomer.mockResolvedValue(null);
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue(null);
 
     const response = await POST(webhookRequest());
 
@@ -319,10 +338,74 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(503);
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
     expect(mocks.inngestSend).not.toHaveBeenCalled();
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
+  });
+
+  it("retrieves an authoritative subscription for an unexpanded invoice reference", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { subscription: "sub_1" } },
+        id: "evt_invoice_reference",
+        type: "invoice.paid",
+      },
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.retrieveStripeSubscription).toHaveBeenCalledWith("sub_1");
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a valid one-off invoice with no subscription", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { subscription: null } },
+        id: "evt_invoice_once",
+        type: "invoice.paid",
+      },
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.retrieveStripeSubscription).not.toHaveBeenCalled();
+    expect(mocks.recordStripeEventIgnored).toHaveBeenCalledWith(
+      "evt_invoice_once",
+      "invoice.paid",
+      new Date(1_700_000_100 * 1000)
+    );
+  });
+
+  it("retrieves an authoritative subscription for checkout completion", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: {
+          object: {
+            customer: "cus_1",
+            metadata: { clerk_org_id: "org_1" },
+            subscription: "sub_1",
+          },
+        },
+        id: "evt_checkout",
+        type: "checkout.session.completed",
+      },
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.retrieveStripeSubscription).toHaveBeenCalledWith("sub_1");
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledTimes(1);
   });
 
   it("does not mirror when the price maps to no known plan", async () => {
@@ -337,12 +420,14 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
-    expect(mocks.recordStripeEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCategory: "unknown_price" })
+    );
   });
 
-  it("ignores subscription events missing clerk_org_id metadata", async () => {
+  it("fails subscription events missing clerk_org_id metadata for retry", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: subscriptionEvent({ metadata: null }),
@@ -350,9 +435,11 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
-    expect(mocks.recordStripeEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCategory: "invalid_payload" })
+    );
   });
 
   it("passes event.created as stripeEventCreatedAt into the subscription mirror", async () => {
@@ -408,7 +495,7 @@ describe("Stripe payments webhook", () => {
     );
   });
 
-  it("skips a subscription event failing schema validation, logs an error, and still records the event", async () => {
+  it("records a failed receipt for invalid consumed subscription data", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: {
@@ -421,7 +508,7 @@ describe("Stripe payments webhook", () => {
 
     const response = await POST(webhookRequest());
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(mocks.logError).toHaveBeenCalledWith(
       "Stripe subscription event failed validation and was skipped.",
       expect.objectContaining({
@@ -430,13 +517,15 @@ describe("Stripe payments webhook", () => {
       })
     );
     expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
-    expect(mocks.recordStripeEvent).toHaveBeenCalledWith(
-      "evt_bad",
-      "customer.subscription.updated"
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        errorCategory: "invalid_payload",
+        eventId: "evt_bad",
+      })
     );
   });
 
-  it("logs an unhandled event type at info level and still records it", async () => {
+  it("records an unsupported event type as intentionally ignored", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: {
@@ -457,13 +546,14 @@ describe("Stripe payments webhook", () => {
         eventType: "charge.succeeded",
       })
     );
-    expect(mocks.recordStripeEvent).toHaveBeenCalledWith(
+    expect(mocks.recordStripeEventIgnored).toHaveBeenCalledWith(
       "evt_charge",
-      "charge.succeeded"
+      "charge.succeeded",
+      new Date(1_700_000_100 * 1000)
     );
   });
 
-  it("propagates the error and does not record the event when the mirror write rejects", async () => {
+  it("records a retryable failure when the mirror write rejects", async () => {
     mocks.constructEvent.mockReturnValue({
       ok: true,
       value: subscriptionEvent(),
@@ -472,10 +562,138 @@ describe("Stripe payments webhook", () => {
       new Error("database unavailable")
     );
 
-    await expect(POST(webhookRequest())).rejects.toThrow(
-      "database unavailable"
-    );
+    const response = await POST(webhookRequest());
 
+    expect(response.status).toBe(503);
     expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCategory: "processing_exception" })
+    );
+  });
+  it("assigns conflicting metadata failures to the verified customer tenant", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent({ metadata: { clerk_org_id: "org_foreign" } }),
+    });
+    mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_1",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_1",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_verified",
+        errorCategory: "tenant_conflict",
+        stripeCustomerId: "cus_1",
+      })
+    );
+    expect(mocks.upsertSubscriptionFromWebhook).not.toHaveBeenCalled();
+  });
+
+  it("uses a known customer binding when subscription metadata is absent", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent({ metadata: null }),
+    });
+    mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_1",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_1",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ clerkOrgId: "org_verified" })
+    );
+  });
+
+  it("assigns provider retrieval failures through the stored subscription binding", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { subscription: "sub_known" } },
+        id: "evt_fetch",
+        type: "invoice.paid",
+      },
+    });
+    mocks.retrieveStripeSubscription.mockResolvedValue({
+      error: { code: "internal", message: "unavailable" },
+      ok: false,
+    });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_known",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_known",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_verified",
+        errorCategory: "provider_fetch",
+        stripeCustomerId: "cus_known",
+      })
+    );
+  });
+
+  it("assigns malformed payload failures through a minimally parsed known customer", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: {
+        created: 1_700_000_100,
+        data: { object: { customer: "cus_known", status: 42 } },
+        id: "evt_malformed",
+        type: "customer.subscription.updated",
+      },
+    });
+    mocks.getSubscriptionForStripeCustomer.mockResolvedValue({
+      cancel_at_period_end: false,
+      clerk_org_id: "org_verified",
+      current_period_end: null,
+      ended_at: null,
+      plan_key: "premium",
+      status: "active",
+      stripe_customer_id: "cus_known",
+      stripe_event_created_at: null,
+      stripe_subscription_id: "sub_known",
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkOrgId: "org_verified",
+        errorCategory: "invalid_payload",
+        stripeCustomerId: "cus_known",
+      })
+    );
   });
 });

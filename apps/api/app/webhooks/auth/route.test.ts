@@ -91,7 +91,8 @@ describe("Clerk organisation membership webhook handling", () => {
   it("links or creates people for each active organisation on membership creation", async () => {
     const response = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_1"
+      "msg_membership_1",
+      new Date(1_700_000_000_000)
     );
 
     expect(response.status).toBe(201);
@@ -135,7 +136,8 @@ describe("Clerk organisation membership webhook handling", () => {
 
     const response = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_partial"
+      "msg_membership_partial",
+      new Date(1_700_000_000_000)
     );
 
     expect(response.status).toBe(503);
@@ -152,7 +154,8 @@ describe("Clerk organisation membership webhook handling", () => {
 
     const response = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_failure"
+      "msg_membership_failure",
+      new Date(1_700_000_000_000)
     );
 
     expect(response.status).toBe(503);
@@ -173,7 +176,8 @@ describe("Clerk organisation membership webhook handling", () => {
 
     const failed = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_replay"
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
     );
     mocks.ensureCurrentUserPerson.mockResolvedValue({
       ok: true,
@@ -181,11 +185,13 @@ describe("Clerk organisation membership webhook handling", () => {
     });
     const repaired = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_replay"
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
     );
     const duplicate = await handleOrganizationMembershipCreated(
       membershipFixture(),
-      "msg_membership_replay"
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
     );
 
     expect([failed.status, repaired.status, duplicate.status]).toEqual([
@@ -286,6 +292,7 @@ describe("Clerk webhook payload validation", () => {
     });
     const body = JSON.stringify({
       data: membershipFixture(),
+      timestamp: 1_700_000_000_000,
       type: "organizationMembership.created",
     });
 
@@ -299,6 +306,25 @@ describe("Clerk webhook payload validation", () => {
     );
     expect(deliveredUuids).toHaveLength(2);
     expect(new Set(deliveredUuids).size).toBe(1);
+    expect(mocks.analyticsCapture.mock.calls[0]?.[0].timestamp).toEqual(
+      new Date(1_700_000_000_000)
+    );
+    expect(mocks.analyticsCapture.mock.calls[1]?.[0].timestamp).toEqual(
+      new Date(1_700_000_000_000)
+    );
+  });
+
+  it("returns a retryable response when membership event time is absent", async () => {
+    const body = JSON.stringify({
+      data: membershipFixture(),
+      type: "organizationMembership.created",
+    });
+
+    const response = await POST(webhookRequest(body));
+
+    expect(response.status).toBe(503);
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
   });
 
   it("returns 400 for malformed JSON after successful verification", async () => {

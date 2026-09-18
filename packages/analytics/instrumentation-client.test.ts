@@ -84,9 +84,39 @@ describe("client analytics initialisation", () => {
       expect.objectContaining({
         api_host: "https://analytics.example.com",
         autocapture: false,
+        before_send: expect.any(Function),
+        capture_pageleave: false,
         capture_pageview: false,
+        disable_session_recording: true,
+        save_campaign_params: false,
+        save_referrer: false,
       })
     );
+    const options = client.init.mock.calls[0]?.[1];
+    const beforeSend = options?.before_send as (event: {
+      properties: Record<string, unknown>;
+    }) => { properties: Record<string, unknown> };
+    expect(
+      beforeSend({
+        properties: {
+          $current_url: "https://app.example/invitations?ticket=secret",
+          $initial_current_url: "https://app.example/sign-up?token=secret",
+          $referrer: "https://app.example/feeds?feed=secret",
+          $session_entry_url: "https://app.example/leave?content=private",
+          $set: { $initial_referrer: "https://app.example/auth?token=secret" },
+          $set_once: {
+            $initial_current_url: "https://app.example/invite?ticket=secret",
+          },
+        },
+      }).properties
+    ).toEqual({
+      $current_url: "https://app.example/invitations",
+      $initial_current_url: "https://app.example/sign-up",
+      $referrer: "https://app.example/feeds",
+      $session_entry_url: "https://app.example/leave",
+      $set: { $initial_referrer: "https://app.example/auth" },
+      $set_once: { $initial_current_url: "https://app.example/invite" },
+    });
   });
 
   it("preserves the first page attribution and a navigation before load", async () => {

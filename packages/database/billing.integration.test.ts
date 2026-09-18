@@ -11,6 +11,7 @@ const {
   getSubscriptionForStripeCustomer,
   isStripeEventProcessed,
   recordStripeEvent,
+  recordStripeEventFailure,
   upsertSubscriptionFromWebhook,
 } = await import("./src/queries/billing.js");
 const { syncPlansFromCatalogue } = await import("./src/seed/plan-sync.js");
@@ -24,6 +25,7 @@ const testEventIds = [
   "evt_test_066_billing_2",
   "evt_test_066_billing_flip",
   "evt_test_066_billing_dup",
+  "evt_test_066_billing_repair",
 ] as const;
 
 const cleanTestData = async () => {
@@ -275,5 +277,60 @@ describe("billing queries integration", () => {
       stripe_customer_id: "cus_test_org_b",
       stripe_subscription_id: "sub_test_org_b",
     });
+  });
+
+  test("a failed receipt remains retryable and is repaired in place", async () => {
+    const eventId = "evt_test_066_billing_repair";
+    const context = {
+      clerkOrgId: testClerkOrgIdA,
+      eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+      stripeCustomerId: "cus_repair",
+    };
+
+    await recordStripeEventFailure({
+      ...context,
+      errorCategory: "provider_fetch",
+      eventId,
+      type: "invoice.paid",
+    });
+    expect(await isStripeEventProcessed(eventId)).toBe(false);
+
+    await recordStripeEvent(eventId, "invoice.paid", context);
+    expect(await isStripeEventProcessed(eventId)).toBe(true);
+
+    const receipt = await database.stripeEvent.findUniqueOrThrow({
+      where: { stripe_event_id: eventId },
+    });
+    expect(receipt).toMatchObject({
+      attempt_count: 2,
+      clerk_org_id: testClerkOrgIdA,
+      delivery_state: "processed",
+      error_category: null,
+      stripe_customer_id: "cus_repair",
+    });
+    expect(receipt.processed_at).toBeInstanceOf(Date);
+  });
+
+  test("a late failing duplicate cannot downgrade a completed receipt", async () => {
+    const eventId = "evt_test_066_billing_dup";
+    const context = {
+      clerkOrgId: testClerkOrgIdA,
+      eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+      stripeCustomerId: "cus_duplicate",
+    };
+    await recordStripeEvent(eventId, "customer.subscription.updated", context);
+    await recordStripeEventFailure({
+      ...context,
+      errorCategory: "processing_exception",
+      eventId,
+      type: "customer.subscription.updated",
+    });
+
+    const receipt = await database.stripeEvent.findUniqueOrThrow({
+      where: { stripe_event_id: eventId },
+    });
+    expect(receipt.delivery_state).toBe("processed");
+    expect(receipt.error_category).toBeNull();
+    expect(await isStripeEventProcessed(eventId)).toBe(true);
   });
 });

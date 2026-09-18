@@ -35,6 +35,7 @@ export interface BillingSubscriptionRow {
   plan_key: string;
   status: string;
   stripe_customer_id: string | null;
+  stripe_event_created_at: Date | null;
   stripe_subscription_id: string | null;
 }
 
@@ -43,7 +44,7 @@ export const getSubscriptionForOrg = async (
 ): Promise<BillingSubscriptionRow | null> => {
   const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
-      stripe_subscription_id, cancel_at_period_end, ended_at
+      stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
     WHERE clerk_org_id = ${clerkOrgId}
     LIMIT 1
@@ -56,9 +57,22 @@ export const getSubscriptionForStripeCustomer = async (
 ): Promise<BillingSubscriptionRow | null> => {
   const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
     SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
-      stripe_subscription_id, cancel_at_period_end, ended_at
+      stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
     FROM clerk_org_subscriptions
     WHERE stripe_customer_id = ${stripeCustomerId}
+    LIMIT 1
+  `;
+  return rows[0] ?? null;
+};
+
+export const getSubscriptionForStripeSubscription = async (
+  stripeSubscriptionId: string
+): Promise<BillingSubscriptionRow | null> => {
+  const rows = await database.$queryRaw<BillingSubscriptionRow[]>`
+    SELECT clerk_org_id, plan_key, status, current_period_end, stripe_customer_id,
+      stripe_subscription_id, cancel_at_period_end, ended_at, stripe_event_created_at
+    FROM clerk_org_subscriptions
+    WHERE stripe_subscription_id = ${stripeSubscriptionId}
     LIMIT 1
   `;
   return rows[0] ?? null;
@@ -211,18 +225,103 @@ export const isStripeEventProcessed = async (
   eventId: string
 ): Promise<boolean> => {
   const rows = await database.$queryRaw<Array<{ stripe_event_id: string }>>`
-    SELECT stripe_event_id FROM stripe_events WHERE stripe_event_id = ${eventId} LIMIT 1
+    SELECT stripe_event_id FROM stripe_events
+    WHERE stripe_event_id = ${eventId} AND delivery_state IN ('processed', 'ignored')
+    LIMIT 1
   `;
   return rows.length > 0;
 };
 
 export const recordStripeEvent = async (
   eventId: string,
-  type: string
+  type: string,
+  context: {
+    clerkOrgId: string | null;
+    eventCreatedAt: Date | null;
+    stripeCustomerId: string | null;
+  } = { clerkOrgId: null, eventCreatedAt: null, stripeCustomerId: null }
 ): Promise<void> => {
   await database.$executeRaw`
-    INSERT INTO stripe_events (id, stripe_event_id, type, processed_at, created_at, updated_at)
-    VALUES (gen_random_uuid(), ${eventId}, ${type}, NOW(), NOW(), NOW())
-    ON CONFLICT (stripe_event_id) DO NOTHING
+    INSERT INTO stripe_events (
+      id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
+      stripe_customer_id, event_created_at, last_attempted_at, processed_at,
+      created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), ${eventId}, ${type}, 'processed', 1, ${context.clerkOrgId},
+      ${context.stripeCustomerId}, ${context.eventCreatedAt}, NOW(), NOW(), NOW(), NOW()
+    )
+    ON CONFLICT (stripe_event_id) DO UPDATE SET
+      delivery_state = 'processed',
+      attempt_count = stripe_events.attempt_count + 1,
+      clerk_org_id = COALESCE(EXCLUDED.clerk_org_id, stripe_events.clerk_org_id),
+      stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, stripe_events.stripe_customer_id),
+      event_created_at = COALESCE(EXCLUDED.event_created_at, stripe_events.event_created_at),
+      error_category = NULL,
+      last_attempted_at = NOW(),
+      processed_at = NOW(),
+      updated_at = NOW()
   `;
+};
+
+export const recordStripeEventIgnored = async (
+  eventId: string,
+  type: string,
+  eventCreatedAt: Date | null
+): Promise<void> => {
+  await database.$executeRaw`
+    INSERT INTO stripe_events (
+      id, stripe_event_id, type, delivery_state, attempt_count, event_created_at,
+      last_attempted_at, processed_at, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), ${eventId}, ${type}, 'ignored', 1, ${eventCreatedAt},
+      NOW(), NOW(), NOW(), NOW()
+    )
+    ON CONFLICT (stripe_event_id) DO UPDATE SET
+      delivery_state = 'ignored', attempt_count = stripe_events.attempt_count + 1,
+      error_category = NULL, last_attempted_at = NOW(), processed_at = NOW(), updated_at = NOW()
+  `;
+};
+
+export const recordStripeEventFailure = async (input: {
+  clerkOrgId: string | null;
+  errorCategory: string;
+  eventCreatedAt: Date | null;
+  eventId: string;
+  stripeCustomerId: string | null;
+  type: string;
+}): Promise<void> => {
+  await database.$executeRaw`
+    INSERT INTO stripe_events (
+      id, stripe_event_id, type, delivery_state, attempt_count, clerk_org_id,
+      stripe_customer_id, event_created_at, error_category, last_attempted_at,
+      processed_at, created_at, updated_at
+    ) VALUES (
+      gen_random_uuid(), ${input.eventId}, ${input.type}, 'failed', 1,
+      ${input.clerkOrgId}, ${input.stripeCustomerId}, ${input.eventCreatedAt},
+      ${input.errorCategory}, NOW(), NULL, NOW(), NOW()
+    )
+    ON CONFLICT (stripe_event_id) DO UPDATE SET
+      delivery_state = 'failed', attempt_count = stripe_events.attempt_count + 1,
+      clerk_org_id = COALESCE(EXCLUDED.clerk_org_id, stripe_events.clerk_org_id),
+      stripe_customer_id = COALESCE(EXCLUDED.stripe_customer_id, stripe_events.stripe_customer_id),
+      event_created_at = COALESCE(EXCLUDED.event_created_at, stripe_events.event_created_at),
+      error_category = EXCLUDED.error_category, last_attempted_at = NOW(),
+      processed_at = NULL, updated_at = NOW()
+    WHERE stripe_events.delivery_state = 'failed'
+  `;
+};
+
+export const hasUnresolvedStripeEventForOrg = async (
+  clerkOrgId: string,
+  mirroredAt: Date | null
+): Promise<boolean> => {
+  const rows = await database.$queryRaw<Array<{ exists: boolean }>>`
+    SELECT EXISTS (
+      SELECT 1 FROM stripe_events
+      WHERE clerk_org_id = ${clerkOrgId}
+        AND delivery_state = 'failed'
+        AND (${mirroredAt}::timestamptz IS NULL OR event_created_at IS NULL OR event_created_at >= ${mirroredAt})
+    ) AS exists
+  `;
+  return rows[0]?.exists ?? false;
 };

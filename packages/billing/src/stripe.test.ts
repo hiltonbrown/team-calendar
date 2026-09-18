@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   checkoutCreate: vi.fn(),
+  eventRetrieve: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
+  subscriptionRetrieve: vi.fn(),
 }));
 const CHECKOUT_IDEMPOTENCY_KEY = /^team-calendar:checkout:[a-f0-9]{64}$/;
 
@@ -18,11 +20,19 @@ vi.mock("@repo/database", () => ({
 vi.mock("stripe", () => ({
   default: class Stripe {
     checkout = { sessions: { create: mocks.checkoutCreate } };
+    events = { retrieve: mocks.eventRetrieve };
+    subscriptions = { retrieve: mocks.subscriptionRetrieve };
   },
 }));
 
-const { STRIPE_API_VERSION, createCheckoutSession, getStripe, resolvePlanKey } =
-  await import("./stripe");
+const {
+  STRIPE_API_VERSION,
+  createCheckoutSession,
+  getStripe,
+  resolvePlanKey,
+  retrieveStripeEvent,
+  retrieveStripeSubscription,
+} = await import("./stripe");
 
 describe("STRIPE_API_VERSION", () => {
   it("pins the tested account API version", () => {
@@ -189,5 +199,38 @@ describe("createCheckoutSession", () => {
     expect(mocks.checkoutCreate.mock.calls[0]?.[1]?.idempotencyKey).not.toBe(
       mocks.checkoutCreate.mock.calls[1]?.[1]?.idempotencyKey
     );
+  });
+});
+
+describe("authoritative Stripe retrieval", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_replay");
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("retrieves an event by exact provider ID", async () => {
+    mocks.eventRetrieve.mockResolvedValue({ id: "evt_1" });
+
+    await expect(retrieveStripeEvent("evt_1")).resolves.toEqual({
+      ok: true,
+      value: { id: "evt_1" },
+    });
+    expect(mocks.eventRetrieve).toHaveBeenCalledWith("evt_1");
+  });
+
+  it("returns a safe failure when subscription retrieval fails", async () => {
+    mocks.subscriptionRetrieve.mockRejectedValue(new Error("provider detail"));
+
+    const result = await retrieveStripeSubscription("sub_1");
+
+    expect(result).toEqual({
+      error: {
+        code: "internal",
+        message: "Stripe subscription retrieval failed.",
+      },
+      ok: false,
+    });
   });
 });

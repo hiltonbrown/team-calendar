@@ -1,7 +1,11 @@
 import { requireRole } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import { getBillingSummary } from "@repo/availability";
-import { database } from "@repo/database";
+import {
+  database,
+  getSubscriptionForOrg,
+  hasUnresolvedStripeEventForOrg,
+} from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -47,6 +51,12 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
     return <FetchErrorState entityName="billing" />;
   }
 
+  const subscription = await getSubscriptionForOrg(clerkOrgId);
+  const billingSyncUnhealthy = await hasUnresolvedStripeEventForOrg(
+    clerkOrgId,
+    subscription?.stripe_event_created_at ?? null
+  );
+
   await database.auditEvent.create({
     data: {
       action: "billing.viewed",
@@ -68,6 +78,7 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
   return (
     <BillingClient
       summary={{
+        billingSyncUnhealthy,
         hasContactFlow: summary.value.hasContactFlow,
         hasUpgradeFlow: summary.value.hasUpgradeFlow,
         isOverLimit: summary.value.isOverLimit,

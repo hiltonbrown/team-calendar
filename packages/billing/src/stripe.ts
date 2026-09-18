@@ -180,3 +180,40 @@ export const constructEvent = (
     };
   }
 };
+
+export const retrieveStripeEvent = async (
+  eventId: string
+): Promise<Result<Stripe.Event>> => {
+  const stripe = getStripe();
+  if (!stripe.ok) {
+    return stripe;
+  }
+  try {
+    return { ok: true, value: await stripe.value.events.retrieve(eventId) };
+  } catch {
+    return {
+      error: appError("internal", "Stripe event retrieval failed."),
+      ok: false,
+    };
+  }
+};
+
+export const retrieveStripeSubscription = async (
+  subscriptionId: string
+): Promise<Result<Stripe.Subscription>> => {
+  const stripe = getStripe();
+  if (!stripe.ok) {
+    return stripe;
+  }
+  try {
+    return {
+      ok: true,
+      value: await stripe.value.subscriptions.retrieve(subscriptionId),
+    };
+  } catch {
+    return {
+      error: appError("internal", "Stripe subscription retrieval failed."),
+      ok: false,
+    };
+  }
+};

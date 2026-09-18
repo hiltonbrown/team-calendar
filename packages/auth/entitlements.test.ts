@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   getPlanFeatures: vi.fn(),
   getPlanLimits: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
+  hasUnresolvedStripeEventForOrg: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,11 +15,14 @@ vi.mock("@repo/database", () => ({
   getPlanFeatures: mocks.getPlanFeatures,
   getPlanLimits: mocks.getPlanLimits,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
 }));
 
 describe("entitlements", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllEnvs();
+    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);
   });
 
   describe("withinLimit", () => {
@@ -161,6 +165,43 @@ describe("entitlements", () => {
       await withinLimit("org_123", "org_entity_123", "seats");
 
       expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
+    });
+
+    it("falls back to basic in paid mode while a newer billing event is unresolved", async () => {
+      vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
+      mocks.getSubscriptionForOrg.mockResolvedValue({
+        plan_key: "premium",
+        status: "active",
+        stripe_event_created_at: new Date("2026-09-18T00:00:00Z"),
+      });
+      mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+      mocks.getPlanLimits.mockReturnValue({ seats: 5 });
+      mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
+
+      await withinLimit("org_123", "org_entity_123", "seats");
+
+      expect(mocks.getPlanLimits).toHaveBeenCalledWith("basic");
+      expect(mocks.hasUnresolvedStripeEventForOrg).toHaveBeenCalledWith(
+        "org_123",
+        new Date("2026-09-18T00:00:00Z")
+      );
+    });
+
+    it("keeps early-access entitlement behaviour during billing repair", async () => {
+      vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "early_access");
+      mocks.getSubscriptionForOrg.mockResolvedValue({
+        plan_key: "premium",
+        status: "active",
+        stripe_event_created_at: new Date("2026-09-18T00:00:00Z"),
+      });
+      mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+      mocks.getPlanLimits.mockReturnValue({ seats: 10 });
+      mocks.getAuthoritativeUsageCount.mockResolvedValue(0);
+
+      await withinLimit("org_123", "org_entity_123", "seats");
+
+      expect(mocks.getPlanLimits).toHaveBeenCalledWith("premium");
+      expect(mocks.hasUnresolvedStripeEventForOrg).not.toHaveBeenCalled();
     });
 
     it("resolves to premium for trialing subscription with premium plan key", async () => {

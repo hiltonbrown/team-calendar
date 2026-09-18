@@ -1,10 +1,14 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const recoveryMessagePattern = /Billing changes are still being reconciled/;
+
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   currentUser: vi.fn(),
   getBillingSummary: vi.fn(),
+  getSubscriptionForOrg: vi.fn(),
+  hasUnresolvedStripeEventForOrg: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
   requireRole: vi.fn(),
@@ -26,6 +30,8 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: { auditEvent: { create: mocks.auditCreate } },
+  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
@@ -52,7 +58,10 @@ const summary = {
 };
 
 describe("BillingPage", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,6 +78,17 @@ describe("BillingPage", () => {
       organisationId,
     });
     mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
+    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);
+  });
+
+  it("shows a paid-mode recovery state for unresolved billing events", async () => {
+    vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
+    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText(recoveryMessagePattern)).toBeDefined();
   });
 
   it("requires admin access", async () => {

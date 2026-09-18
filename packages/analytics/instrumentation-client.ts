@@ -22,6 +22,11 @@ interface PageView {
   readonly url: string;
 }
 
+interface AnalyticsEvent {
+  properties?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 type Association =
   | {
       readonly kind: "identify";
@@ -52,6 +57,45 @@ const sanitiseUrl = (value: string): string => {
   } catch {
     return "";
   }
+};
+
+const sanitiseEventUrls = (
+  event: AnalyticsEvent | null
+): AnalyticsEvent | null => {
+  if (!event?.properties) {
+    return event;
+  }
+  const properties = { ...event.properties };
+  for (const key of [
+    "$current_url",
+    "$referrer",
+    "$initial_current_url",
+    "$session_entry_url",
+  ]) {
+    const value = properties[key];
+    if (typeof value === "string") {
+      properties[key] = sanitiseUrl(value);
+    }
+  }
+  for (const containerKey of ["$set", "$set_once"]) {
+    const value = properties[containerKey];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const nested = { ...(value as Record<string, unknown>) };
+      for (const key of [
+        "$current_url",
+        "$initial_current_url",
+        "$initial_referrer",
+        "$referrer",
+        "$session_entry_url",
+      ]) {
+        if (typeof nested[key] === "string") {
+          nested[key] = sanitiseUrl(nested[key]);
+        }
+      }
+      properties[containerKey] = nested;
+    }
+  }
+  return { ...event, properties };
 };
 
 const scheduleAfterHydration = (callback: () => void) => {
@@ -202,8 +246,13 @@ export const initializeAnalytics = (): Promise<void> => {
           client.init(NEXT_PUBLIC_POSTHOG_KEY, {
             api_host: NEXT_PUBLIC_POSTHOG_HOST,
             autocapture: false,
+            before_send: sanitiseEventUrls,
+            capture_pageleave: false,
             capture_pageview: false,
             defaults: "2025-05-24",
+            disable_session_recording: true,
+            save_campaign_params: false,
+            save_referrer: false,
           });
           analyticsClient = client;
           analyticsState = "ready";

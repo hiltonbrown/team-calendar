@@ -20,9 +20,12 @@ vi.mock("../client", () => ({
   },
 }));
 
-const { getAuthoritativeUsageCount, lockPlanLimitMutations } = await import(
-  "./billing"
-);
+const {
+  getAuthoritativeUsageCount,
+  hasUnresolvedStripeEventForOrg,
+  isStripeEventProcessed,
+  lockPlanLimitMutations,
+} = await import("./billing");
 
 const usageCases = [
   ["seats", "personCount", 8],
@@ -117,5 +120,31 @@ describe("authoritative billing usage", () => {
     );
 
     expect(mocks.queryRaw).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Stripe event receipt health", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("only treats completed or ignored receipts as processed", async () => {
+    mocks.queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ stripe_event_id: "evt_processed" }]);
+
+    await expect(isStripeEventProcessed("evt_failed")).resolves.toBe(false);
+    await expect(isStripeEventProcessed("evt_processed")).resolves.toBe(true);
+  });
+
+  it("reports a newer unresolved event for a known organisation", async () => {
+    mocks.queryRaw.mockResolvedValue([{ exists: true }]);
+
+    await expect(
+      hasUnresolvedStripeEventForOrg(
+        "org_123",
+        new Date("2026-09-18T00:00:00Z")
+      )
+    ).resolves.toBe(true);
   });
 });

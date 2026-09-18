@@ -1,10 +1,17 @@
-import { constructEvent, resolvePlanKey } from "@repo/billing";
+import {
+  constructEvent,
+  resolvePlanKey,
+  retrieveStripeSubscription,
+} from "@repo/billing";
 import {
   getFirstActiveOrganisationIdForClerkOrg,
   getSubscriptionForOrg,
   getSubscriptionForStripeCustomer,
+  getSubscriptionForStripeSubscription,
   isStripeEventProcessed,
   recordStripeEvent,
+  recordStripeEventFailure,
+  recordStripeEventIgnored,
   upsertSubscriptionFromWebhook,
 } from "@repo/database";
 import { inngest } from "@repo/jobs";
@@ -37,7 +44,16 @@ const SubscriptionSchema = z.object({
 // An invoice references its subscription either by id (the unexpanded default)
 // or as the full expanded subscription object, which we mirror directly.
 const InvoiceSchema = z.object({
-  subscription: z.union([z.string(), SubscriptionSchema]).nullable().optional(),
+  parent: z
+    .object({
+      subscription_details: z
+        .object({ subscription: StripeRef.nullable().optional() })
+        .nullable()
+        .optional(),
+    })
+    .nullable()
+    .optional(),
+  subscription: z.union([SubscriptionSchema, z.string()]).nullable().optional(),
 });
 
 const objectId = (value: string | { id: string } | null | undefined) =>
@@ -45,22 +61,105 @@ const objectId = (value: string | { id: string } | null | undefined) =>
 const dateFromSeconds = (value: number | null | undefined) =>
   value ? new Date(value * 1000) : null;
 
-interface MirrorResult {
+interface EventIdentity {
+  clerkOrgId?: string;
+  conflict: boolean;
+  stripeCustomerId?: string | null;
+}
+
+async function resolveEventIdentity(
+  value: unknown,
+  subscriptionId?: string | null
+): Promise<EventIdentity> {
+  const loose = z
+    .object({
+      customer: StripeRef.nullable().optional(),
+      metadata: MetadataSchema.optional(),
+    })
+    .safeParse(value);
+  const stripeCustomerId = loose.success ? objectId(loose.data.customer) : null;
+  const metadataOrgId = loose.success
+    ? loose.data.metadata?.clerk_org_id
+    : undefined;
+  const [customerBinding, subscriptionBinding] = await Promise.all([
+    stripeCustomerId
+      ? getSubscriptionForStripeCustomer(stripeCustomerId)
+      : Promise.resolve(null),
+    subscriptionId
+      ? getSubscriptionForStripeSubscription(subscriptionId)
+      : Promise.resolve(null),
+  ]);
+  const binding = customerBinding ?? subscriptionBinding;
+  if (binding) {
+    return {
+      clerkOrgId: binding.clerk_org_id,
+      conflict: Boolean(
+        metadataOrgId && metadataOrgId !== binding.clerk_org_id
+      ),
+      stripeCustomerId: binding.stripe_customer_id ?? stripeCustomerId,
+    };
+  }
+  if (!metadataOrgId) {
+    return { conflict: false, stripeCustomerId };
+  }
+  const orgBinding = await getSubscriptionForOrg(metadataOrgId);
+  const conflict = Boolean(
+    orgBinding?.stripe_customer_id &&
+      stripeCustomerId &&
+      orgBinding.stripe_customer_id !== stripeCustomerId
+  );
+  return {
+    clerkOrgId: conflict ? undefined : metadataOrgId,
+    conflict,
+    stripeCustomerId,
+  };
+}
+
+export interface MirrorResult {
+  clerkOrgId?: string;
+  disposition?: "ignored" | "processed";
   error?: string;
+  errorCategory?: string;
   ok: boolean;
   status?: number;
+  stripeCustomerId?: string | null;
 }
 
 async function mirrorSubscription(
   data: z.infer<typeof SubscriptionSchema>,
   eventCreatedAt: Date
 ): Promise<MirrorResult> {
-  const clerkOrgId = data.metadata?.clerk_org_id;
-  if (!clerkOrgId) {
-    log.error("Stripe subscription event missing clerk_org_id metadata.", {
+  const identity = await resolveEventIdentity(data, data.id);
+  const { clerkOrgId } = identity;
+  const metadataOrgId = data.metadata?.clerk_org_id;
+  if (identity.conflict) {
+    log.error("Stripe subscription tenant cross-check conflict detected.", {
+      metadataOrgId: metadataOrgId ?? null,
+      resolvedClerkOrgId: clerkOrgId ?? null,
+      stripeCustomerId: identity.stripeCustomerId ?? null,
       stripeSubscriptionId: data.id,
     });
-    return { ok: true };
+    return {
+      clerkOrgId,
+      error: "Stripe customer and organisation identity conflict",
+      errorCategory: "tenant_conflict",
+      ok: false,
+      status: 503,
+      stripeCustomerId: identity.stripeCustomerId,
+    };
+  }
+  if (!clerkOrgId) {
+    log.error(
+      "Stripe subscription event missing trusted organisation identity.",
+      { stripeSubscriptionId: data.id }
+    );
+    return {
+      error: "Billing subscription metadata is incomplete",
+      errorCategory: "invalid_payload",
+      ok: false,
+      status: 503,
+      stripeCustomerId: identity.stripeCustomerId,
+    };
   }
   const priceId = data.items.data[0]?.price.id;
   const plan = resolvePlanKey(priceId);
@@ -69,42 +168,16 @@ async function mirrorSubscription(
       priceId,
       stripeSubscriptionId: data.id,
     });
-    return { ok: true };
-  }
-
-  const stripeCustomerId = objectId(data.customer);
-  const [orgBinding, customerBinding] = await Promise.all([
-    getSubscriptionForOrg(clerkOrgId),
-    stripeCustomerId
-      ? getSubscriptionForStripeCustomer(stripeCustomerId)
-      : Promise.resolve(null),
-  ]);
-
-  const orgBoundToDifferentCustomer = Boolean(
-    orgBinding?.stripe_customer_id &&
-      stripeCustomerId &&
-      orgBinding.stripe_customer_id !== stripeCustomerId
-  );
-
-  const customerBoundToDifferentOrg = Boolean(
-    customerBinding?.clerk_org_id && customerBinding.clerk_org_id !== clerkOrgId
-  );
-
-  if (orgBoundToDifferentCustomer || customerBoundToDifferentOrg) {
-    log.error("Stripe subscription tenant cross-check conflict detected.", {
-      clerkOrgId,
-      customerBoundOrgId: customerBinding?.clerk_org_id ?? null,
-      orgBoundCustomerId: orgBinding?.stripe_customer_id ?? null,
-      stripeCustomerId,
-      stripeSubscriptionId: data.id,
-    });
     return {
-      error: "Stripe customer and organisation identity conflict",
+      clerkOrgId,
+      error: "Billing price is not recognised",
+      errorCategory: "unknown_price",
       ok: false,
-      status: 409,
+      status: 503,
+      stripeCustomerId: identity.stripeCustomerId,
     };
   }
-
+  const stripeCustomerId = identity.stripeCustomerId ?? objectId(data.customer);
   await upsertSubscriptionFromWebhook({
     cancelAtPeriodEnd: data.cancel_at_period_end,
     clerkOrgId,
@@ -121,21 +194,15 @@ async function mirrorSubscription(
   if (!organisationId) {
     log.error(
       "Stripe subscription mirror skipped recount-usage because no active organisation was found.",
-      {
-        clerkOrgId,
-        stripeSubscriptionId: data.id,
-      }
+      { clerkOrgId, stripeSubscriptionId: data.id }
     );
-    return { ok: true };
+    return { clerkOrgId, disposition: "processed", ok: true, stripeCustomerId };
   }
   await inngest.send({
-    data: {
-      clerkOrgId,
-      organisationId,
-    },
+    data: { clerkOrgId, organisationId },
     name: "recount-usage",
   });
-  return { ok: true };
+  return { clerkOrgId, disposition: "processed", ok: true, stripeCustomerId };
 }
 
 const SUBSCRIPTION_EVENT_TYPES = new Set([
@@ -169,7 +236,15 @@ async function handleSubscriptionEvent(
     eventType: event.type,
     issues: parsed.error.issues,
   });
-  return { ok: true };
+  const identity = await resolveEventIdentity(event.data.object);
+  return {
+    clerkOrgId: identity.clerkOrgId,
+    error: "Stripe subscription payload is invalid",
+    errorCategory: "invalid_payload",
+    ok: false,
+    status: 503,
+    stripeCustomerId: identity.stripeCustomerId,
+  };
 }
 
 async function handleInvoiceEvent(
@@ -182,37 +257,109 @@ async function handleInvoiceEvent(
       eventType: event.type,
       issues: parsed.error.issues,
     });
-    return { ok: true };
+    return {
+      error: "Stripe invoice payload is invalid",
+      errorCategory: "invalid_payload",
+      ok: false,
+      status: 503,
+    };
   }
-  const { subscription } = parsed.data;
+  const subscription =
+    parsed.data.subscription ??
+    parsed.data.parent?.subscription_details?.subscription;
   if (subscription && typeof subscription !== "string") {
+    const expanded = SubscriptionSchema.safeParse(subscription);
+    if (expanded.success) {
+      return await mirrorSubscription(
+        expanded.data,
+        dateFromSeconds(event.created) ?? new Date()
+      );
+    }
+  }
+  const subscriptionId = objectId(subscription);
+  if (subscriptionId) {
+    const retrieved = await retrieveStripeSubscription(subscriptionId);
+    if (!retrieved.ok) {
+      const identity = await resolveEventIdentity(
+        event.data.object,
+        subscriptionId
+      );
+      return {
+        clerkOrgId: identity.clerkOrgId,
+        error: "Stripe subscription retrieval failed",
+        errorCategory: "provider_fetch",
+        ok: false,
+        status: 503,
+        stripeCustomerId: identity.stripeCustomerId,
+      };
+    }
+    const authoritative = SubscriptionSchema.safeParse(retrieved.value);
+    if (!authoritative.success) {
+      return {
+        error: "Stripe subscription payload is invalid",
+        errorCategory: "invalid_payload",
+        ok: false,
+        status: 503,
+      };
+    }
     return await mirrorSubscription(
-      subscription,
+      authoritative.data,
       dateFromSeconds(event.created) ?? new Date()
     );
   }
-  if (subscription) {
-    log.info(
-      "Stripe invoice event carried no expanded subscription and was skipped.",
-      { eventId: event.id, eventType: event.type }
-    );
-  }
-  return { ok: true };
+  return { disposition: "ignored", ok: true };
 }
 
-function checkCheckoutSessionMetadata(event: StripeEventLike) {
+async function handleCheckoutSession(
+  event: StripeEventLike
+): Promise<MirrorResult> {
   const parsed = SessionSchema.safeParse(event.data.object);
-  if (parsed.success && !parsed.data.metadata?.clerk_org_id) {
-    log.warn("Stripe checkout session missing clerk_org_id metadata.");
+  if (!parsed.success) {
+    return {
+      error: "Stripe checkout payload is invalid",
+      errorCategory: "invalid_payload",
+      ok: false,
+      status: 503,
+    };
   }
+  const subscriptionId = objectId(parsed.data.subscription);
+  if (!subscriptionId) {
+    return { disposition: "ignored", ok: true };
+  }
+  const retrieved = await retrieveStripeSubscription(subscriptionId);
+  if (!retrieved.ok) {
+    const identity = await resolveEventIdentity(
+      event.data.object,
+      subscriptionId
+    );
+    return {
+      clerkOrgId: identity.clerkOrgId,
+      error: "Stripe subscription retrieval failed",
+      errorCategory: "provider_fetch",
+      ok: false,
+      status: 503,
+      stripeCustomerId: identity.stripeCustomerId,
+    };
+  }
+  const authoritative = SubscriptionSchema.safeParse(retrieved.value);
+  return authoritative.success
+    ? mirrorSubscription(
+        authoritative.data,
+        dateFromSeconds(event.created) ?? new Date()
+      )
+    : {
+        error: "Stripe subscription payload is invalid",
+        errorCategory: "invalid_payload",
+        ok: false,
+        status: 503,
+      };
 }
 
-async function processStripeEvent(
+export async function processStripeEvent(
   event: StripeEventLike
 ): Promise<MirrorResult> {
   if (event.type === "checkout.session.completed") {
-    checkCheckoutSessionMetadata(event);
-    return { ok: true };
+    return await handleCheckoutSession(event);
   }
   if (SUBSCRIPTION_EVENT_TYPES.has(event.type)) {
     return await handleSubscriptionEvent(event);
@@ -224,7 +371,7 @@ async function processStripeEvent(
     eventId: event.id,
     eventType: event.type,
   });
-  return { ok: true };
+  return { disposition: "ignored", ok: true };
 }
 
 export async function POST(request: Request) {
@@ -237,7 +384,7 @@ export async function POST(request: Request) {
   if (!eventResult.ok) {
     return NextResponse.json(
       { error: eventResult.error.message },
-      { status: 400 }
+      { status: eventResult.error.code === "internal" ? 503 : 400 }
     );
   }
   const event = eventResult.value;
@@ -248,14 +395,54 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
-  const result = await processStripeEvent(event);
-  if (!result.ok) {
+  let result: MirrorResult;
+  try {
+    result = await processStripeEvent(event);
+  } catch {
+    log.error("Stripe event processing raised an unexpected error.", {
+      eventId: event.id,
+      eventType: event.type,
+    });
+    await recordStripeEventFailure({
+      clerkOrgId: null,
+      errorCategory: "processing_exception",
+      eventCreatedAt: dateFromSeconds(event.created),
+      eventId: event.id,
+      stripeCustomerId: null,
+      type: event.type,
+    });
     return NextResponse.json(
-      { error: result.error },
-      { status: result.status ?? 409 }
+      { error: "Billing event processing failed" },
+      { status: 503 }
+    );
+  }
+  if (!result.ok) {
+    await recordStripeEventFailure({
+      clerkOrgId: result.clerkOrgId ?? null,
+      errorCategory: result.errorCategory ?? "processing_failure",
+      eventCreatedAt: dateFromSeconds(event.created),
+      eventId: event.id,
+      stripeCustomerId: result.stripeCustomerId ?? null,
+      type: event.type,
+    });
+    return NextResponse.json(
+      { error: "Billing event processing failed" },
+      { status: result.status ?? 503 }
     );
   }
 
-  await recordStripeEvent(event.id, event.type);
+  if (result.disposition === "ignored") {
+    await recordStripeEventIgnored(
+      event.id,
+      event.type,
+      dateFromSeconds(event.created)
+    );
+  } else {
+    await recordStripeEvent(event.id, event.type, {
+      clerkOrgId: result.clerkOrgId ?? null,
+      eventCreatedAt: dateFromSeconds(event.created),
+      stripeCustomerId: result.stripeCustomerId ?? null,
+    });
+  }
   return NextResponse.json({ received: true });
 }

@@ -46,6 +46,7 @@ const ClerkOrganizationMembershipDataSchema = z.object({
 
 const ClerkWebhookEnvelopeSchema = z.object({
   data: z.object({ id: z.string().optional() }).passthrough(),
+  timestamp: z.number().optional(),
   type: z.string().min(1),
 });
 
@@ -197,7 +198,8 @@ const handleOrganizationUpdated = (data: ClerkOrganizationData) => {
 
 export const handleOrganizationMembershipCreated = async (
   data: ClerkOrganizationMembershipData,
-  deliveryId: string
+  deliveryId: string,
+  eventTimestamp: Date
 ): Promise<Response> => {
   const provisioned = await ensurePeopleForMembership(data);
   if (!provisioned) {
@@ -215,6 +217,7 @@ export const handleOrganizationMembershipCreated = async (
   analytics?.capture({
     distinctId: data.public_user_data.user_id,
     event: "Organisation Member Created",
+    timestamp: eventTimestamp,
     uuid: deliveryUuid(deliveryId),
   });
 
@@ -430,7 +433,18 @@ export const POST = async (request: Request): Promise<Response> => {
       break;
     }
     case "organizationMembership.created": {
-      response = await handleOrganizationMembershipCreated(event.data, svixId);
+      const { timestamp } = envelope.data;
+      if (!timestamp || timestamp < Date.UTC(2020, 0, 1)) {
+        response = new Response("Webhook timestamp is invalid", {
+          status: 503,
+        });
+        break;
+      }
+      response = await handleOrganizationMembershipCreated(
+        event.data,
+        svixId,
+        new Date(timestamp)
+      );
       break;
     }
     case "organizationMembership.deleted": {
