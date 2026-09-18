@@ -76,7 +76,7 @@ describe("settings/leave-approval server actions", () => {
 
       const result = await updateLeaveApprovalSettingsAction({
         organisationId,
-        patch: { requireDeclineReason: false },
+        patch: { requireDeclineReason: true },
       });
 
       expect(result).toEqual({
@@ -93,9 +93,10 @@ describe("settings/leave-approval server actions", () => {
     it("rejects malformed inputs (invalid patch field)", async () => {
       const result = await updateLeaveApprovalSettingsAction({
         organisationId,
+        // Test-only type escape: exercise runtime rejection of an unknown patch key.
         patch: {
           invalidKey: true,
-        } as unknown as { requireDeclineReason?: boolean },
+        } as never,
       });
 
       expect(result.ok).toBe(false);
@@ -122,7 +123,7 @@ describe("settings/leave-approval server actions", () => {
   });
 
   describe("action specific functionality", () => {
-    it("asserts decline-reason toggle round-trips correctly", async () => {
+    it("accepts the required decline-reason policy", async () => {
       const resultOn = await updateLeaveApprovalSettingsAction({
         organisationId,
         patch: { requireDeclineReason: true },
@@ -131,15 +132,20 @@ describe("settings/leave-approval server actions", () => {
       expect(mocks.updateSettings).toHaveBeenCalledWith(
         expect.objectContaining({ patch: { requireDeclineReason: true } })
       );
+    });
 
+    it("rejects attempts to make decline reasons optional", async () => {
       const resultOff = await updateLeaveApprovalSettingsAction({
         organisationId,
-        patch: { requireDeclineReason: false },
+        // Test-only type escape: exercise runtime rejection of the legacy false value.
+        patch: { requireDeclineReason: false } as never,
       });
-      expect(resultOff).toEqual({ ok: true, value: { updated: true } });
-      expect(mocks.updateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ patch: { requireDeclineReason: false } })
-      );
+
+      expect(resultOff).toMatchObject({
+        error: { code: "validation_error" },
+        ok: false,
+      });
+      expect(mocks.updateSettings).not.toHaveBeenCalled();
     });
 
     it("surfaces updateSettings error when settings read/update fails", async () => {

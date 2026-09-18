@@ -28,7 +28,7 @@ const PatchSchema = z.object({
         .enum(["all_team_leave", "direct_reports_only"])
         .optional(),
       notifyManagersOnStatusChange: z.boolean().optional(),
-      requireDeclineReason: z.boolean().optional(),
+      requireDeclineReason: z.literal(true).optional(),
       showDeclinedOnApprovals: z.boolean().optional(),
       showPendingOnCalendar: z.boolean().optional(),
     })

@@ -44,7 +44,7 @@ describe("LeaveApprovalSettingsClient", () => {
     mocks.updateLeaveApprovalSettingsAction.mockReset();
   });
 
-  it("gives every auto-save switch an accessible name", () => {
+  it("gives every auto-save switch an accessible name and exposes the fixed decline policy", () => {
     render(
       <LeaveApprovalSettingsClient
         organisationId={organisationId}
@@ -65,9 +65,15 @@ describe("LeaveApprovalSettingsClient", () => {
         name: "Notify managers on status change",
       })
     ).toBeDefined();
+    expect(screen.getByText("Decline reasons")).toBeDefined();
     expect(
-      screen.getByRole("switch", { name: "Require decline reason" })
+      screen.getByText(
+        "Every decline requires a reason between 3 and 1,000 characters."
+      )
     ).toBeDefined();
+    expect(
+      screen.queryByRole("switch", { name: "Require decline reason" })
+    ).toBeNull();
   });
 
   it("announces the receipt beside the setting that saved", async () => {

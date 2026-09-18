@@ -181,8 +181,13 @@ const DetailSchema = z.object({
 });
 
 const CommandSchema = DetailSchema;
+const DeclineReasonSchema = z
+  .string()
+  .trim()
+  .min(3, "Enter a decline reason of at least 3 characters.")
+  .max(1000, "Enter a decline reason of no more than 1,000 characters.");
 const DeclineSchema = CommandSchema.extend({
-  reason: z.string().trim().max(1000).optional().default(""),
+  reason: DeclineReasonSchema,
 });
 const InfoSchema = CommandSchema.extend({
   question: z.string().trim().min(3).max(1000),
@@ -568,41 +573,9 @@ export async function decline(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const settingsResult = await getSettings({
-    clerkOrgId: parsed.data.clerkOrgId,
-    organisationId: parsed.data.organisationId,
-  });
-
-  if (!settingsResult.ok) {
-    log.warn(
-      "Failed to load organisation settings for decline policy, failing closed",
-      {
-        clerkOrgId: parsed.data.clerkOrgId,
-        error: settingsResult.error,
-        organisationId: parsed.data.organisationId,
-      }
-    );
-  }
-
-  // A settings read failure must not silently disable a compliance control.
-  // The stored default for requireDeclineReason is true, so treat an unreadable
-  // setting as "required" rather than skipping the check.
-  const requireDeclineReason = settingsResult.ok
-    ? settingsResult.value.requireDeclineReason
-    : true;
-
-  if (requireDeclineReason && parsed.data.reason.trim().length < 3) {
-    return {
-      error: {
-        code: "validation_error",
-        message: "Enter a decline reason of at least 3 characters.",
-      },
-      ok: false,
-    };
-  }
   return await performDecline(parsed.data, externalWritePort, {
     failureAuditAction: "availability_records.decline_failed",
-    reason: parsed.data.reason.trim(),
+    reason: parsed.data.reason,
     successAuditAction: "availability_records.declined",
   });
 }
@@ -621,14 +594,14 @@ export async function retryDecline(
     if (!authorised.ok) {
       return authorised;
     }
-    const reason = authorised.value.approval_note?.trim();
+    const reason = authorised.value.approval_note;
     if (
       authorised.value.approval_status !== "xero_sync_failed" ||
       authorised.value.failed_action !== "decline"
     ) {
       return invalidState("invalid_state_for_retry");
     }
-    if (!reason) {
+    if (!reason?.trim()) {
       return {
         error: {
           code: "missing_preserved_reason",
@@ -639,12 +612,21 @@ export async function retryDecline(
       };
     }
 
-    return await performDecline({ ...parsed.data, reason }, externalWritePort, {
-      failureAuditAction: "availability_records.decline_retry_failed",
-      reason,
-      retry: true,
-      successAuditAction: "availability_records.decline_retry_succeeded",
-    });
+    const parsedReason = DeclineReasonSchema.safeParse(reason);
+    if (!parsedReason.success) {
+      return validationError(parsedReason.error);
+    }
+
+    return await performDecline(
+      { ...parsed.data, reason: parsedReason.data },
+      externalWritePort,
+      {
+        failureAuditAction: "availability_records.decline_retry_failed",
+        reason: parsedReason.data,
+        retry: true,
+        successAuditAction: "availability_records.decline_retry_succeeded",
+      }
+    );
   } catch (error) {
     return logAndReturnUnknown(
       error,

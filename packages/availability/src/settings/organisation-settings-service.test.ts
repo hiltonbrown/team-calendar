@@ -150,6 +150,46 @@ describe("organisation-settings-service", () => {
     });
   });
 
+  it("reads a legacy disabled decline-reason policy truthfully", async () => {
+    mocks.getOrCreateOrganisationSettings.mockResolvedValue({
+      ...baseRow,
+      require_decline_reason: false,
+    });
+
+    const result = await service.getSettings({
+      clerkOrgId: "org_legacy",
+      organisationId: baseRow.organisation_id,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { requireDeclineReason: false },
+    });
+  });
+
+  it("rejects attempts to make decline reasons optional without persisting", async () => {
+    const result = await service.updateSettings({
+      actingRole: "admin",
+      actingUserId: "user_1",
+      clerkOrgId: baseRow.clerk_org_id,
+      organisationId: baseRow.organisation_id,
+      // Test-only type escape: exercise domain validation of the legacy false value.
+      patch: { requireDeclineReason: false } as never,
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+    expect(mocks.updateOrganisationSettings).not.toHaveBeenCalled();
+  });
+
+  it("restores the required decline-reason policy in the default patch", () => {
+    expect(service.defaultOrganisationSettingsPatch()).toMatchObject({
+      requireDeclineReason: true,
+    });
+  });
+
   it.each([
     ["viewer", false],
     ["manager", false],

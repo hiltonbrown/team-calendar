@@ -881,6 +881,24 @@ describe("approval-service", () => {
     }
   });
 
+  it("retryDecline rejects a preserved reason outside the required bounds", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_note: "no",
+      approval_status: "xero_sync_failed",
+      failed_action: "decline",
+    });
+
+    const result = await retryDecline(input, mockPort);
+
+    expect(result).toMatchObject({
+      error: { code: "validation_error" },
+      ok: false,
+    });
+    expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
   it("rejects approve when the record is not submitted", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
@@ -1327,106 +1345,39 @@ describe("approval-service", () => {
     );
   });
 
-  describe("decline policy and organisation settings handling", () => {
-    it("fails closed when getSettings returns ok: false on decline with empty reason", async () => {
-      mocks.getSettings.mockResolvedValueOnce({
-        error: { code: "not_found", message: "Failed" },
-        ok: false,
-      });
+  describe("decline validation and organisation settings handling", () => {
+    it.each([
+      ["empty", "", "Enter a decline reason of at least 3 characters."],
+      [
+        "whitespace-only",
+        "   ",
+        "Enter a decline reason of at least 3 characters.",
+      ],
+      [
+        "two-character",
+        "ok",
+        "Enter a decline reason of at least 3 characters.",
+      ],
+      [
+        "over 1,000-character",
+        "a".repeat(1001),
+        "Enter a decline reason of no more than 1,000 characters.",
+      ],
+    ])(
+      "rejects a %s reason before claiming or calling Xero",
+      async (_label, reason, message) => {
+        const result = await decline({ ...input, reason }, mockPort);
 
-      const result = await decline({ ...input, reason: "" }, mockPort);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toEqual({
-          code: "validation_error",
-          message: "Enter a decline reason of at least 3 characters.",
+        expect(result).toEqual({
+          error: { code: "validation_error", message },
+          ok: false,
         });
+        expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
+        expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
       }
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
-    });
+    );
 
-    it("rejects empty reason when requireDeclineReason is true", async () => {
-      mocks.getSettings.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          defaultFeedPrivacyMode: "named",
-          defaultLeaveRequestAdvanceDays: 0,
-          defaultPrivacyMode: "named",
-          feedsIncludePublicHolidaysDefault: false,
-          id: "settings_1",
-          managerVisibilityScope: "direct_reports_only",
-          notifyManagersOnStatusChange: true,
-          organisationId: input.organisationId,
-          requireDeclineReason: true,
-          showDeclinedOnApprovals: true,
-          showPendingOnCalendar: true,
-        },
-      });
-
-      const result = await decline({ ...input, reason: "" }, mockPort);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toEqual({
-          code: "validation_error",
-          message: "Enter a decline reason of at least 3 characters.",
-        });
-      }
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
-    });
-
-    it("rejects reason shorter than 3 characters when requireDeclineReason is true", async () => {
-      mocks.getSettings.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          defaultFeedPrivacyMode: "named",
-          defaultLeaveRequestAdvanceDays: 0,
-          defaultPrivacyMode: "named",
-          feedsIncludePublicHolidaysDefault: false,
-          id: "settings_1",
-          managerVisibilityScope: "direct_reports_only",
-          notifyManagersOnStatusChange: true,
-          organisationId: input.organisationId,
-          requireDeclineReason: true,
-          showDeclinedOnApprovals: true,
-          showPendingOnCalendar: true,
-        },
-      });
-
-      const result = await decline({ ...input, reason: "ok" }, mockPort);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toEqual({
-          code: "validation_error",
-          message: "Enter a decline reason of at least 3 characters.",
-        });
-      }
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
-    });
-
-    it("succeeds with valid reason when requireDeclineReason is true", async () => {
-      mocks.availabilityFindFirst
-        .mockResolvedValueOnce(record)
-        .mockResolvedValueOnce({ ...record, approval_status: "declined" });
-      mocks.declineLeaveApplicationForRegion.mockResolvedValueOnce({
-        ok: true,
-        value: undefined,
-      });
-
-      const result = await decline(
-        { ...input, reason: "Too much overlap" },
-        mockPort
-      );
-
-      expect(result.ok).toBe(true);
-      expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledWith(
-        expect.objectContaining({ remoteId: "xero-leave-1" })
-      );
-    });
-
-    it("succeeds with empty reason when requireDeclineReason is false", async () => {
+    it("does not allow a legacy false setting to bypass reason validation", async () => {
       mocks.getSettings.mockResolvedValueOnce({
         ok: true,
         value: {
@@ -1443,6 +1394,22 @@ describe("approval-service", () => {
           showPendingOnCalendar: true,
         },
       });
+
+      const result = await decline({ ...input, reason: "" }, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "validation_error" },
+        ok: false,
+      });
+      expect(mocks.getSettings).not.toHaveBeenCalled();
+      expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
+      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["exactly 3 characters", "abc"],
+      ["exactly 1,000 characters", "a".repeat(1000)],
+    ])("accepts a reason with %s", async (_label, reason) => {
       mocks.availabilityFindFirst
         .mockResolvedValueOnce(record)
         .mockResolvedValueOnce({ ...record, approval_status: "declined" });
@@ -1451,43 +1418,59 @@ describe("approval-service", () => {
         value: undefined,
       });
 
-      const result = await decline({ ...input, reason: "" }, mockPort);
+      const result = await decline({ ...input, reason }, mockPort);
 
       expect(result.ok).toBe(true);
       expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledWith(
-        expect.objectContaining({ remoteId: "xero-leave-1" })
+        expect.objectContaining({ reason, remoteId: "xero-leave-1" })
       );
     });
 
-    it("rejects whitespace-only reason when requireDeclineReason is true", async () => {
-      mocks.getSettings.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          defaultFeedPrivacyMode: "named",
-          defaultLeaveRequestAdvanceDays: 0,
-          defaultPrivacyMode: "named",
-          feedsIncludePublicHolidaysDefault: false,
-          id: "settings_1",
-          managerVisibilityScope: "direct_reports_only",
-          notifyManagersOnStatusChange: true,
-          organisationId: input.organisationId,
-          requireDeclineReason: true,
-          showDeclinedOnApprovals: true,
-          showPendingOnCalendar: true,
+    it.each([
+      [
+        "a legacy false setting",
+        {
+          ok: true,
+          value: {
+            defaultFeedPrivacyMode: "named",
+            defaultLeaveRequestAdvanceDays: 0,
+            defaultPrivacyMode: "named",
+            feedsIncludePublicHolidaysDefault: false,
+            id: "settings_1",
+            managerVisibilityScope: "direct_reports_only",
+            notifyManagersOnStatusChange: true,
+            organisationId: input.organisationId,
+            requireDeclineReason: false,
+            showDeclinedOnApprovals: true,
+            showPendingOnCalendar: true,
+          },
         },
-      });
-
-      const result = await decline({ ...input, reason: "   " }, mockPort);
-
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toEqual({
-          code: "validation_error",
-          message: "Enter a decline reason of at least 3 characters.",
+      ],
+      [
+        "unavailable settings",
+        { error: { code: "unknown_error", message: "Failed" }, ok: false },
+      ],
+    ] as const)(
+      "accepts a valid reason with %s",
+      async (_label, settingsResult) => {
+        mocks.getSettings.mockResolvedValueOnce(settingsResult);
+        mocks.availabilityFindFirst
+          .mockResolvedValueOnce(record)
+          .mockResolvedValueOnce({ ...record, approval_status: "declined" });
+        mocks.declineLeaveApplicationForRegion.mockResolvedValueOnce({
+          ok: true,
+          value: undefined,
         });
+
+        const result = await decline(
+          { ...input, reason: "Valid reason" },
+          mockPort
+        );
+
+        expect(result.ok).toBe(true);
+        expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledOnce();
       }
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
-    });
+    );
 
     it("omits declined records from default list filter when getSettings fails", async () => {
       mocks.getSettings.mockResolvedValueOnce({

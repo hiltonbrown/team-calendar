@@ -1,6 +1,9 @@
 "use client";
 
-import type { OrganisationSettings } from "@repo/availability";
+import type {
+  OrganisationSettings,
+  OrganisationSettingsPatch,
+} from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
@@ -39,13 +42,13 @@ export const LeaveApprovalSettingsClient = ({
 }: LeaveApprovalSettingsClientProps) => {
   const [state, setState] = useState(settings);
   const [isPending, startTransition] = useTransition();
-  const [saveState, setSaveState] = useState<Record<string, SettingSaveState>>(
-    {}
-  );
+  const [saveState, setSaveState] = useState<
+    Partial<Record<string, SettingSaveState>>
+  >({});
 
   const updatePatch = (
     key: string,
-    patch: Partial<OrganisationSettings>,
+    patch: OrganisationSettingsPatch,
     toastMessage = "Setting updated."
   ) => {
     const previous = state;
@@ -237,17 +240,14 @@ export const LeaveApprovalSettingsClient = ({
         </CardContent>
       </Card>
 
-      <SettingsToggleCard
-        checked={state.requireDeclineReason}
-        description="Decline reasons help employees understand decisions. Disabling this is not recommended."
-        disabled={isPending}
-        id="require-decline-reason"
-        label="Require decline reason"
-        onCheckedChange={(checked) =>
-          updatePatch("requireDeclineReason", { requireDeclineReason: checked })
-        }
-        saveState={saveState.requireDeclineReason ?? "idle"}
-      />
+      <Card className="rounded-xl">
+        <CardHeader>
+          <CardTitle>Decline reasons</CardTitle>
+          <CardDescription>
+            Every decline requires a reason between 3 and 1,000 characters.
+          </CardDescription>
+        </CardHeader>
+      </Card>
 
       <Card className="rounded-xl">
         <CardHeader>
