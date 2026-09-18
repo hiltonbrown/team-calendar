@@ -47,6 +47,9 @@ export interface DatabaseIdentity {
   role: string;
 }
 
+export const parseReleaseManifest = (value: unknown): ReleaseManifest =>
+  manifestSchema.parse(value);
+
 const REQUIRED_CONSUMERS = [
   "rebuild-feed-cache",
   "reconcile-feed-publications",
@@ -71,7 +74,7 @@ export const parseDatabaseIdentity = (value: string): DatabaseIdentity => {
 
 export const readReleaseManifest = (path: string): ReleaseManifest => {
   const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
-  return manifestSchema.parse(parsed);
+  return parseReleaseManifest(parsed);
 };
 
 export const assertLiveDatabaseAuthority = (input: {

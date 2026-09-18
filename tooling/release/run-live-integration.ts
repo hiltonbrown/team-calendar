@@ -1,6 +1,10 @@
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
-import { acquireActiveRun, releaseActiveRun } from "./active-run-registry.js";
+import {
+  acquireActiveRun,
+  assertActiveRunOwner,
+  releaseActiveRun,
+} from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
@@ -17,6 +21,10 @@ if (!manifestPath) {
 }
 const protectedManifestPath = manifestPath;
 const recoveryRequested = process.argv.includes("--recover");
+const preacquired = process.argv.includes("--preacquired");
+if (recoveryRequested && preacquired) {
+  throw new Error("Choose either --recover or --preacquired, not both");
+}
 
 const manifest = assertLiveDatabaseAuthority({
   acknowledgement: process.env.ALLOW_LIVE_DATABASE_TESTS,
@@ -32,7 +40,13 @@ const registryInput = {
   token: process.env.KV_REST_API_TOKEN,
   url: process.env.KV_REST_API_URL,
 };
-const activeState = await acquireActiveRun(manifest, registryInput);
+let activeState: "acquired" | "interrupted";
+if (preacquired) {
+  await assertActiveRunOwner(manifest, registryInput);
+  activeState = "acquired";
+} else {
+  activeState = await acquireActiveRun(manifest, registryInput);
+}
 if (activeState === "interrupted" && !recoveryRequested) {
   throw new Error(
     "Interrupted release run detected; rerun with --recover to reconcile it"
