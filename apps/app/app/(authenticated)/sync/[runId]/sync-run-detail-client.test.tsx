@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   cancelRunAction: vi.fn(),
   dispatchManualSyncAction: vi.fn(),
   exportFailedRecordsCsvAction: vi.fn(),
+  loadFailedRecordsPageAction: vi.fn(),
+  loadRedactedFailurePayloadAction: vi.fn(),
+  loadTimelinePageAction: vi.fn(),
   refresh: vi.fn(),
   subscribe: vi.fn<
     (listener: (event: TestSyncEvent) => void) => () => undefined
@@ -30,6 +33,12 @@ vi.mock("../_actions", () => ({
     mocks.dispatchManualSyncAction(input),
   exportFailedRecordsCsvAction: (input: unknown) =>
     mocks.exportFailedRecordsCsvAction(input),
+  loadFailedRecordsPageAction: (input: unknown) =>
+    mocks.loadFailedRecordsPageAction(input),
+  loadRedactedFailurePayloadAction: (input: unknown) =>
+    mocks.loadRedactedFailurePayloadAction(input),
+  loadTimelinePageAction: (input: unknown) =>
+    mocks.loadTimelinePageAction(input),
 }));
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
@@ -37,6 +46,7 @@ const tenantId = "00000000-0000-4000-8000-000000000011";
 const runId = "00000000-0000-4000-8000-000000000021";
 const detail: RunDetail = {
   failedRecords: [],
+  failedRecordsNextCursor: null,
   run: {
     completedAt: new Date("2026-08-01T00:01:00.000Z"),
     durationSeconds: 60,
@@ -56,6 +66,7 @@ const detail: RunDetail = {
     xeroTenantId: tenantId,
   },
   timeline: [],
+  timelineNextCursor: null,
 };
 const tenantSummary: TenantSummary = {
   connectionStatus: "active",

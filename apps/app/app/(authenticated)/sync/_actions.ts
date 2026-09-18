@@ -4,8 +4,13 @@ import { auth, currentUser } from "@repo/auth/server";
 import {
   cancelRun,
   exportFailedRecordsCsv,
+  getRedactedFailedRecordPayload,
+  listRunFailedRecords,
+  listRunTimeline,
+  type RunDetailPage,
   type SyncMonitorError,
   type SyncMonitorRole,
+  type TimelinePage,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { revalidatePath } from "next/cache";
@@ -190,6 +195,70 @@ export async function exportFailedRecordsCsvAction(input: {
   }
   return await exportFailedRecordsCsv({
     ...context.value,
+    runId: parsed.data.runId,
+  });
+}
+
+const DetailPageActionSchema = z.object({
+  cursor: z.string().min(1).nullable(),
+  organisationId: z.string().uuid(),
+  runId: z.string().uuid(),
+});
+
+const RawFailureActionSchema = z.object({
+  failureId: z.string().uuid(),
+  organisationId: z.string().uuid(),
+  runId: z.string().uuid(),
+});
+
+export async function loadFailedRecordsPageAction(input: {
+  cursor: string | null;
+  organisationId: string;
+  runId: string;
+}): Promise<Result<RunDetailPage, SyncActionError>> {
+  const parsed = DetailPageActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await syncActionContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  return await listRunFailedRecords({ ...context.value, ...parsed.data });
+}
+
+export async function loadTimelinePageAction(input: {
+  cursor: string | null;
+  organisationId: string;
+  runId: string;
+}): Promise<Result<TimelinePage, SyncActionError>> {
+  const parsed = DetailPageActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await syncActionContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  return await listRunTimeline({ ...context.value, ...parsed.data });
+}
+
+export async function loadRedactedFailurePayloadAction(input: {
+  failureId: string;
+  organisationId: string;
+  runId: string;
+}): Promise<Result<{ payload: unknown }, SyncActionError>> {
+  const parsed = RawFailureActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error.issues[0]?.message);
+  }
+  const context = await syncActionContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  return await getRedactedFailedRecordPayload({
+    ...context.value,
+    failureId: parsed.data.failureId,
     runId: parsed.data.runId,
   });
 }

@@ -3,14 +3,19 @@ import type { SyncRunStatus, SyncRunType } from "./sync-monitor-service";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
+  auditFindMany: vi.fn(),
   dispatchSyncEvent: vi.fn(),
+  failedRecordCount: vi.fn(),
+  failedRecordFindFirst: vi.fn(),
   failedRecordFindMany: vi.fn(),
   getRegisteredSyncEventName: vi.fn(),
   scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
   })),
+  syncRunFindFirst: vi.fn(),
   syncRunFindMany: vi.fn(),
+  syncRunGroupBy: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
   xeroTenantFindMany: vi.fn(),
 }));
@@ -18,9 +23,23 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
-    auditEvent: { create: mocks.auditCreate },
-    failedRecord: { findMany: mocks.failedRecordFindMany },
-    syncRun: { findMany: mocks.syncRunFindMany },
+    $transaction: vi.fn((callback) =>
+      callback({
+        auditEvent: { create: mocks.auditCreate },
+        failedRecord: { findFirst: mocks.failedRecordFindFirst },
+      })
+    ),
+    auditEvent: { create: mocks.auditCreate, findMany: mocks.auditFindMany },
+    failedRecord: {
+      count: mocks.failedRecordCount,
+      findFirst: mocks.failedRecordFindFirst,
+      findMany: mocks.failedRecordFindMany,
+    },
+    syncRun: {
+      findFirst: mocks.syncRunFindFirst,
+      findMany: mocks.syncRunFindMany,
+      groupBy: mocks.syncRunGroupBy,
+    },
     xeroTenant: {
       findFirst: mocks.xeroTenantFindFirst,
       findMany: mocks.xeroTenantFindMany,
@@ -41,9 +60,12 @@ vi.mock("./sync-events", () => ({
   },
 }));
 
-const { dispatchManualSync, listTenantSummaries } = await import(
-  "./sync-monitor-service"
-);
+const {
+  dispatchManualSync,
+  getRedactedFailedRecordPayload,
+  getRunDetail,
+  listTenantSummaries,
+} = await import("./sync-monitor-service");
 
 const baseInput = {
   actingRole: "admin" as const,
@@ -93,6 +115,30 @@ function failedRecordFixture(input: {
   };
 }
 
+function mockSummaryRuns(
+  runs: Array<ReturnType<typeof completedRunFixture>>
+): void {
+  mocks.syncRunFindFirst.mockImplementation(
+    ({ where }: { where: { run_type?: SyncRunType; status?: unknown } }) => {
+      if (where.status === "running") return null;
+      return (
+        runs.find((run) => {
+          if (where.run_type && run.run_type !== where.run_type) return false;
+          if (
+            typeof where.status === "object" &&
+            where.status &&
+            "in" in where.status
+          ) {
+            const statuses = (where.status as { in: SyncRunStatus[] }).in;
+            return statuses.includes(run.status);
+          }
+          return true;
+        }) ?? null
+      );
+    }
+  );
+}
+
 describe("sync-monitor-service", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -115,7 +161,11 @@ describe("sync-monitor-service", () => {
       },
     ]);
     mocks.syncRunFindMany.mockResolvedValue([]);
+    mockSummaryRuns([]);
     mocks.failedRecordFindMany.mockResolvedValue([]);
+    mocks.failedRecordCount.mockResolvedValue(0);
+    mocks.auditFindMany.mockResolvedValue([]);
+    mocks.syncRunGroupBy.mockResolvedValue([]);
     mocks.xeroTenantFindFirst.mockResolvedValue({
       id: "tenant_1",
       organisation_id: baseInput.organisationId,
@@ -133,6 +183,79 @@ describe("sync-monitor-service", () => {
       ok: true,
       value: undefined,
     });
+  });
+
+  it("bounds initial detail and excludes raw or arbitrary audit payloads", async () => {
+    mocks.syncRunFindFirst.mockResolvedValue({
+      _count: { failed_records: 0 },
+      completed_at: new Date("2026-04-19T12:05:00.000Z"),
+      error_summary: null,
+      id: "00000000-0000-4000-8000-000000000021",
+      records_failed: 0,
+      records_fetched: 1,
+      records_skipped: 0,
+      records_upserted: 1,
+      run_type: "people",
+      started_at: new Date("2026-04-19T12:00:00.000Z"),
+      status: "succeeded",
+      trigger_type: "scheduled",
+      triggered_by_user_id: null,
+      xero_tenant: { id: "tenant_1", tenant_name: "Acme Payroll" },
+      xero_tenant_id: "tenant_1",
+    });
+
+    const result = await getRunDetail({
+      ...baseInput,
+      runId: "00000000-0000-4000-8000-000000000021",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.failedRecordFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.not.objectContaining({ raw_payload: true }),
+        take: 51,
+      })
+    );
+    expect(mocks.auditFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: {
+          action: true,
+          actor_user_id: true,
+          created_at: true,
+          id: true,
+        },
+        take: 51,
+      })
+    );
+  });
+
+  it("loads and audits only a run-bound redacted failure payload", async () => {
+    mocks.failedRecordFindFirst.mockResolvedValue({
+      id: "00000000-0000-4000-8000-000000000031",
+      raw_payload: { access_token: "secret", safe: "visible" },
+    });
+
+    const result = await getRedactedFailedRecordPayload({
+      ...baseInput,
+      failureId: "00000000-0000-4000-8000-000000000031",
+      runId: "00000000-0000-4000-8000-000000000021",
+    });
+
+    expect(mocks.failedRecordFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: baseInput.clerkOrgId,
+          id: "00000000-0000-4000-8000-000000000031",
+          organisation_id: baseInput.organisationId,
+          sync_run_id: "00000000-0000-4000-8000-000000000021",
+        }),
+      })
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: { payload: { access_token: "[SCRUBBED]", safe: "visible" } },
+    });
+    expect(mocks.auditCreate).toHaveBeenCalledOnce();
   });
 
   it("includes syncPausedAt in tenant summaries", async () => {
@@ -155,7 +278,7 @@ describe("sync-monitor-service", () => {
 
     const startedAt = new Date("2026-04-19T12:00:00.000Z");
     const completedAt = new Date("2026-04-19T12:05:00.000Z");
-    mocks.syncRunFindMany.mockResolvedValue([
+    mockSummaryRuns([
       completedRunFixture({
         completedAt,
         failedRecordIds: ["failed_record_1"],
@@ -175,12 +298,22 @@ describe("sync-monitor-service", () => {
         startedAt,
       }),
     ]);
+    mocks.failedRecordCount.mockImplementation(({ where }) =>
+      where.sync_run.run_type === "people" ? 1 : 0
+    );
+    mocks.syncRunGroupBy.mockResolvedValue([
+      {
+        _count: { _all: 1 },
+        status: "partial_success",
+        xero_tenant_id: "tenant_1",
+      },
+    ]);
 
     try {
       const result = await listTenantSummaries(baseInput);
       const since = new Date("2026-03-21T12:00:00.000Z");
 
-      expect(mocks.syncRunFindMany).toHaveBeenCalledWith(
+      expect(mocks.syncRunGroupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             started_at: { gte: since },
@@ -188,16 +321,7 @@ describe("sync-monitor-service", () => {
           }),
         })
       );
-      expect(mocks.failedRecordFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            sync_run: {
-              started_at: { gte: since },
-              xero_tenant_id: { in: ["tenant_1"] },
-            },
-          }),
-        })
-      );
+      expect(mocks.failedRecordCount).toHaveBeenCalledTimes(4);
       expect(result).toMatchObject({
         ok: true,
         value: [
@@ -230,7 +354,7 @@ describe("sync-monitor-service", () => {
 
     const failedAt = new Date("2026-04-18T12:00:00.000Z");
     const succeededAt = new Date("2026-04-19T12:00:00.000Z");
-    mocks.syncRunFindMany.mockResolvedValue([
+    mockSummaryRuns([
       completedRunFixture({
         id: "run_succeeded",
         runType: "people",
@@ -254,6 +378,10 @@ describe("sync-monitor-service", () => {
         runType: "people",
         startedAt: failedAt,
       }),
+    ]);
+    mocks.syncRunGroupBy.mockResolvedValue([
+      { _count: { _all: 1 }, status: "failed", xero_tenant_id: "tenant_1" },
+      { _count: { _all: 1 }, status: "succeeded", xero_tenant_id: "tenant_1" },
     ]);
 
     const result = await listTenantSummaries(baseInput);
@@ -279,7 +407,7 @@ describe("sync-monitor-service", () => {
     const oldestAt = new Date("2026-04-17T12:00:00.000Z");
     const failedAt = new Date("2026-04-18T12:00:00.000Z");
     const succeededAt = new Date("2026-04-19T12:00:00.000Z");
-    mocks.syncRunFindMany.mockResolvedValue([
+    mockSummaryRuns([
       completedRunFixture({
         id: "run_leave_records_succeeded",
         runType: "leave_records",
@@ -318,6 +446,18 @@ describe("sync-monitor-service", () => {
         runType: "leave_records",
         startedAt: oldestAt,
       }),
+    ]);
+    mocks.failedRecordCount.mockImplementation(({ where }) =>
+      where.sync_run.run_type === "people" ? 1 : 0
+    );
+    mocks.syncRunGroupBy.mockResolvedValue([
+      { _count: { _all: 1 }, status: "failed", xero_tenant_id: "tenant_1" },
+      { _count: { _all: 1 }, status: "succeeded", xero_tenant_id: "tenant_1" },
+      {
+        _count: { _all: 1 },
+        status: "partial_success",
+        xero_tenant_id: "tenant_1",
+      },
     ]);
 
     const result = await listTenantSummaries(baseInput);
