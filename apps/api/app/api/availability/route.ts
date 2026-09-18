@@ -49,7 +49,18 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json(
+        {
+          error: { code: "invalid", message: "Malformed JSON request body" },
+          ok: false,
+        },
+        { status: 400 }
+      );
+    }
     const parseResult = CreateAvailabilitySchema.safeParse(body);
 
     if (!parseResult.success) {

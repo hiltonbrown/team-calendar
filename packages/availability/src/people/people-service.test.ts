@@ -154,6 +154,39 @@ describe("people-service", () => {
     );
   });
 
+  it("denies a manager without a linked acting person before querying people", async () => {
+    const result = await listPeople({
+      actingPersonId: null,
+      clerkOrgId: "org_1",
+      organisationId,
+      role: "manager",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty page without querying for an empty manager scope", async () => {
+    mocks.managerScopePersonIds.mockResolvedValue([]);
+
+    const result = await listPeople({
+      actingPersonId: managerId,
+      clerkOrgId: "org_1",
+      organisationId,
+      role: "manager",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { nextCursor: null, people: [], totalCount: 0 },
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+    expect(mocks.personCount).not.toHaveBeenCalled();
+  });
+
   it("batches xero sync failed counts instead of counting per person", async () => {
     const people = Array.from({ length: 5 }, (_, index) =>
       personRow(`00000000-0000-4000-8000-00000000010${index}`)

@@ -93,6 +93,45 @@ describe("Availability Collection Route (POST)", () => {
     expect(body.error.code).toBe("unauthorised");
   });
 
+  it("returns 401 for malformed JSON when unauthenticated", async () => {
+    vi.mocked(requireOrg).mockRejectedValue(new Error("Not authenticated"));
+
+    const response = await POST(
+      new Request("http://localhost/api/availability", {
+        body: "{",
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(401);
+    expect(getOrganisationById).not.toHaveBeenCalled();
+    expect(listPeopleForOrganisation).not.toHaveBeenCalled();
+    expect(createManualAvailability).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for malformed JSON without querying domain data", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+
+    const response = await POST(
+      new Request("http://localhost/api/availability", {
+        body: "{",
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "invalid", message: "Malformed JSON request body" },
+      ok: false,
+    });
+    expect(getOrganisationById).not.toHaveBeenCalled();
+    expect(listPeopleForOrganisation).not.toHaveBeenCalled();
+    expect(createManualAvailability).not.toHaveBeenCalled();
+  });
+
   it("returns 401 when currentUser is null", async () => {
     vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
     vi.mocked(currentUser).mockResolvedValue(null);
@@ -745,6 +784,61 @@ describe("Availability Single Record Route (DELETE)", () => {
     );
 
     expect(response.status).toBe(401);
+  });
+
+  it("returns 401 for malformed JSON when unauthenticated", async () => {
+    vi.mocked(requireOrg).mockRejectedValue(new Error("Not authenticated"));
+
+    const response = await DELETE(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          body: "{",
+          headers: { "content-type": "application/json" },
+          method: "DELETE",
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(401);
+    expect(getOrganisationById).not.toHaveBeenCalled();
+    expect(getAvailabilityRecordById).not.toHaveBeenCalled();
+    expect(archiveManualAvailability).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for malformed JSON without querying domain data", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+
+    const response = await DELETE(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          body: "{",
+          headers: { "content-type": "application/json" },
+          method: "DELETE",
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: "invalid", message: "Malformed JSON request body" },
+      ok: false,
+    });
+    expect(getOrganisationById).not.toHaveBeenCalled();
+    expect(getAvailabilityRecordById).not.toHaveBeenCalled();
+    expect(archiveManualAvailability).not.toHaveBeenCalled();
   });
 
   it("returns 400 when organisationId is missing in body", async () => {

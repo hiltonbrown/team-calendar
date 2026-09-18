@@ -21,6 +21,7 @@ import {
   type RecordType,
   USER_CREATABLE_RECORD_TYPES,
 } from "../records/record-type-categories";
+import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { deriveAvailabilityUidKey } from "../sync/availability-uid";
 import { hasActiveXeroConnection } from "../xero-connection-state";
@@ -231,8 +232,9 @@ export async function listMyRecords(input: {
     }
 
     return listRecordsForScope({
+      authorisedPersonIds: [person.id],
       clerkOrgId: input.clerkOrgId,
-      filters: { ...parsedFilters.value, personId: [person.id] },
+      filters: parsedFilters.value,
       organisationId: input.organisationId,
     });
   } catch {
@@ -244,7 +246,7 @@ export async function listTeamRecords(input: {
   actingOrgRole?: string | null;
   clerkOrgId: string;
   filters?: unknown;
-  managerPersonId: string;
+  managerPersonId?: null | string;
   organisationId: string;
 }): Promise<Result<RecordListItem[], PlanServiceError>> {
   const parsedFilters = parseFilters(input.filters);
@@ -256,32 +258,27 @@ export async function listTeamRecords(input: {
     const filters = parsedFilters.value;
     if (isAdminOrOwner(input.actingOrgRole)) {
       return listRecordsForScope({
+        authorisedPersonIds: null,
         clerkOrgId: input.clerkOrgId,
         filters,
         organisationId: input.organisationId,
       });
     }
+    if (!input.managerPersonId) {
+      return notAuthorised();
+    }
 
-    const reports = await database.person.findMany({
-      select: { id: true },
-      where: {
-        ...scopedTo({
-          clerkOrgId: input.clerkOrgId,
-          organisationId: input.organisationId,
-        }),
-        archived_at: null,
-        manager_person_id: input.managerPersonId,
-      },
+    const reportIds = await managerScopePersonIds({
+      actingPersonId: input.managerPersonId,
+      clerkOrgId: input.clerkOrgId,
+      excludeSelf: true,
+      organisationId: input.organisationId,
     });
-    const reportIds = reports.map((person) => person.id);
-    const requestedPersonIds = filters.personId ?? reportIds;
-    const scopedPersonIds = requestedPersonIds.filter((personId) =>
-      reportIds.includes(personId)
-    );
 
     return listRecordsForScope({
+      authorisedPersonIds: reportIds,
       clerkOrgId: input.clerkOrgId,
-      filters: { ...filters, personId: scopedPersonIds },
+      filters,
       organisationId: input.organisationId,
     });
   } catch {
@@ -873,14 +870,30 @@ type ScopedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type SelectedPerson = ScopedRecord["person"];
 
 async function listRecordsForScope({
+  authorisedPersonIds,
   clerkOrgId,
   filters,
   organisationId,
 }: {
+  authorisedPersonIds: null | string[];
   clerkOrgId: string;
   filters: PlanFilters;
   organisationId: string;
 }): Promise<Result<RecordListItem[], PlanServiceError>> {
+  const requestedPersonIds = filters.personId;
+  let personIds = requestedPersonIds;
+  if (authorisedPersonIds !== null) {
+    personIds = requestedPersonIds
+      ? requestedPersonIds.filter((personId) =>
+          authorisedPersonIds.includes(personId)
+        )
+      : authorisedPersonIds;
+  }
+
+  if (personIds?.length === 0) {
+    return { ok: true, value: [] };
+  }
+
   const hasXero = await hasActiveXeroConnection({ clerkOrgId, organisationId });
   const records = await database.availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
@@ -892,9 +905,7 @@ async function listRecordsForScope({
       ...(filters.approvalStatus?.length
         ? { approval_status: { in: filters.approvalStatus } }
         : {}),
-      ...(filters.personId?.length
-        ? { person_id: { in: filters.personId } }
-        : {}),
+      ...(personIds?.length ? { person_id: { in: personIds } } : {}),
       ...(filters.recordType?.length
         ? { record_type: { in: [...filters.recordType] } }
         : recordTypeCategoryFilter(filters.recordTypeCategory)),

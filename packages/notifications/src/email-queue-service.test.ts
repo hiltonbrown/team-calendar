@@ -40,6 +40,8 @@ const queuedEmail = (overrides: Record<string, unknown> = {}) => ({
 describe("email-queue-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("RESEND_FROM", "notifications@teamcalendar.test");
+    vi.stubEnv("RESEND_TOKEN", "re_test_token");
     mocks.create.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000201",
     });
@@ -49,6 +51,54 @@ describe("email-queue-service", () => {
       value: { id: "email_1" },
     });
     mocks.update.mockResolvedValue({});
+  });
+
+  it.each([
+    ["RESEND_TOKEN", ""],
+    ["RESEND_TOKEN", "invalid-token"],
+    ["RESEND_FROM", ""],
+    ["RESEND_FROM", "not-an-email"],
+  ])(
+    "returns a configuration failure without querying the queue when %s is invalid",
+    async (name, value) => {
+      vi.stubEnv(name, value);
+
+      const result = await sendQueuedNotificationEmails(client);
+
+      expect(result).toEqual({
+        error: {
+          code: "configuration_error",
+          message: "Notification email transport is not configured.",
+        },
+        ok: false,
+      });
+      expect(mocks.findMany).not.toHaveBeenCalled();
+      expect(mocks.send).not.toHaveBeenCalled();
+      expect(mocks.update).not.toHaveBeenCalled();
+    }
+  );
+
+  it("processes the preserved backlog after transport configuration is restored", async () => {
+    mocks.findMany.mockResolvedValue([
+      queuedEmail(),
+      queuedEmail({ id: "00000000-0000-4000-8000-000000000202" }),
+    ]);
+    vi.stubEnv("RESEND_TOKEN", "");
+
+    const unavailable = await sendQueuedNotificationEmails(client);
+
+    expect(unavailable.ok).toBe(false);
+    expect(mocks.findMany).not.toHaveBeenCalled();
+
+    vi.stubEnv("RESEND_TOKEN", "re_restored_token");
+    const recovered = await sendQueuedNotificationEmails(client);
+
+    expect(recovered).toEqual({
+      ok: true,
+      value: { failed: 0, processed: 2, sent: 2 },
+    });
+    expect(mocks.send).toHaveBeenCalledTimes(2);
+    expect(mocks.update).toHaveBeenCalledTimes(2);
   });
 
   it("creates a durable queue row with preference URL", async () => {

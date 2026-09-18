@@ -29,9 +29,11 @@ const mocks = vi.hoisted(() => {
     availabilityCreate,
     availabilityDeleteMany: vi.fn(),
     availabilityFindFirst,
+    availabilityFindMany: vi.fn(),
     availabilityUpdateMany: vi.fn(),
     hasActiveXeroConnection: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
+    managerScopePersonIds: vi.fn(),
     materialiseAvailabilityPublication: vi.fn(() =>
       Promise.resolve({ ok: true, value: undefined })
     ),
@@ -61,7 +63,10 @@ vi.mock("@repo/database", () => ({
           updateMany: mocks.availabilityUpdateMany,
         },
       }),
-    availabilityRecord: { findFirst: mocks.availabilityFindFirst },
+    availabilityRecord: {
+      findFirst: mocks.availabilityFindFirst,
+      findMany: mocks.availabilityFindMany,
+    },
     leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
     person: { findFirst: mocks.personFindFirst },
   },
@@ -70,6 +75,9 @@ vi.mock("@repo/database", () => ({
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+}));
+vi.mock("../settings/manager-scope", () => ({
+  managerScopePersonIds: mocks.managerScopePersonIds,
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
@@ -80,6 +88,7 @@ const {
   createRecord,
   deleteDraftRecord,
   getRecord,
+  listTeamRecords,
   updateRecord,
 } = await import("./plan-service");
 
@@ -153,9 +162,11 @@ describe("plan-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       scopedRecordFixture({ managerPersonId: null })
     );
+    mocks.availabilityFindMany.mockResolvedValue([]);
     mocks.availabilityDeleteMany.mockResolvedValue({ count: 1 });
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.managerScopePersonIds.mockResolvedValue([baseInput.personId]);
     mocks.personFindFirst.mockResolvedValue({
       email: "person@example.com",
       first_name: "Test",
@@ -165,6 +176,101 @@ describe("plan-service", () => {
       manager_person_id: null,
     });
   });
+
+  it("returns no team records without querying when a manager has no reports", async () => {
+    mocks.managerScopePersonIds.mockResolvedValue([]);
+
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+    expect(mocks.hasActiveXeroConnection).not.toHaveBeenCalled();
+  });
+
+  it("returns no team records when requested people are outside manager scope", async () => {
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        personId: ["00000000-0000-4000-8000-000000000099"],
+      },
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+  });
+
+  it("intersects requested people with manager scope", async () => {
+    await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        personId: [baseInput.personId, "00000000-0000-4000-8000-000000000099"],
+      },
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: baseInput.clerkOrgId,
+          organisation_id: baseInput.organisationId,
+          person_id: { in: [baseInput.personId] },
+        }),
+      })
+    );
+    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith({
+      actingPersonId: "00000000-0000-4000-8000-000000000031",
+      clerkOrgId: baseInput.clerkOrgId,
+      excludeSelf: true,
+      organisationId: baseInput.organisationId,
+    });
+  });
+
+  it("denies a manager without a linked acting person", async () => {
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      managerPersonId: null,
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.managerScopePersonIds).not.toHaveBeenCalled();
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each(["org:admin", "org:owner"])(
+    "allows %s to query the scoped organisation without a manager person",
+    async (actingOrgRole) => {
+      await listTeamRecords({
+        actingOrgRole,
+        clerkOrgId: baseInput.clerkOrgId,
+        managerPersonId: null,
+        organisationId: baseInput.organisationId,
+      });
+
+      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            clerk_org_id: baseInput.clerkOrgId,
+            organisation_id: baseInput.organisationId,
+          }),
+        })
+      );
+    }
+  );
 
   it.each([
     ["wfh", true, "manual", "approved"],

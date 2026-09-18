@@ -282,6 +282,9 @@ export async function listPeople(input: {
       clerkOrgId as ClerkOrgId,
       organisationId as OrganisationId
     );
+    if (role === "manager" && !actingPersonId) {
+      return notAuthorised();
+    }
     const visiblePersonIds =
       role === "manager" && actingPersonId
         ? await managerScopePersonIds({
@@ -290,6 +293,12 @@ export async function listPeople(input: {
             organisationId,
           })
         : null;
+    if (visiblePersonIds?.length === 0) {
+      return {
+        ok: true,
+        value: { nextCursor: null, people: [], totalCount: 0 },
+      };
+    }
     const personWhere = buildPeopleWhere({
       filters,
       scoped,

@@ -228,7 +228,18 @@ export async function DELETE(
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json(
+        {
+          error: { code: "invalid", message: "Malformed JSON request body" },
+          ok: false,
+        },
+        { status: 400 }
+      );
+    }
     const parseResult = DeleteAvailabilitySchema.safeParse(body);
 
     if (!parseResult.success) {
