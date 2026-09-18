@@ -29,6 +29,24 @@ export const removeMember = async (input: unknown): Promise<Result<void>> => {
 
   try {
     const clerk = await clerkClient();
+    const memberships = await clerk.organizations.getOrganizationMembershipList(
+      {
+        organizationId: orgId,
+        userId: [parsed.data.userId],
+      }
+    );
+
+    if (memberships.data.length !== 1) {
+      return { error: "Member not found", ok: false };
+    }
+
+    if (memberships.data[0]?.role === "org:owner" && orgRole !== "org:owner") {
+      return {
+        error: "Only owners can remove another owner",
+        ok: false,
+      };
+    }
+
     await clerk.organizations.deleteOrganizationMembership({
       organizationId: orgId,
       userId: parsed.data.userId,

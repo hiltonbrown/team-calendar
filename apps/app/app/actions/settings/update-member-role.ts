@@ -41,6 +41,24 @@ export const updateMemberRole = async (
 
   try {
     const clerk = await clerkClient();
+    const memberships = await clerk.organizations.getOrganizationMembershipList(
+      {
+        organizationId: orgId,
+        userId: [parsed.data.membershipId],
+      }
+    );
+
+    if (memberships.data.length !== 1) {
+      return { error: "Member not found", ok: false };
+    }
+
+    if (memberships.data[0]?.role === "org:owner" && orgRole !== "org:owner") {
+      return {
+        error: "Only owners can change another owner's role",
+        ok: false,
+      };
+    }
+
     await clerk.organizations.updateOrganizationMembership({
       organizationId: orgId,
       role: parsed.data.role,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   clerkClient: vi.fn(),
+  getOrganizationMembershipList: vi.fn(),
   updateOrganizationMembership: vi.fn(),
 }));
 
@@ -27,8 +28,12 @@ describe("updateMemberRole", () => {
     });
     mocks.clerkClient.mockResolvedValue({
       organizations: {
+        getOrganizationMembershipList: mocks.getOrganizationMembershipList,
         updateOrganizationMembership: mocks.updateOrganizationMembership,
       },
+    });
+    mocks.getOrganizationMembershipList.mockResolvedValue({
+      data: [{ id: "membership_1", role: "org:viewer" }],
     });
     mocks.updateOrganizationMembership.mockResolvedValue({});
   });
@@ -50,6 +55,10 @@ describe("updateMemberRole", () => {
     const result = await updateMemberRole(validInput);
 
     expect(result.ok).toBe(true);
+    expect(mocks.getOrganizationMembershipList).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      userId: ["user_1"],
+    });
     expect(mocks.updateOrganizationMembership).toHaveBeenCalledWith({
       organizationId: "org_1",
       role: "org:admin",
@@ -90,5 +99,64 @@ describe("updateMemberRole", () => {
       role: "org:owner",
       userId: "user_1",
     });
+  });
+
+  it("forbids admins from demoting owners", async () => {
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:admin",
+    });
+    mocks.getOrganizationMembershipList.mockResolvedValue({
+      data: [{ id: "membership_1", role: "org:owner" }],
+    });
+
+    const result = await updateMemberRole(validInput);
+
+    expect(result).toEqual({
+      error: "Only owners can change another owner's role",
+      ok: false,
+    });
+    expect(mocks.updateOrganizationMembership).not.toHaveBeenCalled();
+  });
+
+  it("allows owners to demote another owner", async () => {
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:owner",
+    });
+    mocks.getOrganizationMembershipList.mockResolvedValue({
+      data: [{ id: "membership_1", role: "org:owner" }],
+    });
+
+    const result = await updateMemberRole(validInput);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.updateOrganizationMembership).toHaveBeenCalledWith({
+      organizationId: "org_1",
+      role: "org:admin",
+      userId: "user_1",
+    });
+  });
+
+  it.each([
+    ["missing", []],
+    [
+      "ambiguous",
+      [
+        { id: "membership_1", role: "org:viewer" },
+        { id: "membership_2", role: "org:viewer" },
+      ],
+    ],
+  ])("rejects a %s target before updating a role", async (_case, data) => {
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:owner",
+    });
+    mocks.getOrganizationMembershipList.mockResolvedValue({ data });
+
+    const result = await updateMemberRole(validInput);
+
+    expect(result).toEqual({ error: "Member not found", ok: false });
+    expect(mocks.updateOrganizationMembership).not.toHaveBeenCalled();
   });
 });
