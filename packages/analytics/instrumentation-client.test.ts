@@ -49,6 +49,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  window.__teamCalendarAnalyticsCleanup?.();
   window.history.pushState = originalPushState;
   window.history.replaceState = originalReplaceState;
   vi.doUnmock("./keys");
@@ -61,8 +62,12 @@ describe("client analytics initialisation", () => {
     await instrumentation.initializeAnalytics();
     expect(importFactory).not.toHaveBeenCalled();
     expect(idleCallback).toBeUndefined();
-    instrumentation.identifyAnalytics("ignored");
-    instrumentation.groupAnalytics("organisation", "ignored");
+    for (let index = 0; index < 150; index += 1) {
+      instrumentation.identifyAnalytics(`ignored-${index}`);
+      instrumentation.groupAnalytics("organisation", `ignored-${index}`);
+    }
+    expect(client.identify).not.toHaveBeenCalled();
+    expect(client.group).not.toHaveBeenCalled();
   });
 
   it("uses one initialisation promise and disables automatic page views", async () => {
@@ -78,12 +83,18 @@ describe("client analytics initialisation", () => {
       "phc_test",
       expect.objectContaining({
         api_host: "https://analytics.example.com",
+        autocapture: false,
         capture_pageview: false,
       })
     );
   });
 
   it("preserves the first page attribution and a navigation before load", async () => {
+    Object.defineProperty(document, "referrer", {
+      configurable: true,
+      value: "https://search.example/results?auth=secret",
+    });
+    window.history.replaceState({}, "", "/start?invitation=secret#token");
     const { instrumentation } = await loadInstrumentation(configuredKeys);
     const initialized = instrumentation.initializeAnalytics();
     window.history.pushState({}, "", "/next");
@@ -94,7 +105,7 @@ describe("client analytics initialisation", () => {
         "$pageview",
         {
           $current_url: "http://localhost:3000/start",
-          $referrer: "https://search.example/",
+          $referrer: "https://search.example/results",
         },
       ],
       [
@@ -102,6 +113,34 @@ describe("client analytics initialisation", () => {
         {
           $current_url: "http://localhost:3000/next",
           $referrer: "http://localhost:3000/start",
+        },
+      ],
+    ]);
+  });
+
+  it("tracks navigation after ready and popstate without query parameters", async () => {
+    const { instrumentation } = await loadInstrumentation(configuredKeys);
+    const initialized = instrumentation.initializeAnalytics();
+    idleCallback?.();
+    await initialized;
+
+    window.history.pushState({}, "", "/ready?feed=secret");
+    originalReplaceState.call(window.history, {}, "", "/back?leave=private");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+
+    expect(client.capture.mock.calls.slice(-2)).toEqual([
+      [
+        "$pageview",
+        {
+          $current_url: "http://localhost:3000/ready",
+          $referrer: "http://localhost:3000/start",
+        },
+      ],
+      [
+        "$pageview",
+        {
+          $current_url: "http://localhost:3000/back",
+          $referrer: "http://localhost:3000/ready",
         },
       ],
     ]);
@@ -132,7 +171,14 @@ describe("client analytics initialisation", () => {
     const initialized = instrumentation.initializeAnalytics();
     idleCallback?.();
     await expect(initialized).resolves.toBeUndefined();
-    instrumentation.identifyAnalytics("ignored-after-failure");
-    instrumentation.groupAnalytics("organisation", "ignored-after-failure");
+    for (let index = 0; index < 150; index += 1) {
+      instrumentation.identifyAnalytics(`ignored-after-failure-${index}`);
+      instrumentation.groupAnalytics(
+        "organisation",
+        `ignored-after-failure-${index}`
+      );
+    }
+    expect(client.identify).not.toHaveBeenCalled();
+    expect(client.group).not.toHaveBeenCalled();
   });
 });

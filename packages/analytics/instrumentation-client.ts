@@ -1,5 +1,11 @@
 import { keys } from "./keys";
 
+declare global {
+  interface Window {
+    __teamCalendarAnalyticsCleanup?: () => void;
+  }
+}
+
 interface PostHogClient {
   capture: (event: string, properties?: Record<string, unknown>) => void;
   group: (
@@ -36,6 +42,18 @@ let analyticsState: "idle" | "loading" | "ready" | "disabled" = "idle";
 const MAX_PENDING_ASSOCIATIONS = 100;
 const MAX_PENDING_PAGE_VIEWS = 50;
 
+const sanitiseUrl = (value: string): string => {
+  if (!value) {
+    return "";
+  }
+  try {
+    const url = new URL(value, window.location.origin);
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return "";
+  }
+};
+
 const scheduleAfterHydration = (callback: () => void) => {
   const scheduleIdle = () => {
     if ("requestIdleCallback" in window) {
@@ -59,10 +77,11 @@ const capturePageView = (client: PostHogClient, pageView: PageView) => {
 };
 
 const observeNavigation = (initialPageView: PageView) => {
+  window.__teamCalendarAnalyticsCleanup?.();
   const pendingPageViews: PageView[] = [];
   let previousUrl = initialPageView.url;
   const recordPageView = () => {
-    const url = window.location.href;
+    const url = sanitiseUrl(window.location.href);
     if (url === previousUrl) {
       return;
     }
@@ -80,14 +99,24 @@ const observeNavigation = (initialPageView: PageView) => {
       pendingPageViews.push(pageView);
     }
   };
-  for (const method of ["pushState", "replaceState"] as const) {
-    const original = window.history[method].bind(window.history);
+  const originalPushState = window.history.pushState.bind(window.history);
+  const originalReplaceState = window.history.replaceState.bind(window.history);
+  for (const [method, original] of [
+    ["pushState", originalPushState],
+    ["replaceState", originalReplaceState],
+  ] as const) {
     window.history[method] = (...arguments_) => {
       original(...arguments_);
       recordPageView();
     };
   }
   window.addEventListener("popstate", recordPageView);
+  window.__teamCalendarAnalyticsCleanup = () => {
+    window.history.pushState = originalPushState;
+    window.history.replaceState = originalReplaceState;
+    window.removeEventListener("popstate", recordPageView);
+    window.__teamCalendarAnalyticsCleanup = undefined;
+  };
   return pendingPageViews;
 };
 
@@ -160,8 +189,8 @@ export const initializeAnalytics = (): Promise<void> => {
   }
 
   const initialPageView = {
-    referrer: document.referrer,
-    url: window.location.href,
+    referrer: sanitiseUrl(document.referrer),
+    url: sanitiseUrl(window.location.href),
   };
   const pendingPageViews = observeNavigation(initialPageView);
   analyticsState = "loading";
@@ -172,6 +201,7 @@ export const initializeAnalytics = (): Promise<void> => {
           const client: PostHogClient = posthog;
           client.init(NEXT_PUBLIC_POSTHOG_KEY, {
             api_host: NEXT_PUBLIC_POSTHOG_HOST,
+            autocapture: false,
             capture_pageview: false,
             defaults: "2025-05-24",
           });
@@ -187,6 +217,7 @@ export const initializeAnalytics = (): Promise<void> => {
           analyticsState = "disabled";
           pendingAssociations.splice(0);
           pendingPageViews.splice(0);
+          window.__teamCalendarAnalyticsCleanup?.();
         })
         .finally(resolve);
     });
