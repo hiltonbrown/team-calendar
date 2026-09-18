@@ -45,7 +45,8 @@ export const assertTestDatabaseConnectionAllowed = (): void => {
     decodeURIComponent(identity.pathname.slice(1)) !== manifest.target.database ||
     decodeURIComponent(identity.username) !== manifest.target.role ||
     identity.hostname !== manifest.target.hostname ||
-    process.env.TC_RELEASE_DURABLE_VERIFIED !== runId
+    process.env.TC_RELEASE_DURABLE_VERIFIED !== runId ||
+    process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED !== runId
   ) {
     throw new Error("Live database identity does not match the protected manifest");
   }

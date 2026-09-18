@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 const originalEnvironment = { ...process.env };
@@ -27,6 +30,41 @@ describe("database unit-test isolation", () => {
     process.env.TC_SOURCE_GATES = "1";
     expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
       "source-only gates"
+    );
+  });
+
+  it("denies direct live invocation without the runner-verified active lock", () => {
+    const runId = "00000000-0000-4000-8000-000000000001";
+    const manifestPath = join(mkdtempSync(join(tmpdir(), "tc-guard-")), "manifest.json");
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        active: true,
+        durableManifestConfirmed: true,
+        namespace: `release:run:${runId}`,
+        runId,
+        target: {
+          database: "release_db",
+          endpointId: "ep-release",
+          hostname: "ep-release.example.neon.tech",
+          role: "release_owner",
+        },
+        version: 1,
+      })
+    );
+    Object.assign(process.env, {
+      ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
+      DATABASE_URL:
+        "postgresql://release_owner:private@ep-release.example.neon.tech/release_db",
+      NODE_ENV: "test",
+      TC_RELEASE_DURABLE_VERIFIED: runId,
+      TC_RELEASE_MANIFEST: manifestPath,
+      TC_RELEASE_RUN_ID: runId,
+    });
+    delete process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED;
+
+    expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
+      "protected manifest"
     );
   });
 });

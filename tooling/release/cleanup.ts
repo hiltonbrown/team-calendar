@@ -1,3 +1,4 @@
+import { assertActiveRunOwner } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
@@ -24,6 +25,12 @@ await assertDurableManifestReadBack(manifest, {
   token: process.env.KV_REST_API_TOKEN,
   url: process.env.KV_REST_API_URL,
 });
+if (mode !== "--dry-run") {
+  await assertActiveRunOwner(manifest, {
+    token: process.env.KV_REST_API_TOKEN,
+    url: process.env.KV_REST_API_URL,
+  });
+}
 process.env.TC_RELEASE_DURABLE_VERIFIED = manifest.runId;
 if (
   !(manifest.owned.clerkOrgIds.length && manifest.owned.organisationIds.length)

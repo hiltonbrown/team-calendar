@@ -10,6 +10,7 @@ export const buildLiveIntegrationEnvironment = (
   TC_EXPECTED_DATABASE_HOST: manifest.target.hostname,
   TC_EXPECTED_DATABASE_NAME: manifest.target.database,
   TC_EXPECTED_DATABASE_ROLE: manifest.target.role,
+  TC_RELEASE_ACTIVE_RUN_VERIFIED: manifest.runId,
   TC_RELEASE_DURABLE_VERIFIED: manifest.runId,
   TC_RELEASE_MANIFEST: manifestPath,
 });

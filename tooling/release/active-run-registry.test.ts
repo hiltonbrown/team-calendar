@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { acquireActiveRun, releaseActiveRun } from "./active-run-registry.js";
+import {
+  acquireActiveRun,
+  assertActiveRunOwner,
+  releaseActiveRun,
+} from "./active-run-registry.js";
 import type { ReleaseManifest } from "./database-guard.js";
 
 const manifest = {
@@ -12,9 +16,9 @@ describe("active run registry", () => {
 
   it("acquires the single non-expiring run slot", async () => {
     let requestedUrl = "";
-    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+    const fetchMock = vi.fn((request: RequestInfo | URL) => {
       requestedUrl = String(request);
-      return Response.json({ result: "OK" });
+      return Promise.resolve(Response.json({ result: "OK" }));
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -28,9 +32,7 @@ describe("active run registry", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ result: null }))
-      .mockResolvedValueOnce(
-        Response.json({ result: manifest.runId })
-      );
+      .mockResolvedValueOnce(Response.json({ result: manifest.runId }));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(acquireActiveRun(manifest, input)).resolves.toBe(
@@ -42,19 +44,26 @@ describe("active run registry", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ result: null }))
-      .mockResolvedValueOnce(
-        Response.json({ result: "another-run" })
-      );
+      .mockResolvedValueOnce(Response.json({ result: "another-run" }));
     vi.stubGlobal("fetch", fetchMock);
     await expect(acquireActiveRun(manifest, input)).rejects.toThrow(
       "Another protected release run"
     );
 
     fetchMock.mockReset();
-    fetchMock.mockResolvedValueOnce(
-      Response.json({ result: 1 })
-    );
+    fetchMock.mockResolvedValueOnce(Response.json({ result: 1 }));
     await expect(releaseActiveRun(manifest, input)).resolves.toBeUndefined();
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/eval/");
+  });
+
+  it("fences cleanup when the manifest does not own the active slot", async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ result: "another-run" })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(assertActiveRunOwner(manifest, input)).rejects.toThrow(
+      "does not own"
+    );
   });
 });

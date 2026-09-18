@@ -25,6 +25,7 @@ describe("buildLiveIntegrationEnvironment", () => {
       TC_EXPECTED_DATABASE_HOST: "ep-release.example.neon.tech",
       TC_EXPECTED_DATABASE_NAME: "release_db",
       TC_EXPECTED_DATABASE_ROLE: "release_owner",
+      TC_RELEASE_ACTIVE_RUN_VERIFIED: manifest.runId,
       TC_RELEASE_DURABLE_VERIFIED: manifest.runId,
       TC_RELEASE_MANIFEST: "/protected/manifest.json",
     });

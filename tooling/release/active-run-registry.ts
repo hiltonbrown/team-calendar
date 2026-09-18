@@ -13,9 +13,12 @@ const request = async (
     throw new Error("Active-run registry KV configuration is required");
   }
   const path = command.map((part) => encodeURIComponent(part)).join("/");
-  const response = await fetch(`${input.url.replace(TRAILING_SLASH, "")}/${path}`, {
-    headers: { Authorization: `Bearer ${input.token}` },
-  });
+  const response = await fetch(
+    `${input.url.replace(TRAILING_SLASH, "")}/${path}`,
+    {
+      headers: { Authorization: `Bearer ${input.token}` },
+    }
+  );
   if (!response.ok) {
     throw new Error("Active-run registry request failed");
   }
@@ -57,5 +60,15 @@ export const releaseActiveRun = async (
   ]);
   if (result !== 1) {
     throw new Error("Active-run registry ownership changed before release");
+  }
+};
+
+export const assertActiveRunOwner = async (
+  manifest: ReleaseManifest,
+  input: { token?: string; url?: string }
+): Promise<void> => {
+  const current = await request(input, ["get", ACTIVE_RUN_KEY]);
+  if (current !== manifest.runId) {
+    throw new Error("Release run does not own the active-run registry slot");
   }
 };
