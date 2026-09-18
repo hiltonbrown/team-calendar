@@ -57,7 +57,10 @@ import { formatLeaveBalance } from "@/lib/format-leave-balance";
 import { withOrg } from "@/lib/navigation/org-url";
 import {
   archiveRecordAction,
+  attachSubmitRecoveryCandidateAction,
   deleteDraftAction,
+  listSubmitRecoveryCandidatesAction,
+  resolveSubmitAsNotCreatedAction,
   restoreRecordAction,
   retrySubmissionAction,
   revertToDraftAction,
@@ -115,6 +118,7 @@ export interface PlansClientRecord {
 }
 
 interface PlansClientProps {
+  canRecoverSubmit?: boolean;
   canViewTeam: boolean;
   filters: PlansFilterInput;
   hasActiveXeroConnection: boolean;
@@ -163,6 +167,7 @@ const primaryActionOrder: RowAction[] = [
 ];
 
 export function PlansClient({
+  canRecoverSubmit = false,
   canViewTeam,
   filters,
   hasActiveXeroConnection,
@@ -421,6 +426,13 @@ export function PlansClient({
                         <span className="hidden xl:inline">
                           <StatusCue status={status} />
                         </span>
+                        {canRecoverSubmit &&
+                        record.submissionResolutionPending ? (
+                          <SubmitRecoveryControls
+                            organisationId={organisationId}
+                            recordId={record.id}
+                          />
+                        ) : null}
                       </div>
                     </td>
                     <td className="xl:p-3">
@@ -591,6 +603,143 @@ export function PlansClient({
         />
       ) : null}
     </section>
+  );
+}
+
+function SubmitRecoveryControls({
+  organisationId,
+  recordId,
+}: {
+  organisationId: string;
+  recordId: string;
+}) {
+  const router = useRouter();
+  const [candidates, setCandidates] = useState<Array<{ remoteId: string }>>([]);
+  const [reason, setReason] = useState("");
+  const [evidenceReference, setEvidenceReference] = useState("");
+  const [independentlyVerified, setIndependentlyVerified] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const loadCandidates = () =>
+    startTransition(async () => {
+      const result = await listSubmitRecoveryCandidatesAction({
+        organisationId,
+        recordId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      setError("");
+      setCandidates(result.value.candidates);
+    });
+
+  const attach = (remoteId: string) =>
+    startTransition(async () => {
+      const result = await attachSubmitRecoveryCandidateAction({
+        organisationId,
+        reason,
+        recordId,
+        remoteId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      router.refresh();
+    });
+
+  const attestNotCreated = () =>
+    startTransition(async () => {
+      const result = await resolveSubmitAsNotCreatedAction({
+        evidenceReference,
+        independentlyVerified,
+        organisationId,
+        reason,
+        recordId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      router.refresh();
+    });
+
+  return (
+    <details className="mt-2 rounded-xl bg-muted p-3 text-xs">
+      <summary className="cursor-pointer font-medium">
+        Resolve Xero submission
+      </summary>
+      <div className="mt-3 grid gap-3">
+        <Label htmlFor={`recovery-reason-${recordId}`}>Recovery reason</Label>
+        <Input
+          id={`recovery-reason-${recordId}`}
+          onChange={(event) => setReason(event.target.value)}
+          value={reason}
+        />
+        <Button
+          disabled={pending || reason.trim().length < 10}
+          onClick={loadCandidates}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          Check Xero candidates
+        </Button>
+        {candidates.map((candidate) => (
+          <Button
+            disabled={pending || reason.trim().length < 10}
+            key={candidate.remoteId}
+            onClick={() => attach(candidate.remoteId)}
+            size="sm"
+            type="button"
+          >
+            Attach {candidate.remoteId}
+          </Button>
+        ))}
+        <p className="text-muted-foreground">
+          Only use the option below after independently confirming in Xero or
+          with Xero support that no request was created. An empty search or
+          timeout is not proof.
+        </p>
+        <Label htmlFor={`recovery-evidence-${recordId}`}>
+          Independent evidence reference
+        </Label>
+        <Input
+          id={`recovery-evidence-${recordId}`}
+          onChange={(event) => setEvidenceReference(event.target.value)}
+          value={evidenceReference}
+        />
+        <label className="flex items-start gap-2">
+          <input
+            checked={independentlyVerified}
+            onChange={(event) => setIndependentlyVerified(event.target.checked)}
+            type="checkbox"
+          />
+          I independently verified that Xero did not create this request.
+        </label>
+        <Button
+          disabled={
+            pending ||
+            !independentlyVerified ||
+            evidenceReference.trim().length < 10 ||
+            reason.trim().length < 10
+          }
+          onClick={attestNotCreated}
+          size="sm"
+          type="button"
+          variant="destructive"
+        >
+          Confirm not created and unlock
+        </Button>
+        {error ? (
+          <p className="text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 

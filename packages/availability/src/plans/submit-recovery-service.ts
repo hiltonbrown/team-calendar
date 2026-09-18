@@ -15,6 +15,7 @@ import {
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
+import { dispatchNotification } from "@repo/notifications";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 
@@ -32,7 +33,8 @@ const AttachSchema = RecoveryScopeSchema.extend({
 });
 
 const DefinitiveNotCreatedSchema = RecoveryScopeSchema.extend({
-  evidenceReference: z.string().trim().min(3).max(200),
+  evidenceReference: z.string().trim().min(10).max(200),
+  independentlyVerified: z.literal(true),
   reason: z.string().trim().min(10).max(500),
 });
 
@@ -48,6 +50,7 @@ export interface SubmitRecoveryError {
 }
 
 export interface SubmitRecoveryCandidate {
+  approvalStatus: ProviderLeaveCandidate["approvalStatus"];
   employeeId: string;
   endsAt: string;
   leaveTypeId: string;
@@ -72,6 +75,7 @@ export async function listSubmitRecoveryCandidates(
   }
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
     clerkOrgId: context.value.input.clerkOrgId,
+    employeeId: context.value.employeeId,
     organisationId: context.value.input.organisationId,
   });
   if (!candidates?.ok) {
@@ -103,6 +107,7 @@ export async function attachSubmitRecoveryCandidate(
   }
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
     clerkOrgId: parsed.data.clerkOrgId,
+    employeeId: context.value.employeeId,
     organisationId: parsed.data.organisationId,
   });
   if (!candidates?.ok) {
@@ -119,6 +124,15 @@ export async function attachSubmitRecoveryCandidate(
       "The selected Xero record does not match this leave request."
     );
   }
+  if (
+    context.value.operation.status === "provider_accepted" &&
+    context.value.operation.known_remote_id !== candidate.remoteId
+  ) {
+    return recoveryError(
+      "candidate_mismatch",
+      "The accepted Xero record ID does not match this candidate."
+    );
+  }
 
   const accepted = await markSubmitProviderAccepted(
     operationAttempt(parsed.data, context.value.operation.attempt_generation),
@@ -132,89 +146,210 @@ export async function attachSubmitRecoveryCandidate(
   }
 
   let mergedRecordId: string | null = null;
-  await database.$transaction(async (tx) => {
-    const duplicate = await tx.availabilityRecord.findFirst({
-      where: {
-        ...scopedTo(parsed.data),
-        id: { not: parsed.data.recordId },
-        source_remote_id: candidate.remoteId,
-      },
-    });
-    if (duplicate) {
-      mergedRecordId = duplicate.id;
-      await tx.availabilityRecord.update({
+  const alreadyAttached =
+    context.value.record.source_remote_id === candidate.remoteId;
+  if (!alreadyAttached) {
+    await database.$transaction(async (tx) => {
+      const duplicate = await tx.availabilityRecord.findFirst({
+        where: {
+          ...scopedTo(parsed.data),
+          id: { not: parsed.data.recordId },
+          source_remote_id: candidate.remoteId,
+        },
+      });
+      if (duplicate) {
+        mergedRecordId = duplicate.id;
+        await tx.availabilityRecord.update({
+          data: {
+            archived_at: new Date(),
+            publish_status: "archived",
+            source_remote_id: null,
+          },
+          where: { id: duplicate.id },
+        });
+      }
+
+      const updated = await tx.availabilityRecord.updateMany({
         data: {
-          archived_at: new Date(),
-          publish_status: "archived",
+          approval_status: candidate.approvalStatus,
+          derived_sequence: { increment: 1 },
+          failed_action: null,
+          source_payload_json: candidate.rawResponse as Prisma.InputJsonValue,
+          source_remote_id: candidate.remoteId,
+          submitted_at: new Date(),
+          updated_by_user_id: parsed.data.actingUserId,
+          xero_write_claimed_at: null,
+          xero_write_error: null,
+          xero_write_error_raw: Prisma.DbNull,
+        },
+        where: {
+          ...scopedTo(parsed.data),
+          id: parsed.data.recordId,
           source_remote_id: null,
         },
-        where: { id: duplicate.id },
       });
-    }
-
-    const updated = await tx.availabilityRecord.updateMany({
-      data: {
-        approval_status: "submitted",
-        derived_sequence: { increment: 1 },
-        failed_action: null,
-        source_payload_json: candidate.rawResponse as Prisma.InputJsonValue,
-        source_remote_id: candidate.remoteId,
-        submitted_at: new Date(),
-        updated_by_user_id: parsed.data.actingUserId,
-        xero_write_claimed_at: null,
-        xero_write_error: null,
-        xero_write_error_raw: Prisma.DbNull,
-      },
-      where: {
-        ...scopedTo(parsed.data),
-        id: parsed.data.recordId,
-        source_remote_id: null,
-      },
-    });
-    if (updated.count !== 1) {
-      throw new Error("Recovery target changed");
-    }
-    if (
-      !(await markSubmitCompleted(
-        operationAttempt(
-          parsed.data,
-          context.value.operation.attempt_generation
-        ),
-        tx
-      ))
-    ) {
-      throw new Error("Recovery operation changed");
-    }
-    await tx.auditEvent.create({
-      data: {
-        action: "availability_records.submit_recovery_attached",
-        actor_user_id: parsed.data.actingUserId,
-        clerk_org_id: parsed.data.clerkOrgId,
-        organisation_id: parsed.data.organisationId,
-        payload: {
-          mergedRecordId,
-          reason: parsed.data.reason,
-          remoteId: candidate.remoteId,
+      if (updated.count !== 1) {
+        throw new Error("Recovery target changed");
+      }
+      await tx.auditEvent.create({
+        data: {
+          action: "availability_records.submit_recovery_attached",
+          actor_user_id: parsed.data.actingUserId,
+          clerk_org_id: parsed.data.clerkOrgId,
+          organisation_id: parsed.data.organisationId,
+          payload: {
+            mergedRecordId,
+            reason: parsed.data.reason,
+            remoteId: candidate.remoteId,
+          },
+          resource_id: parsed.data.recordId,
+          resource_type: "availability_record",
         },
-        resource_id: parsed.data.recordId,
-        resource_type: "availability_record",
-      },
-    });
-  });
-
-  await materialiseAvailabilityPublication({
-    availabilityRecordId: parsed.data.recordId,
-    clerkOrgId: parsed.data.clerkOrgId,
-    organisationId: parsed.data.organisationId,
-  });
-  if (mergedRecordId) {
-    await materialiseAvailabilityPublication({
-      availabilityRecordId: mergedRecordId,
-      clerkOrgId: parsed.data.clerkOrgId,
-      organisationId: parsed.data.organisationId,
+      });
     });
   }
+
+  const sideEffects = await completeRecoverySideEffects({
+    candidate,
+    context: context.value,
+    input: parsed.data,
+    mergedRecordId,
+  });
+  if (!sideEffects.ok) {
+    return sideEffects;
+  }
+
+  if (
+    !(await markSubmitCompleted(
+      operationAttempt(parsed.data, context.value.operation.attempt_generation),
+      database
+    ))
+  ) {
+    return recoveryError(
+      "not_recoverable",
+      "This operation changed. Reload and try again."
+    );
+  }
   return { ok: true, value: undefined };
+}
+
+type RecoveryContext = Extract<
+  Awaited<ReturnType<typeof loadRecoveryContext>>,
+  { ok: true }
+>["value"];
+
+async function completeRecoverySideEffects(input: {
+  candidate: ProviderLeaveCandidate;
+  context: RecoveryContext;
+  input: z.infer<typeof AttachSchema>;
+  mergedRecordId: string | null;
+}): Promise<Result<void, SubmitRecoveryError>> {
+  const publicationCheckpoint = await database.auditEvent.findFirst({
+    select: { id: true },
+    where: {
+      action: "availability_records.submit_recovery_publication_completed",
+      clerk_org_id: input.input.clerkOrgId,
+      organisation_id: input.input.organisationId,
+      resource_id: input.input.recordId,
+    },
+  });
+  if (!publicationCheckpoint) {
+    const targetPublication = await materialiseAvailabilityPublication({
+      availabilityRecordId: input.input.recordId,
+      clerkOrgId: input.input.clerkOrgId,
+      organisationId: input.input.organisationId,
+    });
+    if (!targetPublication.ok) {
+      return recoveryError(
+        "provider_error",
+        "The Xero record was attached, but calendar publication is awaiting retry."
+      );
+    }
+    await database.auditEvent.create({
+      data: checkpointAuditData(
+        input.input,
+        "availability_records.submit_recovery_publication_completed"
+      ),
+    });
+  }
+  if (input.mergedRecordId) {
+    const duplicatePublication = await materialiseAvailabilityPublication({
+      availabilityRecordId: input.mergedRecordId,
+      clerkOrgId: input.input.clerkOrgId,
+      organisationId: input.input.organisationId,
+    });
+    if (!duplicatePublication.ok) {
+      return recoveryError(
+        "provider_error",
+        "The Xero record was attached, but duplicate calendar cancellation is awaiting retry."
+      );
+    }
+  }
+
+  const { manager } = input.context.record.person;
+  if (manager?.clerk_user_id) {
+    const managerUserId = manager.clerk_user_id;
+    const notificationCheckpoint = await database.auditEvent.findFirst({
+      select: { id: true },
+      where: {
+        action: "availability_records.submit_recovery_notification_completed",
+        clerk_org_id: input.input.clerkOrgId,
+        organisation_id: input.input.organisationId,
+        resource_id: input.input.recordId,
+      },
+    });
+    if (!notificationCheckpoint) {
+      const notified = await database.$transaction(async (tx) => {
+        const result = await dispatchNotification(
+          {
+            actionUrl: `/plans?record=${input.input.recordId}`,
+            actorUserId: input.input.actingUserId,
+            body: "A leave request recovered from Xero is ready for review.",
+            clerkOrgId: input.input.clerkOrgId,
+            objectId: input.input.recordId,
+            objectType: "availability_record",
+            organisationId: input.input.organisationId,
+            recipientPersonId: manager.id,
+            recipientUserId: managerUserId,
+            title: "Leave submitted for approval",
+            type: "leave_submitted",
+          },
+          tx
+        );
+        if (!result.ok) {
+          return false;
+        }
+        await tx.auditEvent.create({
+          data: checkpointAuditData(
+            input.input,
+            "availability_records.submit_recovery_notification_completed"
+          ),
+        });
+        return true;
+      });
+      if (!notified) {
+        return recoveryError(
+          "provider_error",
+          "The Xero record and calendar were recovered, but the notification is awaiting retry."
+        );
+      }
+    }
+  }
+  return { ok: true, value: undefined };
+}
+
+function checkpointAuditData(
+  input: z.infer<typeof RecoveryScopeSchema>,
+  action: string
+) {
+  return {
+    action,
+    actor_user_id: input.actingUserId,
+    clerk_org_id: input.clerkOrgId,
+    organisation_id: input.organisationId,
+    resource_id: input.recordId,
+    resource_type: "availability_record",
+  };
 }
 
 export async function resolveSubmitAsNotCreated(
@@ -231,31 +366,38 @@ export async function resolveSubmitAsNotCreated(
       "No unknown submission is awaiting resolution."
     );
   }
-  if (
-    !(await markSubmitDefinitiveFailure(
+  const resolved = await database.$transaction(async (tx) => {
+    const marked = await markSubmitDefinitiveFailure(
       operationAttempt(parsed.data, operation.attempt_generation),
-      "verified_not_created"
-    ))
-  ) {
+      "verified_not_created",
+      tx
+    );
+    if (!marked) {
+      return false;
+    }
+    await tx.auditEvent.create({
+      data: {
+        action: "availability_records.submit_recovery_not_created",
+        actor_user_id: parsed.data.actingUserId,
+        clerk_org_id: parsed.data.clerkOrgId,
+        organisation_id: parsed.data.organisationId,
+        payload: {
+          evidenceReference: parsed.data.evidenceReference,
+          independentlyVerified: true,
+          reason: parsed.data.reason,
+        },
+        resource_id: parsed.data.recordId,
+        resource_type: "availability_record",
+      },
+    });
+    return true;
+  });
+  if (!resolved) {
     return recoveryError(
       "not_recoverable",
       "This operation changed. Reload and try again."
     );
   }
-  await database.auditEvent.create({
-    data: {
-      action: "availability_records.submit_recovery_not_created",
-      actor_user_id: parsed.data.actingUserId,
-      clerk_org_id: parsed.data.clerkOrgId,
-      organisation_id: parsed.data.organisationId,
-      payload: {
-        evidenceReference: parsed.data.evidenceReference,
-        reason: parsed.data.reason,
-      },
-      resource_id: parsed.data.recordId,
-      resource_type: "availability_record",
-    },
-  });
   return { ok: true, value: undefined };
 }
 
@@ -269,7 +411,14 @@ async function loadRecoveryContext(
   }
   const [record, operation] = await Promise.all([
     database.availabilityRecord.findFirst({
-      include: { person: { select: { location_id: true } } },
+      include: {
+        person: {
+          select: {
+            location_id: true,
+            manager: { select: { clerk_user_id: true, id: true } },
+          },
+        },
+      },
       where: { ...scopedTo(parsed.data), id: parsed.data.recordId },
     }),
     getSubmitOperation(operationScope(parsed.data)),

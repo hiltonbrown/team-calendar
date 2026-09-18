@@ -23,6 +23,18 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
 
+const noUnresolvedSubmitOperationWhere =
+  (): Prisma.AvailabilityRecordWhereInput => ({
+    outbound_operations: {
+      none: {
+        action: "submit" as const,
+        status: {
+          in: ["prepared", "outcome_unknown", "provider_accepted"],
+        },
+      },
+    },
+  });
+
 const ReconcileInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
@@ -270,6 +282,7 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
         ends_at: { gte: windowStart },
         source_remote_id: { not: null },
         ...unclaimedOrExpiredXeroWriteWhere(),
+        ...noUnresolvedSubmitOperationWhere(),
       },
     });
 
@@ -515,6 +528,7 @@ async function transitionRecord(
         derived_sequence: record.derived_sequence,
         id: record.id,
         ...unclaimedOrExpiredXeroWriteWhere(),
+        ...noUnresolvedSubmitOperationWhere(),
       },
     });
     if (updated.count !== 1) {
@@ -561,6 +575,7 @@ async function archiveMissing(
         derived_sequence: record.derived_sequence,
         id: record.id,
         ...unclaimedOrExpiredXeroWriteWhere(),
+        ...noUnresolvedSubmitOperationWhere(),
       },
     });
     if (updated.count !== 1) {
@@ -577,6 +592,7 @@ async function archiveMissing(
           ...scoped(context),
           id: record.id,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       return;
@@ -974,6 +990,7 @@ async function stampCheckedAt(
       ...scoped(context),
       id: recordId,
       ...unclaimedOrExpiredXeroWriteWhere(),
+      ...noUnresolvedSubmitOperationWhere(),
     },
   });
 }

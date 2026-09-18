@@ -82,6 +82,7 @@ export async function listSubmitRecoveryCandidatesAction(input: {
 
 export async function resolveSubmitAsNotCreatedAction(input: {
   evidenceReference: string;
+  independentlyVerified: boolean;
   organisationId: string;
   reason: string;
   recordId: string;
@@ -90,9 +91,15 @@ export async function resolveSubmitAsNotCreatedAction(input: {
   if (!context.ok) {
     return context;
   }
+  if (!input.independentlyVerified) {
+    return validationError(
+      "Independent provider verification must be confirmed."
+    );
+  }
   const result = await resolveSubmitAsNotCreated({
     ...context.value,
     evidenceReference: input.evidenceReference,
+    independentlyVerified: true,
     reason: input.reason,
     recordId: input.recordId,
   });

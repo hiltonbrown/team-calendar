@@ -96,6 +96,41 @@ describe("outbound operation repository", () => {
     expect(mocks.updateMany).not.toHaveBeenCalled();
   });
 
+  it("fences and retries a prepared operation only after its record claim is reclaimable", async () => {
+    mocks.findFirst.mockResolvedValue({
+      attempt_generation: 1,
+      dispatch_started_at: null,
+      id: "operation_1",
+      status: "prepared",
+    });
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+
+    await expect(
+      prepareAndClaimSubmitOperation({
+        ...scope,
+        actorUserId: "user_2",
+        claimableBefore: new Date("2026-05-01T00:00:00.000Z"),
+        expectedFailedAction: null,
+        expectedSequence: 2,
+        expectedStatus: "draft",
+        requestFingerprint: "same-request-fingerprint",
+      })
+    ).resolves.toEqual({
+      attemptGeneration: 2,
+      claimedAt: expect.any(Date),
+    });
+    expect(mocks.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ attempt_generation: 2 }),
+        where: expect.objectContaining({
+          attempt_generation: 1,
+          status: "prepared",
+        }),
+      })
+    );
+  });
+
   it("uses a conditional transition before network dispatch", async () => {
     mocks.updateMany.mockResolvedValue({ count: 1 });
 

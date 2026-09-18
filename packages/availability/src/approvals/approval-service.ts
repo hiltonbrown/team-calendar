@@ -37,6 +37,7 @@ import { dispatchSyncEvent } from "../sync/sync-events";
 import { hasActiveXeroConnection } from "../xero-connection-state";
 import {
   acquireXeroWriteClaim,
+  noUnresolvedSubmitOperationWhere,
   releaseXeroWriteClaim,
   unclaimedOrExpiredXeroWriteWhere,
 } from "../xero-write-claim";
@@ -726,6 +727,7 @@ export async function revertApprovalAttempt(
           derived_sequence: record.derived_sequence,
           id: record.id,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (update.count !== 1) {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
+  auditFindFirst: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityUpdate: vi.fn(),
   availabilityUpdateMany: vi.fn(),
@@ -11,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   markSubmitDefinitiveFailure: vi.fn(),
   markSubmitProviderAccepted: vi.fn(),
   materialise: vi.fn(),
+  notify: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -18,14 +20,17 @@ vi.mock("@repo/database", () => ({
   database: {
     $transaction: async (callback: (client: unknown) => unknown) =>
       await callback({
-        auditEvent: { create: mocks.auditCreate },
+        auditEvent: {
+          create: mocks.auditCreate,
+          findFirst: mocks.auditFindFirst,
+        },
         availabilityRecord: {
           findFirst: mocks.availabilityFindFirst,
           update: mocks.availabilityUpdate,
           updateMany: mocks.availabilityUpdateMany,
         },
       }),
-    auditEvent: { create: mocks.auditCreate },
+    auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
   },
   getSubmitOperation: mocks.getSubmitOperation,
@@ -39,6 +44,9 @@ vi.mock("@repo/database", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialise,
+}));
+vi.mock("@repo/notifications", () => ({
+  dispatchNotification: mocks.notify,
 }));
 vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
@@ -61,13 +69,17 @@ const record = {
   all_day: true,
   ends_at: new Date("2026-05-05T00:00:00.000Z"),
   id: input.recordId,
-  person: { location_id: null },
+  person: {
+    location_id: null,
+    manager: { clerk_user_id: "manager_user_1", id: "manager_person_1" },
+  },
   person_id: "person_1",
   record_type: "annual_leave",
   starts_at: new Date("2026-05-04T00:00:00.000Z"),
   title: "Annual leave",
 };
 const candidate = {
+  approvalStatus: "submitted" as const,
   employeeId: "employee_1",
   endsAt: "2026-05-05",
   leaveTypeId: "leave_type_1",
@@ -101,6 +113,7 @@ describe("submit recovery service", () => {
     mocks.markSubmitDefinitiveFailure.mockResolvedValue(true);
     mocks.markSubmitProviderAccepted.mockResolvedValue(true);
     mocks.materialise.mockResolvedValue({ ok: true, value: undefined });
+    mocks.notify.mockResolvedValue({ ok: true, value: {} });
     port.findLeaveApplicationCandidates.mockResolvedValue({
       ok: true,
       value: { candidates: [candidate], complete: true },
@@ -215,13 +228,15 @@ describe("submit recovery service", () => {
     const result = await resolveSubmitAsNotCreated({
       ...input,
       evidenceReference: "XERO-SUPPORT-123",
+      independentlyVerified: true,
       reason: "Xero support confirmed the request was not created.",
     });
 
     expect(result.ok).toBe(true);
     expect(mocks.markSubmitDefinitiveFailure).toHaveBeenCalledWith(
       expect.objectContaining({ attemptGeneration: 1 }),
-      "verified_not_created"
+      "verified_not_created",
+      expect.anything()
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -230,5 +245,154 @@ describe("submit recovery service", () => {
         }),
       }),
     });
+  });
+
+  it("cannot attach a different candidate after Xero accepted a known remote ID", async () => {
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      attempt_generation: 1,
+      known_remote_id: "remote_accepted",
+      status: "provider_accepted",
+    });
+
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified against the accepted Xero response.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "candidate_mismatch" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("preserves an authoritative approved provider state when attaching", async () => {
+    port.findLeaveApplicationCandidates.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        candidates: [{ ...candidate, approvalStatus: "approved" }],
+        complete: true,
+      },
+    });
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(null);
+
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified approved leave against the Xero record.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "approved" }),
+      })
+    );
+  });
+
+  it("keeps the operation recoverable until a failed publication succeeds", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(null);
+    mocks.materialise.mockResolvedValueOnce({
+      error: { code: "internal", message: "publication failed" },
+      ok: false,
+    });
+
+    const first = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified against the Xero payroll record.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(first).toMatchObject({
+      error: { code: "provider_error" },
+      ok: false,
+    });
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      attempt_generation: 1,
+      known_remote_id: "remote_1",
+      status: "provider_accepted",
+    });
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      source_remote_id: "remote_1",
+    });
+    const retry = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Retry calendar and notification recovery.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(retry.ok).toBe(true);
+    expect(mocks.materialise).toHaveBeenCalledTimes(2);
+    expect(mocks.markSubmitCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries notification from its durable checkpoint before completion", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(null);
+    mocks.notify.mockResolvedValueOnce({
+      error: { code: "unknown_error", message: "notification failed" },
+      ok: false,
+    });
+
+    const first = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified against the Xero payroll record.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+    expect(first).toMatchObject({
+      error: { code: "provider_error" },
+      ok: false,
+    });
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+
+    mocks.getSubmitOperation.mockResolvedValueOnce({
+      attempt_generation: 1,
+      known_remote_id: "remote_1",
+      status: "provider_accepted",
+    });
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      source_remote_id: "remote_1",
+    });
+    mocks.auditFindFirst
+      .mockResolvedValueOnce({ id: "publication_checkpoint" })
+      .mockResolvedValueOnce(null);
+
+    const retry = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Retry the failed manager notification.",
+        remoteId: "remote_1",
+      },
+      port
+    );
+
+    expect(retry.ok).toBe(true);
+    expect(mocks.notify).toHaveBeenCalledTimes(2);
+    expect(mocks.markSubmitCompleted).toHaveBeenCalledTimes(1);
   });
 });

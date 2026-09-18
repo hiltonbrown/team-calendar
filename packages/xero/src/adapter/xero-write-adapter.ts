@@ -11,7 +11,10 @@ import type {
 import { database } from "@repo/database";
 import { availability_record_type } from "@repo/database/generated/enums";
 import { ensureFreshXeroConnection } from "../oauth/service";
-import { fetchLeaveRecordsForRegion } from "../read/dispatch";
+import {
+  fetchLeaveForEmployeeForRegion,
+  fetchLeaveRecordsForRegion,
+} from "../read/dispatch";
 import { resolveXeroEmployeeId } from "../resolution/resolve-employee";
 import { resolveXeroLeaveTypeId } from "../resolution/resolve-leave-type";
 import {
@@ -170,9 +173,15 @@ export const XeroWriteAdapter: ExternalWritePort = {
         ok: false,
       };
     }
-    const result = await fetchLeaveRecordsForRegion(tenant.payroll_region, {
-      xeroTenant: tenant,
-    });
+    const result =
+      tenant.payroll_region === "AU"
+        ? await fetchLeaveRecordsForRegion(tenant.payroll_region, {
+            xeroTenant: tenant,
+          })
+        : await fetchLeaveForEmployeeForRegion(tenant.payroll_region, {
+            xeroEmployeeId: input.employeeId,
+            xeroTenant: tenant,
+          });
     if (!result.ok) {
       return {
         error: {
@@ -190,16 +199,19 @@ export const XeroWriteAdapter: ExternalWritePort = {
     return {
       ok: true,
       value: {
-        candidates: result.value.leaveRecords.map((record) => ({
-          employeeId: record.employeeId,
-          endsAt: record.endDate,
-          leaveTypeId: record.leaveTypeId,
-          rawResponse: record.rawPayload,
-          remoteId: record.leaveApplicationId,
-          startsAt: record.startDate,
-          title: record.title,
-          units: record.units,
-        })),
+        candidates: result.value.leaveRecords
+          .filter((record) => record.employeeId === input.employeeId)
+          .map((record) => ({
+            approvalStatus: providerApprovalStatus(record.status),
+            employeeId: record.employeeId,
+            endsAt: record.endDate,
+            leaveTypeId: record.leaveTypeId,
+            rawResponse: record.rawPayload,
+            remoteId: record.leaveApplicationId,
+            startsAt: record.startDate,
+            title: record.title,
+            units: record.units,
+          })),
         complete: result.value.complete,
       },
     };
@@ -349,3 +361,26 @@ export const XeroWriteAdapter: ExternalWritePort = {
     return { ok: true, value: undefined };
   },
 };
+
+function providerApprovalStatus(
+  status:
+    | "APPROVED"
+    | "DELETED"
+    | "REJECTED"
+    | "SUBMITTED"
+    | "UNKNOWN"
+    | "WITHDRAWN"
+): "approved" | "cancelled" | "declined" | "submitted" | "withdrawn" {
+  switch (status) {
+    case "APPROVED":
+      return "approved";
+    case "DELETED":
+      return "cancelled";
+    case "REJECTED":
+      return "declined";
+    case "WITHDRAWN":
+      return "withdrawn";
+    default:
+      return "submitted";
+  }
+}

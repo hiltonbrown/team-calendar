@@ -30,7 +30,10 @@ import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { deriveAvailabilityUidKey } from "../sync/availability-uid";
 import { hasActiveXeroConnection } from "../xero-connection-state";
-import { unclaimedOrExpiredXeroWriteWhere } from "../xero-write-claim";
+import {
+  noUnresolvedSubmitOperationWhere,
+  unclaimedOrExpiredXeroWriteWhere,
+} from "../xero-write-claim";
 
 export type EditableAction =
   | "archive"
@@ -590,6 +593,7 @@ export async function updateRecord(
           derived_sequence: existing.derived_sequence,
           id: parsed.data.recordId,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (updated.count !== 1) {
@@ -695,6 +699,7 @@ export async function deleteDraftRecord(
           derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (deleted.count !== 1) {
@@ -785,6 +790,7 @@ export async function archiveRecord(
           derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (archived.count !== 1) {
@@ -858,6 +864,7 @@ export async function restoreRecord(
           derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (restored.count !== 1) {

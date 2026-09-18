@@ -29,6 +29,12 @@ export interface SubmitLeaveInput {
 }
 
 export interface ProviderLeaveCandidate {
+  approvalStatus:
+    | "approved"
+    | "cancelled"
+    | "declined"
+    | "submitted"
+    | "withdrawn";
   employeeId: string;
   endsAt: string;
   leaveTypeId: string;
@@ -71,6 +77,7 @@ export interface ExternalWritePort {
   ) => Promise<Result<void, ProviderWriteError>>;
   findLeaveApplicationCandidates?: (input: {
     clerkOrgId: string;
+    employeeId: string;
     organisationId: string;
   }) => Promise<
     Result<

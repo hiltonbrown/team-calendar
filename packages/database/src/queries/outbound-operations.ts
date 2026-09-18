@@ -50,7 +50,13 @@ export const prepareAndClaimSubmitOperation = async (
       const existing = await getSubmitOperation(input, tx);
       let attemptGeneration = 1;
       if (existing) {
-        if (existing.status !== "definitive_failure") {
+        const safelyRetryablePrepared =
+          existing.status === "prepared" &&
+          existing.dispatch_started_at === null;
+        if (
+          existing.status !== "definitive_failure" &&
+          !safelyRetryablePrepared
+        ) {
           throw new SubmitClaimConflictError();
         }
         attemptGeneration = existing.attempt_generation + 1;
@@ -70,7 +76,7 @@ export const prepareAndClaimSubmitOperation = async (
           where: {
             attempt_generation: existing.attempt_generation,
             id: existing.id,
-            status: "definitive_failure",
+            status: safelyRetryablePrepared ? "prepared" : "definitive_failure",
             ...scopedTo(input),
           },
         });
@@ -146,9 +152,10 @@ export const markSubmitDispatchStarted = async (
 
 export const markSubmitDefinitiveFailure = async (
   scope: OutboundOperationAttemptScope,
-  safeErrorCode: string
+  safeErrorCode: string,
+  client: OperationClient = database
 ): Promise<boolean> => {
-  const updated = await database.outboundOperation.updateMany({
+  const updated = await client.outboundOperation.updateMany({
     data: { safe_error_code: safeErrorCode, status: "definitive_failure" },
     where: {
       ...scopedTo(scope),

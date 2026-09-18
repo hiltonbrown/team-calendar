@@ -187,6 +187,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         )}
 
         <PlansClient
+          canRecoverSubmit={isAdminOrOwner(orgRole)}
           canViewTeam={canViewTeam}
           filters={filters}
           hasActiveXeroConnection={hasXero}

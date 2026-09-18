@@ -31,6 +31,18 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
 
+const noUnresolvedSubmitOperationWhere =
+  (): Prisma.AvailabilityRecordWhereInput => ({
+    outbound_operations: {
+      none: {
+        action: "submit" as const,
+        status: {
+          in: ["prepared", "outcome_unknown", "provider_accepted"],
+        },
+      },
+    },
+  });
+
 const SyncXeroLeaveRecordsInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
@@ -1010,6 +1022,7 @@ async function processLeaveRecord(
           source_remote_hash: existing.source_remote_hash,
           updated_at: existing.updated_at,
           ...unclaimedOrExpiredXeroWriteWhere(),
+          ...noUnresolvedSubmitOperationWhere(),
         },
       });
       if (updateResult.count === 0) {
@@ -1160,6 +1173,7 @@ async function archiveStaleRecords(
     source_type: "xero_leave" as const,
     updated_at: { lte: startedAt },
     ...unclaimedOrExpiredXeroWriteWhere(),
+    ...noUnresolvedSubmitOperationWhere(),
   };
 
   const [stalePeople, updateResult] = await database.$transaction(
