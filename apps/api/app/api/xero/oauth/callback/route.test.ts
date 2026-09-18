@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   completeXeroOAuth: vi.fn(),
+  isLocalApplicationPath: vi.fn(),
   isPreviewDeployment: vi.fn(),
 }));
 
 vi.mock("@repo/xero", () => ({
   completeXeroOAuth: mocks.completeXeroOAuth,
+  isLocalApplicationPath: mocks.isLocalApplicationPath,
   isPreviewDeployment: mocks.isPreviewDeployment,
 }));
 
@@ -19,6 +21,12 @@ describe("Xero OAuth callback route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.isPreviewDeployment.mockReturnValue(false);
+    mocks.isLocalApplicationPath.mockImplementation(
+      (value: string) =>
+        value.startsWith("/") &&
+        !value.startsWith("//") &&
+        !value.includes("\\")
+    );
     mocks.completeXeroOAuth.mockResolvedValue({
       ok: true,
       value: {
@@ -54,12 +62,47 @@ describe("Xero OAuth callback route", () => {
     );
 
     expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "https://api.example.com/settings/integrations/xero/connect?session=session_1"
+    );
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
       code: "code",
       nonce: "matching-nonce",
       state: "state",
     });
     expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
+  });
+
+  it("preserves a valid local redirect query and fragment", async () => {
+    mocks.completeXeroOAuth.mockResolvedValue({
+      ok: true,
+      value: {
+        redirectTo: "/calendar?team=people#upcoming",
+        sessionId: "session_1",
+      },
+    });
+
+    const response = await GET(new Request(callbackUrl));
+
+    expect(response.headers.get("location")).toBe(
+      "https://api.example.com/calendar?team=people#upcoming"
+    );
+  });
+
+  it("falls back to Xero settings for an unsafe service redirect", async () => {
+    mocks.completeXeroOAuth.mockResolvedValue({
+      ok: true,
+      value: {
+        redirectTo: "https://attacker.example/path",
+        sessionId: "session_1",
+      },
+    });
+
+    const response = await GET(new Request(callbackUrl));
+
+    expect(response.headers.get("location")).toBe(
+      "https://api.example.com/settings/integrations/xero"
+    );
   });
 
   it("returns the service error for a mismatched nonce", async () => {

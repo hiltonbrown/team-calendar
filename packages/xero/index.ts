@@ -9,6 +9,7 @@ export {
   disconnectXeroOAuthConnection,
   ensureFreshXeroConnection,
   getPendingXeroOAuthSession,
+  isLocalApplicationPath,
   isPreviewDeployment,
   markXeroConnectionStale,
   type PendingXeroSessionOrganisation,

@@ -32,6 +32,7 @@ const XERO_SCOPES = [
   "payroll.settings.read",
 ].join(" ");
 const STATE_MAX_AGE_MS = 10 * 60 * 1000;
+const DEFAULT_XERO_RETURN_TO = "/settings/integrations/xero";
 
 interface OAuthStatePayload {
   clerkOrgId: string;
@@ -133,6 +134,10 @@ export function buildXeroOAuthStartUrl(input: {
     return oauthNotConfigured();
   }
 
+  if (input.returnTo !== undefined && !isLocalApplicationPath(input.returnTo)) {
+    return invalidState();
+  }
+
   const url = new URL(XERO_AUTHORISE_URL);
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", callbackUrl());
@@ -147,7 +152,7 @@ export function buildXeroOAuthStartUrl(input: {
         issuedAt: Date.now(),
         nonce,
         organisationId: input.organisationId ?? null,
-        returnTo: input.returnTo ?? "/settings/integrations/xero",
+        returnTo: input.returnTo ?? DEFAULT_XERO_RETURN_TO,
         userId: input.userId ?? null,
       },
       clientSecret
@@ -173,6 +178,10 @@ export async function completeXeroOAuth(input: {
   if (!nonceMatches) {
     return invalidState();
   }
+
+  const returnTo = isLocalApplicationPath(state.value.returnTo)
+    ? state.value.returnTo
+    : DEFAULT_XERO_RETURN_TO;
 
   const orgKey = orgRateLimitKey({
     clerkOrgId: state.value.clerkOrgId,
@@ -216,7 +225,7 @@ export async function completeXeroOAuth(input: {
       refresh_token_auth_tag: encryptedRefreshToken.authTag,
       refresh_token_encrypted: encryptedRefreshToken.encrypted,
       refresh_token_iv: encryptedRefreshToken.iv,
-      return_to: state.value.returnTo,
+      return_to: returnTo,
       status: "pending",
       token_encrypted_at: encryptedAccessToken.encryptedAt,
       token_expires_at: tokenExpiresAt,
@@ -232,6 +241,21 @@ export async function completeXeroOAuth(input: {
       sessionId: session.id,
     },
   };
+}
+
+export function isLocalApplicationPath(value: string): boolean {
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return false;
+  }
+
+  for (const character of value) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint !== undefined && (codePoint <= 31 || (codePoint >= 127 && codePoint <= 159))) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export async function getPendingXeroOAuthSession(input: {

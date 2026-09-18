@@ -1,4 +1,8 @@
-import { completeXeroOAuth, isPreviewDeployment } from "@repo/xero";
+import {
+  completeXeroOAuth,
+  isLocalApplicationPath,
+  isPreviewDeployment,
+} from "@repo/xero";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
@@ -38,8 +42,11 @@ export async function GET(request: Request) {
   }
 
   const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL ?? request.url;
+  const redirectTo = isLocalApplicationPath(result.value.redirectTo)
+    ? result.value.redirectTo
+    : "/settings/integrations/xero";
   const response = NextResponse.redirect(
-    new URL(result.value.redirectTo, appBaseUrl)
+    new URL(redirectTo, appBaseUrl)
   );
   response.cookies.delete({
     name: "xero_oauth_nonce",
