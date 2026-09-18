@@ -247,3 +247,7 @@ export {
 } from "./src/sync/sync-monitor-service";
 export * from "./src/xero-connection-state";
 export { hasActiveXeroConnection } from "./src/xero-connection-state";
+export {
+  unclaimedOrExpiredXeroWriteWhere,
+  XERO_WRITE_CLAIM_LEASE_MS,
+} from "./src/xero-write-claim";

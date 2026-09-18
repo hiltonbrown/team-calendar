@@ -14,6 +14,7 @@ import type {
 } from "../write/types";
 
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
+const XERO_WRITE_TIMEOUT_MS = 120_000;
 
 const LeaveApplicationResponseSchema = z
   .object({
@@ -178,7 +179,9 @@ async function xeroRequest(
           "Xero-Tenant-Id": xeroTenant.xero_tenant_id,
         },
         method: request.method,
+        signal: AbortSignal.timeout(XERO_WRITE_TIMEOUT_MS),
       },
+      maxAttempts: 1,
       orgKey: orgRateLimitKey({
         clerkOrgId: xeroTenant.clerk_org_id,
         organisationId: xeroTenant.organisation_id,

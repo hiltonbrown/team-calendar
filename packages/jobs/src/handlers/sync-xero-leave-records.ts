@@ -4,6 +4,7 @@ import {
   type InboundLeaveApprovalStatus,
   materialiseAvailabilityPublication,
   normaliseInboundLeaveRecord,
+  unclaimedOrExpiredXeroWriteWhere,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
@@ -1008,6 +1009,7 @@ async function processLeaveRecord(
           source_last_modified_at: existing.source_last_modified_at,
           source_remote_hash: existing.source_remote_hash,
           updated_at: existing.updated_at,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
       if (updateResult.count === 0) {
@@ -1157,6 +1159,7 @@ async function archiveStaleRecords(
       : {}),
     source_type: "xero_leave" as const,
     updated_at: { lte: startedAt },
+    ...unclaimedOrExpiredXeroWriteWhere(),
   };
 
   const [stalePeople, updateResult] = await database.$transaction(

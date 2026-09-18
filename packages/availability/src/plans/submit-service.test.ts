@@ -393,6 +393,22 @@ describe("submit-service", () => {
     );
   });
 
+  it("does not revert a failed submission while its Xero claim is active", async () => {
+    mocks.availabilityFindFirst.mockResolvedValueOnce({
+      ...record,
+      approval_status: "xero_sync_failed",
+      failed_action: "submit",
+    });
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await revertToDraft(input);
+
+    expect(result).toMatchObject({
+      error: { code: "invalid_state_for_revert" },
+      ok: false,
+    });
+  });
+
   it("withdraws only submitted records", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({

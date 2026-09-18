@@ -24,6 +24,7 @@ import {
 import { getSettings } from "../settings/organisation-settings-service";
 import { deriveAvailabilityUidKey } from "../sync/availability-uid";
 import { hasActiveXeroConnection } from "../xero-connection-state";
+import { unclaimedOrExpiredXeroWriteWhere } from "../xero-write-claim";
 
 export type EditableAction =
   | "archive"
@@ -535,7 +536,7 @@ export async function updateRecord(
     });
 
     await database.$transaction(async (tx) => {
-      await tx.availabilityRecord.updateMany({
+      const updated = await tx.availabilityRecord.updateMany({
         data: {
           ...(patch.allDay !== undefined && { all_day: patch.allDay }),
           ...(patch.contactabilityStatus && {
@@ -567,9 +568,15 @@ export async function updateRecord(
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           }),
+          archived_at: existing.archived_at,
+          derived_sequence: existing.derived_sequence,
           id: parsed.data.recordId,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
+      if (updated.count !== 1) {
+        throw new ActiveXeroWriteConflictError();
+      }
 
       await tx.auditEvent.create({
         data: {
@@ -610,7 +617,16 @@ export async function updateRecord(
       ok: true,
       value: toPlanRecord(updated, deriveActions(updated, hasXero)),
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActiveXeroWriteConflictError) {
+      return {
+        error: {
+          code: "not_editable_after_submission",
+          message: "This record is being updated in Xero and cannot be edited.",
+        },
+        ok: false,
+      };
+    }
     return unknownError();
   }
 }
@@ -642,22 +658,38 @@ export async function deleteDraftRecord(
     }
 
     await database.$transaction(async (tx) => {
-      await tx.availabilityRecord.deleteMany({
+      const deleted = await tx.availabilityRecord.deleteMany({
         where: {
           ...scopedTo({
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           }),
+          approval_status: existing.value.approval_status,
+          derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
+      if (deleted.count !== 1) {
+        throw new ActiveXeroWriteConflictError();
+      }
       await tx.auditEvent.create({
         data: auditData(parsed.data, "availability_records.draft_deleted"),
       });
     });
 
     return { ok: true, value: undefined };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActiveXeroWriteConflictError) {
+      return {
+        error: {
+          code: "invalid_state_for_delete",
+          message:
+            "This record is being updated in Xero and cannot be deleted.",
+        },
+        ok: false,
+      };
+    }
     return unknownError();
   }
 }
@@ -702,7 +734,7 @@ export async function archiveRecord(
     }
 
     await database.$transaction(async (tx) => {
-      await tx.availabilityRecord.updateMany({
+      const archived = await tx.availabilityRecord.updateMany({
         data: {
           archived_at: new Date(),
           publish_status: "archived",
@@ -713,9 +745,15 @@ export async function archiveRecord(
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           }),
+          approval_status: existing.value.approval_status,
+          derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
+      if (archived.count !== 1) {
+        throw new ActiveXeroWriteConflictError();
+      }
       await tx.auditEvent.create({
         data: auditData(parsed.data, "availability_records.archived"),
       });
@@ -728,7 +766,17 @@ export async function archiveRecord(
     });
 
     return { ok: true, value: undefined };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActiveXeroWriteConflictError) {
+      return {
+        error: {
+          code: "invalid_state_for_archive",
+          message:
+            "This record is being updated in Xero and cannot be archived.",
+        },
+        ok: false,
+      };
+    }
     return unknownError();
   }
 }
@@ -760,7 +808,7 @@ export async function restoreRecord(
     }
 
     await database.$transaction(async (tx) => {
-      await tx.availabilityRecord.updateMany({
+      const restored = await tx.availabilityRecord.updateMany({
         data: {
           archived_at: null,
           publish_status: "eligible",
@@ -771,9 +819,14 @@ export async function restoreRecord(
             clerkOrgId: parsed.data.clerkOrgId,
             organisationId: parsed.data.organisationId,
           }),
+          derived_sequence: existing.value.derived_sequence,
           id: parsed.data.recordId,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
+      if (restored.count !== 1) {
+        throw new ActiveXeroWriteConflictError();
+      }
       await tx.auditEvent.create({
         data: auditData(parsed.data, "availability_records.restored"),
       });
@@ -786,7 +839,17 @@ export async function restoreRecord(
     });
 
     return { ok: true, value: undefined };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActiveXeroWriteConflictError) {
+      return {
+        error: {
+          code: "invalid_state_for_archive",
+          message:
+            "This record is being updated in Xero and cannot be restored.",
+        },
+        ok: false,
+      };
+    }
     return unknownError();
   }
 }
@@ -1290,3 +1353,5 @@ function emptyToNull(value: string | undefined): string | null {
   const trimmed = value?.trim();
   return trimmed ? trimmed : null;
 }
+
+class ActiveXeroWriteConflictError extends Error {}

@@ -22,6 +22,11 @@ import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
 import { hasActiveXeroConnection } from "../xero-connection-state";
+import {
+  acquireXeroWriteClaim,
+  releaseXeroWriteClaim,
+  unclaimedOrExpiredXeroWriteWhere,
+} from "../xero-write-claim";
 
 export type SubmitServiceError =
   | { code: "invalid_state_for_retry"; message: string }
@@ -64,12 +69,6 @@ type JsonValue =
   | string
   | JsonValue[]
   | { [key: string]: JsonValue };
-
-// How long a claim on an outbound Xero write stays live. Long enough to cover
-// the full xeroFetch budget (rate-limiter wait plus backed-off retries) with
-// headroom, short enough that a process that dies mid-write does not lock the
-// record out of retry indefinitely.
-const XERO_WRITE_CLAIM_TTL_MS = 2 * 60 * 1000;
 
 export async function submitDraftRecord(
   input: RecordActionInput,
@@ -130,6 +129,7 @@ export async function revertToDraft(
           approval_status: "xero_sync_failed",
           derived_sequence: authorised.value.derived_sequence,
           id: parsed.data.recordId,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
       if (update.count !== 1) {
@@ -168,6 +168,7 @@ export async function withdrawSubmission(
     return unknownError("Invalid submission request.");
   }
 
+  let claimedAt: Date | null = null;
   try {
     const authorised = await loadAndAuthorise(parsed.data, "owner_only");
     if (!authorised.ok) {
@@ -193,6 +194,17 @@ export async function withdrawSubmission(
       return prepared;
     }
 
+    claimedAt = await acquireXeroWriteClaim({
+      ...parsed.data,
+      expectedFailedAction: null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: record.approval_status,
+    });
+    if (!claimedAt) {
+      return invalidState("invalid_state_for_withdraw");
+    }
+    const ownerClaim = claimedAt;
+
     const xeroLeaveApplicationId = record.source_remote_id;
     const response = await externalWritePort.withdrawLeaveApplication({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -205,6 +217,7 @@ export async function withdrawSubmission(
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
         auditAction: "availability_records.withdrawal_failed",
+        claimedAt: ownerClaim,
         error: response.error,
         expectedStatus: record.approval_status,
         failedAction: "withdraw",
@@ -221,6 +234,7 @@ export async function withdrawSubmission(
           failed_action: null,
           updated_by_user_id: parsed.data.actingUserId,
           withdrawn_at: new Date(),
+          xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
         },
@@ -229,6 +243,7 @@ export async function withdrawSubmission(
           approval_status: { in: ["submitted", "approved"] },
           derived_sequence: record.derived_sequence,
           id: record.id,
+          xero_write_claimed_at: ownerClaim,
         },
       });
       if (update.count !== 1) {
@@ -253,6 +268,9 @@ export async function withdrawSubmission(
     await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
+    if (claimedAt) {
+      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+    }
     if (error instanceof OptimisticConflictError) {
       return invalidState("invalid_state_for_withdraw");
     }
@@ -276,6 +294,7 @@ async function performSubmission(
   }
 
   let record: LoadedRecord | null = null;
+  let claimedAt: Date | null = null;
   try {
     const authorised = await loadAndAuthorise(parsed.data, "manager_allowed");
     if (!authorised.ok) {
@@ -315,12 +334,14 @@ async function performSubmission(
     // already exists in payroll. Xero's create endpoint has no idempotency key,
     // so two concurrent submissions would create two applications and only one
     // would be recorded here.
-    const claimed = await claimXeroWrite(
-      parsed.data,
-      record,
-      options.validStatus
-    );
-    if (!claimed) {
+    claimedAt = await acquireXeroWriteClaim({
+      ...parsed.data,
+      expectedFailedAction:
+        options.validStatus === "xero_sync_failed" ? "submit" : null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: options.validStatus,
+    });
+    if (!claimedAt) {
       return invalidState(options.invalidStateCode);
     }
 
@@ -339,7 +360,8 @@ async function performSubmission(
         units: prepared.value.units,
       });
     } catch (error) {
-      await releaseXeroWrite(parsed.data, record);
+      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+      claimedAt = null;
       throw error;
     }
 
@@ -347,6 +369,7 @@ async function performSubmission(
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
         auditAction: options.failureAuditAction,
+        claimedAt,
         error: submission.error,
         expectedStatus: options.validStatus,
         failedAction: "submit",
@@ -379,6 +402,7 @@ async function performSubmission(
           approval_status: options.validStatus,
           derived_sequence: claimedRecord.derived_sequence,
           id: claimedRecord.id,
+          xero_write_claimed_at: claimedAt,
         },
       });
       if (update.count !== 1) {
@@ -391,6 +415,7 @@ async function performSubmission(
         }),
       });
     });
+    claimedAt = null;
 
     await notifyManagerBestEffort(parsed.data, record, "leave_submitted", {
       actionUrl: `/leave-approvals?recordId=${record.id}`,
@@ -403,10 +428,10 @@ async function performSubmission(
     await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
+    if (claimedAt) {
+      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+    }
     if (error instanceof OptimisticConflictError) {
-      if (record) {
-        await releaseXeroWrite(parsed.data, record);
-      }
       return invalidState(options.invalidStateCode);
     }
     return unknownError("Failed to submit this record.");
@@ -486,6 +511,7 @@ async function persistXeroFailure(input: {
   expectedStatus: availability_approval_status;
   failedAction: "submit" | "withdraw";
   input: RecordActionInput;
+  claimedAt: Date;
   record: LoadedRecord;
   error: ProviderWriteError;
 }): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
@@ -512,6 +538,7 @@ async function persistXeroFailure(input: {
         approval_status: input.expectedStatus,
         derived_sequence: input.record.derived_sequence,
         id: input.record.id,
+        xero_write_claimed_at: input.claimedAt,
       },
     });
     if (update.count !== 1) {
@@ -574,48 +601,6 @@ function loadBareRecord(input: RecordActionInput) {
       ...scoped(input),
       id: input.recordId,
     },
-  });
-}
-
-// Atomically take the write claim. Returns false when another request already
-// holds a live claim, in which case the caller must not call Xero. The status
-// and derived_sequence predicates keep this consistent with the guarded update
-// that follows; the claim itself never changes derived_sequence, because that
-// value is published as the ICS SEQUENCE and is the optimistic-concurrency key
-// for the failure path.
-async function claimXeroWrite(
-  input: RecordActionInput,
-  record: LoadedRecord,
-  expectedStatus: availability_approval_status
-): Promise<boolean> {
-  const staleBefore = new Date(Date.now() - XERO_WRITE_CLAIM_TTL_MS);
-  const claim = await database.availabilityRecord.updateMany({
-    data: { xero_write_claimed_at: new Date() },
-    where: {
-      ...scoped(input),
-      approval_status: expectedStatus,
-      derived_sequence: record.derived_sequence,
-      id: record.id,
-      OR: [
-        { xero_write_claimed_at: null },
-        { xero_write_claimed_at: { lt: staleBefore } },
-      ],
-    },
-  });
-  return claim.count === 1;
-}
-
-// Clear the claim. Best-effort: the record may legitimately no longer match
-// (for example the success path already moved it to submitted and cleared the
-// claim in the same transaction), and an uncleared claim self-heals after the
-// TTL.
-async function releaseXeroWrite(
-  input: RecordActionInput,
-  record: LoadedRecord
-): Promise<void> {
-  await database.availabilityRecord.updateMany({
-    data: { xero_write_claimed_at: null },
-    where: { ...scoped(input), id: record.id },
   });
 }
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   approveLeaveApplicationForRegion: vi.fn(),
   auditCreate: vi.fn(),
+  availabilityClaimUpdateMany: vi.fn(),
   availabilityCount: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityFindMany: vi.fn(),
@@ -25,10 +26,12 @@ const mocks = vi.hoisted(() => ({
   ),
   organisationFindFirst: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
+  resolveXeroLeaveTypeId: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
   })),
+  withdrawLeaveApplicationForRegion: vi.fn(),
   workingDayYearsForInput: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
@@ -46,6 +49,7 @@ vi.mock("@repo/database", () => ({
       count: mocks.availabilityCount,
       findFirst: mocks.availabilityFindFirst,
       findMany: mocks.availabilityFindMany,
+      updateMany: mocks.availabilityClaimUpdateMany,
     },
     leaveBalance: {
       findFirst: mocks.leaveBalanceFindFirst,
@@ -53,6 +57,9 @@ vi.mock("@repo/database", () => ({
     },
     location: { findMany: mocks.locationFindMany },
     organisation: { findFirst: mocks.organisationFindFirst },
+    person: {
+      findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
+    },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
   scopedTo: mocks.scopedTo,
@@ -94,7 +101,7 @@ const mockPort = {
   resolveEmployeeId: mocks.resolveXeroEmployeeId,
   resolveLeaveTypeId: vi.fn(),
   submitLeaveApplication: vi.fn(),
-  withdrawLeaveApplication: vi.fn(),
+  withdrawLeaveApplication: mocks.withdrawLeaveApplicationForRegion,
 };
 
 const {
@@ -109,6 +116,7 @@ const {
   retryApproval,
   retryDecline,
 } = await import("./approval-service");
+const { withdrawSubmission } = await import("../plans/submit-service");
 
 const input = {
   actingPersonId: "00000000-0000-4000-8000-000000000012",
@@ -167,10 +175,19 @@ const xeroTenant = {
   xero_tenant_id: "xero-tenant-1",
 };
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve;
+  });
+  return { promise, resolve };
+}
+
 describe("approval-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.computeWorkingDaysFromReferenceData.mockReturnValue({
       ok: true,
@@ -229,12 +246,104 @@ describe("approval-service", () => {
       ok: true,
       value: "employee-1",
     });
+    mockPort.resolveLeaveTypeId.mockResolvedValue({
+      ok: true,
+      value: "type-1",
+    });
     mocks.managerScopePersonIds.mockResolvedValue([record.person_id]);
     mocks.workingDayYearsForInput.mockReturnValue({
       ok: true,
       value: [2026],
     });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
+  });
+
+  it("allows only the claim winner to call Xero for approve versus decline", async () => {
+    const approval = deferred<{ ok: true; value: { rawResponse: object } }>();
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.availabilityClaimUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    mocks.approveLeaveApplicationForRegion.mockReturnValue(approval.promise);
+
+    const approving = approve(input, mockPort);
+    await vi.waitFor(() =>
+      expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
+    );
+    const declining = decline(
+      { ...input, reason: "Coverage is unavailable" },
+      mockPort
+    );
+
+    await expect(declining).resolves.toMatchObject({
+      error: { code: "invalid_state_for_decline" },
+      ok: false,
+    });
+    expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+    approval.resolve({ ok: true, value: { rawResponse: {} } });
+    await expect(approving).resolves.toMatchObject({ ok: true });
+  });
+
+  it("allows only the claim winner to call Xero for approve versus withdraw", async () => {
+    const approval = deferred<{ ok: true; value: { rawResponse: object } }>();
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.availabilityClaimUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    mocks.approveLeaveApplicationForRegion.mockReturnValue(approval.promise);
+
+    const approving = approve(input, mockPort);
+    await vi.waitFor(() =>
+      expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
+    );
+    const withdrawing = withdrawSubmission(
+      {
+        actingOrgRole: "org:viewer",
+        actingUserId: record.person.clerk_user_id,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+        recordId: input.recordId,
+      },
+      mockPort
+    );
+
+    await expect(withdrawing).resolves.toMatchObject({
+      error: { code: "invalid_state_for_withdraw" },
+      ok: false,
+    });
+    expect(mocks.withdrawLeaveApplicationForRegion).not.toHaveBeenCalled();
+    approval.resolve({ ok: true, value: { rawResponse: {} } });
+    await expect(approving).resolves.toMatchObject({ ok: true });
+  });
+
+  it("allows only one duplicate withdrawal to call Xero", async () => {
+    const withdrawal = deferred<{ ok: true; value: { rawResponse: object } }>();
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.availabilityClaimUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    mocks.withdrawLeaveApplicationForRegion.mockReturnValue(withdrawal.promise);
+    const withdrawInput = {
+      actingOrgRole: "org:viewer",
+      actingUserId: record.person.clerk_user_id,
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+      recordId: input.recordId,
+    };
+
+    const first = withdrawSubmission(withdrawInput, mockPort);
+    await vi.waitFor(() =>
+      expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
+    );
+    const second = withdrawSubmission(withdrawInput, mockPort);
+
+    await expect(second).resolves.toMatchObject({
+      error: { code: "invalid_state_for_withdraw" },
+      ok: false,
+    });
+    expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledTimes(1);
+    withdrawal.resolve({ ok: true, value: { rawResponse: {} } });
+    await expect(first).resolves.toMatchObject({ ok: true });
   });
 
   it("dispatches inbound Xero leave records for an authorised admin", async () => {

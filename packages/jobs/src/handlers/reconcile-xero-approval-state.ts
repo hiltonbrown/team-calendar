@@ -1,6 +1,7 @@
 import "server-only";
 
 import { clerkClient } from "@repo/auth/server";
+import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
@@ -268,6 +269,7 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
         archived_at: null,
         ends_at: { gte: windowStart },
         source_remote_id: { not: null },
+        ...unclaimedOrExpiredXeroWriteWhere(),
       },
     });
 
@@ -512,6 +514,7 @@ async function transitionRecord(
         approval_status: record.approval_status,
         derived_sequence: record.derived_sequence,
         id: record.id,
+        ...unclaimedOrExpiredXeroWriteWhere(),
       },
     });
     if (updated.count !== 1) {
@@ -557,6 +560,7 @@ async function archiveMissing(
         approval_status: record.approval_status,
         derived_sequence: record.derived_sequence,
         id: record.id,
+        ...unclaimedOrExpiredXeroWriteWhere(),
       },
     });
     if (updated.count !== 1) {
@@ -569,7 +573,11 @@ async function archiveMissing(
       });
       await tx.availabilityRecord.updateMany({
         data: { xero_approval_checked_at: checkedAt },
-        where: { ...scoped(context), id: record.id },
+        where: {
+          ...scoped(context),
+          id: record.id,
+          ...unclaimedOrExpiredXeroWriteWhere(),
+        },
       });
       return;
     }
@@ -962,7 +970,11 @@ async function stampCheckedAt(
 ) {
   await database.availabilityRecord.updateMany({
     data: { xero_approval_checked_at: checkedAt },
-    where: { ...scoped(context), id: recordId },
+    where: {
+      ...scoped(context),
+      id: recordId,
+      ...unclaimedOrExpiredXeroWriteWhere(),
+    },
   });
 }
 

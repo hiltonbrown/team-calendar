@@ -35,6 +35,11 @@ import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { dispatchSyncEvent } from "../sync/sync-events";
 import { hasActiveXeroConnection } from "../xero-connection-state";
+import {
+  acquireXeroWriteClaim,
+  releaseXeroWriteClaim,
+  unclaimedOrExpiredXeroWriteWhere,
+} from "../xero-write-claim";
 
 export type ApprovalRole = "admin" | "manager" | "owner";
 
@@ -738,6 +743,7 @@ export async function revertApprovalAttempt(
           approval_status: "xero_sync_failed",
           derived_sequence: record.derived_sequence,
           id: record.id,
+          ...unclaimedOrExpiredXeroWriteWhere(),
         },
       });
       if (update.count !== 1) {
@@ -862,6 +868,7 @@ async function performApproval(
 
   let failureStage: ApprovalFailureStage = "prepare";
   let xeroWriteSucceeded = false;
+  let claimedAt: Date | null = null;
   try {
     const prepared = await prepareApprovalWrite(
       parsed.data,
@@ -886,6 +893,19 @@ async function performApproval(
       });
     }
 
+    claimedAt = await acquireXeroWriteClaim({
+      ...parsed.data,
+      expectedFailedAction: options.retry ? "approve" : null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+    });
+    if (!claimedAt) {
+      return invalidState(
+        options.retry ? "invalid_state_for_retry" : "invalid_state_for_approve"
+      );
+    }
+    const ownerClaim = claimedAt;
+
     failureStage = "xero_write";
     const response = await externalWritePort.approveLeaveApplication({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -897,6 +917,7 @@ async function performApproval(
       failureStage = "local_transaction";
       return await persistApprovalFailure({
         auditAction: options.failureAuditAction,
+        claimedAt: ownerClaim,
         error: response.error,
         failedAction: "approve",
         input: parsed.data,
@@ -916,10 +937,11 @@ async function performApproval(
           derived_sequence: { increment: 1 },
           failed_action: null,
           updated_by_user_id: parsed.data.actingUserId,
+          xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
         },
-        where: transitionWhere(parsed.data, record),
+        where: transitionWhere(parsed.data, record, ownerClaim),
       });
       if (update.count !== 1) {
         throw new OptimisticConflictError();
@@ -930,6 +952,7 @@ async function performApproval(
         }),
       });
     });
+    claimedAt = null;
 
     failureStage = "notification";
     await notifyApprovalBestEffort(parsed.data, record, {
@@ -947,6 +970,9 @@ async function performApproval(
     failureStage = "projection";
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
+    if (claimedAt) {
+      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+    }
     return handleApprovalWriteFailure(
       error,
       {
@@ -975,6 +1001,7 @@ async function performDecline(
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
   let failureStage: ApprovalFailureStage = "prepare";
   let xeroWriteSucceeded = false;
+  let claimedAt: Date | null = null;
   try {
     const prepared = await prepareApprovalWrite(input, externalWritePort, {
       expectedFailedAction: options.retry ? "decline" : null,
@@ -995,6 +1022,19 @@ async function performDecline(
       });
     }
 
+    claimedAt = await acquireXeroWriteClaim({
+      ...input,
+      expectedFailedAction: options.retry ? "decline" : null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+    });
+    if (!claimedAt) {
+      return invalidState(
+        options.retry ? "invalid_state_for_retry" : "invalid_state_for_decline"
+      );
+    }
+    const ownerClaim = claimedAt;
+
     failureStage = "xero_write";
     const response = await externalWritePort.declineLeaveApplication({
       clerkOrgId: input.clerkOrgId,
@@ -1008,6 +1048,7 @@ async function performDecline(
       return await persistApprovalFailure({
         approvalNote: options.reason,
         auditAction: options.failureAuditAction,
+        claimedAt: ownerClaim,
         error: response.error,
         failedAction: "decline",
         input,
@@ -1028,10 +1069,11 @@ async function performDecline(
           derived_sequence: { increment: 1 },
           failed_action: null,
           updated_by_user_id: input.actingUserId,
+          xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
         },
-        where: transitionWhere(input, record),
+        where: transitionWhere(input, record, ownerClaim),
       });
       if (update.count !== 1) {
         throw new OptimisticConflictError();
@@ -1043,6 +1085,7 @@ async function performDecline(
         }),
       });
     });
+    claimedAt = null;
 
     failureStage = "notification";
     await notifyApprovalBestEffort(input, record, {
@@ -1061,6 +1104,9 @@ async function performDecline(
     failureStage = "projection";
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
+    if (claimedAt) {
+      await releaseXeroWriteClaim({ ...input, claimedAt });
+    }
     return handleApprovalWriteFailure(
       error,
       {
@@ -1143,6 +1189,7 @@ async function persistApprovalFailure(input: {
   auditAction: string;
   failedAction: "approve" | "decline";
   input: CommandInput;
+  claimedAt: Date;
   record: LoadedApprovalRecord;
   error: ProviderWriteError;
 }): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
@@ -1154,6 +1201,7 @@ async function persistApprovalFailure(input: {
         approval_status: "xero_sync_failed",
         failed_action: input.failedAction,
         updated_by_user_id: input.input.actingUserId,
+        xero_write_claimed_at: null,
         xero_write_error: plainMessage,
         xero_write_error_raw: {
           attemptedAction: input.failedAction,
@@ -1165,7 +1213,7 @@ async function persistApprovalFailure(input: {
           timestamp: new Date().toISOString(),
         },
       },
-      where: transitionWhere(input.input, input.record),
+      where: transitionWhere(input.input, input.record, input.claimedAt),
     });
     if (update.count !== 1) {
       throw new OptimisticConflictError();
@@ -1841,12 +1889,17 @@ function auditData(
   };
 }
 
-function transitionWhere(input: CommandInput, record: LoadedApprovalRecord) {
+function transitionWhere(
+  input: CommandInput,
+  record: LoadedApprovalRecord,
+  claimedAt: Date
+) {
   return {
     ...scoped(input),
     approval_status: record.approval_status,
     derived_sequence: record.derived_sequence,
     id: record.id,
+    xero_write_claimed_at: claimedAt,
   };
 }
 

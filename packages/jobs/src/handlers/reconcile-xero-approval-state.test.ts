@@ -156,6 +156,29 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
     );
     expect(mocks.auditEventCreate).not.toHaveBeenCalled();
     expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+    expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([{ xero_write_claimed_at: null }]),
+        }),
+      })
+    );
+  });
+
+  it("excludes active outbound claims from reconciliation selection", async () => {
+    mocks.availabilityRecordFindMany.mockResolvedValue([]);
+
+    await reconcileXeroApprovalState(input());
+
+    expect(mocks.availabilityRecordFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: CLERK_ORG_ID,
+          OR: expect.arrayContaining([{ xero_write_claimed_at: null }]),
+          organisation_id: ORGANISATION_ID,
+        }),
+      })
+    );
   });
 
   it("audits and notifies after a guarded declined transition", async () => {

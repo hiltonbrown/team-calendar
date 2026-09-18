@@ -45,6 +45,12 @@ vi.mock("../client", () => ({
 vi.mock("@repo/availability", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
   normaliseInboundLeaveRecord: mocks.normaliseInboundLeaveRecord,
+  unclaimedOrExpiredXeroWriteWhere: vi.fn(() => ({
+    OR: [
+      { xero_write_claimed_at: null },
+      { xero_write_claimed_at: { lt: new Date(0) } },
+    ],
+  })),
 }));
 const databaseMock = {
   $transaction: mocks.databaseTransaction,
@@ -209,6 +215,13 @@ describe("leave records stale archival", () => {
       })
     );
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([{ xero_write_claimed_at: null }]),
+        }),
+      })
+    );
   });
 
   it("persists rejected leave with zero units", async () => {
@@ -1002,7 +1015,7 @@ describe("leave records stale archival", () => {
     }
     expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
+        where: expect.objectContaining({
           approval_status: "approved",
           clerk_org_id: CLERK_ORG_ID,
           derived_sequence: 3,
@@ -1011,7 +1024,7 @@ describe("leave records stale archival", () => {
           source_last_modified_at: storedTimestamp,
           source_remote_hash: "hash-before-update",
           updated_at: new Date("2026-01-01T00:00:00.000Z"),
-        },
+        }),
       })
     );
   });
@@ -1063,6 +1076,13 @@ describe("leave records stale archival", () => {
     }
     expect(mocks.materialiseAvailabilityPublication).not.toHaveBeenCalled();
     expect(mocks.inngestSend).not.toHaveBeenCalled();
+    expect(mocks.availabilityRecordUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([{ xero_write_claimed_at: null }]),
+        }),
+      })
+    );
   });
 });
 

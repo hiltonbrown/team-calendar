@@ -154,6 +154,29 @@ describe("AU payroll write path", () => {
     }
   });
 
+  it("uses one bounded provider attempt for a payroll mutation", async () => {
+    const controller = new AbortController();
+    const timeout = vi
+      .spyOn(AbortSignal, "timeout")
+      .mockReturnValue(controller.signal);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ Message: "Try later" }), { status: 429 })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await approveLeaveApplication({
+      xeroEmployeeId: "employee-1",
+      xeroLeaveApplicationId: "leave-1",
+      xeroTenant: buildXeroTenant(),
+    });
+
+    expect(timeout).toHaveBeenCalledWith(120_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+  });
+
   it("approves leave through Xero", async () => {
     const fetchMock = vi
       .fn()

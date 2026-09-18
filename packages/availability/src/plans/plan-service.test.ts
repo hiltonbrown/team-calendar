@@ -27,7 +27,9 @@ const mocks = vi.hoisted(() => {
   return {
     auditCreate,
     availabilityCreate,
+    availabilityDeleteMany: vi.fn(),
     availabilityFindFirst,
+    availabilityUpdateMany: vi.fn(),
     hasActiveXeroConnection: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
     materialiseAvailabilityPublication: vi.fn(() =>
@@ -55,7 +57,8 @@ vi.mock("@repo/database", () => ({
         auditEvent: { create: mocks.auditCreate },
         availabilityRecord: {
           create: mocks.availabilityCreate,
-          updateMany: vi.fn(),
+          deleteMany: mocks.availabilityDeleteMany,
+          updateMany: mocks.availabilityUpdateMany,
         },
       }),
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
@@ -72,9 +75,13 @@ vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
 }));
 
-const { archiveRecord, createRecord, getRecord, updateRecord } = await import(
-  "./plan-service"
-);
+const {
+  archiveRecord,
+  createRecord,
+  deleteDraftRecord,
+  getRecord,
+  updateRecord,
+} = await import("./plan-service");
 
 const baseInput = {
   actingOrgRole: "org:viewer",
@@ -105,7 +112,21 @@ function scopedRecordFixture({
   personId?: string;
 }) {
   return {
+    all_day: true,
+    approval_note: null,
     approval_status: "approved",
+    approved_at: new Date("2026-01-01T00:00:00.000Z"),
+    archived_at: null,
+    contactability: "contactable",
+    created_at: new Date("2026-01-01T00:00:00.000Z"),
+    created_by_user_id: "user_1",
+    derived_sequence: 2,
+    derived_uid_key: "uid-key",
+    ends_at: baseInput.endsAt,
+    failed_action: null,
+    id: actionInput.recordId,
+    notes_internal: null,
+    organisation_id: baseInput.organisationId,
     person: {
       email: "person@example.com",
       first_name: "Test",
@@ -114,7 +135,15 @@ function scopedRecordFixture({
       location_id: null,
       manager_person_id: managerPersonId,
     },
+    person_id: personId,
+    privacy_mode: "named",
+    record_type: "wfh",
+    source_remote_id: null,
     source_type: "manual",
+    starts_at: baseInput.startsAt,
+    submitted_at: null,
+    updated_at: new Date("2026-01-01T00:00:00.000Z"),
+    xero_write_error: null,
   };
 }
 
@@ -124,6 +153,8 @@ describe("plan-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       scopedRecordFixture({ managerPersonId: null })
     );
+    mocks.availabilityDeleteMany.mockResolvedValue({ count: 1 });
+    mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
     mocks.personFindFirst.mockResolvedValue({
       email: "person@example.com",
@@ -239,6 +270,54 @@ describe("plan-service", () => {
     });
 
     expect(result).toMatchObject({ ok: true });
+  });
+
+  it("does not edit a record while an outbound Xero claim is active", async () => {
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await updateRecord({
+      ...actionInput,
+      actingOrgRole: "org:viewer",
+      patch: { notesInternal: "Changed" },
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "not_editable_after_submission" },
+      ok: false,
+    });
+  });
+
+  it("does not archive a record while an outbound Xero claim is active", async () => {
+    mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await archiveRecord({
+      ...actionInput,
+      actingOrgRole: "org:viewer",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "invalid_state_for_archive" },
+      ok: false,
+    });
+  });
+
+  it("does not delete a draft while an outbound Xero claim is active", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...scopedRecordFixture({ managerPersonId: null }),
+      approval_status: "draft",
+      source_type: "team_calendar_leave",
+    });
+    mocks.availabilityDeleteMany.mockResolvedValueOnce({ count: 0 });
+
+    const result = await deleteDraftRecord({
+      ...actionInput,
+      actingOrgRole: "org:viewer",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "invalid_state_for_delete" },
+      ok: false,
+    });
   });
 
   it("projects unit, currencyCode, and balance amount on balanceChip", async () => {
