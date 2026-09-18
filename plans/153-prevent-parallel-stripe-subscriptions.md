@@ -58,6 +58,8 @@ Checkout path, and identical organisation, plan and subscription transitions
 share a deterministic SHA-256 Stripe idempotency key.
 
 Verification passed 14 billing tests, 26 billing action and payment webhook
-tests, billing and app typechecks, scoped Ultracite and `git diff --check`.
+tests, billing and app typechecks, scoped Ultracite and `git diff --check`. The
+merged candidate also passed repository check, 19 typecheck tasks, boundaries,
+app/API/web builds, 17 unit-test tasks and all five integration-test packages.
 Paid-mode production preflight remains a deployment gate because production
 launch mode and Stripe configuration were not changed by this source plan.
