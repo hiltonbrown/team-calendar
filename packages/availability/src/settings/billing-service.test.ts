@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  getAuthoritativeUsageCount: vi.fn(),
   getPlanLimits: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
-  queryRaw: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
-  database: { $queryRaw: mocks.queryRaw },
+  getAuthoritativeUsageCount: mocks.getAuthoritativeUsageCount,
   getPlanDefinition: (key: string) => ({
     name: `${key.charAt(0).toUpperCase()}${key.slice(1)}`,
   }),
@@ -42,13 +42,13 @@ describe("billing-service", () => {
       payroll_entities: 2,
       seats: 50,
     });
-    mocks.queryRaw.mockResolvedValue([
-      { current_value: 1, metric_key: "payroll_entities" },
-      { current_value: 8, metric_key: "seats" },
-    ]);
+    mocks.getAuthoritativeUsageCount.mockImplementation(
+      (_clerkOrgId: string, limitType: string) =>
+        Promise.resolve({ feeds: 0, payroll_entities: 1, seats: 8 }[limitType])
+    );
   });
 
-  it("returns plan, usage, and over-limit state", async () => {
+  it("returns plan, authoritative usage, and over-limit state", async () => {
     const result = await getBillingSummary(baseInput);
 
     expect(result).toMatchObject({
@@ -64,6 +64,34 @@ describe("billing-service", () => {
         },
       },
     });
+    expect(result.ok && result.value.usage).toEqual([
+      {
+        currentValue: 1,
+        label: "Payroll entities",
+        limit: 2,
+        metricKey: "payroll_entities",
+        unit: "payroll entities",
+      },
+      {
+        currentValue: 8,
+        label: "Seats",
+        limit: 50,
+        metricKey: "seats",
+        unit: "seats",
+      },
+      {
+        currentValue: 0,
+        label: "Feeds",
+        limit: null,
+        metricKey: "feeds",
+        unit: "feeds",
+      },
+    ]);
+    expect(mocks.getAuthoritativeUsageCount.mock.calls).toEqual([
+      ["org_1", "payroll_entities"],
+      ["org_1", "seats"],
+      ["org_1", "feeds"],
+    ]);
   });
 
   it("allows admins", async () => {
@@ -112,9 +140,10 @@ describe("billing-service", () => {
       payroll_entities: 1,
       seats: 10,
     });
-    mocks.queryRaw.mockResolvedValue([
-      { current_value: 5, metric_key: "feeds" },
-    ]);
+    mocks.getAuthoritativeUsageCount.mockImplementation(
+      (_clerkOrgId: string, limitType: string) =>
+        Promise.resolve({ feeds: 5, payroll_entities: 1, seats: 10 }[limitType])
+    );
 
     const result = await getBillingSummary(baseInput);
 
@@ -125,9 +154,12 @@ describe("billing-service", () => {
   });
 
   it("treats an unlimited (-1) limit as never over-limit", async () => {
-    mocks.queryRaw.mockResolvedValue([
-      { current_value: 9999, metric_key: "feeds" },
-    ]);
+    mocks.getAuthoritativeUsageCount.mockImplementation(
+      (_clerkOrgId: string, limitType: string) =>
+        Promise.resolve(
+          { feeds: 9999, payroll_entities: 1, seats: 8 }[limitType]
+        )
+    );
 
     const result = await getBillingSummary(baseInput);
 
