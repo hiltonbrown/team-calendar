@@ -10,14 +10,14 @@ const CreateAvailabilitySchema = z.object({
   allDay: z.boolean().optional().default(true),
   contactability: z.enum(["contactable", "limited", "unavailable"]).optional(),
   endsAt: z.string().datetime(),
-  notesInternal: z.string().optional().nullable(),
+  notesInternal: z.string().max(2000).optional().nullable(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid(),
-  preferredContactMethod: z.string().optional().nullable(),
+  preferredContactMethod: z.string().max(200).optional().nullable(),
   recordType: z.enum(["leave", "wfh", "travel", "training", "client_site"]),
   startsAt: z.string().datetime(),
-  title: z.string().optional().nullable(),
-  workingLocation: z.string().optional().nullable(),
+  title: z.string().min(1).max(200),
+  workingLocation: z.string().max(200).optional().nullable(),
 });
 
 export async function POST(request: Request): Promise<Response> {

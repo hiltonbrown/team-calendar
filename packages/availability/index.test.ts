@@ -17,11 +17,13 @@ const mocks = vi.hoisted(() => {
   }
 
   interface PersonFixture {
+    clerk_user_id: string | null;
     display_name: string | null;
     email: string | null;
     first_name: string;
     id: string;
     last_name: string;
+    manager_person_id: string | null;
   }
 
   interface AvailabilityRecordFixture {
@@ -36,6 +38,7 @@ const mocks = vi.hoisted(() => {
     organisation_id: string;
     person: PersonFixture;
     person_id: string;
+    preferred_contact_method: string | null;
     privacy_mode: string | null;
     record_type: string;
     source_remote_id: string | null;
@@ -103,6 +106,10 @@ const mocks = vi.hoisted(() => {
         organisation_id: String(data.organisation_id),
         person,
         person_id: String(data.person_id),
+        preferred_contact_method:
+          typeof data.preferred_contact_method === "string"
+            ? data.preferred_contact_method
+            : null,
         privacy_mode:
           typeof data.privacy_mode === "string" ? data.privacy_mode : null,
         record_type: String(data.record_type),
@@ -129,9 +136,9 @@ const mocks = vi.hoisted(() => {
         where,
       }: {
         data: Record<string, unknown>;
-        where: { id: string };
+        where: ScopedWhere;
       }) => {
-        const record = records.find((entry) => entry.id === where.id);
+        const record = records.find((entry) => matchesWhere(entry, where));
         if (!record) {
           throw new Error("Record fixture missing for update");
         }
@@ -147,6 +154,36 @@ const mocks = vi.hoisted(() => {
         }
         if (typeof data.title === "string") {
           record.title = data.title;
+        }
+        if (typeof data.all_day === "boolean") {
+          record.all_day = data.all_day;
+        }
+        if (typeof data.contactability === "string") {
+          record.contactability = data.contactability;
+        }
+        if (typeof data.include_in_feed === "boolean") {
+          record.include_in_feed = data.include_in_feed;
+        }
+        if (typeof data.privacy_mode === "string") {
+          record.privacy_mode = data.privacy_mode;
+        }
+        if (
+          data.notes_internal === null ||
+          typeof data.notes_internal === "string"
+        ) {
+          record.notes_internal = data.notes_internal;
+        }
+        if (
+          data.preferred_contact_method === null ||
+          typeof data.preferred_contact_method === "string"
+        ) {
+          record.preferred_contact_method = data.preferred_contact_method;
+        }
+        if (
+          data.working_location === null ||
+          typeof data.working_location === "string"
+        ) {
+          record.working_location = data.working_location;
         }
 
         return record;
@@ -231,18 +268,33 @@ const baseInput = {
   workingLocation: "Brisbane",
 } as const;
 
+const basePatchInput = {
+  allDay: baseInput.allDay,
+  contactability: baseInput.contactability,
+  endsAt: baseInput.endsAt,
+  includeInFeed: baseInput.includeInFeed,
+  notesInternal: baseInput.notesInternal,
+  privacyMode: baseInput.privacyMode,
+  recordType: baseInput.recordType,
+  startsAt: baseInput.startsAt,
+  title: baseInput.title,
+  workingLocation: baseInput.workingLocation,
+};
+
 const adminActor = {
   orgRole: "org:admin",
   userId: "user_test",
 } as const;
 
-function addPerson(id: string) {
+function addPerson(id: string, clerkUserId: string | null = null) {
   mocks.people.push({
+    clerk_user_id: clerkUserId,
     display_name: null,
     email: `${id}@example.com`,
     first_name: "Manual",
     id,
     last_name: "Person",
+    manager_person_id: null,
   });
 }
 
@@ -411,7 +463,7 @@ describe("createManualAvailability duplicate guard", () => {
     const result = await updateManualAvailability(
       baseTenant,
       second.value.id,
-      baseInput,
+      basePatchInput,
       adminActor
     );
 
@@ -440,7 +492,7 @@ describe("createManualAvailability duplicate guard", () => {
       baseTenant,
       created.value.id,
       {
-        ...baseInput,
+        ...basePatchInput,
         endsAt: new Date("2026-05-13T00:00:00.000Z"),
         startsAt: new Date("2026-05-11T00:00:00.000Z"),
       },
@@ -450,6 +502,225 @@ describe("createManualAvailability duplicate guard", () => {
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdate).toHaveBeenCalledTimes(1);
     expect(mocks.records).toHaveLength(1);
+  });
+
+  it("updates only the title and preserves private non-default fields", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      {
+        ...baseInput,
+        allDay: false,
+        contactability: "unavailable",
+        includeInFeed: false,
+        preferredContactMethod: "Signal",
+        privacyMode: "private",
+      },
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      { title: "Changed" },
+      adminActor
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        allDay: false,
+        contactability: "unavailable",
+        includeInFeed: false,
+        privacyMode: "private",
+        title: "Changed",
+      },
+    });
+    expect(mocks.availabilityUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          all_day: false,
+          contactability: "unavailable",
+          include_in_feed: false,
+          preferred_contact_method: "Signal",
+          privacy_mode: "private",
+          title: "Changed",
+        }),
+        where: {
+          archived_at: null,
+          clerk_org_id: baseTenant.clerkOrgId,
+          id: created.value.id,
+          organisation_id: baseTenant.organisationId,
+          source_type: "manual",
+        },
+      })
+    );
+  });
+
+  it("does not update a source-mismatched record", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    const stored = mocks.records.at(0);
+    if (!stored) {
+      throw new Error("Expected a stored record fixture");
+    }
+    stored.source_type = "xero";
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      { title: "Changed" },
+      adminActor
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "not_found" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does not update a record from another tenant", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      otherTenant,
+      created.value.id,
+      { title: "Changed" },
+      adminActor
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "not_found" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+  });
+
+  it("denies an actor who cannot manage the record", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      { title: "Changed" },
+      { orgRole: "org:viewer", userId: "user_outsider" }
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects person reassignment", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      { personId: otherPersonId },
+      adminActor
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "bad_request" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a partial update whose merged interval is inverted", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      baseInput,
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      { startsAt: new Date("2026-05-13T00:00:00.000Z") },
+      adminActor
+    );
+
+    expect(result).toMatchObject({
+      error: { code: "bad_request" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdate).not.toHaveBeenCalled();
+  });
+
+  it("clears nullable optional text fields", async () => {
+    const created = await createManualAvailability(
+      baseTenant,
+      { ...baseInput, preferredContactMethod: "Signal" },
+      adminActor
+    );
+    if (!created.ok) {
+      throw new Error("Expected the record to be created");
+    }
+    vi.clearAllMocks();
+
+    const result = await updateManualAvailability(
+      baseTenant,
+      created.value.id,
+      {
+        notesInternal: null,
+        preferredContactMethod: null,
+        workingLocation: null,
+      },
+      adminActor
+    );
+
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          notes_internal: null,
+          preferred_contact_method: null,
+          working_location: null,
+        }),
+      })
+    );
   });
 
   it("ignores archived records when guarding updates", async () => {
@@ -482,7 +753,7 @@ describe("createManualAvailability duplicate guard", () => {
     const result = await updateManualAvailability(
       baseTenant,
       second.value.id,
-      baseInput,
+      basePatchInput,
       adminActor
     );
 

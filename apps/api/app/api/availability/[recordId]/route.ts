@@ -17,20 +17,11 @@ const RouteParamsSchema = z.object({
   recordId: z.string().uuid(),
 });
 
-const UpdateAvailabilitySchema = z.object({
-  allDay: z.boolean().optional(),
-  contactability: z.enum(["contactable", "limited", "unavailable"]).optional(),
-  endsAt: z.string().datetime().optional(),
-  notesInternal: z.string().optional().nullable(),
-  organisationId: z.string().uuid(),
-  preferredContactMethod: z.string().optional().nullable(),
-  recordType: z
-    .enum(["leave", "wfh", "travel", "training", "client_site"])
-    .optional(),
-  startsAt: z.string().datetime().optional(),
-  title: z.string().optional().nullable(),
-  workingLocation: z.string().optional().nullable(),
-});
+const UpdateAvailabilitySchema = z
+  .object({
+    organisationId: z.string().uuid(),
+  })
+  .passthrough();
 
 const DeleteAvailabilitySchema = z.object({
   organisationId: z.string().uuid(),
@@ -85,7 +76,18 @@ export async function PATCH(
       );
     }
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json(
+        {
+          error: { code: "invalid", message: "Malformed JSON request body" },
+          ok: false,
+        },
+        { status: 400 }
+      );
+    }
     const parseResult = UpdateAvailabilitySchema.safeParse(body);
 
     if (!parseResult.success) {
@@ -102,11 +104,11 @@ export async function PATCH(
       );
     }
 
-    const { data } = parseResult;
+    const { organisationId, ...patch } = parseResult.data;
 
     // Safe branded cast: clerkOrgId is verified by Clerk requireOrg(), organisationId and recordId are validated by Zod UUID schemas
     const scopedClerkOrgId = clerkOrgId as ClerkOrgId;
-    const scopedOrgId = data.organisationId as OrganisationId;
+    const scopedOrgId = organisationId as OrganisationId;
     const scopedRecordId = parsedParams.data.recordId as AvailabilityRecordId;
 
     // Validate organisation exists
@@ -119,36 +121,6 @@ export async function PATCH(
       );
     }
 
-    // Get record to verify it's editable
-    const recordResult = await getAvailabilityRecordById(
-      scopedClerkOrgId,
-      scopedOrgId,
-      scopedRecordId
-    );
-
-    if (!recordResult.ok) {
-      return Response.json(
-        { error: recordResult.error, ok: false },
-        { status: recordResult.error.code === "not_found" ? 404 : 500 }
-      );
-    }
-
-    const record = recordResult.value;
-
-    // Check if record is Xero-sourced (read-only)
-    if (record.sourceType !== "manual") {
-      return Response.json(
-        {
-          error: {
-            code: "forbidden",
-            message: "Xero-sourced records cannot be edited",
-          },
-          ok: false,
-        },
-        { status: 403 }
-      );
-    }
-
     const authResult = await auth();
 
     // Call availability service to update record
@@ -158,17 +130,7 @@ export async function PATCH(
         organisationId: scopedOrgId,
       },
       scopedRecordId,
-      {
-        allDay: data.allDay,
-        contactability: data.contactability,
-        endsAt: data.endsAt ? new Date(data.endsAt) : undefined,
-        notesInternal: data.notesInternal,
-        preferredContactMethod: data.preferredContactMethod,
-        recordType: data.recordType,
-        startsAt: data.startsAt ? new Date(data.startsAt) : undefined,
-        title: data.title,
-        workingLocation: data.workingLocation,
-      },
+      patch,
       { orgRole: authResult.orgRole, userId: user.id }
     );
 
@@ -176,7 +138,7 @@ export async function PATCH(
       return Response.json(
         { error: updateResult.error, ok: false },
         {
-          status: updateResult.error.code === "not_authorised" ? 403 : 500,
+          status: statusForUpdateError(updateResult.error.code),
         }
       );
     }
@@ -195,6 +157,26 @@ export async function PATCH(
       { status: 500 }
     );
   }
+}
+
+function statusForUpdateError(code: string): number {
+  if (code === "bad_request") {
+    return 400;
+  }
+
+  if (code === "conflict") {
+    return 409;
+  }
+
+  if (code === "not_found") {
+    return 404;
+  }
+
+  if (code === "not_authorised") {
+    return 403;
+  }
+
+  return 500;
 }
 
 export async function DELETE(

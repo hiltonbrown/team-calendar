@@ -67,8 +67,7 @@ const validPostPayload = {
 
 const validPatchPayload = {
   organisationId: "22222222-2222-4222-a222-222222222222",
-  recordType: "travel",
-  startsAt: "2026-07-02T09:00:00.000Z",
+  title: "Changed",
 };
 
 describe("Availability Collection Route (POST)", () => {
@@ -407,6 +406,30 @@ describe("Availability Single Record Route (PATCH)", () => {
     expect(updateManualAvailability).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for malformed JSON", async () => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+
+    const response = await PATCH(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          body: "{",
+          headers: { "content-type": "application/json" },
+          method: "PATCH",
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateManualAvailability).not.toHaveBeenCalled();
+  });
+
   it("returns 400 when organisationId is not a valid UUID", async () => {
     vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
     vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
@@ -497,7 +520,7 @@ describe("Availability Single Record Route (PATCH)", () => {
       ok: true,
       value: { id: "org-1" } as any,
     });
-    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
+    vi.mocked(updateManualAvailability).mockResolvedValue({
       error: { code: "not_found", message: "Record not found" } as any,
       ok: false,
     });
@@ -521,19 +544,16 @@ describe("Availability Single Record Route (PATCH)", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns 403 when record is not manual (e.g. xero-sourced)", async () => {
+  it("returns 404 when the service rejects a source mismatch", async () => {
     vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
     vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
     vi.mocked(getOrganisationById).mockResolvedValue({
       ok: true,
       value: { id: "org-1" } as any,
     });
-    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
-      ok: true,
-      value: {
-        id: "33333333-3333-4333-a333-333333333333",
-        sourceType: "xero",
-      } as any,
+    vi.mocked(updateManualAvailability).mockResolvedValue({
+      error: { code: "not_found", message: "Record not found" } as any,
+      ok: false,
     });
 
     const response = await PATCH(
@@ -552,12 +572,12 @@ describe("Availability Single Record Route (PATCH)", () => {
       }
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body.error.message).toBe("Xero-sourced records cannot be edited");
+    expect(body.error.message).toBe("Record not found");
   });
 
-  it("returns 200 on happy path PATCH, verifying tenant isolation", async () => {
+  it("returns 200 for a title-only PATCH without personId", async () => {
     vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
     vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
     vi.mocked(getOrganisationById).mockResolvedValue({
@@ -600,23 +620,58 @@ describe("Availability Single Record Route (PATCH)", () => {
     expect(body.ok).toBe(true);
     expect(body.value.title).toBe("Updated");
 
-    // Tenant isolation verification
-    expect(getAvailabilityRecordById).toHaveBeenCalledWith(
-      "org_clerk_123",
-      validPatchPayload.organisationId,
-      "33333333-3333-4333-a333-333333333333"
-    );
     expect(updateManualAvailability).toHaveBeenCalledWith(
       {
         clerkOrgId: "org_clerk_123",
         organisationId: validPatchPayload.organisationId,
       },
       "33333333-3333-4333-a333-333333333333",
-      expect.objectContaining({
-        recordType: validPatchPayload.recordType,
-      }),
+      { title: "Changed" },
       { orgRole: "org:viewer", userId: "user_123" }
     );
+  });
+
+  it.each([
+    ["bad_request", 400],
+    ["conflict", 409],
+    ["not_found", 404],
+    ["internal", 500],
+  ] as const)("maps %s service errors to %i", async (code, status) => {
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as any);
+    vi.mocked(getOrganisationById).mockResolvedValue({
+      ok: true,
+      value: { id: "org-1" } as any,
+    });
+    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
+      ok: true,
+      value: {
+        id: "33333333-3333-4333-a333-333333333333",
+        sourceType: "manual",
+      } as any,
+    });
+    vi.mocked(updateManualAvailability).mockResolvedValue({
+      error: { code, message: "Update failed" } as any,
+      ok: false,
+    });
+
+    const response = await PATCH(
+      new Request(
+        "http://localhost/api/availability/33333333-3333-4333-a333-333333333333",
+        {
+          body: JSON.stringify(validPatchPayload),
+          headers: { "content-type": "application/json" },
+          method: "PATCH",
+        }
+      ),
+      {
+        params: Promise.resolve({
+          recordId: "33333333-3333-4333-a333-333333333333",
+        }),
+      }
+    );
+
+    expect(response.status).toBe(status);
   });
 
   it("returns 403 when updateManualAvailability returns not_authorised", async () => {

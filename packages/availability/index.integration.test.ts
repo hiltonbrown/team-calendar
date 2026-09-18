@@ -74,6 +74,19 @@ const inputFor = (tenant: TenantFixture) => ({
   workingLocation: "Brisbane",
 });
 
+const patchInput = {
+  allDay: true,
+  contactability: "limited",
+  endsAt: new Date("2026-05-12T00:00:00.000Z"),
+  includeInFeed: true,
+  notesInternal: "Manual entry fixture",
+  privacyMode: "named",
+  recordType: "wfh",
+  startsAt: new Date("2026-05-10T00:00:00.000Z"),
+  title: "Working from home",
+  workingLocation: "Brisbane",
+} as const;
+
 const createTenant = async (tenant: TenantFixture) => {
   await database.organisation.create({
     data: {
@@ -227,7 +240,7 @@ describe("manual availability services", () => {
       updateManualAvailability(
         contextFor(tenantB),
         created.value.id,
-        inputFor(tenantB),
+        patchInput,
         { orgRole: "org:admin", userId: "user_test" }
       )
     ).resolves.toMatchObject({
@@ -239,7 +252,7 @@ describe("manual availability services", () => {
       contextFor(tenantA),
       created.value.id,
       {
-        ...inputFor(tenantA),
+        ...patchInput,
         contactability: "unavailable",
         includeInFeed: false,
         title: "Training day",

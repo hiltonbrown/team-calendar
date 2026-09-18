@@ -31,14 +31,14 @@ export const ManualAvailabilityInputSchema = z
     contactability: ContactabilityStatusSchema.default("contactable"),
     endsAt: z.coerce.date(),
     includeInFeed: z.boolean().default(true),
-    notesInternal: z.string().max(2000).optional(),
+    notesInternal: z.string().max(2000).nullable().optional(),
     personId: z.string().uuid(),
-    preferredContactMethod: z.string().max(200).optional(),
+    preferredContactMethod: z.string().max(200).nullable().optional(),
     privacyMode: PrivacyModeSchema.default("named"),
     recordType: RecordTypeSchema,
     startsAt: z.coerce.date(),
     title: z.string().min(1).max(200),
-    workingLocation: z.string().max(200).optional(),
+    workingLocation: z.string().max(200).nullable().optional(),
   })
   .refine((value) => value.endsAt >= value.startsAt, {
     message: "End date must be after start date",
@@ -48,6 +48,84 @@ export const ManualAvailabilityInputSchema = z
 export type ManualAvailabilityInput = z.infer<
   typeof ManualAvailabilityInputSchema
 >;
+
+const ManualAvailabilityPatchSchema = z
+  .object({
+    allDay: z.boolean().optional(),
+    contactability: ContactabilityStatusSchema.optional(),
+    endsAt: z.coerce.date().optional(),
+    includeInFeed: z.boolean().optional(),
+    notesInternal: z.string().max(2000).nullable().optional(),
+    personId: z.string().uuid().optional(),
+    preferredContactMethod: z.string().max(200).nullable().optional(),
+    privacyMode: PrivacyModeSchema.optional(),
+    recordType: RecordTypeSchema.optional(),
+    startsAt: z.coerce.date().optional(),
+    title: z.string().min(1).max(200).optional(),
+    workingLocation: z.string().max(200).nullable().optional(),
+  })
+  .strict();
+
+const ManualAvailabilityEditableStateSchema = z
+  .object({
+    allDay: z.boolean(),
+    contactability: ContactabilityStatusSchema,
+    endsAt: z.coerce.date(),
+    includeInFeed: z.boolean(),
+    notesInternal: z.string().max(2000).nullable(),
+    preferredContactMethod: z.string().max(200).nullable(),
+    privacyMode: PrivacyModeSchema,
+    recordType: RecordTypeSchema,
+    startsAt: z.coerce.date(),
+    title: z.string().min(1).max(200),
+    workingLocation: z.string().max(200).nullable(),
+  })
+  .refine((value) => value.endsAt >= value.startsAt, {
+    message: "End date must be after start date",
+    path: ["endsAt"],
+  });
+
+type ManualAvailabilityPatch = z.infer<typeof ManualAvailabilityPatchSchema>;
+
+function mergeManualAvailabilityPatch(
+  existing: {
+    all_day: boolean;
+    contactability: string;
+    ends_at: Date;
+    include_in_feed: boolean;
+    notes_internal: string | null;
+    preferred_contact_method: string | null;
+    privacy_mode: string;
+    record_type: string;
+    starts_at: Date;
+    title: string | null;
+    working_location: string | null;
+  },
+  patch: ManualAvailabilityPatch
+) {
+  return ManualAvailabilityEditableStateSchema.safeParse({
+    allDay: patch.allDay ?? existing.all_day,
+    contactability: patch.contactability ?? existing.contactability,
+    endsAt: patch.endsAt ?? existing.ends_at,
+    includeInFeed: patch.includeInFeed ?? existing.include_in_feed,
+    notesInternal:
+      patch.notesInternal === undefined
+        ? existing.notes_internal
+        : patch.notesInternal,
+    preferredContactMethod:
+      patch.preferredContactMethod === undefined
+        ? existing.preferred_contact_method
+        : patch.preferredContactMethod,
+    privacyMode: patch.privacyMode ?? existing.privacy_mode,
+    recordType: patch.recordType ?? existing.record_type,
+    startsAt: patch.startsAt ?? existing.starts_at,
+    title: patch.title ?? existing.title,
+    workingLocation:
+      patch.workingLocation === undefined
+        ? existing.working_location
+        : patch.workingLocation,
+  });
+}
 
 export interface ManualAvailabilityActor {
   orgRole?: string | null;
@@ -260,7 +338,7 @@ export const updateManualAvailability = async (
   input: unknown,
   actor: ManualAvailabilityActor
 ): Promise<Result<AvailabilityRecordView, ManualAvailabilityServiceError>> => {
-  const parsed = ManualAvailabilityInputSchema.safeParse(input);
+  const parsed = ManualAvailabilityPatchSchema.safeParse(input);
   if (!parsed.success) {
     return {
       error: appError(
@@ -273,6 +351,11 @@ export const updateManualAvailability = async (
 
   const existing = await database.availabilityRecord.findFirst({
     select: {
+      all_day: true,
+      contactability: true,
+      ends_at: true,
+      include_in_feed: true,
+      notes_internal: true,
       person: {
         select: {
           clerk_user_id: true,
@@ -281,6 +364,12 @@ export const updateManualAvailability = async (
         },
       },
       person_id: true,
+      preferred_contact_method: true,
+      privacy_mode: true,
+      record_type: true,
+      starts_at: true,
+      title: true,
+      working_location: true,
     },
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
@@ -303,18 +392,39 @@ export const updateManualAvailability = async (
     return authorisation;
   }
 
+  if (parsed.data.personId && parsed.data.personId !== existing.person_id) {
+    return {
+      error: appError(
+        "bad_request",
+        "An availability record cannot be reassigned to another person."
+      ),
+      ok: false,
+    };
+  }
+
+  const merged = mergeManualAvailabilityPatch(existing, parsed.data);
+  if (!merged.success) {
+    return {
+      error: appError(
+        "bad_request",
+        merged.error.issues[0]?.message ?? "Invalid availability record"
+      ),
+      ok: false,
+    };
+  }
+
   const duplicate = await database.availabilityRecord.findFirst({
     select: { id: true },
     where: {
       ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
       archived_at: null,
-      ends_at: parsed.data.endsAt,
+      ends_at: merged.data.endsAt,
       id: { not: recordId },
       person_id: existing.person_id,
-      record_type: parsed.data.recordType,
+      record_type: merged.data.recordType,
       source_remote_id: null,
       source_type: "manual",
-      starts_at: parsed.data.startsAt,
+      starts_at: merged.data.startsAt,
     },
   });
 
@@ -328,32 +438,37 @@ export const updateManualAvailability = async (
   try {
     const derivedUidKey = deriveAvailabilityUidKey({
       clerkOrgId: tenant.clerkOrgId,
-      endsAt: parsed.data.endsAt,
+      endsAt: merged.data.endsAt,
       organisationId: tenant.organisationId,
       personId: existing.person_id,
-      recordType: parsed.data.recordType,
+      recordType: merged.data.recordType,
       sourceType: "manual",
       stableSourceKey: recordId,
-      startsAt: parsed.data.startsAt,
+      startsAt: merged.data.startsAt,
     });
     const record = await database.availabilityRecord.update({
       data: {
-        all_day: parsed.data.allDay,
-        contactability: parsed.data.contactability,
+        all_day: merged.data.allDay,
+        contactability: merged.data.contactability,
         derived_uid_key: derivedUidKey,
-        ends_at: parsed.data.endsAt,
-        include_in_feed: parsed.data.includeInFeed,
-        notes_internal: parsed.data.notesInternal,
-        preferred_contact_method: parsed.data.preferredContactMethod,
-        privacy_mode: parsed.data.privacyMode,
-        record_type: parsed.data.recordType,
-        starts_at: parsed.data.startsAt,
-        title: parsed.data.title,
+        ends_at: merged.data.endsAt,
+        include_in_feed: merged.data.includeInFeed,
+        notes_internal: merged.data.notesInternal,
+        preferred_contact_method: merged.data.preferredContactMethod,
+        privacy_mode: merged.data.privacyMode,
+        record_type: merged.data.recordType,
+        starts_at: merged.data.startsAt,
+        title: merged.data.title,
         updated_by_user_id: actor.userId,
-        working_location: parsed.data.workingLocation,
+        working_location: merged.data.workingLocation,
       },
       include: { person: true },
-      where: { id: recordId },
+      where: {
+        ...scopedQuery(tenant.clerkOrgId, tenant.organisationId),
+        archived_at: null,
+        id: recordId,
+        source_type: "manual",
+      },
     });
 
     await materialisePublication(tenant, record.id);
