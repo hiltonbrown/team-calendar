@@ -8,6 +8,7 @@ process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
 vi.mock("server-only", () => ({}));
 
 let createFeed: typeof import("./index")["createFeed"];
+let createInitialTokenWithClient: typeof import("./index")["createInitialTokenWithClient"];
 let ensureDefaultCalendarFeed: typeof import("./index")["ensureDefaultCalendarFeed"];
 let getFeedDetail: typeof import("./index")["getFeedDetail"];
 let pauseFeed: typeof import("./index")["pauseFeed"];
@@ -25,6 +26,7 @@ const describeWithDatabase = process.env.DATABASE_URL
 if (process.env.DATABASE_URL) {
   ({
     createFeed,
+    createInitialTokenWithClient,
     ensureDefaultCalendarFeed,
     getFeedDetail,
     pauseFeed,
@@ -58,6 +60,100 @@ describeWithDatabase("feed services", () => {
   afterAll(async () => {
     await cleanTestData();
     await database.$disconnect();
+  });
+
+  test("exposes the one-active-token partial unique index", async () => {
+    const indexes = await database.$queryRaw<
+      Array<{ indexdef: string; indexname: string }>
+    >`
+      SELECT indexdef::text AS indexdef, indexname::text AS indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public'
+        AND tablename = 'feed_tokens'
+        AND indexname = 'feed_tokens_one_active_per_feed_key'
+    `;
+
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0]?.indexdef).toContain("UNIQUE INDEX");
+    expect(indexes[0]?.indexdef).toContain("WHERE (status = 'active'");
+  });
+
+  test("allows only one concurrent initial token", async () => {
+    const feed = await createFeedWithoutToken();
+    const input = {
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: feed.id,
+      organisationId: tenant.organisationId,
+    };
+
+    const results = await Promise.all([
+      database.$transaction((tx) => createInitialTokenWithClient(tx, input)),
+      database.$transaction((tx) => createInitialTokenWithClient(tx, input)),
+    ]);
+
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok)).toEqual([
+      {
+        error: {
+          code: "initial_token_exists",
+          message: "This feed already has an active token.",
+        },
+        ok: false,
+      },
+    ]);
+    await expect(
+      database.feedToken.count({
+        where: { feed_id: feed.id, status: "active" },
+      })
+    ).resolves.toBe(1);
+  });
+
+  test("keeps one active token across concurrent rotations", async () => {
+    const created = await createTestFeed();
+    const initialTokenId = signedFeedTokenId(created.plaintext);
+    const input = {
+      actingRole: "owner",
+      actingUserId: "user_owner",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: created.feedId,
+      organisationId: tenant.organisationId,
+    };
+
+    const results = await Promise.all([rotateToken(input), rotateToken(input)]);
+    const tokens = await database.feedToken.findMany({
+      orderBy: { created_at: "asc" },
+      where: { feed_id: created.feedId },
+    });
+    const activeTokens = tokens.filter((token) => token.status === "active");
+
+    expect(activeTokens).toHaveLength(1);
+    expect(tokens.find((token) => token.id === initialTokenId)).toMatchObject({
+      status: "revoked",
+    });
+    expect(
+      results.every(
+        (result) => result.ok || result.error.code === "active_token_conflict"
+      )
+    ).toBe(true);
+    await expect(renderFeedForToken(created.plaintext)).resolves.toMatchObject({
+      ok: true,
+      value: { status: "revoked" },
+    });
+
+    for (const result of results) {
+      if (!result.ok && result.error.code === "active_token_conflict") {
+        continue;
+      }
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
+      const tokenId = signedFeedTokenId(result.value.plaintext);
+      const stored = tokens.find((token) => token.id === tokenId);
+      expect(stored?.status).toBe(
+        tokenId === activeTokens[0]?.id ? "active" : "revoked"
+      );
+    }
   });
 
   test("creates feeds with a signed URL that can be loaded again", async () => {
@@ -451,6 +547,21 @@ async function createTestFeed() {
     feedId: result.value.feedId,
     plaintext: result.value.token.plaintext,
   };
+}
+
+async function createFeedWithoutToken() {
+  return await database.feed.create({
+    data: {
+      clerk_org_id: tenant.clerkOrgId,
+      created_by_user_id: "user_admin",
+      name: "Concurrent token feed",
+      organisation_id: tenant.organisationId,
+      privacy_mode: "named",
+      slug: `concurrent-token-${crypto.randomUUID()}`,
+      status: "active",
+    },
+    select: { id: true },
+  });
 }
 
 async function createTenant(input: typeof tenant) {

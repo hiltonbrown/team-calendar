@@ -23,6 +23,7 @@ export type FeedActorRole =
   | `org:${string}`;
 
 export type TokenServiceError =
+  | { code: "active_token_conflict"; message: string }
   | { code: "feed_not_found"; message: string }
   | { code: "initial_token_exists"; message: string }
   | { code: "not_authorised"; message: string }
@@ -175,17 +176,24 @@ export async function createInitialTokenWithClient(
   const tokenHash = hashFeedToken(generateFeedTokenSecret());
   const plaintext = createSignedFeedToken({ tokenHash, tokenId });
   const hint = plaintext.slice(-4);
-  const token = await tx.feedToken.create({
-    data: {
-      clerk_org_id: input.clerkOrgId,
-      feed_id: input.feedId,
-      id: tokenId,
-      organisation_id: input.organisationId,
-      token_hash: tokenHash,
-      token_hint: hint,
-    },
-    select: { id: true },
+  const token = await insertActiveToken(tx, {
+    clerkOrgId: input.clerkOrgId,
+    feedId: input.feedId,
+    hint,
+    organisationId: input.organisationId,
+    rotatedFromTokenId: null,
+    tokenHash,
+    tokenId,
   });
+  if (!token) {
+    return {
+      error: {
+        code: "initial_token_exists",
+        message: "This feed already has an active token.",
+      },
+      ok: false,
+    };
+  }
 
   await auditToken(tx, input, "feeds.token_created", token.id, {
     actingUserId: input.actingUserId,
@@ -255,18 +263,18 @@ export async function rotateToken(
       const tokenHash = hashFeedToken(generateFeedTokenSecret());
       const plaintext = createSignedFeedToken({ tokenHash, tokenId });
       const hint = plaintext.slice(-4);
-      const token = await tx.feedToken.create({
-        data: {
-          clerk_org_id: parsed.data.clerkOrgId,
-          feed_id: parsed.data.feedId,
-          id: tokenId,
-          organisation_id: parsed.data.organisationId,
-          rotated_from_token_id: previousToken.id,
-          token_hash: tokenHash,
-          token_hint: hint,
-        },
-        select: { id: true },
+      const token = await insertActiveToken(tx, {
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: parsed.data.feedId,
+        hint,
+        organisationId: parsed.data.organisationId,
+        rotatedFromTokenId: previousToken.id,
+        tokenHash,
+        tokenId,
       });
+      if (!token) {
+        return activeTokenConflict();
+      }
 
       await auditToken(tx, parsed.data, "feeds.token_rotated", token.id, {
         actingUserId: parsed.data.actingUserId,
@@ -297,6 +305,60 @@ export async function rotateToken(
   } catch {
     return unknownError("Failed to rotate feed token.");
   }
+}
+
+async function insertActiveToken(
+  tx: Prisma.TransactionClient,
+  input: {
+    clerkOrgId: string;
+    feedId: string;
+    hint: string;
+    organisationId: string;
+    rotatedFromTokenId: string | null;
+    tokenHash: string;
+    tokenId: string;
+  }
+): Promise<{ id: string } | null> {
+  const rows = await tx.$queryRaw<Array<{ id: string }>>`
+    INSERT INTO "feed_tokens" (
+      "id",
+      "clerk_org_id",
+      "organisation_id",
+      "feed_id",
+      "token_hash",
+      "token_hint",
+      "status",
+      "rotated_from_token_id",
+      "created_at",
+      "updated_at"
+    )
+    VALUES (
+      ${input.tokenId}::uuid,
+      ${input.clerkOrgId},
+      ${input.organisationId}::uuid,
+      ${input.feedId}::uuid,
+      ${input.tokenHash},
+      ${input.hint},
+      'active'::feed_token_status,
+      ${input.rotatedFromTokenId}::uuid,
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT ("feed_id") WHERE "status" = 'active'
+    DO NOTHING
+    RETURNING "id"
+  `;
+  return rows[0] ?? null;
+}
+
+function activeTokenConflict(): Result<never, TokenServiceError> {
+  return {
+    error: {
+      code: "active_token_conflict",
+      message: "The feed token changed during rotation. Refresh and try again.",
+    },
+    ok: false,
+  };
 }
 
 export async function revokeToken(

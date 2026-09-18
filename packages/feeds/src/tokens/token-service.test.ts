@@ -4,13 +4,13 @@ const mocks = vi.hoisted(() => ({
   auditEventCreate: vi.fn(),
   feedFindFirst: vi.fn(),
   feedFindMany: vi.fn(),
-  feedTokenCreate: vi.fn(),
   feedTokenFindFirst: vi.fn(),
   feedTokenFindMany: vi.fn(),
   feedTokenUpdate: vi.fn(),
   feedTokenUpdateMany: vi.fn(),
   invalidateFeedCache: vi.fn(),
   logError: vi.fn(),
+  queryRaw: vi.fn(),
   scopedTo: vi.fn((input: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
@@ -24,6 +24,7 @@ vi.mock("@repo/observability/log", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: {
+    $queryRaw: mocks.queryRaw,
     $transaction: mocks.transaction,
     auditEvent: {
       create: mocks.auditEventCreate,
@@ -33,7 +34,6 @@ vi.mock("@repo/database", () => ({
       findMany: mocks.feedFindMany,
     },
     feedToken: {
-      create: mocks.feedTokenCreate,
       findFirst: mocks.feedTokenFindFirst,
       findMany: mocks.feedTokenFindMany,
       update: mocks.feedTokenUpdate,
@@ -75,8 +75,9 @@ beforeEach(() => {
   mocks.auditEventCreate.mockResolvedValue({ id: "audit_1" });
   mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
   mocks.feedFindMany.mockResolvedValue([]);
-  mocks.feedTokenCreate.mockImplementation((input: { data: { id: string } }) =>
-    Promise.resolve({ id: input.data.id })
+  mocks.queryRaw.mockImplementation(
+    (_strings: TemplateStringsArray, tokenId: string) =>
+      Promise.resolve([{ id: tokenId }])
   );
   mocks.feedTokenFindFirst.mockResolvedValue(null);
   mocks.feedTokenFindMany.mockResolvedValue([]);
@@ -154,19 +155,21 @@ describe("feed token lifecycle with a mocked database", () => {
       select: { id: true },
       where: scopedTokenByFeed(),
     });
-    const createCall = mocks.feedTokenCreate.mock.calls[0]?.[0];
-    expect(createCall).toMatchObject({
-      data: {
-        ...scopedTokenByFeed(),
-        id: result.value.tokenId,
-        token_hash: expect.stringMatching(TOKEN_HASH_PATTERN),
-        token_hint: result.value.hint,
-      },
-      select: { id: true },
-    });
+    const [insertCall] = mocks.queryRaw.mock.calls;
+    const tokenHash = insertCall?.[5];
+    expect(insertCall).toEqual(
+      expect.arrayContaining([
+        result.value.tokenId,
+        baseInput.clerkOrgId,
+        baseInput.organisationId,
+        baseInput.feedId,
+        expect.stringMatching(TOKEN_HASH_PATTERN),
+        result.value.hint,
+      ])
+    );
     expect(
       createSignedFeedToken({
-        tokenHash: createCall.data.token_hash,
+        tokenHash,
         tokenId: result.value.tokenId,
       })
     ).toBe(result.value.plaintext);
@@ -199,19 +202,54 @@ describe("feed token lifecycle with a mocked database", () => {
       data: { revoked_at: expect.any(Date), status: "revoked" },
       where: { ...scopedTokenByFeed(), status: "active" },
     });
-    expect(mocks.feedTokenCreate).toHaveBeenCalledWith({
-      data: {
-        ...scopedTokenByFeed(),
-        id: result.value.tokenId,
-        rotated_from_token_id: "71000000-0000-4000-8000-000000000010",
-        token_hash: expect.stringMatching(TOKEN_HASH_PATTERN),
-        token_hint: result.value.hint,
-      },
-      select: { id: true },
-    });
+    expect(mocks.queryRaw.mock.calls[0]).toEqual(
+      expect.arrayContaining([
+        result.value.tokenId,
+        baseInput.clerkOrgId,
+        baseInput.organisationId,
+        baseInput.feedId,
+        expect.stringMatching(TOKEN_HASH_PATTERN),
+        result.value.hint,
+        "71000000-0000-4000-8000-000000000010",
+      ])
+    );
     expect(mocks.invalidateFeedCache).toHaveBeenCalledWith({
       feedId: baseInput.feedId,
     });
+  });
+
+  it("returns a stable conflict when concurrent initialisation loses", async () => {
+    mocks.queryRaw.mockResolvedValue([]);
+    const tx = mockDatabase() as unknown as Parameters<
+      typeof createInitialTokenWithClient
+    >[0];
+
+    await expect(createInitialTokenWithClient(tx, baseInput)).resolves.toEqual({
+      error: {
+        code: "initial_token_exists",
+        message: "This feed already has an active token.",
+      },
+      ok: false,
+    });
+    expect(mocks.auditEventCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable conflict when concurrent rotation loses", async () => {
+    mocks.feedTokenFindMany.mockResolvedValue([
+      { id: "71000000-0000-4000-8000-000000000010" },
+    ]);
+    mocks.queryRaw.mockResolvedValue([]);
+
+    await expect(rotateToken(baseInput)).resolves.toEqual({
+      error: {
+        code: "active_token_conflict",
+        message:
+          "The feed token changed during rotation. Refresh and try again.",
+      },
+      ok: false,
+    });
+    expect(mocks.auditEventCreate).not.toHaveBeenCalled();
+    expect(mocks.invalidateFeedCache).not.toHaveBeenCalled();
   });
 
   it("revokes a token only after a scoped lookup", async () => {
@@ -360,6 +398,7 @@ describe("feed token lifecycle with a mocked database", () => {
 
 function mockDatabase() {
   return {
+    $queryRaw: mocks.queryRaw,
     auditEvent: {
       create: mocks.auditEventCreate,
     },
@@ -368,7 +407,6 @@ function mockDatabase() {
       findMany: mocks.feedFindMany,
     },
     feedToken: {
-      create: mocks.feedTokenCreate,
       findFirst: mocks.feedTokenFindFirst,
       findMany: mocks.feedTokenFindMany,
       update: mocks.feedTokenUpdate,
@@ -396,9 +434,9 @@ function scopedTokenByFeed() {
 function databaseCallsAsText() {
   return JSON.stringify({
     audit: mocks.auditEventCreate.mock.calls,
-    create: mocks.feedTokenCreate.mock.calls,
     findFirst: mocks.feedTokenFindFirst.mock.calls,
     findMany: mocks.feedTokenFindMany.mock.calls,
+    insert: mocks.queryRaw.mock.calls,
     update: mocks.feedTokenUpdate.mock.calls,
     updateMany: mocks.feedTokenUpdateMany.mock.calls,
   });

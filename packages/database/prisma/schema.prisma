@@ -886,6 +886,9 @@ model FeedToken {
   rotated_from_token FeedToken?   @relation("FeedTokenRotation", fields: [rotated_from_token_id], references: [id])
   rotated_tokens     FeedToken[]  @relation("FeedTokenRotation")
 
+  // PostgreSQL enforces at most one active token per feed with the partial
+  // unique index feed_tokens_one_active_per_feed_key. Prisma cannot express a
+  // partial index, so keep this invariant aligned with the dedicated migration.
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([feed_id])
