@@ -1,4 +1,6 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright project matchers are one-time configuration.
+
+import { resolve } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { releaseEnvironment } from "./e2e/environment.js";
 
@@ -9,7 +11,7 @@ export default defineConfig({
   forbidOnly: true,
   fullyParallel: false,
   globalTeardown: "./e2e/global.teardown.ts",
-  outputDir: "tooling/release/test-results",
+  outputDir: resolve(import.meta.dirname, "test-results"),
   projects: [
     { name: "setup", testMatch: /global\.setup\.ts/ },
     {
@@ -49,7 +51,10 @@ export default defineConfig({
     ["list"],
     [
       "html",
-      { open: "never", outputFolder: "tooling/release/playwright-report" },
+      {
+        open: "never",
+        outputFolder: resolve(import.meta.dirname, "playwright-report"),
+      },
     ],
   ],
   retries: 0,
