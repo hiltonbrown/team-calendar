@@ -2,6 +2,10 @@
 import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment, requiredFixture } from "./environment.js";
 import { expect, rowForRecord, test, useRole } from "./fixture.js";
+import {
+  readProviderSnapshot,
+  requireExactProviderState,
+} from "./provider-snapshot.js";
 
 const { fixtures } = releaseEnvironment();
 
@@ -20,6 +24,10 @@ test.describe
       await row.getByRole("button", { name: "Approve" }).click();
       await page.getByRole("button", { name: "Confirm and approve" }).click();
       await expect(page.getByText("Leave approved in Xero")).toBeVisible();
+      requireExactProviderState(
+        readProviderSnapshot(fixtures.records.approve),
+        "approved"
+      );
       await manager.context.close();
       const viewer = await useRole(browser, "viewer");
       await viewer.page.goto(withOrg("/plans", fixtures.organisations.primary));
@@ -31,6 +39,10 @@ test.describe
       await expect(
         viewer.page.getByText("Submission withdrawn.")
       ).toBeVisible();
+      requireExactProviderState(
+        readProviderSnapshot(fixtures.records.approve),
+        "withdrawn"
+      );
       await viewer.context.close();
     });
 
@@ -52,6 +64,10 @@ test.describe
       await page.getByLabel("Reason").fill("Controlled release verification");
       await page.getByRole("button", { name: /confirm.*decline/i }).click();
       await expect(page.getByText("Leave declined in Xero")).toBeVisible();
+      requireExactProviderState(
+        readProviderSnapshot(fixtures.records.decline),
+        "declined"
+      );
       await context.close();
     });
   });

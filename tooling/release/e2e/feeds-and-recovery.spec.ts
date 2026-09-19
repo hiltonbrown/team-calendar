@@ -2,6 +2,10 @@
 import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment, requiredFixture } from "./environment.js";
 import { expect, test, useRole } from "./fixture.js";
+import {
+  readProviderSnapshot,
+  requireExactProviderState,
+} from "./provider-snapshot.js";
 
 const { fixtures } = releaseEnvironment();
 
@@ -26,6 +30,12 @@ test("an ambiguous submission exposes recovery without issuing another create", 
   browser,
 }) => {
   const { context, page } = await useRole(browser, "admin");
+  const before = readProviderSnapshot(fixtures.records.recovery);
+  expect(before.matches).toHaveLength(1);
+  const [candidate] = before.matches;
+  if (!candidate) {
+    throw new Error("Recovery fixture has no exact provider candidate");
+  }
   await page.goto(
     withOrg(
       `/plans?personId=${fixtures.people.recovery}`,
@@ -34,11 +44,13 @@ test("an ambiguous submission exposes recovery without issuing another create", 
   );
   const row = page.locator(`tr:has(a[href*="${fixtures.records.recovery}"])`);
   await expect(row).toBeVisible();
-  await expect(
-    row
-      .getByRole("button", { name: /find|attach|not created|recover/i })
-      .first()
-  ).toBeVisible();
+  await row.getByText("Resolve Xero submission").click();
+  await row.getByLabel("Recovery reason").fill("Controlled release recovery");
+  await row.getByRole("button", { name: "Check Xero candidates" }).click();
+  await row
+    .getByRole("button", { name: `Attach ${candidate.remoteId}` })
+    .click();
+  await expect(row).toContainText("Submitted");
   await expect(
     row.getByRole("button", { name: "Retry submission" })
   ).toHaveCount(0);
@@ -46,6 +58,11 @@ test("an ambiguous submission exposes recovery without issuing another create", 
   await expect(
     page.locator(`tr:has(a[href*="${fixtures.records.recovery}"])`)
   ).toHaveCount(1);
+  const after = readProviderSnapshot(fixtures.records.recovery);
+  expect(after.matches).toEqual(before.matches);
+  expect(requireExactProviderState(after, "submitted")).toBe(
+    candidate.remoteId
+  );
   await context.close();
 });
 
@@ -53,6 +70,7 @@ test("a definitive failed submission can be retried to a known state", async ({
   browser,
 }) => {
   const { context, page } = await useRole(browser, "viewer");
+  const before = readProviderSnapshot(fixtures.records.retry);
   await page.goto(
     withOrg(
       `/plans?personId=${fixtures.people.retry}`,
@@ -67,6 +85,11 @@ test("a definitive failed submission can be retried to a known state", async ({
     .last()
     .click();
   await expect(row).toContainText("Submitted");
+  const after = readProviderSnapshot(fixtures.records.retry);
+  const remoteId = requireExactProviderState(after, "submitted");
+  expect(before.matches.map((candidate) => candidate.remoteId)).not.toContain(
+    remoteId
+  );
   await context.close();
 });
 
