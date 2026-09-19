@@ -314,11 +314,13 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
     const first = await database.auditEvent.findUnique({
       select: { created_at: true },
       where: {
+        clerk_org_id: token.clerk_org_id,
         id: activationMilestoneId(
           token.clerk_org_id,
           token.organisation_id,
           "first_feed_accessed"
         ),
+        organisation_id: token.organisation_id,
       },
     });
     return first?.created_at
