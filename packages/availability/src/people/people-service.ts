@@ -21,6 +21,7 @@ import {
   type CurrentStatusKey,
   computeCurrentStatus,
   computeCurrentStatusForPeople,
+  computePublicHolidayApplicability,
 } from "./current-status";
 import {
   type FieldOwnership,
@@ -500,32 +501,18 @@ async function buildCurrentStatusWhere(input: {
     select: { id: true },
     where: scoped,
   });
-  const subjects = [null, ...locations.map(({ id }) => id)].map(
-    (locationId, index) => ({
-      locationId,
-      personId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-    })
-  );
-  const holidayStatuses = await computeCurrentStatusForPeople({
+  const holidayApplicability = await computePublicHolidayApplicability({
     at: input.at,
     clerkOrgId: input.clerkOrgId,
+    locationIds: locations.map(({ id }) => id),
     organisationId: input.organisationId,
-    people: subjects,
   });
-  const holidayIds = subjects
-    .filter(
-      (subject) =>
-        subject.locationId &&
-        holidayStatuses.get(subject.personId)?.statusKey === "public_holiday"
-    )
-    .map(({ locationId }) => locationId as string);
-  const nullHoliday =
-    holidayStatuses.get(subjects[0]?.personId ?? "")?.statusKey ===
-    "public_holiday";
   const holidayWhere: Prisma.PersonWhereInput = {
     OR: [
-      ...(holidayIds.length ? [{ location_id: { in: holidayIds } }] : []),
-      ...(nullHoliday ? [{ location_id: null }] : []),
+      ...(holidayApplicability.locationIds.size
+        ? [{ location_id: { in: [...holidayApplicability.locationIds] } }]
+        : []),
+      ...(holidayApplicability.unassigned ? [{ location_id: null }] : []),
     ],
   };
   const noLeave: Prisma.PersonWhereInput = {

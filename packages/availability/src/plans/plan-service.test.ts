@@ -224,6 +224,41 @@ describe("plan-service", () => {
     expect(mocks.leaveBalanceFindMany).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [1, 2],
+    [50, 51],
+    [200, 201],
+  ])(
+    "keeps page size %i to one bounded query with take %i",
+    async (pageSize, take) => {
+      await listTeamRecordsPage({
+        actingOrgRole: "org:admin",
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        pageSize,
+      });
+
+      expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
+      expect(mocks.availabilityCount).toHaveBeenCalledTimes(1);
+      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take })
+      );
+    }
+  );
+
+  it("removes the overlap window only when all history is requested", async () => {
+    await listTeamRecordsPage({
+      actingOrgRole: "org:admin",
+      allHistory: true,
+      clerkOrgId: baseInput.clerkOrgId,
+      organisationId: baseInput.organisationId,
+    });
+
+    const where = mocks.availabilityFindMany.mock.calls[0]?.[0]?.where;
+    expect(where).not.toHaveProperty("ends_at");
+    expect(where).not.toHaveProperty("starts_at");
+  });
+
   it("returns no team records without querying when a manager has no reports", async () => {
     mocks.managerScopePersonIds.mockResolvedValue([]);
 

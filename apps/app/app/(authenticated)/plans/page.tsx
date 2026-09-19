@@ -211,22 +211,42 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           orgQueryValue={orgQueryValue}
           records={records}
           totalCount={recordsResult.value.totalCount}
+          window={{
+            from: recordsResult.value.window.from?.toISOString() ?? null,
+            to: recordsResult.value.window.to?.toISOString() ?? null,
+          }}
         />
 
         {records.length === 0 && (
           <EmptyState
             actionSlot={
               filtersAreDefault(filters) ? (
-                <Button asChild>
-                  <Link href={withOrg("/plans/new", orgQueryValue)}>
-                    Create a plan
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild>
+                    <Link href={withOrg("/plans/new", orgQueryValue)}>
+                      Create a plan
+                    </Link>
+                  </Button>
+                  {!filters.allHistory && (
+                    <Button asChild variant="outline">
+                      <Link
+                        href={withOrg(
+                          "/plans?tab=my&allHistory=true",
+                          orgQueryValue
+                        )}
+                      >
+                        View all history
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               ) : undefined
             }
             description={emptyStateDescription(filters)}
             title={
-              filtersAreDefault(filters) ? "No plans yet" : "No matching plans"
+              filtersAreDefault(filters)
+                ? "No plans in this window"
+                : "No matching plans"
             }
           />
         )}
@@ -278,6 +298,7 @@ function filtersAreDefault(filters: PlansFilterInput): boolean {
     filters.tab === "my" &&
     filters.recordTypeCategory === "all" &&
     filters.includeArchived === false &&
+    filters.allHistory === false &&
     !filters.approvalStatus &&
     !filters.dateFrom &&
     !filters.dateTo &&
@@ -289,7 +310,7 @@ function filtersAreDefault(filters: PlansFilterInput): boolean {
 
 function emptyStateDescription(filters: PlansFilterInput): string {
   if (filtersAreDefault(filters)) {
-    return "Create leave or availability so calendars, feeds, and approval queues have something to track.";
+    return "There are no leave or availability records in the current window. Create a plan or view all history.";
   }
   return "Change the filters or clear the date and status selections to see more leave and availability records.";
 }

@@ -127,6 +127,7 @@ interface PlansClientProps {
   orgQueryValue: string | null;
   records: PlansClientRecord[];
   totalCount?: number;
+  window?: { from: string | null; to: string | null };
 }
 
 const recordTypeLabels: Record<string, string> = {
@@ -178,6 +179,7 @@ export function PlansClient({
   records,
   nextCursor = null,
   totalCount,
+  window = { from: null, to: null },
 }: PlansClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -379,6 +381,14 @@ export function PlansClient({
       </form>
 
       <ActiveFilters filters={filters} orgQueryValue={orgQueryValue} />
+
+      {!filters.allHistory && window.from && window.to && (
+        <p className="text-muted-foreground text-sm">
+          Showing plans from {formatWindowDate(window.from)} to{" "}
+          {formatWindowDate(window.to)}. Choose All history to search outside
+          this window.
+        </p>
+      )}
 
       {records.length > 0 && (
         <div className="rounded-2xl bg-muted p-3 xl:p-0">
@@ -638,6 +648,15 @@ export function PlansClient({
       ) : null}
     </section>
   );
+}
+
+function formatWindowDate(value: string): string {
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function SubmitRecoveryControls({

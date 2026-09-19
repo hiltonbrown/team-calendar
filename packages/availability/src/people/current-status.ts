@@ -72,6 +72,11 @@ export interface CurrentStatusPersonInput {
   personId: string;
 }
 
+export interface PublicHolidayApplicability {
+  locationIds: Set<string>;
+  unassigned: boolean;
+}
+
 interface CurrentStatusHolidayRow {
   archived_at?: Date | null;
   assignments?: Array<{
@@ -268,6 +273,79 @@ export async function computeCurrentStatusForPeople(input: {
   }
 
   return statuses;
+}
+
+export async function computePublicHolidayApplicability(input: {
+  at: Date;
+  clerkOrgId: string;
+  locationIds: string[];
+  organisationId: string;
+}): Promise<PublicHolidayApplicability> {
+  const clerkOrgId = input.clerkOrgId as ClerkOrgId;
+  const organisationId = input.organisationId as OrganisationId;
+  const [locations, organisation] = await Promise.all([
+    input.locationIds.length
+      ? database.location.findMany({
+          select: {
+            country_code: true,
+            id: true,
+            region_code: true,
+            timezone: true,
+          },
+          where: {
+            ...scopedQuery(clerkOrgId, organisationId),
+            id: { in: input.locationIds },
+          },
+        })
+      : Promise.resolve([]),
+    database.organisation.findFirst({
+      select: { country_code: true, timezone: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        id: organisationId,
+      },
+    }),
+  ]);
+  const subjects = [
+    ...locations.map((location) => ({
+      countryCode: location.country_code ?? organisation?.country_code ?? null,
+      localDate: dateOnlyInTimeZone(
+        input.at,
+        location.timezone ?? organisation?.timezone ?? "UTC"
+      ),
+      locationId: location.id,
+      regionCode: location.region_code ?? null,
+    })),
+    {
+      countryCode: organisation?.country_code ?? null,
+      localDate: dateOnlyInTimeZone(input.at, organisation?.timezone ?? "UTC"),
+      locationId: null,
+      regionCode: null,
+    },
+  ];
+  const holidays = await findPublicHolidays({
+    clerkOrgId,
+    holidayLookupInputs: subjects,
+    organisationId,
+  });
+  const applicable = new Set<string>();
+  let unassigned = false;
+  for (const subject of subjects) {
+    const holiday = findPublicHolidayInRows({
+      ...subject,
+      holidays,
+    });
+    if (!holiday) {
+      continue;
+    }
+    if (subject.locationId) {
+      applicable.add(subject.locationId);
+    } else {
+      unassigned = true;
+    }
+  }
+  return { locationIds: applicable, unassigned };
 }
 
 export async function computeCurrentStatus(input: {

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   availabilityGroupBy: vi.fn(),
   computeCurrentStatus: vi.fn(),
   computeCurrentStatusForPeople: vi.fn(),
+  computePublicHolidayApplicability: vi.fn(),
   locationFindMany: vi.fn(),
   managerScopePersonIds: vi.fn(),
   personCount: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock("../settings/manager-scope", () => ({
 vi.mock("./current-status", () => ({
   computeCurrentStatus: mocks.computeCurrentStatus,
   computeCurrentStatusForPeople: mocks.computeCurrentStatusForPeople,
+  computePublicHolidayApplicability: mocks.computePublicHolidayApplicability,
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: vi.fn(),
@@ -72,6 +74,10 @@ describe("people-service", () => {
     mocks.locationFindMany.mockResolvedValue([]);
     mocks.availabilityGroupBy.mockResolvedValue([]);
     mocks.computeCurrentStatus.mockResolvedValue(currentStatus());
+    mocks.computePublicHolidayApplicability.mockResolvedValue({
+      locationIds: new Set(),
+      unassigned: false,
+    });
     mocks.computeCurrentStatusForPeople.mockImplementation(
       async (input: {
         people: Array<{ locationId: string | null; personId: string }>;

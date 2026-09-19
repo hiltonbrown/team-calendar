@@ -33,6 +33,7 @@ vi.mock("@repo/database", () => ({
 const {
   computeCurrentStatus,
   computeCurrentStatusForPeople,
+  computePublicHolidayApplicability,
   dateOnlyInTimeZone,
 } = await import("./current-status");
 
@@ -74,6 +75,43 @@ describe("current-status", () => {
     mocks.publicHolidayFindFirst.mockResolvedValue(null);
     mocks.publicHolidayFindMany.mockResolvedValue([]);
     mocks.availabilityFindMany.mockResolvedValue([]);
+  });
+
+  it("computes holiday applicability without querying invented people", async () => {
+    const locationId = "00000000-0000-4000-8000-000000000101";
+    mocks.locationFindMany.mockResolvedValue([
+      {
+        country_code: "AU",
+        id: locationId,
+        region_code: "QLD",
+        timezone: "Australia/Brisbane",
+      },
+    ]);
+    mocks.publicHolidayFindMany.mockResolvedValue([
+      {
+        archived_at: null,
+        assignments: [],
+        country_code: "AU",
+        default_classification: "non_working",
+        holiday_date: new Date("2026-04-25T00:00:00.000Z"),
+        holiday_type: "public",
+        id: "holiday-1",
+        name: "ANZAC Day",
+        region_code: null,
+        source: "australian_government",
+      },
+    ]);
+
+    const result = await computePublicHolidayApplicability({
+      at: baseInput.at,
+      clerkOrgId: baseInput.clerkOrgId,
+      locationIds: [locationId],
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result.locationIds).toEqual(new Set([locationId]));
+    expect(result.unassigned).toBe(true);
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
   });
 
   it("prioritises approved Xero leave over lower-priority local records", async () => {
