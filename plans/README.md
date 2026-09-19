@@ -2,11 +2,19 @@
 
 [Ship Team Calendar's Australian release](go-live.md) is the only active plan.
 Reviewed against `80ac9f7` and the supplied working tree on 19 September 2026.
-**Plan status: READY FOR EXECUTION. Production readiness is not yet verified.**
+**Plan status: IN PROGRESS. Production readiness is not yet verified.**
 
 | Plan | Priority | Status | Completion evidence |
 | --- | --- | --- | --- |
-| [Australian go-live](go-live.md) | P0 release programme | READY FOR EXECUTION | Its Section 11 ledger records fixes, checks and final deployed candidate |
+| [Australian go-live](go-live.md) | P0 release programme | IN PROGRESS | Executor branch `codex/go-live-candidate`; Section 11 records current execution and verification |
+
+Execution began on 19 September 2026 in the isolated worktree
+`/home/hilton/.codex/worktrees/australian-go-live/teamcalendar`.
+The source drift check against `80ac9f7` was empty. The user's consolidation
+commit `54f8df5` changes plans only and is preserved.
+The user explicitly authorised live database tests during execution. Use the
+configured live Neon database with owned fixtures and cleanup; do not request
+that permission again or treat independent source work as blocked.
 
 Start D1's test isolation and C6's manager-scope fix immediately. Progress
 payroll recovery, webhooks, email, preflight and independent UI/performance work
@@ -38,7 +46,14 @@ missing submit-recovery details. It added the confirmed manager empty/missing
 scope disclosure and expanded sync performance work to include the overview.
 Rejected findings and maintenance rules are recorded at the end of the plan.
 
-Review validation: 23 focused preflight/launch-mode tests passed. Source paths,
-commands, plan links and whitespace were checked. This review changed only the
-two plan documents; it did not implement source fixes, run live database tests,
-inspect current provider state or certify deployment/browser readiness.
+Final candidate `816b181` is clean. Fresh Node 24 source gates passed all three
+app builds, checks, types, 2,231 unit tests and 29 release-tool tests. Independent
+affected Node 22 checks passed 433 availability and 29 release-tool tests.
+Live read-only verification found and confirmed the fix for a holiday filter
+defect; all 13 status filters now match actual displayed status, with constant
+query counts at requested page sizes 1/50/200. These checks do not substitute for
+the guarded full integration run or deployed browser/provider proof.
+
+Section 11 of the plan records provider changes already applied, verification
+evidence and the remaining external inputs and exact workflow approval. The
+candidate has not been deployed; production readiness remains unverified.

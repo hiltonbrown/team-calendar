@@ -2,7 +2,7 @@
 
 ## 1. Execution contract
 
-- **Status**: READY FOR EXECUTION. This is not a production-readiness certificate.
+- **Status**: IN PROGRESS. This is not a production-readiness certificate.
 - **Reviewed at**: `80ac9f7`, 19 September 2026, including the supplied working-tree plan consolidation.
 - **Priority**: P0 release programme. All work below is required unless a row explicitly says paid-mode only.
 - **Result**: app, API and public web run the same reviewed commit; admitted Australian customers can complete onboarding, leave approval, Xero write-back and calendar subscription; every release gate has fresh passing evidence.
@@ -1002,6 +1002,18 @@ never replace missing proof with a waiver or a fabricated result.
 
 ## 11. Execution ledger and review
 
+Execution started 19 September 2026 on `codex/go-live-candidate` in
+`/home/hilton/.codex/worktrees/australian-go-live/teamcalendar`.
+Source drift from `80ac9f7` was empty at dispatch. The full consolidated plan
+was supplied through its shared absolute filesystem path rather than the older
+committed worktree copy. The advisor reviews; the separate executor edits source.
+
+The user explicitly instructed: "Use the live database. Continue. Do not block".
+This authorises live Neon testing without another permission request. Target
+verification, fixture ownership and cleanup are execution work, not reasons to
+request the same authority again. No reset or development seed replacement is
+part of that testing.
+
 Update this single ledger during implementation. A row is DONE only when its
 behaviour, regression checks and applicable live proof pass. Allowed status:
 TODO, IN PROGRESS, DONE, or WAITING ON EXTERNAL ACTION with the exact action.
@@ -1009,23 +1021,179 @@ Keep secrets, applicant information and customer data out of this file.
 
 | Work | Status | Commit / command result / evidence |
 | --- | --- | --- |
-| D1 | TODO | Guard, inventory, source isolation and live cleanup proof |
-| C6 | TODO | Empty/missing manager-scope regressions and deployed denial |
-| C1 | TODO | Durable submit recovery, races and reconciled AU records |
-| C2 | TODO | Partial retry and delivered activation dedup |
-| C3 | TODO | Failed receipt, replay, ordering and entitlement-health tests |
-| C4/C5 | TODO | Email handler retry and malformed-JSON tests |
-| R1/R2/R3 | TODO | Preflight regressions, three project results, Sentry build/event |
-| P1/P2/P3 | TODO | Query bounds, exact counts, scope and payload proof |
-| P4/P5 | TODO | Chunk graph/sizes and first-page event tests |
-| G1 | TODO | Delivered application and separately admitted first owner |
-| G2/G3 | TODO | Support/rollback exercise and truthful public surfaces |
-| T1/T2/T3 | TODO | Browser report, CI gates and runtime/type inventory |
-| O1 | TODO | Provider identities, migration set and deployed SHA/IDs |
-| External security | TODO | Rotation/revocation, retained-ref remediation and mirror scan |
+| D1 | IN PROGRESS | Foundation `67cc976`, runner/fencing revisions through `2fef06d`, allocator `c6bfedb` and remaining suites `8810ef1`. Advisor inventory confirms all 21 integration suites use the manifest allocator with no direct dotenv loader or skip wrapper. Revision `eda8fcf` restores real seed function and plan-sync coverage through owned input data, preserving default inputs. `1bc9c64` adds outside-owned catalogue comparison; `92d46ea`/`9baa427` persist and retain the immutable per-run baseline across crashes. Earlier advisor live Neon rollback checks passed 3/3 with no residue. Three additive migrations are pending; full guarded fixture, consumer pause and cleanup proof remain due. |
+| C6 | IN PROGRESS | Source commit `0526f5d` reviewed; advisor independently passed 42 service tests and 65 Plans/People UI tests. Deployed role proof pending. |
+| C1 | IN PROGRESS | Source review approved through `ef66d86`: durable request snapshot/fingerprint, atomic writer fencing, prepared recovery, verified attach/not-created resolution, resumable merge cancellation and shared normal/recovery completion. Advisor passed 39 submit/recovery/helper tests plus 5 notification dispatch tests. Transactional submit notification persists inbox/email but suppresses pre-commit SSE; browser visibility and guarded live concurrency/provider recovery proof remain required. |
+| C2 | IN PROGRESS | Source retries partial membership provisioning and supplies deterministic event UUID plus stable verified timestamp. Advisor passed 25 route/abuse/auth tests; real server SDK transport regression exists. Complete deployed partial-retry/event-cardinality proof remains due. |
+| C3 | IN PROGRESS | Source review approved through `b502b28`: authoritative same-second Stripe snapshots may repair equal timestamps, concurrent insertion collisions trigger authoritative retrieval, and unsuccessful repair cannot become processed. Advisor passed 32 payment webhook and 19 billing query tests. Live replay/ordering proof remains due. Rolling API back to the old receipt schema behaviour requires preserving failed-receipt inventory and forward repair/replay. |
+| C4/C5 | IN PROGRESS | Source commit `0526f5d` reviewed; advisor independently passed 11 email queue, 2 handler and 36 API route tests with Bun 1.4.0. Deployed email proof pending. |
+| R1/R2/R3 | IN PROGRESS | Source commit `42537a0` reviewed. Advisor passed 35 preflight/launch-mode and 10 observability tests; installed Sentry 10.75.0 config export resolves. Actual project preflights and symbolicated event pending. |
+| P1/P2/P3 | IN PROGRESS | Guarded fixture regressions added in `4a328be`; read-only live P2/P3 evidence and holiday predicate fix `816b181` are recorded below.  P3 revision `504d1e5` replaces Prisma client-side distinct with fixed per-type findFirst queries and aggregate counts; reviewer passed service/recovery tests 16/16 and sync UI tests 14/14. P1/P2 `2b2c3f5` adds bounded keyset pages and batched hydration; advisor independently passed 93 focused tests. Revision `1f0f723` fixes holiday-only applicability and visible Plans window/empty-state copy; advisor passed 63 revised service/status tests plus 4 Plans server tests. Guarded predicate/oracle parity and actual query counts remain due. Deployed query/payload proof remains pending. |
+| P4/P5 | IN PROGRESS | Source sanitisation corrected in `b77f707`. Advisor real Chromium/PostHog transport check delivered four expected events with zero query/fragment markers or browser errors. Turbopack comparison confirms Clerk client parts removed from public routes and PostHog deferred from the synchronous app graph. Final deployed browser network and candidate consistency proof remain due. |
+| G1 | IN PROGRESS | Application/private Resend/HMAC-backed KV receipt flow implemented. First activation milestones use durable timestamps and tenant/organisation-scoped identities; first feed access preserves hourly usage updates. Advisor passed 34 feed rendering and 2 job activation tests. Delivered application, complete initial sync and separately admitted first owner proof remain due. |
+| G2/G3 | IN PROGRESS | Provisional public identity material and obsolete region/access claims being removed; support and rollback proof pending |
+| T1/T2/T3 | IN PROGRESS | Final tooling revisions through `b483535` add pre-mutation fixture/session ownership and provider fingerprint/remote-state verification; advisor passed 29 release-tool tests.  T2 commit `344f749` reviewed: advisor independently passed docs broken-links, email production build, export and 3,961-byte/two-link render assertion. First-party Node types align with Node 22. Browser suite scaffold now exists; reviewer requires exact owned record selection, isolated role contexts, provider final-state reconciliation and first-owner admission coverage before mutation runs. Production runtime and remote CI proof pending. Persistent release workflow rejected by automatic approval review and remains unapplied. |
+| O1 | IN PROGRESS | Live Neon read-only identity checked, 12/12 applied migration checksums match base with no pending migrations. At `54f8df5`, API `dpl_4sh5z6nG9AJa4ZEVdRQT9PBUWr92` READY; app `dpl_7GeUDMUW4Dh22kL8AHs2Gbw6cdUT` and web `dpl_BEuv9DgKB4NsrizCwvfZ9zaCZqMg` ERROR. API Inngest GET 500 confirmed by runtime log: missing signing key. |
+| External security | IN PROGRESS | Fresh remote mirror at `54f8df5`, Gitleaks 8.30.1 checksum verified, all-ref scan: 1,571 commits, exit 1, 29 redacted findings. Historical `.mcp.json` credential remains reachable through 114 pull refs (no current head/tag). Rotation and GitHub retained-ref/cache purge remain unverified; other findings require fixture/example triage. No secret values reproduced. |
 | Final release | TODO | Candidate SHA/tree, launch date and READY report |
 
+### Provider execution, 19 September 2026
+
+Vercel CLI login is now verified as `hiltonbrown`. Build logs for the failed app
+and web deployments confirm incomplete Better Stack configuration. Initially
+applied the existing complete trio to app/web, then inspected actual resources:
+the page contains only an unrelated paused `hiltonbrown.com.au` monitor, not
+Team Calendar's five advertised components. Selected the plan's explicitly
+allowed disabled-integration option, removing the complete Better Stack group
+from production on all three projects. Original values remain privately backed
+up and unrelated provider resources are untouched. Public status tests pass 9/9:
+missing configuration remains unknown with no hosted-page link or invented check
+time. Sentry/Inngest alert proof remains required.
+
+Explicit `NEXT_PUBLIC_LAUNCH_MODE=early_access` was applied to all three projects.
+These environment changes still require final-candidate deployments.
+
+Current production aliases were read back from Vercel: app points to READY
+`dpl_GRZrokHhhVvcT3FKRUhSgwfykj1M`, web to READY
+`dpl_ENreo5KaNud6ewdezntVs2kiJczq`, both at
+`a75bcbaeba958429c8aa222e68d55c232e2213fe` (29 August). API points to
+`dpl_4sh5z6nG9AJa4ZEVdRQT9PBUWr92` at `54f8df5`. These are recorded
+rollback candidates, not a completed rollback rehearsal or compatibility proof.
+
+Resend's existing production account had no sending domain. Created
+`teamcalendar.online` (sending enabled, receiving disabled), added its four
+provider-required DKIM/mail-from DNS records through Vercel DNS, and confirmed
+all four records and the domain are verified. Existing DNS records were retained.
+Set API production `RESEND_FROM=notifications@teamcalendar.online` and generated
+a server-only `EARLY_ACCESS_APPLICATION_HMAC_SECRET` directly into sensitive
+Vercel storage. Private
+application recipient and controlled delivery receipt remain pending.
+
+The existing local Stripe credential was checked without printing it: it is test
+mode and lists zero webhook endpoints. Production retains its existing sensitive
+Stripe credential; no test key was substituted. Production webhook signing
+configuration and live paid/replay evidence remain unverified.
+
+Live Clerk Backend API access is verified. Organisation selection is enforced,
+but only default admin/member roles exist and the creator role is currently
+`org:admin`; the required owner/manager/viewer roles and creator-role configuration
+are being reconciled. Public Clerk FAPI reports sign-up mode `restricted`,
+confirming invitation-only access is already configured. Production role creation was rejected by Clerk with
+`unsupported_subscription_plan_features` (`org:roles`): the B2B Authentication
+add-on is required. Config schema access also requires a Clerk account login.
+Both provider actions were requested asynchronously; no customer membership was
+changed. The live database testing authorisation remains unchanged.
+
+### Browser-confirmed admission correction
+
+Chromium 153.0.8010.12 on 19 September loads the current public site with HTTP 200
+and no console/page errors. App sign-in and sign-up return HTTP 200 but repeatedly
+block `clerk.teamcalendar.online` scripts under CSP; no Clerk form renders.
+Candidate `apps/app/proxy.ts` still allows only Clerk development/vendor domains.
+Extend the existing policy with the validated configured Clerk frontend origin
+for the necessary script/connect/frame directives, preserving nonce protection.
+Candidate fix derives the exact configured frontend origin from the publishable
+key without widening the policy to arbitrary custom domains. Advisor passed
+18 proxy tests. Rendered Clerk form readiness is asserted in the maintained
+browser suite; deployed proof remains required.
+This is a confirmed G1 admission defect; HTTP status alone cannot certify it.
+
+### Resumed verification, 19 September
+
+Independent live read-only verification advanced P3: with PostgreSQL
+`default_transaction_read_only=on` verified before reads, 82 existing sync runs
+produced a 16-query/872-byte overview. History pages requested at 1, 50 and 200
+returned 1, 50 and 82 rows using 2, 3 and 3 actual emitted SQL queries. Evidence:
+`/tmp/teamcalendar-production-env/sync-monitor-readonly-proof.json`.
+
+The same live read-only approach found a confirmed P2 defect after source gates
+passed: an AU/Brisbane organisation with no locations and no applicable holiday
+has 23 people displaying `available`, yet `public_holiday` filtering returned all
+23 instead of zero. The empty holiday `OR` predicate is not a reliable false
+condition when nested in Prisma filters. Revision `816b181` corrects the predicate
+with an explicit impossible ID filter and adds unit plus guarded integration
+regressions. The advisor reran the exact live read-only check: all 13 status
+filters now match the unfiltered status oracle, including zero holidays and
+23 available people. Page sizes 1/50/200 return 1/23/23 rows with exact total 23
+and 10 emitted SQL queries each. Private passing evidence:
+`/tmp/teamcalendar-production-env/people-readonly-proof.json`. Private sanitised counts and SQL text
+are in `/tmp/teamcalendar-production-env/people-parity-diagnostic.json`. No data
+was modified. Final clean candidate
+`816b1811423b32793e0c33eeec48baee08b9e310` passed a fresh forced Node 24.21.0
+source wrapper: app/API/web builds, lint, types, boundaries, 2,231 unit tests
+across 17 workspaces, 29 release-tool tests and release-tool type checking.
+No Turbo tasks were cached. Evidence:
+`/tmp/teamcalendar-source-gates-final-816b181-node24.log`.
+Independent affected Node 22.23.2 checks passed 433 availability tests and
+29 release-tool tests, both exit 0. Evidence:
+`/tmp/teamcalendar-final-816b181-node22-availability.log` and
+`/tmp/teamcalendar-final-816b181-node22-release.log`.
+
+Clean candidate `bd5f4abd7fe5b2d2c304bcaf028aabe268c35efe` passed the complete
+Node 24.21.0 source wrapper with forced uncached builds: app/API/web builds,
+workspace type checks, boundary checks, 2,230 unit tests across 17 workspaces,
+26 release-tool tests and release-tool type checking. Terminal exit 0 was
+recorded at 11:15:33 AEST in
+`/tmp/teamcalendar-source-gates-final-node24.log`. Build verification also fixed
+the API Stripe module import and an email-template package boundary. The guard
+now permits only identified compiler IPC while retaining external network and
+database denial. Independent Node 22.23.2 verification also passed (exit 0), including the same
+2,230 unit and 26 release-tool tests, recorded in
+`/tmp/teamcalendar-source-gates-final-node22.log`. During that run `9aca56e`
+updated only `tasks/todo.md`; direct Git comparison confirms no source, lockfile
+or configuration changes from verified `bd5f4ab`. No rebuild was repeated for
+that documentation-only change. These results do not certify production deployment.
+
+Candidate `b77f707` fixes the real PostHog identity-envelope URL leak. The advisor
+rebuilt the candidate instrumentation and ran installed `posthog-js` 1.434.0 in
+Chromium with all network requests intercepted and artificial query/fragment
+markers. Four real serialised events were delivered: identity, group identity,
+one initial page view and one navigation page view. No marker remained in any
+payload, including envelope-level `$set_once`, and no browser error occurred.
+The only SDK test override disabled automated-browser suppression; capture,
+`before_send` and transport serialisation were real. Maintained regression
+`be12d0e` now bundles the unchanged application source and reproduces this check
+with all four expected events, zero marker leakage and zero browser errors.
+Run `PLAYWRIGHT_BROWSERS_PATH=/tmp/teamcalendar-playwright bun run
+test:release-analytics-privacy`; evidence is also retained under
+`/tmp/teamcalendar-analytics-browser-release/`. Private evidence is in
+`/tmp/teamcalendar-analytics-browser-fixed/requests.json` and `result.json`.
+
+D1 has a central allocator with disjoint suite tenant slots and manifest-owned
+global plan/event keys. All 21 suite files now call the allocator. Review caught
+a seed test that exercised a test-only replacement instead of the production
+seed function. Revision `eda8fcf` restores real seed and plan-sync execution
+with owned organisations, people, locations and plan limits. Earlier source
+wrapper formatting/import failures were corrected; the final source gates above
+pass. The full 21-suite guarded live integration run remains pending protected
+execution, durable KV fencing, provider configuration and additive migrations.
+
+T1 runner commit `d7c0417` is not approved for live browser mutations. Direct
+review still found first matching record selectors, ambiguous submission accepted
+as success, premature reconciliation without provider cleanup, and corrupt
+journey ledger reads treated as empty. Corrections through `a32aa5e` and `38b98ca` address ambiguity handling, exact
+existing-record selectors and ledger read/write handling. Review then found
+new-record selectors based on notes absent from the table, and fresh browser
+contexts missing base URLs/error observation. Revision `d123f72` fixes these
+with guarded exact correlation lookup and error observation on role contexts.
+Revision `8e985d1` adds pre-mutation fixture/session ownership validation and
+explicit organisation selection. Revision `b483535` adds provider verification
+against immutable submit fingerprints, exact remote identity and canonical
+state, including no-second-create assertions. These helpers pass the final
+29 release-tool tests. Actual provider-side browser journey evidence is still
+required; passing helper tests do not establish completed live recovery.
+
 ### Review decisions and rejected findings
+
+The advisor decoded the installed Next.js Turbopack analyser format for matching
+baseline (`0526f5d`) and candidate builds. On home/about/pricing, Clerk client
+module parts dropped from 65 (110,455 raw bytes; 34,964 summed compressed-part
+bytes) to zero. PostHog was reachable from the baseline app entry's synchronous
+dependency graph and is only an asynchronous dependency in the candidate.
+Home-route client module parts totalled 2,678,373 raw / 1,181,555 compressed-part
+bytes before and 2,533,524 / 1,133,010 after. These include asynchronous chunks and
+are analyser module metrics, not measured initial browser transfer sizes.
+Final browser network verification and final-candidate consistency remain due.
 
 - Plan 153's parallel-subscription fix is already present at `0af2573`; do not
   rebuild it. Its regression and paid live evidence remain required.
@@ -1041,7 +1209,8 @@ Keep secrets, applicant information and customer data out of this file.
 - Database-free gates, mutation safety, wrong Sentry path, Resend alias/sender,
   first-owner admission and manager empty-scope gaps were confirmed by direct
   source reads and incorporated above. Source-only reviewer checks do not certify
-  production. No source files or provider settings were modified in this review.
+  production. The initial advisory review changed no source or provider settings;
+  subsequent execution and authorised provider changes are recorded above.
 
 ### Maintenance notes
 
@@ -1052,3 +1221,32 @@ update P2 query parity tests. A new integration suite must join D1's inventory
 before it can run. New launch modes, provider variables, public CTAs and analytics
 events must update runtime validation, preflight and deployed release checks in
 the same change. Recheck these invariants when reviewing the final diff.
+
+Final lockfile audit on 19 September still exits 1 with the same seven package
+groups (`deepmerge-ts`, `esbuild`, `extract-zip`, `hono`, `mysql2`, `qs`, `sharp`).
+Retain the reachability dispositions in candidate
+`tasks/release-dependency-audit.md`; do not call this audit a pass. Fresh private
+output: `/tmp/teamcalendar-release-scanner/dependency-audit-final.json`.
+
+### Remaining execution requirements
+
+Status remains **IN PROGRESS, not deployed or certified live**. Source candidate
+`816b181` is clean and verified as described above. Vercel login and live database
+authorisation are resolved and must not be requested again.
+
+- Configure production Inngest, KV, Sentry and Clerk webhook signing inputs;
+  provide the application delivery recipient. Keep secret values out of chat.
+- Enable Clerk's required B2B role capability and complete the requested Clerk
+  account login so owner/manager/viewer and creator-role configuration can finish.
+- Resolve the pending exact protected-workflow patch approval. Automatic approval
+  review rejected the persistent CI production effects as beyond the existing
+  live-test authorisation. The prepared patch remains unapplied, not bypassed.
+- Confirm historical credential revocation/rotation and authorise the prepared
+  GitHub Support purge request before sending it. No credential value is needed.
+- Obtain exact Neon branch/restore evidence and consumer pause/drain evidence;
+  apply the three reviewed additive migrations, run all guarded live integration
+  suites, and verify scoped cleanup and unchanged unowned data.
+- Deploy and verify the exact candidate, execute the owned browser/payroll
+  journeys with provider reconciliation, and complete rollback and monitoring
+  evidence before marking READY. Paid Stripe execution is not a launch gate for
+  the configured invitation-only `early_access` mode.
