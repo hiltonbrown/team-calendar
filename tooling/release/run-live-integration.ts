@@ -106,8 +106,35 @@ if (action === "run") {
 }
 let status = 1;
 let cleanupSucceeded = false;
+let catalogueDigestBefore: string | undefined;
+const readCatalogueDigest = (output: string) => {
+  const line = output.trim().split("\n").at(-1);
+  if (!line) {
+    throw new Error("Cleanup did not return a catalogue digest");
+  }
+  const parsed = JSON.parse(line) as { outsideOwnedCatalogueDigest?: unknown };
+  if (typeof parsed.outsideOwnedCatalogueDigest !== "string") {
+    throw new Error("Cleanup returned an invalid catalogue digest");
+  }
+  return parsed.outsideOwnedCatalogueDigest;
+};
 try {
   if (action === "run") {
+    const snapshot = spawnSync(
+      "bun",
+      [
+        "run",
+        "tooling/release/cleanup.ts",
+        "--manifest",
+        protectedManifestPath,
+        "--dry-run",
+      ],
+      { cwd: root, encoding: "utf8", env: childEnvironment }
+    );
+    if (snapshot.status !== 0) {
+      throw new Error(snapshot.stderr || snapshot.stdout);
+    }
+    catalogueDigestBefore = readCatalogueDigest(snapshot.stdout);
     const result = spawnSync("bun", ["run", "test:integration"], {
       cwd: root,
       env: childEnvironment,
@@ -125,14 +152,25 @@ try {
       protectedManifestPath,
       "--apply",
     ],
-    { cwd: root, env: childEnvironment, stdio: "inherit" }
+    { cwd: root, encoding: "utf8", env: childEnvironment }
   );
   if (cleanup.status === 0) {
-    cleanupSucceeded = true;
-    if (recoveryRequested || recoverIfOwned) {
-      status = 0;
+    const catalogueChanged =
+      catalogueDigestBefore &&
+      readCatalogueDigest(cleanup.stdout) !== catalogueDigestBefore;
+    if (catalogueChanged) {
+      process.stderr.write(
+        "Live integration changed catalogue rows outside manifest ownership"
+      );
+      status = 1;
+    } else {
+      cleanupSucceeded = true;
+      if (recoveryRequested || recoverIfOwned) {
+        status = 0;
+      }
     }
   } else {
+    process.stderr.write(cleanup.stderr || cleanup.stdout);
     status = cleanup.status ?? 1;
   }
 }

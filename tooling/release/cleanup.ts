@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { assertActiveRunOwner } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
@@ -110,6 +111,27 @@ const countRows = async (table: string, sql: string, values: string[]) => {
   );
   return Number(rows[0]?.count ?? 0n);
 };
+const outsideOwnedCatalogueDigest = async () => {
+  const plans = await database.$queryRawUnsafe<unknown[]>(
+    `SELECT id::text, key, plan_key, name, is_active, is_custom, COALESCE(stripe_price_id, '') AS stripe_price_id
+     FROM plans
+     WHERE NOT (id = ANY($1::uuid[]) OR key = ANY($2::text[]) OR plan_key = ANY($2::text[]))
+     ORDER BY id`,
+    planIds,
+    planKeys
+  );
+  const limits = await database.$queryRawUnsafe<unknown[]>(
+    `SELECT id::text, plan_id::text, limit_type::text, limit_value
+     FROM plan_limits
+     WHERE NOT (plan_id = ANY($1::uuid[]))
+     ORDER BY id`,
+    planIds
+  );
+  return createHash("sha256")
+    .update(JSON.stringify({ limits, plans }))
+    .digest("hex");
+};
+const catalogueDigestBefore = await outsideOwnedCatalogueDigest();
 const counts: Record<string, number> = {};
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
@@ -152,7 +174,13 @@ if (planIds.length > 0 || planKeys.length > 0) {
 }
 
 if (mode === "--dry-run") {
-  console.log(JSON.stringify({ counts, runId: manifest.runId }));
+  console.log(
+    JSON.stringify({
+      counts,
+      outsideOwnedCatalogueDigest: catalogueDigestBefore,
+      runId: manifest.runId,
+    })
+  );
   await database.$disconnect();
   process.exit(0);
 }
@@ -262,8 +290,19 @@ if (planIds.length > 0 || planKeys.length > 0) {
   }
   residue.plans = await countRows("plans", clauses.join(" OR "), values);
 }
+const catalogueDigestAfter =
+  mode === "--apply"
+    ? await outsideOwnedCatalogueDigest()
+    : catalogueDigestBefore;
 await database.$disconnect();
-console.log(JSON.stringify({ before: counts, residue, runId: manifest.runId }));
+console.log(
+  JSON.stringify({
+    before: counts,
+    outsideOwnedCatalogueDigest: catalogueDigestAfter,
+    residue,
+    runId: manifest.runId,
+  })
+);
 if (Object.values(residue).some((count) => count !== 0)) {
   throw new Error("Manifest-owned fixture residue remains");
 }
