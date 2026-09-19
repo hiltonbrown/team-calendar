@@ -1,5 +1,5 @@
 import { render } from "@react-email/render";
-import { NotificationEmailTemplate } from "../../../packages/email/templates/notification";
+import { NotificationEmailTemplate } from "@repo/email/templates/notification";
 
 const actionUrl = "https://app.teamcalendar.test/notifications";
 const unsubscribeUrl =
