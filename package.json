@@ -26,6 +26,7 @@
     "stripe:failures": "bun --conditions=react-server tooling/release/list-failed-stripe-events.ts",
     "test": "turbo test",
     "test:integration": "turbo test:integration",
+    "test:release": "playwright test --config tooling/release/playwright.config.ts",
     "test:release-tools": "vitest run --config tooling/release/vitest.config.ts",
     "translate": "turbo translate",
     "typecheck": "turbo typecheck",
@@ -52,6 +53,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",
+    "@clerk/testing": "^2.2.36",
     "@playwright/test": "1.63.0",
     "@repo/typescript-config": "*",
     "@turbo/gen": "^2.10.13",

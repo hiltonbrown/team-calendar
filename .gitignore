@@ -112,3 +112,6 @@ tmp/
 .ds-sync/
 ds-bundle/
 packages/design-system/styles/compiled.css
+tooling/release/.auth/
+tooling/release/test-results/
+tooling/release/playwright-report/
