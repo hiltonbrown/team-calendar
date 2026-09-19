@@ -82,9 +82,11 @@ are implementation work, not a new permission gate.
   allowlist, lazy connection denial, candidate-bound protected manifest,
   durable KV read-back, active-run fencing, pre-write zero-residue assertion,
   FK-ordered cleanup and focused live rollback proof are implemented. The
-  exact protected workflow patch is reviewable but unapplied. Full suite
-  fixture ownership conversion, consumer restore implementation and provider
-  restore evidence remain open.
+  exact protected workflow patch is reviewable but unapplied. All 21 suites now
+  use disjoint manifest-owned fixtures, production seed execution accepts owned
+  inputs, cleanup checks outside-owned catalogue digests, and interrupted runs
+  retain the digest in durable storage. Consumer pause/restore provider proof,
+  a protected workflow environment and the complete guarded live run remain open.
 - [x] C6: empty and missing manager scope fails closed. Focused availability
   suites pass 42 tests in 3 files.
 - [x] C4/C5: missing email transport fails before queue selection and malformed
@@ -104,7 +106,9 @@ are implementation work, not a new permission gate.
   2,564,021 / 1,156,608 to 2,417,857 / 1,107,839; Pricing from
   2,631,576 / 1,168,019 to 2,486,744 / 1,119,481. These totals include async
   chunks and are not network initial-transfer sizes. PostHog moved out of the
-  app entry synchronous graph.
+  app entry synchronous graph. A real intercepted `posthog-js` Chromium
+  delivery produced exactly identify, group-identify and two page-view events,
+  with no query/fragment markers or browser errors.
 - [x] C1/C2/C3 source: submit side effects remain recoverable through durable
   completion; provisioning deduplicates; failed/equal-time Stripe deliveries
   reconcile authoritatively and remain replayable. Live journey proof remains.
@@ -114,9 +118,11 @@ are implementation work, not a new permission gate.
 - [x] G1 source: early-access application, invite-only entry contract, stable
   provider idempotency and durable activation capture are implemented. Provider
   mailbox, Clerk role and delivered production evidence remain open.
-- [ ] T1: Playwright runner scaffold and production Clerk CSP repair exist. The
-  mutation journeys must be bound to exact manifest-owned fixtures with full
-  reconciliation before execution.
+- [ ] T1: Playwright runner and production Clerk CSP repair exist. All 30
+  journeys fail closed without candidate/manifests, use exact owned records,
+  fresh role contexts and a durable local create ledger with cleanup. No live
+  mutation journey has run because required provider configuration and
+  sanctioned candidate deployments are still absent.
 - [x] T2 source and local gates: docs links and rendered email checks pass.
 - [ ] G2 and O1: production configuration, candidate deployment, rollback-aware
   live journeys, monitoring/alerts and launch decision remain open.
