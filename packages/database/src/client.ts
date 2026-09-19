@@ -6,8 +6,8 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import ws from "ws";
 import { PrismaClient } from "../generated/client";
 import { keys } from "../keys";
-import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 import { createLazyClient } from "./lazy-client";
+import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 declare global {
   var __teamCalendarDatabase: PrismaClient | undefined;

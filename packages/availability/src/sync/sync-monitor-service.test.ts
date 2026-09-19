@@ -115,9 +115,7 @@ function failedRecordFixture(input: {
   };
 }
 
-function mockSummaryRuns(
-  runs: ReturnType<typeof completedRunFixture>[]
-): void {
+function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
   mocks.syncRunFindFirst.mockImplementation(
     ({ where }: { where: { run_type?: SyncRunType; status?: unknown } }) => {
       if (where.status === "running") {
