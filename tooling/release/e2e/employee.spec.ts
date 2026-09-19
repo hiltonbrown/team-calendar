@@ -10,6 +10,7 @@ const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
 const afterTomorrow = new Date(Date.now() + 172_800_000)
   .toISOString()
   .slice(0, 10);
+const runId = process.env.TC_RELEASE_RUN_ID;
 
 test.describe
   .serial("employee leave and manual availability", () => {
@@ -24,12 +25,11 @@ test.describe
       await page.getByRole("option", { name: /Training:/ }).click();
       await page.getByLabel("Starts").fill(tomorrow);
       await page.getByLabel("Ends").fill(afterTomorrow);
-      await page
-        .getByLabel("Notes")
-        .fill(`T1 manual ${process.env.TC_RELEASE_RUN_ID}`);
+      const note = `T1 manual ${runId} ${correlationId}`;
+      await page.getByLabel("Notes").fill(note);
       await page.getByRole("button", { name: "Save" }).click();
       await expect(page).toHaveURL(/\/plans/);
-      const row = page.getByRole("row").filter({ hasText: "Training" }).first();
+      const row = page.getByRole("row").filter({ hasText: note });
       await expect(row).toBeVisible();
       const edit = row.getByRole("link", { name: /edit/i });
       const recordId = planIdFromHref(await edit.getAttribute("href"));
@@ -41,6 +41,7 @@ test.describe
       await page.getByRole("button", { name: "Save changes" }).click();
       await expect(page.getByText(/T1 manual edited/)).toBeVisible();
       await row.getByRole("button", { name: /archive/i }).click();
+      await expect(row).toHaveCount(0);
       reconcileCreate(correlationId);
       await context.close();
     });
@@ -54,11 +55,10 @@ test.describe
       await page.getByRole("option", { name: /Annual leave:/ }).click();
       await page.getByLabel("Starts").fill(tomorrow);
       await page.getByLabel("Ends").fill(afterTomorrow);
+      const note = `T1 payroll ${runId} ${correlationId}`;
+      await page.getByLabel("Notes").fill(note);
       await page.getByRole("button", { name: "Save draft" }).click();
-      const row = page
-        .getByRole("row")
-        .filter({ hasText: "Annual leave" })
-        .first();
+      const row = page.getByRole("row").filter({ hasText: note });
       const recordId = planIdFromHref(
         await row.getByRole("link", { name: /edit/i }).getAttribute("href")
       );
@@ -68,7 +68,10 @@ test.describe
         .getByRole("button", { name: /confirm|submit/i })
         .last()
         .click();
-      await expect(row).toContainText(/Submitted|Resolution required/);
+      await expect(row).toContainText("Submitted");
+      await row.getByRole("button", { name: "Withdraw" }).click();
+      await page.getByRole("button", { name: "Withdraw from Xero" }).click();
+      await expect(row).toContainText("Withdrawn");
       reconcileCreate(correlationId);
       await context.close();
     });

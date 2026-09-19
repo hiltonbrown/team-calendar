@@ -26,10 +26,7 @@ test("an ambiguous submission exposes recovery without issuing another create", 
 }) => {
   const { context, page } = await useRole(browser, "admin");
   await page.goto(`/plans?personId=${fixtures.people.recovery}`);
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: /Resolution required|outcome/i })
-    .first();
+  const row = page.locator(`tr:has(a[href*="${fixtures.records.recovery}"])`);
   await expect(row).toBeVisible();
   await expect(
     row
@@ -41,7 +38,7 @@ test("an ambiguous submission exposes recovery without issuing another create", 
   ).toHaveCount(0);
   await page.reload();
   await expect(
-    page.getByRole("row").filter({ hasText: /Resolution required|outcome/i })
+    page.locator(`tr:has(a[href*="${fixtures.records.recovery}"])`)
   ).toHaveCount(1);
   await context.close();
 });
@@ -51,16 +48,14 @@ test("a definitive failed submission can be retried to a known state", async ({
 }) => {
   const { context, page } = await useRole(browser, "viewer");
   await page.goto(`/plans?personId=${fixtures.people.retry}`);
-  const row = page
-    .getByRole("row")
-    .filter({ hasText: /Submit failed|Xero sync failed/ })
-    .first();
+  const row = page.locator(`tr:has(a[href*="${fixtures.records.retry}"])`);
+  await expect(row).toContainText(/Submit failed|Xero sync failed/);
   await row.getByRole("button", { name: "Retry submission" }).click();
   await page
     .getByRole("button", { name: /confirm|retry/i })
     .last()
     .click();
-  await expect(row).toContainText(/Submitted|Resolution required/);
+  await expect(row).toContainText("Submitted");
   await context.close();
 });
 

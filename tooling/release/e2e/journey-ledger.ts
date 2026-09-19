@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { releaseEnvironment } from "./environment.js";
@@ -21,14 +21,28 @@ const ledgerPath = resolve(
 
 function readLedger(): z.infer<typeof ledgerSchema> {
   try {
-    return ledgerSchema.parse(JSON.parse(readFileSync(ledgerPath, "utf8")));
-  } catch {
-    return { entries: [], runId: environment.manifest.runId };
+    const ledger = ledgerSchema.parse(
+      JSON.parse(readFileSync(ledgerPath, "utf8"))
+    );
+    if (ledger.runId !== environment.manifest.runId) {
+      throw new Error("Release journey ledger belongs to a different run");
+    }
+    return ledger;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return { entries: [], runId: environment.manifest.runId };
+    }
+    throw error;
   }
 }
 
 function save(ledger: z.infer<typeof ledgerSchema>) {
-  writeFileSync(ledgerPath, `${JSON.stringify(ledger)}\n`, { mode: 0o600 });
+  const temporary = `${ledgerPath}.${process.pid}.tmp`;
+  writeFileSync(temporary, `${JSON.stringify(ledgerSchema.parse(ledger))}\n`, {
+    flag: "wx",
+    mode: 0o600,
+  });
+  renameSync(temporary, ledgerPath);
 }
 
 export function recordIntendedCreate(action: string, correlationId: string) {

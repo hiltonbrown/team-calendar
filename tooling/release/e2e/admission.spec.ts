@@ -10,10 +10,9 @@ test("invite-only admission rejects uninvited direct sign-up", async ({
 }) => {
   await setupClerkTestingToken({ page });
   await page.goto("/sign-up");
-  await expect(page.locator(".cl-signUp-root")).toBeVisible();
-  await expect(
-    page.getByText(/invite|invitation|not accepting/i).first()
-  ).toBeVisible();
+  await expect(page).toHaveURL(
+    `${environment.webUrl}/contact?admission=required`
+  );
 });
 
 for (const [state, invitationUrl] of [
