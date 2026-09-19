@@ -24,6 +24,7 @@ const clerkOrgIds = organisationIds.map((_, index) => `org_release_${index}`);
 const environment = { ...process.env };
 
 const configureEnvironment = () => {
+  delete process.env.TC_SOURCE_GATES;
   Object.assign(process.env, {
     ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
     DATABASE_URL: "postgresql://role@host/database",

@@ -1,10 +1,14 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 const originalEnvironment = { ...process.env };
+
+beforeEach(() => {
+  delete process.env.TC_SOURCE_GATES;
+});
 
 afterEach(() => {
   process.env = { ...originalEnvironment };
