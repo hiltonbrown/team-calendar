@@ -1,5 +1,7 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright locators run once per serial journey.
-import { expect, test, useRole } from "./fixture.js";
+import { findCreatedRecordId } from "./created-record.js";
+import { releaseEnvironment } from "./environment.js";
+import { expect, rowForRecord, test, useRole } from "./fixture.js";
 import {
   persistReturnedId,
   reconcileCreate,
@@ -11,6 +13,7 @@ const afterTomorrow = new Date(Date.now() + 172_800_000)
   .toISOString()
   .slice(0, 10);
 const runId = process.env.TC_RELEASE_RUN_ID;
+const { fixtures } = releaseEnvironment();
 
 test.describe
   .serial("employee leave and manual availability", () => {
@@ -29,11 +32,14 @@ test.describe
       await page.getByLabel("Notes").fill(note);
       await page.getByRole("button", { name: "Save" }).click();
       await expect(page).toHaveURL(/\/plans/);
-      const row = page.getByRole("row").filter({ hasText: note });
+      const recordId = await findCreatedRecordId({
+        notes: note,
+        personId: fixtures.people.viewer,
+      });
+      persistReturnedId(correlationId, recordId);
+      const row = rowForRecord(page, recordId);
       await expect(row).toBeVisible();
       const edit = row.getByRole("link", { name: /edit/i });
-      const recordId = planIdFromHref(await edit.getAttribute("href"));
-      persistReturnedId(correlationId, recordId);
       await edit.click();
       await page
         .getByLabel("Notes")
@@ -58,11 +64,14 @@ test.describe
       const note = `T1 payroll ${runId} ${correlationId}`;
       await page.getByLabel("Notes").fill(note);
       await page.getByRole("button", { name: "Save draft" }).click();
-      const row = page.getByRole("row").filter({ hasText: note });
-      const recordId = planIdFromHref(
-        await row.getByRole("link", { name: /edit/i }).getAttribute("href")
-      );
+      await expect(page).toHaveURL(/\/plans/);
+      const recordId = await findCreatedRecordId({
+        notes: note,
+        personId: fixtures.people.viewer,
+      });
       persistReturnedId(correlationId, recordId);
+      const row = rowForRecord(page, recordId);
+      await expect(row).toBeVisible();
       await row.getByRole("button", { name: /submit/i }).click();
       await page
         .getByRole("button", { name: /confirm|submit/i })
@@ -76,11 +85,3 @@ test.describe
       await context.close();
     });
   });
-
-function planIdFromHref(href: string | null): string {
-  const match = href?.match(/\/plans\/([0-9a-f-]{36})/i);
-  if (!match?.[1]) {
-    throw new Error("Created plan did not expose its returned ID");
-  }
-  return match[1];
-}

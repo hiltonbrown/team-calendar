@@ -12,22 +12,20 @@ import {
 } from "./environment.js";
 
 const environment = releaseEnvironment();
+const browserErrors = new WeakMap<Browser, string[]>();
 
 export const test = base.extend<{ errors: string[] }>({
   errors: [
-    async ({ page }, use) => {
+    async ({ browser, page }, use) => {
       const errors: string[] = [];
-      page.on("console", (message) => {
-        if (message.type() === "error") {
-          errors.push(`console: ${message.text()}`);
-        }
-      });
-      page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
+      browserErrors.set(browser, errors);
+      attachErrorCapture(page, errors);
       await use(errors);
       playwrightExpect(
         errors,
         "unexpected browser console or page errors"
       ).toEqual([]);
+      browserErrors.delete(browser);
     },
     { auto: true },
   ],
@@ -36,9 +34,15 @@ export const test = base.extend<{ errors: string[] }>({
 export { expect } from "@playwright/test";
 
 export async function useRole(browser: Browser, role: ReleaseRole) {
+  const errors = browserErrors.get(browser);
+  if (!errors) {
+    throw new Error("Role pages require the automatic browser error fixture");
+  }
   const context = await browser.newContext({
+    baseURL: environment.appUrl,
     storageState: environment.authFiles[role],
   });
+  context.on("page", (rolePage) => attachErrorCapture(rolePage, errors));
   const page = await context.newPage();
   await page.goto("/");
   await page.waitForFunction(() => Boolean(window.Clerk?.user));
@@ -52,6 +56,15 @@ export async function useRole(browser: Browser, role: ReleaseRole) {
   playwrightExpect(identity.email).toBe(roleEmail(role));
   playwrightExpect(identity.role).toBe(`org:${role}`);
   return { context, page };
+}
+
+function attachErrorCapture(page: Page, errors: string[]) {
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      errors.push(`console: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => errors.push(`page: ${error.message}`));
 }
 
 export async function expectRoleDenied(page: Page, path: string) {
