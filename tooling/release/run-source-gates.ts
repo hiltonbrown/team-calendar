@@ -26,6 +26,7 @@ for (const key of Object.keys(environment)) {
 }
 environment.NODE_ENV = "test";
 environment.TC_SOURCE_GATES = "1";
+environment.TURBO_FORCE = "true";
 environment.DATABASE_URL =
   "postgresql://source_gate:source_gate@127.0.0.1:1/source_gate";
 environment.NODE_OPTIONS = [

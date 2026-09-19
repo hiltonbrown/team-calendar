@@ -1,7 +1,7 @@
 import { constructEvent } from "@repo/billing";
 import { NextResponse } from "next/server";
 import { env } from "@/env";
-import { deliverStripeEvent } from "../../../lib/stripe-event-delivery.js";
+import { deliverStripeEvent } from "@/lib/stripe-event-delivery";
 
 export async function POST(request: Request) {
   const eventResult = constructEvent(
