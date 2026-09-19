@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthoritativeUsageType } from "./billing";
 
 const mocks = vi.hoisted(() => ({
+  executeRaw: vi.fn(),
   feedCount: vi.fn(),
   organisationCount: vi.fn(),
   personCount: vi.fn(),
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   database: {
+    $executeRaw: mocks.executeRaw,
     $queryRaw: mocks.queryRaw,
     feed: { count: mocks.feedCount },
     organisation: { count: mocks.organisationCount },
@@ -28,6 +30,7 @@ const {
   isStripeEventProcessed,
   lockPlanLimitMutations,
   recordStripeEventFailure,
+  upsertSubscriptionFromWebhook,
 } = await import("./billing");
 
 const usageCases = [
@@ -211,5 +214,26 @@ describe("Stripe event receipt health", () => {
         lastAttemptedAt: attemptedAt,
       },
     ]);
+  });
+});
+
+describe("subscription mirror ordering", () => {
+  it("passes an explicit authoritative tie fence into the atomic upsert", async () => {
+    mocks.executeRaw.mockResolvedValue(1);
+    await upsertSubscriptionFromWebhook({
+      authoritativeTie: true,
+      cancelAtPeriodEnd: true,
+      clerkOrgId: "org_123",
+      currentPeriodEnd: null,
+      endedAt: new Date("2026-09-19T00:00:00.000Z"),
+      planKey: "basic",
+      status: "canceled",
+      stripeCustomerId: "cus_123",
+      stripeEventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
+      stripeSubscriptionId: "sub_123",
+    });
+
+    expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
+    expect(mocks.executeRaw.mock.calls[0]).toContain(true);
   });
 });

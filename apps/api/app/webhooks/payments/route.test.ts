@@ -16,7 +16,9 @@ const mocks = vi.hoisted(() => ({
   recordStripeEventIgnored: vi.fn(() => Promise.resolve()),
   resolvePlanKey: vi.fn(),
   retrieveStripeSubscription: vi.fn(),
-  upsertSubscriptionFromWebhook: vi.fn(() => Promise.resolve()),
+  upsertSubscriptionFromWebhook: vi.fn((input: unknown) =>
+    Promise.resolve(input)
+  ),
 }));
 
 vi.mock("@repo/billing", () => ({
@@ -507,6 +509,7 @@ describe("Stripe payments webhook", () => {
       for (const [mirrored] of mocks.upsertSubscriptionFromWebhook.mock.calls) {
         expect(mirrored).toEqual(
           expect.objectContaining({
+            authoritativeTie: true,
             cancelAtPeriodEnd: true,
             status: "canceled",
             stripeEventCreatedAt: new Date(1_700_000_100 * 1000),
@@ -515,6 +518,60 @@ describe("Stripe payments webhook", () => {
       }
     }
   );
+
+  it("authoritatively reconciles an equal-second insert collision before marking the event processed", async () => {
+    const event = subscriptionEvent();
+    mocks.constructEvent.mockReturnValue({ ok: true, value: event });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue(null);
+    mocks.upsertSubscriptionFromWebhook
+      .mockResolvedValueOnce(0)
+      .mockResolvedValueOnce(1);
+    mocks.retrieveStripeSubscription.mockResolvedValue({
+      ok: true,
+      value: {
+        ...event.data.object,
+        cancel_at_period_end: true,
+        ended_at: 1_700_000_100,
+        status: "canceled",
+      },
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(200);
+    expect(mocks.retrieveStripeSubscription).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenCalledTimes(2);
+    expect(mocks.upsertSubscriptionFromWebhook).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authoritativeTie: true,
+        cancelAtPeriodEnd: true,
+        status: "canceled",
+      })
+    );
+    expect(mocks.recordStripeEvent).toHaveBeenCalledTimes(1);
+    expect(mocks.recordStripeEventFailure).not.toHaveBeenCalled();
+  });
+
+  it("fails an equal-second insert collision when Stripe cannot provide the authoritative snapshot", async () => {
+    mocks.constructEvent.mockReturnValue({
+      ok: true,
+      value: subscriptionEvent(),
+    });
+    mocks.getSubscriptionForStripeSubscription.mockResolvedValue(null);
+    mocks.upsertSubscriptionFromWebhook.mockResolvedValueOnce(0);
+    mocks.retrieveStripeSubscription.mockResolvedValue({
+      error: "Stripe unavailable",
+      ok: false,
+    });
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(503);
+    expect(mocks.recordStripeEvent).not.toHaveBeenCalled();
+    expect(mocks.recordStripeEventFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCategory: "provider_fetch" })
+    );
+  });
 
   it("passes a later event.created for a newer event (newer-wins path)", async () => {
     const newerCreatedSeconds = 1_700_001_000;

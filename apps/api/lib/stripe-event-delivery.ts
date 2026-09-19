@@ -167,7 +167,8 @@ export interface MirrorResult {
 
 async function mirrorSubscription(
   data: z.infer<typeof SubscriptionSchema>,
-  eventCreatedAt: Date
+  eventCreatedAt: Date,
+  authoritativeTie = false
 ): Promise<MirrorResult> {
   const identity = await resolveEventIdentity(data, data.id);
   const { clerkOrgId } = identity;
@@ -218,7 +219,8 @@ async function mirrorSubscription(
     };
   }
   const stripeCustomerId = identity.stripeCustomerId ?? objectId(data.customer);
-  await upsertSubscriptionFromWebhook({
+  const affected = await upsertSubscriptionFromWebhook({
+    authoritativeTie,
     cancelAtPeriodEnd: data.cancel_at_period_end,
     clerkOrgId,
     currentPeriodEnd: dateFromSeconds(data.current_period_end),
@@ -229,6 +231,41 @@ async function mirrorSubscription(
     stripeEventCreatedAt: eventCreatedAt,
     stripeSubscriptionId: data.id,
   });
+  if (Number(affected) === 0) {
+    if (authoritativeTie) {
+      return {
+        clerkOrgId,
+        error: "Authoritative Stripe subscription could not be mirrored",
+        errorCategory: "equal_time_conflict",
+        ok: false,
+        status: 503,
+        stripeCustomerId,
+      };
+    }
+    const retrieved = await retrieveStripeSubscription(data.id);
+    if (!retrieved.ok) {
+      return {
+        clerkOrgId,
+        error: "Equal-time Stripe subscription reconciliation failed",
+        errorCategory: "provider_fetch",
+        ok: false,
+        status: 503,
+        stripeCustomerId,
+      };
+    }
+    const authoritative = SubscriptionSchema.safeParse(retrieved.value);
+    if (!authoritative.success) {
+      return {
+        clerkOrgId,
+        error: "Authoritative Stripe subscription payload is invalid",
+        errorCategory: "invalid_payload",
+        ok: false,
+        status: 503,
+        stripeCustomerId,
+      };
+    }
+    return mirrorSubscription(authoritative.data, eventCreatedAt, true);
+  }
   const organisationId =
     await getFirstActiveOrganisationIdForClerkOrg(clerkOrgId);
   if (!organisationId) {
@@ -303,7 +340,7 @@ async function handleSubscriptionEvent(
         stripeCustomerId: identity.stripeCustomerId,
       };
     }
-    return await mirrorSubscription(authoritative.data, eventCreatedAt);
+    return await mirrorSubscription(authoritative.data, eventCreatedAt, true);
   }
   log.error("Stripe subscription event failed validation and was skipped.", {
     eventId: event.id,
@@ -387,7 +424,8 @@ async function handleInvoiceEvent(
     }
     return await mirrorSubscription(
       authoritative.data,
-      dateFromSeconds(event.created) ?? new Date()
+      dateFromSeconds(event.created) ?? new Date(),
+      true
     );
   }
   return { disposition: "ignored", ok: true };
@@ -444,7 +482,8 @@ async function handleCheckoutSession(
   }
   return mirrorSubscription(
     authoritative.data,
-    dateFromSeconds(event.created) ?? new Date()
+    dateFromSeconds(event.created) ?? new Date(),
+    true
   );
 }
 

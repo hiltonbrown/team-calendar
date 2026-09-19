@@ -16,6 +16,7 @@ export type AuthoritativeUsageClient = Pick<
 type PlanLimitLockClient = Pick<Prisma.TransactionClient, "$queryRaw">;
 
 export interface SubscriptionMirrorInput {
+  authoritativeTie?: boolean;
   cancelAtPeriodEnd: boolean;
   clerkOrgId: string;
   currentPeriodEnd: Date | null;
@@ -219,6 +220,7 @@ export const upsertSubscriptionFromWebhook = (input: SubscriptionMirrorInput) =>
     WHERE clerk_org_subscriptions.stripe_event_created_at IS NULL
        OR EXCLUDED.stripe_event_created_at IS NULL
        OR clerk_org_subscriptions.stripe_event_created_at < EXCLUDED.stripe_event_created_at
+       OR (${input.authoritativeTie ?? false} AND clerk_org_subscriptions.stripe_event_created_at = EXCLUDED.stripe_event_created_at)
   `;
 
 export const isStripeEventProcessed = async (
