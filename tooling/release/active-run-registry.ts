@@ -104,22 +104,3 @@ export const readCatalogueDigest = async (
   }
   return result;
 };
-
-export const releaseCatalogueDigest = async (
-  manifest: ReleaseManifest,
-  digest: string,
-  input: { token?: string; url?: string }
-): Promise<void> => {
-  const compareAndDelete =
-    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
-  const result = await request(input, [
-    "eval",
-    compareAndDelete,
-    "1",
-    catalogueDigestKey(manifest.runId),
-    digest,
-  ]);
-  if (result !== 1) {
-    throw new Error("Release catalogue baseline ownership changed");
-  }
-};

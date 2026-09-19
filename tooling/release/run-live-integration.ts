@@ -6,7 +6,6 @@ import {
   persistCatalogueDigest,
   readCatalogueDigest,
   releaseActiveRun,
-  releaseCatalogueDigest,
 } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
@@ -188,7 +187,6 @@ if (cleanupSucceeded) {
   if (!catalogueDigestBefore) {
     throw new Error("Release catalogue baseline was not established");
   }
-  await releaseCatalogueDigest(manifest, catalogueDigestBefore, registryInput);
   await releaseActiveRun(manifest, registryInput);
 }
 process.exit(status);
