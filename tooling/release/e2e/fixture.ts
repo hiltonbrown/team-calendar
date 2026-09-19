@@ -61,3 +61,9 @@ export async function expectRoleDenied(page: Page, path: string) {
     page.getByText(/not authorised|permission|not found/i).first()
   ).toBeVisible();
 }
+
+export function rowForRecord(page: Page, recordId: string) {
+  return page
+    .getByRole("row")
+    .filter({ has: page.locator(`a[href*="/plans/${recordId}"]`) });
+}
