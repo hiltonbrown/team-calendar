@@ -1,8 +1,8 @@
 diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
-index ceef69f..f2e478a 100644
+index ceef69f..8bdc3e6 100644
 --- a/.github/workflows/ci.yml
 +++ b/.github/workflows/ci.yml
-@@ -10,73 +10,18 @@ permissions:
+@@ -10,73 +10,24 @@ permissions:
    contents: read
  
  jobs:
@@ -34,9 +34,15 @@ index ceef69f..f2e478a 100644
 -      # build can run. Not a secret and not used in any deployment.
 -      XERO_TOKEN_ENCRYPTION_KEY: WE552bw0+Wd6mi3TXcaj5P72E2x7gA7UPna73SevrmE=
 -
++    strategy:
++      matrix:
++        node-version: [22.23.2, 24.21.0]
      steps:
        - uses: actions/checkout@v7
 -
++      - uses: actions/setup-node@v6
++        with:
++          node-version: ${{ matrix.node-version }}
        - uses: oven-sh/setup-bun@v2
          with:
            bun-version-file: package.json
@@ -80,7 +86,7 @@ index ceef69f..f2e478a 100644
        - name: Guard against untestable workspaces
          run: |
            status=0
-@@ -90,21 +35,10 @@ jobs:
+@@ -90,21 +41,10 @@ jobs:
              fi
            done
            exit $status
@@ -104,10 +110,13 @@ index ceef69f..f2e478a 100644
 -        run: bun run test:integration
 diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
 new file mode 100644
-index 0000000..a4ed368
+index 0000000..c57cd51
 --- /dev/null
 +++ b/.github/workflows/release.yml
-@@ -0,0 +1,135 @@
+@@ -0,0 +1,156 @@
++# Bootstrap prerequisites: merge the referenced release helpers to main, create
++# protected branch release/go-live, and configure approval plus branch rules on
++# the production-release environment before enabling this workflow.
 +name: Protected production release
 +
 +on:
@@ -159,6 +168,9 @@ index 0000000..a4ed368
 +      - uses: oven-sh/setup-bun@v2
 +        with:
 +          bun-version-file: trusted/package.json
++      - uses: actions/setup-node@v6
++        with:
++          node-version: 24.21.0
 +      - name: Install trusted release tooling
 +        working-directory: trusted
 +        run: bun install --frozen-lockfile
@@ -189,6 +201,7 @@ index 0000000..a4ed368
 +          trusted_base=$(git merge-base HEAD origin/main)
 +          bun run tooling/release/migration-check.ts --base "$trusted_base"
 +      - name: Verify live target and acquire release fence
++        id: fence
 +        working-directory: candidate
 +        env:
 +          ALLOW_LIVE_DATABASE_TESTS: I_ACKNOWLEDGE_LIVE_MUTATION
@@ -203,18 +216,32 @@ index 0000000..a4ed368
 +            recovery_args+=(--recover)
 +          fi
 +          bun run tooling/release/verify-live-target.ts --manifest "${{ steps.manifest.outputs.path }}" "${recovery_args[@]}"
++          echo "acquired=true" >> "$GITHUB_OUTPUT"
++      - name: Reconcile requested interrupted run
++        if: ${{ inputs.recover_interrupted_run }}
++        working-directory: candidate
++        env:
++          ALLOW_LIVE_DATABASE_TESTS: I_ACKNOWLEDGE_LIVE_MUTATION
++          DATABASE_URL: ${{ secrets.DATABASE_URL }}
++          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
++          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
++          TC_RELEASE_RUN_ID: ${{ steps.manifest.outputs.run_id }}
++        run: bun run tooling/release/run-live-integration.ts --manifest "${{ steps.manifest.outputs.path }}" --recover
 +      - name: Deploy reviewed migrations
++        if: ${{ !inputs.recover_interrupted_run }}
 +        working-directory: candidate
 +        env:
 +          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 +        run: bun run migrate:deploy
 +      - name: Verify deployed schema has no drift
++        if: ${{ !inputs.recover_interrupted_run }}
 +        working-directory: candidate/packages/database
 +        env:
 +          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 +        run: bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
 +      - name: Run protected live integration gates
 +        id: live
++        if: ${{ !inputs.recover_interrupted_run }}
 +        working-directory: candidate
 +        env:
 +          ALLOW_LIVE_DATABASE_TESTS: I_ACKNOWLEDGE_LIVE_MUTATION
@@ -233,8 +260,8 @@ index 0000000..a4ed368
 +          XERO_CLIENT_SECRET: ${{ secrets.XERO_CLIENT_SECRET }}
 +          XERO_TOKEN_ENCRYPTION_KEY: ${{ secrets.XERO_TOKEN_ENCRYPTION_KEY }}
 +        run: bun run tooling/release/run-live-integration.ts --manifest "${{ steps.manifest.outputs.path }}" --preacquired
-+      - name: Reconcile an interrupted protected run
-+        if: ${{ always() && steps.live.outcome == 'skipped' }}
++      - name: Reconcile a failed or interrupted protected run
++        if: ${{ always() && steps.fence.outputs.acquired == 'true' && steps.live.outcome != 'success' }}
 +        working-directory: candidate
 +        env:
 +          ALLOW_LIVE_DATABASE_TESTS: I_ACKNOWLEDGE_LIVE_MUTATION
@@ -242,4 +269,4 @@ index 0000000..a4ed368
 +          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}
 +          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
 +          TC_RELEASE_RUN_ID: ${{ steps.manifest.outputs.run_id }}
-+        run: bun run tooling/release/run-live-integration.ts --manifest "${{ steps.manifest.outputs.path }}" --recover
++        run: bun run tooling/release/run-live-integration.ts --manifest "${{ steps.manifest.outputs.path }}" --recover-if-owned
