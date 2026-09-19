@@ -292,20 +292,39 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
   occurredAt: Date;
 }> {
   try {
-    await markTokenUsed(token);
-    const first = await database.feedToken.findFirst({
-      orderBy: { last_used_at: "asc" },
-      select: { last_used_at: true },
+    const occurredAt = new Date();
+    await Promise.all([
+      markTokenUsed(token, occurredAt),
+      database.auditEvent.createMany({
+        data: {
+          action: "activation.first_feed_accessed",
+          clerk_org_id: token.clerk_org_id,
+          created_at: occurredAt,
+          id: activationMilestoneId(
+            token.clerk_org_id,
+            token.organisation_id,
+            "first_feed_accessed"
+          ),
+          organisation_id: token.organisation_id,
+          resource_type: "activation_milestone",
+        },
+        skipDuplicates: true,
+      }),
+    ]);
+    const first = await database.auditEvent.findUnique({
+      select: { created_at: true },
       where: {
-        clerk_org_id: token.clerk_org_id,
-        last_used_at: { not: null },
-        organisation_id: token.organisation_id,
+        id: activationMilestoneId(
+          token.clerk_org_id,
+          token.organisation_id,
+          "first_feed_accessed"
+        ),
       },
     });
-    return first?.last_used_at
+    return first?.created_at
       ? {
           clerkOrgId: token.clerk_org_id,
-          occurredAt: first.last_used_at,
+          occurredAt: first.created_at,
           organisationId: token.organisation_id,
         }
       : null;
@@ -318,17 +337,33 @@ async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
   }
 }
 
-function markTokenUsed(token: FeedTokenRow): Promise<unknown> {
-  if (token.last_used_at) {
+function markTokenUsed(
+  token: FeedTokenRow,
+  occurredAt: Date
+): Promise<unknown> {
+  const oneHourAgo = new Date(occurredAt.getTime() - 60 * 60 * 1000);
+  if (token.last_used_at && token.last_used_at >= oneHourAgo) {
     return Promise.resolve();
   }
   return database.feedToken.updateMany({
-    data: { last_used_at: new Date() },
+    data: { last_used_at: occurredAt },
     where: {
       clerk_org_id: token.clerk_org_id,
       id: token.id,
-      last_used_at: null,
+      OR: [{ last_used_at: null }, { last_used_at: { lt: oneHourAgo } }],
       organisation_id: token.organisation_id,
     },
   });
+}
+
+function activationMilestoneId(
+  clerkOrgId: string,
+  organisationId: string,
+  milestone: string
+): string {
+  const hex = createHash("sha256")
+    .update(`${clerkOrgId}:${organisationId}:${milestone}`)
+    .digest("hex")
+    .slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
 }

@@ -48,7 +48,7 @@ export async function completeTenantSelectionAction(input: {
 
   const existingConnection = parsed.data.organisationId
     ? await database.xeroConnection.findFirst({
-        select: { created_at: true, id: true, status: true },
+        select: { id: true },
         where: {
           clerk_org_id: orgId,
           organisation_id: parsed.data.organisationId,
@@ -73,7 +73,7 @@ export async function completeTenantSelectionAction(input: {
     };
   }
 
-  const connectionAudit = await database.auditEvent.create({
+  await database.auditEvent.create({
     data: {
       action: existingConnection
         ? "xero.connection_reconnected"
@@ -95,19 +95,34 @@ export async function completeTenantSelectionAction(input: {
       resource_type: "xero_connection",
     },
   });
-  const connectedEvent = createActivationEvent({
-    deduplicationKey: `${orgId}:${result.value.organisationId}`,
-    name: "Xero Connected",
-    occurredAt: existingConnection?.created_at ?? connectionAudit.created_at,
-    subjectId: orgId,
-  });
-  analytics?.capture({
-    distinctId: connectedEvent.distinctId,
-    event: connectedEvent.event,
-    properties: connectedEvent.properties,
-    timestamp: connectedEvent.timestamp,
-    uuid: connectedEvent.uuid,
-  });
+  try {
+    const durableConnection = await database.xeroConnection.findFirst({
+      select: { created_at: true },
+      where: {
+        clerk_org_id: orgId,
+        id: result.value.connectionId,
+        organisation_id: result.value.organisationId,
+      },
+    });
+    if (durableConnection) {
+      const connectedEvent = createActivationEvent({
+        deduplicationKey: `${orgId}:${result.value.organisationId}`,
+        name: "Xero Connected",
+        occurredAt: durableConnection.created_at,
+        subjectId: orgId,
+      });
+      analytics?.capture({
+        distinctId: connectedEvent.distinctId,
+        event: connectedEvent.event,
+        properties: connectedEvent.properties,
+        timestamp: connectedEvent.timestamp,
+        uuid: connectedEvent.uuid,
+      });
+      await analytics?.flush();
+    }
+  } catch {
+    // The connection is durable; analytics must not turn it into a user-visible failure.
+  }
 
   // Perform immediate initial sync (people, leave-records, leave-balances).
   // Best effort: the connection is already persisted and scheduled syncs will catch up if
@@ -127,8 +142,6 @@ export async function completeTenantSelectionAction(input: {
   } catch {
     // Best-effort initial execution; scheduled runs or manual syncs will retry.
   }
-  await analytics?.flush();
-
   const initialRunTypes = [
     "people",
     "leave_records",

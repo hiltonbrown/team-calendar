@@ -17,28 +17,26 @@ export async function captureInitialSyncCompleted(input: {
   organisationId: string;
 }): Promise<void> {
   try {
-    const runs = await database.syncRun.findMany({
-      orderBy: { completed_at: "asc" },
-      select: { completed_at: true, run_type: true },
-      where: {
-        clerk_org_id: input.clerkOrgId,
-        completed_at: { not: null },
-        organisation_id: input.organisationId,
-        run_type: { in: INITIAL_RUN_TYPES },
-        status: "succeeded",
-      },
-    });
-    const firstByType = new Map<string, Date>();
-    for (const run of runs) {
-      if (run.completed_at && !firstByType.has(run.run_type)) {
-        firstByType.set(run.run_type, run.completed_at);
-      }
-    }
-    if (firstByType.size !== INITIAL_RUN_TYPES.length) {
+    const runs = await Promise.all(
+      INITIAL_RUN_TYPES.map((runType) =>
+        database.syncRun.findFirst({
+          orderBy: { completed_at: "asc" },
+          select: { completed_at: true },
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            completed_at: { not: null },
+            organisation_id: input.organisationId,
+            run_type: runType,
+            status: "succeeded",
+          },
+        })
+      )
+    );
+    if (runs.some((run) => !run?.completed_at)) {
       return;
     }
     const occurredAt = new Date(
-      Math.max(...Array.from(firstByType.values(), (date) => date.getTime()))
+      Math.max(...runs.map((run) => run?.completed_at?.getTime() ?? 0))
     );
     const event = createActivationEvent({
       deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,

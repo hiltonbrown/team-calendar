@@ -41,8 +41,9 @@ const icalMocks = vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
-  feedTokenFindFirst: vi.fn(() =>
-    Promise.resolve({ last_used_at: new Date("2026-09-19T00:00:00.000Z") })
+  auditEventCreateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+  auditEventFindUnique: vi.fn(() =>
+    Promise.resolve({ created_at: new Date("2026-09-19T00:00:00.000Z") })
   ),
   feedTokenFindUnique: vi.fn(),
   feedTokenUpdate: vi.fn(() => Promise.resolve({ count: 1 })),
@@ -79,9 +80,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
+    auditEvent: {
+      createMany: mocks.auditEventCreateMany,
+      findUnique: mocks.auditEventFindUnique,
+    },
     feed: { update: mocks.feedUpdate },
     feedToken: {
-      findFirst: mocks.feedTokenFindFirst,
       findUnique: mocks.feedTokenFindUnique,
       update: mocks.feedTokenUpdate,
       updateMany: mocks.feedTokenUpdate,
@@ -403,7 +407,7 @@ describe("renderFeedForToken", () => {
     expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
   });
 
-  it("preserves the durable first-use timestamp on later cache hits", async () => {
+  it("refreshes hourly activity without replacing the durable first-access milestone", async () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     mocks.feedTokenFindUnique.mockResolvedValue(
       feedTokenFixture({ last_used_at: twoHoursAgo })
@@ -416,7 +420,14 @@ describe("renderFeedForToken", () => {
     const result = await renderFeedForToken("plaintext-token");
 
     expect(result.ok).toBe(true);
-    expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
+    if (result.ok) {
+      await result.value.activation;
+    }
+    expect(mocks.feedTokenUpdate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditEventCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true })
+    );
+    expect(mocks.auditEventFindUnique).toHaveBeenCalledTimes(1);
   });
 
   it("writes last_used_at on a cache hit when last_used_at is null", async () => {
