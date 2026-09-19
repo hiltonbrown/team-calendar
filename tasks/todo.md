@@ -75,18 +75,22 @@ was performed.
 ## Active execution: consolidated Australian go-live plan
 
 Candidate branch: `codex/go-live-candidate`, based on `80ac9f7`. Live Neon test
-authority is explicit and persists for this release, but fixture mutation waits
-for the protected manifest, exact provider identity and cleanup guard to pass.
+authority is explicit and persists for this release. Verification safeguards
+are implementation work, not a new permission gate.
 
-- [ ] D1: unit/live database isolation. Unit exclusion, exact six-workspace
-  inventory, lazy connection denial, protected manifest guard, durable KV
-  read-back and FK-ordered cleanup are implemented. Protected CI workflow,
-  provider metadata, restore evidence and live fixture proof remain open.
+- [ ] D1: unit/live database isolation. Source-only CI, exact 21-suite runtime
+  allowlist, lazy connection denial, candidate-bound protected manifest,
+  durable KV read-back, active-run fencing, pre-write zero-residue assertion,
+  FK-ordered cleanup and focused live rollback proof are implemented. The
+  exact protected workflow patch is reviewable but unapplied. Full suite
+  fixture ownership conversion, consumer restore implementation and provider
+  restore evidence remain open.
 - [x] C6: empty and missing manager scope fails closed. Focused availability
   suites pass 42 tests in 3 files.
 - [x] C4/C5: missing email transport fails before queue selection and malformed
   availability JSON returns 400 after authentication. Focused suites pass 49 tests.
-- [ ] R1/R2/R3 and T3: implementation in progress.
+- [x] R1/R2/R3 and T3: source contracts and focused gates pass on declared
+  Node/Bun versions; deployed evidence remains part of O1.
 - [x] G3: provisional identity and obsolete launch/region claims removed. Focused
   web suites pass 22 tests in 5 files.
 - [x] P4/P5 source and privacy behaviour: public provider excludes auth, analytics
@@ -101,13 +105,30 @@ for the protected manifest, exact provider identity and cleanup guard to pass.
   2,631,576 / 1,168,019 to 2,486,744 / 1,119,481. These totals include async
   chunks and are not network initial-transfer sizes. PostHog moved out of the
   app entry synchronous graph.
-- [ ] C1/C2/C3, P1/P2/P3/P4/P5, G1/G2, T1/T2 and O1 remain open.
+- [x] C1/C2/C3 source: submit side effects remain recoverable through durable
+  completion; provisioning deduplicates; failed/equal-time Stripe deliveries
+  reconcile authoritatively and remain replayable. Live journey proof remains.
+- [x] P1/P2/P3 source: Plans, People and sync views use bounded, stable pages,
+  exact scoped counts and batched hydration. Guarded database parity proof is
+  still part of D1/T1.
+- [x] G1 source: early-access application, invite-only entry contract, stable
+  provider idempotency and durable activation capture are implemented. Provider
+  mailbox, Clerk role and delivered production evidence remain open.
+- [ ] T1: Playwright runner scaffold and production Clerk CSP repair exist. The
+  mutation journeys must be bound to exact manifest-owned fixtures with full
+  reconciliation before execution.
+- [x] T2 source and local gates: docs links and rendered email checks pass.
+- [ ] G2 and O1: production configuration, candidate deployment, rollback-aware
+  live journeys, monitoring/alerts and launch decision remain open.
 
 ### Current external evidence
 
 - Live Neon read-only identity and the 12 applied migration checksums were
   verified; project/branch/restore metadata is still unavailable.
-- API health responds, while the deployed Inngest registration endpoint fails.
-- Vercel app and web deployments are in error at the current source SHA.
+- API health responds; the deployed Inngest registration endpoint fails because
+  production signing configuration is absent.
+- App and web deployment configuration was repaired for the prior partial
+  Better Stack group, then the unrelated status integration was explicitly
+  disabled. A reviewed candidate has not been deployed.
 - Host Bun 1.3.14 is not release evidence; candidate gates use the existing
   `/home/hilton/.bun/bin/bun` 1.4.0 executable.
