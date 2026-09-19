@@ -30,6 +30,7 @@ if (mode !== "--dry-run") {
     token: process.env.KV_REST_API_TOKEN,
     url: process.env.KV_REST_API_URL,
   });
+  process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED = manifest.runId;
 }
 process.env.TC_RELEASE_DURABLE_VERIFIED = manifest.runId;
 if (
@@ -74,8 +75,19 @@ const clerkTables = [
 const stripeEventIds = manifest.owned.globalKeys
   .filter((key) => key.startsWith("stripe_event:"))
   .map((key) => key.slice("stripe_event:".length));
+const planIds = manifest.owned.globalKeys
+  .filter((key) => key.startsWith("plan_id:"))
+  .map((key) => key.slice("plan_id:".length));
+const planKeys = manifest.owned.globalKeys
+  .filter((key) => key.startsWith("plan_key:"))
+  .map((key) => key.slice("plan_key:".length));
 const unknownGlobalKeys = manifest.owned.globalKeys.filter(
-  (key) => !key.startsWith("stripe_event:")
+  (key) =>
+    !(
+      key.startsWith("stripe_event:") ||
+      key.startsWith("plan_id:") ||
+      key.startsWith("plan_key:")
+    )
 );
 if (unknownGlobalKeys.length > 0) {
   throw new Error("Cleanup manifest contains unsupported global fixture keys");
@@ -117,6 +129,25 @@ if (stripeEventIds.length > 0) {
     stripeEventIds
   );
 }
+if (planIds.length > 0) {
+  const planIdSql = `plan_id IN (${placeholders(1, planIds.length)})`;
+  counts.plan_limits = await countRows("plan_limits", planIdSql, planIds);
+}
+if (planIds.length > 0 || planKeys.length > 0) {
+  const clauses: string[] = [];
+  const values: string[] = [];
+  if (planIds.length > 0) {
+    clauses.push(`id IN (${placeholders(1, planIds.length)})`);
+    values.push(...planIds);
+  }
+  if (planKeys.length > 0) {
+    clauses.push(
+      `key IN (${placeholders(values.length + 1, planKeys.length)})`
+    );
+    values.push(...planKeys);
+  }
+  counts.plans = await countRows("plans", clauses.join(" OR "), values);
+}
 
 if (mode === "--dry-run") {
   console.log(JSON.stringify({ counts, runId: manifest.runId }));
@@ -155,6 +186,30 @@ if (mode === "--apply") {
         ...stripeEventIds
       );
     }
+    if (planIds.length > 0) {
+      await transaction.$executeRawUnsafe(
+        `DELETE FROM "plan_limits" WHERE plan_id IN (${placeholders(1, planIds.length)})`,
+        ...planIds
+      );
+    }
+    if (planIds.length > 0 || planKeys.length > 0) {
+      const clauses: string[] = [];
+      const values: string[] = [];
+      if (planIds.length > 0) {
+        clauses.push(`id IN (${placeholders(1, planIds.length)})`);
+        values.push(...planIds);
+      }
+      if (planKeys.length > 0) {
+        clauses.push(
+          `key IN (${placeholders(values.length + 1, planKeys.length)})`
+        );
+        values.push(...planKeys);
+      }
+      await transaction.$executeRawUnsafe(
+        `DELETE FROM "plans" WHERE ${clauses.join(" OR ")}`,
+        ...values
+      );
+    }
     await transaction.$executeRawUnsafe(
       `DELETE FROM "organisations" WHERE ${organisationSql}`,
       ...scopedValues
@@ -180,6 +235,28 @@ if (stripeEventIds.length > 0) {
     `stripe_event_id IN (${placeholders(1, stripeEventIds.length)})`,
     stripeEventIds
   );
+}
+if (planIds.length > 0) {
+  residue.plan_limits = await countRows(
+    "plan_limits",
+    `plan_id IN (${placeholders(1, planIds.length)})`,
+    planIds
+  );
+}
+if (planIds.length > 0 || planKeys.length > 0) {
+  const clauses: string[] = [];
+  const values: string[] = [];
+  if (planIds.length > 0) {
+    clauses.push(`id IN (${placeholders(1, planIds.length)})`);
+    values.push(...planIds);
+  }
+  if (planKeys.length > 0) {
+    clauses.push(
+      `key IN (${placeholders(values.length + 1, planKeys.length)})`
+    );
+    values.push(...planKeys);
+  }
+  residue.plans = await countRows("plans", clauses.join(" OR "), values);
 }
 await database.$disconnect();
 console.log(JSON.stringify({ before: counts, residue, runId: manifest.runId }));

@@ -9,7 +9,10 @@ import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
-import { discoverIntegrationTests } from "./integration-inventory.js";
+import {
+  assertExpectedIntegrationInventory,
+  discoverIntegrationTests,
+} from "./integration-inventory.js";
 import { buildLiveIntegrationEnvironment } from "./live-run-environment.js";
 import { type LiveRunMode, resolveLiveRunAction } from "./live-run-mode.js";
 
@@ -76,15 +79,31 @@ if (action === "release-noop") {
 }
 
 const inventory = discoverIntegrationTests(root);
-if (inventory.length === 0) {
-  throw new Error("No live integration tests were discovered");
-}
+assertExpectedIntegrationInventory(inventory);
 
 const childEnvironment = buildLiveIntegrationEnvironment(
   process.env,
   manifest,
   protectedManifestPath
 );
+if (action === "run") {
+  const baseline = spawnSync(
+    "bun",
+    [
+      "run",
+      "tooling/release/cleanup.ts",
+      "--manifest",
+      protectedManifestPath,
+      "--assert-clean",
+    ],
+    { cwd: root, env: childEnvironment, stdio: "inherit" }
+  );
+  if (baseline.status !== 0) {
+    throw new Error(
+      "Manifest-owned fixture baseline is not clean; recover the interrupted run before testing"
+    );
+  }
+}
 let status = 1;
 let cleanupSucceeded = false;
 try {
