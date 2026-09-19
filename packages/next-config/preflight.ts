@@ -69,6 +69,7 @@ const validateModeAssertion = (
 
 export const runProductionPreflight = (
   options: PreflightOptions
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Release preflight intentionally keeps the cross-variable production contract in one auditable pass.
 ): PreflightResult => {
   const { appName, envVars = process.env, launchMode: explicitMode } = options;
   const errors: string[] = [];
@@ -205,6 +206,14 @@ export const runProductionPreflight = (
     }
     checkEmail("RESEND_FROM");
     checkEmail("EARLY_ACCESS_APPLICATION_RECIPIENT");
+    if (
+      checkPresent("EARLY_ACCESS_APPLICATION_HMAC_SECRET") &&
+      (envVars.EARLY_ACCESS_APPLICATION_HMAC_SECRET?.trim().length ?? 0) < 32
+    ) {
+      errors.push(
+        "EARLY_ACCESS_APPLICATION_HMAC_SECRET must be at least 32 characters"
+      );
+    }
   }
 
   // Paid mode checks

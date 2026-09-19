@@ -42,10 +42,7 @@ const EarlyAccess = () => (
               Future commercial terms will be confirmed before paid billing
               begins.
             </p>
-            <a
-              className="marketing-btn marketing-btn--primary"
-              href={supportMailtoHref}
-            >
+            <a className="marketing-btn marketing-btn--primary" href="/contact">
               Enquire about early access
             </a>
           </article>

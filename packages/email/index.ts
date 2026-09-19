@@ -70,3 +70,52 @@ export async function sendNotificationEmail(
 
   return { ok: true, value: { id: data.id } };
 }
+
+export interface SendEarlyAccessApplicationInput {
+  readonly application: {
+    readonly calendarClient: string;
+    readonly companySize: string;
+    readonly country: string;
+    readonly currentProcess: string;
+    readonly email: string;
+    readonly heardFrom: string;
+    readonly reference: string;
+    readonly usesXeroPayroll: string;
+  };
+  readonly idempotencyKey: string;
+  readonly to: string;
+}
+
+export async function sendEarlyAccessApplication(
+  input: SendEarlyAccessApplicationInput
+): Promise<SendNotificationEmailResult> {
+  const { RESEND_FROM } = keys();
+  if (!(resend && RESEND_FROM)) {
+    return { error: "Resend transport is not configured", ok: false };
+  }
+  const template: {
+    EarlyAccessApplicationEmail: (
+      props: SendEarlyAccessApplicationInput["application"]
+    ) => ReactElement;
+  } = require("./templates/early-access-application");
+  const html = await render(
+    template.EarlyAccessApplicationEmail(input.application)
+  );
+  const { data, error } = await resend.emails.send(
+    {
+      from: RESEND_FROM,
+      html,
+      replyTo: input.application.email,
+      subject: `AU early access application ${input.application.reference}`,
+      to: input.to,
+    },
+    { idempotencyKey: input.idempotencyKey }
+  );
+  if (error || !data) {
+    return {
+      error: error?.message ?? "Resend did not return an email ID",
+      ok: false,
+    };
+  }
+  return { ok: true, value: { id: data.id } };
+}

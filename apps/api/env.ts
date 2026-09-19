@@ -30,6 +30,16 @@ export const env = createEnv({
     observability(),
     xero(),
   ],
-  runtimeEnv: { STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET },
-  server: { STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional() },
+  runtimeEnv: {
+    EARLY_ACCESS_APPLICATION_HMAC_SECRET:
+      process.env.EARLY_ACCESS_APPLICATION_HMAC_SECRET,
+    EARLY_ACCESS_APPLICATION_RECIPIENT:
+      process.env.EARLY_ACCESS_APPLICATION_RECIPIENT,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  },
+  server: {
+    EARLY_ACCESS_APPLICATION_HMAC_SECRET: z.string().min(32).optional(),
+    EARLY_ACCESS_APPLICATION_RECIPIENT: z.string().email().optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
+  },
 });

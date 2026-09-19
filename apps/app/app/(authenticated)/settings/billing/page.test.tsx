@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   currentUser: vi.fn(),
   getBillingSummary: vi.fn(),
+  getActivationDashboardSummary: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
   getUnresolvedStripeEventsForOrg: vi.fn(),
   hasUnresolvedStripeEventForOrg: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: { auditEvent: { create: mocks.auditCreate } },
+  getActivationDashboardSummary: mocks.getActivationDashboardSummary,
   getSubscriptionForOrg: mocks.getSubscriptionForOrg,
   getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
   hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
@@ -80,6 +82,17 @@ describe("BillingPage", () => {
       organisationId,
     });
     mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
+    mocks.getActivationDashboardSummary.mockResolvedValue({
+      failures: { stripeDeliveries: 0, syncRecords: 0, xeroWrites: 0 },
+      milestones: {
+        feedAccessed: false,
+        firstLeaveApproved: false,
+        firstLeaveSubmitted: false,
+        initialSyncCompleted: false,
+        organisationProvisioned: true,
+        xeroConnected: false,
+      },
+    });
     mocks.getSubscriptionForOrg.mockResolvedValue(null);
     mocks.getUnresolvedStripeEventsForOrg.mockResolvedValue([]);
     mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);

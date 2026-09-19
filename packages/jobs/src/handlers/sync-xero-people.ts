@@ -16,6 +16,7 @@ import {
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
+import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
 
 const SyncXeroPeopleInputSchema = z.object({
@@ -377,6 +378,9 @@ export async function syncXeroPeople(input: unknown): Promise<
       errorSummary,
       status: finalStatus,
     });
+    if (finalStatus === "succeeded") {
+      await captureInitialSyncCompleted(context);
+    }
 
     return {
       ok: true,

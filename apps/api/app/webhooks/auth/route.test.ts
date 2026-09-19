@@ -5,6 +5,7 @@ const uuidV5Pattern =
 
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
   analyticsGroupIdentify: vi.fn(),
   analyticsIdentify: vi.fn(),
   analyticsShutdown: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/analytics/server", () => ({
   analytics: {
     capture: mocks.analyticsCapture,
+    flush: mocks.analyticsFlush,
     groupIdentify: mocks.analyticsGroupIdentify,
     identify: mocks.analyticsIdentify,
     shutdown: mocks.analyticsShutdown,
@@ -65,6 +67,7 @@ function membershipFixture() {
       last_name: "Person",
       user_id: "user_1",
     },
+    role: "org:owner",
   } as Parameters<typeof handleOrganizationMembershipCreated>[0];
 }
 
@@ -144,6 +147,25 @@ describe("Clerk organisation membership webhook handling", () => {
     expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledTimes(2);
     expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
     expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+
+    mocks.ensureCurrentUserPerson.mockResolvedValue({
+      ok: true,
+      value: { id: "00000000-0000-4000-8000-000000000011" },
+    });
+    const retry = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_partial",
+      new Date(1_700_000_000_000)
+    );
+    const delivered = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    expect(retry.status).toBe(201);
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toMatchObject({
+      timestamp: new Date(1_700_000_000_000),
+      uuid: expect.any(String),
+    });
   });
 
   it("returns 503 when every organisation fails", async () => {
@@ -197,9 +219,10 @@ describe("Clerk organisation membership webhook handling", () => {
     expect([failed.status, repaired.status, duplicate.status]).toEqual([
       503, 201, 201,
     ]);
-    const deliveredUuids = mocks.analyticsCapture.mock.calls.map(
-      ([event]) => event.uuid
-    );
+    const deliveredEvents = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    const deliveredUuids = deliveredEvents.map((event) => event.uuid);
     expect(deliveredUuids).toHaveLength(2);
     expect(new Set(deliveredUuids).size).toBe(1);
     expect(deliveredUuids[0]).toMatch(uuidV5Pattern);
@@ -257,6 +280,7 @@ describe("Clerk webhook payload validation", () => {
   it("passes the exact raw body to Svix and accepts a valid consumed event", async () => {
     const body = ` {
   "data": { "created_by": "user_1", "id": "org_1", "name": "Acme" },
+  "timestamp": 1789776000000,
   "type": "organization.created"
 } `;
 
@@ -301,17 +325,14 @@ describe("Clerk webhook payload validation", () => {
 
     expect(first.status).toBe(201);
     expect(replay.status).toBe(201);
-    const deliveredUuids = mocks.analyticsCapture.mock.calls.map(
-      ([event]) => event.uuid
-    );
+    const deliveredEvents = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    const deliveredUuids = deliveredEvents.map((event) => event.uuid);
     expect(deliveredUuids).toHaveLength(2);
     expect(new Set(deliveredUuids).size).toBe(1);
-    expect(mocks.analyticsCapture.mock.calls[0]?.[0].timestamp).toEqual(
-      new Date(1_700_000_000_000)
-    );
-    expect(mocks.analyticsCapture.mock.calls[1]?.[0].timestamp).toEqual(
-      new Date(1_700_000_000_000)
-    );
+    expect(deliveredEvents[0]?.timestamp).toEqual(new Date(1_700_000_000_000));
+    expect(deliveredEvents[1]?.timestamp).toEqual(new Date(1_700_000_000_000));
   });
 
   it("returns a retryable response when membership event time is absent", async () => {

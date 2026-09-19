@@ -30,6 +30,7 @@ const validAppVars = {
 const validApiVars = {
   ...validAppVars,
   CLERK_WEBHOOK_SECRET: "whsec_clerk123",
+  EARLY_ACCESS_APPLICATION_HMAC_SECRET: "h".repeat(32),
   EARLY_ACCESS_APPLICATION_RECIPIENT: "admissions@teamcalendar.online",
   INNGEST_EVENT_KEY: "ingest_event_key_123",
   INNGEST_SIGNING_KEY: "signkey-prod-123",

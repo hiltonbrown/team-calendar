@@ -42,12 +42,12 @@ type FeedTokenRow = Prisma.FeedTokenGetPayload<{
   select: typeof feedTokenSelect;
 }>;
 
-// last_used_at is telemetry, not a correctness input. Writing it on every
-// calendar-client poll produces one row update per subscriber every few
-// minutes, forever. Hourly granularity carries the same information.
-const TOKEN_USE_DEBOUNCE_MS = 60 * 60 * 1000;
-
 export interface RenderedFeed {
+  activation?: Promise<null | {
+    clerkOrgId: string;
+    organisationId: string;
+    occurredAt: Date;
+  }>;
   body: string;
   etag: string;
   status: "active" | "expired" | "revoked";
@@ -178,11 +178,17 @@ export async function renderFeedForToken(
       data: { status: "expired" },
       where: { id: feedToken.id },
     });
-    return { ok: true, value: { body: "", etag: "", status: "expired" } };
+    return {
+      ok: true,
+      value: { body: "", etag: "", status: "expired" },
+    };
   }
 
   if (feedToken.feed.status !== "active") {
-    return { ok: true, value: { body: "", etag: "", status: "revoked" } };
+    return {
+      ok: true,
+      value: { body: "", etag: "", status: "revoked" },
+    };
   }
 
   const key = feedCacheKey({
@@ -191,14 +197,10 @@ export async function renderFeedForToken(
   });
   const cached = await getCachedFeedBody(key);
   if (cached.ok && cached.value) {
-    // Telemetry only: never block or fail the feed response on it.
-    markTokenUsed(feedToken).catch((error) => {
-      log.warn("Feed token use write failed", {
-        error,
-        feedId: feedToken.feed_id,
-      });
-    });
-    return { ok: true, value: { ...cached.value, status: "active" } };
+    return {
+      ok: true,
+      value: withActivation({ ...cached.value, status: "active" }, feedToken),
+    };
   }
 
   const rendered = await renderFeedBody({
@@ -214,7 +216,6 @@ export async function renderFeedForToken(
   const { body, etag } = rendered.value;
 
   await Promise.all([
-    markTokenUsed(feedToken),
     database.feed.update({
       data: {
         last_etag: etag,
@@ -240,7 +241,21 @@ export async function renderFeedForToken(
     });
   }
 
-  return { ok: true, value: { body, etag, status: "active" } };
+  return {
+    ok: true,
+    value: withActivation({ body, etag, status: "active" }, feedToken),
+  };
+}
+
+function withActivation(
+  rendered: RenderedFeed,
+  token: FeedTokenRow
+): RenderedFeed {
+  Object.defineProperty(rendered, "activation", {
+    enumerable: false,
+    value: firstFeedAccess(token),
+  });
+  return rendered;
 }
 
 async function resolveFeedToken(token: string): Promise<FeedTokenRow | null> {
@@ -271,25 +286,48 @@ async function resolveFeedToken(token: string): Promise<FeedTokenRow | null> {
   return feedToken;
 }
 
-function markTokenUsed(token: {
-  id: string;
-  clerk_org_id: string;
-  last_used_at: Date | null;
-  organisation_id: string;
-}): Promise<unknown> {
-  if (
-    token.last_used_at &&
-    Date.now() - token.last_used_at.getTime() < TOKEN_USE_DEBOUNCE_MS
-  ) {
+async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
+  clerkOrgId: string;
+  organisationId: string;
+  occurredAt: Date;
+}> {
+  try {
+    await markTokenUsed(token);
+    const first = await database.feedToken.findFirst({
+      orderBy: { last_used_at: "asc" },
+      select: { last_used_at: true },
+      where: {
+        clerk_org_id: token.clerk_org_id,
+        last_used_at: { not: null },
+        organisation_id: token.organisation_id,
+      },
+    });
+    return first?.last_used_at
+      ? {
+          clerkOrgId: token.clerk_org_id,
+          occurredAt: first.last_used_at,
+          organisationId: token.organisation_id,
+        }
+      : null;
+  } catch (error) {
+    log.warn("Feed token use write failed", {
+      error,
+      feedId: token.feed_id,
+    });
+    return null;
+  }
+}
+
+function markTokenUsed(token: FeedTokenRow): Promise<unknown> {
+  if (token.last_used_at) {
     return Promise.resolve();
   }
-
-  return database.feedToken.update({
+  return database.feedToken.updateMany({
     data: { last_used_at: new Date() },
-    // Scope the write by clerk_org_id and organisation_id as well as the unique id.
     where: {
       clerk_org_id: token.clerk_org_id,
       id: token.id,
+      last_used_at: null,
       organisation_id: token.organisation_id,
     },
   });

@@ -1,5 +1,7 @@
 "use server";
 
+import { createActivationEvent } from "@repo/analytics/activation-events";
+import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   archiveRecord,
@@ -19,6 +21,8 @@ import {
   withdrawSubmission,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { database } from "@repo/database";
+import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -204,6 +208,42 @@ export async function updateRecordAction(
   return { ok: true, value: { id: result.value.id } };
 }
 
+async function captureSubmissionActivation(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  submittedAt: Date | null;
+}): Promise<void> {
+  if (!input.submittedAt) {
+    return;
+  }
+  const first = await database.availabilityRecord.findFirst({
+    orderBy: { submitted_at: "asc" },
+    select: { submitted_at: true },
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+      submitted_at: { not: null },
+    },
+  });
+  if (!first?.submitted_at) {
+    return;
+  }
+  const event = createActivationEvent({
+    deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+    name: "First Leave Submitted",
+    occurredAt: first.submitted_at,
+    subjectId: input.clerkOrgId,
+  });
+  analytics?.capture({
+    distinctId: event.distinctId,
+    event: event.event,
+    properties: event.properties,
+    timestamp: event.timestamp,
+    uuid: event.uuid,
+  });
+  await analytics?.flush();
+}
+
 export async function deleteDraftAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
@@ -306,6 +346,16 @@ export async function submitForApprovalAction(
     return result;
   }
 
+  try {
+    await captureSubmissionActivation({
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      submittedAt: result.value.submitted_at,
+    });
+  } catch (error) {
+    log.warn("Leave submission activation capture failed", { error });
+  }
+
   revalidateSubmissionPaths();
   return submissionValue(result.value);
 }
@@ -341,6 +391,16 @@ export async function retrySubmissionAction(
   const result = await retrySubmission(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
+  }
+
+  try {
+    await captureSubmissionActivation({
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      submittedAt: result.value.submitted_at,
+    });
+  } catch (error) {
+    log.warn("Leave submission activation capture failed", { error });
   }
 
   revalidateSubmissionPaths();

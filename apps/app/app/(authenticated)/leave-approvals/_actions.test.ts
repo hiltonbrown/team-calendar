@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   approve: vi.fn(),
+  analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
   auth: vi.fn(),
   currentUser: vi.fn(),
   database: {
+    availabilityRecord: { findFirst: vi.fn() },
     person: {
       findFirst: vi.fn(),
     },
@@ -23,6 +26,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
+}));
+vi.mock("@repo/analytics/server", () => ({
+  analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
 }));
 vi.mock("@repo/availability", () => ({
   approve: mocks.approve,
@@ -66,6 +72,10 @@ const userId = "user_456";
 describe("leave approval server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.analyticsFlush.mockResolvedValue(undefined);
+    mocks.database.availabilityRecord.findFirst.mockResolvedValue({
+      approved_at: new Date("2026-09-19T02:00:00.000Z"),
+    });
     mocks.auth.mockResolvedValue({ orgRole: "org:manager" });
     mocks.currentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
@@ -77,6 +87,7 @@ describe("leave approval server actions", () => {
       ok: true,
       value: {
         approvalStatus: "approved",
+        approvedAt: new Date("2026-09-19T02:00:00.000Z"),
         failedAction: null,
         id: recordId,
         xeroWriteError: null,

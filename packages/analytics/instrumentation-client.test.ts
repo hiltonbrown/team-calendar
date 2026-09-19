@@ -176,6 +176,51 @@ describe("client analytics initialisation", () => {
     ]);
   });
 
+  it("sanitises the complete browser SDK payload delivered after navigation", async () => {
+    const { instrumentation } = await loadInstrumentation(configuredKeys);
+    const initialized = instrumentation.initializeAnalytics();
+    idleCallback?.();
+    await initialized;
+    const beforeSend = client.init.mock.calls[0]?.[1]?.before_send as (event: {
+      event: string;
+      properties: Record<string, unknown>;
+    }) => { event: string; properties: Record<string, unknown> };
+    const delivered: Array<{
+      event: string;
+      properties: Record<string, unknown>;
+    }> = [];
+    client.capture.mockImplementation((event, properties) => {
+      delivered.push(
+        beforeSend({
+          event,
+          properties: {
+            ...properties,
+            $initial_current_url: "https://app.example/sign-up?ticket=secret",
+            $session_entry_url: "https://app.example/leave?content=private",
+            $set_once: {
+              $initial_referrer: "https://search.example/?auth=secret",
+            },
+          },
+        })
+      );
+    });
+
+    window.history.pushState({}, "", "/delivered?feed=secret#token");
+
+    expect(delivered).toEqual([
+      {
+        event: "$pageview",
+        properties: {
+          $current_url: "http://localhost:3000/delivered",
+          $initial_current_url: "https://app.example/sign-up",
+          $referrer: "http://localhost:3000/start",
+          $session_entry_url: "https://app.example/leave",
+          $set_once: { $initial_referrer: "https://search.example/" },
+        },
+      },
+    ]);
+  });
+
   it("associates queued identity and group details after load", async () => {
     const { instrumentation } = await loadInstrumentation(configuredKeys);
     const initialized = instrumentation.initializeAnalytics();

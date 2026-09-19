@@ -7,6 +7,10 @@
       "types": "./index.ts",
       "default": "./index.ts"
     },
+    "./activation-events": {
+      "types": "./activation-events.ts",
+      "default": "./activation-events.ts"
+    },
     "./instrumentation-client": {
       "types": "./instrumentation-client.ts",
       "default": "./instrumentation-client.ts"

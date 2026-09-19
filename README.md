@@ -257,6 +257,31 @@ Unknown rather than assuming the service is operational.
 
 `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded) is validated on startup in `packages/xero`. An absent or malformed key prevents the application from starting rather than failing later at token access time.
 
+### Maintained browser release suite
+
+`bun run test:release` runs the Playwright release journeys against three
+explicit HTTPS candidate deployments. It requires `TC_APP_CANDIDATE_URL`,
+`TC_API_CANDIDATE_URL`, `TC_WEB_CANDIDATE_URL`,
+`TC_DEPLOYED_CANDIDATE_SHA`, and the D1 `TC_RELEASE_MANIFEST`. The manifest,
+deployed SHA assertion, and local checkout must identify the same commit.
+
+Provide Clerk test-instance keys plus `TC_E2E_OWNER_EMAIL`,
+`TC_E2E_ADMIN_EMAIL`, `TC_E2E_MANAGER_EMAIL`, and `TC_E2E_VIEWER_EMAIL` for
+isolated role sessions. Controlled fixture inputs are
+`TC_E2E_APPROVE_EMPLOYEE_NAME`, `TC_E2E_DECLINE_EMPLOYEE_NAME`,
+`TC_E2E_FOREIGN_PERSON_ID`, `TC_E2E_FEED_ID`,
+`TC_E2E_RECOVERY_PERSON_ID`, `TC_E2E_RETRY_PERSON_ID`, and
+`TC_E2E_CALENDAR_EVENT_LABEL`. Missing inputs fail the mandatory journey rather
+than skipping it. The suite runs cleanup from the protected manifest even after
+test failure and fails if owned residue remains.
+
+Use Clerk development/test credentials and controlled Xero organisations only.
+The suite does not mock authentication or provider success.
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=/tmp/teamcalendar-playwright bun run test:release
+```
+
 ### GitHub-backed support submissions
 
 If you enable GitHub-backed support submissions in deployed environments, configure `GITHUB_TOKEN`, `GITHUB_OWNER`, and `GITHUB_REPO` on the `api` project only. These values are server-side and must not be added to the `app` or `web` deployments. Set them in both Preview and Production if the feature should work in both, and redeploy the API app after changing them.
@@ -267,3 +292,7 @@ Xero requires every OAuth redirect URI to be pre-registered on the Xero app, and
 
 - Register `https://<your-api-domain>/api/xero/oauth/callback` as the redirect URI on the Xero app and set `XERO_REDIRECT_URI` to that exact URL on the `api` (and `app`) projects for every environment. If `XERO_REDIRECT_URI` is unset, the callback is derived from `NEXT_PUBLIC_API_URL` instead.
 - On preview deployments (`VERCEL_ENV=preview`) the Xero connect flow and the callback route are gated off and return a clear message. Connect Xero from the production deployment.
+
+### AU early access applications
+
+The public application, private-mailbox retention rule, and separate Clerk owner-admission runbook are documented in [docs/early-access-admission.md](docs/early-access-admission.md). The API requires `EARLY_ACCESS_APPLICATION_RECIPIENT` and a private `EARLY_ACCESS_APPLICATION_HMAC_SECRET` of at least 32 characters, plus the configured KV pair used for abuse controls and retry receipts.

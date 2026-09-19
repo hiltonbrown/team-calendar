@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
+  analyticsShutdown: vi.fn(),
   auditEventCreate: vi.fn(),
   auth: vi.fn(),
   completeXeroTenantSelection: vi.fn(),
@@ -13,6 +16,21 @@ const mocks = vi.hoisted(() => ({
   xeroConnectionFindFirst: vi.fn(),
 }));
 
+vi.mock("@repo/analytics/activation-events", () => ({
+  createActivationEvent: (input: { name: string }) => ({
+    distinctId: "subject",
+    event: input.name,
+    properties: { event_version: 1 },
+    uuid: `uuid-${input.name}`,
+  }),
+}));
+vi.mock("@repo/analytics/server", () => ({
+  analytics: {
+    capture: mocks.analyticsCapture,
+    flush: mocks.analyticsFlush,
+    shutdown: mocks.analyticsShutdown,
+  },
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -48,6 +66,8 @@ const validInput = {
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.analyticsShutdown.mockResolvedValue(undefined);
+    mocks.analyticsFlush.mockResolvedValue(undefined);
     mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "admin@example.com" }],

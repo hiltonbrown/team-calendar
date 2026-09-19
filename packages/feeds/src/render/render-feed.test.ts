@@ -41,8 +41,11 @@ const icalMocks = vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
+  feedTokenFindFirst: vi.fn(() =>
+    Promise.resolve({ last_used_at: new Date("2026-09-19T00:00:00.000Z") })
+  ),
   feedTokenFindUnique: vi.fn(),
-  feedTokenUpdate: vi.fn(() => Promise.resolve({})),
+  feedTokenUpdate: vi.fn(() => Promise.resolve({ count: 1 })),
   feedUpdate: vi.fn(() => Promise.resolve({})),
   getCachedFeedBody: vi.fn(() => Promise.resolve({ ok: true, value: null })),
   logWarn: vi.fn(),
@@ -78,8 +81,10 @@ vi.mock("@repo/database", () => ({
   database: {
     feed: { update: mocks.feedUpdate },
     feedToken: {
+      findFirst: mocks.feedTokenFindFirst,
       findUnique: mocks.feedTokenFindUnique,
       update: mocks.feedTokenUpdate,
+      updateMany: mocks.feedTokenUpdate,
     },
   },
 }));
@@ -398,7 +403,7 @@ describe("renderFeedForToken", () => {
     expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
   });
 
-  it("writes last_used_at on a cache hit when last_used_at was 2 hours ago", async () => {
+  it("preserves the durable first-use timestamp on later cache hits", async () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     mocks.feedTokenFindUnique.mockResolvedValue(
       feedTokenFixture({ last_used_at: twoHoursAgo })
@@ -411,15 +416,7 @@ describe("renderFeedForToken", () => {
     const result = await renderFeedForToken("plaintext-token");
 
     expect(result.ok).toBe(true);
-    expect(mocks.feedTokenUpdate).toHaveBeenCalledTimes(1);
-    expect(mocks.feedTokenUpdate).toHaveBeenCalledWith({
-      data: { last_used_at: expect.any(Date) },
-      where: {
-        clerk_org_id: "org_render",
-        id: "30000000-0000-4000-8000-000000000001",
-        organisation_id: "40000000-0000-4000-8000-000000000001",
-      },
-    });
+    expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
   });
 
   it("writes last_used_at on a cache hit when last_used_at is null", async () => {

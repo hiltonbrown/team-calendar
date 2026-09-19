@@ -9,6 +9,7 @@ export {
 } from "./src/organisation-settings/repository";
 
 export * from "./src/queries/billing";
+export * from "./src/queries/activation-dashboard";
 export * from "./src/queries/outbound-operations";
 export * from "./src/queries/schedulable-xero-tenants";
 export * from "./src/seed/plan-sync";

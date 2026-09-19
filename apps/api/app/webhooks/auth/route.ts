@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
@@ -42,6 +43,7 @@ const ClerkOrganizationMembershipDataSchema = z.object({
     last_name: z.string().nullish(),
     user_id: z.string(),
   }),
+  role: z.string().optional(),
 });
 
 const ClerkWebhookEnvelopeSchema = z.object({
@@ -154,7 +156,10 @@ const handleUserDeleted = (data: ClerkDeletedObjectData) => {
   return new Response("User deleted", { status: 201 });
 };
 
-const handleOrganizationCreated = (data: ClerkOrganizationData) => {
+const handleOrganizationCreated = (
+  data: ClerkOrganizationData,
+  eventTimestamp: Date
+) => {
   analytics?.groupIdentify({
     distinctId: data.created_by ?? undefined,
     groupKey: data.id,
@@ -169,6 +174,19 @@ const handleOrganizationCreated = (data: ClerkOrganizationData) => {
     analytics?.capture({
       distinctId: data.created_by,
       event: "Organisation Created",
+    });
+    const activation = createActivationEvent({
+      deduplicationKey: data.id,
+      name: "Organisation Provisioned",
+      occurredAt: eventTimestamp,
+      subjectId: data.id,
+    });
+    analytics?.capture({
+      distinctId: activation.distinctId,
+      event: activation.event,
+      properties: activation.properties,
+      timestamp: activation.timestamp,
+      uuid: activation.uuid,
     });
   }
 
@@ -220,6 +238,21 @@ export const handleOrganizationMembershipCreated = async (
     timestamp: eventTimestamp,
     uuid: deliveryUuid(deliveryId),
   });
+  if (data.role === "org:owner") {
+    const activation = createActivationEvent({
+      deduplicationKey: deliveryId,
+      name: "Customer Admitted",
+      occurredAt: eventTimestamp,
+      subjectId: data.organization.id,
+    });
+    analytics?.capture({
+      distinctId: activation.distinctId,
+      event: activation.event,
+      properties: activation.properties,
+      timestamp: eventTimestamp,
+      uuid: activation.uuid,
+    });
+  }
 
   return new Response("Organisation membership created", { status: 201 });
 };
@@ -390,7 +423,7 @@ export const POST = async (request: Request): Promise<Response> => {
       eventType,
       id: envelope.data.data.id,
     });
-    await analytics?.shutdown();
+    await analytics?.flush();
     return new Response("", { status: 201 });
   }
 
@@ -425,7 +458,14 @@ export const POST = async (request: Request): Promise<Response> => {
       break;
     }
     case "organization.created": {
-      response = handleOrganizationCreated(event.data);
+      const { timestamp } = envelope.data;
+      if (!timestamp || timestamp < Date.UTC(2020, 0, 1)) {
+        response = new Response("Webhook timestamp is invalid", {
+          status: 503,
+        });
+        break;
+      }
+      response = handleOrganizationCreated(event.data, new Date(timestamp));
       break;
     }
     case "organization.updated": {
@@ -456,7 +496,7 @@ export const POST = async (request: Request): Promise<Response> => {
     }
   }
 
-  await analytics?.shutdown();
+  await analytics?.flush();
 
   return response;
 };
