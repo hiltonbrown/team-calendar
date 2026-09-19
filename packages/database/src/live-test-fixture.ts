@@ -118,10 +118,12 @@ export const allocateLiveTestFixture = (
   if (
     new Set(manifest.owned.clerkOrgIds).size !==
       manifest.owned.clerkOrgIds.length ||
+    new Set(manifest.owned.globalKeys).size !==
+      manifest.owned.globalKeys.length ||
     new Set(manifest.owned.organisationIds).size !==
       manifest.owned.organisationIds.length
   ) {
-    throw new Error("Protected live fixture tenant slots must be unique");
+    throw new Error("Protected live fixture ownership slots must be unique");
   }
   if (
     manifest.owned.clerkOrgIds.length < REQUIRED_LIVE_FIXTURE_TENANT_SLOTS ||

@@ -149,6 +149,37 @@ describe("live fixture registry", () => {
     ).toThrow("disjoint tenant slots");
   });
 
+  it("rejects duplicate durable global ownership keys", () => {
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        active: true,
+        durableManifestConfirmed: true,
+        namespace: `release:run:${runId}`,
+        owned: {
+          clerkOrgIds,
+          globalKeys: Array.from({ length: 17 }, () => "plan_id:duplicate"),
+          organisationIds,
+        },
+        runId,
+        target: {
+          database: "database",
+          endpointId: "endpoint",
+          hostname: "host",
+          role: "role",
+        },
+        version: 1,
+      })
+    );
+    configureEnvironment();
+
+    expect(() =>
+      allocateLiveTestFixture(
+        "packages/database/availability_records.integration.test.ts"
+      )
+    ).toThrow("ownership slots must be unique");
+  });
+
   it("rejects an unregistered suite", () => {
     configureEnvironment();
     expect(() =>
