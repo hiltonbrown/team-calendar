@@ -607,6 +607,21 @@ describe("current user person identity", () => {
 });
 
 describe("release list-query evidence", () => {
+  test("returns no public-holiday people when no holiday applies", async () => {
+    const result = await listPeople({
+      clerkOrgId: tenantA.clerkOrgId,
+      filters: { status: ["public_holiday"] },
+      organisationId: tenantA.organisationId,
+      pagination: { pageSize: 50 },
+      role: "admin",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { nextCursor: null, people: [], totalCount: 0 },
+    });
+  });
+
   test("matches every people status filter to the current-status oracle", async () => {
     const at = new Date("2026-10-03T14:30:00.000Z");
     vi.useFakeTimers();

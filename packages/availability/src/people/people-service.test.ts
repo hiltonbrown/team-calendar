@@ -365,6 +365,35 @@ describe("people-service", () => {
     expect(result.value.nextCursor).toEqual(expect.any(String));
     expect(result.value.totalCount).toBe(3);
   });
+
+  it("uses an impossible holiday predicate when no holiday applies", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.personCount.mockResolvedValue(0);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      filters: { status: ["public_holiday"] },
+      organisationId,
+      pagination: { pageSize: 50 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                expect.objectContaining({
+                  AND: expect.arrayContaining([{ id: { in: [] } }]),
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      })
+    );
+  });
 });
 
 function personRow(

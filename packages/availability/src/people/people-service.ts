@@ -507,14 +507,19 @@ async function buildCurrentStatusWhere(input: {
     locationIds: locations.map(({ id }) => id),
     organisationId: input.organisationId,
   });
-  const holidayWhere: Prisma.PersonWhereInput = {
-    OR: [
-      ...(holidayApplicability.locationIds.size
-        ? [{ location_id: { in: [...holidayApplicability.locationIds] } }]
-        : []),
-      ...(holidayApplicability.unassigned ? [{ location_id: null }] : []),
-    ],
-  };
+  const applicableHolidayLocations: Prisma.PersonWhereInput[] = [
+    ...(holidayApplicability.locationIds.size
+      ? [{ location_id: { in: [...holidayApplicability.locationIds] } }]
+      : []),
+    ...(holidayApplicability.unassigned ? [{ location_id: null }] : []),
+  ];
+  // Prisma removes an empty OR while normalising relation predicates. Keep an
+  // explicitly impossible predicate so `public_holiday` matches nobody and
+  // `NOT holidayWhere` continues to match available/local-status people.
+  const holidayWhere: Prisma.PersonWhereInput =
+    applicableHolidayLocations.length
+      ? { OR: applicableHolidayLocations }
+      : { id: { in: [] } };
   const noLeave: Prisma.PersonWhereInput = {
     availability_records: { none: { OR: [approved, pending] } },
   };
