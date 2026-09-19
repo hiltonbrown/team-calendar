@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   availabilityGroupBy: vi.fn(),
   computeCurrentStatus: vi.fn(),
   computeCurrentStatusForPeople: vi.fn(),
+  locationFindMany: vi.fn(),
   managerScopePersonIds: vi.fn(),
   personCount: vi.fn(),
   personFindMany: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@repo/database", () => ({
       count: mocks.availabilityCount,
       groupBy: mocks.availabilityGroupBy,
     },
+    location: { findMany: mocks.locationFindMany },
     person: {
       count: mocks.personCount,
       findMany: mocks.personFindMany,
@@ -67,6 +69,7 @@ describe("people-service", () => {
     mocks.managerScopePersonIds.mockResolvedValue([managerId, directReportId]);
     mocks.personFindMany.mockResolvedValue([personRow(directReportId)]);
     mocks.personCount.mockResolvedValue(1);
+    mocks.locationFindMany.mockResolvedValue([]);
     mocks.availabilityGroupBy.mockResolvedValue([]);
     mocks.computeCurrentStatus.mockResolvedValue(currentStatus());
     mocks.computeCurrentStatusForPeople.mockImplementation(
@@ -332,12 +335,13 @@ describe("people-service", () => {
     expect(result.value.totalCount).toBe(2);
   });
 
-  it("keeps filtered path pagination in memory when status filters apply", async () => {
+  it("pages and counts status filters in the database", async () => {
     mocks.personFindMany.mockResolvedValue([
       personRow("00000000-0000-4000-8000-000000000101"),
       personRow("00000000-0000-4000-8000-000000000102"),
       personRow("00000000-0000-4000-8000-000000000103"),
     ]);
+    mocks.personCount.mockResolvedValue(3);
 
     const result = await listPeople({
       clerkOrgId: "org_1",
@@ -348,9 +352,9 @@ describe("people-service", () => {
 
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledWith(
-      expect.not.objectContaining({ take: expect.any(Number) })
+      expect.objectContaining({ take: 3 })
     );
-    expect(mocks.personCount).not.toHaveBeenCalled();
+    expect(mocks.personCount).toHaveBeenCalledOnce();
     expect(result.value.people).toHaveLength(2);
     expect(result.value.nextCursor).toEqual(expect.any(String));
     expect(result.value.totalCount).toBe(3);

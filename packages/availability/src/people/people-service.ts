@@ -299,36 +299,39 @@ export async function listPeople(input: {
         value: { nextCursor: null, people: [], totalCount: 0 },
       };
     }
-    const personWhere = buildPeopleWhere({
+    const at = new Date();
+    const statusWhere = await buildCurrentStatusWhere({
+      at,
+      clerkOrgId,
+      organisationId,
+      statuses: filters.status ?? [],
+    });
+    const baseWhere = buildPeopleWhere({
       filters,
       scoped,
       visiblePersonIds,
     });
     const cursor = decodePeopleCursor(pagination.cursor ?? null);
-    const hasInMemoryFilters = Boolean(
-      filters.status?.length || filters.xeroSyncFailedOnly
-    );
+    const personWhere: Prisma.PersonWhereInput = statusWhere
+      ? { AND: [baseWhere, statusWhere] }
+      : baseWhere;
     const people = await database.person.findMany({
       orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
       select: personListSelect,
-      where: personWhere,
-      ...(hasInMemoryFilters
-        ? {}
-        : {
-            ...(cursor ? { cursor: { id: cursor.id }, skip: 1 } : {}),
-            take: pagination.pageSize + 1,
-          }),
+      take: pagination.pageSize + 1,
+      where: cursor
+        ? { AND: [personWhere, peopleCursorWhere(cursor)] }
+        : personWhere,
     });
-    const totalCount = hasInMemoryFilters
-      ? null
-      : await database.person.count({ where: personWhere });
+    const totalCount = await database.person.count({ where: personWhere });
+    const pageRows = people.slice(0, pagination.pageSize);
     const failedCounts = await database.availabilityRecord.groupBy({
       _count: { _all: true },
       by: ["person_id"],
       where: {
         ...scoped,
         approval_status: "xero_sync_failed",
-        person_id: { in: people.map((person) => person.id) },
+        person_id: { in: pageRows.map((person) => person.id) },
       },
     });
     const failedCountByPersonId = new Map(
@@ -336,15 +339,15 @@ export async function listPeople(input: {
     );
 
     const currentStatusesByPersonId = await computeCurrentStatusForPeople({
-      at: new Date(),
+      at,
       clerkOrgId: scoped.clerk_org_id,
       organisationId: scoped.organisation_id,
-      people: people.map((person) => ({
+      people: pageRows.map((person) => ({
         locationId: person.location_id,
         personId: person.id,
       })),
     });
-    const mapped = people.map((person) => {
+    const page = pageRows.map((person) => {
       const currentStatus = currentStatusesByPersonId.get(person.id);
       if (!currentStatus) {
         throw new Error("Current status missing for person list item");
@@ -355,26 +358,8 @@ export async function listPeople(input: {
         failedCountByPersonId.get(person.id) ?? 0
       );
     });
-    const filtered = mapped.filter((person) => {
-      if (filters.xeroSyncFailedOnly && person.xeroSyncFailedCount === 0) {
-        return false;
-      }
-      if (
-        filters.status?.length &&
-        !filters.status.includes(person.currentStatus.statusKey)
-      ) {
-        return false;
-      }
-      return true;
-    });
-
-    const afterCursor =
-      cursor && hasInMemoryFilters
-        ? filtered.filter((person) => comparePeopleCursor(person, cursor) > 0)
-        : filtered;
-    const page = afterCursor.slice(0, pagination.pageSize);
     const nextCursor =
-      afterCursor.length > pagination.pageSize
+      people.length > pagination.pageSize
         ? encodePeopleCursor(page.at(-1))
         : null;
 
@@ -383,7 +368,7 @@ export async function listPeople(input: {
       value: {
         nextCursor,
         people: page,
-        totalCount: totalCount ?? filtered.length,
+        totalCount,
       },
     };
   } catch {
@@ -456,6 +441,160 @@ function buildPeopleWhere({
           },
         }
       : {}),
+  };
+}
+
+const LEAVE_TYPES: availability_record_type[] = [
+  "annual_leave",
+  "holiday",
+  "long_service_leave",
+  "personal_leave",
+  "sick_leave",
+  "unpaid_leave",
+];
+const LOCAL_RUNGS: Array<{
+  key: CurrentStatusKey;
+  types: availability_record_type[];
+}> = [
+  { key: "travelling", types: ["travelling"] },
+  { key: "client_site", types: ["client_site"] },
+  { key: "another_office", types: ["another_office"] },
+  { key: "training", types: ["training"] },
+  { key: "offsite_meeting", types: ["offsite_meeting"] },
+  { key: "wfh", types: ["wfh"] },
+  {
+    key: "limited_availability",
+    types: ["contractor_unavailable", "limited_availability"],
+  },
+  { key: "alternative_contact", types: ["alternative_contact"] },
+  { key: "other", types: ["other"] },
+];
+
+async function buildCurrentStatusWhere(input: {
+  at: Date;
+  clerkOrgId: string;
+  organisationId: string;
+  statuses: CurrentStatusKey[];
+}): Promise<Prisma.PersonWhereInput | null> {
+  if (!input.statuses.length) {
+    return null;
+  }
+  const scoped = scopedQuery(
+    input.clerkOrgId as ClerkOrgId,
+    input.organisationId as OrganisationId
+  );
+  const active = (
+    types: availability_record_type[],
+    status?: "approved" | "submitted"
+  ): Prisma.AvailabilityRecordWhereInput => ({
+    ...scoped,
+    approval_status: status ?? { in: ["approved", "submitted"] },
+    archived_at: null,
+    ends_at: { gte: input.at },
+    record_type: { in: types },
+    starts_at: { lte: input.at },
+  });
+  const approved = active(LEAVE_TYPES, "approved");
+  const pending = active(LEAVE_TYPES, "submitted");
+  const locations = await database.location.findMany({
+    select: { id: true },
+    where: scoped,
+  });
+  const subjects = [null, ...locations.map(({ id }) => id)].map(
+    (locationId, index) => ({
+      locationId,
+      personId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    })
+  );
+  const holidayStatuses = await computeCurrentStatusForPeople({
+    at: input.at,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+    people: subjects,
+  });
+  const holidayIds = subjects
+    .filter(
+      (subject) =>
+        subject.locationId &&
+        holidayStatuses.get(subject.personId)?.statusKey === "public_holiday"
+    )
+    .map(({ locationId }) => locationId as string);
+  const nullHoliday =
+    holidayStatuses.get(subjects[0]?.personId ?? "")?.statusKey ===
+    "public_holiday";
+  const holidayWhere: Prisma.PersonWhereInput = {
+    OR: [
+      ...(holidayIds.length ? [{ location_id: { in: holidayIds } }] : []),
+      ...(nullHoliday ? [{ location_id: null }] : []),
+    ],
+  };
+  const noLeave: Prisma.PersonWhereInput = {
+    availability_records: { none: { OR: [approved, pending] } },
+  };
+  const predicates: Prisma.PersonWhereInput[] = [];
+  for (const status of input.statuses) {
+    if (status === "on_leave") {
+      predicates.push({ availability_records: { some: approved } });
+      continue;
+    }
+    if (status === "pending_leave") {
+      predicates.push({
+        AND: [
+          { availability_records: { none: approved } },
+          { availability_records: { some: pending } },
+        ],
+      });
+      continue;
+    }
+    if (status === "public_holiday") {
+      predicates.push({ AND: [noLeave, holidayWhere] });
+      continue;
+    }
+    const index = LOCAL_RUNGS.findIndex(({ key }) => key === status);
+    if (index >= 0) {
+      const higher = LOCAL_RUNGS.slice(0, index).flatMap(({ types }) => types);
+      predicates.push({
+        AND: [
+          noLeave,
+          { NOT: holidayWhere },
+          ...(higher.length
+            ? [{ availability_records: { none: active(higher) } }]
+            : []),
+          {
+            availability_records: {
+              some: active(LOCAL_RUNGS[index]?.types ?? []),
+            },
+          },
+        ],
+      });
+    } else if (status === "available") {
+      predicates.push({
+        AND: [
+          noLeave,
+          { NOT: holidayWhere },
+          {
+            availability_records: {
+              none: active(LOCAL_RUNGS.flatMap(({ types }) => types)),
+            },
+          },
+        ],
+      });
+    }
+  }
+  return predicates.length ? { OR: predicates } : { id: { in: [] } };
+}
+
+function peopleCursorWhere(cursor: PeopleCursor): Prisma.PersonWhereInput {
+  return {
+    OR: [
+      { last_name: { gt: cursor.lastName } },
+      { first_name: { gt: cursor.firstName }, last_name: cursor.lastName },
+      {
+        first_name: cursor.firstName,
+        id: { gt: cursor.id },
+        last_name: cursor.lastName,
+      },
+    ],
   };
 }
 
@@ -953,18 +1092,6 @@ interface PeopleCursor {
   firstName: string;
   id: string;
   lastName: string;
-}
-
-function comparePeopleCursor(person: PersonListItem, cursor: PeopleCursor) {
-  const last = person.lastName.localeCompare(cursor.lastName);
-  if (last !== 0) {
-    return last;
-  }
-  const first = person.firstName.localeCompare(cursor.firstName);
-  if (first !== 0) {
-    return first;
-  }
-  return person.id.localeCompare(cursor.id);
 }
 
 function encodePeopleCursor(person: PersonListItem | undefined): string | null {

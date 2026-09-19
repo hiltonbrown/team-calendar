@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     auditCreate,
+    availabilityCount: vi.fn(),
     availabilityCreate,
     availabilityDeleteMany: vi.fn(),
     availabilityFindFirst,
@@ -34,6 +35,7 @@ const mocks = vi.hoisted(() => {
     hasActiveXeroConnection: vi.fn(),
     hasUnresolvedSubmitOperation: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
+    leaveBalanceFindMany: vi.fn(),
     managerScopePersonIds: vi.fn(),
     materialiseAvailabilityPublication: vi.fn(() =>
       Promise.resolve({ ok: true, value: undefined })
@@ -65,10 +67,14 @@ vi.mock("@repo/database", () => ({
         },
       }),
     availabilityRecord: {
+      count: mocks.availabilityCount,
       findFirst: mocks.availabilityFindFirst,
       findMany: mocks.availabilityFindMany,
     },
-    leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
+    leaveBalance: {
+      findFirst: mocks.leaveBalanceFindFirst,
+      findMany: mocks.leaveBalanceFindMany,
+    },
     person: { findFirst: mocks.personFindFirst },
   },
   hasUnresolvedSubmitOperation: mocks.hasUnresolvedSubmitOperation,
@@ -91,6 +97,7 @@ const {
   deleteDraftRecord,
   getRecord,
   listTeamRecords,
+  listTeamRecordsPage,
   updateRecord,
 } = await import("./plan-service");
 
@@ -165,6 +172,8 @@ describe("plan-service", () => {
       scopedRecordFixture({ managerPersonId: null })
     );
     mocks.availabilityFindMany.mockResolvedValue([]);
+    mocks.availabilityCount.mockResolvedValue(0);
+    mocks.leaveBalanceFindMany.mockResolvedValue([]);
     mocks.availabilityDeleteMany.mockResolvedValue({ count: 1 });
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
@@ -177,6 +186,42 @@ describe("plan-service", () => {
       location_id: null,
       manager_person_id: null,
     });
+  });
+
+  it("pages plans with one exact count and a bounded stable query", async () => {
+    mocks.availabilityCount.mockResolvedValue(241);
+
+    const result = await listTeamRecordsPage({
+      actingOrgRole: "org:admin",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        approvalStatus: ["approved"],
+        sourceType: ["manual"],
+      },
+      organisationId: baseInput.organisationId,
+      pageSize: 50,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { nextCursor: null, totalCount: 241 },
+    });
+    expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.availabilityCount).toHaveBeenCalledTimes(1);
+    const pageQuery = mocks.availabilityFindMany.mock.calls[0]?.[0];
+    const countQuery = mocks.availabilityCount.mock.calls[0]?.[0];
+    expect(pageQuery).toMatchObject({
+      orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
+      take: 51,
+      where: {
+        approval_status: { in: ["approved"] },
+        clerk_org_id: baseInput.clerkOrgId,
+        organisation_id: baseInput.organisationId,
+        source_type: { in: ["manual"] },
+      },
+    });
+    expect(countQuery?.where).toEqual(pageQuery?.where);
+    expect(mocks.leaveBalanceFindMany).not.toHaveBeenCalled();
   });
 
   it("returns no team records without querying when a manager has no reports", async () => {

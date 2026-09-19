@@ -1,10 +1,11 @@
 import { auth, currentUser } from "@repo/auth/server";
 import {
-  computeWorkingDays,
+  computeWorkingDaysFromReferenceData,
   ensureCurrentUserPerson,
   hasActiveXeroConnection,
-  listMyRecords,
-  listTeamRecords,
+  listMyRecordsPage,
+  listTeamRecordsPage,
+  loadWorkingDaysReferenceData,
   type RecordListItem,
 } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
@@ -30,6 +31,7 @@ interface PlansPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
 const PlansPage = async ({ searchParams }: PlansPageProps) => {
   await requirePageRole("org:viewer");
 
@@ -113,17 +115,23 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
 
   const [recordsResult, hasXero] = await Promise.all([
     filters.tab === "team"
-      ? listTeamRecords({
+      ? listTeamRecordsPage({
           actingOrgRole: orgRole,
+          allHistory: filters.allHistory ?? false,
           clerkOrgId,
+          cursor: filters.cursor,
           filters: serviceFilters,
           managerPersonId: currentPersonResult.value.id,
           organisationId,
+          pageSize: filters.pageSize ?? 50,
         })
-      : listMyRecords({
+      : listMyRecordsPage({
+          allHistory: filters.allHistory ?? false,
           clerkOrgId,
+          cursor: filters.cursor,
           filters: serviceFilters,
           organisationId,
+          pageSize: filters.pageSize ?? 50,
           userId: user.id,
         }),
     hasActiveXeroConnection({ clerkOrgId, organisationId }),
@@ -143,24 +151,31 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     );
   }
 
-  const records = await Promise.all(
-    recordsResult.value.map(async (record) => {
-      const duration = await computeWorkingDays({
-        allDay: record.allDay,
-        clerkOrgId,
-        endsAt: record.endsAt,
-        locationId: record.person.locationId,
-        organisationId,
-        startsAt: record.startsAt,
-      });
+  const durationInputs = recordsResult.value.items.map((record) => ({
+    allDay: record.allDay,
+    clerkOrgId,
+    endsAt: record.endsAt,
+    locationId: record.person.locationId,
+    organisationId,
+    startsAt: record.startsAt,
+  }));
+  const durationReference = await loadWorkingDaysReferenceData(durationInputs);
+  const records = recordsResult.value.items.map((record, index) => {
+    const durationInput = durationInputs[index];
+    if (!durationInput) {
+      return toClientRecord(record, null, "Duration input is unavailable");
+    }
+    const duration = computeWorkingDaysFromReferenceData(
+      durationInput,
+      durationReference
+    );
 
-      return toClientRecord(
-        record,
-        duration.ok ? duration.value : null,
-        duration.ok ? null : duration.error.message
-      );
-    })
-  );
+    return toClientRecord(
+      record,
+      duration.ok ? duration.value : null,
+      duration.ok ? null : duration.error.message
+    );
+  });
 
   return (
     <>
@@ -191,9 +206,11 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           canViewTeam={canViewTeam}
           filters={filters}
           hasActiveXeroConnection={hasXero}
+          nextCursor={recordsResult.value.nextCursor}
           organisationId={organisationId}
           orgQueryValue={orgQueryValue}
           records={records}
+          totalCount={recordsResult.value.totalCount}
         />
 
         {records.length === 0 && (

@@ -122,9 +122,11 @@ interface PlansClientProps {
   canViewTeam: boolean;
   filters: PlansFilterInput;
   hasActiveXeroConnection: boolean;
+  nextCursor?: string | null;
   organisationId: string;
   orgQueryValue: string | null;
   records: PlansClientRecord[];
+  totalCount?: number;
 }
 
 const recordTypeLabels: Record<string, string> = {
@@ -174,6 +176,8 @@ export function PlansClient({
   organisationId,
   orgQueryValue,
   records,
+  nextCursor = null,
+  totalCount,
 }: PlansClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -352,6 +356,20 @@ export function PlansClient({
             name="dateTo"
             type="date"
           />
+        </FilterField>
+        <FilterField htmlFor="plans-history" label="History">
+          <Select
+            defaultValue={filters.allHistory ? "true" : "false"}
+            name="allHistory"
+          >
+            <SelectTrigger id="plans-history">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="false">Current window</SelectItem>
+              <SelectItem value="true">All history</SelectItem>
+            </SelectContent>
+          </Select>
         </FilterField>
         <div className="flex items-end">
           <Button className="w-full" type="submit" variant="secondary">
@@ -555,6 +573,22 @@ export function PlansClient({
           </table>
         </div>
       )}
+
+      <div
+        aria-live="polite"
+        className="flex items-center justify-between text-sm"
+      >
+        <span className="text-muted-foreground">
+          {totalCount ?? records.length} matching plans
+        </span>
+        {nextCursor ? (
+          <Button asChild variant="secondary">
+            <Link href={plansPageHref(filters, nextCursor, orgQueryValue)}>
+              Next page
+            </Link>
+          </Button>
+        ) : null}
+      </div>
 
       {!hasActiveXeroConnection && (
         <p className="text-muted-foreground text-sm">
@@ -812,6 +846,44 @@ function ActiveFilters({
 
 function tabHref(tab: "my" | "team", orgQueryValue: string | null): string {
   return withOrg(`/plans?tab=${tab}`, orgQueryValue);
+}
+
+function plansPageHref(
+  filters: PlansFilterInput,
+  cursor: string,
+  orgQueryValue: string | null
+): string {
+  const params = new URLSearchParams({
+    cursor,
+    pageSize: String(filters.pageSize ?? 50),
+    tab: filters.tab,
+  });
+  if (filters.allHistory) {
+    params.set("allHistory", "true");
+  }
+  if (filters.includeArchived) {
+    params.set("includeArchived", "true");
+  }
+  for (const [key, value] of [
+    ["approvalStatus", filters.approvalStatus],
+    ["personId", filters.personId],
+    ["recordType", filters.recordType],
+    ["sourceType", filters.sourceType],
+  ] as const) {
+    if (value?.length) {
+      params.set(key, value.join(","));
+    }
+  }
+  if (filters.dateFrom) {
+    params.set("dateFrom", filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    params.set("dateTo", filters.dateTo);
+  }
+  if (filters.recordTypeCategory !== "all") {
+    params.set("recordTypeCategory", filters.recordTypeCategory);
+  }
+  return withOrg(`/plans?${params.toString()}`, orgQueryValue);
 }
 
 function RowActions({
@@ -1099,6 +1171,9 @@ function activeFilterLabels(filters: PlansFilterInput): string[] {
   }
   if (filters.includeArchived) {
     labels.push("Archived included");
+  }
+  if (filters.allHistory) {
+    labels.push("All history");
   }
   if (filters.recordType?.[0]) {
     labels.push(`Type: ${recordTypeLabel(filters.recordType[0])}`);

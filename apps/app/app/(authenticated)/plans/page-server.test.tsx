@@ -20,11 +20,38 @@ vi.mock("@repo/auth/server", () => ({
   currentUser: mocks.currentUser,
 }));
 vi.mock("@repo/availability", () => ({
-  computeWorkingDays: mocks.computeWorkingDays,
+  computeWorkingDaysFromReferenceData: mocks.computeWorkingDays,
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
-  listMyRecords: mocks.listMyRecords,
-  listTeamRecords: mocks.listTeamRecords,
+  listMyRecordsPage: async (...args: unknown[]) => {
+    const result = await mocks.listMyRecords(...args);
+    return result.ok
+      ? {
+          ok: true,
+          value: {
+            items: result.value,
+            nextCursor: null,
+            totalCount: result.value.length,
+            window: { from: null, to: null },
+          },
+        }
+      : result;
+  },
+  listTeamRecordsPage: async (...args: unknown[]) => {
+    const result = await mocks.listTeamRecords(...args);
+    return result.ok
+      ? {
+          ok: true,
+          value: {
+            items: result.value,
+            nextCursor: null,
+            totalCount: result.value.length,
+            window: { from: null, to: null },
+          },
+        }
+      : result;
+  },
+  loadWorkingDaysReferenceData: vi.fn(() => Promise.resolve({})),
 }));
 vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
@@ -187,7 +214,7 @@ describe("Plans page server data", () => {
       xeroWriteError: null,
     }));
     mocks.listMyRecords.mockResolvedValue({ ok: true, value: records });
-    mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
+    mocks.computeWorkingDays.mockReturnValue({ ok: true, value: 2 });
 
     render(await PlansPage({ searchParams: Promise.resolve({}) }));
 

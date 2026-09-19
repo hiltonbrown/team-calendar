@@ -113,6 +113,12 @@ export interface BalanceChip {
 export interface RecordListItem extends PlanRecord {
   balanceChip: BalanceChip | null;
 }
+export interface PlanListPage {
+  items: RecordListItem[];
+  nextCursor: string | null;
+  totalCount: number;
+  window: { from: Date | null; to: Date | null };
+}
 
 export interface RecordDetail extends RecordListItem {
   xeroWriteErrorMessage: string | null;
@@ -295,6 +301,74 @@ export async function listTeamRecords(input: {
       clerkOrgId: input.clerkOrgId,
       filters,
       organisationId: input.organisationId,
+    });
+  } catch {
+    return unknownError();
+  }
+}
+
+export async function listMyRecordsPage(input: {
+  allHistory?: boolean;
+  clerkOrgId: string;
+  cursor?: string | null;
+  filters?: unknown;
+  organisationId: string;
+  pageSize?: number;
+  userId: string;
+}): Promise<Result<PlanListPage, PlanServiceError>> {
+  const filters = parseFilters(input.filters);
+  if (!filters.ok) {
+    return filters;
+  }
+  try {
+    const person = await resolvePersonForUser(
+      input.clerkOrgId,
+      input.organisationId,
+      input.userId
+    );
+    if (!person) {
+      return notAuthorised();
+    }
+    return listRecordsPageForScope({
+      ...input,
+      authorisedPersonIds: [person.id],
+      filters: filters.value,
+    });
+  } catch {
+    return unknownError();
+  }
+}
+export async function listTeamRecordsPage(input: {
+  actingOrgRole?: string | null;
+  allHistory?: boolean;
+  clerkOrgId: string;
+  cursor?: string | null;
+  filters?: unknown;
+  managerPersonId?: null | string;
+  organisationId: string;
+  pageSize?: number;
+}): Promise<Result<PlanListPage, PlanServiceError>> {
+  const filters = parseFilters(input.filters);
+  if (!filters.ok) {
+    return filters;
+  }
+  try {
+    let authorisedPersonIds: string[] | null = null;
+    if (!isAdminOrOwner(input.actingOrgRole)) {
+      if (!input.managerPersonId) {
+        return notAuthorised();
+      }
+      authorisedPersonIds = await managerScopePersonIds({
+        actingPersonId: input.managerPersonId,
+        clerkOrgId: input.clerkOrgId,
+        excludeSelf: true,
+        organisationId: input.organisationId,
+      });
+    }
+    return listRecordsPageForScope({
+      ...input,
+      authorisedPersonIds,
+      filters: filters.value,
     });
   } catch {
     return unknownError();
@@ -921,6 +995,202 @@ const recordInclude = {
 
 type ScopedRecord = NonNullable<Awaited<ReturnType<typeof loadScopedRecord>>>;
 type SelectedPerson = ScopedRecord["person"];
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Page scope, filters, window and cursor must form one identical count/page predicate.
+async function listRecordsPageForScope(input: {
+  allHistory?: boolean;
+  authorisedPersonIds: null | string[];
+  clerkOrgId: string;
+  cursor?: string | null;
+  filters: PlanFilters;
+  organisationId: string;
+  pageSize?: number;
+}): Promise<Result<PlanListPage, PlanServiceError>> {
+  const requested = input.filters.personId;
+  let personIds = requested;
+  if (input.authorisedPersonIds !== null) {
+    personIds = requested
+      ? requested.filter((id) => input.authorisedPersonIds?.includes(id))
+      : input.authorisedPersonIds;
+  }
+  const now = new Date();
+  const from = new Date(now);
+  from.setUTCDate(from.getUTCDate() - 90);
+  const to = new Date(now);
+  to.setUTCDate(to.getUTCDate() + 365);
+  const window = input.allHistory
+    ? {
+        from: input.filters.dateRange?.from ?? null,
+        to: input.filters.dateRange?.to ?? null,
+      }
+    : {
+        from: input.filters.dateRange?.from ?? from,
+        to: input.filters.dateRange?.to ?? to,
+      };
+  if (personIds?.length === 0) {
+    return {
+      ok: true,
+      value: { items: [], nextCursor: null, totalCount: 0, window },
+    };
+  }
+  const where: Prisma.AvailabilityRecordWhereInput = {
+    ...scopedTo(input),
+    source_type: {
+      in: input.filters.sourceType?.length
+        ? [...input.filters.sourceType]
+        : ["manual", "team_calendar_leave"],
+    },
+    ...(input.filters.includeArchived ? {} : { archived_at: null }),
+    ...(input.filters.approvalStatus?.length
+      ? { approval_status: { in: input.filters.approvalStatus } }
+      : {}),
+    ...(personIds?.length ? { person_id: { in: personIds } } : {}),
+    ...(input.filters.recordType?.length
+      ? { record_type: { in: [...input.filters.recordType] } }
+      : recordTypeCategoryFilter(input.filters.recordTypeCategory)),
+    ...(window.from ? { ends_at: { gte: window.from } } : {}),
+    ...(window.to ? { starts_at: { lte: window.to } } : {}),
+  };
+  const cursor = decodePlanCursor(input.cursor ?? null);
+  const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
+  const [rows, totalCount, hasXero] = await Promise.all([
+    database.availabilityRecord.findMany({
+      include: recordInclude,
+      orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
+      take: pageSize + 1,
+      where: cursor
+        ? {
+            AND: [
+              where,
+              {
+                OR: [
+                  { starts_at: { gt: cursor.startsAt } },
+                  {
+                    created_at: { gt: cursor.createdAt },
+                    starts_at: cursor.startsAt,
+                  },
+                  {
+                    created_at: cursor.createdAt,
+                    id: { gt: cursor.id },
+                    starts_at: cursor.startsAt,
+                  },
+                ],
+              },
+            ],
+          }
+        : where,
+    }),
+    database.availabilityRecord.count({ where }),
+    hasActiveXeroConnection({
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+    }),
+  ]);
+  const page = rows.slice(0, pageSize);
+  const balances = page.length
+    ? await database.leaveBalance.findMany({
+        orderBy: { updated_at: "desc" },
+        where: {
+          ...scopedTo(input),
+          person_id: { in: [...new Set(page.map((r) => r.person_id))] },
+          record_type: { in: [...new Set(page.map((r) => r.record_type))] },
+        },
+      })
+    : [];
+  const byPair = new Map<string, (typeof balances)[number]>();
+  for (const balance of balances) {
+    const key = `${balance.person_id}:${balance.record_type}`;
+    if (!byPair.has(key)) {
+      byPair.set(key, balance);
+    }
+  }
+  const items = page.map((record) => ({
+    ...toPlanRecord(record, deriveActions(record, hasXero)),
+    balanceChip: balanceChipFromRow(
+      record,
+      byPair.get(`${record.person_id}:${record.record_type}`)
+    ),
+  }));
+  return {
+    ok: true,
+    value: {
+      items,
+      nextCursor: rows.length > pageSize ? encodePlanCursor(page.at(-1)) : null,
+      totalCount,
+      window,
+    },
+  };
+}
+
+function balanceChipFromRow(
+  record: ScopedRecord,
+  balance:
+    | {
+        balance: Prisma.Decimal;
+        balance_unit: leave_balance_unit | null;
+        currency_code: string | null;
+        updated_at: Date;
+      }
+    | undefined
+): BalanceChip | null {
+  if (isLocalOnlyType(record.record_type)) {
+    return null;
+  }
+  if (!isXeroLeaveType(record.record_type)) {
+    return {
+      balanceAvailable: null,
+      balanceUnavailableReason: "not_xero_leave",
+      currencyCode: null,
+      leaveBalanceUpdatedAt: null,
+      unit: null,
+    };
+  }
+  return balance
+    ? {
+        balanceAvailable: Number(balance.balance),
+        balanceUnavailableReason: "not_synced",
+        currencyCode: balance.currency_code,
+        leaveBalanceUpdatedAt: balance.updated_at,
+        unit: balance.balance_unit,
+      }
+    : {
+        balanceAvailable: null,
+        balanceUnavailableReason: "not_synced",
+        currencyCode: null,
+        leaveBalanceUpdatedAt: null,
+        unit: null,
+      };
+}
+function encodePlanCursor(record: ScopedRecord | undefined): string | null {
+  return record
+    ? Buffer.from(
+        JSON.stringify({
+          createdAt: record.created_at.toISOString(),
+          id: record.id,
+          startsAt: record.starts_at.toISOString(),
+        })
+      ).toString("base64url")
+    : null;
+}
+function decodePlanCursor(
+  value: string | null
+): { createdAt: Date; id: string; startsAt: Date } | null {
+  if (!value) {
+    return null;
+  }
+  try {
+    const result = z
+      .object({
+        createdAt: z.coerce.date(),
+        id: z.string().uuid(),
+        startsAt: z.coerce.date(),
+      })
+      .safeParse(JSON.parse(Buffer.from(value, "base64url").toString("utf8")));
+    return result.success ? result.data : null;
+  } catch {
+    return null;
+  }
+}
 
 async function listRecordsForScope({
   authorisedPersonIds,
