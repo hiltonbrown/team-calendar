@@ -15,10 +15,14 @@ const isTurbopackWorkerConnection = (target) =>
   target.host === "127.0.0.1" &&
   Number.isInteger(target.port) &&
   target.port === Number(process.argv[2]) &&
-  process.argv[1]?.includes("/.next/build/chunks/");
+  (process.argv[1]?.includes("/.next/") ||
+    process.argv[1]?.includes("/node_modules/next/"));
 const isIpcConnection = (arguments_) => {
   const [first] = arguments_;
-  const target = Array.isArray(first) ? first[0] : first;
+  let target = first;
+  while (Array.isArray(target)) {
+    [target] = target;
+  }
   return (
     isAllowedIpcPath(target) ||
     (target && typeof target === "object" && isAllowedIpcPath(target.path)) ||
