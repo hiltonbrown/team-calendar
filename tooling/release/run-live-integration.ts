@@ -21,9 +21,14 @@ if (!manifestPath) {
 }
 const protectedManifestPath = manifestPath;
 const recoveryRequested = process.argv.includes("--recover");
+const recoverIfOwned = process.argv.includes("--recover-if-owned");
 const preacquired = process.argv.includes("--preacquired");
-if (recoveryRequested && preacquired) {
-  throw new Error("Choose either --recover or --preacquired, not both");
+if (
+  [recoveryRequested, recoverIfOwned, preacquired].filter(Boolean).length > 1
+) {
+  throw new Error(
+    "Choose only one of --recover, --recover-if-owned, or --preacquired"
+  );
 }
 
 const manifest = assertLiveDatabaseAuthority({
@@ -55,6 +60,10 @@ if (activeState === "interrupted" && !recoveryRequested) {
 if (activeState === "acquired" && recoveryRequested) {
   await releaseActiveRun(manifest, registryInput);
   throw new Error("No interrupted release run exists for recovery");
+}
+if (activeState === "acquired" && recoverIfOwned) {
+  await releaseActiveRun(manifest, registryInput);
+  process.exit(0);
 }
 
 const inventory = discoverIntegrationTests(root);
@@ -92,7 +101,7 @@ try {
   );
   if (cleanup.status === 0) {
     cleanupSucceeded = true;
-    if (recoveryRequested) {
+    if (recoveryRequested || recoverIfOwned) {
       status = 0;
     }
   } else {

@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import { Pool } from "pg";
-import { acquireActiveRun } from "./active-run-registry.js";
+import { acquireActiveRun, releaseActiveRun } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
@@ -33,10 +33,18 @@ const activeRunState = await acquireActiveRun(manifest, {
   token: process.env.KV_REST_API_TOKEN,
   url: process.env.KV_REST_API_URL,
 });
-if (activeRunState === "interrupted" && !process.argv.includes("--recover")) {
+const recoveryRequested = process.argv.includes("--recover");
+if (activeRunState === "interrupted" && !recoveryRequested) {
   throw new Error(
     "This manifest already owns an interrupted active run; pass --recover after checking its state"
   );
+}
+if (activeRunState === "acquired" && recoveryRequested) {
+  await releaseActiveRun(manifest, {
+    token: process.env.KV_REST_API_TOKEN,
+    url: process.env.KV_REST_API_URL,
+  });
+  throw new Error("No interrupted release run exists for recovery");
 }
 
 const databaseUrl = process.env.DATABASE_URL;
