@@ -3,6 +3,28 @@ import { type NextRequest, NextResponse } from "next/server";
 import { getPublicApiOrigin } from "./lib/public-api-url";
 
 export const REPORTING_ENDPOINTS_HEADER = 'csp-endpoint="/api/csp-report"';
+const CLERK_KEY_PREFIX = /^pk_(?:test|live)_/;
+const CLERK_KEY_TERMINATOR = /\$$/;
+const SAFE_HOSTNAME =
+  /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+export function clerkFrontendOrigin(
+  publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+): string | null {
+  if (!(publishableKey && CLERK_KEY_PREFIX.test(publishableKey))) {
+    return null;
+  }
+  try {
+    const encoded = publishableKey.replace(CLERK_KEY_PREFIX, "");
+    const hostname = Buffer.from(encoded, "base64url")
+      .toString("utf8")
+      .replace(CLERK_KEY_TERMINATOR, "")
+      .toLowerCase();
+    return SAFE_HOSTNAME.test(hostname) ? `https://${hostname}` : null;
+  } catch {
+    return null;
+  }
+}
 
 export const isPublicAppRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -17,7 +39,8 @@ export function generateNonce(): string {
 
 export function buildContentSecurityPolicy(
   nonce: string,
-  isDev = process.env.NODE_ENV === "development"
+  isDev = process.env.NODE_ENV === "development",
+  clerkOrigin = clerkFrontendOrigin()
 ): string {
   const apiOrigin = getPublicApiOrigin();
 
@@ -27,6 +50,7 @@ export function buildContentSecurityPolicy(
     isDev ? "'unsafe-eval'" : null,
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
+    clerkOrigin,
     "https://challenges.cloudflare.com",
     "https://va.vercel-scripts.com",
     "https://www.googletagmanager.com",
@@ -37,6 +61,7 @@ export function buildContentSecurityPolicy(
     "'self'",
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
+    clerkOrigin,
     "https://*.sentry.io",
     "https://us.i.posthog.com",
     "https://*.posthog.com",
@@ -61,6 +86,7 @@ export function buildContentSecurityPolicy(
     "https://challenges.cloudflare.com",
     "https://*.clerk.accounts.dev",
     "https://*.clerk.com",
+    clerkOrigin,
   ];
 
   return [

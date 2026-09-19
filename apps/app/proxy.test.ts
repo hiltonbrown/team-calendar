@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { describe, expect, it } from "vitest";
 import {
   buildContentSecurityPolicy,
+  clerkFrontendOrigin,
   generateNonce,
   handleProxyWithNonce,
   isPublicAppRoute,
@@ -53,6 +54,24 @@ describe("Proxy nonce and CSP generation", () => {
     expect(csp).toContain("https://www.googletagmanager.com");
     expect(csp).toContain("https://*.google-analytics.com");
   });
+
+  it("allows only the exact Clerk frontend origin encoded by the configured key", () => {
+    const key = `pk_live_${Buffer.from("clerk.teamcalendar.online$").toString("base64url")}`;
+    expect(clerkFrontendOrigin(key)).toBe("https://clerk.teamcalendar.online");
+    const csp = buildContentSecurityPolicy(
+      "nonce",
+      false,
+      clerkFrontendOrigin(key)
+    );
+    expect(csp).toContain("script-src 'self' 'nonce-nonce'");
+    expect(csp).toContain("https://clerk.teamcalendar.online");
+    expect(csp).not.toContain("https://*.teamcalendar.online");
+  });
+
+  it.each(["", "pk_live_invalid", "sk_live_secret"])(
+    "rejects an invalid Clerk publishable key (%s)",
+    (key) => expect(clerkFrontendOrigin(key)).toBeNull()
+  );
 
   it("includes unsafe-eval in script-src only in development", () => {
     const nonce = "dev-nonce-456";
