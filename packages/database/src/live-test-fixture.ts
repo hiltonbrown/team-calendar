@@ -17,7 +17,7 @@ export const LIVE_FIXTURE_SUITES = {
   "packages/database/authoritative-usage.integration.test.ts": { tenants: 2 },
   "packages/database/availability_records.integration.test.ts": { tenants: 2 },
   "packages/database/billing.integration.test.ts": {
-    globalKeys: { plan_id: 2, plan_key: 2, stripe_event: 5 },
+    globalKeys: { plan_id: 3, plan_key: 3, stripe_event: 5 },
     tenants: 2,
   },
   "packages/database/leave_balances.integration.test.ts": { tenants: 1 },
@@ -179,7 +179,7 @@ export const allocateLiveTestFixture = (
   return {
     globalKey: (kind, index = 0) => {
       const suiteCount = suiteAllocation.globalKeys?.[kind] ?? 0;
-      if (index >= suiteCount) {
+      if (!(Number.isInteger(index) && index >= 0 && index < suiteCount)) {
         throw new Error(`Suite does not own global key ${kind}:${index}`);
       }
       const value = globalKeysByKind(kind)[globalOffset(kind) + index];

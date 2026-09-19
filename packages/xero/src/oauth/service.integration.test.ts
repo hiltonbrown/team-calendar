@@ -1,47 +1,9 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository's .integration.test.ts convention.
+
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
-  try {
-    const fs = require("node:fs");
-    const path = require("node:path");
-    const envPaths = [
-      path.resolve(process.cwd(), "packages/database/.env"),
-      path.resolve(process.cwd(), "../database/.env"),
-    ];
-    for (const envPath of envPaths) {
-      if (!fs.existsSync(envPath)) {
-        continue;
-      }
-      const envContent = fs.readFileSync(envPath, "utf-8");
-      for (const line of envContent.split("\n")) {
-        const trimmed = line.trim();
-        if (!(trimmed && !trimmed.startsWith("#"))) {
-          continue;
-        }
-        const [key, ...valueParts] = trimmed.split("=");
-        const value = valueParts.join("=");
-        if (key && value) {
-          const cleanKey = key.trim();
-          if (
-            cleanKey !== "__proto__" &&
-            cleanKey !== "constructor" &&
-            cleanKey !== "prototype"
-          ) {
-            Reflect.set(
-              process.env,
-              cleanKey,
-              value.trim().replace(/^['"]|['"]$/g, "")
-            );
-          }
-        }
-      }
-      break;
-    }
-  } catch {
-    // The suite is skipped below when no integration database is configured.
-  }
-
   process.env.XERO_CLIENT_ID = "integration-client-id";
   process.env.XERO_CLIENT_SECRET = "integration-client-secret";
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
@@ -50,11 +12,6 @@ vi.hoisted(() => {
 });
 
 vi.mock("server-only", () => ({}));
-
-const describeIntegration = process.env.DATABASE_URL
-  ? describe
-  : // biome-ignore lint/complexity/useLiteralKeys: Keep the suite discoverable without requiring a local database.
-    describe["skip"];
 
 type CryptoModule = typeof import("../crypto/tokens");
 type DatabaseModule = typeof import("@repo/database");
@@ -68,15 +25,18 @@ let disconnectXeroOAuthConnection: ServiceModule["disconnectXeroOAuthConnection"
 let ensureFreshXeroConnection: ServiceModule["ensureFreshXeroConnection"];
 let scrubInactiveXeroOAuthSessionCredentials: ServiceModule["scrubInactiveXeroOAuthSessionCredentials"];
 
+const allocation = allocateLiveTestFixture(
+  "packages/xero/src/oauth/service.integration.test.ts"
+);
 const fixture = {
-  clerkOrgId: "org_test_xero_refresh_lock",
-  connectionId: "75000000-0000-4000-8000-000000000002",
-  organisationId: "75000000-0000-4000-8000-000000000001",
-  sessionId: "75000000-0000-4000-8000-000000000003",
-  tenantId: "75000000-0000-4000-8000-000000000004",
+  clerkOrgId: allocation.tenants[0]?.clerkOrgId as string,
+  connectionId: allocation.id("connection"),
+  organisationId: allocation.tenants[0]?.organisationId as string,
+  sessionId: allocation.id("session"),
+  tenantId: allocation.id("tenant"),
 } as const;
 
-describeIntegration("ensureFreshXeroConnection integration", () => {
+describe("ensureFreshXeroConnection integration", () => {
   beforeAll(async () => {
     const [cryptoModule, databaseModule, serviceModule] = await Promise.all([
       import("../crypto/tokens"),

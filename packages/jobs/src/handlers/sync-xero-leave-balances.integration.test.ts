@@ -1,3 +1,4 @@
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -24,55 +25,50 @@ await import("./setup-env");
 
 const { getRegisteredSyncEventName } = await import("../events");
 
-let database: typeof import("@repo/database")["database"];
-let syncXeroLeaveBalances: typeof import("./sync-xero-leave-balances")["syncXeroLeaveBalances"];
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database } = await import("@repo/database"));
-  ({ syncXeroLeaveBalances } = await import("./sync-xero-leave-balances"));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts"
+);
+const { database } = await import("@repo/database");
+const { syncXeroLeaveBalances } = await import("./sync-xero-leave-balances");
 
 const tenantA = {
-  clerkOrgId: "org_test_balance_sync_a",
-  organisationId: "70000000-0000-4000-8000-000000000001",
-  personId: "70000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "70000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "70000000-0000-4000-8000-000000000005",
-  xeroTenantId: "70000000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  personId: fixture.id("person", 0),
+  xeroConnectionId: fixture.id("connection", 0),
+  xeroEmployeeId: fixture.id("employee", 0),
+  xeroTenantId: fixture.id("tenant", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_balance_sync_b",
-  organisationId: "80000000-0000-4000-8000-000000000001",
-  personId: "80000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "80000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  personId: fixture.id("person", 1),
+  xeroConnectionId: fixture.id("connection", 1),
   xeroEmployeeId: tenantA.xeroEmployeeId,
-  xeroTenantId: "80000000-0000-4000-8000-000000000003",
+  xeroTenantId: fixture.id("tenant", 1),
 } as const;
 
 const tenantNz = {
-  clerkOrgId: "org_test_balance_sync_nz",
+  clerkOrgId: fixture.tenants[2]?.clerkOrgId as string,
   countryCode: "NZ",
-  organisationId: "71000000-0000-4000-8000-000000000001",
+  organisationId: fixture.tenants[2]?.organisationId as string,
   payrollRegion: "NZ" as const,
-  personId: "71000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "71000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "71000000-0000-4000-8000-000000000005",
-  xeroTenantId: "71000000-0000-4000-8000-000000000003",
+  personId: fixture.id("person", 2),
+  xeroConnectionId: fixture.id("connection", 2),
+  xeroEmployeeId: fixture.id("employee", 2),
+  xeroTenantId: fixture.id("tenant", 2),
 } as const;
 
 const tenantUk = {
-  clerkOrgId: "org_test_balance_sync_uk",
+  clerkOrgId: fixture.tenants[3]?.clerkOrgId as string,
   countryCode: "GB",
-  organisationId: "72000000-0000-4000-8000-000000000001",
+  organisationId: fixture.tenants[3]?.organisationId as string,
   payrollRegion: "UK" as const,
-  personId: "72000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "72000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "72000000-0000-4000-8000-000000000005",
-  xeroTenantId: "72000000-0000-4000-8000-000000000003",
+  personId: fixture.id("person", 3),
+  xeroConnectionId: fixture.id("connection", 3),
+  xeroEmployeeId: fixture.id("employee", 3),
+  xeroTenantId: fixture.id("tenant", 3),
 } as const;
 
 const testClerkOrgIds = [
@@ -90,7 +86,7 @@ describe("sync-xero-leave-balances handler", () => {
   });
 });
 
-describeWithDatabase("sync-xero-leave-balances database flow", () => {
+describe("sync-xero-leave-balances database flow", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     await cleanTestData();

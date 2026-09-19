@@ -1,50 +1,15 @@
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-
-vi.hoisted(() => {
-  try {
-    const fs = require("node:fs");
-    const path = require("node:path");
-    const envPaths = [
-      path.resolve(process.cwd(), "packages/database/.env"),
-      path.resolve(process.cwd(), "../database/.env"),
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, "utf-8");
-        for (const line of envContent.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("#")) {
-            const [key, ...valueParts] = trimmed.split("=");
-            const value = valueParts.join("=");
-            if (key && value) {
-              const cleanKey = key.trim();
-              if (
-                cleanKey !== "__proto__" &&
-                cleanKey !== "constructor" &&
-                cleanKey !== "prototype"
-              ) {
-                Reflect.set(
-                  process.env,
-                  cleanKey,
-                  value.trim().replace(/^['"]|['"]$/g, "")
-                );
-              }
-            }
-          }
-        }
-        break;
-      }
-    }
-  } catch {
-    // ignore
-  }
-});
 
 vi.mock("server-only", () => ({}));
 
 import { database } from "@repo/database";
 import { getRegisteredSyncEventName } from "../events";
 import { syncXeroPeople } from "./sync-xero-people";
+
+const fixture = allocateLiveTestFixture(
+  "packages/jobs/src/handlers/sync-xero-people.integration.test.ts"
+);
 
 // Mock fetchEmployeesForRegion and toPlainLanguageMessage from @repo/xero
 const mockFetchEmployeesForRegion = vi.fn();
@@ -58,17 +23,17 @@ vi.mock("@repo/xero", async (importOriginal) => {
 });
 
 const tenantA = {
-  clerkOrgId: "org_test_people_sync_a",
-  organisationId: "93000000-0000-4000-8000-000000000001",
-  xeroConnectionId: "93000000-0000-4000-8000-000000000002",
-  xeroTenantId: "93000000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  xeroConnectionId: fixture.id("connection", 0),
+  xeroTenantId: fixture.id("tenant", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_people_sync_b",
-  organisationId: "94000000-0000-4000-8000-000000000001",
-  xeroConnectionId: "94000000-0000-4000-8000-000000000002",
-  xeroTenantId: "94000000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  xeroConnectionId: fixture.id("connection", 1),
+  xeroTenantId: fixture.id("tenant", 1),
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;

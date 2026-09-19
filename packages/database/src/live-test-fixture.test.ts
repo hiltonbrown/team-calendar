@@ -51,12 +51,12 @@ describe("live fixture registry", () => {
           clerkOrgIds,
           globalKeys: [
             ...Array.from(
-              { length: 6 },
+              { length: 7 },
               (_, index) =>
                 `plan_id:22222222-2222-4222-8222-${index.toString().padStart(12, "0")}`
             ),
             ...Array.from(
-              { length: 6 },
+              { length: 7 },
               (_, index) => `plan_key:release_plan_${index}`
             ),
             ...Array.from(
@@ -115,7 +115,16 @@ describe("live fixture registry", () => {
       allocations
         .find((item) => item.suite.includes("plan_limits.integration"))
         ?.globalKey("plan_key")
-    ).toBe("release_plan_2");
+    ).toBe("release_plan_3");
+    const planLimitAllocation = allocations.find((item) =>
+      item.suite.includes("plan_limits.integration")
+    );
+    expect(() => planLimitAllocation?.globalKey("plan_key", -1)).toThrow(
+      "does not own"
+    );
+    expect(() => planLimitAllocation?.globalKey("plan_key", 0.5)).toThrow(
+      "does not own"
+    );
   });
 
   it("rejects a manifest without the complete disjoint allocation", () => {
