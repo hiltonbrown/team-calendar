@@ -27,6 +27,7 @@
     "test": "turbo test",
     "test:integration": "turbo test:integration",
     "test:release": "playwright test --config tooling/release/playwright.config.ts",
+    "test:release-analytics-privacy": "bun --no-env-file tooling/release/verify-browser-analytics-privacy.ts",
     "test:release-tools": "vitest run --config tooling/release/vitest.config.ts",
     "translate": "turbo translate",
     "typecheck": "turbo typecheck",
