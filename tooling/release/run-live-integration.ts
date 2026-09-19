@@ -11,6 +11,7 @@ import {
 } from "./database-guard.js";
 import { discoverIntegrationTests } from "./integration-inventory.js";
 import { buildLiveIntegrationEnvironment } from "./live-run-environment.js";
+import { type LiveRunMode, resolveLiveRunAction } from "./live-run-mode.js";
 
 const manifestFlag = process.argv.indexOf("--manifest");
 const manifestPath =
@@ -52,16 +53,24 @@ if (preacquired) {
 } else {
   activeState = await acquireActiveRun(manifest, registryInput);
 }
-if (activeState === "interrupted" && !recoveryRequested) {
-  throw new Error(
-    "Interrupted release run detected; rerun with --recover to reconcile it"
-  );
+let mode: LiveRunMode = "new";
+if (recoveryRequested) {
+  mode = "recover";
+} else if (recoverIfOwned) {
+  mode = "recover-if-owned";
+} else if (preacquired) {
+  mode = "preacquired";
 }
-if (activeState === "acquired" && recoveryRequested) {
-  await releaseActiveRun(manifest, registryInput);
-  throw new Error("No interrupted release run exists for recovery");
+let action: ReturnType<typeof resolveLiveRunAction>;
+try {
+  action = resolveLiveRunAction(activeState, mode);
+} catch (error) {
+  if (activeState === "acquired" && recoveryRequested) {
+    await releaseActiveRun(manifest, registryInput);
+  }
+  throw error;
 }
-if (activeState === "acquired" && recoverIfOwned) {
+if (action === "release-noop") {
   await releaseActiveRun(manifest, registryInput);
   process.exit(0);
 }
@@ -79,7 +88,7 @@ const childEnvironment = buildLiveIntegrationEnvironment(
 let status = 1;
 let cleanupSucceeded = false;
 try {
-  if (activeState === "acquired") {
+  if (action === "run") {
     const result = spawnSync("bun", ["run", "test:integration"], {
       cwd: root,
       env: childEnvironment,
