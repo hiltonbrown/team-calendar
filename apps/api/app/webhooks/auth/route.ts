@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { ensureCurrentUserPerson } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
@@ -41,10 +43,12 @@ const ClerkOrganizationMembershipDataSchema = z.object({
     last_name: z.string().nullish(),
     user_id: z.string(),
   }),
+  role: z.string().optional(),
 });
 
 const ClerkWebhookEnvelopeSchema = z.object({
   data: z.object({ id: z.string().optional() }).passthrough(),
+  timestamp: z.number().optional(),
   type: z.string().min(1),
 });
 
@@ -152,7 +156,10 @@ const handleUserDeleted = (data: ClerkDeletedObjectData) => {
   return new Response("User deleted", { status: 201 });
 };
 
-const handleOrganizationCreated = (data: ClerkOrganizationData) => {
+const handleOrganizationCreated = (
+  data: ClerkOrganizationData,
+  eventTimestamp: Date
+) => {
   analytics?.groupIdentify({
     distinctId: data.created_by ?? undefined,
     groupKey: data.id,
@@ -167,6 +174,19 @@ const handleOrganizationCreated = (data: ClerkOrganizationData) => {
     analytics?.capture({
       distinctId: data.created_by,
       event: "Organisation Created",
+    });
+    const activation = createActivationEvent({
+      deduplicationKey: data.id,
+      name: "Organisation Provisioned",
+      occurredAt: eventTimestamp,
+      subjectId: data.id,
+    });
+    analytics?.capture({
+      distinctId: activation.distinctId,
+      event: activation.event,
+      properties: activation.properties,
+      timestamp: activation.timestamp,
+      uuid: activation.uuid,
     });
   }
 
@@ -195,8 +215,17 @@ const handleOrganizationUpdated = (data: ClerkOrganizationData) => {
 };
 
 export const handleOrganizationMembershipCreated = async (
-  data: ClerkOrganizationMembershipData
+  data: ClerkOrganizationMembershipData,
+  deliveryId: string,
+  eventTimestamp: Date
 ): Promise<Response> => {
+  const provisioned = await ensurePeopleForMembership(data);
+  if (!provisioned) {
+    return new Response("Membership provisioning temporarily unavailable", {
+      status: 503,
+    });
+  }
+
   analytics?.groupIdentify({
     distinctId: data.public_user_data.user_id,
     groupKey: data.organization.id,
@@ -206,9 +235,24 @@ export const handleOrganizationMembershipCreated = async (
   analytics?.capture({
     distinctId: data.public_user_data.user_id,
     event: "Organisation Member Created",
+    timestamp: eventTimestamp,
+    uuid: deliveryUuid(deliveryId),
   });
-
-  await ensurePeopleForMembership(data);
+  if (data.role === "org:owner") {
+    const activation = createActivationEvent({
+      deduplicationKey: deliveryId,
+      name: "Customer Admitted",
+      occurredAt: eventTimestamp,
+      subjectId: data.organization.id,
+    });
+    analytics?.capture({
+      distinctId: activation.distinctId,
+      event: activation.event,
+      properties: activation.properties,
+      timestamp: eventTimestamp,
+      uuid: activation.uuid,
+    });
+  }
 
   return new Response("Organisation membership created", { status: 201 });
 };
@@ -236,7 +280,7 @@ export const handleOrganizationMembershipDeleted = async (
 
 async function ensurePeopleForMembership(
   data: ClerkOrganizationMembershipData
-) {
+): Promise<boolean> {
   const organisations = await database.organisation.findMany({
     select: {
       clerk_org_id: true,
@@ -248,39 +292,67 @@ async function ensurePeopleForMembership(
     },
   });
 
-  await Promise.all(
+  const outcomes = await Promise.all(
     organisations.map(async (organisation) => {
-      const result = await ensureCurrentUserPerson(
-        {
-          clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
-          organisationId: organisation.id as OrganisationId,
-        },
-        {
-          avatarUrl: data.public_user_data.image_url,
-          clerkUserId: data.public_user_data.user_id,
-          displayName:
-            [data.public_user_data.first_name, data.public_user_data.last_name]
-              .filter(Boolean)
-              .join(" ") ||
-            data.public_user_data.identifier ||
-            data.public_user_data.user_id,
-          email: data.public_user_data.identifier,
-          firstName: data.public_user_data.first_name,
-          lastName: data.public_user_data.last_name,
-        }
-      );
+      try {
+        const result = await ensureCurrentUserPerson(
+          {
+            clerkOrgId: organisation.clerk_org_id as ClerkOrgId,
+            organisationId: organisation.id as OrganisationId,
+          },
+          {
+            avatarUrl: data.public_user_data.image_url,
+            clerkUserId: data.public_user_data.user_id,
+            displayName:
+              [
+                data.public_user_data.first_name,
+                data.public_user_data.last_name,
+              ]
+                .filter(Boolean)
+                .join(" ") ||
+              data.public_user_data.identifier ||
+              data.public_user_data.user_id,
+            email: data.public_user_data.identifier,
+            firstName: data.public_user_data.first_name,
+            lastName: data.public_user_data.last_name,
+          }
+        );
 
-      if (!result.ok) {
-        log.error("Failed to link Clerk organisation member to person", {
+        if (!result.ok) {
+          log.error("Failed to link Clerk organisation member to person", {
+            clerkOrgId: data.organization.id,
+            errorCode: result.error.code,
+            organisationId: organisation.id,
+            userId: data.public_user_data.user_id,
+          });
+          return false;
+        }
+        return true;
+      } catch (error) {
+        log.error("Clerk organisation member provisioning failed", {
           clerkOrgId: data.organization.id,
-          error: result.error,
+          error,
           organisationId: organisation.id,
           userId: data.public_user_data.user_id,
         });
+        return false;
       }
     })
   );
+
+  return outcomes.every(Boolean);
 }
+
+const deliveryUuid = (deliveryId: string): string => {
+  const hash = createHash("sha256")
+    .update(`clerk-membership:${deliveryId}`)
+    .digest("hex")
+    .slice(0, 32);
+  const variant =
+    ["8", "9", "a", "b"][Number.parseInt(hash[16] ?? "0", 16) % 4] ?? "8";
+  const uuidHex = `${hash.slice(0, 12)}5${hash.slice(13, 16)}${variant}${hash.slice(17)}`;
+  return `${uuidHex.slice(0, 8)}-${uuidHex.slice(8, 12)}-${uuidHex.slice(12, 16)}-${uuidHex.slice(16, 20)}-${uuidHex.slice(20)}`;
+};
 
 export const POST = async (request: Request): Promise<Response> => {
   if (!env.CLERK_WEBHOOK_SECRET) {
@@ -351,7 +423,7 @@ export const POST = async (request: Request): Promise<Response> => {
       eventType,
       id: envelope.data.data.id,
     });
-    await analytics?.shutdown();
+    await analytics?.flush();
     return new Response("", { status: 201 });
   }
 
@@ -386,7 +458,14 @@ export const POST = async (request: Request): Promise<Response> => {
       break;
     }
     case "organization.created": {
-      response = handleOrganizationCreated(event.data);
+      const { timestamp } = envelope.data;
+      if (!timestamp || timestamp < Date.UTC(2020, 0, 1)) {
+        response = new Response("Webhook timestamp is invalid", {
+          status: 503,
+        });
+        break;
+      }
+      response = handleOrganizationCreated(event.data, new Date(timestamp));
       break;
     }
     case "organization.updated": {
@@ -394,7 +473,18 @@ export const POST = async (request: Request): Promise<Response> => {
       break;
     }
     case "organizationMembership.created": {
-      response = await handleOrganizationMembershipCreated(event.data);
+      const { timestamp } = envelope.data;
+      if (!timestamp || timestamp < Date.UTC(2020, 0, 1)) {
+        response = new Response("Webhook timestamp is invalid", {
+          status: 503,
+        });
+        break;
+      }
+      response = await handleOrganizationMembershipCreated(
+        event.data,
+        svixId,
+        new Date(timestamp)
+      );
       break;
     }
     case "organizationMembership.deleted": {
@@ -406,7 +496,7 @@ export const POST = async (request: Request): Promise<Response> => {
     }
   }
 
-  await analytics?.shutdown();
+  await analytics?.flush();
 
   return response;
 };

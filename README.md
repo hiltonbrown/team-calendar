@@ -200,6 +200,7 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `NEXT_PUBLIC_WEB_URL` | All apps | Required (URL) | Required (URL) |
 | `NEXT_PUBLIC_API_URL` | All apps | Required (URL) | Required (URL) |
 | `NEXT_PUBLIC_SENTRY_DSN` | All apps | Required (URL) | Required (URL) |
+| `SENTRY_ORG` / `SENTRY_PROJECT` / `SENTRY_AUTH_TOKEN` | All apps | Required for source-map upload | Required for source-map upload |
 | `DATABASE_URL` | `app`, `api` | Required | Required |
 | `XERO_TOKEN_ENCRYPTION_KEY` | `app`, `api` | Required | Required |
 | `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` | `app`, `api` | Required | Required |
@@ -207,7 +208,8 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `CLERK_WEBHOOK_SECRET` | `api` | Required | Required |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | `app`, `api` | Required pair | Required pair |
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | `api` | Required pair | Required pair |
-| `RESEND_TOKEN` (or `RESEND_API_KEY`) | `api` | Required | Required |
+| `RESEND_TOKEN` / `RESEND_FROM` | `api` | Required | Required |
+| `EARLY_ACCESS_APPLICATION_RECIPIENT` | `api` | Required private mailbox | Required private mailbox |
 | `SUPPORT_EMAIL` (or `NEXT_PUBLIC_SUPPORT_EMAIL` / `RESEND_FROM`) | `web` | Optional email override (defaults to `support@teamcalendar.online`) | Optional email override (defaults to `support@teamcalendar.online`) |
 | `BETTERSTACK_API_KEY` / `BETTERSTACK_STATUS_PAGE_ID` / `BETTERSTACK_STATUS_PAGE_URL` | `web` | Optional complete trio (status is Unknown when absent) | Optional complete trio (status is Unknown when absent) |
 | `STRIPE_SECRET_KEY` | `app`, `api` | Optional (disabled) | Required |
@@ -220,9 +222,9 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 Before deploying any application, run the production preflight check:
 
 ```bash
-bun run preflight app early_access
-bun run preflight api early_access
-bun run preflight web early_access
+bun run preflight app
+bun run preflight api
+bun run preflight web
 ```
 
 The rows marked required in the matrix above are the canonical production
@@ -231,8 +233,14 @@ for the full, annotated list. Optional variables that carry a format constraint
 (a URL, an email, or a required prefix) are commented out in the examples: an
 empty string fails validation, so leave them absent rather than set to `""`.
 
-The API accepts `RESEND_API_KEY` as an alias for `RESEND_TOKEN`. The web app
-uses `SUPPORT_EMAIL`, then `NEXT_PUBLIC_SUPPORT_EMAIL`, then `RESEND_FROM`, and
+Run each command after securely pulling that project's production environment.
+The optional mode argument is an assertion against `NEXT_PUBLIC_LAUNCH_MODE`;
+it never supplies or overrides the deployed value. Run each project separately,
+rather than combining all three projects' environments.
+
+The API requires the runtime's `RESEND_TOKEN` name, a valid `RESEND_FROM`, and a
+private `EARLY_ACCESS_APPLICATION_RECIPIENT`. The web app uses `SUPPORT_EMAIL`,
+then `NEXT_PUBLIC_SUPPORT_EMAIL`, then `RESEND_FROM`, and
 finally `support@teamcalendar.online`; any configured value must be a valid
 email address. Required credential pairs must be complete: setting only one of
 `KV_REST_API_URL`/`KV_REST_API_TOKEN` or
@@ -249,6 +257,31 @@ Unknown rather than assuming the service is operational.
 
 `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded) is validated on startup in `packages/xero`. An absent or malformed key prevents the application from starting rather than failing later at token access time.
 
+### Maintained browser release suite
+
+`bun run test:release` runs the Playwright release journeys against three
+explicit HTTPS candidate deployments. It requires `TC_APP_CANDIDATE_URL`,
+`TC_API_CANDIDATE_URL`, `TC_WEB_CANDIDATE_URL`,
+`TC_DEPLOYED_CANDIDATE_SHA`, and the D1 `TC_RELEASE_MANIFEST`. The manifest,
+deployed SHA assertion, and local checkout must identify the same commit.
+
+Provide Clerk test-instance keys plus `TC_E2E_OWNER_EMAIL`,
+`TC_E2E_ADMIN_EMAIL`, `TC_E2E_MANAGER_EMAIL`, and `TC_E2E_VIEWER_EMAIL` for
+isolated role sessions. Controlled fixture inputs are
+`TC_E2E_APPROVE_EMPLOYEE_NAME`, `TC_E2E_DECLINE_EMPLOYEE_NAME`,
+`TC_E2E_FOREIGN_PERSON_ID`, `TC_E2E_FEED_ID`,
+`TC_E2E_RECOVERY_PERSON_ID`, `TC_E2E_RETRY_PERSON_ID`, and
+`TC_E2E_CALENDAR_EVENT_LABEL`. Missing inputs fail the mandatory journey rather
+than skipping it. The suite runs cleanup from the protected manifest even after
+test failure and fails if owned residue remains.
+
+Use Clerk development/test credentials and controlled Xero organisations only.
+The suite does not mock authentication or provider success.
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=/tmp/teamcalendar-playwright bun run test:release
+```
+
 ### GitHub-backed support submissions
 
 If you enable GitHub-backed support submissions in deployed environments, configure `GITHUB_TOKEN`, `GITHUB_OWNER`, and `GITHUB_REPO` on the `api` project only. These values are server-side and must not be added to the `app` or `web` deployments. Set them in both Preview and Production if the feature should work in both, and redeploy the API app after changing them.
@@ -259,3 +292,7 @@ Xero requires every OAuth redirect URI to be pre-registered on the Xero app, and
 
 - Register `https://<your-api-domain>/api/xero/oauth/callback` as the redirect URI on the Xero app and set `XERO_REDIRECT_URI` to that exact URL on the `api` (and `app`) projects for every environment. If `XERO_REDIRECT_URI` is unset, the callback is derived from `NEXT_PUBLIC_API_URL` instead.
 - On preview deployments (`VERCEL_ENV=preview`) the Xero connect flow and the callback route are gated off and return a clear message. Connect Xero from the production deployment.
+
+### AU early access applications
+
+The public application, private-mailbox retention rule, and separate Clerk owner-admission runbook are documented in [docs/early-access-admission.md](docs/early-access-admission.md). The API requires `EARLY_ACCESS_APPLICATION_RECIPIENT` and a private `EARLY_ACCESS_APPLICATION_HMAC_SECRET` of at least 32 characters, plus the configured KV pair used for abuse controls and retry receipts.

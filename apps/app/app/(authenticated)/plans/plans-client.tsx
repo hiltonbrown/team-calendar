@@ -57,7 +57,10 @@ import { formatLeaveBalance } from "@/lib/format-leave-balance";
 import { withOrg } from "@/lib/navigation/org-url";
 import {
   archiveRecordAction,
+  attachSubmitRecoveryCandidateAction,
   deleteDraftAction,
+  listSubmitRecoveryCandidatesAction,
+  resolveSubmitAsNotCreatedAction,
   restoreRecordAction,
   retrySubmissionAction,
   revertToDraftAction,
@@ -108,18 +111,23 @@ export interface PlansClientRecord {
   recordType: string;
   sourceType: string;
   startsAt: string;
+  submissionResolutionPending?: boolean;
   workingDays: number | null;
   workingDaysError: string | null;
   xeroWriteError: string | null;
 }
 
 interface PlansClientProps {
+  canRecoverSubmit?: boolean;
   canViewTeam: boolean;
   filters: PlansFilterInput;
   hasActiveXeroConnection: boolean;
+  nextCursor?: string | null;
   organisationId: string;
   orgQueryValue: string | null;
   records: PlansClientRecord[];
+  totalCount?: number;
+  window?: { from: string | null; to: string | null };
 }
 
 const recordTypeLabels: Record<string, string> = {
@@ -162,12 +170,16 @@ const primaryActionOrder: RowAction[] = [
 ];
 
 export function PlansClient({
+  canRecoverSubmit = false,
   canViewTeam,
   filters,
   hasActiveXeroConnection,
   organisationId,
   orgQueryValue,
   records,
+  nextCursor = null,
+  totalCount,
+  window = { from: null, to: null },
 }: PlansClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -347,6 +359,20 @@ export function PlansClient({
             type="date"
           />
         </FilterField>
+        <FilterField htmlFor="plans-history" label="History">
+          <Select
+            defaultValue={filters.allHistory ? "true" : "false"}
+            name="allHistory"
+          >
+            <SelectTrigger id="plans-history">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="false">Current window</SelectItem>
+              <SelectItem value="true">All history</SelectItem>
+            </SelectContent>
+          </Select>
+        </FilterField>
         <div className="flex items-end">
           <Button className="w-full" type="submit" variant="secondary">
             Apply filters
@@ -355,6 +381,14 @@ export function PlansClient({
       </form>
 
       <ActiveFilters filters={filters} orgQueryValue={orgQueryValue} />
+
+      {!filters.allHistory && window.from && window.to && (
+        <p className="text-muted-foreground text-sm">
+          Showing plans from {formatWindowDate(window.from)} to{" "}
+          {formatWindowDate(window.to)}. Choose All history to search outside
+          this window.
+        </p>
+      )}
 
       {records.length > 0 && (
         <div className="rounded-2xl bg-muted p-3 xl:p-0">
@@ -373,6 +407,7 @@ export function PlansClient({
               </tr>
             </thead>
             <tbody className="block space-y-3 xl:table-row-group xl:space-y-0">
+              {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each responsive plan row coordinates status, recovery, balance and role-gated actions in one accessible table row. */}
               {records.map((record) => {
                 const status = planStatusForRecord(record);
                 const rowPending = pendingRecordId === record.id;
@@ -419,6 +454,13 @@ export function PlansClient({
                         <span className="hidden xl:inline">
                           <StatusCue status={status} />
                         </span>
+                        {canRecoverSubmit &&
+                        record.submissionResolutionPending ? (
+                          <SubmitRecoveryControls
+                            organisationId={organisationId}
+                            recordId={record.id}
+                          />
+                        ) : null}
                       </div>
                     </td>
                     <td className="xl:p-3">
@@ -477,7 +519,20 @@ export function PlansClient({
                           <span>{inlineError[record.id]}</span>
                         </div>
                       ) : null}
-                      {record.approvalStatus === "xero_sync_failed" &&
+                      {record.submissionResolutionPending ? (
+                        <div
+                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.leave}`}
+                          role="status"
+                        >
+                          <Clock3Icon className="mt-0.5 size-4 shrink-0" />
+                          <span>
+                            Xero may have received this request. It is locked
+                            while an administrator verifies the outcome.
+                          </span>
+                        </div>
+                      ) : null}
+                      {!record.submissionResolutionPending &&
+                        record.approvalStatus === "xero_sync_failed" &&
                         record.xeroWriteError && (
                           <div className="mt-3">
                             <XeroSyncFailedState
@@ -529,6 +584,22 @@ export function PlansClient({
         </div>
       )}
 
+      <div
+        aria-live="polite"
+        className="flex items-center justify-between text-sm"
+      >
+        <span className="text-muted-foreground">
+          {totalCount ?? records.length} matching plans
+        </span>
+        {nextCursor ? (
+          <Button asChild variant="secondary">
+            <Link href={plansPageHref(filters, nextCursor, orgQueryValue)}>
+              Next page
+            </Link>
+          </Button>
+        ) : null}
+      </div>
+
       {!hasActiveXeroConnection && (
         <p className="text-muted-foreground text-sm">
           Xero is disconnected, so new leave records save locally as approved
@@ -576,6 +647,152 @@ export function PlansClient({
         />
       ) : null}
     </section>
+  );
+}
+
+function formatWindowDate(value: string): string {
+  return new Intl.DateTimeFormat("en-AU", {
+    day: "numeric",
+    month: "short",
+    timeZone: "UTC",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function SubmitRecoveryControls({
+  organisationId,
+  recordId,
+}: {
+  organisationId: string;
+  recordId: string;
+}) {
+  const router = useRouter();
+  const [candidates, setCandidates] = useState<Array<{ remoteId: string }>>([]);
+  const [reason, setReason] = useState("");
+  const [evidenceReference, setEvidenceReference] = useState("");
+  const [independentlyVerified, setIndependentlyVerified] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const loadCandidates = () =>
+    startTransition(async () => {
+      const result = await listSubmitRecoveryCandidatesAction({
+        organisationId,
+        recordId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      setError("");
+      setCandidates(result.value.candidates);
+    });
+
+  const attach = (remoteId: string) =>
+    startTransition(async () => {
+      const result = await attachSubmitRecoveryCandidateAction({
+        organisationId,
+        reason,
+        recordId,
+        remoteId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      router.refresh();
+    });
+
+  const attestNotCreated = () =>
+    startTransition(async () => {
+      const result = await resolveSubmitAsNotCreatedAction({
+        evidenceReference,
+        independentlyVerified,
+        organisationId,
+        reason,
+        recordId,
+      });
+      if (!result.ok) {
+        setError(result.error.message);
+        return;
+      }
+      router.refresh();
+    });
+
+  return (
+    <details className="mt-2 rounded-xl bg-muted p-3 text-xs">
+      <summary className="cursor-pointer font-medium">
+        Resolve Xero submission
+      </summary>
+      <div className="mt-3 grid gap-3">
+        <Label htmlFor={`recovery-reason-${recordId}`}>Recovery reason</Label>
+        <Input
+          id={`recovery-reason-${recordId}`}
+          onChange={(event) => setReason(event.target.value)}
+          value={reason}
+        />
+        <Button
+          disabled={pending || reason.trim().length < 10}
+          onClick={loadCandidates}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          Check Xero candidates
+        </Button>
+        {candidates.map((candidate) => (
+          <Button
+            disabled={pending || reason.trim().length < 10}
+            key={candidate.remoteId}
+            onClick={() => attach(candidate.remoteId)}
+            size="sm"
+            type="button"
+          >
+            Attach {candidate.remoteId}
+          </Button>
+        ))}
+        <p className="text-muted-foreground">
+          Only use the option below after independently confirming in Xero or
+          with Xero support that no request was created. An empty search or
+          timeout is not proof.
+        </p>
+        <Label htmlFor={`recovery-evidence-${recordId}`}>
+          Independent evidence reference
+        </Label>
+        <Input
+          id={`recovery-evidence-${recordId}`}
+          onChange={(event) => setEvidenceReference(event.target.value)}
+          value={evidenceReference}
+        />
+        <label className="flex items-start gap-2">
+          <input
+            checked={independentlyVerified}
+            onChange={(event) => setIndependentlyVerified(event.target.checked)}
+            type="checkbox"
+          />
+          I independently verified that Xero did not create this request.
+        </label>
+        <Button
+          disabled={
+            pending ||
+            !independentlyVerified ||
+            evidenceReference.trim().length < 10 ||
+            reason.trim().length < 10
+          }
+          onClick={attestNotCreated}
+          size="sm"
+          type="button"
+          variant="destructive"
+        >
+          Confirm not created and unlock
+        </Button>
+        {error ? (
+          <p className="text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
@@ -648,6 +865,44 @@ function ActiveFilters({
 
 function tabHref(tab: "my" | "team", orgQueryValue: string | null): string {
   return withOrg(`/plans?tab=${tab}`, orgQueryValue);
+}
+
+function plansPageHref(
+  filters: PlansFilterInput,
+  cursor: string,
+  orgQueryValue: string | null
+): string {
+  const params = new URLSearchParams({
+    cursor,
+    pageSize: String(filters.pageSize ?? 50),
+    tab: filters.tab,
+  });
+  if (filters.allHistory) {
+    params.set("allHistory", "true");
+  }
+  if (filters.includeArchived) {
+    params.set("includeArchived", "true");
+  }
+  for (const [key, value] of [
+    ["approvalStatus", filters.approvalStatus],
+    ["personId", filters.personId],
+    ["recordType", filters.recordType],
+    ["sourceType", filters.sourceType],
+  ] as const) {
+    if (value?.length) {
+      params.set(key, value.join(","));
+    }
+  }
+  if (filters.dateFrom) {
+    params.set("dateFrom", filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    params.set("dateTo", filters.dateTo);
+  }
+  if (filters.recordTypeCategory !== "all") {
+    params.set("recordTypeCategory", filters.recordTypeCategory);
+  }
+  return withOrg(`/plans?${params.toString()}`, orgQueryValue);
 }
 
 function RowActions({
@@ -935,6 +1190,9 @@ function activeFilterLabels(filters: PlansFilterInput): string[] {
   }
   if (filters.includeArchived) {
     labels.push("Archived included");
+  }
+  if (filters.allHistory) {
+    labels.push("All history");
   }
   if (filters.recordType?.[0]) {
     labels.push(`Type: ${recordTypeLabel(filters.recordType[0])}`);

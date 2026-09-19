@@ -1,3 +1,4 @@
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -42,40 +43,35 @@ vi.mock("@repo/xero", async (importOriginal) => {
 
 await import("./setup-env");
 
-let database: typeof import("@repo/database")["database"];
-let reconcileXeroApprovalState: typeof import("./reconcile-xero-approval-state")["reconcileXeroApprovalState"];
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database } = await import("@repo/database"));
-  ({ reconcileXeroApprovalState } = await import(
-    "./reconcile-xero-approval-state"
-  ));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts"
+);
+const { database } = await import("@repo/database");
+const { reconcileXeroApprovalState } = await import(
+  "./reconcile-xero-approval-state"
+);
 
 const tenantA = {
-  clerkOrgId: "org_test_reconcile_a",
-  organisationId: "aa100000-0000-4000-8000-000000000001",
-  personId: "aa100000-0000-4000-8000-000000000004",
-  xeroConnectionId: "aa100000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "aa100000-0000-4000-8000-000000000005",
-  xeroTenantId: "aa100000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  personId: fixture.id("person", 0),
+  xeroConnectionId: fixture.id("connection", 0),
+  xeroEmployeeId: fixture.id("employee", 0),
+  xeroTenantId: fixture.id("tenant", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_reconcile_b",
-  organisationId: "aa200000-0000-4000-8000-000000000001",
-  personId: "aa200000-0000-4000-8000-000000000004",
-  xeroConnectionId: "aa200000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "aa200000-0000-4000-8000-000000000005",
-  xeroTenantId: "aa200000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  personId: fixture.id("person", 1),
+  xeroConnectionId: fixture.id("connection", 1),
+  xeroEmployeeId: fixture.id("employee", 1),
+  xeroTenantId: fixture.id("tenant", 1),
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
 
-describeWithDatabase("reconcile-xero-approval-state database flow", () => {
+describe("reconcile-xero-approval-state database flow", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockEnsureFreshXeroConnection.mockResolvedValue({

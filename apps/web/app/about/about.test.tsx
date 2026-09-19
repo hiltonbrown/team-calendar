@@ -30,23 +30,21 @@ describe("About page", () => {
     expect(html).toContain("Xero leave");
     expect(html).toContain("Manual availability");
     expect(html).toContain("Hilton Brown");
-    expect(html).toContain("Connie");
     expect(html.match(/<h2/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(html.match(/<h3/g)?.length).toBeGreaterThanOrEqual(5);
+    expect(html.match(/<h3/g)?.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("renders the approved LinkedIn destination and honest preview identity material", () => {
+  it("renders the approved LinkedIn destination and honest identity material", () => {
     const html = renderToStaticMarkup(React.createElement(AboutPage));
 
     expect(html).toContain('href="https://www.linkedin.com/in/hiltonbrown/"');
-    expect(html).toContain("Preview biography");
+    expect(html).not.toContain("Preview biography");
+    expect(html).not.toContain("Preview profile");
     expect(html).toContain("built and run on the Gold Coast");
-    expect(html).toContain("Anonymous illustrative founder portrait");
-    expect(html).toContain("This image does not depict Hilton Brown");
-    expect(html).toContain("Illustrative black-and-white tuxedo cat");
-    expect(html).toContain("This image does not depict Connie");
-    expect(html).toContain("%2Fmarketing%2Fhilton-brown.webp");
-    expect(html).toContain("%2Fmarketing%2Fconnie.webp");
+    expect(html).not.toContain("illustrative founder portrait");
+    expect(html).not.toContain("Chief Availability Tester");
+    expect(html).not.toContain("%2Fmarketing%2Fhilton-brown.webp");
+    expect(html).not.toContain("%2Fmarketing%2Fconnie.webp");
     expect(html).not.toMatch(placeholderPattern);
   });
 

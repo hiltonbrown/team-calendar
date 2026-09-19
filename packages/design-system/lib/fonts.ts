@@ -1,18 +1,28 @@
 import { cn } from '@repo/design-system/lib/utils';
-import { Lora, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-plus-jakarta-sans',
+const plusJakartaSans = localFont({
   display: 'swap',
-  weight: ['400', '500', '600', '700'],
+  src: '../../../.design-sync/fonts/plus-jakarta-sans.woff2',
+  variable: '--font-plus-jakarta-sans',
+  weight: '400 700',
 });
 
-const lora = Lora({
-  subsets: ['latin'],
-  variable: '--font-lora',
+const lora = localFont({
   display: 'swap',
-  style: ['normal', 'italic'],
+  src: [
+    {
+      path: '../../../.design-sync/fonts/lora-regular.woff2',
+      style: 'normal',
+      weight: '400 700',
+    },
+    {
+      path: '../../../.design-sync/fonts/lora-italic.woff2',
+      style: 'italic',
+      weight: '400 700',
+    },
+  ],
+  variable: '--font-lora',
 });
 
 const base = 'touch-manipulation font-sans antialiased';

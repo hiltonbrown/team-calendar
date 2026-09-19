@@ -8,6 +8,7 @@ import { log } from "@repo/observability/log";
 import { z } from "zod";
 
 export type EmailQueueServiceError =
+  | { code: "configuration_error"; message: string }
   | { code: "unknown_error"; message: string }
   | { code: "validation_error"; message: string };
 
@@ -88,6 +89,16 @@ export async function sendQueuedNotificationEmails(
 ): Promise<
   Result<SendQueuedNotificationEmailsSummary, EmailQueueServiceError>
 > {
+  if (!hasConfiguredEmailTransport()) {
+    return {
+      error: {
+        code: "configuration_error",
+        message: "Notification email transport is not configured.",
+      },
+      ok: false,
+    };
+  }
+
   try {
     const rows = await client.notificationEmailQueue.findMany({
       orderBy: { queued_at: "asc" },
@@ -121,13 +132,6 @@ export async function sendQueuedNotificationEmails(
         }
 
         summary.failed += 1;
-        if (result.error === "Resend transport is not configured") {
-          log.error("Notification email transport is not configured", {
-            queueId: row.id,
-          });
-          continue;
-        }
-
         await updateFailedEmail(row.id, row.attempts, result.error, client);
       } catch (error) {
         summary.failed += 1;
@@ -147,6 +151,17 @@ export async function sendQueuedNotificationEmails(
   } catch {
     return unknownError("Failed to drain notification email queue.");
   }
+}
+
+function hasConfiguredEmailTransport(): boolean {
+  const token = process.env.RESEND_TOKEN?.trim();
+  const sender = process.env.RESEND_FROM?.trim();
+
+  return Boolean(
+    token?.startsWith("re_") &&
+      sender &&
+      z.string().email().safeParse(sender).success
+  );
 }
 
 async function updateFailedEmail(

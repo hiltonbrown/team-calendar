@@ -58,12 +58,17 @@ const optionalDateString = z.preprocess(
 );
 
 export const PlansFilterSchema = z.object({
+  allHistory: z
+    .preprocess((value) => value === "true" || value === true, z.boolean())
+    .optional(),
   approvalStatus: csvArray(z.enum(planApprovalStatuses)),
+  cursor: z.string().optional(),
   dateFrom: optionalDateString,
   dateTo: optionalDateString,
   includeArchived: z
     .preprocess((value) => value === "true" || value === true, z.boolean())
     .default(false),
+  pageSize: z.coerce.number().int().min(1).max(200).optional(),
   personId: csvArray(z.string().uuid()),
   recordType: csvArray(z.enum(userCreatableRecordTypes)),
   recordTypeCategory: z

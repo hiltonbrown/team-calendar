@@ -1,4 +1,5 @@
 import { employment_type, source_system } from "@repo/database/generated/enums";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -20,21 +21,18 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
-let createManualPersonAction: typeof import("./_actions")["createManualPersonAction"];
-let database: typeof import("@repo/database")["database"];
-
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-const clerkOrgId = "org_test_manual_person_limit";
-const organisationId = "b1000000-0000-4000-8000-000000000001";
-
-if (process.env.DATABASE_URL) {
-  ({ createManualPersonAction } = await import("./_actions"));
-  ({ database } = await import("@repo/database"));
+const fixture = allocateLiveTestFixture(
+  "apps/app/app/(authenticated)/people/new/_actions.integration.test.ts"
+);
+const [tenant] = fixture.tenants;
+if (!tenant) {
+  throw new Error("App live fixture tenant was not allocated");
 }
+const { clerkOrgId, organisationId } = tenant;
+const { createManualPersonAction } = await import("./_actions");
+const { database } = await import("@repo/database");
 
-describeWithDatabase("manual person plan-limit enforcement", () => {
+describe("manual person plan-limit enforcement", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
@@ -55,6 +53,9 @@ describeWithDatabase("manual person plan-limit enforcement", () => {
 
   afterAll(async () => {
     await cleanTestData();
+    await expect(
+      database.organisation.count({ where: { clerk_org_id: clerkOrgId } })
+    ).resolves.toBe(0);
     await database.$disconnect();
   });
 
@@ -120,6 +121,7 @@ async function createPeople(count: number) {
       email: `existing-${index}@example.com`,
       employment_type: employment_type.employee,
       first_name: "Existing",
+      id: fixture.id("person", index),
       last_name: `${index}`,
       organisation_id: organisationId,
       source_system: source_system.MANUAL,

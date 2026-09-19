@@ -28,14 +28,54 @@ const isValidUrl = (value: string): boolean => {
 
 const isValidEmail = (value: string): boolean => EMAIL_REGEX.test(value);
 
+const validateOptionalGroup = (
+  envVars: Record<string, string | undefined>,
+  varNames: readonly string[],
+  urlVarName?: string
+): string | undefined => {
+  const configuredCount = varNames.filter((varName) =>
+    envVars[varName]?.trim()
+  ).length;
+
+  if (configuredCount !== 0 && configuredCount !== varNames.length) {
+    return `${varNames.join(", ")} must be configured together`;
+  }
+
+  if (configuredCount === 0 || !urlVarName) {
+    return;
+  }
+
+  const value = envVars[urlVarName]?.trim();
+  if (!(value && isValidUrl(value) && value.startsWith("https://"))) {
+    return `${urlVarName} must be a valid HTTPS URL`;
+  }
+};
+
+const appendError = (errors: string[], error: string | undefined): void => {
+  if (error) {
+    errors.push(error);
+  }
+};
+
+const validateModeAssertion = (
+  actualMode: string | undefined,
+  expectedMode: LaunchMode | undefined
+): string | undefined => {
+  if (!(actualMode && expectedMode) || actualMode === expectedMode) {
+    return;
+  }
+  return `NEXT_PUBLIC_LAUNCH_MODE is "${actualMode}" but the CLI assertion expected "${expectedMode}"`;
+};
+
 export const runProductionPreflight = (
   options: PreflightOptions
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Release preflight intentionally keeps the cross-variable production contract in one auditable pass.
 ): PreflightResult => {
   const { appName, envVars = process.env, launchMode: explicitMode } = options;
   const errors: string[] = [];
   const checkedVars: string[] = [];
 
-  const rawMode = explicitMode || envVars.NEXT_PUBLIC_LAUNCH_MODE?.trim();
+  const rawMode = envVars.NEXT_PUBLIC_LAUNCH_MODE?.trim();
   const parsedMode = launchModeSchema.safeParse(rawMode);
 
   if (!parsedMode.success) {
@@ -48,6 +88,8 @@ export const runProductionPreflight = (
   const mode: LaunchMode = parsedMode.success
     ? parsedMode.data
     : "early_access";
+
+  appendError(errors, validateModeAssertion(rawMode, explicitMode));
 
   const checkPresent = (varName: string) => {
     checkedVars.push(varName);
@@ -115,6 +157,22 @@ export const runProductionPreflight = (
   checkUrl("NEXT_PUBLIC_WEB_URL");
   checkUrl("NEXT_PUBLIC_API_URL");
   checkUrl("NEXT_PUBLIC_SENTRY_DSN");
+  checkPresent("SENTRY_ORG");
+  checkPresent("SENTRY_PROJECT");
+  checkPresent("SENTRY_AUTH_TOKEN");
+
+  const betterStackVars = [
+    "BETTERSTACK_API_KEY",
+    "BETTERSTACK_STATUS_PAGE_ID",
+    "BETTERSTACK_STATUS_PAGE_URL",
+  ] as const;
+  checkedVars.push(...betterStackVars);
+  const betterStackError = validateOptionalGroup(
+    envVars,
+    betterStackVars,
+    "BETTERSTACK_STATUS_PAGE_URL"
+  );
+  appendError(errors, betterStackError);
 
   if (appName === "web") {
     const supportEmail =
@@ -140,11 +198,21 @@ export const runProductionPreflight = (
     checkPresent("CLERK_WEBHOOK_SECRET");
     checkPair("INNGEST_EVENT_KEY", "INNGEST_SIGNING_KEY");
 
-    checkedVars.push("RESEND_TOKEN");
-    const resendToken =
-      envVars.RESEND_TOKEN?.trim() || envVars.RESEND_API_KEY?.trim();
-    if (!resendToken) {
-      errors.push("RESEND_TOKEN (or RESEND_API_KEY) is missing or empty");
+    if (checkPresent("RESEND_TOKEN")) {
+      const resendToken = envVars.RESEND_TOKEN?.trim();
+      if (!resendToken?.startsWith("re_")) {
+        errors.push("RESEND_TOKEN must start with re_");
+      }
+    }
+    checkEmail("RESEND_FROM");
+    checkEmail("EARLY_ACCESS_APPLICATION_RECIPIENT");
+    if (
+      checkPresent("EARLY_ACCESS_APPLICATION_HMAC_SECRET") &&
+      (envVars.EARLY_ACCESS_APPLICATION_HMAC_SECRET?.trim().length ?? 0) < 32
+    ) {
+      errors.push(
+        "EARLY_ACCESS_APPLICATION_HMAC_SECRET must be at least 32 characters"
+      );
     }
   }
 

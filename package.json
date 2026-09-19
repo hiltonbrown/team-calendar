@@ -1,68 +1,82 @@
 {
   "name": "team-calendar",
   "version": "6.0.2",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
+    "analyze": "turbo analyze",
+    "boundaries": "turbo boundaries",
     "build": "turbo build --filter=!email",
+    "bump-deps": "bunx npm-check-updates --deep -u && bun install",
+    "bump-ui": "bunx shadcn@latest add --all --overwrite -c packages/design-system",
+    "check": "ultracite check apps packages scripts tooling tsup.config.ts",
+    "clean": "git clean -xdf node_modules",
+    "db:push": "cd packages/database && bunx prisma format && bunx prisma generate && bunx prisma db push",
     "dev": "bun run --parallel dev:apps dev:inngest",
     "dev:apps": "bunx turbo dev --ui=stream --filter=app --filter=api --filter=web --filter=email",
     "dev:inngest": "inngest dev -u http://localhost:3002/api/inngest",
-    "check": "ultracite check apps packages scripts tooling tsup.config.ts",
     "fix": "ultracite fix apps packages scripts tooling tsup.config.ts",
-    "typecheck": "turbo typecheck",
-    "test": "turbo test",
-    "test:integration": "turbo test:integration",
-    "analyze": "turbo analyze",
-    "translate": "turbo translate",
-    "boundaries": "turbo boundaries",
-    "bump-deps": "bunx npm-check-updates --deep -u && bun install",
-    "bump-ui": "bunx shadcn@latest add --all --overwrite -c packages/design-system",
     "migrate": "cd packages/database && bunx prisma format && bunx prisma generate && bunx prisma migrate dev",
     "migrate:deploy": "cd packages/database && bunx prisma generate && bunx prisma migrate deploy",
-    "db:push": "cd packages/database && bunx prisma format && bunx prisma generate && bunx prisma db push",
-    "clean": "git clean -xdf node_modules",
-    "preflight": "bun run packages/next-config/bin/preflight.ts"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.5.14",
-    "@repo/typescript-config": "*",
-    "@turbo/gen": "^2.10.13",
-    "@types/node": "^22.20.3",
-    "inngest-cli": "1.45.1",
-    "tsup": "^8.5.1",
-    "turbo": "^2.10.13",
-    "typescript": "^7.0.2",
-    "ultracite": "7.12.0",
-    "vitest": "^5.0.1"
-  },
-  "engines": {
-    "node": "22 || >=24.0.0"
-  },
-  "packageManager": "bun@1.4.0",
-  "dependencies": {
-    "@clack/prompts": "^1.8.1",
-    "commander": "^15.0.0",
-    "nypm": "^0.6.10"
+    "preflight": "bun run packages/next-config/bin/preflight.ts",
+    "replay:stripe": "bun --conditions=react-server tooling/release/replay-stripe-event.ts",
+    "stripe:failures": "bun --conditions=react-server tooling/release/list-failed-stripe-events.ts",
+    "test": "turbo test",
+    "test:integration": "turbo test:integration",
+    "test:release": "playwright test --config tooling/release/playwright.config.ts",
+    "test:release-analytics-privacy": "bun --no-env-file tooling/release/verify-browser-analytics-privacy.ts",
+    "test:release-tools": "vitest run --config tooling/release/vitest.config.ts",
+    "translate": "turbo translate",
+    "typecheck": "turbo typecheck",
+    "typecheck:release-tools": "tsc -p tooling/release/tsconfig.json --noEmit"
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.4",
-    "fast-uri": "3.1.5",
+    "adm-zip": "0.6.1",
+    "fast-uri": "3.1.6",
     "hono": "4.12.34",
     "import-in-the-middle": "3.5.1",
+    "js-yaml": "4.3.2",
+    "nanoid": "3.3.18",
     "next": "16.3.5",
     "parse5": "^7.2.1",
     "protobufjs": "7.6.5",
     "require-in-the-middle": "8.0.1",
     "vite": "8.0.16"
   },
-  "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "trustedDependencies": [
-    "inngest-cli"
-  ],
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "commander": "^15.0.0",
+    "nypm": "^0.6.10"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@clerk/testing": "^2.2.36",
+    "@playwright/test": "1.63.0",
+    "@repo/typescript-config": "*",
+    "@turbo/gen": "^2.10.13",
+    "@types/node": "^22.20.3",
+    "@types/pg": "^8.23.1",
+    "inngest-cli": "1.45.1",
+    "pg": "^8.23.0",
+    "tsup": "^8.5.1",
+    "turbo": "^2.10.13",
+    "typescript": "^7.0.2",
+    "ultracite": "7.12.0",
+    "vitest": "^5.0.1",
+    "zod": "^4.6.5"
+  },
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "node": "22 || >=24.0.0"
+  },
   "patchedDependencies": {
     "next-themes@0.4.6": "patches/next-themes@0.4.6.patch"
-  }
+  },
+  "trustedDependencies": [
+    "inngest-cli"
+  ]
 }

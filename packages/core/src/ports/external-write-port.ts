@@ -6,6 +6,7 @@ export interface ProviderResolutionError {
 }
 
 export interface ProviderWriteError {
+  certainty?: ProviderWriteCertainty;
   code: string;
   correlationId?: string | null;
   httpStatus?: number | null;
@@ -13,6 +14,8 @@ export interface ProviderWriteError {
   rawPayload?: unknown;
   userMessage: string;
 }
+
+export type ProviderWriteCertainty = "definitive_failure" | "outcome_unknown";
 
 export interface SubmitLeaveInput {
   clerkOrgId: string;
@@ -22,6 +25,23 @@ export interface SubmitLeaveInput {
   organisationId: string;
   startsAt: Date;
   title?: string;
+  units: number;
+}
+
+export interface ProviderLeaveCandidate {
+  approvalStatus:
+    | "approved"
+    | "cancelled"
+    | "declined"
+    | "submitted"
+    | "withdrawn";
+  employeeId: string;
+  endsAt: string;
+  leaveTypeId: string;
+  rawResponse: unknown;
+  remoteId: string;
+  startsAt: string;
+  title: string | null;
   units: number;
 }
 
@@ -55,6 +75,16 @@ export interface ExternalWritePort {
   declineLeaveApplication: (
     input: DeclineLeaveInput
   ) => Promise<Result<void, ProviderWriteError>>;
+  findLeaveApplicationCandidates?: (input: {
+    clerkOrgId: string;
+    employeeId: string;
+    organisationId: string;
+  }) => Promise<
+    Result<
+      { candidates: ProviderLeaveCandidate[]; complete: boolean },
+      ProviderWriteError
+    >
+  >;
   resolveEmployeeId: (input: {
     personId: string;
     clerkOrgId: string;

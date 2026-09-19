@@ -408,6 +408,7 @@ export const ModelName = {
   XeroOAuthSession: 'XeroOAuthSession',
   XeroSyncCursor: 'XeroSyncCursor',
   AvailabilityRecord: 'AvailabilityRecord',
+  OutboundOperation: 'OutboundOperation',
   AvailabilityPublication: 'AvailabilityPublication',
   LeaveBalance: 'LeaveBalance',
   XeroPersonMatch: 'XeroPersonMatch',
@@ -443,7 +444,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1258,6 +1259,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AvailabilityRecordCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AvailabilityRecordCountAggregateOutputType> | number
+        }
+      }
+    }
+    OutboundOperation: {
+      payload: Prisma.$OutboundOperationPayload<ExtArgs>
+      fields: Prisma.OutboundOperationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OutboundOperationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OutboundOperationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        findFirst: {
+          args: Prisma.OutboundOperationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OutboundOperationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        findMany: {
+          args: Prisma.OutboundOperationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>[]
+        }
+        create: {
+          args: Prisma.OutboundOperationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        createMany: {
+          args: Prisma.OutboundOperationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OutboundOperationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>[]
+        }
+        delete: {
+          args: Prisma.OutboundOperationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        update: {
+          args: Prisma.OutboundOperationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        deleteMany: {
+          args: Prisma.OutboundOperationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OutboundOperationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OutboundOperationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>[]
+        }
+        upsert: {
+          args: Prisma.OutboundOperationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OutboundOperationPayload>
+        }
+        aggregate: {
+          args: Prisma.OutboundOperationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOutboundOperation>
+        }
+        groupBy: {
+          args: Prisma.OutboundOperationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OutboundOperationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OutboundOperationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OutboundOperationCountAggregateOutputType> | number
         }
       }
     }
@@ -3044,6 +3119,37 @@ export const AvailabilityRecordScalarFieldEnum = {
 export type AvailabilityRecordScalarFieldEnum = (typeof AvailabilityRecordScalarFieldEnum)[keyof typeof AvailabilityRecordScalarFieldEnum]
 
 
+export const OutboundOperationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  availability_record_id: 'availability_record_id',
+  action: 'action',
+  status: 'status',
+  request_fingerprint: 'request_fingerprint',
+  request_employee_id: 'request_employee_id',
+  request_leave_type_id: 'request_leave_type_id',
+  request_starts_at: 'request_starts_at',
+  request_ends_at: 'request_ends_at',
+  request_title: 'request_title',
+  request_units: 'request_units',
+  actor_user_id: 'actor_user_id',
+  attempt_generation: 'attempt_generation',
+  safe_error_code: 'safe_error_code',
+  known_remote_id: 'known_remote_id',
+  merged_record_id: 'merged_record_id',
+  side_effect_claimed_at: 'side_effect_claimed_at',
+  prepared_at: 'prepared_at',
+  dispatch_started_at: 'dispatch_started_at',
+  provider_accepted_at: 'provider_accepted_at',
+  completed_at: 'completed_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type OutboundOperationScalarFieldEnum = (typeof OutboundOperationScalarFieldEnum)[keyof typeof OutboundOperationScalarFieldEnum]
+
+
 export const AvailabilityPublicationScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
@@ -3421,6 +3527,13 @@ export const StripeEventScalarFieldEnum = {
   id: 'id',
   stripe_event_id: 'stripe_event_id',
   type: 'type',
+  delivery_state: 'delivery_state',
+  attempt_count: 'attempt_count',
+  clerk_org_id: 'clerk_org_id',
+  stripe_customer_id: 'stripe_customer_id',
+  event_created_at: 'event_created_at',
+  error_category: 'error_category',
+  last_attempted_at: 'last_attempted_at',
   processed_at: 'processed_at',
   created_at: 'created_at',
   updated_at: 'updated_at'
@@ -3757,6 +3870,34 @@ export type ListEnumavailability_publish_statusFieldRefInput<$PrismaModel> = Fie
 
 
 /**
+ * Reference to a field of type 'outbound_operation_action'
+ */
+export type Enumoutbound_operation_actionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'outbound_operation_action'>
+    
+
+
+/**
+ * Reference to a field of type 'outbound_operation_action[]'
+ */
+export type ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'outbound_operation_action[]'>
+    
+
+
+/**
+ * Reference to a field of type 'outbound_operation_status'
+ */
+export type Enumoutbound_operation_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'outbound_operation_status'>
+    
+
+
+/**
+ * Reference to a field of type 'outbound_operation_status[]'
+ */
+export type ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'outbound_operation_status[]'>
+    
+
+
+/**
  * Reference to a field of type 'leave_balance_unit'
  */
 export type Enumleave_balance_unitFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'leave_balance_unit'>
@@ -3981,6 +4122,20 @@ export type ListEnumplan_limit_typeFieldRefInput<$PrismaModel> = FieldRefInputTy
 
 
 /**
+ * Reference to a field of type 'stripe_event_delivery_state'
+ */
+export type Enumstripe_event_delivery_stateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'stripe_event_delivery_state'>
+    
+
+
+/**
+ * Reference to a field of type 'stripe_event_delivery_state[]'
+ */
+export type ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'stripe_event_delivery_state[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -4155,6 +4310,7 @@ export type GlobalOmitConfig = {
   xeroOAuthSession?: Prisma.XeroOAuthSessionOmit
   xeroSyncCursor?: Prisma.XeroSyncCursorOmit
   availabilityRecord?: Prisma.AvailabilityRecordOmit
+  outboundOperation?: Prisma.OutboundOperationOmit
   availabilityPublication?: Prisma.AvailabilityPublicationOmit
   leaveBalance?: Prisma.LeaveBalanceOmit
   xeroPersonMatch?: Prisma.XeroPersonMatchOmit

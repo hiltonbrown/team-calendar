@@ -204,6 +204,24 @@ export const availability_failed_action = {
 export type availability_failed_action = (typeof availability_failed_action)[keyof typeof availability_failed_action]
 
 
+export const outbound_operation_action = {
+  submit: 'submit'
+} as const
+
+export type outbound_operation_action = (typeof outbound_operation_action)[keyof typeof outbound_operation_action]
+
+
+export const outbound_operation_status = {
+  prepared: 'prepared',
+  outcome_unknown: 'outcome_unknown',
+  provider_accepted: 'provider_accepted',
+  completed: 'completed',
+  definitive_failure: 'definitive_failure'
+} as const
+
+export type outbound_operation_status = (typeof outbound_operation_status)[keyof typeof outbound_operation_status]
+
+
 export const availability_privacy_mode = {
   named: 'named',
   masked: 'masked',
@@ -347,3 +365,12 @@ export const plan_limit_type = {
 } as const
 
 export type plan_limit_type = (typeof plan_limit_type)[keyof typeof plan_limit_type]
+
+
+export const stripe_event_delivery_state = {
+  failed: 'failed',
+  processed: 'processed',
+  ignored: 'ignored'
+} as const
+
+export type stripe_event_delivery_state = (typeof stripe_event_delivery_state)[keyof typeof stripe_event_delivery_state]

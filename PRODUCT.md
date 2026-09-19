@@ -23,10 +23,6 @@ Where this document conflicts with any other, PRODUCT.md takes precedence.
 
 ---
 
-## Register
-
-product
-
 ## Users
 
 Three overlapping user types, each with different needs and contexts:
@@ -76,7 +72,7 @@ WCAG 2.2 AA is the floor for all text, interactive elements, and status indicato
 
 ## Product truth
 
-Team Calendar is a multi-tenant leave management and availability publishing platform for small businesses running Xero Payroll (AU, NZ, UK). Employees submit and manage leave inside Team Calendar; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which Team Calendar reads but never calculates.
+Team Calendar is a multi-tenant leave management and availability publishing platform built first for Australian small businesses running Xero Payroll. Employees submit and manage leave inside Team Calendar; managers approve or decline; approved state writes back to Xero synchronously via the Xero API. Xero remains the payroll source of truth for balances and accruals, which Team Calendar reads but never calculates. New Zealand and United Kingdom support is planned for future releases.
 
 Alongside Xero leave, Team Calendar captures manual availability entries (WFH, travelling, training, client site) that are not written to Xero, then publishes a combined, privacy-controlled view as secure ICS feeds.
 

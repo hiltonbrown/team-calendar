@@ -175,6 +175,7 @@ export {
   restoreRecord,
   updateRecord,
 } from "./src/plans/plan-service";
+export * from "./src/plans/submit-recovery-service";
 export * from "./src/plans/submit-service";
 export {
   retrySubmission,
@@ -231,10 +232,15 @@ export {
   cancelRun,
   dispatchManualSync,
   exportFailedRecordsCsv,
+  type FailedRecordSummary,
+  getRedactedFailedRecordPayload,
   getRunDetail,
+  listRunFailedRecords,
   listRuns,
+  listRunTimeline,
   listTenantSummaries,
   type RunDetail,
+  type RunDetailPage,
   type RunListItem,
   type SyncMonitorError,
   type SyncMonitorRole,
@@ -244,10 +250,12 @@ export {
   type SyncTriggerType,
   type TenantSummary,
   type TimelineEvent,
+  type TimelinePage,
 } from "./src/sync/sync-monitor-service";
 export * from "./src/xero-connection-state";
 export { hasActiveXeroConnection } from "./src/xero-connection-state";
 export {
+  noUnresolvedSubmitOperationWhere,
   unclaimedOrExpiredXeroWriteWhere,
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "./src/xero-write-claim";

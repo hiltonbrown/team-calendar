@@ -19,6 +19,7 @@ import {
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
+import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
 
 const SyncXeroLeaveBalancesInputSchema = z.object({
@@ -272,6 +273,9 @@ export async function syncXeroLeaveBalances(
       counts,
       status: finalStatus,
     });
+    if (finalStatus === "succeeded") {
+      await captureInitialSyncCompleted(context);
+    }
 
     return {
       ok: true,

@@ -61,6 +61,90 @@ export interface WorkingDaysReferenceData {
   locationById: Map<string, DurationLocation>;
   organisation: DurationLocation | null;
 }
+export async function loadWorkingDaysReferenceData(
+  inputs: ComputeWorkingDaysInput[]
+): Promise<WorkingDaysReferenceData> {
+  const [first] = inputs;
+  if (!first) {
+    return {
+      holidaysByYear: new Map(),
+      locationById: new Map(),
+      organisation: null,
+    };
+  }
+  const scoped = scopedQuery(
+    first.clerkOrgId as ClerkOrgId,
+    first.organisationId as OrganisationId
+  );
+  const ids = [
+    ...new Set(
+      inputs
+        .map(({ locationId }) => locationId)
+        .filter((id): id is string => id !== null)
+    ),
+  ];
+  const [locations, organisation] = await Promise.all([
+    ids.length
+      ? database.location.findMany({
+          select: {
+            country_code: true,
+            id: true,
+            region_code: true,
+            timezone: true,
+          },
+          where: { ...scoped, id: { in: ids } },
+        })
+      : Promise.resolve([]),
+    database.organisation.findFirst({
+      select: { country_code: true, timezone: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: scoped.clerk_org_id,
+        id: scoped.organisation_id,
+      },
+    }),
+  ]);
+  const locationById = new Map(
+    locations.map(({ id, ...location }) => [id, location])
+  );
+  const organisationLocation = organisation
+    ? {
+        country_code: organisation.country_code,
+        region_code: null,
+        timezone: organisation.timezone,
+      }
+    : null;
+  const years = new Set<number>();
+  for (const item of inputs) {
+    const result = workingDayYearsForInput(item, {
+      locationById,
+      organisation: organisationLocation,
+    });
+    if (result.ok) {
+      for (const year of result.value) {
+        years.add(year);
+      }
+    }
+  }
+  const entries = await Promise.all(
+    [...years].map(
+      async (year) =>
+        [
+          year,
+          await listForOrganisation(
+            first.clerkOrgId as ClerkOrgId,
+            first.organisationId as OrganisationId,
+            { year }
+          ),
+        ] as const
+    )
+  );
+  return {
+    holidaysByYear: new Map(entries),
+    locationById,
+    organisation: organisationLocation,
+  };
+}
 
 const WORKING_DAY_START_MINUTES = 9 * 60;
 const WORKING_DAY_END_MINUTES = 17 * 60;

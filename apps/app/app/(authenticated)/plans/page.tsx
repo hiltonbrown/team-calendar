@@ -1,10 +1,11 @@
 import { auth, currentUser } from "@repo/auth/server";
 import {
-  computeWorkingDays,
+  computeWorkingDaysFromReferenceData,
   ensureCurrentUserPerson,
   hasActiveXeroConnection,
-  listMyRecords,
-  listTeamRecords,
+  listMyRecordsPage,
+  listTeamRecordsPage,
+  loadWorkingDaysReferenceData,
   type RecordListItem,
 } from "@repo/availability";
 import { Button } from "@repo/design-system/components/ui/button";
@@ -30,6 +31,7 @@ interface PlansPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Authentication, scope and filter failures are rendered at the route boundary.
 const PlansPage = async ({ searchParams }: PlansPageProps) => {
   await requirePageRole("org:viewer");
 
@@ -113,17 +115,23 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
 
   const [recordsResult, hasXero] = await Promise.all([
     filters.tab === "team"
-      ? listTeamRecords({
+      ? listTeamRecordsPage({
           actingOrgRole: orgRole,
+          allHistory: filters.allHistory ?? false,
           clerkOrgId,
+          cursor: filters.cursor,
           filters: serviceFilters,
           managerPersonId: currentPersonResult.value.id,
           organisationId,
+          pageSize: filters.pageSize ?? 50,
         })
-      : listMyRecords({
+      : listMyRecordsPage({
+          allHistory: filters.allHistory ?? false,
           clerkOrgId,
+          cursor: filters.cursor,
           filters: serviceFilters,
           organisationId,
+          pageSize: filters.pageSize ?? 50,
           userId: user.id,
         }),
     hasActiveXeroConnection({ clerkOrgId, organisationId }),
@@ -143,24 +151,31 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     );
   }
 
-  const records = await Promise.all(
-    recordsResult.value.map(async (record) => {
-      const duration = await computeWorkingDays({
-        allDay: record.allDay,
-        clerkOrgId,
-        endsAt: record.endsAt,
-        locationId: record.person.locationId,
-        organisationId,
-        startsAt: record.startsAt,
-      });
+  const durationInputs = recordsResult.value.items.map((record) => ({
+    allDay: record.allDay,
+    clerkOrgId,
+    endsAt: record.endsAt,
+    locationId: record.person.locationId,
+    organisationId,
+    startsAt: record.startsAt,
+  }));
+  const durationReference = await loadWorkingDaysReferenceData(durationInputs);
+  const records = recordsResult.value.items.map((record, index) => {
+    const durationInput = durationInputs[index];
+    if (!durationInput) {
+      return toClientRecord(record, null, "Duration input is unavailable");
+    }
+    const duration = computeWorkingDaysFromReferenceData(
+      durationInput,
+      durationReference
+    );
 
-      return toClientRecord(
-        record,
-        duration.ok ? duration.value : null,
-        duration.ok ? null : duration.error.message
-      );
-    })
-  );
+    return toClientRecord(
+      record,
+      duration.ok ? duration.value : null,
+      duration.ok ? null : duration.error.message
+    );
+  });
 
   return (
     <>
@@ -187,28 +202,51 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
         )}
 
         <PlansClient
+          canRecoverSubmit={isAdminOrOwner(orgRole)}
           canViewTeam={canViewTeam}
           filters={filters}
           hasActiveXeroConnection={hasXero}
+          nextCursor={recordsResult.value.nextCursor}
           organisationId={organisationId}
           orgQueryValue={orgQueryValue}
           records={records}
+          totalCount={recordsResult.value.totalCount}
+          window={{
+            from: recordsResult.value.window.from?.toISOString() ?? null,
+            to: recordsResult.value.window.to?.toISOString() ?? null,
+          }}
         />
 
         {records.length === 0 && (
           <EmptyState
             actionSlot={
               filtersAreDefault(filters) ? (
-                <Button asChild>
-                  <Link href={withOrg("/plans/new", orgQueryValue)}>
-                    Create a plan
-                  </Link>
-                </Button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild>
+                    <Link href={withOrg("/plans/new", orgQueryValue)}>
+                      Create a plan
+                    </Link>
+                  </Button>
+                  {!filters.allHistory && (
+                    <Button asChild variant="outline">
+                      <Link
+                        href={withOrg(
+                          "/plans?tab=my&allHistory=true",
+                          orgQueryValue
+                        )}
+                      >
+                        View all history
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               ) : undefined
             }
             description={emptyStateDescription(filters)}
             title={
-              filtersAreDefault(filters) ? "No plans yet" : "No matching plans"
+              filtersAreDefault(filters)
+                ? "No plans in this window"
+                : "No matching plans"
             }
           />
         )}
@@ -240,6 +278,7 @@ function toClientRecord(
     recordType: record.recordType,
     sourceType: record.sourceType,
     startsAt: record.startsAt.toISOString(),
+    submissionResolutionPending: record.submissionResolutionPending,
     workingDays,
     workingDaysError,
     xeroWriteError: record.xeroWriteError,
@@ -259,6 +298,7 @@ function filtersAreDefault(filters: PlansFilterInput): boolean {
     filters.tab === "my" &&
     filters.recordTypeCategory === "all" &&
     filters.includeArchived === false &&
+    filters.allHistory === false &&
     !filters.approvalStatus &&
     !filters.dateFrom &&
     !filters.dateTo &&
@@ -270,7 +310,7 @@ function filtersAreDefault(filters: PlansFilterInput): boolean {
 
 function emptyStateDescription(filters: PlansFilterInput): string {
   if (filtersAreDefault(filters)) {
-    return "Create leave or availability so calendars, feeds, and approval queues have something to track.";
+    return "There are no leave or availability records in the current window. Create a plan or view all history.";
   }
   return "Change the filters or clear the date and status selections to see more leave and availability records.";
 }

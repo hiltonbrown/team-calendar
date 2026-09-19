@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const uuidV5Pattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
   analyticsGroupIdentify: vi.fn(),
   analyticsIdentify: vi.fn(),
   analyticsShutdown: vi.fn(),
@@ -14,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@repo/analytics/server", () => ({
   analytics: {
     capture: mocks.analyticsCapture,
+    flush: mocks.analyticsFlush,
     groupIdentify: mocks.analyticsGroupIdentify,
     identify: mocks.analyticsIdentify,
     shutdown: mocks.analyticsShutdown,
@@ -62,6 +67,7 @@ function membershipFixture() {
       last_name: "Person",
       user_id: "user_1",
     },
+    role: "org:owner",
   } as Parameters<typeof handleOrganizationMembershipCreated>[0];
 }
 
@@ -87,7 +93,9 @@ describe("Clerk organisation membership webhook handling", () => {
 
   it("links or creates people for each active organisation on membership creation", async () => {
     const response = await handleOrganizationMembershipCreated(
-      membershipFixture()
+      membershipFixture(),
+      "msg_membership_1",
+      new Date(1_700_000_000_000)
     );
 
     expect(response.status).toBe(201);
@@ -116,6 +124,108 @@ describe("Clerk organisation membership webhook handling", () => {
         lastName: "Person",
       }
     );
+  });
+
+  it("returns 503 and withholds activation analytics when any organisation fails", async () => {
+    mocks.ensureCurrentUserPerson
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { id: "00000000-0000-4000-8000-000000000011" },
+      })
+      .mockResolvedValueOnce({
+        error: { code: "database_error", message: "temporary failure" },
+        ok: false,
+      });
+
+    const response = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_partial",
+      new Date(1_700_000_000_000)
+    );
+
+    expect(response.status).toBe(503);
+    expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledTimes(2);
+    expect(mocks.analyticsGroupIdentify).not.toHaveBeenCalled();
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+
+    mocks.ensureCurrentUserPerson.mockResolvedValue({
+      ok: true,
+      value: { id: "00000000-0000-4000-8000-000000000011" },
+    });
+    const retry = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_partial",
+      new Date(1_700_000_000_000)
+    );
+    const delivered = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    expect(retry.status).toBe(201);
+    expect(delivered).toHaveLength(1);
+    expect(delivered[0]).toMatchObject({
+      timestamp: new Date(1_700_000_000_000),
+      uuid: expect.any(String),
+    });
+  });
+
+  it("returns 503 when every organisation fails", async () => {
+    mocks.ensureCurrentUserPerson.mockResolvedValue({
+      error: { code: "database_error", message: "temporary failure" },
+      ok: false,
+    });
+
+    const response = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_failure",
+      new Date(1_700_000_000_000)
+    );
+
+    expect(response.status).toBe(503);
+    expect(mocks.ensureCurrentUserPerson).toHaveBeenCalledTimes(2);
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
+  });
+
+  it("repairs a failed replay and uses one provider delivery identity after success", async () => {
+    mocks.ensureCurrentUserPerson
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { id: "00000000-0000-4000-8000-000000000011" },
+      })
+      .mockResolvedValueOnce({
+        error: { code: "database_error", message: "temporary failure" },
+        ok: false,
+      });
+
+    const failed = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
+    );
+    mocks.ensureCurrentUserPerson.mockResolvedValue({
+      ok: true,
+      value: { id: "00000000-0000-4000-8000-000000000011" },
+    });
+    const repaired = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
+    );
+    const duplicate = await handleOrganizationMembershipCreated(
+      membershipFixture(),
+      "msg_membership_replay",
+      new Date(1_700_000_000_000)
+    );
+
+    expect([failed.status, repaired.status, duplicate.status]).toEqual([
+      503, 201, 201,
+    ]);
+    const deliveredEvents = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    const deliveredUuids = deliveredEvents.map((event) => event.uuid);
+    expect(deliveredUuids).toHaveLength(2);
+    expect(new Set(deliveredUuids).size).toBe(1);
+    expect(deliveredUuids[0]).toMatch(uuidV5Pattern);
   });
 
   it("clears clerk_user_id on membership deletion without deleting people", async () => {
@@ -170,6 +280,7 @@ describe("Clerk webhook payload validation", () => {
   it("passes the exact raw body to Svix and accepts a valid consumed event", async () => {
     const body = ` {
   "data": { "created_by": "user_1", "id": "org_1", "name": "Acme" },
+  "timestamp": 1789776000000,
   "type": "organization.created"
 } `;
 
@@ -190,6 +301,51 @@ describe("Clerk webhook payload validation", () => {
         name: "Acme",
       },
     });
+  });
+
+  it("uses the verified Svix delivery identity for membership activation", async () => {
+    mocks.organisationFindMany.mockResolvedValue([
+      {
+        clerk_org_id: "org_1",
+        id: "00000000-0000-4000-8000-000000000001",
+      },
+    ]);
+    mocks.ensureCurrentUserPerson.mockResolvedValue({
+      ok: true,
+      value: { id: "00000000-0000-4000-8000-000000000011" },
+    });
+    const body = JSON.stringify({
+      data: membershipFixture(),
+      timestamp: 1_700_000_000_000,
+      type: "organizationMembership.created",
+    });
+
+    const first = await POST(webhookRequest(body));
+    const replay = await POST(webhookRequest(body));
+
+    expect(first.status).toBe(201);
+    expect(replay.status).toBe(201);
+    const deliveredEvents = mocks.analyticsCapture.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.event === "Customer Admitted");
+    const deliveredUuids = deliveredEvents.map((event) => event.uuid);
+    expect(deliveredUuids).toHaveLength(2);
+    expect(new Set(deliveredUuids).size).toBe(1);
+    expect(deliveredEvents[0]?.timestamp).toEqual(new Date(1_700_000_000_000));
+    expect(deliveredEvents[1]?.timestamp).toEqual(new Date(1_700_000_000_000));
+  });
+
+  it("returns a retryable response when membership event time is absent", async () => {
+    const body = JSON.stringify({
+      data: membershipFixture(),
+      type: "organizationMembership.created",
+    });
+
+    const response = await POST(webhookRequest(body));
+
+    expect(response.status).toBe(503);
+    expect(mocks.ensureCurrentUserPerson).not.toHaveBeenCalled();
+    expect(mocks.analyticsCapture).not.toHaveBeenCalled();
   });
 
   it("returns 400 for malformed JSON after successful verification", async () => {

@@ -1,56 +1,41 @@
-import { config } from "dotenv";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
-config({ path: new URL("../database/.env", import.meta.url).pathname });
 // getFeedDetail builds the full subscribe URL from the API origin and
 // requires it to be configured. Provide one for the integration environment.
 process.env.NEXT_PUBLIC_API_URL ||= "https://api.test.local";
 vi.mock("server-only", () => ({}));
 
-let createFeed: typeof import("./index")["createFeed"];
-let createInitialTokenWithClient: typeof import("./index")["createInitialTokenWithClient"];
-let ensureDefaultCalendarFeed: typeof import("./index")["ensureDefaultCalendarFeed"];
-let getFeedDetail: typeof import("./index")["getFeedDetail"];
-let pauseFeed: typeof import("./index")["pauseFeed"];
-let renderFeedForToken: typeof import("./index")["renderFeedForToken"];
-let revokeAllFeedTokens: typeof import("./index")["revokeAllFeedTokens"];
-let revokeToken: typeof import("./index")["revokeToken"];
-let rotateToken: typeof import("./index")["rotateToken"];
-let signedFeedTokenId: typeof import("./index")["signedFeedTokenId"];
-let database: typeof import("@repo/database")["database"];
-
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({
-    createFeed,
-    createInitialTokenWithClient,
-    ensureDefaultCalendarFeed,
-    getFeedDetail,
-    pauseFeed,
-    renderFeedForToken,
-    revokeAllFeedTokens,
-    revokeToken,
-    rotateToken,
-    signedFeedTokenId,
-  } = await import("./index"));
-  ({ database } = await import("@repo/database"));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/feeds/index.integration.test.ts"
+);
+const {
+  createFeed,
+  createInitialTokenWithClient,
+  ensureDefaultCalendarFeed,
+  getFeedDetail,
+  pauseFeed,
+  renderFeedForToken,
+  revokeAllFeedTokens,
+  revokeToken,
+  rotateToken,
+  signedFeedTokenId,
+} = await import("./index");
+const { database } = await import("@repo/database");
 
 const tenant = {
-  clerkOrgId: "org_test_feed_services_a",
-  organisationId: "51000000-0000-4000-8000-000000000001",
+  ...fixture.tenants[0],
 };
 const otherTenant = {
-  clerkOrgId: "org_test_feed_services_b",
-  organisationId: "52000000-0000-4000-8000-000000000001",
+  ...fixture.tenants[1],
 };
+if (!(tenant.clerkOrgId && otherTenant.clerkOrgId && fixture.tenants[2])) {
+  throw new Error("Feeds live fixture tenants were not allocated");
+}
 const clerkOrgIds = [tenant.clerkOrgId, otherTenant.clerkOrgId];
 const TOKEN_PATTERN = /^tc1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/;
 
-describeWithDatabase("feed services", () => {
+describe("feed services", () => {
   beforeEach(async () => {
     await cleanTestData();
     await createTenant(tenant);
@@ -59,6 +44,11 @@ describeWithDatabase("feed services", () => {
 
   afterAll(async () => {
     await cleanTestData();
+    await expect(
+      database.organisation.count({
+        where: { clerk_org_id: { in: clerkOrgIds } },
+      })
+    ).resolves.toBe(0);
     await database.$disconnect();
   });
 
@@ -319,8 +309,8 @@ describeWithDatabase("feed services", () => {
 
   test("rejects at the exact feed limit despite a stale reporting counter", async () => {
     await Promise.all([
-      seedActiveFeed("61000000-0000-4000-8000-000000000001", "first-limit"),
-      seedActiveFeed("61000000-0000-4000-8000-000000000002", "second-limit"),
+      seedActiveFeed(fixture.id("feed", 1), "first-limit"),
+      seedActiveFeed(fixture.id("feed", 2), "second-limit"),
     ]);
     await database.usageCounter.create({
       data: {
@@ -354,10 +344,7 @@ describeWithDatabase("feed services", () => {
   });
 
   test("serialises concurrent feed creation at the final available slot", async () => {
-    await seedActiveFeed(
-      "61000000-0000-4000-8000-000000000003",
-      "existing-limit"
-    );
+    await seedActiveFeed(fixture.id("feed", 3), "existing-limit");
 
     const results = await Promise.all([
       createFeed({
@@ -402,7 +389,7 @@ describeWithDatabase("feed services", () => {
   }, 20_000);
 
   test("suffixes default feed slugs across organisations in one Clerk org", async () => {
-    const secondOrganisationId = "51000000-0000-4000-8000-000000000002";
+    const secondOrganisationId = fixture.tenants[2]?.organisationId as string;
     await createTenant({
       clerkOrgId: tenant.clerkOrgId,
       organisationId: secondOrganisationId,

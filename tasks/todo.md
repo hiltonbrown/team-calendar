@@ -71,3 +71,70 @@ fresh-database migration proof, physical browser coverage, authenticated role
 workflows, outbound Xero write-back and external security follow-ups are not
 verified. See `tasks/go-live-readiness-report.md`. No remote push or deployment
 was performed.
+
+## Active execution: consolidated Australian go-live plan
+
+Candidate branch: `codex/go-live-candidate`, based on `80ac9f7`. Live Neon test
+authority is explicit and persists for this release. Verification safeguards
+are implementation work, not a new permission gate.
+
+- [ ] D1: unit/live database isolation. Source-only CI, exact 21-suite runtime
+  allowlist, lazy connection denial, candidate-bound protected manifest,
+  durable KV read-back, active-run fencing, pre-write zero-residue assertion,
+  FK-ordered cleanup and focused live rollback proof are implemented. The
+  exact protected workflow patch is reviewable but unapplied. All 21 suites now
+  use disjoint manifest-owned fixtures, production seed execution accepts owned
+  inputs, cleanup checks outside-owned catalogue digests, and interrupted runs
+  retain the digest in durable storage. Consumer pause/restore provider proof,
+  a protected workflow environment and the complete guarded live run remain open.
+- [x] C6: empty and missing manager scope fails closed. Focused availability
+  suites pass 42 tests in 3 files.
+- [x] C4/C5: missing email transport fails before queue selection and malformed
+  availability JSON returns 400 after authentication. Focused suites pass 49 tests.
+- [x] R1/R2/R3 and T3: source contracts and focused gates pass on declared
+  Node/Bun versions; deployed evidence remains part of O1.
+- [x] G3: provisional identity and obsolete launch/region claims removed. Focused
+  web suites pass 22 tests in 5 files.
+- [x] P4/P5 source and privacy behaviour: public provider excludes auth, analytics
+  initialisation is conditional and URL data is sanitised. Identical Turbopack
+  analyses reduced `analyze.data` from 540,368 to 507,582 bytes and
+  `modules.data` from 2,149,679 to 1,996,006 bytes. These are analyser metadata
+  sizes, not compressed route-JavaScript savings.
+  Decoded Turbopack data shows Clerk browser parts fell from 65 parts
+  (110,455 raw / 34,964 per-part compressed bytes) to zero. Home browser module
+  parts fell from 2,678,373 / 1,181,555 to 2,533,524 / 1,133,010; About from
+  2,564,021 / 1,156,608 to 2,417,857 / 1,107,839; Pricing from
+  2,631,576 / 1,168,019 to 2,486,744 / 1,119,481. These totals include async
+  chunks and are not network initial-transfer sizes. PostHog moved out of the
+  app entry synchronous graph. A real intercepted `posthog-js` Chromium
+  delivery produced exactly identify, group-identify and two page-view events,
+  with no query/fragment markers or browser errors.
+- [x] C1/C2/C3 source: submit side effects remain recoverable through durable
+  completion; provisioning deduplicates; failed/equal-time Stripe deliveries
+  reconcile authoritatively and remain replayable. Live journey proof remains.
+- [x] P1/P2/P3 source: Plans, People and sync views use bounded, stable pages,
+  exact scoped counts and batched hydration. Guarded database parity proof is
+  still part of D1/T1.
+- [x] G1 source: early-access application, invite-only entry contract, stable
+  provider idempotency and durable activation capture are implemented. Provider
+  mailbox, Clerk role and delivered production evidence remain open.
+- [ ] T1: Playwright runner and production Clerk CSP repair exist. All 30
+  journeys fail closed without candidate/manifests, use exact owned records,
+  fresh role contexts and a durable local create ledger with cleanup. No live
+  mutation journey has run because required provider configuration and
+  sanctioned candidate deployments are still absent.
+- [x] T2 source and local gates: docs links and rendered email checks pass.
+- [ ] G2 and O1: production configuration, candidate deployment, rollback-aware
+  live journeys, monitoring/alerts and launch decision remain open.
+
+### Current external evidence
+
+- Live Neon read-only identity and the 12 applied migration checksums were
+  verified; project/branch/restore metadata is still unavailable.
+- API health responds; the deployed Inngest registration endpoint fails because
+  production signing configuration is absent.
+- App and web deployment configuration was repaired for the prior partial
+  Better Stack group, then the unrelated status integration was explicitly
+  disabled. A reviewed candidate has not been deployed.
+- Host Bun 1.3.14 is not release evidence; candidate gates use the existing
+  `/home/hilton/.bun/bin/bun` 1.4.0 executable.

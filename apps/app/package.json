@@ -7,7 +7,8 @@
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "dev": "bun --bun next dev -p 3000",
     "start": "bun --bun next start",
-    "test": "NODE_ENV=test vitest run",
+    "test": "NODE_ENV=test vitest run --exclude '**/*.integration.test.ts'",
+    "test:integration": "NODE_ENV=test vitest run --config vitest.integration.config.mts .integration.test.ts",
     "typecheck": "tsc --noEmit --emitDeclarationOnly false"
   },
   "dependencies": {
@@ -47,7 +48,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
-    "@types/node": "26.6.1",
+    "@types/node": "^22.20.3",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "^6.1.1",

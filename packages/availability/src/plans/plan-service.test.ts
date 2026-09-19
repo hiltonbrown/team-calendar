@@ -26,12 +26,17 @@ const mocks = vi.hoisted(() => {
 
   return {
     auditCreate,
+    availabilityCount: vi.fn(),
     availabilityCreate,
     availabilityDeleteMany: vi.fn(),
     availabilityFindFirst,
+    availabilityFindMany: vi.fn(),
     availabilityUpdateMany: vi.fn(),
     hasActiveXeroConnection: vi.fn(),
+    hasUnresolvedSubmitOperation: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
+    leaveBalanceFindMany: vi.fn(),
+    managerScopePersonIds: vi.fn(),
     materialiseAvailabilityPublication: vi.fn(() =>
       Promise.resolve({ ok: true, value: undefined })
     ),
@@ -61,15 +66,26 @@ vi.mock("@repo/database", () => ({
           updateMany: mocks.availabilityUpdateMany,
         },
       }),
-    availabilityRecord: { findFirst: mocks.availabilityFindFirst },
-    leaveBalance: { findFirst: mocks.leaveBalanceFindFirst },
+    availabilityRecord: {
+      count: mocks.availabilityCount,
+      findFirst: mocks.availabilityFindFirst,
+      findMany: mocks.availabilityFindMany,
+    },
+    leaveBalance: {
+      findFirst: mocks.leaveBalanceFindFirst,
+      findMany: mocks.leaveBalanceFindMany,
+    },
     person: { findFirst: mocks.personFindFirst },
   },
+  hasUnresolvedSubmitOperation: mocks.hasUnresolvedSubmitOperation,
   scopedQuery: mocks.scopedQuery,
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+}));
+vi.mock("../settings/manager-scope", () => ({
+  managerScopePersonIds: mocks.managerScopePersonIds,
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
@@ -80,6 +96,8 @@ const {
   createRecord,
   deleteDraftRecord,
   getRecord,
+  listTeamRecords,
+  listTeamRecordsPage,
   updateRecord,
 } = await import("./plan-service");
 
@@ -153,9 +171,13 @@ describe("plan-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       scopedRecordFixture({ managerPersonId: null })
     );
+    mocks.availabilityFindMany.mockResolvedValue([]);
+    mocks.availabilityCount.mockResolvedValue(0);
+    mocks.leaveBalanceFindMany.mockResolvedValue([]);
     mocks.availabilityDeleteMany.mockResolvedValue({ count: 1 });
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.managerScopePersonIds.mockResolvedValue([baseInput.personId]);
     mocks.personFindFirst.mockResolvedValue({
       email: "person@example.com",
       first_name: "Test",
@@ -165,6 +187,172 @@ describe("plan-service", () => {
       manager_person_id: null,
     });
   });
+
+  it("pages plans with one exact count and a bounded stable query", async () => {
+    mocks.availabilityCount.mockResolvedValue(241);
+
+    const result = await listTeamRecordsPage({
+      actingOrgRole: "org:admin",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        approvalStatus: ["approved"],
+        sourceType: ["manual"],
+      },
+      organisationId: baseInput.organisationId,
+      pageSize: 50,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { nextCursor: null, totalCount: 241 },
+    });
+    expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
+    expect(mocks.availabilityCount).toHaveBeenCalledTimes(1);
+    const pageQuery = mocks.availabilityFindMany.mock.calls[0]?.[0];
+    const countQuery = mocks.availabilityCount.mock.calls[0]?.[0];
+    expect(pageQuery).toMatchObject({
+      orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
+      take: 51,
+      where: {
+        approval_status: { in: ["approved"] },
+        clerk_org_id: baseInput.clerkOrgId,
+        organisation_id: baseInput.organisationId,
+        source_type: { in: ["manual"] },
+      },
+    });
+    expect(countQuery?.where).toEqual(pageQuery?.where);
+    expect(mocks.leaveBalanceFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [1, 2],
+    [50, 51],
+    [200, 201],
+  ])(
+    "keeps page size %i to one bounded query with take %i",
+    async (pageSize, take) => {
+      await listTeamRecordsPage({
+        actingOrgRole: "org:admin",
+        clerkOrgId: baseInput.clerkOrgId,
+        organisationId: baseInput.organisationId,
+        pageSize,
+      });
+
+      expect(mocks.availabilityFindMany).toHaveBeenCalledTimes(1);
+      expect(mocks.availabilityCount).toHaveBeenCalledTimes(1);
+      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take })
+      );
+    }
+  );
+
+  it("removes the overlap window only when all history is requested", async () => {
+    await listTeamRecordsPage({
+      actingOrgRole: "org:admin",
+      allHistory: true,
+      clerkOrgId: baseInput.clerkOrgId,
+      organisationId: baseInput.organisationId,
+    });
+
+    const where = mocks.availabilityFindMany.mock.calls[0]?.[0]?.where;
+    expect(where).not.toHaveProperty("ends_at");
+    expect(where).not.toHaveProperty("starts_at");
+  });
+
+  it("returns no team records without querying when a manager has no reports", async () => {
+    mocks.managerScopePersonIds.mockResolvedValue([]);
+
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+    expect(mocks.hasActiveXeroConnection).not.toHaveBeenCalled();
+  });
+
+  it("returns no team records when requested people are outside manager scope", async () => {
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        personId: ["00000000-0000-4000-8000-000000000099"],
+      },
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toEqual({ ok: true, value: [] });
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+  });
+
+  it("intersects requested people with manager scope", async () => {
+    await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      filters: {
+        personId: [baseInput.personId, "00000000-0000-4000-8000-000000000099"],
+      },
+      managerPersonId: "00000000-0000-4000-8000-000000000031",
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          clerk_org_id: baseInput.clerkOrgId,
+          organisation_id: baseInput.organisationId,
+          person_id: { in: [baseInput.personId] },
+        }),
+      })
+    );
+    expect(mocks.managerScopePersonIds).toHaveBeenCalledWith({
+      actingPersonId: "00000000-0000-4000-8000-000000000031",
+      clerkOrgId: baseInput.clerkOrgId,
+      excludeSelf: true,
+      organisationId: baseInput.organisationId,
+    });
+  });
+
+  it("denies a manager without a linked acting person", async () => {
+    const result = await listTeamRecords({
+      actingOrgRole: "org:manager",
+      clerkOrgId: baseInput.clerkOrgId,
+      managerPersonId: null,
+      organisationId: baseInput.organisationId,
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.managerScopePersonIds).not.toHaveBeenCalled();
+    expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
+  });
+
+  it.each(["org:admin", "org:owner"])(
+    "allows %s to query the scoped organisation without a manager person",
+    async (actingOrgRole) => {
+      await listTeamRecords({
+        actingOrgRole,
+        clerkOrgId: baseInput.clerkOrgId,
+        managerPersonId: null,
+        organisationId: baseInput.organisationId,
+      });
+
+      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            clerk_org_id: baseInput.clerkOrgId,
+            organisation_id: baseInput.organisationId,
+          }),
+        })
+      );
+    }
+  );
 
   it.each([
     ["wfh", true, "manual", "approved"],
@@ -322,6 +510,7 @@ describe("plan-service", () => {
 
   it("projects unit, currencyCode, and balance amount on balanceChip", async () => {
     mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.hasUnresolvedSubmitOperation.mockResolvedValue(false);
     mocks.availabilityFindFirst.mockResolvedValue({
       ...scopedRecordFixture({ managerPersonId: null }),
       all_day: true,

@@ -1,4 +1,5 @@
 import "./setup-env";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getScheduledSyncEventId,
@@ -24,32 +25,26 @@ vi.mock("../client", () => ({
   },
 }));
 
-let database: typeof import("@repo/database")["database"];
-let scheduleXeroSyncsPage: typeof import("./schedule-xero-syncs")["scheduleXeroSyncsPage"];
-
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database } = await import("@repo/database"));
-  ({ scheduleXeroSyncsPage } = await import("./schedule-xero-syncs"));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts"
+);
+const { database } = await import("@repo/database");
+const { scheduleXeroSyncsPage } = await import("./schedule-xero-syncs");
 
 const tenantA = {
-  clerkOrgId: "org_test_schedule_sync_a",
-  databaseTenantId: "95000000-0000-4000-8000-000000000003",
-  organisationId: "95000000-0000-4000-8000-000000000001",
-  providerTenantId: "95000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "95000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  databaseTenantId: fixture.id("tenant", 0),
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  providerTenantId: fixture.id("provider-tenant", 0),
+  xeroConnectionId: fixture.id("connection", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_schedule_sync_b",
-  databaseTenantId: "96000000-0000-4000-8000-000000000003",
-  organisationId: "96000000-0000-4000-8000-000000000001",
-  providerTenantId: "96000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "96000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  databaseTenantId: fixture.id("tenant", 1),
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  providerTenantId: fixture.id("provider-tenant", 1),
+  xeroConnectionId: fixture.id("connection", 1),
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
@@ -107,7 +102,7 @@ async function cleanupTestFixtures() {
   });
 }
 
-describeWithDatabase("scheduleXeroSyncs Integration", () => {
+describe("scheduleXeroSyncs Integration", () => {
   beforeEach(async () => {
     sentEvents.length = 0;
     await cleanupTestFixtures();

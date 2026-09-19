@@ -1,0 +1,13 @@
+{
+  "extends": "../../packages/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../../apps/api/*"],
+      "@repo/jobs/src/*": ["../../packages/jobs/src/*"],
+      "@repo/*": ["../../packages/*/index.ts"]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["./**/*.ts"]
+}

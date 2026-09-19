@@ -1,5 +1,8 @@
+import { createActivationEvent } from "@repo/analytics/activation-events";
+import { analytics } from "@repo/analytics/server";
 import { renderFeedForToken } from "@repo/feeds";
 import { log } from "@repo/observability/log";
+import { after } from "next/server";
 import {
   checkFeedRateLimit,
   extractClientIp,
@@ -75,6 +78,30 @@ export async function GET(
   // Handle expired or revoked tokens
   if (status === "expired" || status === "revoked") {
     return new Response("Gone", { status: 410 });
+  }
+
+  if (feedResult.value.activation) {
+    const activationPromise = feedResult.value.activation;
+    after(async () => {
+      const activation = await activationPromise;
+      if (!activation) {
+        return;
+      }
+      const event = createActivationEvent({
+        deduplicationKey: `${activation.clerkOrgId}:${activation.organisationId}`,
+        name: "First Feed Accessed",
+        occurredAt: activation.occurredAt,
+        subjectId: activation.clerkOrgId,
+      });
+      analytics?.capture({
+        distinctId: event.distinctId,
+        event: event.event,
+        properties: event.properties,
+        timestamp: event.timestamp,
+        uuid: event.uuid,
+      });
+      await analytics?.flush();
+    });
   }
 
   const ifNoneMatch = request.headers.get("if-none-match");

@@ -1,9 +1,12 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is availability_records.integration.test.ts.
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
+
+const fixture = allocateLiveTestFixture(
+  "packages/database/availability_records.integration.test.ts"
+);
 
 const {
   availability_approval_status,
@@ -18,19 +21,19 @@ const {
 } = await import("./index.js");
 
 const tenantA = {
-  clerkOrgId: "org_test_availability_a",
-  locationId: "10000000-0000-4000-8000-000000000003",
-  organisationId: "10000000-0000-4000-8000-000000000001",
-  personId: "10000000-0000-4000-8000-000000000004",
-  teamId: "10000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  locationId: fixture.id("location", 0),
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  personId: fixture.id("person", 0),
+  teamId: fixture.id("team", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_availability_b",
-  locationId: "20000000-0000-4000-8000-000000000003",
-  organisationId: "20000000-0000-4000-8000-000000000001",
-  personId: "20000000-0000-4000-8000-000000000004",
-  teamId: "20000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  locationId: fixture.id("location", 1),
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  personId: fixture.id("person", 1),
+  teamId: fixture.id("team", 1),
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
@@ -44,12 +47,12 @@ interface Tenant {
 }
 
 const availabilityRecordIds = {
-  manualDuplicate: "30000000-0000-4000-8000-000000000006",
-  manualOriginal: "30000000-0000-4000-8000-000000000005",
-  otherTenant: "30000000-0000-4000-8000-000000000002",
-  scoped: "30000000-0000-4000-8000-000000000001",
-  xeroDuplicate: "30000000-0000-4000-8000-000000000004",
-  xeroOriginal: "30000000-0000-4000-8000-000000000003",
+  manualDuplicate: fixture.id("availability-record", 5),
+  manualOriginal: fixture.id("availability-record", 4),
+  otherTenant: fixture.id("availability-record", 1),
+  scoped: fixture.id("availability-record", 0),
+  xeroDuplicate: fixture.id("availability-record", 3),
+  xeroOriginal: fixture.id("availability-record", 2),
 } as const;
 
 const createTenant = async (tenant: Tenant) => {

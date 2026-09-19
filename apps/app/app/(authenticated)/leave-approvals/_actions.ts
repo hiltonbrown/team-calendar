@@ -1,5 +1,7 @@
 "use server";
 
+import { createActivationEvent } from "@repo/analytics/activation-events";
+import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   type ApprovalListItem,
@@ -16,6 +18,7 @@ import {
 } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
+import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -66,6 +69,39 @@ export async function approveAction(input: {
   const result = await approve(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
+  }
+  if (result.value.approvedAt) {
+    try {
+      const first = await database.availabilityRecord.findFirst({
+        orderBy: { approved_at: "asc" },
+        select: { approved_at: true },
+        where: {
+          approved_at: { not: null },
+          clerk_org_id: context.value.clerkOrgId,
+          organisation_id: context.value.organisationId,
+        },
+      });
+      if (!first?.approved_at) {
+        revalidateApprovalWritePaths();
+        return approvalValue(result.value);
+      }
+      const event = createActivationEvent({
+        deduplicationKey: `${context.value.clerkOrgId}:${context.value.organisationId}`,
+        name: "First Leave Approved",
+        occurredAt: first.approved_at,
+        subjectId: context.value.clerkOrgId,
+      });
+      analytics?.capture({
+        distinctId: event.distinctId,
+        event: event.event,
+        properties: event.properties,
+        timestamp: event.timestamp,
+        uuid: event.uuid,
+      });
+      await analytics?.flush();
+    } catch (error) {
+      log.warn("Leave approval activation capture failed", { error });
+    }
   }
   revalidateApprovalWritePaths();
   return approvalValue(result.value);

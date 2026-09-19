@@ -1,9 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
+  analyticsShutdown: vi.fn(),
   auditEventCreate: vi.fn(),
   auth: vi.fn(),
   completeXeroTenantSelection: vi.fn(),
+  createActivationEvent: vi.fn((input: { name: string }) => ({
+    distinctId: "subject",
+    event: input.name,
+    properties: { event_version: 1 },
+    timestamp: "2026-09-19T00:00:00.000Z",
+    uuid: `uuid-${input.name}`,
+  })),
   currentUser: vi.fn(),
   dispatchManualSync: vi.fn(),
   revalidatePath: vi.fn(),
@@ -13,6 +23,16 @@ const mocks = vi.hoisted(() => ({
   xeroConnectionFindFirst: vi.fn(),
 }));
 
+vi.mock("@repo/analytics/activation-events", () => ({
+  createActivationEvent: mocks.createActivationEvent,
+}));
+vi.mock("@repo/analytics/server", () => ({
+  analytics: {
+    capture: mocks.analyticsCapture,
+    flush: mocks.analyticsFlush,
+    shutdown: mocks.analyticsShutdown,
+  },
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -48,6 +68,8 @@ const validInput = {
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.analyticsShutdown.mockResolvedValue(undefined);
+    mocks.analyticsFlush.mockResolvedValue(undefined);
     mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({
       emailAddresses: [{ emailAddress: "admin@example.com" }],
@@ -65,6 +87,9 @@ describe("completeTenantSelectionAction", () => {
       },
     });
     mocks.auditEventCreate.mockResolvedValue({});
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
+      created_at: new Date("2026-09-19T00:00:00.000Z"),
+    });
     mocks.dispatchManualSync.mockResolvedValue({
       ok: true,
       value: { eventName: "sync-xero-people", queued: true },
@@ -146,5 +171,30 @@ describe("completeTenantSelectionAction", () => {
 
     expect(result.ok).toBe(false);
     expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
+  });
+
+  it("keeps a durable connection successful when analytics flush fails", async () => {
+    mocks.analyticsFlush.mockRejectedValue(new Error("analytics unavailable"));
+
+    const result = await completeTenantSelectionAction(validInput);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.dispatchManualSync).toHaveBeenCalledTimes(3);
+  });
+
+  it("uses the durable connection creation time for the activation event", async () => {
+    const createdAt = new Date("2026-09-18T03:04:05.000Z");
+    mocks.xeroConnectionFindFirst
+      .mockResolvedValueOnce({ id: "existing-connection" })
+      .mockResolvedValueOnce({ created_at: createdAt });
+
+    await completeTenantSelectionAction({
+      ...validInput,
+      organisationId: "33333333-3333-4333-8333-333333333333",
+    });
+
+    expect(mocks.createActivationEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ occurredAt: createdAt })
+    );
   });
 });

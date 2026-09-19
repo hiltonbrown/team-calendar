@@ -66,7 +66,7 @@ vi.mock("@repo/notifications", () => ({
     mocks.publishOrganisationNotificationEvent,
 }));
 vi.mock("@repo/observability/log", () => ({
-  log: { error: vi.fn(), info: vi.fn() },
+  log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 vi.mock("@repo/xero", () => ({
   ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,

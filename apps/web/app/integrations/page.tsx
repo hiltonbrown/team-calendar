@@ -17,7 +17,8 @@ const regions = integrationCapabilities.xeroPayrollRegions.map((region) => ({
     region.status === "shipped"
       ? "Annual leave, sick leave, long service leave, personal carer's leave, and public holidays."
       : "Planned for a future release.",
-  statusLabel: region.status === "shipped" ? "Supported at launch" : "Planned",
+  statusLabel:
+    region.status === "shipped" ? "Australian early access" : "Planned",
 }));
 
 const shippedRegionNames = integrationCapabilities.xeroPayrollRegions
@@ -178,10 +179,10 @@ const IntegrationsPage = () => (
       <div className={`fmkt-container ${styles.split}`}>
         <div className="fmkt-section-header">
           <h2 className="fmkt-section-title">
-            Australian Xero Payroll support at launch.
+            Australian Xero Payroll in early access.
           </h2>
           <p className={styles.copy}>
-            Team Calendar currently supports Xero Payroll{" "}
+            Team Calendar early access is available for Xero Payroll{" "}
             {shippedRegionNames.join(" and ")}.{" "}
             {plannedRegionNames.join(" and ")} support is planned for future
             releases.

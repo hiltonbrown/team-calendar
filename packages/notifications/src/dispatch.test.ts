@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   notificationCreate: vi.fn(),
   personFindFirst: vi.fn(),
   preferenceFindUnique: vi.fn(),
+  publish: vi.fn(),
+}));
+
+vi.mock("./sse/broker", () => ({
+  publishNotificationEvent: mocks.publish,
 }));
 
 const client = {
@@ -56,6 +61,7 @@ describe("dispatchNotification", () => {
     });
     mocks.personFindFirst.mockResolvedValue({ email: "ava@example.com" });
     mocks.preferenceFindUnique.mockResolvedValue(null);
+    mocks.publish.mockResolvedValue(undefined);
   });
 
   it("creates in-app rows and queues email when defaults allow both", async () => {
@@ -88,6 +94,16 @@ describe("dispatchNotification", () => {
     expect(result.ok).toBe(true);
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
     expect(mocks.emailCreate).toHaveBeenCalled();
+  });
+
+  it("suppresses realtime publication for a caller-owned transaction", async () => {
+    const result = await dispatchNotification(input, client, {
+      publishRealtime: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.notificationCreate).toHaveBeenCalledOnce();
+    expect(mocks.publish).not.toHaveBeenCalled();
   });
 
   it("never queues email for null-template types", async () => {

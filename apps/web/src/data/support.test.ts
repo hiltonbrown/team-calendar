@@ -22,7 +22,8 @@ describe("public support details", () => {
     );
     expect(body).toContain("Organisation name:");
     expect(body).toContain("Team size:");
-    expect(body).toContain("Xero Payroll region:");
+    expect(body).toContain("Australian Xero Payroll organisation:");
+    expect(body).not.toContain("Xero Payroll region:");
     expect(body).toContain("Help needed:");
   });
 

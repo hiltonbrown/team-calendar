@@ -1,5 +1,7 @@
 "use server";
 
+import { createActivationEvent } from "@repo/analytics/activation-events";
+import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import { dispatchManualSync } from "@repo/availability";
 import type { Result } from "@repo/core";
@@ -46,7 +48,7 @@ export async function completeTenantSelectionAction(input: {
 
   const existingConnection = parsed.data.organisationId
     ? await database.xeroConnection.findFirst({
-        select: { id: true, status: true },
+        select: { id: true },
         where: {
           clerk_org_id: orgId,
           organisation_id: parsed.data.organisationId,
@@ -93,6 +95,34 @@ export async function completeTenantSelectionAction(input: {
       resource_type: "xero_connection",
     },
   });
+  try {
+    const durableConnection = await database.xeroConnection.findFirst({
+      select: { created_at: true },
+      where: {
+        clerk_org_id: orgId,
+        id: result.value.connectionId,
+        organisation_id: result.value.organisationId,
+      },
+    });
+    if (durableConnection) {
+      const connectedEvent = createActivationEvent({
+        deduplicationKey: `${orgId}:${result.value.organisationId}`,
+        name: "Xero Connected",
+        occurredAt: durableConnection.created_at,
+        subjectId: orgId,
+      });
+      analytics?.capture({
+        distinctId: connectedEvent.distinctId,
+        event: connectedEvent.event,
+        properties: connectedEvent.properties,
+        timestamp: connectedEvent.timestamp,
+        uuid: connectedEvent.uuid,
+      });
+      await analytics?.flush();
+    }
+  } catch {
+    // The connection is durable; analytics must not turn it into a user-visible failure.
+  }
 
   // Perform immediate initial sync (people, leave-records, leave-balances).
   // Best effort: the connection is already persisted and scheduled syncs will catch up if
@@ -112,7 +142,6 @@ export async function completeTenantSelectionAction(input: {
   } catch {
     // Best-effort initial execution; scheduled runs or manual syncs will retry.
   }
-
   const initialRunTypes = [
     "people",
     "leave_records",

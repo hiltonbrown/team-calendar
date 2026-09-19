@@ -640,6 +640,40 @@ export type JsonNullableWithAggregatesFilterBase<$PrismaModel = never> = {
   _max?: Prisma.NestedJsonNullableFilter<$PrismaModel>
 }
 
+export type Enumoutbound_operation_actionFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_action | Prisma.Enumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel> | $Enums.outbound_operation_action
+}
+
+export type Enumoutbound_operation_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_status | Prisma.Enumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel> | $Enums.outbound_operation_status
+}
+
+export type Enumoutbound_operation_actionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_action | Prisma.Enumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_actionWithAggregatesFilter<$PrismaModel> | $Enums.outbound_operation_action
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel>
+}
+
+export type Enumoutbound_operation_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_status | Prisma.Enumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_statusWithAggregatesFilter<$PrismaModel> | $Enums.outbound_operation_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel>
+}
+
 export type Enumavailability_record_typeNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.availability_record_type | Prisma.Enumavailability_record_typeFieldRefInput<$PrismaModel> | null
   in?: $Enums.availability_record_type[] | Prisma.ListEnumavailability_record_typeFieldRefInput<$PrismaModel> | null
@@ -988,6 +1022,23 @@ export type Enumplan_limit_typeNullableWithAggregatesFilter<$PrismaModel = never
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumplan_limit_typeNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumplan_limit_typeNullableFilter<$PrismaModel>
+}
+
+export type Enumstripe_event_delivery_stateFilter<$PrismaModel = never> = {
+  equals?: $Enums.stripe_event_delivery_state | Prisma.Enumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel> | $Enums.stripe_event_delivery_state
+}
+
+export type Enumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.stripe_event_delivery_state | Prisma.Enumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel> | $Enums.stripe_event_delivery_state
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
 }
 
 export type NestedUuidFilter<$PrismaModel = never> = {
@@ -1571,6 +1622,40 @@ export type NestedJsonNullableFilterBase<$PrismaModel = never> = {
   not?: runtime.InputJsonValue | Prisma.JsonFieldRefInput<$PrismaModel> | Prisma.JsonNullValueFilter
 }
 
+export type NestedEnumoutbound_operation_actionFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_action | Prisma.Enumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel> | $Enums.outbound_operation_action
+}
+
+export type NestedEnumoutbound_operation_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_status | Prisma.Enumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel> | $Enums.outbound_operation_status
+}
+
+export type NestedEnumoutbound_operation_actionWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_action | Prisma.Enumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_action[] | Prisma.ListEnumoutbound_operation_actionFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_actionWithAggregatesFilter<$PrismaModel> | $Enums.outbound_operation_action
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumoutbound_operation_actionFilter<$PrismaModel>
+}
+
+export type NestedEnumoutbound_operation_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.outbound_operation_status | Prisma.Enumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.outbound_operation_status[] | Prisma.ListEnumoutbound_operation_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumoutbound_operation_statusWithAggregatesFilter<$PrismaModel> | $Enums.outbound_operation_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumoutbound_operation_statusFilter<$PrismaModel>
+}
+
 export type NestedEnumavailability_record_typeNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.availability_record_type | Prisma.Enumavailability_record_typeFieldRefInput<$PrismaModel> | null
   in?: $Enums.availability_record_type[] | Prisma.ListEnumavailability_record_typeFieldRefInput<$PrismaModel> | null
@@ -1919,6 +2004,23 @@ export type NestedEnumplan_limit_typeNullableWithAggregatesFilter<$PrismaModel =
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedEnumplan_limit_typeNullableFilter<$PrismaModel>
   _max?: Prisma.NestedEnumplan_limit_typeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumstripe_event_delivery_stateFilter<$PrismaModel = never> = {
+  equals?: $Enums.stripe_event_delivery_state | Prisma.Enumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel> | $Enums.stripe_event_delivery_state
+}
+
+export type NestedEnumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.stripe_event_delivery_state | Prisma.Enumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.stripe_event_delivery_state[] | Prisma.ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel> | $Enums.stripe_event_delivery_state
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
 }
 
 

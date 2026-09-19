@@ -1228,3 +1228,47 @@
     transform: none;
   }
 }
+
+.marketing-contact__panel form {
+  display: grid;
+  gap: 1rem;
+}
+
+.marketing-contact__panel form > div {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.marketing-contact__panel label {
+  font-weight: 650;
+  color: var(--foreground);
+}
+
+.marketing-contact__panel input,
+.marketing-contact__panel select,
+.marketing-contact__panel textarea {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  font: inherit;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 0;
+  border-radius: 14px;
+}
+
+.marketing-contact__panel textarea {
+  resize: vertical;
+}
+
+.marketing-contact__panel input:focus-visible,
+.marketing-contact__panel select:focus-visible,
+.marketing-contact__panel textarea:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.marketing-contact__panel form p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}

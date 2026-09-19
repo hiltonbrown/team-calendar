@@ -20,6 +20,9 @@ import {
   cancelRunAction,
   dispatchManualSyncAction,
   exportFailedRecordsCsvAction,
+  loadFailedRecordsPageAction,
+  loadRedactedFailurePayloadAction,
+  loadTimelinePageAction,
 } from "../_actions";
 
 const FIRST_LINE_PATTERN = /\r?\n/;
@@ -41,7 +44,15 @@ export function SyncRunDetailClient({
   const router = useRouter();
   const { subscribe } = useNotificationEvents();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [rawVisible, setRawVisible] = useState<string | null>(null);
+  const [rawPayloads, setRawPayloads] = useState<Record<string, unknown>>({});
+  const [failedRecords, setFailedRecords] = useState(detail.failedRecords);
+  const [failedCursor, setFailedCursor] = useState(
+    detail.failedRecordsNextCursor
+  );
+  const [timeline, setTimeline] = useState(detail.timeline);
+  const [timelineCursor, setTimelineCursor] = useState(
+    detail.timelineNextCursor
+  );
   const [message, setMessage] = useState<{
     text: string;
     tone: "error" | "status";
@@ -71,6 +82,64 @@ export function SyncRunDetailClient({
   const finishAction = () => {
     pendingActionRef.current = null;
     setPendingAction(null);
+  };
+
+  const revealPayload = async (failureId: string) => {
+    if (Object.hasOwn(rawPayloads, failureId)) {
+      setRawPayloads((current) => {
+        const next = { ...current };
+        delete next[failureId];
+        return next;
+      });
+      return;
+    }
+    const result = await loadRedactedFailurePayloadAction({
+      failureId,
+      organisationId,
+      runId: run.id,
+    });
+    if (!result.ok) {
+      setMessage({ text: result.error.message, tone: "error" });
+      return;
+    }
+    setRawPayloads((current) => ({
+      ...current,
+      [failureId]: result.value.payload,
+    }));
+  };
+
+  const loadMoreFailures = async () => {
+    if (!failedCursor) {
+      return;
+    }
+    const result = await loadFailedRecordsPageAction({
+      cursor: failedCursor,
+      organisationId,
+      runId: run.id,
+    });
+    if (!result.ok) {
+      setMessage({ text: result.error.message, tone: "error" });
+      return;
+    }
+    setFailedRecords((current) => [...current, ...result.value.records]);
+    setFailedCursor(result.value.nextCursor);
+  };
+
+  const loadMoreTimeline = async () => {
+    if (!timelineCursor) {
+      return;
+    }
+    const result = await loadTimelinePageAction({
+      cursor: timelineCursor,
+      organisationId,
+      runId: run.id,
+    });
+    if (!result.ok) {
+      setMessage({ text: result.error.message, tone: "error" });
+      return;
+    }
+    setTimeline((current) => [...current, ...result.value.events]);
+    setTimelineCursor(result.value.nextCursor);
   };
 
   useEffect(
@@ -232,11 +301,9 @@ export function SyncRunDetailClient({
             className={`rounded-2xl p-4 text-sm ${statusToneClasses.failed}`}
           >
             <p>{run.errorSummary}</p>
-            {detail.failedRecords.some((record) => record.rawPayload) && (
-              <p className="mt-2 text-muted-foreground">
-                Expand failed records below for details.
-              </p>
-            )}
+            <p className="mt-2 text-muted-foreground">
+              Expand failed records below for details.
+            </p>
           </div>
         ) : null}
 
@@ -248,7 +315,7 @@ export function SyncRunDetailClient({
                 Raw payloads stay collapsed unless opened by an admin or owner.
               </p>
             </div>
-            {detail.failedRecords.length > 0 && (
+            {failedRecords.length > 0 && (
               <Button
                 aria-busy={pendingAction === "export"}
                 disabled={pendingAction !== null}
@@ -263,11 +330,11 @@ export function SyncRunDetailClient({
             )}
           </div>
 
-          {detail.failedRecords.length === 0 ? (
+          {failedRecords.length === 0 ? (
             <EmptyState description="This run completed without any failures." />
           ) : (
             <div className="space-y-2">
-              {detail.failedRecords.map((record) => {
+              {failedRecords.map((record) => {
                 const isOpen = expanded === record.id;
                 return (
                   <article className="rounded-2xl bg-muted p-4" key={record.id}>
@@ -296,34 +363,35 @@ export function SyncRunDetailClient({
                         <p className="whitespace-pre-wrap text-sm">
                           {record.errorMessage}
                         </p>
-                        {record.rawPayload ? (
-                          <>
-                            <Button
-                              onClick={() =>
-                                setRawVisible(
-                                  rawVisible === record.id ? null : record.id
-                                )
-                              }
-                              size="sm"
-                              type="button"
-                              variant="secondary"
-                            >
-                              {rawVisible === record.id
-                                ? "Hide raw payload"
-                                : "Show raw payload"}
-                            </Button>
-                            {rawVisible === record.id && (
-                              <pre className="overflow-auto rounded-xl bg-background p-3 text-xs">
-                                {JSON.stringify(record.rawPayload, null, 2)}
-                              </pre>
-                            )}
-                          </>
-                        ) : null}
+                        <Button
+                          onClick={() => revealPayload(record.id)}
+                          size="sm"
+                          type="button"
+                          variant="secondary"
+                        >
+                          {Object.hasOwn(rawPayloads, record.id)
+                            ? "Hide raw payload"
+                            : "Show redacted raw payload"}
+                        </Button>
+                        {Object.hasOwn(rawPayloads, record.id) && (
+                          <pre className="overflow-auto rounded-xl bg-background p-3 text-xs">
+                            {JSON.stringify(rawPayloads[record.id], null, 2)}
+                          </pre>
+                        )}
                       </div>
                     )}
                   </article>
                 );
               })}
+              {failedCursor ? (
+                <Button
+                  onClick={loadMoreFailures}
+                  type="button"
+                  variant="secondary"
+                >
+                  Load more failures
+                </Button>
+              ) : null}
             </div>
           )}
         </section>
@@ -381,7 +449,7 @@ export function SyncRunDetailClient({
             </p>
           </div>
         )}
-        {detail.timeline.length > 0 && (
+        {timeline.length > 0 && (
           <Button
             className="w-full"
             onClick={() => setTimelineOpen((value) => !value)}
@@ -393,7 +461,7 @@ export function SyncRunDetailClient({
         )}
         {timelineOpen ? (
           <ol className="space-y-2 text-sm">
-            {detail.timeline.map((event) => (
+            {timeline.map((event) => (
               <li key={event.id}>
                 <p className="font-medium">{event.action}</p>
                 <p className="text-muted-foreground">
@@ -401,6 +469,18 @@ export function SyncRunDetailClient({
                 </p>
               </li>
             ))}
+            {timelineCursor ? (
+              <li>
+                <Button
+                  onClick={loadMoreTimeline}
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                >
+                  Load more timeline events
+                </Button>
+              </li>
+            ) : null}
           </ol>
         ) : null}
       </aside>

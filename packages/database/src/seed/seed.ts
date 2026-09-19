@@ -4,7 +4,7 @@ import {
   type OrganisationSeed,
   seedOrganisations,
 } from "./data";
-import { syncPlansFromCatalogue } from "./plan-sync";
+import { type PlanSeedDefinition, syncPlansFromCatalogue } from "./plan-sync";
 
 export interface SeedSummary {
   clerkOrgId: string;
@@ -23,6 +23,8 @@ export interface SeedOptions {
    * setup). Falls back to DEFAULT_SEED_CLERK_ORG_ID when absent.
    */
   clerkOrgId?: string | undefined;
+  organisations?: readonly OrganisationSeed[] | undefined;
+  plans?: readonly PlanSeedDefinition[] | undefined;
 }
 
 const seedOrganisation = async (
@@ -144,14 +146,15 @@ export const seedDevelopmentData = async (
   options: SeedOptions = {}
 ): Promise<SeedSummary> => {
   const clerkOrgId = options.clerkOrgId ?? DEFAULT_SEED_CLERK_ORG_ID;
+  const organisations = options.organisations ?? seedOrganisations;
 
   let teams = 0;
   let locations = 0;
   let people = 0;
 
-  const planSummary = await syncPlansFromCatalogue(db);
+  const planSummary = await syncPlansFromCatalogue(db, options.plans);
 
-  for (const org of seedOrganisations) {
+  for (const org of organisations) {
     await seedOrganisation(db, clerkOrgId, org);
     teams += org.teams.length;
     locations += org.locations.length;
@@ -161,7 +164,7 @@ export const seedDevelopmentData = async (
   return {
     clerkOrgId,
     locations,
-    organisations: seedOrganisations.length,
+    organisations: organisations.length,
     people,
     planLimits: planSummary.limits,
     plans: planSummary.plans,

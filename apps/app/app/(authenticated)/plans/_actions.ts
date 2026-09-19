@@ -1,20 +1,28 @@
 "use server";
 
+import { createActivationEvent } from "@repo/analytics/activation-events";
+import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import {
   archiveRecord,
+  attachSubmitRecoveryCandidate,
   createRecord,
   deleteDraftRecord,
+  listSubmitRecoveryCandidates,
   type PlanServiceError,
+  resolveSubmitAsNotCreated,
   restoreRecord,
   retrySubmission,
   revertToDraft,
+  type SubmitRecoveryError,
   type SubmitServiceError,
   submitDraftRecord,
   updateRecord,
   withdrawSubmission,
 } from "@repo/availability";
 import type { Result } from "@repo/core";
+import { database } from "@repo/database";
+import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
@@ -30,11 +38,80 @@ import {
 
 export type PlanActionError =
   | PlanServiceError
+  | SubmitRecoveryError
   | SubmitServiceError
   | { code: "not_authorised"; message: string }
   | { code: "validation_error"; message: string };
 
 export type PlanActionResult<T = { id?: string }> = Result<T, PlanActionError>;
+
+export async function attachSubmitRecoveryCandidateAction(input: {
+  organisationId: string;
+  reason: string;
+  recordId: string;
+  remoteId: string;
+}): Promise<PlanActionResult<void>> {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await attachSubmitRecoveryCandidate(
+    {
+      ...context.value,
+      reason: input.reason,
+      recordId: input.recordId,
+      remoteId: input.remoteId,
+    },
+    XeroWriteAdapter
+  );
+  if (result.ok) {
+    revalidateSubmissionPaths();
+  }
+  return result;
+}
+
+export async function listSubmitRecoveryCandidatesAction(input: {
+  organisationId: string;
+  recordId: string;
+}) {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  return await listSubmitRecoveryCandidates(
+    { ...context.value, recordId: input.recordId },
+    XeroWriteAdapter
+  );
+}
+
+export async function resolveSubmitAsNotCreatedAction(input: {
+  evidenceReference: string;
+  independentlyVerified: boolean;
+  organisationId: string;
+  reason: string;
+  recordId: string;
+}): Promise<PlanActionResult<void>> {
+  const context = await resolveRecoveryContext(input.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  if (!input.independentlyVerified) {
+    return validationError(
+      "Independent provider verification must be confirmed."
+    );
+  }
+  const result = await resolveSubmitAsNotCreated({
+    ...context.value,
+    evidenceReference: input.evidenceReference,
+    independentlyVerified: true,
+    reason: input.reason,
+    recordId: input.recordId,
+  });
+  if (result.ok) {
+    revalidateSubmissionPaths();
+  }
+  return result;
+}
 
 export async function createRecordAction(
   input: PlanRecordFormInput
@@ -129,6 +206,42 @@ export async function updateRecordAction(
   revalidatePath("/plans");
   revalidatePath("/calendar");
   return { ok: true, value: { id: result.value.id } };
+}
+
+async function captureSubmissionActivation(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  submittedAt: Date | null;
+}): Promise<void> {
+  if (!input.submittedAt) {
+    return;
+  }
+  const first = await database.availabilityRecord.findFirst({
+    orderBy: { submitted_at: "asc" },
+    select: { submitted_at: true },
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+      submitted_at: { not: null },
+    },
+  });
+  if (!first?.submitted_at) {
+    return;
+  }
+  const event = createActivationEvent({
+    deduplicationKey: `${input.clerkOrgId}:${input.organisationId}`,
+    name: "First Leave Submitted",
+    occurredAt: first.submitted_at,
+    subjectId: input.clerkOrgId,
+  });
+  analytics?.capture({
+    distinctId: event.distinctId,
+    event: event.event,
+    properties: event.properties,
+    timestamp: event.timestamp,
+    uuid: event.uuid,
+  });
+  await analytics?.flush();
 }
 
 export async function deleteDraftAction(
@@ -233,6 +346,16 @@ export async function submitForApprovalAction(
     return result;
   }
 
+  try {
+    await captureSubmissionActivation({
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      submittedAt: result.value.submitted_at,
+    });
+  } catch (error) {
+    log.warn("Leave submission activation capture failed", { error });
+  }
+
   revalidateSubmissionPaths();
   return submissionValue(result.value);
 }
@@ -268,6 +391,16 @@ export async function retrySubmissionAction(
   const result = await retrySubmission(context.value, XeroWriteAdapter);
   if (!result.ok) {
     return result;
+  }
+
+  try {
+    await captureSubmissionActivation({
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      submittedAt: result.value.submitted_at,
+    });
+  } catch (error) {
+    log.warn("Leave submission activation capture failed", { error });
   }
 
   revalidateSubmissionPaths();
@@ -350,6 +483,42 @@ function canUsePlans(role: string | null | undefined): boolean {
     role === "org:admin" ||
     role === "org:owner"
   );
+}
+
+async function resolveRecoveryContext(organisationId: string): Promise<
+  PlanActionResult<{
+    actingOrgRole: "org:admin" | "org:owner";
+    actingUserId: string;
+    clerkOrgId: string;
+    organisationId: string;
+  }>
+> {
+  const context = await resolveActionContext(organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  if (
+    context.value.orgRole !== "org:admin" &&
+    context.value.orgRole !== "org:owner"
+  ) {
+    return {
+      error: {
+        code: "not_authorised",
+        message:
+          "Administrator access is required to resolve Xero submissions.",
+      },
+      ok: false,
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    },
+  };
 }
 
 async function resolveRecordActionContext(

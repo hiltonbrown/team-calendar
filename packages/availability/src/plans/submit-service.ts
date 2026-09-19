@@ -1,12 +1,26 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import type {
   ExternalWritePort,
   ProviderResolutionError,
   ProviderWriteError,
   Result,
 } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  acquireSubmitRecoverySideEffects,
+  database,
+  hasUnresolvedSubmitOperation,
+  markSubmitCompleted,
+  markSubmitDefinitiveFailure,
+  markSubmitDispatchStarted,
+  markSubmitOutcomeUnknown,
+  markSubmitProviderAccepted,
+  prepareAndClaimSubmitOperation,
+  releaseSubmitRecoverySideEffects,
+  scopedTo as scoped,
+} from "@repo/database";
 import {
   type AvailabilityRecord,
   Prisma,
@@ -26,7 +40,9 @@ import {
   acquireXeroWriteClaim,
   releaseXeroWriteClaim,
   unclaimedOrExpiredXeroWriteWhere,
+  XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
+import { completeSubmitSideEffects } from "./submit-side-effects";
 
 export type SubmitServiceError =
   | { code: "invalid_state_for_retry"; message: string }
@@ -41,6 +57,7 @@ export type SubmitServiceError =
       message: string;
       resolutionError: ProviderResolutionError;
     }
+  | { code: "submission_outcome_unknown"; message: string }
   | { code: "unknown_error"; message: string }
   | {
       code: "xero_not_connected";
@@ -113,6 +130,15 @@ export async function revertToDraft(
       authorised.value.failed_action !== "submit"
     ) {
       return invalidState("invalid_state_for_revert");
+    }
+    if (
+      await hasUnresolvedSubmitOperation({
+        availabilityRecordId: authorised.value.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      })
+    ) {
+      return submissionOutcomeUnknown();
     }
 
     await database.$transaction(async (tx) => {
@@ -278,6 +304,7 @@ export async function withdrawSubmission(
   }
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Submission deliberately keeps durable operation transitions beside the synchronous provider call so reviewers can verify every uncertainty edge in one ordered path.
 async function performSubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort,
@@ -295,6 +322,8 @@ async function performSubmission(
 
   let record: LoadedRecord | null = null;
   let claimedAt: Date | null = null;
+  let dispatchStarted = false;
+  let attemptGeneration: number | null = null;
   try {
     const authorised = await loadAndAuthorise(parsed.data, "manager_allowed");
     if (!authorised.ok) {
@@ -329,20 +358,50 @@ async function performSubmission(
       return prepared;
     }
 
+    const operationScope = {
+      availabilityRecordId: record.id,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    };
+    const preparedOperation = await prepareAndClaimSubmitOperation({
+      ...operationScope,
+      actorUserId: parsed.data.actingUserId,
+      claimableBefore: new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
+      expectedFailedAction:
+        options.validStatus === "xero_sync_failed" ? "submit" : null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: options.validStatus,
+      requestEmployeeId: prepared.value.xeroEmployeeId,
+      requestEndsAt: record.ends_at,
+      requestFingerprint: submitRequestFingerprint({
+        employeeId: prepared.value.xeroEmployeeId,
+        endsAt: record.ends_at,
+        leaveTypeId: prepared.value.xeroLeaveTypeId,
+        startsAt: record.starts_at,
+        title: record.title ?? "Leave request",
+        units: prepared.value.units,
+      }),
+      requestLeaveTypeId: prepared.value.xeroLeaveTypeId,
+      requestStartsAt: record.starts_at,
+      requestTitle: record.title ?? "Leave request",
+      requestUnits: prepared.value.units,
+    });
+    if (!preparedOperation) {
+      return submissionOutcomeUnknown();
+    }
+    ({ attemptGeneration, claimedAt } = preparedOperation);
+    const operationAttempt = { ...operationScope, attemptGeneration };
+
     // Claim before calling Xero, not after. The guarded update further down
     // protects the database row, but by the time it runs the leave application
     // already exists in payroll. Xero's create endpoint has no idempotency key,
     // so two concurrent submissions would create two applications and only one
     // would be recorded here.
-    claimedAt = await acquireXeroWriteClaim({
-      ...parsed.data,
-      expectedFailedAction:
-        options.validStatus === "xero_sync_failed" ? "submit" : null,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: options.validStatus,
-    });
-    if (!claimedAt) {
-      return invalidState(options.invalidStateCode);
+    dispatchStarted = await markSubmitDispatchStarted(operationAttempt);
+    if (!dispatchStarted) {
+      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
+      claimedAt = null;
+      return submissionOutcomeUnknown();
     }
 
     let submission: Awaited<
@@ -356,16 +415,25 @@ async function performSubmission(
         leaveTypeId: prepared.value.xeroLeaveTypeId,
         organisationId: parsed.data.organisationId,
         startsAt: record.starts_at,
-        title: record.title ?? undefined,
+        title: record.title ?? "Leave request",
         units: prepared.value.units,
       });
-    } catch (error) {
+    } catch {
+      await markSubmitOutcomeUnknown(operationAttempt, "transport_exception");
       await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
       claimedAt = null;
-      throw error;
+      return submissionOutcomeUnknown();
     }
 
     if (!submission.ok) {
+      if (isDefinitiveWriteFailure(submission.error)) {
+        await markSubmitDefinitiveFailure(
+          operationAttempt,
+          submission.error.code
+        );
+      } else {
+        await markSubmitOutcomeUnknown(operationAttempt, submission.error.code);
+      }
       return await persistXeroFailure({
         actionUrl: `/plans?recordId=${record.id}`,
         auditAction: options.failureAuditAction,
@@ -376,6 +444,14 @@ async function performSubmission(
         input: parsed.data,
         record,
       });
+    }
+
+    const accepted = await markSubmitProviderAccepted(
+      operationAttempt,
+      submission.value.remoteId
+    );
+    if (!accepted) {
+      return submissionOutcomeUnknown();
     }
 
     // `record` is a `let` narrowed above; alias it to a const so the
@@ -417,17 +493,56 @@ async function performSubmission(
     });
     claimedAt = null;
 
-    await notifyManagerBestEffort(parsed.data, record, "leave_submitted", {
-      actionUrl: `/leave-approvals?recordId=${record.id}`,
+    const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
+      operationAttempt,
+      new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+    );
+    if (!sideEffectClaimedAt) {
+      return submissionOutcomeUnknown();
+    }
+    const sideEffects = await completeSubmitSideEffects({
+      actorUserId: parsed.data.actingUserId,
+      attempt: operationAttempt,
+      claimedAt: sideEffectClaimedAt,
+      clerkOrgId: parsed.data.clerkOrgId,
+      manager: record.person.manager?.clerk_user_id
+        ? {
+            clerkUserId: record.person.manager.clerk_user_id,
+            personId: record.person.manager.id,
+          }
+        : null,
+      notifyManager: true,
+      organisationId: parsed.data.organisationId,
+      recordId: record.id,
     });
+    if (!sideEffects.ok) {
+      await releaseSubmitRecoverySideEffects(
+        operationAttempt,
+        sideEffectClaimedAt
+      );
+      return submissionOutcomeUnknown();
+    }
+    if (!(await markSubmitCompleted(operationAttempt, database))) {
+      return submissionOutcomeUnknown();
+    }
 
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
     }
-    await materialiseSubmitPublication(parsed.data);
     return { ok: true, value: updated };
   } catch (error) {
+    if (record && dispatchStarted && attemptGeneration !== null) {
+      await markSubmitOutcomeUnknown(
+        {
+          attemptGeneration,
+          availabilityRecordId: record.id,
+          clerkOrgId: parsed.data.clerkOrgId,
+          organisationId: parsed.data.organisationId,
+        },
+        "local_persistence_failure"
+      );
+    }
     if (claimedAt) {
       await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
     }
@@ -437,6 +552,49 @@ async function performSubmission(
     return unknownError("Failed to submit this record.");
   }
 }
+
+export const submitRequestFingerprint = (input: {
+  employeeId: string;
+  endsAt: Date;
+  leaveTypeId: string;
+  startsAt: Date;
+  title: string | null;
+  units: number;
+}): string =>
+  createHash("sha256")
+    .update(
+      JSON.stringify({
+        employeeId: input.employeeId,
+        endsAt: input.endsAt.toISOString(),
+        leaveTypeId: input.leaveTypeId,
+        startsAt: input.startsAt.toISOString(),
+        title: input.title,
+        units: input.units,
+      })
+    )
+    .digest("hex");
+
+const submissionOutcomeUnknown = (): Result<never, SubmitServiceError> => ({
+  error: {
+    code: "submission_outcome_unknown",
+    message:
+      "Xero may have received this leave request. An administrator must resolve it before it can be submitted again.",
+  },
+  ok: false,
+});
+
+const isDefinitiveWriteFailure = (error: ProviderWriteError): boolean =>
+  error.certainty === "definitive_failure" ||
+  (error.certainty === undefined &&
+    [
+      "auth_error",
+      "conflict_error",
+      "not_found_error",
+      "permission_error",
+      "rate_limit_error",
+      "region_not_supported_error",
+      "validation_error",
+    ].includes(error.code));
 
 async function prepareXeroWrite(
   input: RecordActionInput,

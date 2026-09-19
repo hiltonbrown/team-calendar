@@ -94,5 +94,17 @@ jobs:
       - name: Run unit tests
         run: bun run test
 
+      - name: Test release safety tooling
+        run: bun run test:release-tools && bun run typecheck:release-tools
+
+      - name: Validate documentation links
+        run: bun run --cwd apps/docs lint
+
+      - name: Build and render notification email
+        run: |
+          bun run --cwd apps/email build
+          bun run --cwd apps/email export
+          bun run --cwd apps/email assert-render
+
       - name: Run integration tests
         run: bun run test:integration

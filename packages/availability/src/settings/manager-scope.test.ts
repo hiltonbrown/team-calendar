@@ -42,6 +42,15 @@ describe("managerScopePersonIds", () => {
       input.actingPersonId,
       directReportId,
     ]);
+    expect(mocks.findMany).toHaveBeenCalledWith({
+      orderBy: { id: "asc" },
+      select: { id: true, manager_person_id: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+      },
+    });
   });
 
   it("excludes the actor while retaining direct reports", async () => {

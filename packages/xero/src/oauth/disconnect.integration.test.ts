@@ -1,4 +1,6 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is disconnect.integration.test.ts.
+
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   afterAll,
   beforeAll,
@@ -11,10 +13,9 @@ import {
 
 vi.mock("server-only", () => ({}));
 
-const describeDisconnect = process.env.DATABASE_URL
-  ? describe
-  : // biome-ignore lint/complexity/useLiteralKeys: plan done criterion
-    describe["skip"];
+const fixture = allocateLiveTestFixture(
+  "packages/xero/src/oauth/disconnect.integration.test.ts"
+);
 
 type DatabaseModule = typeof import("@repo/database");
 type XeroServiceModule = typeof import("./service");
@@ -23,37 +24,37 @@ let database: DatabaseModule["database"];
 let disconnectXeroOAuthConnection: XeroServiceModule["disconnectXeroOAuthConnection"];
 
 const tenantA = {
-  availabilityRecordId: "73000000-0000-4000-8000-000000000030",
-  candidatePersonId: "73000000-0000-4000-8000-000000000021",
-  clerkOrgId: "org_test_disconnect_a",
-  connectionId: "73000000-0000-4000-8000-000000000010",
-  cursorId: "73000000-0000-4000-8000-000000000070",
-  leaveBalanceId: "73000000-0000-4000-8000-000000000040",
-  matchId: "73000000-0000-4000-8000-000000000050",
-  organisationId: "73000000-0000-4000-8000-000000000001",
-  syncRunId: "73000000-0000-4000-8000-000000000060",
-  xeroPersonId: "73000000-0000-4000-8000-000000000020",
-  xeroTenantId: "73000000-0000-4000-8000-000000000011",
+  availabilityRecordId: fixture.id("availability-record", 0),
+  candidatePersonId: fixture.id("candidate-person", 0),
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  connectionId: fixture.id("connection", 0),
+  cursorId: fixture.id("cursor", 0),
+  leaveBalanceId: fixture.id("leave-balance", 0),
+  matchId: fixture.id("match", 0),
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  syncRunId: fixture.id("sync-run", 0),
+  xeroPersonId: fixture.id("xero-person", 0),
+  xeroTenantId: fixture.id("tenant", 0),
 };
 
 const tenantB = {
-  availabilityRecordId: "74000000-0000-4000-8000-000000000030",
-  candidatePersonId: "74000000-0000-4000-8000-000000000021",
-  clerkOrgId: "org_test_disconnect_b",
-  connectionId: "74000000-0000-4000-8000-000000000010",
-  cursorId: "74000000-0000-4000-8000-000000000070",
-  leaveBalanceId: "74000000-0000-4000-8000-000000000040",
-  matchId: "74000000-0000-4000-8000-000000000050",
-  organisationId: "74000000-0000-4000-8000-000000000001",
-  syncRunId: "74000000-0000-4000-8000-000000000060",
-  xeroPersonId: "74000000-0000-4000-8000-000000000020",
-  xeroTenantId: "74000000-0000-4000-8000-000000000011",
+  availabilityRecordId: fixture.id("availability-record", 1),
+  candidatePersonId: fixture.id("candidate-person", 1),
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  connectionId: fixture.id("connection", 1),
+  cursorId: fixture.id("cursor", 1),
+  leaveBalanceId: fixture.id("leave-balance", 1),
+  matchId: fixture.id("match", 1),
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  syncRunId: fixture.id("sync-run", 1),
+  xeroPersonId: fixture.id("xero-person", 1),
+  xeroTenantId: fixture.id("tenant", 1),
 };
 
 const tenantFixtures = [tenantA, tenantB] as const;
 const testClerkOrgIds = tenantFixtures.map((tenant) => tenant.clerkOrgId);
 
-describeDisconnect("disconnectXeroOAuthConnection integration", () => {
+describe("disconnectXeroOAuthConnection integration", () => {
   beforeAll(async () => {
     const [databaseModule, serviceModule] = await Promise.all([
       import("@repo/database"),

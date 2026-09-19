@@ -1,7 +1,13 @@
 import { requireRole } from "@repo/auth/helpers";
 import { currentUser } from "@repo/auth/server";
 import { getBillingSummary } from "@repo/availability";
-import { database } from "@repo/database";
+import {
+  database,
+  getActivationDashboardSummary,
+  getSubscriptionForOrg,
+  getUnresolvedStripeEventsForOrg,
+  hasUnresolvedStripeEventForOrg,
+} from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
 import { PermissionDeniedState } from "@/components/states/permission-denied-state";
@@ -47,6 +53,17 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
     return <FetchErrorState entityName="billing" />;
   }
 
+  const subscription = await getSubscriptionForOrg(clerkOrgId);
+  const [billingSyncUnhealthy, failedStripeEvents, activation] =
+    await Promise.all([
+      hasUnresolvedStripeEventForOrg(
+        clerkOrgId,
+        subscription?.stripe_event_created_at ?? null
+      ),
+      getUnresolvedStripeEventsForOrg(clerkOrgId),
+      getActivationDashboardSummary({ clerkOrgId, organisationId }),
+    ]);
+
   await database.auditEvent.create({
     data: {
       action: "billing.viewed",
@@ -66,15 +83,45 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
   });
 
   return (
-    <BillingClient
-      summary={{
-        hasContactFlow: summary.value.hasContactFlow,
-        hasUpgradeFlow: summary.value.hasUpgradeFlow,
-        isOverLimit: summary.value.isOverLimit,
-        plan: summary.value.plan,
-        usage: summary.value.usage,
-      }}
-    />
+    <div className="space-y-6">
+      <BillingClient
+        summary={{
+          billingSyncUnhealthy,
+          failedStripeEvents,
+          hasContactFlow: summary.value.hasContactFlow,
+          hasUpgradeFlow: summary.value.hasUpgradeFlow,
+          isOverLimit: summary.value.isOverLimit,
+          plan: summary.value.plan,
+          usage: summary.value.usage,
+        }}
+      />
+      <section className="rounded-[20px] bg-muted p-6">
+        <h2 className="font-semibold text-lg">Activation operations</h2>
+        <p className="mb-4 text-muted-foreground">
+          Durable milestones and current failures requiring attention.
+        </p>
+        <dl className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <dt>Completed milestones</dt>
+            <dd className="font-semibold text-xl">
+              {Object.values(activation.milestones).filter(Boolean).length}/6
+            </dd>
+          </div>
+          <div>
+            <dt>Sync and Xero failures</dt>
+            <dd className="font-semibold text-xl">
+              {activation.failures.syncRecords + activation.failures.xeroWrites}
+            </dd>
+          </div>
+          <div>
+            <dt>Stripe delivery failures</dt>
+            <dd className="font-semibold text-xl">
+              {activation.failures.stripeDeliveries}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </div>
   );
 };
 

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { database, scopedTo as scoped } from "@repo/database";
+import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
   availability_failed_action,
@@ -73,4 +74,17 @@ export function unclaimedOrExpiredXeroWriteWhere(now = new Date()) {
       },
     ],
   };
+}
+
+export function noUnresolvedSubmitOperationWhere() {
+  return {
+    outbound_operations: {
+      none: {
+        action: "submit",
+        status: {
+          in: ["prepared", "outcome_unknown", "provider_accepted"],
+        },
+      },
+    },
+  } satisfies Prisma.AvailabilityRecordWhereInput;
 }

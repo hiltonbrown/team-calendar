@@ -1,27 +1,19 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration test co-located beside other database integration suites.
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { Prisma } from "./generated/client";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
 
-let database: typeof import("./index")["database"];
-let getAuthoritativeUsageCount: typeof import("./index")["getAuthoritativeUsageCount"];
+const fixture = allocateLiveTestFixture(
+  "packages/database/authoritative-usage.integration.test.ts"
+);
+const { database, getAuthoritativeUsageCount } = await import("./index.js");
+const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
+const activeOrganisationId = fixture.tenants[0]?.organisationId as string;
+const archivedOrganisationId = fixture.tenants[1]?.organisationId as string;
 
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database, getAuthoritativeUsageCount } = await import("./index.js"));
-}
-
-const clerkOrgId = "org_test_authoritative_billing_usage";
-const activeOrganisationId = "a1000000-0000-4000-8000-000000000001";
-const archivedOrganisationId = "a1000000-0000-4000-8000-000000000002";
-
-describeWithDatabase("authoritative billing usage", () => {
+describe("authoritative billing usage", () => {
   beforeEach(async () => {
     await cleanTestData();
     await database.organisation.createMany({
@@ -53,10 +45,10 @@ describeWithDatabase("authoritative billing usage", () => {
   test("counts every supported type from active rows only", async () => {
     await database.person.createMany({
       data: [
-        person("a2000000-0000-4000-8000-000000000001", true, null),
-        person("a2000000-0000-4000-8000-000000000002", false, null),
+        person(fixture.id("person", 0), true, null),
+        person(fixture.id("person", 1), false, null),
         person(
-          "a2000000-0000-4000-8000-000000000003",
+          fixture.id("person", 2),
           true,
           new Date("2026-01-01T00:00:00.000Z")
         ),
@@ -64,10 +56,10 @@ describeWithDatabase("authoritative billing usage", () => {
     });
     await database.feed.createMany({
       data: [
-        feed("a3000000-0000-4000-8000-000000000001", "active", null),
-        feed("a3000000-0000-4000-8000-000000000002", "paused", null),
+        feed(fixture.id("feed", 0), "active", null),
+        feed(fixture.id("feed", 1), "paused", null),
         feed(
-          "a3000000-0000-4000-8000-000000000003",
+          fixture.id("feed", 2),
           "archived",
           new Date("2026-01-01T00:00:00.000Z")
         ),
@@ -75,9 +67,9 @@ describeWithDatabase("authoritative billing usage", () => {
     });
     await database.xeroConnection.createMany({
       data: [
-        connection("a4000000-0000-4000-8000-000000000001", "active", null),
+        connection(fixture.id("connection", 0), "active", null),
         connection(
-          "a4000000-0000-4000-8000-000000000002",
+          fixture.id("connection", 1),
           "disconnected",
           new Date("2026-01-01T00:00:00.000Z")
         ),

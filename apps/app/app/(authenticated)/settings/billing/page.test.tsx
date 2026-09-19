@@ -1,10 +1,16 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const recoveryMessagePattern = /Billing changes are still being reconciled/;
+
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   currentUser: vi.fn(),
+  getActivationDashboardSummary: vi.fn(),
   getBillingSummary: vi.fn(),
+  getSubscriptionForOrg: vi.fn(),
+  getUnresolvedStripeEventsForOrg: vi.fn(),
+  hasUnresolvedStripeEventForOrg: vi.fn(),
   requireActiveOrgPageContext: vi.fn(),
   requirePageRole: vi.fn(),
   requireRole: vi.fn(),
@@ -26,6 +32,10 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: { auditEvent: { create: mocks.auditCreate } },
+  getActivationDashboardSummary: mocks.getActivationDashboardSummary,
+  getSubscriptionForOrg: mocks.getSubscriptionForOrg,
+  getUnresolvedStripeEventsForOrg: mocks.getUnresolvedStripeEventsForOrg,
+  hasUnresolvedStripeEventForOrg: mocks.hasUnresolvedStripeEventForOrg,
 }));
 vi.mock("@/lib/auth/require-page-role", () => ({
   requirePageRole: mocks.requirePageRole,
@@ -52,7 +62,10 @@ const summary = {
 };
 
 describe("BillingPage", () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -69,6 +82,37 @@ describe("BillingPage", () => {
       organisationId,
     });
     mocks.getBillingSummary.mockResolvedValue({ ok: true, value: summary });
+    mocks.getActivationDashboardSummary.mockResolvedValue({
+      failures: { stripeDeliveries: 0, syncRecords: 0, xeroWrites: 0 },
+      milestones: {
+        feedAccessed: false,
+        firstLeaveApproved: false,
+        firstLeaveSubmitted: false,
+        initialSyncCompleted: false,
+        organisationProvisioned: true,
+        xeroConnected: false,
+      },
+    });
+    mocks.getSubscriptionForOrg.mockResolvedValue(null);
+    mocks.getUnresolvedStripeEventsForOrg.mockResolvedValue([]);
+    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(false);
+  });
+
+  it("shows a paid-mode recovery state for unresolved billing events", async () => {
+    vi.stubEnv("NEXT_PUBLIC_LAUNCH_MODE", "paid");
+    mocks.hasUnresolvedStripeEventForOrg.mockResolvedValue(true);
+    mocks.getUnresolvedStripeEventsForOrg.mockResolvedValue([
+      {
+        errorCategory: "provider_fetch",
+        eventId: "evt_operator_1",
+        lastAttemptedAt: new Date("2026-09-19T00:00:00.000Z"),
+      },
+    ]);
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText(recoveryMessagePattern)).toBeDefined();
+    expect(screen.getByText("evt_operator_1: provider_fetch")).toBeDefined();
   });
 
   it("requires admin access", async () => {

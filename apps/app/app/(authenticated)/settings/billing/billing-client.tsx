@@ -15,7 +15,14 @@ import { SettingsSectionHeader } from "../components/settings-section-header";
 import { startCheckout, startPortal } from "./actions";
 
 interface BillingClientProps {
-  summary: BillingSummary;
+  summary: BillingSummary & {
+    billingSyncUnhealthy: boolean;
+    failedStripeEvents: Array<{
+      errorCategory: string;
+      eventId: string;
+      lastAttemptedAt: Date;
+    }>;
+  };
 }
 
 const statusClassName = (status: string) => {
@@ -55,6 +62,23 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
       {summary.isOverLimit ? (
         <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-sm">
           This account is over one or more plan limits.
+        </div>
+      ) : null}
+      {!earlyAccess && summary.billingSyncUnhealthy ? (
+        <div className="space-y-2 rounded-2xl bg-warning-container p-4 text-on-warning-container text-sm">
+          <p>
+            Billing changes are still being reconciled. Basic plan access
+            applies until the latest Stripe event is repaired.
+          </p>
+          {summary.failedStripeEvents.length > 0 ? (
+            <ul className="space-y-1 font-mono text-xs">
+              {summary.failedStripeEvents.map((event) => (
+                <li key={event.eventId}>
+                  {event.eventId}: {event.errorCategory}
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
       <Card className="rounded-xl">

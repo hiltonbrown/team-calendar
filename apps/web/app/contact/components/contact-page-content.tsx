@@ -1,9 +1,6 @@
-import { CalendarDays, Clock, Layers3, Link2, Mail } from "lucide-react";
-import {
-  supportEmail,
-  supportHoursLong,
-  supportMailtoHref,
-} from "@/src/data/support";
+import { CalendarDays, Clock, Layers3, Link2 } from "lucide-react";
+import { supportHoursLong } from "@/src/data/support";
+import { EarlyAccessApplicationForm } from "./early-access-application-form";
 
 const pathway = [
   {
@@ -73,7 +70,7 @@ export const ContactPageContent = () => (
                 className="marketing-contact__panel-title"
                 id="contact-panel-title"
               >
-                Early access contact and support
+                Apply for Australian early access
               </h2>
               <p className="marketing-contact__panel-lead">
                 Team Calendar is in closed early access for Australian
@@ -82,19 +79,7 @@ export const ContactPageContent = () => (
               </p>
             </div>
 
-            <div className="marketing-contact__action">
-              <Mail aria-hidden="true" size={22} strokeWidth={1.8} />
-              <a
-                className="marketing-btn marketing-btn--primary marketing-contact__cta"
-                href={supportMailtoHref}
-              >
-                Email our support team
-              </a>
-              <p className="marketing-contact__fallback">
-                No email app? Write to{" "}
-                <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
-              </p>
-            </div>
+            <EarlyAccessApplicationForm />
 
             <dl className="marketing-contact__details">
               <div>

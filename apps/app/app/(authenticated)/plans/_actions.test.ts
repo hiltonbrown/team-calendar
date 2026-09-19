@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  analyticsCapture: vi.fn(),
+  analyticsFlush: vi.fn(),
   archiveRecord: vi.fn(),
   auth: vi.fn(),
+  availabilityFindFirst: vi.fn(),
   createRecord: vi.fn(),
   currentUser: vi.fn(),
   deleteDraftRecord: vi.fn(),
@@ -17,6 +20,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@repo/analytics/server", () => ({
+  analytics: { capture: mocks.analyticsCapture, flush: mocks.analyticsFlush },
+}));
+vi.mock("@repo/database", () => ({
+  database: { availabilityRecord: { findFirst: mocks.availabilityFindFirst } },
+}));
 vi.mock("@repo/xero", () => ({
   XeroWriteAdapter: {},
 }));
@@ -68,6 +77,10 @@ const validInput = {
 describe("plans actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.analyticsFlush.mockResolvedValue(undefined);
+    mocks.availabilityFindFirst.mockResolvedValue({
+      submitted_at: new Date("2026-09-19T01:00:00.000Z"),
+    });
     mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
     mocks.currentUser.mockResolvedValue({ id: "user_1" });
     mocks.getActiveOrgContext.mockResolvedValue({
@@ -138,6 +151,7 @@ describe("plans actions", () => {
       value: {
         approval_status: "submitted",
         id: "00000000-0000-4000-8000-000000000099",
+        submitted_at: new Date("2026-09-19T01:00:00.000Z"),
         xero_write_error: null,
       },
     });

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  acquireSideEffects: vi.fn(),
   auditCreate: vi.fn(),
   // The xero-write claim/release helpers call database.availabilityRecord.
   // updateMany directly (outside any $transaction), so they need their own
@@ -8,13 +9,21 @@ const mocks = vi.hoisted(() => ({
   availabilityClaimUpdateMany: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityUpdateMany: vi.fn(),
+  completeSideEffects: vi.fn(),
   computeWorkingDays: vi.fn(),
   dispatchNotification: vi.fn(),
   hasActiveXeroConnection: vi.fn(),
+  markSubmitCompleted: vi.fn(),
+  markSubmitDefinitiveFailure: vi.fn(),
+  markSubmitDispatchStarted: vi.fn(),
+  markSubmitOutcomeUnknown: vi.fn(),
+  markSubmitProviderAccepted: vi.fn(),
   materialiseAvailabilityPublication: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined })
   ),
   personFindFirst: vi.fn(),
+  prepareAndClaimSubmitOperation: vi.fn(),
+  releaseSideEffects: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
@@ -28,6 +37,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
+  acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   database: {
     $transaction: async (callback: (tx: unknown) => unknown) =>
       await callback({
@@ -41,6 +51,14 @@ vi.mock("@repo/database", () => ({
     person: { findFirst: mocks.personFindFirst },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
+  hasUnresolvedSubmitOperation: vi.fn(),
+  markSubmitCompleted: mocks.markSubmitCompleted,
+  markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
+  markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,
+  markSubmitOutcomeUnknown: mocks.markSubmitOutcomeUnknown,
+  markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
+  prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
+  releaseSubmitRecoverySideEffects: mocks.releaseSideEffects,
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../duration/working-days", () => ({
@@ -54,6 +72,9 @@ vi.mock("@repo/notifications", () => ({
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
+}));
+vi.mock("./submit-side-effects", () => ({
+  completeSubmitSideEffects: mocks.completeSideEffects,
 }));
 
 const mockPort = {
@@ -128,13 +149,24 @@ describe("submit-service", () => {
     mocks.availabilityFindFirst.mockReset();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.acquireSideEffects.mockResolvedValue(new Date());
+    mocks.completeSideEffects.mockResolvedValue({ ok: true, value: undefined });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.markSubmitCompleted.mockResolvedValue(true);
+    mocks.markSubmitDefinitiveFailure.mockResolvedValue(true);
+    mocks.markSubmitDispatchStarted.mockResolvedValue(true);
+    mocks.markSubmitOutcomeUnknown.mockResolvedValue(true);
+    mocks.markSubmitProviderAccepted.mockResolvedValue(true);
     mocks.dispatchNotification.mockResolvedValue({
       ok: true,
       value: { emailQueued: false, inAppDelivered: true },
     });
     mocks.personFindFirst.mockResolvedValue({ id: record.person.id });
+    mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+      attemptGeneration: 1,
+      claimedAt: new Date("2026-05-01T00:00:00.000Z"),
+    });
     mocks.resolveXeroEmployeeId.mockResolvedValue({
       ok: true,
       value: "employee-1",
@@ -180,12 +212,11 @@ describe("submit-service", () => {
         }),
       })
     );
-    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+    expect(mocks.completeSideEffects).toHaveBeenCalledWith(
       expect.objectContaining({
-        recipientUserId: "manager_1",
-        type: "leave_submitted",
-      }),
-      expect.anything()
+        manager: expect.objectContaining({ clerkUserId: "manager_1" }),
+        notifyManager: true,
+      })
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -677,10 +708,11 @@ describe("submit-service", () => {
       const result = await submitDraftRecord(input, mockPort);
 
       expect(result.ok).toBe(true);
-      expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledTimes(1);
-      expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledWith(
+      expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: { xero_write_claimed_at: expect.any(Date) },
+          availabilityRecordId: record.id,
+          expectedSequence: record.derived_sequence,
+          expectedStatus: "draft",
         })
       );
       expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledTimes(1);
@@ -694,24 +726,12 @@ describe("submit-service", () => {
       );
     });
 
-    it("blocks the write and never calls Xero when a live claim already exists", async () => {
-      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
-      mocks.availabilityClaimUpdateMany.mockResolvedValueOnce({ count: 0 });
-
-      const result = await submitDraftRecord(input, mockPort);
-
-      expect(result).toMatchObject({
-        error: { code: "invalid_state_for_submit" },
-        ok: false,
-      });
-      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
-    });
-
-    it("allows a stale claim to be reclaimed", async () => {
+    it("normalises a missing title before fingerprint persistence and provider dispatch", async () => {
+      const untitled = { ...record, title: null };
       mocks.availabilityFindFirst
-        .mockResolvedValueOnce(record)
+        .mockResolvedValueOnce(untitled)
         .mockResolvedValueOnce({
-          ...record,
+          ...untitled,
           approval_status: "submitted",
           source_remote_id: "xero-leave-1",
         });
@@ -722,16 +742,73 @@ describe("submit-service", () => {
 
       await submitDraftRecord(input, mockPort);
 
-      expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            OR: [
-              { xero_write_claimed_at: null },
-              { xero_write_claimed_at: { lt: expect.any(Date) } },
-            ],
-          }),
-        })
+      expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ requestTitle: "Leave request" })
       );
+      expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Leave request" })
+      );
+    });
+
+    it("leaves an accepted operation recoverable when durable side effects fail", async () => {
+      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+      mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+        ok: true,
+        value: { rawResponse: {}, remoteId: "xero-leave-1" },
+      });
+      mocks.completeSideEffects.mockResolvedValueOnce({
+        error: { message: "publication failed" },
+        ok: false,
+      });
+
+      const result = await submitDraftRecord(input, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "submission_outcome_unknown" },
+        ok: false,
+      });
+      expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+      expect(mocks.releaseSideEffects).toHaveBeenCalledOnce();
+    });
+
+    it("blocks the write and never calls Xero when a live claim already exists", async () => {
+      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
+
+      const result = await submitDraftRecord(input, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "submission_outcome_unknown" },
+        ok: false,
+      });
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    });
+
+    it("allows a stale worker claim to be reclaimed for a new prepared operation", async () => {
+      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
+
+      const result = await submitDraftRecord(input, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "submission_outcome_unknown" },
+        ok: false,
+      });
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    });
+
+    it("does not call Xero when an unresolved operation survives lease expiry", async () => {
+      mocks.availabilityFindFirst.mockResolvedValueOnce(record);
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
+
+      const result = await submitDraftRecord(input, mockPort);
+
+      expect(result).toMatchObject({
+        error: { code: "submission_outcome_unknown" },
+        ok: false,
+      });
+      expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
     });
 
     it("releases the claim when Xero rejects the submission", async () => {
@@ -765,7 +842,7 @@ describe("submit-service", () => {
       );
     });
 
-    it("releases the claim and surfaces unknown_error when the Xero call throws", async () => {
+    it("releases the worker claim but preserves unknown outcome when Xero throws", async () => {
       mocks.availabilityFindFirst.mockResolvedValueOnce(record);
       mocks.submitLeaveApplicationForRegion.mockRejectedValue(
         new Error("socket reset")
@@ -774,12 +851,16 @@ describe("submit-service", () => {
       const result = await submitDraftRecord(input, mockPort);
 
       expect(result).toMatchObject({
-        error: { code: "unknown_error" },
+        error: { code: "submission_outcome_unknown" },
         ok: false,
       });
-      expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledTimes(2);
+      expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalledWith(
+        expect.objectContaining({ availabilityRecordId: record.id }),
+        "transport_exception"
+      );
+      expect(mocks.availabilityClaimUpdateMany).toHaveBeenCalledTimes(1);
       expect(mocks.availabilityClaimUpdateMany).toHaveBeenNthCalledWith(
-        2,
+        1,
         expect.objectContaining({
           data: { xero_write_claimed_at: null },
         })
@@ -793,12 +874,12 @@ describe("submit-service", () => {
         failed_action: "submit",
       };
       mocks.availabilityFindFirst.mockResolvedValueOnce(failedRecord);
-      mocks.availabilityClaimUpdateMany.mockResolvedValueOnce({ count: 0 });
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
 
       const result = await retrySubmission(input, mockPort);
 
       expect(result).toMatchObject({
-        error: { code: "invalid_state_for_retry" },
+        error: { code: "submission_outcome_unknown" },
         ok: false,
       });
       expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();

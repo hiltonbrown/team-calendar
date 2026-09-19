@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   availabilityGroupBy: vi.fn(),
   computeCurrentStatus: vi.fn(),
   computeCurrentStatusForPeople: vi.fn(),
+  computePublicHolidayApplicability: vi.fn(),
+  locationFindMany: vi.fn(),
   managerScopePersonIds: vi.fn(),
   personCount: vi.fn(),
   personFindMany: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock("@repo/database", () => ({
       count: mocks.availabilityCount,
       groupBy: mocks.availabilityGroupBy,
     },
+    location: { findMany: mocks.locationFindMany },
     person: {
       count: mocks.personCount,
       findMany: mocks.personFindMany,
@@ -48,6 +51,7 @@ vi.mock("../settings/manager-scope", () => ({
 vi.mock("./current-status", () => ({
   computeCurrentStatus: mocks.computeCurrentStatus,
   computeCurrentStatusForPeople: mocks.computeCurrentStatusForPeople,
+  computePublicHolidayApplicability: mocks.computePublicHolidayApplicability,
 }));
 vi.mock("../xero-connection-state", () => ({
   hasActiveXeroConnection: vi.fn(),
@@ -67,8 +71,13 @@ describe("people-service", () => {
     mocks.managerScopePersonIds.mockResolvedValue([managerId, directReportId]);
     mocks.personFindMany.mockResolvedValue([personRow(directReportId)]);
     mocks.personCount.mockResolvedValue(1);
+    mocks.locationFindMany.mockResolvedValue([]);
     mocks.availabilityGroupBy.mockResolvedValue([]);
     mocks.computeCurrentStatus.mockResolvedValue(currentStatus());
+    mocks.computePublicHolidayApplicability.mockResolvedValue({
+      locationIds: new Set(),
+      unassigned: false,
+    });
     mocks.computeCurrentStatusForPeople.mockImplementation(
       async (input: {
         people: Array<{ locationId: string | null; personId: string }>;
@@ -152,6 +161,39 @@ describe("people-service", () => {
         }),
       })
     );
+  });
+
+  it("denies a manager without a linked acting person before querying people", async () => {
+    const result = await listPeople({
+      actingPersonId: null,
+      clerkOrgId: "org_1",
+      organisationId,
+      role: "manager",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+  });
+
+  it("returns an empty page without querying for an empty manager scope", async () => {
+    mocks.managerScopePersonIds.mockResolvedValue([]);
+
+    const result = await listPeople({
+      actingPersonId: managerId,
+      clerkOrgId: "org_1",
+      organisationId,
+      role: "manager",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { nextCursor: null, people: [], totalCount: 0 },
+    });
+    expect(mocks.personFindMany).not.toHaveBeenCalled();
+    expect(mocks.personCount).not.toHaveBeenCalled();
   });
 
   it("batches xero sync failed counts instead of counting per person", async () => {
@@ -299,12 +341,13 @@ describe("people-service", () => {
     expect(result.value.totalCount).toBe(2);
   });
 
-  it("keeps filtered path pagination in memory when status filters apply", async () => {
+  it("pages and counts status filters in the database", async () => {
     mocks.personFindMany.mockResolvedValue([
       personRow("00000000-0000-4000-8000-000000000101"),
       personRow("00000000-0000-4000-8000-000000000102"),
       personRow("00000000-0000-4000-8000-000000000103"),
     ]);
+    mocks.personCount.mockResolvedValue(3);
 
     const result = await listPeople({
       clerkOrgId: "org_1",
@@ -315,12 +358,41 @@ describe("people-service", () => {
 
     expect(result.ok).toBe(true);
     expect(mocks.personFindMany).toHaveBeenCalledWith(
-      expect.not.objectContaining({ take: expect.any(Number) })
+      expect.objectContaining({ take: 3 })
     );
-    expect(mocks.personCount).not.toHaveBeenCalled();
+    expect(mocks.personCount).toHaveBeenCalledOnce();
     expect(result.value.people).toHaveLength(2);
     expect(result.value.nextCursor).toEqual(expect.any(String));
     expect(result.value.totalCount).toBe(3);
+  });
+
+  it("uses an impossible holiday predicate when no holiday applies", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.personCount.mockResolvedValue(0);
+
+    const result = await listPeople({
+      clerkOrgId: "org_1",
+      filters: { status: ["public_holiday"] },
+      organisationId,
+      pagination: { pageSize: 50 },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                expect.objectContaining({
+                  AND: expect.arrayContaining([{ id: { in: [] } }]),
+                }),
+              ]),
+            }),
+          ]),
+        }),
+      })
+    );
   });
 });
 

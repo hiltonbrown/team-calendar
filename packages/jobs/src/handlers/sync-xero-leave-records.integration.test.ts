@@ -1,3 +1,4 @@
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -30,33 +31,28 @@ await import("./setup-env");
 
 const { getRegisteredSyncEventName } = await import("../events");
 
-let database: typeof import("@repo/database")["database"];
-let syncXeroLeaveRecords: typeof import("./sync-xero-leave-records")["syncXeroLeaveRecords"];
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database } = await import("@repo/database"));
-  ({ syncXeroLeaveRecords } = await import("./sync-xero-leave-records"));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts"
+);
+const { database } = await import("@repo/database");
+const { syncXeroLeaveRecords } = await import("./sync-xero-leave-records");
 
 const tenantA = {
-  clerkOrgId: "org_test_leave_sync_a",
-  organisationId: "50000000-0000-4000-8000-000000000001",
-  personId: "50000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "50000000-0000-4000-8000-000000000002",
-  xeroEmployeeId: "50000000-0000-4000-8000-000000000005",
-  xeroTenantId: "50000000-0000-4000-8000-000000000003",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  personId: fixture.id("person", 0),
+  xeroConnectionId: fixture.id("connection", 0),
+  xeroEmployeeId: fixture.id("employee", 0),
+  xeroTenantId: fixture.id("tenant", 0),
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_leave_sync_b",
-  organisationId: "60000000-0000-4000-8000-000000000001",
-  personId: "60000000-0000-4000-8000-000000000004",
-  xeroConnectionId: "60000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  organisationId: fixture.tenants[1]?.organisationId as string,
+  personId: fixture.id("person", 1),
+  xeroConnectionId: fixture.id("connection", 1),
   xeroEmployeeId: tenantA.xeroEmployeeId,
-  xeroTenantId: "60000000-0000-4000-8000-000000000003",
+  xeroTenantId: fixture.id("tenant", 1),
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
@@ -69,7 +65,7 @@ describe("sync-xero-leave-records handler", () => {
   });
 });
 
-describeWithDatabase("sync-xero-leave-records database flow", () => {
+describe("sync-xero-leave-records database flow", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     await cleanTestData();

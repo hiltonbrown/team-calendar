@@ -59,11 +59,14 @@ describe("Integrations page", () => {
   it("renders region status and destinations from the capability model", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
-    expect(html).toContain("currently supports Xero Payroll Australia");
+    expect(html).toContain(
+      "early access is available for Xero Payroll Australia"
+    );
     expect(html).toContain("New Zealand and United Kingdom support is planned");
     expect(html.split('data-status="shipped"')).toHaveLength(2);
     expect(html.split('data-status="planned"')).toHaveLength(3);
-    expect(html).toContain("Supported at launch");
+    expect(html).toContain("Australian early access");
+    expect(html).not.toContain("Supported at launch");
     expect(html.split(">Planned<")).toHaveLength(3);
     expect(html).toContain("Outlook");
     expect(html).toContain("Google Calendar");

@@ -41,8 +41,12 @@ const icalMocks = vi.hoisted(() => {
 });
 
 const mocks = vi.hoisted(() => ({
+  auditEventCreateMany: vi.fn(() => Promise.resolve({ count: 1 })),
+  auditEventFindUnique: vi.fn(() =>
+    Promise.resolve({ created_at: new Date("2026-09-19T00:00:00.000Z") })
+  ),
   feedTokenFindUnique: vi.fn(),
-  feedTokenUpdate: vi.fn(() => Promise.resolve({})),
+  feedTokenUpdate: vi.fn(() => Promise.resolve({ count: 1 })),
   feedUpdate: vi.fn(() => Promise.resolve({})),
   getCachedFeedBody: vi.fn(() => Promise.resolve({ ok: true, value: null })),
   logWarn: vi.fn(),
@@ -76,10 +80,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
+    auditEvent: {
+      createMany: mocks.auditEventCreateMany,
+      findUnique: mocks.auditEventFindUnique,
+    },
     feed: { update: mocks.feedUpdate },
     feedToken: {
       findUnique: mocks.feedTokenFindUnique,
       update: mocks.feedTokenUpdate,
+      updateMany: mocks.feedTokenUpdate,
     },
   },
 }));
@@ -398,7 +407,7 @@ describe("renderFeedForToken", () => {
     expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
   });
 
-  it("writes last_used_at on a cache hit when last_used_at was 2 hours ago", async () => {
+  it("refreshes hourly activity without replacing the durable first-access milestone", async () => {
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     mocks.feedTokenFindUnique.mockResolvedValue(
       feedTokenFixture({ last_used_at: twoHoursAgo })
@@ -411,15 +420,14 @@ describe("renderFeedForToken", () => {
     const result = await renderFeedForToken("plaintext-token");
 
     expect(result.ok).toBe(true);
+    if (result.ok) {
+      await result.value.activation;
+    }
     expect(mocks.feedTokenUpdate).toHaveBeenCalledTimes(1);
-    expect(mocks.feedTokenUpdate).toHaveBeenCalledWith({
-      data: { last_used_at: expect.any(Date) },
-      where: {
-        clerk_org_id: "org_render",
-        id: "30000000-0000-4000-8000-000000000001",
-        organisation_id: "40000000-0000-4000-8000-000000000001",
-      },
-    });
+    expect(mocks.auditEventCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true })
+    );
+    expect(mocks.auditEventFindUnique).toHaveBeenCalledTimes(1);
   });
 
   it("writes last_used_at on a cache hit when last_used_at is null", async () => {

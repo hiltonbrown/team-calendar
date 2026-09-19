@@ -42,10 +42,7 @@ const EarlyAccess = () => (
               Future commercial terms will be confirmed before paid billing
               begins.
             </p>
-            <a
-              className="marketing-btn marketing-btn--primary"
-              href={supportMailtoHref}
-            >
+            <a className="marketing-btn marketing-btn--primary" href="/contact">
               Enquire about early access
             </a>
           </article>
@@ -61,8 +58,8 @@ const EarlyAccessContact = () => (
       <div>
         <h2 className="fmkt-section-title">One clear next step</h2>
         <p>
-          Tell us your organisation name, team size, Xero Payroll region and the
-          help you need.
+          Tell us your organisation name, team size and the help you need with
+          Australian Xero Payroll.
         </p>
       </div>
       <div className="fmkt-pricing-form">

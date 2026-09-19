@@ -42,12 +42,12 @@ type FeedTokenRow = Prisma.FeedTokenGetPayload<{
   select: typeof feedTokenSelect;
 }>;
 
-// last_used_at is telemetry, not a correctness input. Writing it on every
-// calendar-client poll produces one row update per subscriber every few
-// minutes, forever. Hourly granularity carries the same information.
-const TOKEN_USE_DEBOUNCE_MS = 60 * 60 * 1000;
-
 export interface RenderedFeed {
+  activation?: Promise<null | {
+    clerkOrgId: string;
+    organisationId: string;
+    occurredAt: Date;
+  }>;
   body: string;
   etag: string;
   status: "active" | "expired" | "revoked";
@@ -178,11 +178,17 @@ export async function renderFeedForToken(
       data: { status: "expired" },
       where: { id: feedToken.id },
     });
-    return { ok: true, value: { body: "", etag: "", status: "expired" } };
+    return {
+      ok: true,
+      value: { body: "", etag: "", status: "expired" },
+    };
   }
 
   if (feedToken.feed.status !== "active") {
-    return { ok: true, value: { body: "", etag: "", status: "revoked" } };
+    return {
+      ok: true,
+      value: { body: "", etag: "", status: "revoked" },
+    };
   }
 
   const key = feedCacheKey({
@@ -191,14 +197,10 @@ export async function renderFeedForToken(
   });
   const cached = await getCachedFeedBody(key);
   if (cached.ok && cached.value) {
-    // Telemetry only: never block or fail the feed response on it.
-    markTokenUsed(feedToken).catch((error) => {
-      log.warn("Feed token use write failed", {
-        error,
-        feedId: feedToken.feed_id,
-      });
-    });
-    return { ok: true, value: { ...cached.value, status: "active" } };
+    return {
+      ok: true,
+      value: withActivation({ ...cached.value, status: "active" }, feedToken),
+    };
   }
 
   const rendered = await renderFeedBody({
@@ -214,7 +216,6 @@ export async function renderFeedForToken(
   const { body, etag } = rendered.value;
 
   await Promise.all([
-    markTokenUsed(feedToken),
     database.feed.update({
       data: {
         last_etag: etag,
@@ -240,7 +241,21 @@ export async function renderFeedForToken(
     });
   }
 
-  return { ok: true, value: { body, etag, status: "active" } };
+  return {
+    ok: true,
+    value: withActivation({ body, etag, status: "active" }, feedToken),
+  };
+}
+
+function withActivation(
+  rendered: RenderedFeed,
+  token: FeedTokenRow
+): RenderedFeed {
+  Object.defineProperty(rendered, "activation", {
+    enumerable: false,
+    value: firstFeedAccess(token),
+  });
+  return rendered;
 }
 
 async function resolveFeedToken(token: string): Promise<FeedTokenRow | null> {
@@ -271,26 +286,86 @@ async function resolveFeedToken(token: string): Promise<FeedTokenRow | null> {
   return feedToken;
 }
 
-function markTokenUsed(token: {
-  id: string;
-  clerk_org_id: string;
-  last_used_at: Date | null;
-  organisation_id: string;
-}): Promise<unknown> {
-  if (
-    token.last_used_at &&
-    Date.now() - token.last_used_at.getTime() < TOKEN_USE_DEBOUNCE_MS
-  ) {
+async function firstFeedAccess(token: FeedTokenRow): Promise<null | {
+  clerkOrgId: string;
+  organisationId: string;
+  occurredAt: Date;
+}> {
+  try {
+    const occurredAt = new Date();
+    await Promise.all([
+      markTokenUsed(token, occurredAt),
+      database.auditEvent.createMany({
+        data: {
+          action: "activation.first_feed_accessed",
+          clerk_org_id: token.clerk_org_id,
+          created_at: occurredAt,
+          id: activationMilestoneId(
+            token.clerk_org_id,
+            token.organisation_id,
+            "first_feed_accessed"
+          ),
+          organisation_id: token.organisation_id,
+          resource_type: "activation_milestone",
+        },
+        skipDuplicates: true,
+      }),
+    ]);
+    const first = await database.auditEvent.findUnique({
+      select: { created_at: true },
+      where: {
+        clerk_org_id: token.clerk_org_id,
+        id: activationMilestoneId(
+          token.clerk_org_id,
+          token.organisation_id,
+          "first_feed_accessed"
+        ),
+        organisation_id: token.organisation_id,
+      },
+    });
+    return first?.created_at
+      ? {
+          clerkOrgId: token.clerk_org_id,
+          occurredAt: first.created_at,
+          organisationId: token.organisation_id,
+        }
+      : null;
+  } catch (error) {
+    log.warn("Feed token use write failed", {
+      error,
+      feedId: token.feed_id,
+    });
+    return null;
+  }
+}
+
+function markTokenUsed(
+  token: FeedTokenRow,
+  occurredAt: Date
+): Promise<unknown> {
+  const oneHourAgo = new Date(occurredAt.getTime() - 60 * 60 * 1000);
+  if (token.last_used_at && token.last_used_at >= oneHourAgo) {
     return Promise.resolve();
   }
-
-  return database.feedToken.update({
-    data: { last_used_at: new Date() },
-    // Scope the write by clerk_org_id and organisation_id as well as the unique id.
+  return database.feedToken.updateMany({
+    data: { last_used_at: occurredAt },
     where: {
       clerk_org_id: token.clerk_org_id,
       id: token.id,
+      OR: [{ last_used_at: null }, { last_used_at: { lt: oneHourAgo } }],
       organisation_id: token.organisation_id,
     },
   });
+}
+
+function activationMilestoneId(
+  clerkOrgId: string,
+  organisationId: string,
+  milestone: string
+): string {
+  const hex = createHash("sha256")
+    .update(`${clerkOrgId}:${organisationId}:${milestone}`)
+    .digest("hex")
+    .slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
 }

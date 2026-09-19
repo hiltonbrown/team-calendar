@@ -70,6 +70,14 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Verification and CI
 
+- Explicit authority to use the live Neon database persists for the release.
+  Implement target, ownership, rollback and cleanup safeguards and continue the
+  authorised tests; do not turn incomplete tooling into another permission
+  question or a reason to fall back to disposable database evidence.
+- When the user explicitly authorises live database verification, that authority
+  persists for the scoped release run. Build and enforce identity, ownership and
+  cleanup safeguards as implementation work; do not turn incomplete safeguards
+  into another permission gate.
 - Initialise expensive module registries once after mocks are declared. A fast
   cached import is not evidence that repeated initialisation will fit CI worker
   timeouts.
@@ -106,3 +114,10 @@ actionable; keep one-off task evidence in the review for that task.
   one part of repository state.
 - Treat dangling Git objects as normal cleanup residue unless `git fsck` reports
   missing or corrupt objects.
+- For timestamp-guarded webhook mirrors, inspect the atomic write result. A
+  zero-row write can be a concurrent equal-time collision and must trigger
+  authoritative reconciliation or a retryable failure before the receipt is
+  marked processed.
+- Describe external provider controls as required configuration until concrete
+  provider evidence identifies the account, access list, rule and delivery
+  result. Repository intent is not proof that a mailbox or dashboard rule exists.

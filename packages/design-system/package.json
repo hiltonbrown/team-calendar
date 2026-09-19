@@ -2,6 +2,29 @@
   "name": "@repo/design-system",
   "version": "0.0.0",
   "private": true,
+  "exports": {
+    ".": {
+      "types": "./index.tsx",
+      "default": "./index.tsx"
+    },
+    "./components/*": {
+      "types": "./components/*.tsx",
+      "default": "./components/*.tsx"
+    },
+    "./hooks/*": {
+      "types": "./hooks/*.ts",
+      "default": "./hooks/*.ts"
+    },
+    "./lib/*": {
+      "types": "./lib/*.ts",
+      "default": "./lib/*.ts"
+    },
+    "./providers/public": {
+      "types": "./providers/public.tsx",
+      "default": "./providers/public.tsx"
+    },
+    "./styles/*": "./styles/*"
+  },
   "scripts": {
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "test": "NODE_ENV=test vitest run --passWithNoTests",
@@ -37,7 +60,7 @@
     "@repo/typescript-config": "*",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
-    "@types/node": "^26.6.1",
+    "@types/node": "^22.20.3",
     "@types/react": "^19.3.0",
     "next": "16.3.5",
     "postcss": "^8.5.28",
