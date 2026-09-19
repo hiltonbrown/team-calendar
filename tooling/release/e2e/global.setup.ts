@@ -2,12 +2,14 @@
 import { mkdirSync } from "node:fs";
 import { clerk, clerkSetup } from "@clerk/testing/playwright";
 import { expect, test as setup } from "@playwright/test";
+import { validateReleaseFixtureOwnership } from "./created-record.js";
 import { releaseEnvironment, roleEmail, roles } from "./environment.js";
 
 setup.describe.configure({ mode: "serial" });
 const environment = releaseEnvironment();
 
 setup("validate candidate health and initialise Clerk", async ({ request }) => {
+  await validateReleaseFixtureOwnership();
   await clerkSetup();
   await expect
     .poll(async () =>

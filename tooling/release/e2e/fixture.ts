@@ -1,10 +1,12 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Shared Playwright assertions run once per journey.
+
 import {
   type Browser,
   test as base,
   type Page,
   expect as playwrightExpect,
 } from "@playwright/test";
+import { validateReleaseFixtureOwnership } from "./created-record.js";
 import {
   type ReleaseRole,
   releaseEnvironment,
@@ -48,13 +50,22 @@ export async function useRole(browser: Browser, role: ReleaseRole) {
   await page.waitForFunction(() => Boolean(window.Clerk?.user));
   const identity = await page.evaluate(() => ({
     email: window.Clerk?.user?.primaryEmailAddress?.emailAddress,
+    organisationId: window.Clerk?.organization?.id,
     role: window.Clerk?.user?.organizationMemberships.find(
       (membership) =>
         membership.organization.id === window.Clerk?.organization?.id
     )?.role,
+    userId: window.Clerk?.user?.id,
   }));
+  const fixtureIdentity = await validateReleaseFixtureOwnership();
   playwrightExpect(identity.email).toBe(roleEmail(role));
+  playwrightExpect(identity.organisationId).toBe(
+    fixtureIdentity.primaryClerkOrgId
+  );
   playwrightExpect(identity.role).toBe(`org:${role}`);
+  if (role === "viewer") {
+    playwrightExpect(identity.userId).toBe(fixtureIdentity.viewerClerkUserId);
+  }
   return { context, page };
 }
 

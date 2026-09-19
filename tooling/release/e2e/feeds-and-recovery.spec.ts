@@ -1,4 +1,5 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright locators run once per journey.
+import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment, requiredFixture } from "./environment.js";
 import { expect, test, useRole } from "./fixture.js";
 
@@ -25,7 +26,12 @@ test("an ambiguous submission exposes recovery without issuing another create", 
   browser,
 }) => {
   const { context, page } = await useRole(browser, "admin");
-  await page.goto(`/plans?personId=${fixtures.people.recovery}`);
+  await page.goto(
+    withOrg(
+      `/plans?personId=${fixtures.people.recovery}`,
+      fixtures.organisations.primary
+    )
+  );
   const row = page.locator(`tr:has(a[href*="${fixtures.records.recovery}"])`);
   await expect(row).toBeVisible();
   await expect(
@@ -47,7 +53,12 @@ test("a definitive failed submission can be retried to a known state", async ({
   browser,
 }) => {
   const { context, page } = await useRole(browser, "viewer");
-  await page.goto(`/plans?personId=${fixtures.people.retry}`);
+  await page.goto(
+    withOrg(
+      `/plans?personId=${fixtures.people.retry}`,
+      fixtures.organisations.primary
+    )
+  );
   const row = page.locator(`tr:has(a[href*="${fixtures.records.retry}"])`);
   await expect(row).toContainText(/Submit failed|Xero sync failed/);
   await row.getByRole("button", { name: "Retry submission" }).click();

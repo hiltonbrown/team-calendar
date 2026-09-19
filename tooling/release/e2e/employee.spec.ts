@@ -1,4 +1,5 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright locators run once per serial journey.
+import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { findCreatedRecordId } from "./created-record.js";
 import { releaseEnvironment } from "./environment.js";
 import { expect, rowForRecord, test, useRole } from "./fixture.js";
@@ -23,7 +24,7 @@ test.describe
       const { context, page } = await useRole(browser, "viewer");
       const correlationId = crypto.randomUUID();
       recordIntendedCreate("manual_availability", correlationId);
-      await page.goto("/plans/new");
+      await page.goto(withOrg("/plans/new", fixtures.organisations.primary));
       await page.getByLabel("Record type").click();
       await page.getByRole("option", { name: /Training:/ }).click();
       await page.getByLabel("Starts").fill(tomorrow);
@@ -56,7 +57,7 @@ test.describe
       const { context, page } = await useRole(browser, "viewer");
       const correlationId = crypto.randomUUID();
       recordIntendedCreate("payroll_leave", correlationId);
-      await page.goto("/plans/new");
+      await page.goto(withOrg("/plans/new", fixtures.organisations.primary));
       await page.getByLabel("Record type").click();
       await page.getByRole("option", { name: /Annual leave:/ }).click();
       await page.getByLabel("Starts").fill(tomorrow);

@@ -1,5 +1,6 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright locators run once per journey.
 
+import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment } from "./environment.js";
 import { expect, expectRoleDenied, test, useRole } from "./fixture.js";
 
@@ -9,7 +10,9 @@ test("admin runs a controlled people import through the live Xero connection", a
   browser,
 }) => {
   const { context, page } = await useRole(browser, "admin");
-  await page.goto("/settings/integrations/xero");
+  await page.goto(
+    withOrg("/settings/integrations/xero", fixtures.organisations.primary)
+  );
   await expect(
     page.getByRole("heading", { name: "Xero Payroll" })
   ).toBeVisible();

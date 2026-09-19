@@ -1,4 +1,5 @@
 // biome-ignore-all lint/performance/useTopLevelRegex: Playwright locators run once per serial journey.
+import { withOrg } from "../../../apps/app/lib/navigation/org-url.js";
 import { releaseEnvironment, requiredFixture } from "./environment.js";
 import { expect, rowForRecord, test, useRole } from "./fixture.js";
 
@@ -10,7 +11,9 @@ test.describe
       const manager = await useRole(browser, "manager");
       const { page } = manager;
       const employee = requiredFixture("TC_E2E_APPROVE_EMPLOYEE_NAME");
-      await page.goto("/leave-approvals");
+      await page.goto(
+        withOrg("/leave-approvals", fixtures.organisations.primary)
+      );
       const row = rowForRecord(page, fixtures.records.approve).filter({
         hasText: employee,
       });
@@ -19,7 +22,7 @@ test.describe
       await expect(page.getByText("Leave approved in Xero")).toBeVisible();
       await manager.context.close();
       const viewer = await useRole(browser, "viewer");
-      await viewer.page.goto("/plans");
+      await viewer.page.goto(withOrg("/plans", fixtures.organisations.primary));
       const approved = rowForRecord(viewer.page, fixtures.records.approve);
       await approved.getByRole("button", { name: "Withdraw" }).click();
       await viewer.page
@@ -36,7 +39,9 @@ test.describe
     }) => {
       const { context, page } = await useRole(browser, "manager");
       const employee = requiredFixture("TC_E2E_DECLINE_EMPLOYEE_NAME");
-      await page.goto("/leave-approvals");
+      await page.goto(
+        withOrg("/leave-approvals", fixtures.organisations.primary)
+      );
       const row = rowForRecord(page, fixtures.records.decline).filter({
         hasText: employee,
       });
