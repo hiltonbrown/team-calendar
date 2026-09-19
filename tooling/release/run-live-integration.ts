@@ -3,7 +3,10 @@ import { resolve } from "node:path";
 import {
   acquireActiveRun,
   assertActiveRunOwner,
+  persistCatalogueDigest,
+  readCatalogueDigest,
   releaseActiveRun,
+  releaseCatalogueDigest,
 } from "./active-run-registry.js";
 import {
   assertDurableManifestReadBack,
@@ -107,7 +110,7 @@ if (action === "run") {
 let status = 1;
 let cleanupSucceeded = false;
 let catalogueDigestBefore: string | undefined;
-const readCatalogueDigest = (output: string) => {
+const parseCatalogueDigest = (output: string) => {
   const line = output.trim().split("\n").at(-1);
   if (!line) {
     throw new Error("Cleanup did not return a catalogue digest");
@@ -134,13 +137,20 @@ try {
     if (snapshot.status !== 0) {
       throw new Error(snapshot.stderr || snapshot.stdout);
     }
-    catalogueDigestBefore = readCatalogueDigest(snapshot.stdout);
+    catalogueDigestBefore = parseCatalogueDigest(snapshot.stdout);
+    await persistCatalogueDigest(
+      manifest,
+      catalogueDigestBefore,
+      registryInput
+    );
     const result = spawnSync("bun", ["run", "test:integration"], {
       cwd: root,
       env: childEnvironment,
       stdio: "inherit",
     });
     status = result.status ?? 1;
+  } else {
+    catalogueDigestBefore = await readCatalogueDigest(manifest, registryInput);
   }
 } finally {
   const cleanup = spawnSync(
@@ -157,7 +167,7 @@ try {
   if (cleanup.status === 0) {
     const catalogueChanged =
       catalogueDigestBefore &&
-      readCatalogueDigest(cleanup.stdout) !== catalogueDigestBefore;
+      parseCatalogueDigest(cleanup.stdout) !== catalogueDigestBefore;
     if (catalogueChanged) {
       process.stderr.write(
         "Live integration changed catalogue rows outside manifest ownership"
@@ -175,6 +185,10 @@ try {
   }
 }
 if (cleanupSucceeded) {
+  if (!catalogueDigestBefore) {
+    throw new Error("Release catalogue baseline was not established");
+  }
+  await releaseCatalogueDigest(manifest, catalogueDigestBefore, registryInput);
   await releaseActiveRun(manifest, registryInput);
 }
 process.exit(status);
