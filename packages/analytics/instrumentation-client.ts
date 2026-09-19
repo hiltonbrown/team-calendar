@@ -62,8 +62,35 @@ const sanitiseUrl = (value: string): string => {
 const sanitiseEventUrls = (
   event: AnalyticsEvent | null
 ): AnalyticsEvent | null => {
-  if (!event?.properties) {
+  if (!event) {
     return event;
+  }
+  const sanitiseUrlContainer = (value: unknown): unknown => {
+    if (!(value && typeof value === "object") || Array.isArray(value)) {
+      return value;
+    }
+    const nested = { ...(value as Record<string, unknown>) };
+    for (const key of [
+      "$current_url",
+      "$initial_current_url",
+      "$initial_referrer",
+      "$referrer",
+      "$session_entry_url",
+    ]) {
+      if (typeof nested[key] === "string") {
+        nested[key] = sanitiseUrl(nested[key]);
+      }
+    }
+    return nested;
+  };
+  const sanitisedEvent = { ...event };
+  for (const containerKey of ["$set", "$set_once"]) {
+    sanitisedEvent[containerKey] = sanitiseUrlContainer(
+      sanitisedEvent[containerKey]
+    );
+  }
+  if (!event.properties) {
+    return sanitisedEvent;
   }
   const properties = { ...event.properties };
   for (const key of [
@@ -78,24 +105,9 @@ const sanitiseEventUrls = (
     }
   }
   for (const containerKey of ["$set", "$set_once"]) {
-    const value = properties[containerKey];
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-      const nested = { ...(value as Record<string, unknown>) };
-      for (const key of [
-        "$current_url",
-        "$initial_current_url",
-        "$initial_referrer",
-        "$referrer",
-        "$session_entry_url",
-      ]) {
-        if (typeof nested[key] === "string") {
-          nested[key] = sanitiseUrl(nested[key]);
-        }
-      }
-      properties[containerKey] = nested;
-    }
+    properties[containerKey] = sanitiseUrlContainer(properties[containerKey]);
   }
-  return { ...event, properties };
+  return { ...sanitisedEvent, properties };
 };
 
 const scheduleAfterHydration = (callback: () => void) => {

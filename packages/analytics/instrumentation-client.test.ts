@@ -94,28 +94,38 @@ describe("client analytics initialisation", () => {
     );
     const options = client.init.mock.calls[0]?.[1];
     const beforeSend = options?.before_send as (event: {
+      $set_once?: Record<string, unknown>;
       properties: Record<string, unknown>;
-    }) => { properties: Record<string, unknown> };
-    expect(
-      beforeSend({
-        properties: {
-          $current_url: "https://app.example/invitations?ticket=secret",
-          $initial_current_url: "https://app.example/sign-up?token=secret",
-          $referrer: "https://app.example/feeds?feed=secret",
-          $session_entry_url: "https://app.example/leave?content=private",
-          $set: { $initial_referrer: "https://app.example/auth?token=secret" },
-          $set_once: {
-            $initial_current_url: "https://app.example/invite?ticket=secret",
-          },
+    }) => {
+      $set_once?: Record<string, unknown>;
+      properties: Record<string, unknown>;
+    };
+    const sanitised = beforeSend({
+      $set_once: {
+        $current_url:
+          "https://app.example/next?ticket=TEST_TICKET_SECRET#TEST_HASH_SECRET",
+      },
+      properties: {
+        $current_url: "https://app.example/invitations?ticket=secret",
+        $initial_current_url: "https://app.example/sign-up?token=secret",
+        $referrer: "https://app.example/feeds?feed=secret",
+        $session_entry_url: "https://app.example/leave?content=private",
+        $set: { $initial_referrer: "https://app.example/auth?token=secret" },
+        $set_once: {
+          $initial_current_url: "https://app.example/invite?ticket=secret",
         },
-      }).properties
-    ).toEqual({
+      },
+    });
+    expect(sanitised.properties).toEqual({
       $current_url: "https://app.example/invitations",
       $initial_current_url: "https://app.example/sign-up",
       $referrer: "https://app.example/feeds",
       $session_entry_url: "https://app.example/leave",
       $set: { $initial_referrer: "https://app.example/auth" },
       $set_once: { $initial_current_url: "https://app.example/invite" },
+    });
+    expect(sanitised.$set_once).toEqual({
+      $current_url: "https://app.example/next",
     });
   });
 
