@@ -1,21 +1,24 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is leave_balances.integration.test.ts.
 import type { ClerkOrgId, OrganisationId, PersonId } from "@repo/core";
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
+
+const fixture = allocateLiveTestFixture(
+  "packages/database/leave_balances.integration.test.ts"
+);
 
 const { database, employment_type, source_system } = await import("./index.js");
 const { listLeaveBalancesForOrganisation, listLeaveBalancesForPerson } =
   await import("./src/queries/leave-balances.js");
 
 const tenant = {
-  clerkOrgId: "org_test_leave_balances_a",
-  locationId: "40000000-0000-4000-8000-000000000003",
-  organisationId: "40000000-0000-4000-8000-000000000001",
-  personId: "40000000-0000-4000-8000-000000000004",
-  teamId: "40000000-0000-4000-8000-000000000002",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  locationId: fixture.id("location"),
+  organisationId: fixture.tenants[0]?.organisationId as string,
+  personId: fixture.id("person"),
+  teamId: fixture.id("team"),
 } as const;
 
 const testClerkOrgIds = [tenant.clerkOrgId] as const;

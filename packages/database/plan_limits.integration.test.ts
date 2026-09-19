@@ -1,14 +1,16 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is plan_limits.integration.test.ts.
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
 
+const fixture = allocateLiveTestFixture(
+  "packages/database/plan_limits.integration.test.ts"
+);
 const { database, plan_limit_type } = await import("./index.js");
 
-const planId = "50000000-0000-4000-8000-000000000001";
-const planKey = "test_plan_limits";
+const planId = fixture.globalKey("plan_id");
+const planKey = fixture.globalKey("plan_key");
 
 const cleanTestData = async () => {
   await database.planLimit.deleteMany({ where: { plan_id: planId } });
@@ -46,7 +48,7 @@ describe("plan_limits", () => {
   test("rejects duplicate (plan_id, limit_type) pairs", async () => {
     await database.planLimit.create({
       data: {
-        id: "51000000-0000-4000-8000-000000000001",
+        id: fixture.id("plan-limit", 0),
         limit_type: plan_limit_type.feeds,
         limit_value: 2,
         plan_id: planId,
@@ -56,7 +58,7 @@ describe("plan_limits", () => {
     await expectPrismaErrorCode(
       database.planLimit.create({
         data: {
-          id: "51000000-0000-4000-8000-000000000002",
+          id: fixture.id("plan-limit", 1),
           limit_type: plan_limit_type.feeds,
           limit_value: 5,
           plan_id: planId,
@@ -69,7 +71,7 @@ describe("plan_limits", () => {
   test("allows distinct limit types for the same plan", async () => {
     await database.planLimit.create({
       data: {
-        id: "51000000-0000-4000-8000-000000000003",
+        id: fixture.id("plan-limit", 2),
         limit_type: plan_limit_type.feeds,
         limit_value: 2,
         plan_id: planId,
@@ -79,7 +81,7 @@ describe("plan_limits", () => {
     await expect(
       database.planLimit.create({
         data: {
-          id: "51000000-0000-4000-8000-000000000004",
+          id: fixture.id("plan-limit", 3),
           limit_type: plan_limit_type.active_people,
           limit_value: 5,
           plan_id: planId,

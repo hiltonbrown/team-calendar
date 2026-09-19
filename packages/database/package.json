@@ -10,6 +10,10 @@
       "types": "./keys.ts",
       "default": "./keys.ts"
     },
+    "./live-test-fixture": {
+      "types": "./src/live-test-fixture.ts",
+      "default": "./src/live-test-fixture.ts"
+    },
     "./generated/client": {
       "types": "./generated/client.ts",
       "default": "./generated/client.ts"

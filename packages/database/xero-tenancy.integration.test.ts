@@ -1,31 +1,34 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration test co-located beside other database integration suites.
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
+
+const fixture = allocateLiveTestFixture(
+  "packages/database/xero-tenancy.integration.test.ts"
+);
 
 const { database, payroll_region } = await import("./index.js");
 
-const testClerkOrgId = "org_test_xero_tenancy_066";
+const testClerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
 const testClerkOrgIds = [testClerkOrgId] as const;
 
 const org1 = {
-  connectionId: "66200000-0000-4000-8000-000000000011",
-  duplicateConnectionId: "66200000-0000-4000-8000-000000000012",
-  duplicateTenantId: "66200000-0000-4000-8000-000000000022",
-  id: "66200000-0000-4000-8000-000000000001",
+  connectionId: fixture.id("connection", 0),
+  duplicateConnectionId: fixture.id("connection", 1),
+  duplicateTenantId: fixture.id("tenant", 1),
+  id: fixture.tenants[0]?.organisationId as string,
   name: "Acme Payroll Entity A",
-  tenantId: "66200000-0000-4000-8000-000000000021",
-  xeroTenantGuid: "66200000-0000-4000-8000-000000000031",
+  tenantId: fixture.id("tenant", 0),
+  xeroTenantGuid: fixture.id("provider-tenant", 0),
 } as const;
 
 const org2 = {
-  connectionId: "66200000-0000-4000-8000-000000000013",
-  id: "66200000-0000-4000-8000-000000000002",
+  connectionId: fixture.id("connection", 2),
+  id: fixture.tenants[1]?.organisationId as string,
   name: "Acme Payroll Entity B",
-  tenantId: "66200000-0000-4000-8000-000000000023",
-  xeroTenantGuid: "66200000-0000-4000-8000-000000000032",
+  tenantId: fixture.id("tenant", 2),
+  xeroTenantGuid: fixture.id("provider-tenant", 1),
 } as const;
 
 const cleanTestData = async () => {

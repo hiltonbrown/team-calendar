@@ -86,7 +86,8 @@ const unknownGlobalKeys = manifest.owned.globalKeys.filter(
     !(
       key.startsWith("stripe_event:") ||
       key.startsWith("plan_id:") ||
-      key.startsWith("plan_key:")
+      key.startsWith("plan_key:") ||
+      key.startsWith("fixture-namespace:")
     )
 );
 if (unknownGlobalKeys.length > 0) {
@@ -142,8 +143,9 @@ if (planIds.length > 0 || planKeys.length > 0) {
   }
   if (planKeys.length > 0) {
     clauses.push(
-      `key IN (${placeholders(values.length + 1, planKeys.length)})`
+      `(key IN (${placeholders(values.length + 1, planKeys.length)}) OR plan_key IN (${placeholders(values.length + planKeys.length + 1, planKeys.length)}))`
     );
+    values.push(...planKeys);
     values.push(...planKeys);
   }
   counts.plans = await countRows("plans", clauses.join(" OR "), values);
@@ -201,8 +203,9 @@ if (mode === "--apply") {
       }
       if (planKeys.length > 0) {
         clauses.push(
-          `key IN (${placeholders(values.length + 1, planKeys.length)})`
+          `(key IN (${placeholders(values.length + 1, planKeys.length)}) OR plan_key IN (${placeholders(values.length + planKeys.length + 1, planKeys.length)}))`
         );
+        values.push(...planKeys);
         values.push(...planKeys);
       }
       await transaction.$executeRawUnsafe(
@@ -252,8 +255,9 @@ if (planIds.length > 0 || planKeys.length > 0) {
   }
   if (planKeys.length > 0) {
     clauses.push(
-      `key IN (${placeholders(values.length + 1, planKeys.length)})`
+      `(key IN (${placeholders(values.length + 1, planKeys.length)}) OR plan_key IN (${placeholders(values.length + planKeys.length + 1, planKeys.length)}))`
     );
+    values.push(...planKeys);
     values.push(...planKeys);
   }
   residue.plans = await countRows("plans", clauses.join(" OR "), values);

@@ -1,10 +1,13 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Database test files follow existing snake_case naming.
 import type { ClerkOrgId, FeedId, OrganisationId } from "@repo/core";
-import { config } from "dotenv";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
-config({ path: new URL("./.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
+
+const fixture = allocateLiveTestFixture(
+  "packages/database/public-holidays.integration.test.ts"
+);
 
 const { database } = await import("./index.js");
 const { importPublicHolidaysForFeed } = await import(
@@ -12,14 +15,14 @@ const { importPublicHolidaysForFeed } = await import(
 );
 
 const tenantA = {
-  clerkOrgId: "org_test_public_holidays_a",
-  feedId: "53000000-0000-4000-8000-000000000002",
-  organisationId: "53000000-0000-4000-8000-000000000001",
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as string,
+  feedId: fixture.id("feed"),
+  organisationId: fixture.tenants[0]?.organisationId as string,
 } as const;
 
 const tenantB = {
-  clerkOrgId: "org_test_public_holidays_b",
-  organisationId: "54000000-0000-4000-8000-000000000001",
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as string,
+  organisationId: fixture.tenants[1]?.organisationId as string,
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
