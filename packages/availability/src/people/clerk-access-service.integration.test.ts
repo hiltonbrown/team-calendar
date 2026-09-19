@@ -1,49 +1,9 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.hoisted(() => {
-  try {
-    const fs = require("node:fs");
-    const path = require("node:path");
-    const envPaths = [
-      path.resolve(process.cwd(), "packages/database/.env"),
-      path.resolve(process.cwd(), "../database/.env"),
-      path.resolve(import.meta.dirname, "../../../database/.env"),
-    ];
-    for (const envPath of envPaths) {
-      if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, "utf-8");
-        for (const line of envContent.split("\n")) {
-          const trimmed = line.trim();
-          if (trimmed && !trimmed.startsWith("#")) {
-            const [key, ...valueParts] = trimmed.split("=");
-            const value = valueParts.join("=");
-            if (key && value) {
-              const cleanKey = key.trim();
-              if (
-                cleanKey !== "__proto__" &&
-                cleanKey !== "constructor" &&
-                cleanKey !== "prototype"
-              ) {
-                Reflect.set(
-                  process.env,
-                  cleanKey,
-                  value.trim().replace(/^['"]|['"]$/g, "")
-                );
-              }
-            }
-          }
-        }
-        break;
-      }
-    }
-  } catch {
-    // ignore
-  }
-});
-
 vi.mock("server-only", () => ({}));
 
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   type ClerkOrganizationsApi,
   inviteClerkAccessCandidates,
@@ -51,17 +11,22 @@ import {
   reconcileClerkAccessLinks,
 } from "./clerk-access-service";
 
+const fixture = allocateLiveTestFixture(
+  "packages/availability/src/people/clerk-access-service.integration.test.ts"
+);
 const { database } = await import("@repo/database");
-
 const tenantA = {
-  clerkOrgId: "org_test_clerk_acc_99a" as ClerkOrgId,
-  organisationId: "99000000-0000-4000-8000-000000000001" as OrganisationId,
+  clerkOrgId: fixture.tenants[0]?.clerkOrgId as ClerkOrgId,
+  organisationId: fixture.tenants[0]?.organisationId as OrganisationId,
 };
 
 const tenantB = {
-  clerkOrgId: "org_test_clerk_acc_99b" as ClerkOrgId,
-  organisationId: "99000000-0000-4000-8000-000000000002" as OrganisationId,
+  clerkOrgId: fixture.tenants[1]?.clerkOrgId as ClerkOrgId,
+  organisationId: fixture.tenants[1]?.organisationId as OrganisationId,
 };
+if (!(tenantA.clerkOrgId && tenantB.clerkOrgId)) {
+  throw new Error("Clerk-access live fixture tenants were not allocated");
+}
 
 const testOrgIds = [tenantA.organisationId, tenantB.organisationId];
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
@@ -107,6 +72,9 @@ describe("clerk-access-service integration", () => {
 
   afterAll(async () => {
     await cleanDatabase();
+    await expect(
+      database.organisation.count({ where: { id: { in: testOrgIds } } })
+    ).resolves.toBe(0);
   });
 
   it("links unique one-to-one matches and isolates by tenant keys", async () => {

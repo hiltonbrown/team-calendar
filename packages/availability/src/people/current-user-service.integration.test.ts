@@ -1,35 +1,29 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
 import { employment_type, source_system } from "@repo/database/generated/enums";
-import { config } from "dotenv";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { TenantContext } from "./current-user-service";
 
-config({ path: new URL("../../../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}));
 
-let database: typeof import("@repo/database")["database"];
-let ensureCurrentUserPerson: typeof import("./current-user-service")["ensureCurrentUserPerson"];
-
-const describeWithDatabase = process.env.DATABASE_URL
-  ? describe
-  : describe.skip;
-
-if (process.env.DATABASE_URL) {
-  ({ database } = await import("@repo/database"));
-  ({ ensureCurrentUserPerson } = await import("./current-user-service"));
-}
+const fixture = allocateLiveTestFixture(
+  "packages/availability/src/people/current-user-service.integration.test.ts"
+);
+const { database } = await import("@repo/database");
+const { ensureCurrentUserPerson } = await import("./current-user-service");
 
 const tenantA = {
-  clerkOrgId: "org_test_current_user_service_a",
-  organisationId: "c5000000-0000-4000-8000-000000000001",
+  ...fixture.tenants[0],
 };
 const tenantB = {
-  clerkOrgId: "org_test_current_user_service_b",
-  organisationId: "c5000000-0000-4000-8000-000000000002",
+  ...fixture.tenants[1],
 };
+if (!(tenantA.clerkOrgId && tenantB.clerkOrgId)) {
+  throw new Error("Current-user live fixture tenants were not allocated");
+}
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId];
 
-describeWithDatabase("current-user-service integration", () => {
+describe("current-user-service integration", () => {
   beforeEach(async () => {
     await cleanTestData();
     await database.organisation.createMany({
@@ -52,6 +46,11 @@ describeWithDatabase("current-user-service integration", () => {
 
   afterAll(async () => {
     await cleanTestData();
+    await expect(
+      database.organisation.count({
+        where: { clerk_org_id: { in: testClerkOrgIds } },
+      })
+    ).resolves.toBe(0);
     await database.$disconnect();
   });
 

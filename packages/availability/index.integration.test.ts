@@ -1,9 +1,8 @@
 import type { ClerkOrgId, OrganisationId } from "@repo/core";
-import { config } from "dotenv";
+import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 import type { TenantContext } from "./index";
 
-config({ path: new URL("../database/.env", import.meta.url).pathname });
 vi.mock("server-only", () => ({}), { virtual: true });
 vi.mock("./src/holidays/nager-client", () => ({
   getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
@@ -25,6 +24,10 @@ vi.mock("./src/holidays/nager-client", () => ({
   ),
 }));
 
+const fixture = allocateLiveTestFixture(
+  "packages/availability/index.integration.test.ts"
+);
+const [tenantSlotA, tenantSlotB, provisioningTenant] = fixture.tenants;
 const {
   archiveManualAvailability,
   createManualAvailability,
@@ -42,17 +45,18 @@ interface TenantFixture {
 }
 
 const tenantA: TenantFixture = {
-  clerkOrgId: "org_test_manual_availability_a",
-  organisationId: "41000000-0000-4000-8000-000000000001",
-  personId: "41000000-0000-4000-8000-000000000002",
+  ...tenantSlotA,
+  personId: fixture.id("person", 0),
 };
 
 const tenantB: TenantFixture = {
-  clerkOrgId: "org_test_manual_availability_b",
-  organisationId: "42000000-0000-4000-8000-000000000001",
-  personId: "42000000-0000-4000-8000-000000000002",
+  ...tenantSlotB,
+  personId: fixture.id("person", 1),
 };
-const provisioningClerkOrgId = "org_test_default_feed_provisioning";
+if (!(tenantA.clerkOrgId && tenantB.clerkOrgId && provisioningTenant)) {
+  throw new Error("Availability live fixture tenants were not allocated");
+}
+const provisioningClerkOrgId = provisioningTenant.clerkOrgId;
 
 const testClerkOrgIds = [
   tenantA.clerkOrgId,
@@ -152,6 +156,16 @@ const contextFor = (tenant: TenantFixture): TenantContext => ({
   organisationId: tenant.organisationId as OrganisationId,
 });
 
+const createProvisioningOrganisation = () =>
+  database.organisation.create({
+    data: {
+      clerk_org_id: provisioningTenant.clerkOrgId,
+      country_code: "AU",
+      id: provisioningTenant.organisationId,
+      name: "Provisioning fixture",
+    },
+  });
+
 beforeEach(async () => {
   await cleanTestData();
   await createTenant(tenantA);
@@ -160,6 +174,11 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await cleanTestData();
+  await expect(
+    database.organisation.count({
+      where: { clerk_org_id: { in: testClerkOrgIds } },
+    })
+  ).resolves.toBe(0);
   await database.$disconnect();
 });
 
@@ -298,6 +317,8 @@ describe("manual availability services", () => {
 
 describe("current user person identity", () => {
   test("provisions one default feed when ensuring an organisation", async () => {
+    await cleanTestData();
+    await createProvisioningOrganisation();
     const context = await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
@@ -364,6 +385,8 @@ describe("current user person identity", () => {
   });
 
   test("provisions default public holidays when ensuring an organisation", async () => {
+    await cleanTestData();
+    await createProvisioningOrganisation();
     const context = await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
@@ -530,7 +553,7 @@ describe("current user person identity", () => {
           email: "duplicate@example.com",
           employment_type: "employee",
           first_name: "Duplicate",
-          id: "41000000-0000-4000-8000-000000000101",
+          id: fixture.id("person", 101),
           last_name: "One",
           organisation_id: tenantA.organisationId,
           source_system: "MANUAL",
@@ -540,7 +563,7 @@ describe("current user person identity", () => {
           email: "duplicate@example.com",
           employment_type: "employee",
           first_name: "Duplicate",
-          id: "41000000-0000-4000-8000-000000000102",
+          id: fixture.id("person", 102),
           last_name: "Two",
           organisation_id: tenantA.organisationId,
           source_system: "MANUAL",
