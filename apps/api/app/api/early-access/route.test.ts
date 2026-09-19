@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
-  flush: vi.fn(),
   checkAbuse: vi.fn(),
+  flush: vi.fn(),
   remember: vi.fn(),
   send: vi.fn(),
   shutdown: vi.fn(),
@@ -21,7 +21,11 @@ vi.mock("@/lib/rate-limit/early-access-rate-limit", () => ({
 }));
 vi.mock("@repo/email", () => ({ sendEarlyAccessApplication: mocks.send }));
 vi.mock("@repo/analytics/server", () => ({
-  analytics: { capture: mocks.capture, flush: mocks.flush, shutdown: mocks.shutdown },
+  analytics: {
+    capture: mocks.capture,
+    flush: mocks.flush,
+    shutdown: mocks.shutdown,
+  },
 }));
 vi.mock("@repo/observability/log", () => ({ log: { error: vi.fn() } }));
 

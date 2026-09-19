@@ -6,8 +6,8 @@ const recoveryMessagePattern = /Billing changes are still being reconciled/;
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   currentUser: vi.fn(),
-  getBillingSummary: vi.fn(),
   getActivationDashboardSummary: vi.fn(),
+  getBillingSummary: vi.fn(),
   getSubscriptionForOrg: vi.fn(),
   getUnresolvedStripeEventsForOrg: vi.fn(),
   hasUnresolvedStripeEventForOrg: vi.fn(),

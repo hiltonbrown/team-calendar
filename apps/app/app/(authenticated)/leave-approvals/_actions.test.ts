@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  approve: vi.fn(),
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
+  approve: vi.fn(),
   auth: vi.fn(),
   currentUser: vi.fn(),
   database: {

@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  archiveRecord: vi.fn(),
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
-  availabilityFindFirst: vi.fn(),
+  archiveRecord: vi.fn(),
   auth: vi.fn(),
+  availabilityFindFirst: vi.fn(),
   createRecord: vi.fn(),
   currentUser: vi.fn(),
   deleteDraftRecord: vi.fn(),
