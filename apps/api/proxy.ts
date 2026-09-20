@@ -5,6 +5,7 @@ export const isPublicApiRoute = createRouteMatcher([
   "/ical(.*)",
   "/api/inngest(.*)",
   "/api/early-access",
+  "/api/contact",
   "/webhooks/auth",
   "/webhooks/payments",
   "/api/xero/oauth/callback",

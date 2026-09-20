@@ -7,6 +7,7 @@ import {
   readCatalogueDigest,
   releaseActiveRun,
 } from "./active-run-registry.js";
+import { assertConsumerIsolationReadBack } from "./consumer-isolation.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
@@ -88,6 +89,12 @@ const childEnvironment = buildLiveIntegrationEnvironment(
   manifest,
   protectedManifestPath
 );
+await assertConsumerIsolationReadBack(manifest, {
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+});
+if (manifest.consumerIsolation) {
+  childEnvironment.TC_RELEASE_CONSUMERS_VERIFIED = manifest.runId;
+}
 if (action === "run") {
   const baseline = spawnSync(
     "bun",
@@ -142,6 +149,9 @@ try {
       catalogueDigestBefore,
       registryInput
     );
+    await assertConsumerIsolationReadBack(manifest, {
+      signingKey: process.env.INNGEST_SIGNING_KEY,
+    });
     const result = spawnSync("bun", ["run", "test:integration"], {
       cwd: root,
       env: childEnvironment,

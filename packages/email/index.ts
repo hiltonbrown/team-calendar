@@ -1,11 +1,9 @@
 import { render } from "@react-email/render";
 import type { ReactElement } from "react";
-import { Resend } from "resend";
+import { resend } from "./client";
 import { keys } from "./keys";
 
-const { RESEND_TOKEN } = keys();
-
-export const resend = RESEND_TOKEN ? new Resend(RESEND_TOKEN) : undefined;
+export { resend } from "./client";
 
 export interface SendNotificationEmailInput {
   readonly actionUrl: string | null;
@@ -119,3 +117,5 @@ export async function sendEarlyAccessApplication(
   }
   return { ok: true, value: { id: data.id } };
 }
+
+export { type ContactMessage, sendContactEmail } from "./contact";

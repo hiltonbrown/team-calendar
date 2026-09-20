@@ -6,7 +6,6 @@ export const HeroSection = () => (
   <section className="fmkt-hero">
     <div className="fmkt-hero__copy">
       <div className="fmkt-hero__copy-inner">
-        <div className="fmkt-pill fmkt-pill--neutral">Now in early access</div>
         <h1 className="fmkt-hero__title">
           Sync Xero with your calendar.
           <em>Manage leave, travel and out of office in one place.</em>

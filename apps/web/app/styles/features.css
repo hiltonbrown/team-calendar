@@ -2164,7 +2164,6 @@
 }
 
 .fmkt-timeline__lead,
-.fmkt-pricing-hero p,
 .fmkt-pricing-contact p {
   margin: 18px 0 0;
   font: 400 1.0625rem / 1.65 var(--marketing-font);
@@ -2710,6 +2709,7 @@
 /* Ambient Tonal Stage */
 .fmkt-pricing-stage-wrap {
   position: relative;
+  padding-top: clamp(32px, 4vw, 56px);
   background: radial-gradient(
     900px circle at var(--spotlight-x, 50%) var(--spotlight-y, 250px),
     color-mix(in srgb, var(--marketing-primary) 4.5%, transparent),
@@ -2724,12 +2724,12 @@
 .fmkt-pricing-controls-bar {
   display: flex;
   justify-content: center;
-  width: min(100% - 32px, 1160px);
-  margin: 0 auto 32px;
+  width: 100%;
+  margin: 0 auto 40px;
 }
 
-/* Country Pricing Slider */
-.fmkt-country-slider-container {
+/* Country Pricing Selector */
+.fmkt-country-selector-container {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -2743,7 +2743,7 @@
     color-mix(in srgb, var(--marketing-inverse-surface) 4%, transparent);
 }
 
-.fmkt-country-slider-header {
+.fmkt-country-selector-header {
   display: flex;
   flex-wrap: wrap;
   gap: 16px;
@@ -2751,7 +2751,7 @@
   justify-content: space-between;
 }
 
-.fmkt-country-slider-badge {
+.fmkt-country-selector-badge {
   display: inline-flex;
   gap: 8px;
   align-items: center;
@@ -2762,130 +2762,35 @@
   border-radius: 12px;
 }
 
-.fmkt-country-slider-dot {
+.fmkt-country-selector-dot {
   width: 6px;
   height: 6px;
   background: var(--marketing-primary);
   border-radius: 50%;
 }
 
-.fmkt-country-slider-active-hint {
+.fmkt-country-selector-active-hint {
   font: 400 0.875rem / 1.4 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
 
-.fmkt-country-slider-active-hint strong {
+.fmkt-country-selector-active-hint strong {
   font-weight: 650;
   color: var(--marketing-on-surface);
 }
 
-/* Slider Track & Range Input */
-.fmkt-country-slider-track-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: 32px;
-}
-
-.fmkt-country-slider-bar {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  height: 8px;
-  overflow: hidden;
-  pointer-events: none;
-  background: var(--marketing-surface-container);
-  border-radius: 9999px;
-  transform: translateY(-50%);
-}
-
-.fmkt-country-slider-fill {
-  height: 100%;
-  background: var(--marketing-primary);
-  border-radius: 9999px;
-  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.fmkt-country-slider-range {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  height: 32px;
-  margin: 0;
-  appearance: none;
-  cursor: pointer;
-  background: transparent;
-}
-
-.fmkt-country-slider-range:focus-visible {
-  outline: none;
-}
-
-.fmkt-country-slider-range::-webkit-slider-thumb {
-  width: 24px;
-  height: 24px;
-  appearance: none;
-  cursor: grab;
-  background: var(--marketing-surface-lowest);
-  border: 3px solid var(--marketing-primary);
-  border-radius: 50%;
-  box-shadow: 0 2px 8px
-    color-mix(in srgb, var(--marketing-inverse-surface) 20%, transparent);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.fmkt-country-slider-range::-webkit-slider-thumb:hover {
-  box-shadow: 0 4px 12px
-    color-mix(in srgb, var(--marketing-primary) 30%, transparent);
-  transform: scale(1.15);
-}
-
-.fmkt-country-slider-range::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.1);
-}
-
-.fmkt-country-slider-range::-moz-range-thumb {
-  width: 24px;
-  height: 24px;
-  cursor: grab;
-  background: var(--marketing-surface-lowest);
-  border: 3px solid var(--marketing-primary);
-  border-radius: 50%;
-  box-shadow: 0 2px 8px
-    color-mix(in srgb, var(--marketing-inverse-surface) 20%, transparent);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.15s ease;
-}
-
-.fmkt-country-slider-range::-moz-range-thumb:hover {
-  box-shadow: 0 4px 12px
-    color-mix(in srgb, var(--marketing-primary) 30%, transparent);
-  transform: scale(1.15);
-}
-
-.fmkt-country-slider-range:focus-visible::-webkit-slider-thumb {
-  outline: 3px solid var(--marketing-primary);
-  outline-offset: 3px;
-}
-
-.fmkt-country-slider-range:focus-visible::-moz-range-thumb {
-  outline: 3px solid var(--marketing-primary);
-  outline-offset: 3px;
-}
-
-/* 3 Country Stops */
-.fmkt-country-slider-stops {
+/* Exclusive country choices */
+.fmkt-country-selector-options {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
-.fmkt-country-slider-stop {
+.fmkt-country-selector-option {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -2898,7 +2803,7 @@
   transition: all 0.2s ease;
 }
 
-.fmkt-country-slider-stop:hover {
+.fmkt-country-selector-option:hover {
   background: color-mix(
     in srgb,
     var(--marketing-surface-container) 80%,
@@ -2907,35 +2812,38 @@
   border-color: color-mix(in srgb, var(--marketing-primary) 20%, transparent);
 }
 
-.fmkt-country-slider-stop:focus-visible {
+.fmkt-country-selector-option:focus-within {
   outline: 3px solid var(--marketing-primary);
   outline-offset: 2px;
 }
 
-.fmkt-country-slider-stop--active {
+.fmkt-country-selector-option--active {
   background: var(--marketing-surface-lowest);
   border-color: var(--marketing-primary);
   box-shadow: 0 4px 14px
     color-mix(in srgb, var(--marketing-primary) 12%, transparent);
 }
 
-.fmkt-country-slider-stop__flag-wrap {
+.fmkt-country-selector-option__label {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.fmkt-country-slider-stop__flag {
-  font-size: 1.25rem;
-  line-height: 1;
+.fmkt-country-selector-option input {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--marketing-primary);
 }
 
-.fmkt-country-slider-stop__name {
+.fmkt-country-selector-option__name {
   font: 600 0.875rem / 1.2 var(--marketing-font);
   color: var(--marketing-on-surface);
 }
 
-.fmkt-country-slider-stop__rates {
+.fmkt-country-selector-option__rates {
   display: flex;
   gap: 6px;
   align-items: center;
@@ -2943,27 +2851,27 @@
   font: 500 0.75rem / 1 var(--marketing-font);
 }
 
-.fmkt-country-slider-stop__code {
+.fmkt-country-selector-option__code {
   font-weight: 700;
   color: var(--marketing-primary);
 }
 
-.fmkt-country-slider-stop__prices {
+.fmkt-country-selector-option__prices {
   font-size: 0.75rem;
   color: var(--marketing-on-surface-variant);
 }
 
 @media (max-width: 640px) {
-  .fmkt-country-slider-container {
+  .fmkt-country-selector-container {
     padding: 18px 16px;
   }
 
-  .fmkt-country-slider-stops {
+  .fmkt-country-selector-options {
     grid-template-columns: 1fr;
     gap: 8px;
   }
 
-  .fmkt-country-slider-stop {
+  .fmkt-country-selector-option {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -2991,7 +2899,11 @@
 
 /* Plan Cards */
 .fmkt-pricing-plans {
-  padding: 0 0 76px;
+  padding: 0 0 clamp(56px, 6vw, 80px);
+}
+
+.fmkt-pricing-hero + .fmkt-pricing-plans {
+  padding-top: clamp(48px, 6vw, 80px);
 }
 
 .fmkt-pricing-cards {
@@ -3013,6 +2925,7 @@
 }
 
 .fmkt-pricing-card--highlighted {
+  padding: 31px;
   border: 2px solid var(--marketing-primary);
   box-shadow: 0 12px 32px
     color-mix(in srgb, var(--marketing-primary) 12%, transparent);
@@ -3216,7 +3129,7 @@
 
 /* Comparison Table */
 .fmkt-pricing-compare {
-  padding: 76px 0;
+  padding: 0 0 clamp(56px, 6vw, 80px);
 }
 
 .fmkt-pricing-table-wrap {
@@ -3380,7 +3293,7 @@
 
 /* High-Conversion Final CTA */
 .fmkt-pricing-final-cta {
-  padding: 80px 0 100px;
+  padding: clamp(56px, 6vw, 80px) 0;
 }
 
 .fmkt-pricing-final-cta__card {
@@ -3702,6 +3615,14 @@
     grid-template-columns: 1fr;
   }
 
+  .fmkt-pricing-faq__header {
+    position: static;
+  }
+
+  .fmkt-pricing-card__description {
+    min-height: 0;
+  }
+
   .fmkt-timeline__board {
     overflow-x: auto;
   }
@@ -3776,8 +3697,6 @@
 
   .fmkt-timeline,
   .fmkt-integration-bridge,
-  .fmkt-pricing-plans,
-  .fmkt-pricing-compare,
   .fmkt-pricing-setup,
   .fmkt-pricing-faq,
   .fmkt-pricing-contact {
@@ -3809,6 +3728,24 @@
 
   .fmkt-pricing-hero {
     padding: 68px 0 56px;
+  }
+
+  .fmkt-pricing-card {
+    padding: 24px;
+  }
+
+  .fmkt-pricing-card--highlighted {
+    padding: 23px;
+  }
+
+  .fmkt-pricing-final-cta__card {
+    padding: 32px 24px;
+  }
+
+  .fmkt-pricing-final-cta__guarantees {
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
   }
 
   .fmkt-pricing-hero h1,

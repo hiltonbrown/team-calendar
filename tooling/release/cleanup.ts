@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { assertActiveRunOwner } from "./active-run-registry.js";
+import { assertConsumerIsolationReadBack } from "./consumer-isolation.js";
 import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
@@ -34,6 +35,12 @@ if (mode !== "--dry-run") {
   process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED = manifest.runId;
 }
 process.env.TC_RELEASE_DURABLE_VERIFIED = manifest.runId;
+await assertConsumerIsolationReadBack(manifest, {
+  signingKey: process.env.INNGEST_SIGNING_KEY,
+});
+if (manifest.consumerIsolation) {
+  process.env.TC_RELEASE_CONSUMERS_VERIFIED = manifest.runId;
+}
 if (
   !(manifest.owned.clerkOrgIds.length && manifest.owned.organisationIds.length)
 ) {

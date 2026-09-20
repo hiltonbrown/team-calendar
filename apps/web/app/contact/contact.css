@@ -1,0 +1,371 @@
+.contact-studio {
+  padding: 170px 0 100px;
+  background: var(--marketing-surface-low);
+}
+.contact-studio__hero {
+  display: flex;
+  gap: 48px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 64px;
+}
+.contact-studio__hero h1 {
+  margin: 0;
+  font-size: clamp(2.75rem, 5.4vw, 5.5rem);
+  font-weight: 600;
+  line-height: 1.09;
+  letter-spacing: -0.035em;
+}
+.contact-studio__hero h1 span {
+  font-family: var(--font-serif), serif;
+  font-weight: 400;
+  color: var(--marketing-primary);
+}
+.contact-studio__welcome {
+  display: grid;
+  gap: 20px;
+  padding-bottom: 6px;
+}
+.contact-studio__welcome svg {
+  color: var(--marketing-primary);
+}
+.contact-studio__welcome p {
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__workspace {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.4fr);
+  gap: clamp(32px, 5vw, 80px);
+  align-items: start;
+}
+.contact-studio__reasons {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.contact-studio__reasons legend {
+  margin-bottom: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.contact-studio__reason {
+  position: relative;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  padding: 22px 18px;
+  cursor: pointer;
+  border-radius: 16px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.contact-studio__reason:hover {
+  background: var(--marketing-surface-container);
+}
+.contact-studio__reason[data-selected="true"] {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+.contact-studio__reason input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.contact-studio__reason:has(:focus-visible) {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 4px;
+}
+.contact-studio__reason strong {
+  display: block;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+.contact-studio__reason small {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.contact-studio__reason > svg {
+  flex-shrink: 0;
+}
+.contact-studio__reason-arrow {
+  margin-left: auto;
+  transition: transform 0.25s;
+}
+.contact-studio__reason[data-selected="true"] .contact-studio__reason-arrow {
+  transform: rotate(45deg);
+}
+.contact-studio__hours {
+  display: flex;
+  gap: 12px;
+  margin: 40px 18px 0;
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__hours svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.contact-studio__hours strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--marketing-on-surface);
+}
+.contact-studio__panel {
+  min-width: 0;
+  padding: clamp(24px, 3.3vw, 48px);
+  background: var(--marketing-surface-lowest);
+  border-radius: 20px;
+}
+.contact-studio__panel-heading {
+  margin-bottom: 30px;
+}
+.contact-studio__panel h2 {
+  margin-bottom: 12px;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.contact-studio__panel-heading p {
+  max-width: 60ch;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__fields {
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.contact-studio__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.contact-studio__fields label:not(.contact-studio__check) {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.contact-studio__fields label > span:not(:only-child) {
+  font-weight: 400;
+}
+.contact-studio__fields input:not([type="checkbox"]),
+.contact-studio__fields select,
+.contact-studio__fields textarea {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  margin-top: 9px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--marketing-on-surface);
+  caret-color: var(--marketing-primary);
+  background: var(--marketing-surface-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: 14px;
+}
+.contact-studio__fields textarea {
+  line-height: 1.6;
+  resize: vertical;
+}
+.contact-studio__fields input:focus-visible,
+.contact-studio__fields textarea:focus-visible,
+.contact-studio__fields select:focus-visible,
+.contact-studio button:focus-visible,
+.contact-studio a:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 3px;
+}
+.contact-studio__adaptive {
+  display: grid;
+  gap: 22px;
+  animation: contact-unfold 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.contact-studio__note {
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__check {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  cursor: pointer;
+}
+.contact-studio__check input {
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  margin-top: 2px;
+  accent-color: var(--marketing-primary);
+}
+.contact-studio__check strong,
+.contact-studio__check small {
+  display: block;
+}
+.contact-studio__check small {
+  margin-top: 3px;
+  font-size: 0.8125rem;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__confirmation {
+  padding-top: 3px;
+}
+.contact-studio__submit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: center;
+  margin-top: 6px;
+}
+.contact-studio__submit button {
+  gap: 20px;
+  min-height: 50px;
+}
+.contact-studio__submit p {
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: var(--marketing-on-surface-variant);
+}
+.contact-studio__submit a {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.contact-studio__error {
+  padding: 16px;
+  font-size: 0.875rem;
+  color: var(--on-error-container);
+  background: var(--error-container);
+  border-radius: 12px;
+}
+.contact-studio__receipt {
+  display: grid;
+  gap: 22px;
+  padding: 24px 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.contact-studio__receipt > svg {
+  color: var(--marketing-primary);
+}
+.contact-studio__receipt h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+.contact-studio__reference {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.contact-studio__receipt button {
+  gap: 18px;
+  justify-self: start;
+}
+.contact-studio :disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.contact-studio ::selection {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+@keyframes contact-unfold {
+  from {
+    clip-path: inset(0 0 10% 0);
+    transform: translateY(6px);
+  }
+  to {
+    clip-path: inset(0);
+    transform: translateY(0);
+  }
+}
+@media (max-width: 900px) {
+  .contact-studio__hero {
+    flex-direction: column;
+    gap: 24px;
+    align-items: start;
+    padding-bottom: 40px;
+  }
+  .contact-studio__welcome {
+    display: flex;
+    align-items: center;
+  }
+  .contact-studio__workspace {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .contact-studio__reasons {
+    grid-template-columns: 1fr 1fr;
+  }
+  .contact-studio__hours {
+    margin-top: 24px;
+  }
+}
+@media (max-width: 540px) {
+  .contact-studio {
+    padding-top: 132px;
+    padding-bottom: 56px;
+  }
+  .contact-studio__hero h1 {
+    font-size: 2.75rem;
+  }
+  .contact-studio__reasons {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .contact-studio__reason {
+    padding: 15px;
+  }
+  .contact-studio__pair {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+  .contact-studio__panel {
+    padding: 24px 20px;
+  }
+  .contact-studio__submit {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .contact-studio__adaptive {
+    animation: none;
+  }
+  .contact-studio__reason,
+  .contact-studio__reason-arrow {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .contact-studio__reason[data-selected="true"] {
+    outline: 2px solid Highlight;
+  }
+  .contact-studio__reason input {
+    position: static;
+    width: 16px;
+    height: 16px;
+    opacity: 1;
+  }
+}

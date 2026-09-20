@@ -53,12 +53,13 @@ export const CalendarIntegrationSection = () => (
     <div className="fmkt-container fmkt-integration-bridge__grid">
       <div>
         <h2 className="fmkt-section-title">
-          Xero is the source. Calendars are where the team checks.
+          Sync Xero leave to Outlook Calendar.
         </h2>
         <p className="fmkt-integration-bridge__lead">
-          The full integration flow now lives in one place: what Team Calendar
-          reads from Xero, what it writes back, and how secure ICS feeds reach
-          the calendar apps your team already uses.
+          Team Calendar synchronises approved leave from Xero Payroll to Outlook
+          Calendar through a secure calendar subscription. See who’s away
+          alongside your meetings, with support for Google Calendar and Apple
+          Calendar too.
         </p>
       </div>
       <div className="fmkt-integration-bridge__panel">

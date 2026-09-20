@@ -4,94 +4,52 @@ import { describe, expect, it } from "vitest";
 import IntegrationsPage from "./page";
 
 describe("Integrations page", () => {
-  it("keeps submitted leave out of the illustrative published calendar", () => {
+  it("distinguishes current and planned payroll connections", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
-    expect(html).toContain("Illustrative example");
-    expect(html).toContain("Leave submitted");
-    expect(html).toContain("No leave event is published");
-    expect(html).not.toContain("Approved · Xero");
-    expect(html).toContain("2 example entries: manual availability");
+    expect(html.split('data-status="shipped"')).toHaveLength(2);
+    expect(html.split('data-status="planned"')).toHaveLength(6);
+    expect(html).toContain("Xero Payroll");
+    expect(html).toContain("Australian early access");
+    for (const name of [
+      "MYOB",
+      "Deputy",
+      "Tanda",
+      "Employment Hero",
+      "Acumatica payroll",
+    ]) {
+      expect(html).toContain(`<h3>${name}</h3>`);
+    }
+    expect(html).toContain("not available yet");
+    expect(html).toContain("New Zealand and United Kingdom");
+    expect(html).toContain("Release dates will be shared when confirmed");
   });
 
-  it("describes calendar refresh timing without promising client delivery", () => {
+  it("keeps functional demonstrations on the features page", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
-    expect(html).not.toContain("60 seconds");
-    expect(html).not.toContain("60-second");
-    expect(html).toContain("Calendar apps refresh subscriptions");
-    expect(html).toContain("on their own schedules");
-  });
-
-  it("links to contact, security and contextual onboarding guidance", () => {
-    const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
-
-    expect(html).toContain('href="/contact">Talk to us</a>');
+    expect(html).toContain('href="/features">Explore features</a>');
+    expect(html).not.toContain("Illustrative example");
+    expect(html).toContain("See planned and unplanned leave in Outlook.");
+    expect(html).toContain("Explore the integration connections");
     expect(html).toContain('href="/security">Review security</a>');
-    expect(html).toContain(
-      'href="/help-centre/onboarding">Read the setup guide</a>'
-    );
-    expect(html).toContain(
-      'href="/help-centre/onboarding#publish">Learn how to subscribe</a>'
-    );
-  });
-
-  it("explains two-way Xero leave sync alongside other availability in the hero", () => {
-    const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
-    const [, heroAndRest = ""] = html.split('data-integrations-section="hero"');
-    const [heroHtml = ""] = heroAndRest.split("<section");
-
-    expect(heroHtml).toContain("See who is away");
-    expect(heroHtml).toContain("Staff request leave in Team Calendar");
-    expect(heroHtml).toContain("Approved leave syncs back to");
-    expect(heroHtml).toContain("Xero Payroll Australia");
-    expect(heroHtml).toContain("travel, WFH and other availability updates");
-    expect(heroHtml).toContain(
-      "Employees, approved leave and balances sync from Xero"
-    );
-    expect(heroHtml).toContain("Leave requests and decisions sync back");
-    expect(heroHtml).toContain("Outlook");
-    expect(heroHtml).toContain("Google Calendar");
-    expect(heroHtml).toContain("Apple Calendar");
-    expect(heroHtml).not.toContain("canonical view");
-  });
-
-  it("separates data collection scope from credential safeguards", () => {
-    const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
-
-    expect(html).not.toContain("Plaintext feed or OAuth tokens");
+    expect(html).not.toContain("availability-example");
+    expect(html).toContain("What moves between systems.");
     expect(html).toContain("Never reads");
     expect(html).toContain("Salary, banking, tax, or superannuation data");
     expect(html).toContain("Personal calendar contents");
-    expect(html).toContain("revoke access when needed");
-    expect(html).toContain("Xero connection credentials are stored encrypted");
+    expect(html).toContain("Reads from Xero");
+    expect(html).toContain("Writes to Xero");
+    expect(html).toContain("source of truth for payroll balances");
   });
 
-  it("describes only the Xero data that Team Calendar reads", () => {
-    const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
-    const lowerHtml = html.toLowerCase();
-
-    expect(lowerHtml).not.toContain("payroll calendar");
-    expect(lowerHtml).not.toContain("pay period information");
-    expect(html).toContain("Employee records");
-    expect(html).toContain("leave applications");
-    expect(html).toContain("balances");
-  });
-
-  it("renders region status and destinations from the capability model", () => {
+  it("offers setup guidance and a way to request another system", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
+    expect(html).toContain('href="/contact">Request an integration</a>');
     expect(html).toContain(
-      "early access is available for Xero Payroll Australia"
+      'href="/help-centre/onboarding">Read the connection guide</a>'
     );
-    expect(html).toContain("New Zealand and United Kingdom support is planned");
-    expect(html.split('data-status="shipped"')).toHaveLength(2);
-    expect(html.split('data-status="planned"')).toHaveLength(3);
-    expect(html).toContain("Australian early access");
-    expect(html).not.toContain("Supported at launch");
-    expect(html.split(">Planned<")).toHaveLength(3);
-    expect(html).toContain("Outlook");
-    expect(html).toContain("Google Calendar");
-    expect(html).toContain("Apple Calendar");
+    expect(html).toContain("payroll or accounting system");
   });
 });

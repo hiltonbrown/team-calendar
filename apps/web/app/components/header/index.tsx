@@ -12,7 +12,6 @@ import { signInHref, signUpHref } from "@/src/lib/auth-links";
 const navLinks = [
   { href: "/", title: "Home" },
   { href: "/features", title: "Features" },
-  { href: "/integrations", title: "Integrations" },
   { href: "/pricing", title: "Pricing" },
   { href: "/contact", title: "Contact" },
 ];

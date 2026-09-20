@@ -2,6 +2,21 @@
 
 Last reviewed: 2026-09-20
 
+## Task: Clarify homepage Xero to Outlook copy
+
+- [x] Check existing copy and supported calendar destinations.
+- [x] Name Xero leave and Outlook Calendar in the section heading and explain the subscription.
+- [x] Run repository checks and record verification limitations.
+
+Review: replaced the abstract heading with “Sync Xero leave to Outlook Calendar.”
+Supporting copy explains approved Xero Payroll leave, secure calendar subscriptions,
+and Google Calendar and Apple Calendar support. PASS: check, typecheck, unit tests,
+and git diff --check. NOT VERIFIED: integration tests are blocked by the local
+database safety guard; browser review is unavailable because agent-browser is not
+installed. Design hook found no deterministic issues, but reported the existing
+design sidecar is older than DESIGN.md. No design configuration changed.
+
+
 ## Task: Pricing hero redesign, remove plan overview & simulator, align with /integrations
 
 - [x] Remove hero plan overview card from `apps/web/app/pricing/components/pricing-experience.tsx`
@@ -722,3 +737,386 @@ pricing, header, stylesheet and plan edits preserved.
 Evidence: `.impeccable/review/integrations/`, `/tmp/integrations-new-*.png`,
 `/tmp/integrations-redesign-*-final.log`, and
 `/tmp/integrations-redesign-integration.log`.
+
+## Contact adaptive studio, 20 September 2026
+
+Approved direction: adaptive contact studio. Preserve brand tokens and early-access eligibility; add enquiry, support and bug paths with optional Resend confirmation.
+
+- [x] Build responsive contact selector and tailored forms, preserving drafts and accessible status feedback.
+- [x] Implement validated, rate-limited Resend delivery and optional confirmation with truthful partial-success handling.
+- [x] Verify route behaviour, desktop/mobile visuals, lint, types and unit tests; attempt integration gate.
+- [x] Record results and remaining environment limitations.
+
+Review: four adaptive contact paths, draft preservation, Australian early-access
+preselection for admission links, opt-in confirmation and public submission
+references implemented. Resend uses the existing private recipient configuration,
+separate idempotency keys for team delivery and confirmations, validated inputs
+and existing abuse controls. Confirmation failure does not misreport the accepted
+message as failed. Legacy early-access endpoint remains available.
+
+PASS: repository check, typecheck and unit suite (17 tasks); 21 contact UI tests,
+21 API contact/legacy cases and 3 transport tests. Browser desktop 1440px and mobile
+390px, light/dark and reduced motion; no mobile overflow or page errors. Mocked
+submission confirms failed-confirmation receipt. Visual selection contrast fixed.
+Impeccable detector: advisory type-ramp findings only, scoped fluid marketing type
+retained. React review: native radio keyboard controls, labelled bounded fields,
+validated responses, preserved drafts and guarded in-flight submission.
+NOT VERIFIED: live Resend delivery (no real emails sent), production deployment,
+and database integration coverage. Integration gate rejects non-local DATABASE_URL;
+Docker is unavailable in this WSL distro. No database guard bypassed.
+Evidence: /tmp/contact-studio-{desktop,mobile,dark}.png and
+/tmp/contact-gate-{0,1,2,3}.log. Temporary preview server stopped; port 3001
+confirmed free immediately after shutdown. Unrelated concurrent edits preserved.
+
+## Shape integrations around leave and Outlook, 20 September 2026
+
+- [x] Inspect the current page, interaction model and product boundaries.
+- [x] Prepare an Outlook-led direction with simplified requests and an Australian provider roadmap.
+- [x] Confirm the proposed brief under the Impeccable shape workflow.
+- [x] Implement Outlook-led copy, simpler requests and the provider catalogue.
+- [x] Verify responsive layouts, interactions and repository gates.
+
+Review: Proposed scope preserves the existing brand and interactive journey,
+leads with planned and unplanned leave in Outlook, and explains simplified
+requests and approvals. Xero remains identified as the current Australian
+connection. MYOB, Deputy, Tanda, Employment Hero and Acumatica payroll are
+explicitly planned, with no availability date or working connection implied.
+Shape only: no production code changed or runtime checks performed.
+
+Implementation review: Outlook-led hero and metadata, simplified request and
+approval narrative, Outlook-selected connection map, and an expandable Australian
+provider catalogue are implemented. Xero remains current early access; MYOB,
+Deputy, Tanda, Employment Hero and Acumatica payroll are individually Planned.
+Calendar refresh timing, privacy boundaries and secondary destinations retained.
+
+PASS: repository lint, unit suite (web: 116 tests), scoped formatting, whitespace
+checks and independent React review. Browser: 1440/768/390/320px in light/dark,
+no page overflow or runtime errors; map, stage selection, filters and reduced
+motion checked. Desktop light and mobile dark screenshots visually inspected.
+Detector reported advisory type-ramp differences consistent with the existing
+surface; no blocking findings. Browser closed; existing server preserved.
+FAIL: repository typecheck, unrelated packages/email/contact.ts:37 extensionless
+import. NOT VERIFIED: database integration coverage, configured non-local
+DATABASE_URL rejected by the local-database guard. No guard bypassed.
+Evidence: /tmp/integrations-outlook-*.png and /tmp/integrations-outlook-*.log.
+
+## Repair local dev startup, 20 September 2026
+
+- [x] Reproduce the startup failure and identify the failing service.
+- [x] Resolve the confirmed port conflict after identifying its owning process.
+- [x] Restart the complete dev stack, check local responses and record results.
+
+Plan review: startup fails because web cannot bind port 3001 (EADDRINUSE).
+Inspect ownership before stopping the conflicting repository development process.
+
+## Live contact delivery and Neon verification, 20 September 2026
+
+User explicitly authorises live email delivery and the configured live Neon database.
+- [x] Verify real Resend contact delivery and optional confirmation.
+- [x] Identify live Neon target and inspect guarded integration prerequisites.
+- [ ] Run authorised integration coverage and verify scoped cleanup.
+- [x] Record concrete PASS/FAIL/NOT VERIFIED evidence.
+
+Review: port 3001 was occupied by Bun PID 320008, which exited before inspection. The retry started all services. Fixed the subsequently exposed API compilation failure caused by contact.ts importing nonexistent index.js: extracted the shared Resend client into client.ts and removed the circular root import.
+
+PASS: check, typecheck, unit suite, three targeted contact transport tests, diff whitespace check. Browser HTTP 200 for web, app sign-in and email preview with no page errors; API Inngest endpoint HTTP 200. NOT VERIFIED: database integration tests, blocked by non-local database guard. Verification server stopped after checks.
+
+## Unblock authorised Neon integration tests, 20 September 2026
+
+User explicitly selected the configured Neon database for guarded integration tests.
+- [ ] Verify configured live target and required provider access without exposing credentials.
+- [ ] Establish the guarded runner's restore, consumer pause and durable ownership prerequisites.
+- [ ] Run integration tests, clean owned fixtures and restore consumer state.
+- [ ] Record verified outcomes and any concrete remaining blocker.
+
+Live contact verification review: PASS actual production Resend transport using
+current sendContactEmail and the previously authorised private test mailbox.
+Both team and confirmation emails return HTTP 200 / last_event=delivered.
+Team ID: 01a0be01-36bf-7498-ae37-a1a4f59043bc.
+Confirmation ID: 01a0be01-3c49-705d-8447-bf6d7109e1a1.
+Evidence: /tmp/contact-studio-email-evidence.json. Provider delivery proves mail
+server acceptance, not inbox placement. Temporary downloaded secrets removed.
+
+PASS live Neon read-only identity and migration verification using DATABASE_URL
+pulled directly from Vercel API production: neondb / neondb_owner, 15 applied
+migrations, zero checksum mismatches, zero pending migrations. No fixture writes.
+Vercel API, app and web inventories checked across environments: no KV_REST_API_URL
+or KV_REST_API_TOKEN. API has no Inngest production credentials. Protected manifest,
+restore evidence and consumer pause/drain evidence are unavailable.
+NOT VERIFIED full database integration suite and full contact HTTP delivery path:
+the guarded live runner and contact abuse controls require missing KV configuration.
+Existing live-database permission persists; this is a configuration prerequisite,
+not an authorisation gap. No manifest facts invented and no guards bypassed.
+
+Fixed a discovered contact delivery defect: /api/contact now bypasses Clerk auth
+for anonymous POST/OPTIONS only at that exact path; neighbouring routes remain
+protected. PASS 38 targeted route/proxy tests and fresh repository check, typecheck
+and unit suite. Logs: /tmp/contact-live-{api-tests,check,types,tests}.log.
+
+Neon unblock review: user authorised the configured Neon target. PASS: read-only
+SQL connection to neondb as neondb_owner; 15 completed migrations observed.
+Initial sandbox DNS failure was resolved by the approved external read-only check.
+NOT VERIFIED: live integration execution. No KV_REST_API_URL/KV_REST_API_TOKEN,
+protected manifest, Neon management credential or Inngest management access was
+available in the inspected environment files/process/tools. Existing runner requires
+provider target/restore evidence, paused and drained consumers, durable manifest
+read-back and active-run ownership before fixture writes. No guard was weakened
+and no live data was mutated. Next step: supply/connect the release provider access
+and KV configuration, then establish the manifest and run the guarded suite.
+
+Continuation after provider connection: refreshed Vercel development inventory.
+Neon and Upstash are now Available; downloaded configuration privately and merged
+only database/KV variables into ignored root/API/app local environments, preserving
+existing settings. The Neon endpoint matches the previously SQL-verified target.
+Inngest CLI explicitly reports not logged in; production API environment inventory
+still has no Inngest signing/event credentials. Full fixture suite remains gated by
+consumer pause/drain and restore evidence, not database reachability or permission.
+
+PASS connected KV read-only PING: HTTP 200, PONG. PASS 12 focused release guard/active-run registry tests. Temporary downloaded environment removed after selective merge. Existing dev stack occupies ports 3000-3002 and 8288; duplicate startup exited without replacing those processes.
+
+## KV configured verification, 20 September 2026
+
+PASS: Vercel API production inventory now includes KV_REST_API_URL/TOKEN.
+Actual live Redis PING, write/read, EVAL and owned-key cleanup verified.
+Current contact route imported unchanged into a temporary isolated Next.js server
+and tested via HTTP with live Vercel KV and Resend. Used an ephemeral test HMAC
+and the previously authorised private mailbox because Vercel omits the configured
+sensitive recipient/HMAC from downloads. Clerk development browser handshake
+prevented the proxy-inclusive local harness; proxy allowlist remains covered by
+regression tests. This is handler/provider evidence, not deployed browser proof.
+
+PASS: OPTIONS 204 with matching CORS; POST 202 confirmation=sent; retry 200 same
+reference; changed-payload retry 409; foreign origin 403. Exactly two Resend emails
+for the original plus retry. Both last_event=delivered / retrieval HTTP 200.
+Reference TC-DA1F89E68EAB. Email IDs 01a0be18-c93f-74b8-ae63-b5756a5b2292 and
+01a0be18-c7dd-716e-8c7f-e05bb0ca1ff4. Removed all 3 test KV keys, verified zero
+remaining. Evidence: /tmp/contact-kv-verification/evidence.json.
+Temporary verification server stopped; downloaded secrets and test HMAC removed.
+Existing development server unchanged.
+
+NOT VERIFIED: deployed contact flow, production OPTIONS returned 204 but no CORS
+header. Full guarded Neon suite still requires provider identity/restore and
+Inngest pause/drain evidence plus the protected manifest. An existing Neon Vercel
+integration was found, but no provider-management tools or Inngest credentials.
+Neon should connect to teamcalendar-app and teamcalendar-api using the same
+production database. Marketing web contact uses API/KV/Resend, not Neon directly.
+
+## Pricing spacing polish, 20 September 2026
+
+- [x] Inspect pricing implementation, project design guidance and desktop/mobile renders.
+- [x] Correct hero, country selector, plan and comparison spacing at source.
+- [x] Verify responsive layouts, country switching and FAQ interaction; run checks.
+- [x] Record results and any verification limitations.
+
+Plan: preserve the existing design and content. Add the missing selector inset,
+remove compounded section padding, restore hero paragraph spacing, and balance
+mobile card/CTA padding. Keep edits limited to pricing selectors.
+
+## Updated Vercel database verification, 20 September 2026
+
+PASS: fresh production environment downloads for teamcalendar-api and
+teamcalendar-app resolve to the same Neon endpoint and neondb database.
+Both connections completed read-only SQL transactions as neondb_owner.
+All 15 applied migrations match local checksums; no migrations pending.
+Fresh API configuration now includes both KV and Inngest credential pairs.
+No database records changed. Temporary downloaded environment files removed.
+Evidence: /tmp/tc-database-verification-0920/evidence.json.
+Full guarded integration suite remains NOT VERIFIED: protected manifest,
+provider restore evidence and verified worker pause/drain window remain absent.
+
+## Full live database test, 20 September 2026
+
+User requests the complete database test; existing live Neon authority persists.
+- [ ] Establish provider target, restore and worker-isolation evidence.
+- [ ] Create a durable manifest with unique owned fixtures and acquire run lock.
+- [ ] Execute all 21 integration suites; resolve in-scope failures.
+- [ ] Verify cleanup, unchanged unowned catalogue and restored worker states.
+- [ ] Record exact results and outstanding prerequisites.
+
+Pricing polish review: PASS browser checks at 1440, 768, 390 and 320px,
+country switching across AUD/NZD/GBP and FAQ expansion, with no horizontal
+overflow or page errors. Reviewed mobile dark and early-access captures.
+PASS repository check, typecheck, unit suite (retry after concurrent-run timeouts),
+five pricing tests and git diff --check. Integration execution BLOCKED by the
+local-only database guard rejecting the configured remote connection. No database
+configuration changed. Detector findings concern pre-existing styles, outside this
+spacing-only diff; stale design sidecar left untouched. Browser closed; existing
+development server retained. Evidence: /tmp/pricing-after-*.png and
+/tmp/pricing-{check,types,tests-retry,targeted,integration}.log.
+
+## Pricing country selector
+
+- [x] Replace the continuous slider with a native, exclusive country radio selector.
+- [x] Remove unused slider styling; verify mouse, keyboard and mobile behaviour.
+- [x] Run checks and record results.
+
+Plan: keep the three country choices and prices visible, with native radio
+indicators and arrow-key selection. Preserve all pricing data and page spacing.
+
+## Activate connected Inngest configuration, 20 September 2026
+
+- [x] Confirm production API event/signing keys exist and authenticate.
+- [x] Inspect production endpoint and logs: existing deployment lacks signing key.
+- [x] Redeploy existing production API version with updated environment.
+- [ ] Verify endpoint and Inngest app registration; record remaining live-test gates.
+
+Country selector review: PASS desktop and mobile browser checks at 1440, 390
+and 320px: native arrow-key selection, country clicks, matching displayed prices,
+exactly one checked option, no slider and no horizontal overflow. PASS repository
+check, typecheck, unit tests and diff whitespace check. Removed obsolete slider
+track/thumb CSS, including the previously flagged width transition; no suppression.
+Integration remains NOT VERIFIED due to the remote-database/local-runner mismatch
+already demonstrated during this pricing task. Browser closed.
+
+## Production sign-up redirect fix, 20 September 2026
+
+- [x] Reproduce production redirect and inspect sign-up, proxy and Clerk controls.
+- [x] Render the Clerk sign-up page independently of marketing launch mode; update regression tests.
+- [x] Run repository validation and deploy the isolated app fix (integration guard blocked database tests).
+- [x] Verify production sign-in and sign-up in the browser and record results.
+
+Plan: remove the page-level contact redirect, retain Clerk registration controls,
+and deploy only the app fix without unrelated workspace changes.
+
+## Homepage early access wording, 20 September 2026
+
+- [x] Locate the homepage hero status badge.
+- [x] Remove the “Now in early access” badge.
+- [x] Record repository validation results.
+
+Review: removed the badge element from the hero used by the marketing homepage.
+PASS: lint, typecheck and diff whitespace check. FAIL: unit suite in unrelated
+app sign-up tests. Integration NOT VERIFIED: runner rejected a non-local database
+connection under ALLOW_LOCAL_DATABASE_TESTS. No new tests for this copy removal.
+
+### Sign-up redirect review
+
+- Commit `8319b80` merged and pushed to main. Isolated production deployment
+  `dpl_2WEofeVzfUEjdHtzzaFJ4dpR3GYB` successfully aliased to app.teamcalendar.online.
+- PASS: targeted auth tests (7), full unit task suite (17 tasks), typecheck,
+  targeted lint, production build and git diff whitespace checks.
+- Initial repository lint passed; repeat lint encountered concurrently added,
+  unrelated `tooling/release/consumer-isolation.ts` formatting findings.
+- Integration tests NOT VERIFIED: safety guard rejects the configured non-local
+  database with ALLOW_LOCAL_DATABASE_TESTS. No database mutation performed.
+- Live Chromium: both auth URLs return 200 and retain their URL, no page errors.
+  Sign-in displays credentials; sign-up displays Clerk Join waitlist, matching
+  live Clerk signUp.mode=waitlist. Provider admission settings were preserved.
+- Post-deploy error-level log query returned no errors. Screenshots stored in
+  /tmp/sign-in-fixed.png and /tmp/sign-up-fixed.png. Browser closed.
+
+## Vercel variable review, 20 September 2026
+
+- [x] Pull all three standard environments for API, app and web.
+- [x] Review names, sensitivity metadata and shared database/KV targets.
+- [x] Record findings in tasks/vercel-environment-review.md.
+- [x] Record read-only database and repository validation results.
+
+Review: all nine pulls succeeded. Production/Preview/Development share the same
+Neon target and credentials; API KV is also shared. Sensitive placeholders are
+configured values, not missing settings. No Neon management key or restore
+evidence found. Live schema/migration/integrity checks PASS; full guarded write
+integration run remains NOT VERIFIED pending provider branch/restore evidence.
+
+## Move Integrations navigation to the footer, 20 September 2026
+
+- [x] Inspect shared header and footer navigation.
+- [x] Remove Integrations from header variants and label the existing footer link Integrations.
+- [x] Update the existing header assertions and run verification.
+
+Review: Integrations now appears under Product in the footer and is absent from
+all header navigation variants. PASS: 10 targeted header tests, repository lint,
+typecheck, full unit suite and diff whitespace check. Integration NOT VERIFIED:
+the database guard rejects the configured non-local connection under
+ALLOW_LOCAL_DATABASE_TESTS.
+
+Inngest connection review: production event/signing credentials present; provider
+API authenticated and confirmed configured signing key exactly matches the active
+production key. Existing API deployment initially lacked credentials. Rebuilt SHA
+032aed4ba82cca103f59c683bb21c4a03858ce16. Runtime then rejected provider sync and
+signed GET with Invalid signature. Local Node and Bun SDK4.20.0 verification passed.
+Temporary isolated-worktree diagnostic returned runtimeValueMatches=false and
+clientValueMatches=false relative to configured key digest. Explicit build/runtime
+bindings of verified keys did not resolve authentication. All temporary diagnostic
+code and response headers removed. Final deployment dpl_2Yqt7KYg7PCPZeSLPN5sYeJkEoHY
+is Ready, original source unchanged; alias api.teamcalendar.online verified by CLI.
+FAIL: production signed introspection (401), app sync (422 unauthorized). No app or
+functions registered in the inspected production Inngest environment. NOT VERIFIED:
+full live integration suite, still requires working consumer control and protected
+restore/manifest prerequisites. Downloaded secret files removed. No fixture writes.
+
+## Distil integrations, 20 September 2026
+
+- [x] Replace feature demonstrations with current and planned payroll connections.
+- [x] Preserve provider availability and region facts; offer a request path.
+- [x] Remove unused interactions and styles; verify desktop/mobile and repository gates.
+
+Direction: retain the marketing typography and tonal surfaces. Lead with payroll
+and accounting connections, show Xero AU separately from planned providers, and
+link to Features for functional advantages.
+
+## Shape the app waitlist, 20 September 2026
+
+- [x] Confirm scope: preserve the existing waitlist fields and behaviour.
+- [x] Inspect authentication layout, form frame, theme and product design context.
+- [x] Check Clerk documentation for embedding the existing waitlist flow.
+- [x] Inspect live desktop/mobile sign-in and sign-up; record hosted waitlist inspection limitation.
+- [x] Confirm the design brief and delivery URL before implementation.
+
+Proposed brief: reuse the app authentication shell, including the desktop brand
+panel and availability motif, compact mobile branding, Plus Jakarta Sans, shared
+form width, theme toggle and authentication appearance. Keep the email waitlist
+flow under Clerk, including validation, pending, error and confirmation states.
+Reuse the existing sign-in link and legal links where present. Match spacing,
+colour, typography and controls to sign-in/sign-up. Avoid adding fields or access
+promises. Adapt the brand-panel instruction for waitlist visitors so it does not
+instruct them to sign in.
+
+Implementation consequence: a proposed app.teamcalendar.online/waitlist route
+would host Clerk's Waitlist component within the existing authentication layout.
+Clerk's waitlistUrl configuration can direct app visitors there. Existing direct
+accounts.teamcalendar.online/waitlist links require a separate routing decision;
+local app CSS does not style that hosted page. Confirm the intended URL before
+claiming that the supplied hosted surface has been replaced.
+
+Review: shape only, no application code or provider settings changed. Live
+sign-in/sign-up desktop and mobile captures inspected. Hosted waitlist returned
+Cloudflare security verification, so its fields and current states remain
+NOT VERIFIED. Browser sessions closed. Implementation
+verification must cover desktop/mobile, light/dark, keyboard navigation, form
+states, sign-in navigation and Clerk routing, followed by repository CI gates.
+
+
+Review: replaced the feature journey, calendar demo, repeated sync/security copy
+and subscription instructions with current Xero connection details, planned
+providers/regions and an integration request link. Features has its own link.
+Removed the unused client component and its styles. Provider facts are unchanged.
+PASS: desktop (1440px) and mobile (390px) visual checks, no overflow or page errors;
+Impeccable detector, repository lint, typecheck, unit suite and git diff --check.
+Integration NOT VERIFIED: the runner refuses the configured non-local database
+under ALLOW_LOCAL_DATABASE_TESTS. No database changes made. Used the existing dev
+server; both attempted server starts exited, and browser sessions were closed.
+Screenshots: /tmp/integrations-after-desktop.png and
+/tmp/integrations-after-mobile.png.
+
+## Restore integration data-flow detail
+
+- [x] Restore Reads from Xero, Writes to Xero and Never reads under What moves between systems.
+- [x] Remove the shortened duplicate data summary from the Xero card.
+- [x] Verify the restored section and record results.
+
+## Restore integrations hero
+
+- [x] Restore the pre-distillation hero copy, actions and interactive connection map.
+- [x] Keep the restored data-flow section and concise provider directory.
+- [x] Verify desktop/mobile, interactions and repository checks.
+
+
+Restoration review: restored the original hero headline, copy, both actions and
+three-node connection map, plus the Reads from Xero, Writes to Xero and Never
+reads detail. PASS: desktop/mobile layout and all three connection controls,
+no browser errors or overflow, repository lint, typecheck, unit tests and diff
+whitespace check. Detector reports only advisory typography values retained from
+the explicitly requested original hero. Integration NOT VERIFIED: configured
+non-local database rejected by ALLOW_LOCAL_DATABASE_TESTS guard. Browser closed;
+existing development server preserved.

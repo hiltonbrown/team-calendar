@@ -6,7 +6,7 @@ import { countryOptions, getCurrencyPricingState } from "../constants";
 import { PricingComparison } from "./pricing-comparison";
 import { PricingPlans } from "./pricing-plans";
 
-const CountrySlider = ({
+const CountrySelector = ({
   countryIndex,
   onSelectCountry,
 }: {
@@ -17,13 +17,13 @@ const CountrySlider = ({
 
   return (
     <div className="fmkt-pricing-controls-bar">
-      <div className="fmkt-country-slider-container">
-        <div className="fmkt-country-slider-header">
-          <div className="fmkt-country-slider-badge">
-            <span aria-hidden="true" className="fmkt-country-slider-dot" />
+      <div className="fmkt-country-selector-container">
+        <div className="fmkt-country-selector-header">
+          <div className="fmkt-country-selector-badge">
+            <span aria-hidden="true" className="fmkt-country-selector-dot" />
             <span>Multi-region payroll pricing</span>
           </div>
-          <span className="fmkt-country-slider-active-hint">
+          <span className="fmkt-country-selector-active-hint">
             Showing pricing for{" "}
             <strong>
               {activeCountry.name} ({activeCountry.code})
@@ -31,68 +31,44 @@ const CountrySlider = ({
           </span>
         </div>
 
-        <div className="fmkt-country-slider-track-wrap">
-          <div className="fmkt-country-slider-bar">
-            <div
-              className="fmkt-country-slider-fill"
-              style={{
-                width: `${(countryIndex / (countryOptions.length - 1)) * 100}%`,
-              }}
-            />
-          </div>
-          <input
-            aria-label="Select country for pricing"
-            className="fmkt-country-slider-range"
-            max={countryOptions.length - 1}
-            min={0}
-            onChange={(e) => onSelectCountry(Number(e.target.value))}
-            step={1}
-            type="range"
-            value={countryIndex}
-          />
-        </div>
-
-        <div
-          aria-label="Country pricing selection"
-          className="fmkt-country-slider-stops"
-          role="tablist"
-        >
+        <fieldset className="fmkt-country-selector-options">
+          <legend className="sr-only">Country pricing selection</legend>
           {countryOptions.map((opt, idx) => {
             const isActive = countryIndex === idx;
             return (
-              <button
-                aria-selected={isActive}
+              <label
                 className={[
-                  "fmkt-country-slider-stop",
-                  isActive ? "fmkt-country-slider-stop--active" : "",
+                  "fmkt-country-selector-option",
+                  isActive ? "fmkt-country-selector-option--active" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 key={opt.code}
-                onClick={() => onSelectCountry(idx)}
-                role="tab"
-                type="button"
               >
-                <div className="fmkt-country-slider-stop__flag-wrap">
-                  <span className="fmkt-country-slider-stop__flag">
-                    {opt.flag}
-                  </span>
-                  <span className="fmkt-country-slider-stop__name">
+                <span className="fmkt-country-selector-option__label">
+                  <input
+                    checked={isActive}
+                    name="pricing-country"
+                    onChange={() => onSelectCountry(idx)}
+                    type="radio"
+                    value={opt.code}
+                  />
+                  <span className="fmkt-country-selector-option__name">
                     {opt.name}
                   </span>
-                </div>
-                <div className="fmkt-country-slider-stop__rates">
-                  <span className="fmkt-country-slider-stop__code">
+                </span>
+                <span className="fmkt-country-selector-option__rates">
+                  <span className="fmkt-country-selector-option__code">
                     {opt.code}
                   </span>
-                  <span className="fmkt-country-slider-stop__prices">
+                  <span className="fmkt-country-selector-option__prices">
                     {opt.starterPrice} / {opt.premiumPrice}
                   </span>
-                </div>
-              </button>
+                </span>
+              </label>
             );
           })}
-        </div>
+        </fieldset>
       </div>
     </div>
   );
@@ -111,7 +87,7 @@ export const PricingCurrencySelector = ({
   return (
     <div className="fmkt-pricing-stage-wrap">
       <div className="fmkt-container">
-        <CountrySlider
+        <CountrySelector
           countryIndex={countryIndex}
           onSelectCountry={setCountryIndex}
         />

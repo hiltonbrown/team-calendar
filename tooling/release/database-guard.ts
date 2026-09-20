@@ -10,6 +10,18 @@ export const LIVE_DATABASE_ACKNOWLEDGEMENT =
 const manifestSchema = z.object({
   active: z.literal(true),
   candidateSha: z.string().regex(/^[0-9a-f]{7,40}$/),
+  consumerIsolation: z
+    .object({
+      activeApps: z.literal(0),
+      archivedApps: z.literal(0),
+      environmentId: z.string().min(1),
+      kind: z.literal("unregistered-inngest-environment"),
+      observedAt: z.string().datetime(),
+      pausedRuns: z.literal(0),
+      pendingRuns: z.literal(0),
+      runningRuns: z.literal(0),
+    })
+    .optional(),
   durableManifestConfirmed: z.literal(true),
   namespace: z.string().regex(/^release:run:[0-9a-f-]{36}$/),
   owned: z.object({
@@ -18,11 +30,13 @@ const manifestSchema = z.object({
     organisationIds: z.array(z.string().uuid()).default([]),
   }),
   pausedConsumers: z.record(z.string(), z.boolean()).default({}),
-  pauseWindow: z.object({
-    currentlyPaused: z.array(z.string()),
-    drainedAt: z.string().datetime(),
-    establishedAt: z.string().datetime(),
-  }),
+  pauseWindow: z
+    .object({
+      currentlyPaused: z.array(z.string()),
+      drainedAt: z.string().datetime(),
+      establishedAt: z.string().datetime(),
+    })
+    .optional(),
   restoreEvidence: z.object({
     observedAt: z.string().datetime(),
     reference: z.string().min(1),
@@ -96,31 +110,43 @@ export const assertLiveDatabaseAuthority = (input: {
   if (manifest.namespace !== `release:run:${manifest.runId}`) {
     throw new Error("Release manifest namespace does not match its run ID");
   }
-  if (
-    REQUIRED_CONSUMERS.some(
-      (consumer) => !(consumer in manifest.pausedConsumers)
-    )
-  ) {
-    throw new Error(
-      "Protected manifest does not inventory every registered consumer"
-    );
-  }
-  if (
-    REQUIRED_CONSUMERS.some(
-      (consumer) => !manifest.pauseWindow.currentlyPaused.includes(consumer)
-    )
-  ) {
-    throw new Error(
-      "Protected manifest does not prove every consumer is paused"
-    );
-  }
-  if (
-    new Date(manifest.pauseWindow.drainedAt) <
-    new Date(manifest.pauseWindow.establishedAt)
-  ) {
-    throw new Error(
-      "Protected manifest drain evidence predates the pause window"
-    );
+  if (manifest.consumerIsolation) {
+    if (
+      manifest.pauseWindow ||
+      Object.keys(manifest.pausedConsumers).length > 0
+    ) {
+      throw new Error(
+        "Unregistered consumer evidence cannot claim a pause window"
+      );
+    }
+  } else {
+    const { pauseWindow } = manifest;
+    if (!pauseWindow) {
+      throw new Error("Protected manifest requires a consumer pause window");
+    }
+    if (
+      REQUIRED_CONSUMERS.some(
+        (consumer) => !(consumer in manifest.pausedConsumers)
+      )
+    ) {
+      throw new Error(
+        "Protected manifest does not inventory every registered consumer"
+      );
+    }
+    if (
+      REQUIRED_CONSUMERS.some(
+        (consumer) => !pauseWindow.currentlyPaused.includes(consumer)
+      )
+    ) {
+      throw new Error(
+        "Protected manifest does not prove every consumer is paused"
+      );
+    }
+    if (new Date(pauseWindow.drainedAt) < new Date(pauseWindow.establishedAt)) {
+      throw new Error(
+        "Protected manifest drain evidence predates the pause window"
+      );
+    }
   }
   const identity = parseDatabaseIdentity(input.databaseUrl);
   if (
@@ -168,6 +194,14 @@ export const assertDatabaseConnectionAllowed = (): void => {
     manifestPath: process.env.TC_RELEASE_MANIFEST,
     runId: process.env.TC_RELEASE_RUN_ID,
   });
+  if (
+    manifest.consumerIsolation &&
+    process.env.TC_RELEASE_CONSUMERS_VERIFIED !== manifest.runId
+  ) {
+    throw new Error(
+      "Database access requires live consumer isolation verification"
+    );
+  }
   if (
     process.env.TC_RELEASE_DURABLE_VERIFIED !== manifest.runId ||
     process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED !== manifest.runId

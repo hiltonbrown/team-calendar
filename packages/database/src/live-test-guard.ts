@@ -4,6 +4,11 @@ import { isLocalDatabase } from "./is-local-database";
 
 const manifestSchema = z.object({
   active: z.literal(true),
+  consumerIsolation: z
+    .object({
+      kind: z.literal("unregistered-inngest-environment"),
+    })
+    .optional(),
   durableManifestConfirmed: z.literal(true),
   namespace: z.string().min(1),
   runId: z.string().uuid(),
@@ -48,6 +53,14 @@ export const assertTestDatabaseConnectionAllowed = (): void => {
     ) {
       throw new Error(
         "Live database identity does not match the protected manifest"
+      );
+    }
+    if (
+      manifest.consumerIsolation &&
+      process.env.TC_RELEASE_CONSUMERS_VERIFIED !== runId
+    ) {
+      throw new Error(
+        "Unregistered consumers require verified live Inngest inventory"
       );
     }
     return;

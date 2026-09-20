@@ -7,6 +7,9 @@ describe("API proxy route boundary", () => {
     ["/ical/example.ics", true],
     ["/api/inngest", true],
     ["/api/early-access", true],
+    ["/api/contact", true],
+    ["/api/contact/admin", false],
+    ["/api/contact-private", false],
     ["/api/early-access/admin", false],
     ["/api/early-access-private", false],
     ["/webhooks/auth", true],
@@ -27,16 +30,18 @@ describe("API proxy route boundary", () => {
       isPublicApiRoute(new NextRequest(`http://localhost:3002${path}`))
     ).toBe(expected);
   });
-  it.each(["OPTIONS", "POST"])(
-    "allows anonymous early access %s requests",
-    (method) => {
-      expect(
-        isPublicApiRoute(
-          new NextRequest("https://api.teamcalendar.online/api/early-access", {
-            method,
-          })
-        )
-      ).toBe(true);
-    }
-  );
+  it.each([
+    ["/api/early-access", "OPTIONS"],
+    ["/api/early-access", "POST"],
+    ["/api/contact", "OPTIONS"],
+    ["/api/contact", "POST"],
+  ])("allows anonymous %s %s requests", (path, method) => {
+    expect(
+      isPublicApiRoute(
+        new NextRequest(`https://api.teamcalendar.online${path}`, {
+          method,
+        })
+      )
+    ).toBe(true);
+  });
 });

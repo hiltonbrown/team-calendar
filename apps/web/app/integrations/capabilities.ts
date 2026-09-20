@@ -16,13 +16,28 @@ interface CalendarDestination {
   readonly name: string;
 }
 
+interface PayrollProvider {
+  readonly id: string;
+  readonly name: string;
+  readonly status: IntegrationStatus;
+}
+
 interface IntegrationCapabilities {
+  readonly australianPayrollProviders: readonly PayrollProvider[];
   readonly calendarDestinations: readonly CalendarDestination[];
   readonly inboundDataCategories: readonly InboundDataCategory[];
   readonly xeroPayrollRegions: readonly XeroPayrollRegion[];
 }
 
 export const integrationCapabilities = {
+  australianPayrollProviders: [
+    { id: "xero", name: "Xero", status: "shipped" },
+    { id: "myob", name: "MYOB", status: "planned" },
+    { id: "deputy", name: "Deputy", status: "planned" },
+    { id: "tanda", name: "Tanda", status: "planned" },
+    { id: "employment-hero", name: "Employment Hero", status: "planned" },
+    { id: "acumatica", name: "Acumatica payroll", status: "planned" },
+  ],
   calendarDestinations: [
     { id: "outlook", name: "Outlook" },
     { id: "google-calendar", name: "Google Calendar" },

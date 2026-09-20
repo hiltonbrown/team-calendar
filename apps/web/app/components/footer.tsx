@@ -18,7 +18,7 @@ const footerColumns = [
       { href: "/features", title: "All features" },
       { href: "/features#ics-feeds", title: "Calendar feeds" },
       { href: "/features#leave-workflow", title: "Leave approvals" },
-      { href: "/integrations", title: "Xero integration" },
+      { href: "/integrations", title: "Integrations" },
       { href: "/pricing", title: "Pricing" },
     ],
     title: "Product",

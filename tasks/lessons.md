@@ -173,3 +173,21 @@ actionable; keep one-off task evidence in the review for that task.
 
 - Calendar contrast refinements must preserve a clearly visible outer boundary.
   Use the theme-aware outline token when tonal surfaces alone do not define it.
+
+- For live verification, inspect the relevant Vercel project environment inventories and pull Production, Preview and Development values before treating missing local variables as missing configuration. Compare database targets across environments. Sensitive values omitted from downloads are not evidence of absence.
+- When a user confirms an existing database connection and says to continue,
+  treat the live-target authorisation as settled. Investigate executable test
+  isolation and available provider configuration before returning the same
+  prerequisite list or asking them to locate credentials again.
+
+- Use an exclusive selector for discrete country/currency choices. A range
+  slider wrongly suggests a continuous scale and duplicates the selection UI.
+
+- Keep Integrations focused on connections to payroll and accounting systems,
+  availability and supported regions. Functional advantages and calendar demos
+  belong on Features; do not repeat them on Integrations.
+- When simplifying Integrations, retain data-flow details: what each connection
+  reads, writes and never accesses. These explain integration scope and are not
+  duplicate product features.
+- Preserve the integrations hero when distilling lower-page content unless its
+  replacement is explicitly requested; restore the user’s reference hero when asked.

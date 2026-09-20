@@ -45,13 +45,13 @@ describe("Marketing header", () => {
   );
 
   it("renders only the focused menu in every navigation variant", () => {
-    navigation.pathname = "/integrations";
+    navigation.pathname = "/features";
 
     const html = renderToStaticMarkup(React.createElement(Header));
 
     expect(html.match(/href="\/"/g)).toHaveLength(4);
     expect(html.match(/href="\/features"/g)).toHaveLength(3);
-    expect(html.match(/href="\/integrations"/g)).toHaveLength(3);
+    expect(html).not.toContain('href="/integrations"');
     expect(html.match(/href="\/pricing"/g)).toHaveLength(3);
     expect(html).not.toContain('href="/about"');
     expect(html).not.toContain('href="/blog"');

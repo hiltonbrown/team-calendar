@@ -1,8 +1,9 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  assertDatabaseConnectionAllowed,
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
   LIVE_DATABASE_ACKNOWLEDGEMENT,
@@ -76,7 +77,90 @@ const validInput = () => ({
   runId,
 });
 
+afterEach(() => vi.unstubAllEnvs());
+
 describe("live database guard", () => {
+  it("rejects missing isolation and missing pause evidence", () => {
+    expect(() =>
+      assertLiveDatabaseAuthority({
+        ...validInput(),
+        manifestPath: writeManifest({ pauseWindow: undefined }),
+      })
+    ).toThrow("requires a consumer pause window");
+  });
+
+  it("requires runtime consumer verification before opening the test database", () => {
+    const input = validInput();
+    input.manifestPath = writeManifest({
+      consumerIsolation: {
+        activeApps: 0,
+        archivedApps: 0,
+        environmentId: "production-test",
+        kind: "unregistered-inngest-environment",
+        observedAt: new Date().toISOString(),
+        pausedRuns: 0,
+        pendingRuns: 0,
+        runningRuns: 0,
+      },
+      pausedConsumers: {},
+      pauseWindow: undefined,
+    });
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ALLOW_LIVE_DATABASE_TESTS", input.acknowledgement);
+    vi.stubEnv("DATABASE_URL", input.databaseUrl);
+    vi.stubEnv("TC_RELEASE_MANIFEST", input.manifestPath);
+    vi.stubEnv("TC_RELEASE_RUN_ID", runId);
+    vi.stubEnv("TC_RELEASE_DURABLE_VERIFIED", runId);
+    vi.stubEnv("TC_RELEASE_ACTIVE_RUN_VERIFIED", runId);
+    vi.stubEnv("TC_RELEASE_CONSUMERS_VERIFIED", "");
+    expect(() => assertDatabaseConnectionAllowed()).toThrow(
+      "consumer isolation verification"
+    );
+    vi.stubEnv("TC_RELEASE_CONSUMERS_VERIFIED", runId);
+    expect(() => assertDatabaseConnectionAllowed()).not.toThrow();
+  });
+
+  it("accepts explicit unregistered evidence without claiming paused consumers", () => {
+    const input = validInput();
+    input.manifestPath = writeManifest({
+      consumerIsolation: {
+        activeApps: 0,
+        archivedApps: 0,
+        environmentId: "production-example",
+        kind: "unregistered-inngest-environment",
+        observedAt: new Date().toISOString(),
+        pausedRuns: 0,
+        pendingRuns: 0,
+        runningRuns: 0,
+      },
+      pausedConsumers: {},
+      pauseWindow: undefined,
+    });
+    expect(
+      assertLiveDatabaseAuthority(input).consumerIsolation?.environmentId
+    ).toBe("production-example");
+  });
+
+  it("rejects unregistered evidence combined with a fabricated pause window", () => {
+    expect(() =>
+      assertLiveDatabaseAuthority({
+        ...validInput(),
+        manifestPath: writeManifest({
+          consumerIsolation: {
+            activeApps: 0,
+            archivedApps: 0,
+            environmentId: "production-example",
+            kind: "unregistered-inngest-environment",
+            observedAt: new Date().toISOString(),
+            pausedRuns: 0,
+            pendingRuns: 0,
+            runningRuns: 0,
+          },
+        }),
+      })
+    ).toThrow("cannot claim a pause window");
+  });
+
   it("rejects missing acknowledgement before authority is granted", () => {
     expect(() =>
       assertLiveDatabaseAuthority({

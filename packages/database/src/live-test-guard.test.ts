@@ -37,43 +37,60 @@ describe("database unit-test isolation", () => {
     );
   });
 
-  it("denies direct live invocation without the runner-verified active lock", () => {
-    const runId = "00000000-0000-4000-8000-000000000001";
-    const manifestPath = join(
-      mkdtempSync(join(tmpdir(), "tc-guard-")),
-      "manifest.json"
-    );
-    writeFileSync(
-      manifestPath,
-      JSON.stringify({
-        active: true,
-        durableManifestConfirmed: true,
-        namespace: `release:run:${runId}`,
-        runId,
-        target: {
-          database: "release_db",
-          endpointId: "ep-release",
-          hostname: "ep-release.example.neon.tech",
-          role: "release_owner",
-        },
-        version: 1,
-      })
-    );
-    Object.assign(process.env, {
-      ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
-      DATABASE_URL:
-        "postgresql://release_owner:private@ep-release.example.neon.tech/release_db",
-      NODE_ENV: "test",
-      TC_RELEASE_DURABLE_VERIFIED: runId,
-      TC_RELEASE_MANIFEST: manifestPath,
-      TC_RELEASE_RUN_ID: runId,
-    });
-    delete process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED;
+  it.each([false, true])(
+    "requires independently verified live guards with unregistered consumers=%s",
+    (unregistered) => {
+      const runId = "00000000-0000-4000-8000-000000000001";
+      const manifestPath = join(
+        mkdtempSync(join(tmpdir(), "tc-guard-")),
+        "manifest.json"
+      );
+      writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          active: true,
+          ...(unregistered
+            ? {
+                consumerIsolation: { kind: "unregistered-inngest-environment" },
+              }
+            : {}),
+          durableManifestConfirmed: true,
+          namespace: `release:run:${runId}`,
+          runId,
+          target: {
+            database: "release_db",
+            endpointId: "ep-release",
+            hostname: "ep-release.example.neon.tech",
+            role: "release_owner",
+          },
+          version: 1,
+        })
+      );
+      Object.assign(process.env, {
+        ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
+        DATABASE_URL:
+          "postgresql://release_owner:private@ep-release.example.neon.tech/release_db",
+        NODE_ENV: "test",
+        TC_RELEASE_DURABLE_VERIFIED: runId,
+        TC_RELEASE_MANIFEST: manifestPath,
+        TC_RELEASE_RUN_ID: runId,
+      });
+      delete process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED;
 
-    expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
-      "protected manifest"
-    );
-  });
+      expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
+        "protected manifest"
+      );
+      process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED = runId;
+      delete process.env.TC_RELEASE_CONSUMERS_VERIFIED;
+      if (unregistered) {
+        expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
+          "verified live Inngest inventory"
+        );
+        process.env.TC_RELEASE_CONSUMERS_VERIFIED = runId;
+      }
+      expect(() => assertTestDatabaseConnectionAllowed()).not.toThrow();
+    }
+  );
 
   it("permits local test connections when ALLOW_LOCAL_DATABASE_TESTS is enabled", () => {
     process.env.NODE_ENV = "test";
