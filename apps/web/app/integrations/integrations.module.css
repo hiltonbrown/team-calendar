@@ -86,28 +86,6 @@
   background: var(--marketing-surface-container);
 }
 
-.dataGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 32px;
-  margin-top: 32px;
-}
-
-.dataPanel h3 {
-  margin: 0 0 16px;
-  font: 600 1.125rem / 1.4 var(--marketing-font);
-  color: var(--marketing-on-surface);
-}
-
-.dataPanel ul {
-  display: grid;
-  gap: 12px;
-  padding-left: 20px;
-  margin: 0;
-  font: 400 1rem / 1.65 var(--marketing-font);
-  color: var(--marketing-on-surface-variant);
-}
-
 .note {
   margin: 24px 0 0;
   font: 400 0.9375rem / 1.65 var(--marketing-font);
@@ -157,8 +135,7 @@
 }
 
 @media (max-width: 760px) {
-  .split,
-  .dataGrid {
+  .split {
     grid-template-columns: minmax(0, 1fr);
   }
 }

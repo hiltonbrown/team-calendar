@@ -2,6 +2,7 @@ import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { integrationCapabilities } from "./capabilities";
+import { DataExchange } from "./data-exchange";
 import { ConnectionMap } from "./integration-experience";
 import styles from "./integrations.module.css";
 
@@ -10,30 +11,6 @@ export const metadata: Metadata = createMetadata({
     "Explore Team Calendar’s payroll and accounting connections: Xero in Australian early access, planned integrations and requests for new systems.",
   title: "Integrations",
 });
-
-const dataMoves = [
-  {
-    items: integrationCapabilities.inboundDataCategories.map(
-      (category) => category.name
-    ),
-    title: "Reads from Xero",
-  },
-  {
-    items: [
-      "Leave applications submitted in Team Calendar",
-      "Manager approval and decline decisions",
-      "Leave application status updates",
-    ],
-    title: "Writes to Xero",
-  },
-  {
-    items: [
-      "Salary, banking, tax, or superannuation data",
-      "Personal calendar contents",
-    ],
-    title: "Never reads",
-  },
-];
 
 const plannedProviders =
   integrationCapabilities.australianPayrollProviders.filter(
@@ -78,6 +55,8 @@ const IntegrationsPage = () => (
       </div>
     </section>
 
+    <DataExchange />
+
     <section aria-labelledby="current-connection" className={styles.section}>
       <div className={`fmkt-container ${styles.split}`}>
         <div>
@@ -106,31 +85,6 @@ const IntegrationsPage = () => (
             Read the connection guide
           </Link>
         </article>
-      </div>
-    </section>
-
-    <section aria-labelledby="data-moves" className={styles.section}>
-      <div className="fmkt-container">
-        <h2 className="fmkt-section-title" id="data-moves">
-          What moves between systems.
-        </h2>
-        <p className={styles.copy}>
-          Xero remains the source for payroll records and leave balances. Team
-          Calendar sends leave requests and decisions back to Xero, and shares
-          availability with your team’s calendars.
-        </p>
-        <div className={styles.dataGrid}>
-          {dataMoves.map((group) => (
-            <article className={styles.dataPanel} key={group.title}>
-              <h3>{group.title}</h3>
-              <ul>
-                {group.items.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
       </div>
     </section>
 

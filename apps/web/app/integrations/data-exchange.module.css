@@ -1,0 +1,336 @@
+.section {
+  padding: clamp(48px, 7vw, 100px) 0;
+  color: var(--marketing-on-surface);
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(24px, 5vw, 72px);
+  align-items: start;
+  margin-bottom: 40px;
+}
+
+.heading h2 {
+  max-width: 15ch;
+  margin-bottom: 0;
+}
+
+.heading p {
+  max-width: 65ch;
+  margin: 0;
+  font: 400 1.0625rem / 1.7 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.exchange {
+  padding: clamp(20px, 4vw, 48px);
+  background: var(--marketing-surface-low);
+  border-radius: 20px;
+}
+
+.diagram {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 2fr) minmax(
+      120px,
+      1fr
+    );
+  align-items: center;
+  padding: 20px 0 36px;
+}
+
+.system {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  text-align: center;
+}
+
+.systemMark {
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  margin-bottom: 12px;
+  font: 600 1.5rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: -0.03em;
+  background: var(--marketing-surface-lowest);
+  border-radius: 20px;
+}
+
+.calendarMark {
+  gap: 5px;
+  align-content: center;
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.calendarMark span {
+  width: 28px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 12px;
+}
+
+.calendarMark span:nth-child(2) {
+  width: 38px;
+}
+
+.system strong {
+  font: 600 1.125rem / 1.4 var(--marketing-font);
+}
+
+.system > span:last-child {
+  max-width: 22ch;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.paths {
+  width: 100%;
+  overflow: visible;
+  color: var(--marketing-on-surface-variant);
+  stroke-width: 2;
+}
+
+.track {
+  stroke: var(--marketing-outline-variant);
+}
+
+.readPath,
+.writePath {
+  stroke: var(--marketing-outline);
+}
+
+.exchange[data-direction="read"] .readPath,
+.exchange[data-direction="write"] .writePath {
+  stroke: var(--marketing-primary);
+  stroke-width: 3;
+}
+
+.trace {
+  stroke: var(--marketing-primary);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 0.06 0.94;
+  stroke-dashoffset: 0;
+}
+
+.pathLabel {
+  font: 500 16px var(--marketing-font);
+}
+
+.instruction {
+  margin: 0 0 20px;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+
+.directions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(24px, 5vw, 64px);
+}
+
+.direction {
+  min-width: 0;
+}
+
+.control {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  font: 600 1.125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  text-align: left;
+  cursor: pointer;
+  background: var(--marketing-surface-container);
+  border: 0;
+  border-radius: 14px;
+  transition:
+    background 180ms ease-out,
+    color 180ms ease-out;
+}
+
+.control svg {
+  flex-shrink: 0;
+}
+
+.control:hover {
+  background: var(--marketing-surface-highest);
+}
+
+.control[aria-pressed="true"] {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.control:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 4px;
+}
+
+.selectedMark {
+  visibility: hidden;
+  margin-left: auto;
+}
+
+.control[aria-pressed="true"] .selectedMark {
+  visibility: visible;
+}
+
+.route {
+  margin: 16px 0 12px;
+  font: 600 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.direction ul {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.direction li {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font: 400 1rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.direction li::before {
+  height: 2px;
+  content: "";
+  background: var(--marketing-outline-variant);
+}
+
+.direction[data-active="true"] li {
+  color: var(--marketing-on-surface);
+}
+
+.direction[data-active="true"] li::before {
+  background: var(--marketing-primary);
+}
+
+.privacy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+  padding: 32px clamp(20px, 4vw, 48px) 0;
+}
+
+.privacyHeading {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.privacy h3 {
+  margin: 0;
+  font: 600 1.125rem / 1.4 var(--marketing-font);
+}
+
+.privacy p {
+  margin: 4px 0 0;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.privacy ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  font: 400 1rem / 1.65 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  list-style: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .trace {
+    animation: trace-exchange 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes trace-exchange {
+    from {
+      stroke-dashoffset: 0;
+    }
+    to {
+      stroke-dashoffset: -0.94;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control {
+    transition: none;
+  }
+  .trace {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .heading,
+  .directions,
+  .privacy {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .heading h2 {
+    max-width: 20ch;
+  }
+  .diagram {
+    grid-template-columns: 90px minmax(0, 1fr) 90px;
+    padding: 8px 0 28px;
+  }
+  .systemMark {
+    width: 60px;
+    height: 60px;
+  }
+  .system strong {
+    font-size: 1rem;
+  }
+  .system > span:last-child {
+    display: none;
+  }
+  .paths {
+    height: 110px;
+  }
+  .pathLabel {
+    display: none;
+  }
+  .privacy {
+    padding-top: 28px;
+  }
+}
+
+@media (forced-colors: active) {
+  .control {
+    border: 1px solid ButtonText;
+  }
+  .control[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+  }
+  .track,
+  .readPath,
+  .writePath {
+    stroke: CanvasText;
+  }
+  .exchange[data-direction="read"] .readPath,
+  .exchange[data-direction="write"] .writePath,
+  .trace {
+    stroke: Highlight;
+  }
+}

@@ -1153,3 +1153,11 @@ repository lint, typecheck, unit suite and diff whitespace check.
 Integration NOT VERIFIED: database guard rejects the configured non-local target
 under ALLOW_LOCAL_DATABASE_TESTS. No database writes attempted. Real-device frame
 rate was not measured. Browser closed; existing dev server retained.
+
+## Move exchange section below hero
+
+- [x] Place DataExchange immediately after the hero, before Connect with Xero.
+- [x] Verify source order, lint, typecheck, unit suite and diff whitespace.
+
+Review: all listed checks PASS. Integration NOT VERIFIED: the database guard
+continues to reject the configured non-local target. Content and controls unchanged.
