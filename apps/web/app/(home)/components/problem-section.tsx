@@ -30,14 +30,16 @@ export const ProblemSection = () => (
       <div className="fmkt-section-header">
         <p className="fmkt-overline">Why teams switch</p>
         <h2 className="fmkt-section-title">
-          Leave admin feels small until it costs you a shift.
+          Don&rsquo;t find out someone&rsquo;s away when you need them.
         </h2>
         <p className="fmkt-problem__lead">
-          A text here, a leave form there, a missed calendar invite. The
-          patchwork holds until it doesn&rsquo;t: leave clashes, uncovered
-          shifts, leave missing from Xero and payroll errors. As your team
-          grows, more of Monday morning disappears into working out who&rsquo;s
-          actually in.
+          Leave approved in a text message can still be missing from Xero and
+          the team calendar. You end up chasing confirmations, finding cover at
+          short notice and correcting payroll.
+        </p>
+        <p className="fmkt-problem__lead">
+          Keep leave, travel and out of office plans where the whole team can
+          see them.
         </p>
       </div>
       <div className="fmkt-problem__grid">

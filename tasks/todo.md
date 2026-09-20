@@ -2,6 +2,21 @@
 
 Last reviewed: 2026-09-20
 
+## Task: Pricing page Overdrive redesign (Direction 2: Living Calendar Feed Preview & Ambient Tonal Stage)
+
+- [ ] Inspect existing pricing architecture, tokens, components, and test contracts
+- [ ] Craft the Living Calendar Feed Interactive Preview & Ambient Tonal Stage in `pricing-currency-selector.tsx`
+- [ ] Redesign Hero section: remove AI slop / awkward metrics, replace with authoritative, clear value proposition
+- [ ] Redesign Plan cards: elevated typography, authentic Lucide checkmarks, clear tier distinction, risk-free trial prompt
+- [ ] Redesign Comparison table: high-clarity tabular presentation with clean mobile cards and clear feature semantics
+- [ ] Overhaul FAQ section: add comprehensive, high-value Australian payroll customer questions & answers with native `<details>`
+- [ ] Add High-Conversion Conversion Section (Final CTA) with trust signals and direct sign-up prompts
+- [ ] Craft dedicated CSS styling honoring Team Calendar's design system tokens, Plus Jakarta Sans, and tonal layering
+- [ ] Verify browser rendering across Desktop (1440px), Tablet (768px), and Mobile (390px) in both Light and Dark themes
+- [ ] Run test verification (`pricing.test.ts`, `bun run check`, `bun run typecheck`, `bun run test`)
+- [ ] Document results in `tasks/todo.md`
+
+
 ## Task: Resolve CI integration test failure in @repo/jobs schedule-xero-syncs
 
 - [x] Add defensive relation guarding and type narrowing in `packages/database/src/queries/schedulable-xero-tenants.ts`
@@ -239,3 +254,338 @@ commit, clean worktree status, no unmerged branches, `git diff --check` and
 `git fsck --full --no-dangling`. No application source changed, so application
 test suites were not rerun. The cleanup record is committed locally; no remote
 push or deployment was performed.
+
+## Homepage SVG refinement (20 September 2026)
+
+- [x] Inspect the sync diagram and existing theme/motion styles.
+- [x] Correct theme contrast, card bounds and connector alignment while preserving copy.
+- [x] Verify desktop/mobile, light/dark and reduced motion; run repository gates and record the integration blocker.
+
+### Review
+
+Replaced fixed pale SVG card fills with theme surfaces, enlarged labels and
+removed translucent secondary text. SVG text contrast measures at least
+6.87:1 in both themes (secondary copy: 7.69:1 light, 8.44:1 dark).
+Matched mobile icon colours, kept cards within the viewBox, and removed
+independent node parallax so animated paths remain attached. Copy is unchanged.
+
+Chromium screenshots checked at 1440px, 768px and 390px in both themes.
+No horizontal overflow or browser errors; reduced motion hides all packets.
+Lint, typecheck and unit tests pass (web: 107 tests across 32 files).
+Integration tests could not run: the database guard rejects the configured
+non-local connection with ALLOW_LOCAL_DATABASE_TESTS. No database writes made.
+Browser evidence is in /tmp/svg-*.png and /tmp/svg-*.log. Used the existing
+port 3001 server; attempted additional preview processes exited. No deployment.
+
+
+## Homepage transparent diagram and sizing
+
+- [x] Identify wrapper background and oversized responsive dimensions.
+- [x] Remove backdrop and constrain the diagram while preserving readable labels.
+- [x] Check both themes at desktop, tablet and mobile sizes; record verification.
+
+### Review
+
+Removed the hero diagram wrapper's tinted fill, dot grid, border and forced
+minimum height in both themes. SVG dimensions now follow its 420:540 aspect
+ratio with a 440px width cap, keeping tablet elements at desktop scale.
+The mobile text alternative sits on the page without a card backdrop or
+excess padding, reducing its wrapper to 223px at a 390px viewport.
+
+Chromium checked light and dark at 1440px, 768px and 390px: computed background
+is transparent, background-image is none and border is 0px. No horizontal
+overflow or browser errors. Screenshots: /tmp/svg-sizing-*.png.
+Lint, typecheck and unit tests pass (107 web tests). The prior integration
+blocker remains unchanged: configured database connection is not local.
+
+
+## Hero availability copy clarification
+
+- [x] Include staff travel, out of office notices, WFH and other availability.
+- [x] Distinguish approved leave syncing to Xero from shared calendar publication.
+- [x] Verify rendered copy and repository checks.
+
+### Review
+
+Updated the shared hero paragraph to include travel plans, out of office
+notices, WFH and other availability updates. Approved leave alone is described
+as syncing back to Xero, with all these updates appearing together in calendars.
+Desktop/mobile browser checks in both themes show no overflow or browser errors.
+Lint, typecheck and unit tests pass (107 web tests). Prior integration database
+guard blocker remains unchanged. Screenshots: /tmp/hero-copy-*.png.
+
+
+## Problem-section copy refinement
+
+- [x] Replace the abstract headline and paragraph with specific staffing and payroll consequences.
+- [x] Check rendered wording on desktop/mobile and run repository checks.
+
+### Review
+
+Replaced the problem-section headline and lead paragraph with direct language
+about missing calendar/payroll records, chasing confirmations and finding cover.
+Desktop/mobile browser checks in both themes showed wrapping without horizontal
+overflow and no runtime errors. Lint, typecheck and unit tests pass (107 web tests).
+The prior integration database guard blocker remains unchanged.
+
+## Contact early access form usability
+
+- [x] Review existing fields and submission behaviour.
+- [x] Improve field contrast and add accessible submission confirmation.
+- [x] Test validation, cancellation, pending, success and failure states.
+- [x] Verify desktop/mobile themes and run repository gates.
+
+### Review
+
+Inputs, selects and textarea now use contrasting theme surfaces, visible outline
+borders and 48px minimum height. Shared AlertDialog confirms the response email
+before submission, restores focus on close and prevents duplicate clicks.
+Unchanged retries retain their idempotency key, failures retain entered details,
+and successful responses display the application reference. Ineligible Xero
+Payroll selections receive a clear message.
+
+PASS: 9 form tests, 12 targeted API tests, full unit suite, typecheck, scoped lint
+and git diff --check. Chromium checked 1440px and 390px in light/dark, validation,
+cancel/focus restoration, confirmation and a simulated successful response.
+No horizontal overflow or page errors. Screenshots: /tmp/contact-*.png.
+The first dialogue captures caught opening animations; settled captures confirm
+opaque readable surfaces and correct desktop/mobile sizing.
+
+FAIL: full lint reports an existing formatting issue in homepage problem-section.tsx.
+NOT VERIFIED: integration suites stop at the non-local database safety guard;
+live email delivery was not exercised. Browser requests and API delivery tests
+use simulated responses. Impeccable detector found only existing typography
+advisories outside the changed CSS. Reused the existing dev server and closed
+test browser instances.
+
+## Features hero whole-team coverage
+
+- [x] Review the existing hero and agree the combined copy, coverage row and motion direction.
+- [x] Name payroll and non-payroll staff explicitly and show four illustrative statuses.
+- [x] Verify desktop/mobile, light/dark and reduced motion; run repository gates.
+
+### Review
+
+Headline revised after feedback to “See everyone’s availability.” Supporting
+copy explicitly includes employees, directors, subcontractors and offshore
+staff whether they are on payroll or not. Four labelled examples enter once
+with staggered CSS motion, with a static reduced-motion presentation. Sage
+identifies payroll leave and lavender identifies manually shared statuses.
+
+PASS: browser checks at 1440px, 768px and 390px in light/dark, no overflow or
+runtime errors; reduced motion disables animation. PASS: lint, typecheck, unit
+tests and git diff --check. Integration NOT VERIFIED: the suite stops at the
+database guard because ALLOW_LOCAL_DATABASE_TESTS rejects the configured
+non-local connection. No deployment. Screenshots: /tmp/features-coverage-*.png.
+Used the existing dev server and closed the verification browsers.
+
+## Live early access delivery verification
+
+- [x] Attempt a clearly labelled test through the production contact form.
+- [x] Diagnose missing browser submission response: Clerk protects the public application endpoint.
+- [x] Exempt the exact application route and add regression coverage.
+- [ ] Verify live delivery after the API fix is deployed.
+
+
+Live delivery result: NOT VERIFIED. Production OPTIONS returned Clerk
+`protect-rewrite, session-token-and-uat-missing`, matched `/404`, and no
+Access-Control-Allow-Origin header for either apex or www origins. The live
+browser submission timed out waiting for POST. No successful delivery or
+reference was observed. Fixed the exact public route locally; production
+requires deployment before delivery can be retested. Added public POST/OPTIONS
+and private neighbouring-route regression coverage.
+
+### Resend live transport evidence
+
+PASS: the production Resend sender sent the actual early access template to
+user-authorised test recipient the private application mailbox. Resend retrieval returned
+HTTP 200 and last_event=delivered for email
+01a0bd46-97db-7315-8a18-cb74574cbea3, from notifications@teamcalendar.online,
+subject AU early access application EA-DELIVERY-TEST-20260920.
+This verifies live email transport, not production browser-to-mailbox completion.
+Production still needs the public route fix deployed and Redis abuse-control
+configuration. The recipient has now been authorised and saved as a sensitive
+production variable. Vercel env ls confirms the HMAC secret already exists;
+sensitive values omitted from env pull were initially misclassified as missing.
+
+
+The application recipient is server-only. Never expose it in public contact-page
+copy, client bundles or API responses. Resend remains the delivery provider.
+The production recipient setting is saved; existing HMAC and public URL settings
+are preserved. Production KV settings are absent from the environment inventory.
+
+## Fix local development and production sign-up page routing
+
+- [x] Inspect sign-up routing logic across `apps/app` and dependencies (`launch-mode`, `isEarlyAccess`, search params, redirect targets)
+- [x] Ensure local development (`process.env.NODE_ENV === "development"`) allows direct sign-up without redirection
+- [x] Ensure production deployment readiness (`isEarlyAccess()` gate, safe URL construction, ticket handling, fallback redirect)
+- [x] Add unit tests in `apps/app/__tests__/sign-up.test.tsx` verifying development bypass, production early access enforcement, ticket admission, and paid mode bypass
+- [x] Verify browser behaviour on `http://localhost:3000/sign-up` in development mode
+- [x] Run verification gates (`bun run check`, `bun run typecheck`, `bun run test`, `bun run build`)
+- [x] Document results in `tasks/todo.md`
+
+### Review
+
+Diagnosed and fixed the local development sign-up redirection issue while ensuring production deployment readiness:
+
+1. **Root cause analysis**: In `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx`, direct sign-ups were unconditionally redirected to `${webUrl}/contact?admission=required` if no `__clerk_ticket` was present in `searchParams`. In local development (`process.env.NODE_ENV === "development"`), developers visiting `http://localhost:3000/sign-up` (or navigating from marketing buttons on `http://localhost:3001`) do not have an early-access invitation ticket, triggering an immediate bounce to the contact application page.
+2. **Local development & production gating**:
+   - In local development (`NODE_ENV === "development"`), the admission requirement is bypassed, rendering `<SignUp />` directly so local sign-up and authentication flows function without friction.
+   - For production environments, admission enforcement is gated by `isEarlyAccess()` from `@repo/next-config/launch-mode`. In `early_access` launch mode, uninvited visitors without a ticket continue to be redirected to `/contact?admission=required`, while valid tickets (`__clerk_ticket`) proceed to `<SignUp />`. In future `paid` launch mode, direct sign-ups are permitted.
+   - Redirect URL construction uses `new URL("/contact?admission=required", webUrl).toString()` to eliminate issues with missing or trailing slashes on `NEXT_PUBLIC_WEB_URL`.
+   - Empty or whitespace tickets are safely identified as uninvited.
+3. **Automated test coverage**: Extended `apps/app/__tests__/sign-up.test.tsx` with 7 unit tests covering:
+   - Early-access invitation ticket admission
+   - Direct uninvited redirect in early access
+   - Empty or whitespace ticket rejection in early access
+   - Development mode direct sign-up allowance
+   - Paid launch mode direct sign-up allowance
+   - Trailing-slash URL normalisation
+   - Canonical metadata exports
+4. **Live verification**:
+   - Automated browser check using Chromium confirmed that navigating to `http://localhost:3000/sign-up` in development returns HTTP 200 and renders the heading "Create your organisation" without errors or redirects.
+   - Navigating to `http://localhost:3001/sign-up` cleanly redirects to `http://localhost:3000/sign-up` and displays the sign-up view.
+   - Full repository checks verified: `bun run check` (1017 files clean), `bun run typecheck` (19/19 packages clean), `bun run test` (all unit test suites pass), and `bun run build` (production build across `api`, `web`, and `app` all succeeded with 100% route generation).
+
+## Features calendar contrast and consistency
+
+- [x] Compare the features calendar with the home page demo and design tokens.
+- [x] Remove decorative green texture, align surfaces and improve label readability.
+- [x] Verify responsive layouts, both themes, story controls and run repository checks (integration blocked as recorded below).
+
+Review: Removed the dotted background and green wash from the features calendar.
+Matched the home demo's lavender stage/header, alternating rows and neutral avatars.
+Kept sage payroll and purple manual events, with full-opacity source labels and
+12px event text. Narrow calendars now scroll by touch or keyboard instead of
+shrinking text to 8px. Exposed the scroll region to assistive technology.
+Browser PASS at 1440, 768 and 390px in both themes: no page overflow, no clipped
+event labels, keyboard scrolling and approval selection work, no page errors.
+Event text contrast ranges from 6.76:1 to 12.72:1 across the two themes.
+Lint, typecheck and unit tests PASS. Integration NOT VERIFIED: the local-database
+guard rejects the configured non-local database connection. No guard bypassed.
+Screenshots: /tmp/calendar-after-{1440,768,390}-{light,dark}.png.
+
+## Features calendar visible border
+
+- [x] Add theme-aware outline borders to the calendar stage and scrolling grid.
+- [x] Verify both themes and run required checks.
+
+Review: Visible 1px outline borders confirmed in light/dark desktop and mobile
+captures. No page overflow or event clipping; keyboard scrolling and story
+selection pass. Lint, typecheck and unit tests PASS. Integration NOT VERIFIED:
+configured database is non-local and the local-database guard rejects it.
+
+## Marketing homepage technical audit, 20 September 2026
+
+- [x] Load audit guidance and identify the homepage and shared components.
+- [x] Check implementation, detector findings and design-system consistency.
+- [x] Verify desktop/mobile, themes, keyboard and reduced-motion behaviour.
+- [x] Record prioritised findings and verification limits without changing UI.
+
+## Integrations marketing critique, 20 September 2026
+
+- [x] Resolve page source and read design context and critique workflow.
+- [x] Compare layout and wording with other marketing routes independently.
+- [x] Verify desktop/mobile browser evidence and run the design detector.
+- [x] Archive the prioritised critique and record verification limits.
+
+Review: Audit recorded in reports/marketing-homepage-audit-2026-09-20.md.
+12/20 provisional health score; 3 P1 and 5 P2 findings. Browser checks covered
+320, 390, 768 and 1440px in both themes, plus focus, coarse-pointer sizing and
+reduced motion. No UI edits. Production performance and full WCAG conformance
+remain NOT VERIFIED. Existing dev server and user source changes preserved.
+
+Review: Independent design and detector assessments completed. Score 20/32.
+Compared home, features, about, security, pricing and contact; desktop/mobile
+integrations screenshots inspected, no horizontal overflow at 390px. Detector
+returned zero findings. Four priorities: hero write-back story, plain-language
+copy, H1 hierarchy and contextual onboarding help. Product UI unchanged.
+Assessment B browser/overlay NOT VERIFIED: sandbox/socket restrictions followed
+by a pending launch and aborted escalation. Assessment A browser closed.
+No app server started successfully; the existing server was preserved.
+
+## Implement integrations critique improvements
+
+- [x] Clarify both Xero sync directions and separate manual availability in the hero.
+- [x] Simplify technical copy and strengthen title hierarchy within the existing design.
+- [x] Link guided setup to onboarding and security details; align container styling.
+- [x] Update existing content checks, verify desktop/mobile in both themes and run repository gates.
+
+Approved scope: all four critique priorities; retain existing visual identity.
+
+Review: All four priorities implemented in integrations/page.tsx and its CSS
+module. Hero now describes staff requests, Xero write-back and separate team
+availability; title has stronger hierarchy. Simplified setup/security wording,
+linked guided onboarding and its publish section, normalised persistent card
+corners, and removed nested summary surfaces. Updated existing content tests.
+
+PASS: scoped lint, typecheck, unit tests, diff whitespace checks, design detector
+(zero findings), desktop/tablet/mobile light/dark browser layouts, onboarding
+link navigation, 3px keyboard focus, no horizontal overflow or page errors.
+Full lint initially passed; final run FAIL due to concurrent homepage timeline
+useSemanticElements errors, outside this task. Integration tests FAIL at the
+non-local database guard; integration behaviour NOT VERIFIED, no bypass.
+Browser closed; existing development server preserved. Screenshots:
+/tmp/integrations-after-{1440,768,390}-{light,dark}.png.
+Design hook reported stale .impeccable/design.json; left unchanged.
+
+## Implement marketing homepage audit fixes
+
+- [x] Repair CTA contrast, timeline semantics and detail focus.
+- [x] Bound diagram animation and honour reduced-motion scrolling.
+- [x] Fix touch sizing and enlarged-text wrapping; clarify refresh copy.
+- [x] Verify browser behaviour and run check, typecheck, unit and integration gates.
+
+Motion plan: retain the sync diagram as a single explanatory sequence lasting
+under five seconds, then leave its static paths and labels visible. Keep
+interaction feedback immediate and disable spatial anchor scrolling when the
+visitor requests reduced motion. Preserve the current visual identity.
+
+## Integrations follow-up critique
+
+- [x] Resolve current source and start independent design and evidence assessments.
+- [x] Inspect fresh desktop/mobile captures in both themes and verify links.
+- [x] Synthesise findings, persist the critique and compare scores.
+
+Review: All eight audit findings addressed. CTA token pairs measure 6.43:1
+(light) and 7.54:1 (dark) on the primary action. Timeline uses named groups,
+full-date/provenance labels, an associated live details region and focus return.
+SVG sequence ends within 4.5 seconds; reduced motion uses auto anchor scrolling.
+Week controls remain 44px square and footer links have 44px hit heights.
+Homepage text wraps safely at 200% root size, including the final CTA.
+Browser PASS at 320/390/768/1440px in light/dark, with no page errors or page
+overflow; enlarged text, focus return, menu Escape and finite motion PASS.
+Lint, typecheck and unit tests PASS. Integration command attempted, NOT VERIFIED:
+configured database is non-local and the local-database guard rejects it.
+No database guard bypassed. Existing dev server left running; audit browsers closed.
+Evidence: /tmp/home-fixed-results.json and /tmp/home-fixed-*.png.
+
+Review: Score 28/32, previous 20/32. No major findings; optional P3 mobile compact-header spacing. Fresh desktop/mobile light/dark checks passed, links reached expected route/anchor, focus 3px and no page errors/overflow. CLI detector clean; runtime overlay returned three untriaged heuristic flags (small text, line length, height transition). Browser closed; temporary detector PID 209559 terminated after helper stop failed to locate it. Existing app server untouched. No UI edits.
+
+## Marketing footer link review
+
+- [x] Inventory footer destinations and public-page coverage.
+- [x] Fix confirmed navigation gaps while preserving the footer design.
+- [x] Verify destinations and desktop/mobile rendering; run repository checks.
+- [x] Record findings and verification limits.
+
+Review: Restored /features#ics-feeds on the publishing story beat. Added home,
+All features and Setup guide links; labelled footer navigation landmarks.
+Replaced the clipped, fixed-colour wordmark with the existing brand mark and
+theme-aware text, and provided a 44px home target. Regression test inventories
+all static marketing pages and checks rendered feature fragment IDs.
+
+PASS: 18 internal footer destinations returned HTTP 200 locally; both feature
+fragments exist and clicking Calendar feeds reaches the publishing narrative.
+Sign-up returned HTTP 200 separately on localhost:3000 (availability only).
+Desktop 1440px and mobile 390px in both themes have no horizontal overflow,
+no page errors, minimum 44px link targets and visible 3px keyboard focus.
+PASS: scoped lint, repository typecheck, unit tests and git diff --check.
+FAIL: repository check reports three unrelated existing pricing lint issues.
+NOT VERIFIED: integration coverage, command rejected non-local DATABASE_URL
+under ALLOW_LOCAL_DATABASE_TESTS. No database guard bypassed.
+Production deployment was not changed or verified. Design sidecar staleness
+reported by hook was left untouched. Browser sessions closed; the attempted
+sandbox dev process was stopped, and the pre-existing server was preserved.
+Evidence: /tmp/footer-results.json, /tmp/footer-{1440,390}-{light,dark}.png,
+/tmp/footer-{check,typecheck,test,integration}.log.

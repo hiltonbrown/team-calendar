@@ -124,26 +124,6 @@
   }
 }
 
-@keyframes fmkt-sync-node-parallax-soft {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-
-  to {
-    transform: translate3d(0, -10px, 0);
-  }
-}
-
-@keyframes fmkt-sync-node-parallax-deep {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-
-  to {
-    transform: translate3d(0, 14px, 0);
-  }
-}
-
 @keyframes fmkt-section-copy-parallax {
   from {
     opacity: 1;
@@ -256,19 +236,6 @@
     .fmkt-hero .fmkt-pathway {
       animation: fmkt-hero-panel-parallax linear both;
       animation-range: exit 0% exit 82%;
-      animation-timeline: view();
-    }
-
-    .fmkt-sync-node--source,
-    .fmkt-sync-node--team {
-      animation: fmkt-sync-node-parallax-soft linear both;
-      animation-range: exit 8% exit 86%;
-      animation-timeline: view();
-    }
-
-    .fmkt-sync-node--xero {
-      animation: fmkt-sync-node-parallax-deep linear both;
-      animation-range: exit 8% exit 86%;
       animation-timeline: view();
     }
 

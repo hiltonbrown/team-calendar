@@ -13,7 +13,7 @@
 }
 
 .ft-hero__title {
-  max-width: 14ch;
+  max-width: 18ch;
   margin: 0;
   font: 600 clamp(3rem, 7vw, 6rem) / 0.98 var(--marketing-font);
   color: var(--marketing-on-surface);
@@ -36,6 +36,89 @@
 
 .ft-hero > .marketing-btn {
   min-width: 120px;
+}
+
+.ft-hero__coverage {
+  width: 100%;
+  margin: 48px 0 0;
+}
+
+.ft-hero__coverage figcaption {
+  margin-bottom: 20px;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.ft-hero__people {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  text-align: left;
+}
+
+.ft-hero__person {
+  padding: 20px 16px;
+  color: var(--on-accent-container);
+  background: var(--accent-container);
+  border-radius: 12px;
+}
+
+.ft-hero__person--payroll {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+
+.ft-hero__person dt {
+  font: 600 0.875rem / 1.5 var(--marketing-font);
+}
+
+.ft-hero__person dd {
+  margin: 12px 0 0;
+  font: 500 0.9375rem / 1.5 var(--marketing-font);
+}
+
+.ft-hero__person :where(dd) span {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--text-label-md);
+  font-weight: 400;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ft-hero__person {
+    animation: ft-coverage-arrive 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .ft-hero__person:nth-child(2) {
+    animation-delay: 100ms;
+  }
+  .ft-hero__person:nth-child(3) {
+    animation-delay: 200ms;
+  }
+  .ft-hero__person:nth-child(4) {
+    animation-delay: 300ms;
+  }
+}
+
+@keyframes ft-coverage-arrive {
+  from {
+    opacity: 0.65;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .ft-hero__people {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ft-hero__person {
+    padding: 16px 12px;
+  }
 }
 
 /* ============ Living calendar story ============ */
@@ -86,36 +169,38 @@
 .ft-story__stage {
   position: relative;
   min-width: 0;
-  padding: clamp(20px, 3vw, 32px);
+  padding: 24px;
+  container-type: inline-size;
   overflow: hidden;
   color: var(--marketing-on-surface);
-  background-color: var(--marketing-surface-lowest);
-  background-image: radial-gradient(
-    circle at center,
-    color-mix(in srgb, var(--marketing-outline-variant) 22%, transparent) 1px,
-    transparent 1.5px
-  );
-  background-size: 22px 22px;
-  border: 1px solid var(--marketing-ghost-border);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline);
   border-radius: 20px;
 }
 
-.ft-story__stage::before {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  content: "";
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklch, var(--marketing-primary-container) 28%, transparent),
-    transparent 42%
-  );
-  opacity: 0.6;
+.ft-story__calendar-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-color: var(--outline-variant) transparent;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
 }
 
-.ft-story__stage > * {
-  position: relative;
-  z-index: 1;
+.ft-story__calendar-scroll:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.ft-story__scroll-hint {
+  margin: 8px 0 0;
+  font: 400 var(--text-label-md) / 1.4 var(--marketing-font);
+  color: var(--on-surface-variant);
+}
+
+@container (min-width: 740px) {
+  .ft-story__scroll-hint {
+    display: none;
+  }
 }
 
 .ft-story__stage-head {
@@ -195,7 +280,7 @@
 .ft-story__source--manual {
   color: var(--on-accent-container);
   background: var(--accent-container);
-  opacity: 0.35;
+  opacity: 1;
   transform: translateX(-8px);
 }
 
@@ -245,18 +330,17 @@
 
 .ft-story__calendar {
   display: grid;
-  grid-template-columns: minmax(108px, 0.9fr) repeat(5, minmax(46px, 1fr));
+  grid-template-columns: 140px repeat(5, minmax(120px, 1fr));
+  min-width: 740px;
   overflow: hidden;
   background: var(--marketing-surface-lowest);
-  border: 1px solid var(--marketing-ghost-border);
   border-radius: 16px;
 }
 
 .ft-story__corner,
 .ft-story__day {
   min-height: 44px;
-  background: var(--marketing-surface-low);
-  border-bottom: 1px solid var(--marketing-ghost-border);
+  background: var(--surface-container);
 }
 
 .ft-story__day {
@@ -275,7 +359,6 @@
   min-width: 0;
   min-height: 68px;
   padding: 10px;
-  border-bottom: 1px solid var(--marketing-ghost-border);
 }
 
 .ft-story__person > span:last-child {
@@ -291,12 +374,12 @@
 }
 
 .ft-story__person strong {
-  font: 600 var(--text-label-sm) / 1.3 var(--marketing-font);
+  font: 500 var(--text-label-lg) / 1.3 var(--marketing-font);
 }
 
 .ft-story__person small {
   margin-top: 2px;
-  font: 400 0.625rem / 1.2 var(--marketing-font);
+  font: 400 var(--text-label-md) / 1.2 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
 
@@ -306,20 +389,15 @@
   place-items: center;
   width: 30px;
   height: 30px;
-  font: 600 0.625rem / 1 var(--marketing-font);
-  color: var(--marketing-on-secondary-container);
-  background: var(--marketing-secondary-container);
-  border-radius: 12px;
+  font: 600 var(--text-label-md) / 1 var(--marketing-font);
+  color: var(--on-surface);
+  background: var(--surface-container-high);
+  border-radius: 50%;
 }
 
-.ft-story__avatar--purple {
-  color: var(--on-accent-container);
-  background: var(--accent-container);
-}
-
-.ft-story__avatar--slate {
-  color: var(--marketing-on-surface);
-  background: var(--marketing-surface-highest);
+.ft-story__person:nth-child(9),
+.ft-story__days--daniel {
+  background: var(--surface-container-low);
 }
 
 .ft-story__days {
@@ -329,7 +407,6 @@
   grid-column: span 5;
   min-width: 0;
   min-height: 68px;
-  border-bottom: 1px solid var(--marketing-ghost-border);
 }
 
 .ft-story__days > span[aria-hidden="true"] {
@@ -338,15 +415,17 @@
 
 .ft-story__event {
   position: absolute;
-  top: 16px;
+  top: 12px;
   z-index: 2;
-  display: flex;
-  gap: 5px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  row-gap: 2px;
+  column-gap: 5px;
   align-items: center;
-  height: 36px;
-  padding: 0 9px;
+  min-height: 44px;
+  padding: 6px 9px;
   overflow: hidden;
-  font: 600 var(--text-label-sm) / 1 var(--marketing-font);
+  font: 500 var(--text-label-md) / 1 var(--marketing-font);
   white-space: nowrap;
   border-radius: 12px;
   transition:
@@ -356,9 +435,8 @@
 }
 
 .ft-story__event small {
-  margin-left: auto;
-  font: 500 0.5625rem / 1 var(--marketing-font);
-  opacity: 0.72;
+  grid-column: 2;
+  font: 500 var(--text-label-sm) / 1 var(--marketing-font);
 }
 
 .ft-story__event--leave {
@@ -369,6 +447,7 @@
 }
 
 .is-beat-1 .ft-story__event--leave {
+  color: var(--marketing-on-warning-container);
   outline: 1.5px dashed var(--marketing-warning);
   outline-offset: -3px;
   background: color-mix(
@@ -1039,109 +1118,22 @@
     padding: 14px;
   }
 
-  .ft-story__stage-head strong {
-    font-size: 0.9375rem;
-  }
-
-  .ft-story__stage-status {
-    max-width: 138px;
-    font-size: 0.625rem;
+  .ft-story__stage-head {
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .ft-story__sources {
     padding: 12px 0;
   }
 
-  .ft-story__source {
-    font-size: 0.5625rem;
-  }
-
   .ft-story__source-line {
     display: none;
   }
 
-  .ft-story__calendar {
-    grid-template-columns: 74px repeat(5, minmax(0, 1fr));
-  }
-
-  .ft-story__corner,
-  .ft-story__day {
-    min-height: 32px;
-  }
-
-  .ft-story__day {
-    padding: 0 2px;
-    font-size: 0.5rem;
-    text-align: center;
-  }
-
-  .ft-story__person,
-  .ft-story__days {
-    min-height: 46px;
-  }
-
-  .ft-story__person {
-    gap: 5px;
-    padding: 6px;
-  }
-
-  .ft-story__avatar {
-    width: 23px;
-    height: 23px;
-    font-size: 0.5rem;
-  }
-
-  .ft-story__person strong {
-    font-size: 0.5625rem;
-  }
-
-  .ft-story__person small {
-    display: none;
-  }
-
-  .ft-story__event {
-    top: 10px;
-    height: 27px;
-    padding: 0 5px;
-    font-size: 0.5rem;
-  }
-
-  .ft-story__event svg,
-  .ft-story__event small {
-    display: none;
-  }
-
-  .ft-story__decision {
-    min-height: 40px;
-    padding: 6px 8px;
-    margin-top: 10px;
-  }
-
-  .ft-story__decision-icon {
-    width: 26px;
-    height: 26px;
-  }
-
-  .ft-story__decision strong {
-    font-size: 0.625rem;
-  }
-
-  .ft-story__decision small {
-    font-size: 0.5625rem;
-  }
-
   .ft-story__destinations {
-    min-height: 30px;
-    margin-top: 8px;
-  }
-
-  .ft-story__destinations > span:first-child {
-    font-size: 0.5625rem;
-  }
-
-  .ft-story__destination {
-    min-height: 28px;
-    padding: 4px 6px;
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .ft-story__beats {
@@ -1293,28 +1285,13 @@
   padding: 0;
 }
 
-/* Hero stage: a calm sage "scheduling canvas" with a faint dot grid. The live
-   sync loop is the signal; the surface recedes (DESIGN north star). Separation
-   is tonal tint + a ghost ring only, never a shadow on this persistent panel. */
+/* The diagram sits directly on the page, with no enclosing canvas. */
 .fmkt-hero .fmkt-pathway {
-  align-self: stretch;
-  min-height: clamp(520px, 56vh, 600px);
-  padding: clamp(32px, 4vw, 52px);
-  overflow: hidden;
-  background-color: color-mix(
-    in oklch,
-    var(--marketing-surface-lowest) 91%,
-    var(--marketing-primary-container)
-  );
-  background-image: radial-gradient(
-    circle at center,
-    color-mix(in srgb, var(--marketing-outline-variant) 22%, transparent) 1px,
-    transparent 1.7px
-  );
-  background-size: 22px 22px;
-  border: 1px solid
-    color-mix(in srgb, var(--marketing-outline-variant) 15%, transparent);
-  border-radius: 20px;
+  align-self: center;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
   transform-origin: center;
 }
 
@@ -1370,12 +1347,13 @@
 }
 
 .fmkt-pathway__icon--team {
-  color: var(--marketing-on-primary);
-  background: var(--marketing-google-blue);
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
 }
 
 .fmkt-pathway__icon--xero {
-  color: var(--marketing-on-primary);
+  /* Keep the fixed vendor cyan paired with dark ink in either theme. */
+  color: #1c1a26;
   background: var(--marketing-xero-cyan);
 }
 
@@ -1423,11 +1401,10 @@
 
 .fmkt-sync-diagram {
   display: none;
-  width: min(100%, 560px);
-  height: 100%;
-  min-height: 470px;
-  max-height: 500px;
+  width: min(100%, 440px);
+  aspect-ratio: 420 / 540;
   padding: 0;
+  margin-inline: auto;
   overflow: hidden;
   background: transparent;
   border-radius: 0;
@@ -1467,10 +1444,8 @@
 }
 
 .fmkt-sync-node > rect {
-  filter: drop-shadow(0 18px 30px rgba(53, 51, 64, 0.14));
-  fill: oklch(99% 0.005 148 / 0.94);
-  stroke: oklch(98.5% 0.004 148 / 0.8);
-  stroke-width: 1;
+  fill: var(--marketing-surface-high);
+  stroke: none;
 }
 
 .fmkt-sync-node {
@@ -1486,7 +1461,7 @@
 }
 
 .fmkt-sync-node--team .fmkt-sync-node__icon {
-  fill: var(--marketing-google-blue);
+  fill: var(--marketing-secondary-container);
 }
 
 .fmkt-sync-node g {
@@ -1494,21 +1469,26 @@
   stroke: currentColor;
 }
 
+.fmkt-sync-node--team g {
+  color: var(--marketing-on-secondary-container);
+}
+
 .fmkt-sync-node-letter {
   font: 700 1rem / 1 var(--marketing-font);
   text-anchor: middle;
-  fill: var(--marketing-on-primary);
+  /* Xero cyan stays fixed across themes, so its contrasting ink does too. */
+  fill: #1c1a26;
 }
 
 .fmkt-sync-label {
-  font: 700 1.0625rem / 1.2 var(--marketing-font);
+  font: 600 1.25rem / 1.2 var(--marketing-font);
   letter-spacing: -0.01em;
-  fill: var(--marketing-inverse-surface);
+  fill: var(--marketing-on-surface);
 }
 
 .fmkt-sync-meta {
-  font: 500 0.75rem / 1.3 var(--marketing-font);
-  fill: color-mix(in oklch, var(--marketing-inverse-surface) 68%, transparent);
+  font: 500 1rem / 1.3 var(--marketing-font);
+  fill: var(--marketing-on-surface-variant);
 }
 
 .fmkt-sync-node--source .fmkt-sync-label,
@@ -1518,9 +1498,6 @@
 
 .fmkt-sync-packet {
   opacity: 0;
-  filter: drop-shadow(
-    0 0 14px color-mix(in oklch, var(--marketing-primary) 55%, transparent)
-  );
   fill: var(--marketing-primary);
   transform-origin: center;
   transform-box: fill-box;
@@ -1549,18 +1526,12 @@
   }
 }
 
-@media (max-width: 1024px) {
-  /* The hero panel is the single stage at every size; let the diagram sit on
-     it transparently rather than nesting a second tinted box. */
-  .fmkt-sync-diagram {
-    width: 100%;
-    height: auto;
-    min-height: 360px;
-    max-height: none;
+@media (max-width: 767px) {
+  .fmkt-hero .fmkt-pathway__card--list {
+    flex-direction: column;
+    gap: 24px;
     padding: 0;
     background: transparent;
-    border-radius: 0;
-    box-shadow: none;
   }
 }
 
@@ -2682,6 +2653,8 @@
 
 /* ---- Pricing Page ---- */
 
+/* ---- Pricing Page (Overdrive Redesign) ---- */
+
 .fmkt-pricing-page {
   background: var(--marketing-surface);
 }
@@ -2689,94 +2662,749 @@
 .fmkt-pricing-hero {
   padding: 96px 0 72px;
   background: var(--marketing-surface-low);
+  border-bottom: 1px solid var(--marketing-ghost-border);
 }
 
-.fmkt-pricing-hero__grid,
-.fmkt-pricing-faq__grid,
-.fmkt-pricing-contact__grid {
+.fmkt-pricing-hero__grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
-  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: clamp(32px, 5vw, 64px);
   align-items: center;
 }
 
-.fmkt-pricing-hero h1 {
-  max-width: 760px;
-  margin: 12px 0 0;
-  font: 600 clamp(2.75rem, 5vw, 4.5rem) / 1.06 var(--marketing-font);
+.fmkt-pricing-hero__title {
+  max-width: 720px;
+  margin: 0 0 16px;
+  font: 650 clamp(2.5rem, 5vw, 4rem) / 1.08 var(--marketing-font);
   color: var(--marketing-inverse-surface);
   letter-spacing: -0.025em;
   text-wrap: balance;
 }
 
-.fmkt-pricing-hero__summary {
+.fmkt-pricing-hero__lead {
+  max-width: 580px;
+  margin: 0 0 24px;
+  font: 400 1.125rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-hero__trust-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.fmkt-pricing-trust-badge {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px;
+  font: 600 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+  border-radius: 12px;
+}
+
+.fmkt-pricing-trust-badge svg {
+  color: var(--marketing-primary);
+}
+
+.fmkt-pricing-hero__card-col {
   justify-self: end;
   width: min(100%, 420px);
-  padding: 34px;
+}
+
+.fmkt-pricing-hero__overview-card {
+  padding: 28px;
   background: var(--marketing-surface-lowest);
-  border-radius: 16px;
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px
+    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
 }
 
-.fmkt-pricing-hero__summary span,
-.fmkt-pricing-hero__summary p {
-  display: block;
+.fmkt-pricing-hero__overview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
 }
 
-.fmkt-pricing-hero__summary span {
-  font: 600 0.75rem / 1 var(--marketing-font);
+.fmkt-pricing-hero__overview-tag {
+  font: 700 0.75rem / 1 var(--marketing-font);
   color: var(--marketing-primary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-.fmkt-pricing-hero__summary strong {
+.fmkt-pricing-hero__overview-currency {
+  padding: 4px 8px;
+  font: 700 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-container);
+  border-radius: 8px;
+}
+
+.fmkt-pricing-hero__overview-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.fmkt-pricing-hero__tier-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--marketing-surface-container-low);
+  border-radius: 14px;
+}
+
+.fmkt-pricing-hero__tier-row--rec {
+  background: color-mix(
+    in srgb,
+    var(--marketing-primary-container) 15%,
+    var(--marketing-surface-container-low)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--marketing-primary) 20%, transparent);
+}
+
+.fmkt-pricing-hero__rec-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmkt-pricing-hero__rec-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  font: 700 0.625rem / 1 var(--marketing-font);
+  color: #ffffff !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--marketing-primary);
+  border-radius: 9999px;
+}
+
+.fmkt-pricing-hero__tier-row strong {
+  display: block;
+  font: 650 0.9375rem var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-pricing-hero__tier-sub {
+  display: block;
+  font: 400 0.8125rem var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-hero__tier-price {
+  font: 700 1.35rem / 1 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-pricing-hero__tier-price span {
+  display: inline;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-hero__tier-divider {
+  display: none;
+}
+
+.fmkt-pricing-hero__overview-footnote {
+  margin: 0;
+  font: 500 0.8125rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+
+/* Hero Cohort Card (Early Access) */
+.fmkt-pricing-hero__cohort-card {
+  padding: 32px;
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px
+    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
+}
+
+.fmkt-pricing-hero__cohort-badge {
+  display: inline-block;
+  font: 700 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fmkt-pricing-hero__cohort-highlight {
   display: block;
   margin: 14px 0 8px;
-  font: 600 4rem / 1 var(--marketing-font);
+  font: 600 3.5rem / 1 var(--marketing-font);
   color: var(--marketing-inverse-surface);
   letter-spacing: -0.03em;
 }
 
-.fmkt-pricing-hero__summary p {
+.fmkt-pricing-hero__cohort-text {
   margin: 0;
-  font-size: var(--text-body-md);
+  font: 400 0.9375rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
 }
 
-.fmkt-pricing-plans,
-.fmkt-pricing-compare,
-.fmkt-pricing-setup,
-.fmkt-pricing-faq,
-.fmkt-pricing-contact {
-  padding: 76px 0;
+/* Ambient Tonal Stage */
+.fmkt-pricing-stage-wrap {
+  position: relative;
+  background: radial-gradient(
+    900px circle at var(--spotlight-x, 50%) var(--spotlight-y, 250px),
+    color-mix(in srgb, var(--marketing-primary) 4.5%, transparent),
+    transparent 70%
+  );
 }
 
-.fmkt-pricing-setup-card h3 {
-  margin: 0;
-  font: 600 1.35rem / 1.25 var(--marketing-font);
+.fmkt-pricing-region {
+  padding: 64px 0 0;
+}
+
+.fmkt-pricing-controls-bar {
+  display: flex;
+  justify-content: center;
+  width: min(100% - 32px, 1160px);
+  margin: 0 auto 32px;
+}
+
+.fmkt-pricing-currency-pill-wrap {
+  position: relative;
+  display: inline-flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.fmkt-pricing-currency-label {
+  font: 600 0.875rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-pricing-currency-toggle {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--marketing-surface-container);
+  border-radius: 14px;
+}
+
+.fmkt-pricing-currency-pill {
+  padding: 8px 16px;
+  font: 600 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.fmkt-pricing-currency-pill:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.fmkt-pricing-currency-pill--active {
+  color: var(--marketing-primary);
+  background: var(--marketing-surface-lowest);
+  box-shadow: 0 2px 8px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-pricing-currency-code {
+  font-weight: 700;
+}
+
+.fmkt-pricing-currency-country {
+  margin-left: 6px;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.fmkt-pricing-sr-select {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  border: 0;
+  opacity: 0;
+  clip: rect(0, 0, 0, 0);
+}
+
+.fmkt-pricing-panel-heading {
+  width: min(100% - 32px, 1160px);
+  margin: 0 auto 36px;
+  font: 650 var(--text-headline-md) / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  text-align: center;
+}
+
+/* LIVING CALENDAR FEED INTERACTIVE PREVIEW */
+.fmkt-feed-simulator-section {
+  width: min(100% - 32px, 1160px);
+  padding: clamp(24px, 3.5vw, 40px);
+  margin: 0 auto 64px;
+  background: var(--marketing-surface-container-low);
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px
+    color-mix(in srgb, var(--marketing-inverse-surface) 4%, transparent);
+}
+
+.fmkt-feed-simulator-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.fmkt-feed-simulator-intro {
+  max-width: 600px;
+}
+
+.fmkt-feed-simulator-title {
+  margin: 0 0 8px;
+  font: 700 1.35rem / 1.25 var(--marketing-font);
   color: var(--marketing-inverse-surface);
   letter-spacing: -0.01em;
 }
 
-.fmkt-pricing-setup-card p {
+.fmkt-feed-simulator-desc {
   margin: 0;
-  font: 400 0.9375rem / 1.6 var(--marketing-font);
+  font: 400 0.9375rem / 1.5 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
 
-.fmkt-pricing-setup__grid {
-  display: grid;
-  gap: 12px;
+.fmkt-feed-plan-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--marketing-surface-container-high);
+  border-radius: 16px;
 }
 
-.fmkt-pricing-plans__table {
-  margin-top: 8px;
+.fmkt-feed-plan-tab {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px;
+  text-align: left;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.fmkt-feed-plan-tab:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.fmkt-feed-plan-tab--active {
+  background: var(--marketing-surface-lowest);
+  box-shadow: 0 4px 12px
+    color-mix(in srgb, var(--marketing-inverse-surface) 8%, transparent);
+}
+
+.fmkt-feed-plan-tab__name {
+  font: 700 0.875rem / 1.2 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-feed-plan-tab--active .fmkt-feed-plan-tab__name {
+  color: var(--marketing-primary);
+}
+
+.fmkt-feed-plan-tab__note {
+  font: 400 0.75rem / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+/* Sync Pipeline */
+.fmkt-sync-pipeline {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 16px;
+}
+
+.fmkt-sync-pipeline__node {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.fmkt-sync-pipeline__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.fmkt-sync-pipeline__icon--xero {
+  color: #007f91;
+  background: color-mix(in srgb, var(--marketing-xero-cyan) 16%, transparent);
+}
+
+.fmkt-sync-pipeline__icon--hub {
+  color: var(--marketing-primary);
+  background: color-mix(in srgb, var(--marketing-primary) 14%, transparent);
+}
+
+.fmkt-sync-pipeline__icon--cal {
+  color: var(--marketing-outlook-blue);
+  background: color-mix(
+    in srgb,
+    var(--marketing-outlook-blue) 14%,
+    transparent
+  );
+}
+
+.fmkt-sync-pipeline__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.fmkt-sync-pipeline__text strong {
+  font: 650 0.8125rem / 1.2 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-sync-pipeline__text span {
+  font: 400 0.75rem / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-sync-pipeline__connector {
+  position: relative;
+  display: flex;
+  flex-grow: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 50px;
+  height: 2px;
+}
+
+.fmkt-sync-pipeline__track {
+  position: absolute;
+  inset: 0;
+  background: var(--marketing-surface-high);
+}
+
+.fmkt-sync-pipeline__pulse {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: var(--marketing-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--marketing-primary);
+  animation: syncPulseAnim 2.8s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fmkt-sync-pipeline__pulse--delay {
+  animation-delay: 1.4s;
+}
+
+.fmkt-sync-pipeline__flow-label {
+  position: absolute;
+  top: -16px;
+  font: 600 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-tertiary);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+@keyframes syncPulseAnim {
+  0% {
+    left: 0%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+/* Feed Mockup Window */
+.fmkt-feed-stage {
+  overflow: hidden;
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 18px;
+}
+
+.fmkt-feed-stage__chrome {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--marketing-surface-container);
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-feed-stage__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.fmkt-feed-stage__dots span {
+  width: 10px;
+  height: 10px;
+  background: var(--marketing-outline-variant);
+  border-radius: 50%;
+}
+
+.fmkt-feed-stage__url-box {
+  display: flex;
+  flex-grow: 1;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  overflow: hidden;
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-lowest);
+  border-radius: 8px;
+}
+
+.fmkt-feed-stage__url-box svg {
+  flex-shrink: 0;
+  color: var(--marketing-primary);
+}
+
+.fmkt-feed-stage__url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fmkt-feed-stage__copy-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-primary);
+  cursor: pointer;
+  background: var(--marketing-primary);
+  border: 0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.fmkt-feed-stage__copy-btn:hover {
+  background: var(--marketing-supportive-green);
+}
+
+.fmkt-feed-stage__copy-btn:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.fmkt-feed-stage__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 18px;
+  background: var(--marketing-surface-low);
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-feed-stage__filter-label {
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-feed-filter-btn {
+  padding: 4px 12px;
+  font: 600 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  cursor: pointer;
+  background: var(--marketing-surface-container);
+  border: 0;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.fmkt-feed-filter-btn:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 2px;
+}
+
+.fmkt-feed-filter-btn--active {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+
+.fmkt-feed-stage__starter-notice {
+  padding: 10px 18px;
+  font: 500 0.8125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-low);
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-feed-events-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding: 18px;
+}
+
+.fmkt-feed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fmkt-feed-col__day {
+  padding-bottom: 4px;
+  font: 700 0.6875rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-feed-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 84px;
+  padding: 10px;
+  border-radius: 12px;
+}
+
+.fmkt-feed-item--xero {
+  background: color-mix(
+    in srgb,
+    var(--marketing-secondary-container) 45%,
+    var(--marketing-surface-low)
+  );
+}
+
+.fmkt-feed-item--manual {
+  background: color-mix(
+    in srgb,
+    var(--marketing-accent-container) 45%,
+    var(--marketing-surface-low)
+  );
+}
+
+.fmkt-feed-item--holiday {
+  background: var(--marketing-surface-high);
+}
+
+.fmkt-feed-item__header {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fmkt-feed-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  font: 600 0.625rem / 1 var(--marketing-font);
+  border-radius: 6px;
+}
+
+.fmkt-feed-badge--sage {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+
+.fmkt-feed-badge--lavender {
+  color: var(--marketing-on-accent-container);
+  background: var(--marketing-accent-container);
+}
+
+.fmkt-feed-badge--holiday {
+  color: var(--marketing-inverse-surface);
+  background: var(--marketing-outline-variant);
+}
+
+.fmkt-feed-time {
+  font: 500 0.625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-feed-item__title {
+  font: 700 0.8125rem / 1.25 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+}
+
+.fmkt-feed-item__sub {
+  font: 400 0.75rem / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-feed-stage__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 18px;
+  font: 500 0.75rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-container);
+  border-top: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-feed-stage__security-tag,
+.fmkt-feed-stage__privacy-tag {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fmkt-feed-stage__security-tag svg,
+.fmkt-feed-stage__privacy-tag svg {
+  color: var(--marketing-primary);
+}
+
+/* Plan Cards */
+.fmkt-pricing-plans {
+  padding: 64px 0 76px;
 }
 
 .fmkt-pricing-cards {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  margin-top: 24px;
 }
 
 .fmkt-pricing-card {
@@ -2784,40 +3412,54 @@
   display: flex;
   flex-direction: column;
   padding: 32px;
-  background: var(--marketing-surface-container);
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
   border-radius: 20px;
+  box-shadow: 0 4px 16px
+    color-mix(in srgb, var(--marketing-inverse-surface) 4%, transparent);
 }
 
 .fmkt-pricing-card--highlighted {
-  background: var(--marketing-primary-container);
+  border: 2px solid var(--marketing-primary);
+  box-shadow: 0 12px 32px
+    color-mix(in srgb, var(--marketing-primary) 12%, transparent);
+}
+
+.fmkt-pricing-card--enterprise {
+  background: var(--marketing-surface-low);
 }
 
 .fmkt-pricing-card__badge {
   position: absolute;
-  top: -12px;
+  top: -13px;
   left: 50%;
-  padding: 4px 12px;
-  font: 600 0.75rem var(--marketing-font);
+  padding: 4px 14px;
+  font: 700 0.6875rem / 1 var(--marketing-font);
   color: var(--marketing-on-primary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   background: var(--marketing-primary);
   border-radius: 12px;
   transform: translateX(-50%);
 }
 
+.fmkt-pricing-card__badge--muted {
+  color: var(--marketing-on-surface-variant);
+  background: var(--marketing-surface-highest);
+}
+
 .fmkt-pricing-card__header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .fmkt-pricing-card__title {
   margin: 0 0 8px;
-  font: 700 1.5rem var(--marketing-font);
+  font: 700 1.5rem / 1.25 var(--marketing-font);
   color: var(--marketing-inverse-surface);
 }
 
 .fmkt-pricing-card__description {
-  min-height: 44px;
+  min-height: 42px;
   margin: 0 0 16px;
   font: 400 0.875rem / 1.5 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
@@ -2830,20 +3472,37 @@
 }
 
 .fmkt-pricing-card__price {
-  font: 700 2.5rem var(--marketing-font);
+  font: 700 2.75rem / 1 var(--marketing-font);
   color: var(--marketing-inverse-surface);
+  letter-spacing: -0.03em;
 }
 
 .fmkt-pricing-card__interval {
-  font: 400 1rem var(--marketing-font);
+  font: 500 1rem / 1 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-card__price-note {
+  margin: 8px 0 0;
+  font: 500 0.8125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-primary);
+}
+
+.fmkt-pricing-card--enterprise .fmkt-pricing-card__price-note {
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-card__divider {
+  height: 1px;
+  margin-bottom: 24px;
+  background: var(--marketing-ghost-border);
 }
 
 .fmkt-pricing-card__features {
   display: flex;
   flex-grow: 1;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   padding: 0;
   margin: 0 0 32px;
   list-style: none;
@@ -2851,15 +3510,18 @@
 
 .fmkt-pricing-card__feature {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
-  font: 400 0.9375rem / 1.4 var(--marketing-font);
-  color: var(--marketing-on-surface-variant);
+  font: 500 0.9375rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
 }
 
 .fmkt-pricing-card__feature-icon {
+  display: flex;
   flex-shrink: 0;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
   color: var(--marketing-primary);
 }
 
@@ -2874,15 +3536,17 @@
   text-align: center;
 }
 
+/* Fallback card for NZD / GBP */
 .fmkt-plan-fallback {
   display: grid;
   gap: 14px;
   justify-items: center;
   max-width: 560px;
   padding: clamp(32px, 5vw, 48px);
-  margin: 8px auto 0;
+  margin: 16px auto 0;
   text-align: center;
-  background: var(--marketing-surface-low);
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
   border-radius: 20px;
 }
 
@@ -2904,10 +3568,16 @@
   margin-top: 6px;
 }
 
+/* Comparison Table */
+.fmkt-pricing-compare {
+  padding: 76px 0;
+}
+
 .fmkt-pricing-table-wrap {
   overflow-x: auto;
-  background: var(--marketing-surface-container);
+  background: var(--marketing-surface-lowest);
   border-radius: 20px;
+  border: 1px solid var(--marketing-ghost-border);
   scrollbar-color: var(--marketing-outline-variant) transparent;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
@@ -2919,14 +3589,22 @@
   border-spacing: 0;
 }
 
+.fmkt-pricing-table caption {
+  padding: 20px 24px;
+  font: 650 0.9375rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+  text-align: left;
+}
+
 /* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
 .fmkt-pricing-table th,
 /* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
 .fmkt-pricing-table td {
-  padding: 18px 20px;
+  padding: 16px 24px;
   font: 500 0.875rem / 1.45 var(--marketing-font);
   color: var(--marketing-on-surface);
   text-align: left;
+  border-top: 1px solid var(--marketing-ghost-border);
 }
 
 /* biome-ignore lint/style/noDescendingSpecificity: Pricing and feature-matrix tables are separate route components, so their selectors cannot overlap. */
@@ -2937,45 +3615,80 @@
   background: var(--marketing-surface-low);
 }
 
-.fmkt-pricing-table tbody tr:nth-child(even) {
+.fmkt-pricing-table__th-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fmkt-pricing-table__th-rec {
+  padding: 2px 8px;
+  font: 700 0.625rem / 1 var(--marketing-font);
+  color: var(--marketing-on-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--marketing-primary);
+  border-radius: 6px;
+}
+
+.fmkt-pricing-table__col--highlight,
+.fmkt-pricing-table__cell--highlight {
+  background: color-mix(in srgb, var(--marketing-primary) 4%, transparent);
+}
+
+.fmkt-pricing-table tbody tr:hover {
+  background: color-mix(
+    in srgb,
+    var(--marketing-surface-high) 40%,
+    transparent
+  );
+}
+
+.fmkt-pricing-comparison-cards {
+  display: none;
+}
+
+/* FAQ Section */
+.fmkt-pricing-faq {
+  padding: 76px 0;
   background: var(--marketing-surface-low);
+  border-top: 1px solid var(--marketing-ghost-border);
 }
 
-.fmkt-pricing-setup {
-  background: var(--marketing-surface-low);
-}
-
-.fmkt-pricing-setup__grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.fmkt-pricing-setup-card {
-  padding: 24px;
-  background: var(--marketing-surface-lowest);
-  border-radius: 16px;
-}
-
-.fmkt-pricing-setup-card h3 {
-  margin-top: 18px;
-}
-
-.fmkt-pricing-setup-card p {
-  margin-top: 10px;
-}
-
-.fmkt-pricing-faq__grid,
-.fmkt-pricing-contact__grid {
+.fmkt-pricing-faq__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(32px, 5vw, 64px);
   align-items: start;
+}
+
+.fmkt-pricing-faq__header {
+  position: sticky;
+  top: 100px;
+}
+
+.fmkt-pricing-faq__subtitle {
+  margin: 12px 0 0;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
 }
 
 .fmkt-pricing-faq__list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .fmkt-pricing-faq__item {
-  background: var(--marketing-surface-container);
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
   border-radius: 16px;
+  transition: all 0.2s ease;
+}
+
+.fmkt-pricing-faq__item[open] {
+  border-color: color-mix(in srgb, var(--marketing-primary) 30%, transparent);
+  box-shadow: 0 4px 16px
+    color-mix(in srgb, var(--marketing-inverse-surface) 4%, transparent);
 }
 
 .fmkt-pricing-faq__item summary {
@@ -2983,7 +3696,7 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 18px 20px;
+  padding: 20px 24px;
   font: 600 1rem / 1.4 var(--marketing-font);
   color: var(--marketing-on-surface);
   text-align: left;
@@ -2993,136 +3706,228 @@
   border: 0;
 }
 
-.fmkt-pricing-faq__item summary:focus-visible,
-.fmkt-pricing-form :where(input, select, textarea, button):focus-visible {
+.fmkt-pricing-faq__item summary:focus-visible {
   outline: 3px solid var(--marketing-primary);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
-.fmkt-pricing-faq__item summary span {
-  font-size: var(--text-title-lg);
+.fmkt-pricing-faq__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-left: 12px;
   color: var(--marketing-primary);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fmkt-pricing-faq__item[open] .fmkt-pricing-faq__icon {
+  transform: rotate(180deg);
 }
 
 .fmkt-pricing-faq__item p {
-  padding: 0 20px 20px;
+  padding: 0 24px 20px;
   margin: 0;
   font: 400 0.9375rem / 1.6 var(--marketing-font);
   color: var(--marketing-on-surface-variant);
 }
 
+/* High-Conversion Final CTA */
+.fmkt-pricing-final-cta {
+  padding: 80px 0 100px;
+}
+
+.fmkt-pricing-final-cta__card {
+  max-width: 960px;
+  padding: clamp(36px, 6vw, 64px);
+  margin: 0 auto;
+  text-align: center;
+  background: linear-gradient(
+    150deg,
+    color-mix(
+      in srgb,
+      var(--marketing-primary) 12%,
+      var(--marketing-surface-low)
+    ),
+    var(--marketing-surface-container)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--marketing-primary) 20%, transparent);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px
+    color-mix(in srgb, var(--marketing-inverse-surface) 6%, transparent);
+}
+
+.fmkt-pricing-final-cta__title {
+  margin: 0 0 12px;
+  font: 700 clamp(1.75rem, 4vw, 2.5rem) / 1.2 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
+  letter-spacing: -0.02em;
+}
+
+.fmkt-pricing-final-cta__sub {
+  max-width: 600px;
+  margin: 0 auto 28px;
+  font: 400 1.0625rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-final-cta__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.fmkt-pricing-final-cta__guarantees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(16px, 3vw, 32px);
+  justify-content: center;
+  padding-top: 24px;
+  border-top: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-pricing-guarantee-item {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font: 500 0.8125rem / 1 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-guarantee-item svg {
+  color: var(--marketing-primary);
+}
+
+/* Early Access Cohort & Contact */
+.fmkt-pricing-cohort {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.fmkt-pricing-cohort-card {
+  padding: clamp(28px, 4vw, 40px);
+  background: var(--marketing-surface-lowest);
+  border: 1px solid var(--marketing-ghost-border);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px
+    color-mix(in srgb, var(--marketing-inverse-surface) 4%, transparent);
+}
+
+.fmkt-pricing-cohort-card__header {
+  margin-bottom: 16px;
+}
+
+.fmkt-pricing-cohort-card__pill {
+  display: inline-block;
+  padding: 3px 10px;
+  margin-bottom: 10px;
+  font: 700 0.75rem / 1 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: color-mix(in srgb, var(--marketing-primary) 12%, transparent);
+  border-radius: 8px;
+}
+
+.fmkt-pricing-cohort-card h3 {
+  margin: 0;
+  font: 700 1.35rem / 1.2 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-pricing-cohort-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+
+.fmkt-pricing-cohort-card__list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font: 500 0.9375rem / 1.4 var(--marketing-font);
+  color: var(--marketing-on-surface);
+}
+
+.fmkt-pricing-cohort-card__list svg {
+  flex-shrink: 0;
+  color: var(--marketing-primary);
+}
+
+.fmkt-pricing-cohort-card__desc {
+  margin: 0 0 16px;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
+}
+
+.fmkt-pricing-cohort-card__note {
+  margin: 0 0 24px;
+  font: 500 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-tertiary);
+}
+
+.fmkt-pricing-cohort-card__btn {
+  display: inline-block;
+}
+
 .fmkt-pricing-contact {
+  padding: 76px 0;
   background: var(--marketing-surface-low);
+  border-top: 1px solid var(--marketing-ghost-border);
+}
+
+.fmkt-pricing-contact__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+}
+
+.fmkt-pricing-contact__desc {
+  margin: 12px 0 0;
+  font: 400 1rem / 1.6 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
 }
 
 .fmkt-pricing-form {
   display: grid;
   gap: 14px;
-  padding: 24px;
+  padding: 28px;
   background: var(--marketing-surface-lowest);
-  border-radius: 16px;
-}
-
-.fmkt-pricing-form label {
-  display: grid;
-  gap: 8px;
-  font: 600 0.8125rem / 1.3 var(--marketing-font);
-  color: var(--marketing-on-surface);
-}
-
-.fmkt-pricing-form input,
-.fmkt-pricing-form select,
-.fmkt-pricing-form textarea {
-  width: 100%;
-  padding: 12px 14px;
-  font: 400 0.9375rem / 1.4 var(--marketing-font);
-  color: var(--marketing-on-surface);
-  background: var(--marketing-surface-high);
-  border: 0;
-  border-radius: 12px;
-}
-
-.fmkt-pricing-form textarea {
-  resize: vertical;
-}
-
-.fmkt-pricing-form__success {
-  padding: 12px 14px;
-  margin: 0;
-  font: 600 0.875rem / 1.4 var(--marketing-font);
-  color: var(--marketing-on-secondary-container);
-  background: var(--marketing-secondary-container);
-  border-radius: 12px;
-}
-
-.fmkt-pricing-cohort {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 24px;
-  margin-top: 28px;
-}
-
-.fmkt-pricing-cohort article {
-  padding: clamp(24px, 4vw, 40px);
-  background: var(--marketing-surface-container);
+  border: 1px solid var(--marketing-ghost-border);
   border-radius: 20px;
 }
 
-.fmkt-pricing-cohort h3,
-/* biome-ignore lint/style/noDescendingSpecificity: This regional panel heading is outside the earlier pricing story panel, so the selectors cannot overlap. */
-.fmkt-pricing-region__panel > h2 {
-  font: 650 var(--text-headline-md) / 1.2 var(--marketing-font);
-  color: var(--marketing-on-surface);
+.fmkt-pricing-form h3 {
+  margin: 0;
+  font: 650 1.25rem / 1.2 var(--marketing-font);
+  color: var(--marketing-inverse-surface);
 }
 
-.fmkt-pricing-cohort ul,
-.fmkt-pricing-cohort p {
-  margin: 20px 0;
-  line-height: 1.65;
-  color: var(--marketing-on-surface-variant);
+.fmkt-pricing-email-link {
+  font: 700 1.125rem / 1.2 var(--marketing-font);
+  color: var(--marketing-primary);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
-.fmkt-pricing-region {
-  padding: 76px 0 0;
-}
-
-.fmkt-pricing-currency {
-  display: grid;
-  gap: 8px;
-  width: min(100% - 32px, 1160px);
-  margin: 0 auto;
-  font-weight: 700;
-}
-
-.fmkt-pricing-currency select {
-  min-height: 44px;
-  padding: 10px 14px;
-  color: var(--marketing-on-surface);
-  background: var(--marketing-surface-high);
-  border: 0;
-  border-radius: 14px;
-}
-
-.fmkt-pricing-currency select:focus-visible,
-.fmkt-pricing-table-wrap:focus-visible {
+.fmkt-pricing-email-link:focus-visible {
   outline: 3px solid var(--marketing-primary);
   outline-offset: 3px;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: This regional panel heading is outside the earlier pricing story panel, so the selectors cannot overlap. */
-.fmkt-pricing-region__panel > h2 {
-  width: min(100% - 32px, 1160px);
-  margin: 32px auto 0;
-}
-
-.fmkt-pricing-comparison-cards {
-  display: none;
-}
-
-.fmkt-pricing-table caption {
-  padding: 16px 20px;
-  font-weight: 650;
-  text-align: left;
+.fmkt-pricing-email-sub {
+  margin: 0;
+  font: 400 0.875rem / 1.5 var(--marketing-font);
+  color: var(--marketing-on-surface-variant);
 }
 
 /* ---- Final CTA ---- */
@@ -3134,23 +3939,15 @@
   padding: clamp(80px, 11vw, 132px) 0;
   overflow: hidden;
   color: var(--marketing-on-primary);
-  background:
-    radial-gradient(
-      130% 120% at 82% -10%,
-      color-mix(in srgb, var(--marketing-primary-container) 26%, transparent),
-      transparent 56%
-    ),
-    linear-gradient(
-      158deg,
-      var(--marketing-primary-container) 0%,
-      var(--marketing-primary) 42%,
-      color-mix(
-          in oklch,
-          var(--marketing-primary) 80%,
-          var(--marketing-inverse-surface)
-        )
-        100%
-    );
+  background: linear-gradient(
+    158deg,
+    var(--marketing-primary),
+    color-mix(
+      in oklch,
+      var(--marketing-primary) 80%,
+      var(--marketing-inverse-surface)
+    )
+  );
 }
 
 .fmkt-cta__panel {
@@ -3173,22 +3970,28 @@
 
 .fmkt-cta .fmkt-pill {
   margin-bottom: 0;
+  color: var(--marketing-on-primary);
+  background: color-mix(in srgb, var(--marketing-on-primary) 10%, transparent);
 }
 
 .fmkt-cta__heading {
+  min-width: 0;
   max-width: 720px;
   margin: 0 auto;
   font: 600 var(--text-display-md) / 1.12 var(--marketing-font);
-  color: #fff;
+  color: var(--marketing-on-primary);
   letter-spacing: -0.02em;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .fmkt-cta__copy {
+  min-width: 0;
   max-width: 52ch;
   margin: 0 auto 22px;
   font: 400 var(--text-body-lg) / 1.55 var(--marketing-font);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--marketing-on-primary);
+  overflow-wrap: anywhere;
 }
 
 .fmkt-cta__actions {
@@ -3200,16 +4003,16 @@
 
 .fmkt-cta__actions .marketing-btn--primary {
   color: var(--marketing-primary);
-  background: #fff;
+  background: var(--marketing-on-primary);
 }
 
 .fmkt-cta__actions .marketing-btn--outline {
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  color: var(--marketing-on-primary);
+  box-shadow: inset 0 0 0 1px var(--marketing-on-primary);
 }
 
 .fmkt-cta__actions .marketing-btn--outline:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--marketing-on-primary) 10%, transparent);
 }
 
 /* ---- Responsive: tablet ---- */
@@ -3258,7 +4061,8 @@
     overflow-x: auto;
   }
 
-  .fmkt-pricing-hero__summary {
+  .fmkt-pricing-hero__summary,
+  .fmkt-pricing-hero__card-col {
     justify-self: stretch;
     width: 100%;
   }
@@ -3266,6 +4070,25 @@
   .fmkt-pricing-setup__grid,
   .fmkt-pricing-cards {
     grid-template-columns: 1fr;
+  }
+
+  .fmkt-feed-simulator-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fmkt-sync-pipeline {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .fmkt-sync-pipeline__connector {
+    display: none;
+  }
+
+  .fmkt-feed-events-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .fmkt-cards-section {
@@ -3298,7 +4121,7 @@
   }
 
   .fmkt-pathway {
-    padding-bottom: 56px;
+    padding: 0;
   }
 
   .fmkt-pathway__card {
@@ -3363,13 +4186,73 @@
     padding: 68px 0 56px;
   }
 
-  .fmkt-pricing-hero h1 {
-    font-size: clamp(var(--text-display-sm), 12vw, var(--text-display-md));
+  .fmkt-pricing-hero h1,
+  .fmkt-pricing-hero__title {
+    font-size: clamp(var(--text-display-sm), 10vw, var(--text-display-md));
   }
 
-  .fmkt-pricing-hero__summary {
-    padding: 24px;
+  .fmkt-pricing-hero__summary,
+  .fmkt-pricing-hero__overview-card,
+  .fmkt-pricing-hero__cohort-card {
+    padding: 22px;
     border-radius: 20px;
+  }
+
+  .fmkt-feed-events-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fmkt-pricing-currency-pill-wrap {
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .fmkt-pricing-currency-toggle {
+    width: 100%;
+    max-width: 340px;
+  }
+
+  .fmkt-pricing-currency-pill {
+    flex: 1;
+    padding: 8px 12px;
+    text-align: center;
+  }
+
+  .fmkt-pricing-currency-country {
+    display: none;
+  }
+
+  .fmkt-feed-plan-tabs {
+    display: flex;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .fmkt-feed-plan-tab {
+    flex: 1;
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  .fmkt-feed-stage__chrome {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fmkt-feed-stage__copy-btn {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .fmkt-pricing-final-cta__actions {
+    flex-direction: column;
+  }
+
+  .fmkt-pricing-final-cta__actions .marketing-btn {
+    width: 100%;
+    text-align: center;
   }
 
   .fmkt-pricing-cohort {
@@ -3387,7 +4270,8 @@
 
   .fmkt-pricing-comparison-cards article {
     padding: 22px;
-    background: var(--marketing-surface-container);
+    background: var(--marketing-surface-lowest);
+    border: 1px solid var(--marketing-ghost-border);
     border-radius: 20px;
   }
 

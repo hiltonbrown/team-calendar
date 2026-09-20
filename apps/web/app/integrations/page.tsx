@@ -31,21 +31,21 @@ const plannedRegionNames = integrationCapabilities.xeroPayrollRegions
 
 const flow = [
   {
-    copy: "Employees, approved leave, and balances sync from your connected payroll file.",
+    copy: "Employees, approved leave and balances sync from Xero. Leave requests and decisions sync back.",
     icon: "sync",
-    label: "Source of truth",
+    label: "Two-way leave sync",
     title: "Xero Payroll",
   },
   {
-    copy: "Leave and manual entries are normalised into one privacy-controlled availability layer.",
+    copy: "Staff request leave and share travel, WFH and other availability updates in one place.",
     icon: "calendar",
-    label: "Availability model",
+    label: "Your team’s availability",
     title: "Team Calendar",
   },
   {
-    copy: "Secure ICS feeds subscribe into Outlook, Google Calendar, and Apple Calendar.",
+    copy: "Approved leave and availability updates appear in Outlook, Google Calendar and Apple Calendar.",
     icon: "link",
-    label: "Published view",
+    label: "Calendar subscriptions",
     title: "Calendar feeds",
   },
 ] as const;
@@ -75,10 +75,10 @@ const dataMoves = [
 ];
 
 const setupSteps = [
-  "Connect your organisation from Team Calendar settings.",
-  "Authorise Team Calendar in Xero and choose the payroll file.",
-  "Run the first sync for employees, leave, and balances.",
-  "Publish secure feeds for teams, people, or locations.",
+  "Confirm early-access eligibility and setup with our team.",
+  "Connect Xero Payroll and choose your payroll file.",
+  "Check your employees, leave and balances after the first sync.",
+  "Choose who each calendar shows, then share its subscription link.",
 ];
 
 const destinationPresentation = {
@@ -105,16 +105,16 @@ const destinations = integrationCapabilities.calendarDestinations.map(
 
 const syncDetails = [
   {
-    copy: "Scheduled jobs keep employees, leave, balances, and approval state current for Australian Xero Payroll files.",
-    title: "Inbound sync",
+    copy: "Employees, leave and balances update regularly from your connected Australian Xero Payroll file.",
+    title: "Payroll stays connected",
   },
   {
-    copy: "Submitted, approved, declined, and withdrawn leave writes to Xero synchronously so payroll records stay correct.",
-    title: "Write-back",
+    copy: "Submitting, approving, declining or withdrawing leave updates Xero as part of that action. If it fails, you see an error so you can resolve it.",
+    title: "Leave decisions update Xero",
   },
   {
-    copy: "Every feed is scoped, signed, and revocable. Team Calendar republishes after relevant changes; calendar clients refresh subscribed feeds on their own schedules.",
-    title: "Feed publishing",
+    copy: "Team Calendar updates your feeds when availability changes. Calendar apps refresh subscriptions on their own schedules, so changes may not appear straight away.",
+    title: "Calendar apps set refresh timing",
   },
 ];
 
@@ -122,20 +122,16 @@ const IntegrationsPage = () => (
   <main className={`fmkt-page ${styles.root}`} id="main-content" tabIndex={-1}>
     <section className={styles.hero} data-integrations-section="hero">
       <div className="fmkt-container">
-        <p className="fmkt-overline">Integrations</p>
         <div className={styles.heroGrid}>
           <div>
             <h1 className={styles.title}>
               See who is away in the calendars your team already uses.
             </h1>
             <p className={styles.lead}>
-              Stop piecing together leave and availability across Xero, email,
-              and separate calendar updates.
-            </p>
-            <p className={styles.copy}>
-              Team Calendar combines approved leave from Xero Payroll Australia
-              with manual availability, then publishes secure ICS feeds to
-              Outlook, Google Calendar, and Apple Calendar.
+              Staff request leave in Team Calendar. Approved leave syncs back to
+              Xero Payroll Australia and appears alongside travel, WFH and other
+              availability updates in Outlook, Google Calendar or Apple
+              Calendar.
             </p>
             <div className={styles.actions}>
               <Link
@@ -154,7 +150,7 @@ const IntegrationsPage = () => (
           </div>
 
           <ol
-            aria-label="Integration path from Xero Payroll to calendar feeds"
+            aria-label="Two-way Xero leave sync and calendar subscriptions"
             className={styles.path}
           >
             {flow.map((item, index) => (
@@ -218,9 +214,9 @@ const IntegrationsPage = () => (
             What moves between systems.
           </h2>
           <p className={styles.copy}>
-            The connection is narrow by design. Team Calendar reads and writes
-            payroll leave information, then publishes availability, not payroll
-            records, into calendar clients.
+            Xero remains the source for payroll records and leave balances. Team
+            Calendar sends leave requests and decisions back to Xero, and shares
+            availability with your team’s calendars.
           </p>
         </div>
         <div className={styles.dataGrid}>
@@ -245,13 +241,19 @@ const IntegrationsPage = () => (
       <div className={`fmkt-container ${styles.workflow}`}>
         <div>
           <h2 className="fmkt-section-title">
-            From first connect to live feeds.
+            Get connected with guided setup.
           </h2>
           <p className={styles.copy}>
-            Setup follows the standard Xero OAuth flow. After authorisation,
-            Team Calendar syncs source data, applies feed scope and privacy
-            rules, and gives each calendar a secure subscription URL.
+            Australian early access includes guided setup. We confirm
+            eligibility and onboarding with you, then help you connect payroll
+            and choose what your team can see in their calendars.
           </p>
+          <Link
+            className={`marketing-content-link ${styles.helpLink}`}
+            href="/help-centre/onboarding"
+          >
+            Read the setup guide
+          </Link>
         </div>
         <ol className={styles.steps}>
           {setupSteps.map((step, index) => (
@@ -271,10 +273,16 @@ const IntegrationsPage = () => (
             Subscribe once in the calendar app.
           </h2>
           <p className={styles.copy}>
-            Feeds work with common calendar clients because they publish
-            standard ICS. Teams see approved leave, WFH, travel, training, and
-            client-site entries without installing another calendar app.
+            Add a secure calendar subscription (ICS) to the app your team
+            already uses. See approved leave, WFH, travel, training and client
+            visits without installing another calendar app.
           </p>
+          <Link
+            className={`marketing-content-link ${styles.helpLink}`}
+            href="/help-centre/onboarding#publish"
+          >
+            Learn how to subscribe
+          </Link>
         </div>
         <div className={styles.destinations}>
           {destinations.map((destination) => (
@@ -300,11 +308,18 @@ const IntegrationsPage = () => (
               <MarketingIcon id="shieldCheck" size={24} />
             </span>
             <div>
-              <h2>Sync, tokens, and publication stay server-side.</h2>
+              <h2>Stay in control of what your team can see.</h2>
               <p>
-                OAuth tokens are encrypted at rest, feed tokens are signed and
-                revocable, and raw Xero payloads stay out of client-side code.
+                Choose which people and details appear in each feed, and revoke
+                access when needed. Your Xero connection credentials are stored
+                encrypted.
               </p>
+              <Link
+                className={`marketing-content-link ${styles.helpLink}`}
+                href="/security"
+              >
+                See how your data is protected
+              </Link>
             </div>
           </div>
           <div className={styles.syncList}>

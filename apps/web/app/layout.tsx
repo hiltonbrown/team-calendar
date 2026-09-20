@@ -13,7 +13,7 @@ interface RootLayoutProperties {
 
 const RootLayout = ({ children }: RootLayoutProperties) => (
   <html
-    className={cn(marketingFonts, "scroll-smooth")}
+    className={cn(marketingFonts, "motion-safe:scroll-smooth")}
     lang="en-AU"
     suppressHydrationWarning
   >

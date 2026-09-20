@@ -942,9 +942,14 @@
   align-items: flex-start;
 }
 
-.marketing-footer__wordmark {
-  width: 168px;
-  height: auto;
+.marketing-footer__home-link {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 44px;
+  font: 600 1.125rem / 1.4 var(--marketing-font);
+  color: var(--marketing-inverse-on-surface);
+  text-decoration: none;
 }
 
 .marketing-footer p {
@@ -1013,8 +1018,10 @@
 }
 
 .marketing-footer__column a {
-  display: block;
-  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin-bottom: 0;
   font: 400 1rem / 1.6 var(--marketing-font);
   color: var(--marketing-inverse-on-surface);
   text-decoration: none;
@@ -1057,6 +1064,10 @@
 }
 
 .marketing-footer__legal a {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
   color: inherit;
   text-decoration: none;
   text-underline-offset: 4px;
@@ -1248,11 +1259,13 @@
 .marketing-contact__panel select,
 .marketing-contact__panel textarea {
   width: 100%;
+  min-height: 48px;
   padding: 0.8rem 0.9rem;
   font: inherit;
   color: var(--foreground);
-  background: var(--muted);
-  border: 0;
+  caret-color: var(--primary);
+  background: var(--surface-container-lowest);
+  border: 1px solid var(--outline);
   border-radius: 14px;
 }
 
@@ -1271,4 +1284,40 @@
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--muted-foreground);
+}
+
+.marketing-contact__panel input:hover,
+.marketing-contact__panel select:hover,
+.marketing-contact__panel textarea:hover {
+  border-color: var(--on-surface);
+}
+
+.marketing-application-dialog {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  color: var(--on-surface);
+  background: var(--surface-container-low);
+  border-radius: 16px;
+}
+
+.marketing-application-dialog button {
+  min-height: 44px;
+  border-radius: 14px;
+}
+
+.marketing-contact__panel form [role="alert"],
+.marketing-contact__panel form [role="status"] {
+  padding: 1rem;
+  overflow-wrap: anywhere;
+  border-radius: 12px;
+}
+
+.marketing-contact__panel form [role="alert"] {
+  color: var(--on-error-container);
+  background: var(--error-container);
+}
+
+.marketing-contact__panel form [role="status"] {
+  color: var(--secondary-foreground);
+  background: var(--secondary);
 }

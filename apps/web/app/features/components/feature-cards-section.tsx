@@ -144,9 +144,11 @@ export const FeatureCardsSection = () => (
         </h2>
         <p className="fmkt-cards-section__lead">
           Staff submit once. Approved leave writes back to Xero Payroll and
-          republishes to the calendars your team already opens. Each calendar
-          app refreshes its subscribed feeds on its own schedule. No re-keying,
-          no separate planner to maintain.
+          republishes to the calendars your team already opens.
+        </p>
+        <p className="fmkt-cards-section__lead">
+          Each calendar app refreshes its subscribed feeds on its own schedule.
+          No re-keying, no separate planner to maintain.
         </p>
       </div>
       <div className="fmkt-card-grid">

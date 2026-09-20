@@ -8,7 +8,7 @@ import {
   startOfWeek,
   subWeeks,
 } from "date-fns";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { MarketingIcon } from "./marketing-icons";
 
 interface Day {
@@ -265,7 +265,7 @@ const Avatar = ({ initials }: { initials: string }) => (
 interface BlockProps {
   entry: Entry;
   isSelected: boolean;
-  onSelect: (selected: SelectedState) => void;
+  onSelect: (selected: SelectedState, trigger: HTMLButtonElement) => void;
   staff: Staff;
   week: Week;
 }
@@ -278,10 +278,13 @@ const Block = ({ entry, staff, week, isSelected, onSelect }: BlockProps) => {
   if (!(startLabel && endLabel)) {
     return null;
   }
-  const ariaLabel =
-    `${staff.name}: ${kind.label}, ${startLabel.dow} ${startLabel.num} ${
-      entry.span > 1 ? `to ${endLabel.dow} ${endLabel.num}` : ""
-    }`.trim();
+  const fullDate = (day: Day) =>
+    day.date
+      ? format(day.date, "EEEE d MMMM yyyy")
+      : `${day.dow} ${day.num} ${day.monthName} 2026`;
+  const ariaLabel = `${staff.name}: ${kind.label}, ${fullDate(startLabel)}${
+    entry.span > 1 ? ` to ${fullDate(endLabel)}` : ""
+  }, ${kind.prov === "xero" ? "Synced from Xero" : "Manual entry"}`;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     const blocks = Array.from(
@@ -313,12 +316,13 @@ const Block = ({ entry, staff, week, isSelected, onSelect }: BlockProps) => {
 
   return (
     <button
+      aria-controls="timeline-entry-details"
+      aria-expanded={isSelected}
       aria-label={ariaLabel}
-      aria-pressed={isSelected}
       className={`tl-block tl-block--${kind.tone} ${
         isSelected ? "is-selected" : ""
       }`}
-      onClick={() => onSelect({ entry, staff, week })}
+      onClick={(event) => onSelect({ entry, staff, week }, event.currentTarget)}
       onKeyDown={handleKeyDown}
       style={{ gridColumn: `${entry.start} / span ${entry.span}` }}
       type="button"
@@ -421,6 +425,17 @@ export const TeamTimelineSection = () => {
   const [weekIdx, setWeekIdx] = useState(1); // current week (This week)
   const [selected, setSelected] = useState<SelectedState | null>(null);
   const [mounted, setMounted] = useState(false);
+  const selectedTrigger = useRef<HTMLButtonElement | null>(null);
+
+  const handleSelect = (entry: SelectedState, trigger: HTMLButtonElement) => {
+    selectedTrigger.current = trigger;
+    setSelected(entry);
+  };
+
+  const handleClose = () => {
+    setSelected(null);
+    selectedTrigger.current?.focus();
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -716,8 +731,8 @@ export const TeamTimelineSection = () => {
                 </div>
               </div>
             </div>
-            {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: Legend wrapper doesn't need native role */}
-            <div aria-label="Legend" className="tl-legend">
+            {/* biome-ignore lint/a11y/useSemanticElements: These labels describe the timeline, not form controls. */}
+            <div aria-label="Legend" className="tl-legend" role="group">
               <span className="tl-legend-item">
                 <span
                   aria-hidden="true"
@@ -744,22 +759,15 @@ export const TeamTimelineSection = () => {
             </div>
           </div>
 
-          {/* biome-ignore lint/a11y/useSemanticElements: Grid layout used for timeline table representation */}
+          {/* biome-ignore lint/a11y/useSemanticElements: This group contains an availability visualisation, not a form. */}
           <div
             aria-label="Team availability timeline"
             className="tl-grid"
-            role="table"
+            role="group"
           >
-            {/* biome-ignore lint/a11y/useSemanticElements: corner element in layout */}
-            {/* biome-ignore lint/a11y/useFocusableInteractive: non-interactive header cell */}
-            <div className="tl-corner" role="columnheader">
-              Team
-            </div>
-            {/* biome-ignore lint/a11y/useSemanticElements: Grid header row */}
-            {/* biome-ignore lint/a11y/useFocusableInteractive: non-interactive header row */}
+            <div className="tl-corner">Team</div>
             <div
               className="tl-days-header"
-              role="row"
               style={{ gridTemplateColumns: weekGridTemplate }}
             >
               {todayLeftPct !== null && (
@@ -770,14 +778,11 @@ export const TeamTimelineSection = () => {
                 />
               )}
               {week.days.map((d, i) => (
-                /* biome-ignore lint/a11y/useSemanticElements: Day head cell */
-                /* biome-ignore lint/a11y/useFocusableInteractive: non-interactive day header */
                 <div
                   className={`tl-day-head ${
                     i === week.todayIdx ? "tl-day-head--today" : ""
                   }`}
                   key={d.dow}
-                  role="columnheader"
                 >
                   <span className="tl-day-head__dow">{d.dow}</span>
                   <span className="tl-day-head__num">
@@ -792,20 +797,18 @@ export const TeamTimelineSection = () => {
 
             {STAFF.map((staff) => (
               <Fragment key={staff.id}>
-                {/* biome-ignore lint/a11y/useSemanticElements: Rowheader in grid timeline */}
-                {/* biome-ignore lint/a11y/useFocusableInteractive: rowheader is not interactive */}
-                <div className="tl-row-staff" role="rowheader">
+                <div className="tl-row-staff">
                   <Avatar initials={staff.initials} />
                   <div className="tl-staff-meta">
                     <div className="tl-staff-name">{staff.name}</div>
                     <div className="tl-staff-role">{staff.role}</div>
                   </div>
                 </div>
-                {/* biome-ignore lint/a11y/useSemanticElements: Track row in grid timeline */}
-                {/* biome-ignore lint/a11y/useFocusableInteractive: track row is non-interactive container */}
+                {/* biome-ignore lint/a11y/useSemanticElements: Availability entries are disclosure buttons, not form fields. */}
                 <div
+                  aria-label={`${staff.name}, ${staff.role}: availability`}
                   className="tl-row-track"
-                  role="row"
+                  role="group"
                   style={{ gridTemplateColumns: weekGridTemplate }}
                 >
                   {todayLeftPct !== null && (
@@ -831,7 +834,7 @@ export const TeamTimelineSection = () => {
                       entry={entry}
                       isSelected={isSelected(staff.id, entry.start)}
                       key={`${staff.id}-${entry.start}`}
-                      onSelect={setSelected}
+                      onSelect={handleSelect}
                       staff={staff}
                       week={week}
                     />
@@ -841,7 +844,13 @@ export const TeamTimelineSection = () => {
             ))}
           </div>
 
-          <Detail onClose={() => setSelected(null)} selected={selected} />
+          <section
+            aria-label="Selected availability entry details"
+            aria-live="polite"
+            id="timeline-entry-details"
+          >
+            <Detail onClose={handleClose} selected={selected} />
+          </section>
         </div>
       </div>
     </section>

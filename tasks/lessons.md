@@ -7,6 +7,26 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Product and design
 
+- Put the calendar-app refresh explanation and “No re-keying” sentence in a
+  separate paragraph from the leave submission and publication description.
+
+- Keep the homepage problem statement’s closing “Keep leave, travel and out
+  of office plans…” sentence in its own paragraph.
+
+- In the homepage problem statement, use “Leave approved in a text message”
+  to identify the communication channel explicitly.
+
+- Marketing copy should name the missed action and its practical consequence.
+  Avoid contrived metaphors, dramatic filler and invented scenes such as
+  “the patchwork holds until it doesn’t” or lost Monday mornings.
+
+- Hero copy must distinguish approved leave write-back to Xero from calendar
+  publication of travel, out of office, WFH and other availability updates.
+
+- Keep the homepage sync diagram on a transparent canvas without a dot grid.
+  Size the SVG independently of its wrapper, and avoid fixed minimum heights
+  that leave empty space beneath the mobile alternative.
+
 - When a page's authored scrollytelling already demonstrates the product, keep
   the hero to one promise, one proof sentence and one action. Do not make the
   visitor decode a second full interactive demo before the narrative begins.
@@ -129,3 +149,15 @@ actionable; keep one-off task evidence in the review for that task.
 - Describe external provider controls as required configuration until concrete
   provider evidence identifies the account, access list, rule and delivery
   result. Repository intent is not proof that a mailbox or dashboard rule exists.
+
+- Avoid clipped, paired slogans in marketing headlines such as “Your whole
+  team. On payroll or off.” State the useful outcome in natural language and
+  explain payroll eligibility in the supporting copy.
+
+- Keep private contact-form recipients in server-side configuration only. Do not
+  repeat their addresses in public-facing copy, responses or task summaries.
+- Vercel environment downloads omit sensitive values. Verify the environment
+  inventory before declaring a setting absent or attempting to replace it.
+
+- Calendar contrast refinements must preserve a clearly visible outer boundary.
+  Use the theme-aware outline token when tonal surfaces alone do not define it.

@@ -21,7 +21,7 @@ const steps: ProcessStep[] = [
     title: "Update the source of truth",
   },
   {
-    copy: "Team Calendar republishes approved changes; calendar apps refresh subscribed feeds on their own schedules.",
+    copy: "Team Calendar republishes approved changes; calendar apps refresh automatically",
     number: 4,
     title: "Publish to calendars",
   },

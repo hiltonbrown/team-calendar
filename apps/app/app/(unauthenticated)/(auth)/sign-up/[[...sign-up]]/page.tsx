@@ -1,4 +1,5 @@
 import { signUpCopy } from "@repo/auth/components/sign-up";
+import { isEarlyAccess } from "@repo/next-config/launch-mode";
 import { createMetadata } from "@repo/seo/metadata";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
@@ -19,10 +20,14 @@ const SignUpPage = async ({
   searchParams: Promise<{ __clerk_ticket?: string }>;
 }) => {
   const { __clerk_ticket: invitationTicket } = await searchParams;
-  if (!invitationTicket) {
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const hasInvitationTicket = Boolean(invitationTicket?.trim());
+
+  if (!isDevelopment && isEarlyAccess() && !hasInvitationTicket) {
     const webUrl = process.env.NEXT_PUBLIC_WEB_URL ?? "http://localhost:3001";
-    redirect(`${webUrl}/contact?admission=required`);
+    redirect(new URL("/contact?admission=required", webUrl).toString());
   }
+
   return <SignUp />;
 };
 

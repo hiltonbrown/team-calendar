@@ -15,6 +15,7 @@ const plannedRegionNames = integrationCapabilities.xeroPayrollRegions
 const footerColumns = [
   {
     items: [
+      { href: "/features", title: "All features" },
       { href: "/features#ics-feeds", title: "Calendar feeds" },
       { href: "/features#leave-workflow", title: "Leave approvals" },
       { href: "/integrations", title: "Xero integration" },
@@ -36,6 +37,7 @@ const footerColumns = [
       { href: "/security", title: "Security" },
       { href: "/status", title: "Status" },
       { href: "/help-centre", title: "Help centre" },
+      { href: "/help-centre/onboarding", title: "Setup guide" },
       { href: "/contact", title: "Contact" },
       { href: "/changelog", title: "Changelog" },
     ],
@@ -52,13 +54,19 @@ export const Footer = () => (
   <footer className="marketing-footer">
     <div className="marketing-footer__grid">
       <div className="marketing-footer__brand">
-        <Image
-          alt={brandNameDisplay}
-          className="marketing-footer__wordmark"
-          height={42}
-          src="/marketing/brand-wordmark-inverse.svg"
-          width={168}
-        />
+        <Link
+          aria-label={`${brandNameDisplay} home`}
+          className="marketing-footer__home-link"
+          href="/"
+        >
+          <Image
+            alt=""
+            height={36}
+            src="/marketing/brand-mark.svg"
+            width={36}
+          />
+          <span>{brandNameDisplay}</span>
+        </Link>
         <p>
           Team availability, synced from Xero Payroll and published to the
           calendars your people already use.
@@ -77,14 +85,18 @@ export const Footer = () => (
         </div>
       </div>
       {footerColumns.map((column) => (
-        <div className="marketing-footer__column" key={column.title}>
+        <nav
+          aria-label={column.title}
+          className="marketing-footer__column"
+          key={column.title}
+        >
           <h2>{column.title}</h2>
           {column.items.map((item) => (
             <Link href={item.href} key={item.title}>
               {item.title}
             </Link>
           ))}
-        </div>
+        </nav>
       ))}
     </div>
     <div className="marketing-footer__bottom">

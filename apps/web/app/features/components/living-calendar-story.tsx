@@ -92,10 +92,9 @@ export const LivingCalendarStory = () => {
 
       <div className="fmkt-container ft-story__layout">
         <div className="ft-story__stage-wrap">
-          <div
+          <section
             aria-label={STORY_BEATS[activeBeat].summary}
             className="ft-story__stage"
-            role="img"
           >
             <div className="ft-story__stage-head">
               <div>
@@ -123,69 +122,79 @@ export const LivingCalendarStory = () => {
               </span>
             </div>
 
-            <div className="ft-story__calendar">
-              <div aria-hidden="true" className="ft-story__corner" />
-              {WEEK_DAYS.map((day) => (
-                <div className="ft-story__day" key={day}>
-                  {day}
+            <section
+              aria-label="Team calendar, scroll to view the full week"
+              className="ft-story__calendar-scroll"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard access to the horizontally scrollable calendar
+              tabIndex={0}
+            >
+              <div className="ft-story__calendar">
+                <div aria-hidden="true" className="ft-story__corner" />
+                {WEEK_DAYS.map((day) => (
+                  <div className="ft-story__day" key={day}>
+                    {day}
+                  </div>
+                ))}
+
+                <div className="ft-story__person">
+                  <span className="ft-story__avatar">SM</span>
+                  <span>
+                    <strong>Sarah M.</strong>
+                    <small>HR lead</small>
+                  </span>
                 </div>
-              ))}
+                <div className="ft-story__days ft-story__days--sarah">
+                  {WEEK_DAYS.map((day) => (
+                    <span aria-hidden="true" key={day} />
+                  ))}
+                  <span className="ft-story__event ft-story__event--leave">
+                    <MarketingIcon id="leaf" size={13} /> Annual leave
+                    <small>{activeBeat === 1 ? "Pending" : "Xero"}</small>
+                  </span>
+                </div>
 
-              <div className="ft-story__person">
-                <span className="ft-story__avatar">SM</span>
-                <span>
-                  <strong>Sarah M.</strong>
-                  <small>HR lead</small>
-                </span>
-              </div>
-              <div className="ft-story__days ft-story__days--sarah">
-                {WEEK_DAYS.map((day) => (
-                  <span aria-hidden="true" key={day} />
-                ))}
-                <span className="ft-story__event ft-story__event--leave">
-                  <MarketingIcon id="leaf" size={13} /> Annual leave
-                  <small>{activeBeat === 1 ? "Pending" : "Xero"}</small>
-                </span>
-              </div>
+                <div className="ft-story__person">
+                  <span className="ft-story__avatar ft-story__avatar--purple">
+                    DC
+                  </span>
+                  <span>
+                    <strong>Daniel C.</strong>
+                    <small>Contractor</small>
+                  </span>
+                </div>
+                <div className="ft-story__days ft-story__days--daniel">
+                  {WEEK_DAYS.map((day) => (
+                    <span aria-hidden="true" key={day} />
+                  ))}
+                  <span className="ft-story__event ft-story__event--manual">
+                    <MarketingIcon id="home" size={13} /> WFH
+                    <small>Manual</small>
+                  </span>
+                </div>
 
-              <div className="ft-story__person">
-                <span className="ft-story__avatar ft-story__avatar--purple">
-                  DC
-                </span>
-                <span>
-                  <strong>Daniel C.</strong>
-                  <small>Contractor</small>
-                </span>
+                <div className="ft-story__person">
+                  <span className="ft-story__avatar ft-story__avatar--slate">
+                    PN
+                  </span>
+                  <span>
+                    <strong>Patrick N.</strong>
+                    <small>Sales</small>
+                  </span>
+                </div>
+                <div className="ft-story__days ft-story__days--patrick">
+                  {WEEK_DAYS.map((day) => (
+                    <span aria-hidden="true" key={day} />
+                  ))}
+                  <span className="ft-story__event ft-story__event--travel">
+                    <MarketingIcon id="briefcase" size={13} /> Client visit
+                    <small>Manual</small>
+                  </span>
+                </div>
               </div>
-              <div className="ft-story__days ft-story__days--daniel">
-                {WEEK_DAYS.map((day) => (
-                  <span aria-hidden="true" key={day} />
-                ))}
-                <span className="ft-story__event ft-story__event--manual">
-                  <MarketingIcon id="home" size={13} /> WFH
-                  <small>Manual</small>
-                </span>
-              </div>
-
-              <div className="ft-story__person">
-                <span className="ft-story__avatar ft-story__avatar--slate">
-                  PN
-                </span>
-                <span>
-                  <strong>Patrick N.</strong>
-                  <small>Sales</small>
-                </span>
-              </div>
-              <div className="ft-story__days ft-story__days--patrick">
-                {WEEK_DAYS.map((day) => (
-                  <span aria-hidden="true" key={day} />
-                ))}
-                <span className="ft-story__event ft-story__event--travel">
-                  <MarketingIcon id="briefcase" size={13} /> Client visit
-                  <small>Manual</small>
-                </span>
-              </div>
-            </div>
+            </section>
+            <p className="ft-story__scroll-hint">
+              Scroll across to view the full week.
+            </p>
 
             <div className="ft-story__decision">
               <span className="ft-story__decision-icon">
@@ -217,7 +226,7 @@ export const LivingCalendarStory = () => {
                 <MarketingIcon id="applecal" size={16} /> Apple
               </span>
             </div>
-          </div>
+          </section>
         </div>
 
         <div className="ft-story__beats">
@@ -225,6 +234,7 @@ export const LivingCalendarStory = () => {
             <article
               className="ft-story__beat"
               data-story-beat={index}
+              id={beat.id === "publish" ? "ics-feeds" : undefined}
               key={beat.id}
               ref={(node) => {
                 beatRefs.current[index] = node;

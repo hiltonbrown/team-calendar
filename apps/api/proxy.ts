@@ -4,6 +4,7 @@ import type { NextProxy } from "next/server";
 export const isPublicApiRoute = createRouteMatcher([
   "/ical(.*)",
   "/api/inngest(.*)",
+  "/api/early-access",
   "/webhooks/auth",
   "/webhooks/payments",
   "/api/xero/oauth/callback",

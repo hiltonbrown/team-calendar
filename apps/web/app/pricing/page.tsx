@@ -17,5 +17,26 @@ export const metadata: Metadata = createMetadata({
   title: launchMode === "early_access" ? "Australian early access" : "Pricing",
 });
 
-const Pricing = () => <PricingExperience mode={launchMode} />;
+interface PageProps {
+  searchParams?: Promise<{ mode?: string }>;
+}
+
+const resolveLaunchMode = (mode?: string): "early_access" | "paid" => {
+  if (mode === "paid") {
+    return "paid";
+  }
+  if (mode === "early_access") {
+    return "early_access";
+  }
+  return launchMode;
+};
+
+const Pricing = async (props: PageProps) => {
+  const searchParams = props.searchParams
+    ? await props.searchParams
+    : undefined;
+  const mode = resolveLaunchMode(searchParams?.mode);
+  return <PricingExperience mode={mode} />;
+};
+
 export default Pricing;

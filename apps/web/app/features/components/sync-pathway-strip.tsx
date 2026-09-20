@@ -117,9 +117,10 @@ const SyncPacket = ({
       begin={`${delay}s`}
       calcMode="linear"
       dur={`${duration}s`}
+      fill="freeze"
       keyPoints="0;0;1;1"
       keyTimes="0;0.08;0.88;1"
-      repeatCount="indefinite"
+      repeatCount="1"
     >
       <mpath href={`#${pathId}`} />
     </animateMotion>
@@ -127,8 +128,9 @@ const SyncPacket = ({
       attributeName="opacity"
       begin={`${delay}s`}
       dur={`${duration}s`}
+      fill="freeze"
       keyTimes="0;0.08;0.76;0.88;1"
-      repeatCount="indefinite"
+      repeatCount="1"
       values="0;0.82;0.82;0;0"
     />
   </circle>
@@ -154,7 +156,7 @@ export const SyncPathwayStrip = () => (
           />
           <path
             className="fmkt-sync-path fmkt-sync-path--team"
-            d="M 270,318 C 266,356 194,372 188,402"
+            d="M 270,320 C 266,356 194,372 188,402"
             id="sync-path-team"
             pathLength={1}
           />
@@ -166,7 +168,7 @@ export const SyncPathwayStrip = () => (
           />
 
           <g className="fmkt-sync-node fmkt-sync-node--source">
-            <rect height="104" rx="26" width="332" x="22" y="34" />
+            <rect height="104" rx="20" width="332" x="22" y="34" />
             <circle className="fmkt-sync-node__icon" cx="76" cy="86" r="22" />
             <g
               fill="none"
@@ -189,7 +191,7 @@ export const SyncPathwayStrip = () => (
           </g>
 
           <g className="fmkt-sync-node fmkt-sync-node--xero">
-            <rect height="92" rx="24" width="300" x="122" y="228" />
+            <rect height="92" rx="20" width="276" x="122" y="228" />
             <circle className="fmkt-sync-node__icon" cx="154" cy="274" r="21" />
             <text className="fmkt-sync-node-letter" x="154" y="282">
               X
@@ -203,7 +205,7 @@ export const SyncPathwayStrip = () => (
           </g>
 
           <g className="fmkt-sync-node fmkt-sync-node--team">
-            <rect height="104" rx="26" width="340" x="18" y="402" />
+            <rect height="104" rx="20" width="340" x="18" y="402" />
             <circle className="fmkt-sync-node__icon" cx="72" cy="454" r="22" />
             <g
               fill="none"
@@ -227,21 +229,21 @@ export const SyncPathwayStrip = () => (
           <SyncPacket
             className="fmkt-sync-packet fmkt-sync-packet--xero"
             delay={0}
-            duration={5.8}
+            duration={2}
             pathId="sync-path-xero"
             radius={6.5}
           />
           <SyncPacket
             className="fmkt-sync-packet fmkt-sync-packet--team"
-            delay={1.5}
-            duration={5.8}
+            delay={1}
+            duration={2}
             pathId="sync-path-team"
             radius={6.5}
           />
           <SyncPacket
             className="fmkt-sync-packet fmkt-sync-packet--return"
-            delay={2.8}
-            duration={6.4}
+            delay={2}
+            duration={2.5}
             pathId="sync-path-return"
             radius={5.5}
           />

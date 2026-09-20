@@ -55,6 +55,10 @@ export const PricingComparison = () => (
         <h2 className="fmkt-section-title" id="comparison-heading">
           Compare Australian plans
         </h2>
+        <p className="fmkt-section-subtitle">
+          Transparent limits and included capabilities for Australian Xero
+          Payroll organisations.
+        </p>
       </div>
       <section
         aria-label="Plan comparison, scroll horizontally if needed"
@@ -68,8 +72,23 @@ export const PricingComparison = () => (
             <tr>
               <th scope="col">Capability</th>
               {PUBLIC_PLAN_CATALOGUE.map((plan) => (
-                <th key={plan.plan_key} scope="col">
-                  {plan.name}
+                <th
+                  className={
+                    plan.plan_key === "premium"
+                      ? "fmkt-pricing-table__col--highlight"
+                      : undefined
+                  }
+                  key={plan.plan_key}
+                  scope="col"
+                >
+                  <div className="fmkt-pricing-table__th-wrap">
+                    <span>{plan.name}</span>
+                    {plan.plan_key === "premium" ? (
+                      <span className="fmkt-pricing-table__th-rec">
+                        Popular
+                      </span>
+                    ) : null}
+                  </div>
                 </th>
               ))}
             </tr>
@@ -79,7 +98,16 @@ export const PricingComparison = () => (
               <tr key={row.label}>
                 <th scope="row">{row.label}</th>
                 {PUBLIC_PLAN_CATALOGUE.map((plan) => (
-                  <td key={plan.plan_key}>{row.value(plan)}</td>
+                  <td
+                    className={
+                      plan.plan_key === "premium"
+                        ? "fmkt-pricing-table__cell--highlight"
+                        : undefined
+                    }
+                    key={plan.plan_key}
+                  >
+                    {row.value(plan)}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -88,11 +116,25 @@ export const PricingComparison = () => (
       </section>
       <div className="fmkt-pricing-comparison-cards">
         {PUBLIC_PLAN_CATALOGUE.map((plan) => (
-          <article key={plan.plan_key}>
-            <h3>{plan.name}</h3>
-            <dl>
+          <article
+            className={
+              plan.plan_key === "premium"
+                ? "fmkt-pricing-cmp-card fmkt-pricing-cmp-card--rec"
+                : "fmkt-pricing-cmp-card"
+            }
+            key={plan.plan_key}
+          >
+            <div className="fmkt-pricing-cmp-card__header">
+              <h3>{plan.name}</h3>
+              {plan.plan_key === "premium" ? (
+                <span className="fmkt-pricing-cmp-card__badge">
+                  Recommended
+                </span>
+              ) : null}
+            </div>
+            <dl className="fmkt-pricing-cmp-card__dl">
               {rows.map((row) => (
-                <div key={row.label}>
+                <div className="fmkt-pricing-cmp-card__row" key={row.label}>
                   <dt>{row.label}</dt>
                   <dd>{row.value(plan)}</dd>
                 </div>

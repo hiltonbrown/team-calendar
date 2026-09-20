@@ -13,9 +13,9 @@ export const FinalCtaSection = () => (
             Bring approved leave straight onto your team&apos;s calendars.
           </h2>
           <p className="fmkt-cta__copy">
-            The calendar and Xero never disagree, because they&apos;re reading
-            the same record. That&apos;s the version your team can trust when it
-            matters.
+            Approved leave writes back to Xero and publishes to your team&apos;s
+            subscribed calendars. Calendar apps pick up changes on their own
+            refresh schedules.
           </p>
           <div className="fmkt-cta__actions">
             <Link

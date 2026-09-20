@@ -12,9 +12,10 @@ export const HeroSection = () => (
           <em>Manage leave, travel and out of office in one place.</em>
         </h1>
         <p className="fmkt-hero__body">
-          Staff request leave or flag WFH. Approved leave writes back to Xero
-          and appears in Outlook, Google Calendar or Apple Calendar. No chasing,
-          re-keying or guessing who&rsquo;s in.
+          Staff request leave and share travel plans, out of office notices, WFH
+          and other availability updates. Approved leave syncs back to Xero and
+          appears alongside these updates in Outlook, Google Calendar or Apple
+          Calendar.
         </p>
         <div className="fmkt-hero__actions">
           <Link

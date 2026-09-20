@@ -16,14 +16,25 @@ describe("Features calendar timing", () => {
     expect(html).toContain('id="leave-workflow"');
   });
 
-  it("keeps the hero to one promise, proof sentence and primary action", () => {
+  it("includes the whole team with illustrative statuses and one primary action", () => {
     const html = renderToStaticMarkup(
       React.createElement(InteractiveHeroSection)
     );
 
     expect(html.match(/<a /g)).toHaveLength(1);
-    expect(html).toContain("Every absence");
-    expect(html).toContain("off-payroll availability");
+    expect(html).toContain("See everyone’s");
+    expect(html).toContain("whether they’re on payroll or not");
+    for (const group of [
+      "Employees",
+      "Directors",
+      "Subcontractors",
+      "Offshore staff",
+    ]) {
+      expect(html).toContain(`<dt>${group}</dt>`);
+    }
+    expect(html).toContain("From Xero Payroll");
+    expect(html.match(/Shared in Team Calendar/g)).toHaveLength(3);
+    expect(html).toContain("Examples of what your team can share");
     expect(html).not.toContain("Availability Sandbox");
     expect(html).not.toContain("See who&#x27;s covered");
     expect(html).not.toContain("<button");

@@ -9,27 +9,37 @@ describe("Integrations page", () => {
 
     expect(html).not.toContain("60 seconds");
     expect(html).not.toContain("60-second");
-    expect(html).toContain("calendar clients refresh subscribed feeds");
+    expect(html).toContain("Calendar apps refresh subscriptions");
     expect(html).toContain("on their own schedules");
   });
 
-  it("links to the canonical contact and security routes", () => {
+  it("links to contact, security and contextual onboarding guidance", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
     expect(html).toContain('href="/contact">Talk to us</a>');
     expect(html).toContain('href="/security">Review security</a>');
+    expect(html).toContain(
+      'href="/help-centre/onboarding">Read the setup guide</a>'
+    );
+    expect(html).toContain(
+      'href="/help-centre/onboarding#publish">Learn how to subscribe</a>'
+    );
   });
 
-  it("assigns the hero outcome, problem, and mechanism distinct copy", () => {
+  it("explains two-way Xero leave sync alongside other availability in the hero", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
     const [, heroAndRest = ""] = html.split('data-integrations-section="hero"');
     const [heroHtml = ""] = heroAndRest.split("<section");
 
     expect(heroHtml).toContain("See who is away");
-    expect(heroHtml).toContain("Stop piecing together leave and availability");
+    expect(heroHtml).toContain("Staff request leave in Team Calendar");
+    expect(heroHtml).toContain("Approved leave syncs back to");
     expect(heroHtml).toContain("Xero Payroll Australia");
-    expect(heroHtml).toContain("manual availability");
-    expect(heroHtml).toContain("secure ICS feeds");
+    expect(heroHtml).toContain("travel, WFH and other availability updates");
+    expect(heroHtml).toContain(
+      "Employees, approved leave and balances sync from Xero"
+    );
+    expect(heroHtml).toContain("Leave requests and decisions sync back");
     expect(heroHtml).toContain("Outlook");
     expect(heroHtml).toContain("Google Calendar");
     expect(heroHtml).toContain("Apple Calendar");
@@ -40,9 +50,11 @@ describe("Integrations page", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
     expect(html).not.toContain("Plaintext feed or OAuth tokens");
-    expect(html).toContain("OAuth tokens are encrypted at rest");
-    expect(html).toContain("feed tokens are signed and revocable");
-    expect(html).toContain("stay out of client-side code");
+    expect(html).toContain("Never reads");
+    expect(html).toContain("Salary, banking, tax, or superannuation data");
+    expect(html).toContain("Personal calendar contents");
+    expect(html).toContain("revoke access when needed");
+    expect(html).toContain("Xero connection credentials are stored encrypted");
   });
 
   it("describes only the Xero data that Team Calendar reads", () => {
