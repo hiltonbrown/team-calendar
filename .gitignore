@@ -65,7 +65,6 @@ yarn-error.log*
 apps/email/.react-email/
 
 # Deployment and local tooling
-.agents/
 .clerk/
 .codex/config.toml
 .idea/
@@ -75,11 +74,13 @@ apps/email/.react-email/
 .vercel/
 kilocode/
 
-# Claude Code local state and installed skills
-.claude/*
-!.claude/skills/
-.claude/skills/*
-!.claude/skills/next-forge/
+# Agent tooling: local development only, never committed.
+# .claude/  Claude Code settings, subagents and installed skills
+# .agents/  cross-harness (Codex/generic) installed skills and plans
+# /agent/   legacy stray skill install, superseded by .agents/
+/.claude/
+/.agents/
+/agent/
 
 # VS Code local settings
 .vscode/*
