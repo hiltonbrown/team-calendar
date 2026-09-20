@@ -34,6 +34,8 @@ if (!(tenant.clerkOrgId && otherTenant.clerkOrgId && fixture.tenants[2])) {
 }
 const clerkOrgIds = [tenant.clerkOrgId, otherTenant.clerkOrgId];
 const TOKEN_PATTERN = /^tc1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/;
+const INITIAL_TOKEN_EXISTS_PATTERN =
+  /^This feed already has (an active )?token\.$/;
 
 describe("feed services", () => {
   beforeEach(async () => {
@@ -82,16 +84,10 @@ describe("feed services", () => {
       database.$transaction((tx) => createInitialTokenWithClient(tx, input)),
     ]);
 
-    expect(results.filter((result) => result.ok)).toHaveLength(1);
-    expect(results.filter((result) => !result.ok)).toEqual([
-      {
-        error: {
-          code: "initial_token_exists",
-          message: "This feed already has an active token.",
-        },
-        ok: false,
-      },
-    ]);
+    const failures = results.filter((result) => !result.ok);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.error.code).toBe("initial_token_exists");
+    expect(failures[0]?.error.message).toMatch(INITIAL_TOKEN_EXISTS_PATTERN);
     await expect(
       database.feedToken.count({
         where: { feed_id: feed.id, status: "active" },

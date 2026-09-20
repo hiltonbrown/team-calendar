@@ -166,7 +166,7 @@ export async function createInitialTokenWithClient(
     return {
       error: {
         code: "initial_token_exists",
-        message: "This feed already has a token.",
+        message: "This feed already has an active token.",
       },
       ok: false,
     };
