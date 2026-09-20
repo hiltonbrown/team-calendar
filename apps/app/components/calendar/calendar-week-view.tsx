@@ -41,13 +41,13 @@ export function CalendarWeekView({
               <h3 id={`week-day-${dateOnly}`}>
                 <span
                   aria-hidden="true"
-                  className="block font-medium text-xs uppercase tracking-wide"
+                  className="block font-medium text-label-md uppercase tracking-wide"
                 >
                   {dayLabels[day.dayOfWeek]}
                 </span>
                 <span
                   aria-hidden="true"
-                  className="mt-1 block font-semibold text-lg tabular-nums"
+                  className="mt-1 block font-semibold text-body-lg tabular-nums"
                 >
                   {day.date.getUTCDate()}
                 </span>
@@ -62,7 +62,7 @@ export function CalendarWeekView({
         <div className="mt-1 grid min-w-[56rem] grid-cols-7 gap-1">
           {data.days.map((day) => (
             <div
-              className={`min-h-12 rounded-xl p-2 text-xs ${statusToneClasses.holiday}`}
+              className={`min-h-12 rounded-xl p-2 text-label-md ${statusToneClasses.holiday}`}
               key={`holidays-${day.date.toISOString()}`}
             >
               {day.publicHolidays.length > 0 ? (

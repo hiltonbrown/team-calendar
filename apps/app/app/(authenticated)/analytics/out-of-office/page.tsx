@@ -185,27 +185,27 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
           personType={personType}
           preset={preset}
         />
-        <section className="rounded-[20px] bg-muted p-6">
+        <section className="px-1">
           <div className="max-w-3xl space-y-2">
-            <p className="font-medium text-muted-foreground text-sm">
+            <p className="font-medium text-body-sm text-muted-foreground">
               Analytics
             </p>
-            <h2 className="font-semibold text-2xl tracking-normal">
+            <h2 className="font-semibold text-headline-md tracking-normal">
               Out-of-office trends for {report.range.label}
             </h2>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Analyse approved out-of-office and travel patterns to understand
               presence.
             </p>
           </div>
         </section>
 
-        <section className="grid gap-6 rounded-[20px] bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
+        <section className="grid gap-6 rounded-xl bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
           <div>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Out-of-office days · {report.range.label}
             </p>
-            <p className="mt-2 font-semibold text-4xl tabular-nums">
+            <p className="mt-2 font-semibold text-display-sm tabular-nums">
               {formatNumber(report.summaryStats.totalOooDays)}
             </p>
           </div>
@@ -226,13 +226,13 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
         </section>
 
         <div className="grid gap-6 xl:grid-cols-2">
-          <Card className="rounded-[20px]">
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle>Out-of-office by type</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-body-sm text-muted-foreground">
                 Approved out-of-office days by type in the selected period.
               </p>
-              <p className="font-medium text-sm">
+              <p className="font-medium text-body-sm">
                 Most common: {mostCommonTypeLabel}
               </p>
             </CardHeader>
@@ -240,17 +240,17 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
               {donutChartData.length > 0 ? (
                 <OooDaysByTypeChart data={donutChartData} />
               ) : (
-                <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-muted-foreground text-sm">
+                <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-label-lg text-muted-foreground">
                   No approved out-of-office records were found for this period.
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="rounded-[20px]">
+          <Card className="rounded-xl">
             <CardHeader>
               <CardTitle>Monthly trends</CardTitle>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-body-sm text-muted-foreground">
                 Approved out-of-office days by type monthly.
               </p>
             </CardHeader>
@@ -261,7 +261,7 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
                   recordTypes={recordTypes}
                 />
               ) : (
-                <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-muted-foreground text-sm">
+                <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-label-lg text-muted-foreground">
                   No approved out-of-office records were found for this period.
                 </div>
               )}
@@ -269,7 +269,7 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
           </Card>
         </div>
 
-        <p className="text-muted-foreground text-xs">
+        <p className="text-label-md text-muted-foreground">
           Generated {formatDateTime(report.dataFreshness.generatedAt)} from{" "}
           {formatNumber(report.dataFreshness.recordCount)} records.
         </p>
@@ -280,9 +280,9 @@ const OutOfOfficePage = async ({ searchParams }: OutOfOfficePageProps) => {
 
 function SummaryFact({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-background p-4">
-      <dt className="text-muted-foreground text-sm">{label}</dt>
-      <dd className="mt-1 font-semibold text-xl tabular-nums">
+    <div className="min-w-0">
+      <dt className="text-label-lg text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-semibold text-title-lg tabular-nums">
         {formatNumber(value)}
       </dd>
     </div>

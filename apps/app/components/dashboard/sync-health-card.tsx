@@ -33,7 +33,7 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
       title="Sync health"
     >
       {state.data.hasActiveXeroConnection ? (
-        <div className="grid grid-cols-2 gap-3 text-body-sm">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <MetricTile label="Tenants" value={state.data.tenantCount} />
           <MetricTile
             label="Active"

@@ -15,7 +15,7 @@ export function PeopleStatusChip({
   const tone = statusToneClasses[toneForStatusKey({ statusKey })];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 font-medium text-xs ring-1 ${tone}`}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1 font-medium text-label-md ring-1 ${tone}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {label}

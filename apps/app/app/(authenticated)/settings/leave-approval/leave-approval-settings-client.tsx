@@ -346,7 +346,7 @@ function SettingsToggleCard({
         <div className="flex items-start justify-between gap-4">
           <div>
             <CardTitle>
-              <Label className="font-semibold text-base" htmlFor={id}>
+              <Label className="font-semibold text-title-md" htmlFor={id}>
                 {label}
               </Label>
             </CardTitle>

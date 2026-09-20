@@ -15,11 +15,11 @@ export default function CalendarLoading() {
         className="flex flex-1 flex-col gap-6 p-6 pt-0"
         role="status"
       >
-        <div className="h-28 animate-pulse rounded-[20px] bg-muted" />
-        <div className="grid grid-cols-1 gap-2 rounded-[20px] bg-muted p-4 sm:grid-cols-7">
+        <div className="h-28 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+        <div className="grid grid-cols-1 gap-2 rounded-xl bg-muted p-4 sm:grid-cols-7">
           {SKELETON_DAYS.map((day) => (
             <div
-              className="h-20 animate-pulse rounded-xl bg-background"
+              className="h-20 animate-pulse rounded-xl bg-background motion-reduce:animate-none"
               key={day}
             />
           ))}

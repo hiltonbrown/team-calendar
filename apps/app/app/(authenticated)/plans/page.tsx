@@ -182,7 +182,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
       <Header page="Plans" />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         {!hasXero && (
-          <div className="rounded-2xl bg-muted p-5 text-muted-foreground text-sm">
+          <div className="rounded-2xl bg-muted p-5 text-label-lg text-muted-foreground">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <p>
                 Xero is not connected. Leave saves in Team Calendar only, so it

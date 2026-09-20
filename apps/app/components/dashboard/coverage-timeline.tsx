@@ -70,7 +70,7 @@ export function CoverageTimeline({
       className={`flex flex-col gap-6 rounded-2xl bg-muted p-6 ${className ?? ""}`}
     >
       <div>
-        <p className="font-medium text-label-sm text-muted-foreground uppercase tracking-widest">
+        <p className="font-medium text-label-sm text-muted-foreground uppercase tracking-wider">
           Coverage
         </p>
         <div className="mt-1.5 flex items-baseline gap-2.5">
@@ -97,7 +97,7 @@ export function CoverageTimeline({
             >
               {hasAway ? (
                 <div
-                  className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] z-30 hidden min-w-[10rem] flex-col rounded-xl bg-popover p-3 text-popover-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:flex group-hover:opacity-100 ${
+                  className={`pointer-events-none absolute bottom-[calc(100%+0.5rem)] z-30 hidden min-w-[10rem] flex-col rounded-xl bg-popover p-3 text-popover-foreground opacity-0 shadow-[var(--elev-popover)] transition-opacity duration-150 group-hover:flex group-hover:opacity-100 ${
                     alignRight ? "right-0" : "left-0"
                   }`}
                 >

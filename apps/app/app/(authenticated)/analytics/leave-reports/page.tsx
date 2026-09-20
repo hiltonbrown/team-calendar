@@ -170,27 +170,27 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
           customStart={fromParam}
           preset={preset}
         />
-        <section className="rounded-[20px] bg-muted p-6">
+        <section className="px-1">
           <div className="max-w-3xl space-y-2">
-            <p className="font-medium text-muted-foreground text-sm">
+            <p className="font-medium text-body-sm text-muted-foreground">
               Analytics
             </p>
-            <h2 className="font-semibold text-2xl tracking-normal">
+            <h2 className="font-semibold text-headline-md tracking-normal">
               Leave trends for {report.range.label}
             </h2>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Compare approved leave patterns across teams and identify where
               coverage needs attention.
             </p>
           </div>
         </section>
 
-        <section className="grid gap-6 rounded-[20px] bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
+        <section className="grid gap-6 rounded-xl bg-muted p-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:p-8">
           <div>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Leave days · {report.range.label}
             </p>
-            <p className="mt-2 font-semibold text-4xl tabular-nums">
+            <p className="mt-2 font-semibold text-display-sm tabular-nums">
               {formatNumber(report.summaryStats.totalLeaveDays)}
             </p>
           </div>
@@ -210,10 +210,10 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
           </dl>
         </section>
 
-        <Card className="rounded-[20px]">
+        <Card className="rounded-xl">
           <CardHeader>
             <CardTitle>Leave days by team</CardTitle>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Top teams by approved leave days in the selected period.
             </p>
           </CardHeader>
@@ -221,14 +221,14 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
             {chartData.length > 0 ? (
               <LeaveDaysByTeamChart data={chartData} />
             ) : (
-              <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-muted-foreground text-sm">
+              <div className="flex min-h-[280px] items-center justify-center rounded-2xl bg-muted text-label-lg text-muted-foreground">
                 No approved leave records were found for this period.
               </div>
             )}
           </CardContent>
         </Card>
 
-        <p className="text-muted-foreground text-xs">
+        <p className="text-label-md text-muted-foreground">
           Generated {formatDateTime(report.dataFreshness.generatedAt)} from{" "}
           {formatNumber(report.dataFreshness.recordCount)} records.
         </p>
@@ -239,9 +239,9 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
 
 function SummaryFact({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl bg-background p-4">
-      <dt className="text-muted-foreground text-sm">{label}</dt>
-      <dd className="mt-1 font-semibold text-xl tabular-nums">
+    <div className="min-w-0">
+      <dt className="text-label-lg text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-semibold text-title-lg tabular-nums">
         {formatNumber(value)}
       </dd>
     </div>

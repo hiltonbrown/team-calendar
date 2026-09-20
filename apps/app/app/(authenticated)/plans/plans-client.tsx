@@ -248,13 +248,13 @@ export function PlansClient({
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-5 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
+          <p className="font-medium text-label-md text-muted-foreground uppercase tracking-wider">
             Availability planning
           </p>
-          <h1 className="mt-2 font-semibold text-3xl text-foreground tracking-tight">
+          <h1 className="mt-2 font-semibold text-foreground text-headline-md tracking-tight">
             Plans
           </h1>
-          <p className="mt-2 max-w-2xl text-muted-foreground text-sm">
+          <p className="mt-2 max-w-2xl text-body-sm text-muted-foreground">
             Create leave requests and availability records, then track what
             needs approval, Xero sync, or correction.
           </p>
@@ -383,7 +383,7 @@ export function PlansClient({
       <ActiveFilters filters={filters} orgQueryValue={orgQueryValue} />
 
       {!filters.allHistory && window.from && window.to && (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           Showing plans from {formatWindowDate(window.from)} to{" "}
           {formatWindowDate(window.to)}. Choose All history to search outside
           this window.
@@ -392,7 +392,7 @@ export function PlansClient({
 
       {records.length > 0 && (
         <div className="rounded-2xl bg-muted p-3 xl:p-0">
-          <table className="block w-full text-sm xl:table">
+          <table className="block w-full text-label-lg xl:table">
             <thead className="sr-only xl:table-header-group">
               <tr>
                 {filters.tab === "team" && (
@@ -419,7 +419,7 @@ export function PlansClient({
                   >
                     {filters.tab === "team" && (
                       <td className="xl:p-3">
-                        <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                        <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                           Person
                         </span>
                         {record.personName}
@@ -438,7 +438,7 @@ export function PlansClient({
                       </div>
                     </td>
                     <td className="xl:p-3">
-                      <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                      <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                         Dates
                       </span>
                       {formatDateRange(record.startsAt, record.endsAt)}
@@ -464,7 +464,7 @@ export function PlansClient({
                       </div>
                     </td>
                     <td className="xl:p-3">
-                      <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                      <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                         Balance
                       </span>
                       {renderBalance(record) || "Not applicable"}
@@ -478,7 +478,7 @@ export function PlansClient({
                       />
                       {rowPending ? (
                         <p
-                          className="mt-2 text-right text-muted-foreground text-xs"
+                          className="mt-2 text-right text-label-md text-muted-foreground"
                           role="status"
                         >
                           Updating this plan…
@@ -490,7 +490,7 @@ export function PlansClient({
                         </summary>
                         <dl className="mt-3 grid gap-2">
                           <div>
-                            <dt className="text-muted-foreground text-xs">
+                            <dt className="text-label-md text-muted-foreground">
                               Duration
                             </dt>
                             <dd>
@@ -500,7 +500,7 @@ export function PlansClient({
                             </dd>
                           </div>
                           <div>
-                            <dt className="text-muted-foreground text-xs">
+                            <dt className="text-label-md text-muted-foreground">
                               Status detail
                             </dt>
                             <dd>
@@ -512,7 +512,7 @@ export function PlansClient({
                       </details>
                       {inlineError[record.id] ? (
                         <div
-                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
+                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-label-lg ${statusToneClasses.failed}`}
                           role="alert"
                         >
                           <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
@@ -521,7 +521,7 @@ export function PlansClient({
                       ) : null}
                       {record.submissionResolutionPending ? (
                         <div
-                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-sm ${statusToneClasses.leave}`}
+                          className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-label-lg ${statusToneClasses.leave}`}
                           role="status"
                         >
                           <Clock3Icon className="mt-0.5 size-4 shrink-0" />
@@ -586,7 +586,7 @@ export function PlansClient({
 
       <div
         aria-live="polite"
-        className="flex items-center justify-between text-sm"
+        className="flex items-center justify-between text-label-lg"
       >
         <span className="text-muted-foreground">
           {totalCount ?? records.length} matching plans
@@ -601,7 +601,7 @@ export function PlansClient({
       </div>
 
       {!hasActiveXeroConnection && (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           Xero is disconnected, so new leave records save locally as approved
           calendar entries. They will not be submitted to payroll until Xero is
           connected.
@@ -720,7 +720,7 @@ function SubmitRecoveryControls({
     });
 
   return (
-    <details className="mt-2 rounded-xl bg-muted p-3 text-xs">
+    <details className="mt-2 rounded-xl bg-muted p-3 text-label-md">
       <summary className="cursor-pointer font-medium">
         Resolve Xero submission
       </summary>
@@ -807,7 +807,7 @@ function FilterField({
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs" htmlFor={htmlFor}>
+      <Label className="text-label-md" htmlFor={htmlFor}>
         {label}
       </Label>
       {children}
@@ -846,7 +846,7 @@ function ActiveFilters({
   return (
     <fieldset className="flex flex-wrap items-center gap-2">
       <legend className="sr-only">Active filters</legend>
-      <span className="text-muted-foreground text-sm">
+      <span className="text-label-lg text-muted-foreground">
         {labels.length === 1
           ? "1 filter active"
           : `${labels.length} filters active`}
@@ -922,7 +922,7 @@ function RowActions({
 
   if (!primaryAction && secondaryActions.length === 0) {
     return (
-      <p className="text-right text-muted-foreground text-sm">No action</p>
+      <p className="text-right text-body-sm text-muted-foreground">No action</p>
     );
   }
 
@@ -1048,8 +1048,8 @@ function StatusOverview({ records }: { records: PlansClientRecord[] }) {
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-muted p-5 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <p className="font-medium text-sm">Current view</p>
-        <p className="mt-1 text-muted-foreground text-sm">
+        <p className="font-medium text-body-sm">Current view</p>
+        <p className="mt-1 text-body-sm text-muted-foreground">
           Review pending or failed plans first; approved plans need no action.
         </p>
       </div>
@@ -1064,8 +1064,8 @@ function StatusOverview({ records }: { records: PlansClientRecord[] }) {
               aria-hidden="true"
               className={`${item.style.dotClassName} size-2 rounded-full`}
             />
-            <span className="font-medium text-xs">{item.label}</span>
-            <span className="font-semibold text-sm">{item.count}</span>
+            <span className="font-medium text-label-md">{item.label}</span>
+            <span className="font-semibold text-label-lg">{item.count}</span>
           </li>
         ))}
       </ul>
@@ -1283,7 +1283,9 @@ function StatusCue({
     return null;
   }
   return (
-    <span className="text-muted-foreground text-xs leading-tight">{cue}</span>
+    <span className="text-label-md text-muted-foreground leading-tight">
+      {cue}
+    </span>
   );
 }
 

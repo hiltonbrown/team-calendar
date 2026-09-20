@@ -133,7 +133,7 @@ export function CalendarTimeline({
   return (
     <section
       aria-labelledby="team-runway-title"
-      className="overflow-hidden rounded-[20px] bg-surface-container"
+      className="overflow-hidden rounded-xl bg-surface-container"
     >
       <RunwayHeader
         affectedPeople={affectedPeople}
@@ -197,7 +197,7 @@ export function CalendarTimeline({
 
       {hiddenLaneCount > 0 ? (
         <div className="flex flex-col gap-2 px-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             Showing {visibleLanes.length} of {lanes.length} people in this
             scope.
           </p>
@@ -213,7 +213,7 @@ export function CalendarTimeline({
       ) : null}
 
       {data.truncated ? (
-        <p className="mx-4 mb-4 rounded-xl bg-warning-container px-3 py-2 text-on-warning-container text-sm">
+        <p className="mx-4 mb-4 rounded-xl bg-warning-container px-3 py-2 text-body-sm text-on-warning-container">
           Showing the first {data.people.length} of {data.totalPeopleInScope}
           people. Narrow the people or location filter to see everyone.
         </p>
@@ -264,7 +264,7 @@ function RunwayHeader({
       {data.xeroSyncFailedCount > 0 ? (
         <span
           className={cn(
-            "inline-flex items-center gap-2 self-start rounded-xl px-3 py-2 font-medium text-sm",
+            "inline-flex items-center gap-2 self-start rounded-xl px-3 py-2 font-medium text-label-lg",
             statusToneClasses.failed
           )}
         >
@@ -365,7 +365,7 @@ function CoverageDayHeader({
           </span>
         </span>
         {summary.isToday ? (
-          <span className="rounded-xl bg-primary px-2 py-1 font-medium text-primary-foreground text-xs">
+          <span className="rounded-xl bg-primary px-2 py-1 font-medium text-label-md text-primary-foreground">
             Today
           </span>
         ) : (
@@ -376,7 +376,7 @@ function CoverageDayHeader({
         )}
       </span>
       <span className="relative">
-        <span className="flex items-center justify-between gap-2 text-xs">
+        <span className="flex items-center justify-between gap-2 text-label-md">
           <span className="font-medium tabular-nums">
             {summary.distinctPeopleCount} affected
           </span>
@@ -437,14 +437,14 @@ function TimelineLaneRow({
         )}
         href={withOrg(`/people/${lane.personId}`, orgQueryValue)}
       >
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-semibold text-sm">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-semibold text-label-lg">
           {initialsForName(personName)}
         </span>
         <span className="min-w-0">
-          <span className="block truncate font-medium text-sm">
+          <span className="block truncate font-medium text-label-lg">
             {personName}
           </span>
-          <span className="block truncate text-muted-foreground text-xs">
+          <span className="block truncate text-label-md text-muted-foreground">
             {lane.segments.length > 0
               ? personMeta || "Availability recorded"
               : "No recorded unavailability"}
@@ -511,7 +511,7 @@ function TimelineEventButton({
       aria-label={`${event.displayName}: ${label}, ${calendarEventSourceLabel(event)}${treatment ? `, ${treatment}` : ""}`}
       aria-pressed={selected}
       className={cn(
-        "relative z-[1] m-1 flex min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-left font-medium text-xs outline-none ring-1 transition-[filter,transform,box-shadow] hover:brightness-95 focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring active:translate-y-px motion-safe:duration-200 motion-safe:ease-out",
+        "relative z-[1] m-1 flex min-w-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-left font-medium text-label-md outline-none ring-1 transition-[filter,transform,box-shadow] hover:brightness-95 focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring active:translate-y-px motion-safe:duration-200 motion-safe:ease-out",
         statusToneClasses[tone],
         event.renderTreatment === "dashed" && "border border-dashed opacity-90",
         event.renderTreatment === "draft" && "opacity-70",
@@ -550,7 +550,7 @@ function RunwayDetail({
 }) {
   if (!event) {
     return (
-      <div className="calendar-runway-detail mx-3 mb-3 flex min-h-20 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 py-3 text-muted-foreground text-sm">
+      <div className="calendar-runway-detail mx-3 mb-3 flex min-h-20 items-center gap-3 rounded-2xl bg-surface-container-lowest px-4 py-3 text-label-lg text-muted-foreground">
         <ArrowUpRightIcon aria-hidden="true" className="size-4 shrink-0" />
         Select an entry to see its dates, status, source and contactability.
       </div>
@@ -591,7 +591,7 @@ function RunwayDetail({
             <p className="mt-1 text-body-sm text-muted-foreground">
               {formatEventDateRange(event)}
             </p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-label-lg">
               <DetailDatum
                 label="Status"
                 value={approvalStatusLabel(event.approvalStatus) ?? "Unknown"}
@@ -619,7 +619,7 @@ function RunwayDetail({
               </Link>
             </Button>
           ) : (
-            <span className="rounded-xl bg-surface-container-low px-3 py-2 text-muted-foreground text-sm">
+            <span className="rounded-xl bg-surface-container-low px-3 py-2 text-label-lg text-muted-foreground">
               View-only access
             </span>
           )}
@@ -637,7 +637,7 @@ function RunwayDetail({
       {event.xeroWriteError ? (
         <p
           className={cn(
-            "mt-4 rounded-xl px-3 py-2 text-sm",
+            "mt-4 rounded-xl px-3 py-2 text-body-sm",
             statusToneClasses.failed
           )}
         >
@@ -689,10 +689,10 @@ function MobileRunway({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold text-base">
+                <p className="font-semibold text-body-md">
                   {formatFullDay(day.date)}
                 </p>
-                <p className="mt-0.5 text-muted-foreground text-sm">
+                <p className="mt-0.5 text-body-sm text-muted-foreground">
                   {summary.distinctPeopleCount === 0
                     ? "No recorded unavailability"
                     : `${summary.distinctPeopleCount} ${summary.distinctPeopleCount === 1 ? "person" : "people"} affected`}
@@ -722,7 +722,7 @@ function MobileRunway({
               />
             </span>
             {day.publicHolidays.length > 0 ? (
-              <p className="mt-3 rounded-xl bg-warning-container px-3 py-2 text-on-warning-container text-sm">
+              <p className="mt-3 rounded-xl bg-warning-container px-3 py-2 text-body-sm text-on-warning-container">
                 {day.publicHolidays.map(({ name }) => name).join(", ")}
               </p>
             ) : null}
@@ -773,10 +773,10 @@ function MobileEventButton({
     >
       <SourceIcon aria-hidden="true" className="size-4 shrink-0" />
       <span className="min-w-0">
-        <span className="block truncate font-medium text-sm">
+        <span className="block truncate font-medium text-label-lg">
           {event.displayName}
         </span>
-        <span className="block truncate text-xs opacity-75">
+        <span className="block truncate text-label-md opacity-75">
           {label} · {calendarEventSourceLabel(event)}
         </span>
       </span>
@@ -786,7 +786,7 @@ function MobileEventButton({
 
 function RunwayEmptyState() {
   return (
-    <div className="flex min-h-40 items-center justify-center rounded-2xl bg-surface-container-lowest p-6 text-center text-muted-foreground text-sm">
+    <div className="flex min-h-40 items-center justify-center rounded-2xl bg-surface-container-lowest p-6 text-center text-label-lg text-muted-foreground">
       No people match this calendar scope.
     </div>
   );

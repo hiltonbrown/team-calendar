@@ -180,7 +180,7 @@ export const FeedsClient = ({
         <CardContent className="space-y-3">
           {feeds.map((feed) => (
             <div
-              className="flex items-center justify-between rounded-xl bg-muted/30 p-3 text-sm"
+              className="flex items-center justify-between rounded-xl bg-muted/30 p-3 text-label-lg"
               key={feed.id}
             >
               <div>

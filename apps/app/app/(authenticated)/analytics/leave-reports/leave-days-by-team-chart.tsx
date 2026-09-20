@@ -29,7 +29,7 @@ export function LeaveDaysByTeamChart({ data }: LeaveDaysByTeamChartProps) {
   const [leadingTeam] = data;
   return (
     <div className="space-y-5">
-      <p className="text-muted-foreground text-sm">
+      <p className="text-body-sm text-muted-foreground">
         {leadingTeam
           ? `${leadingTeam.teamName} has the most approved leave in this view at ${leadingTeam.days.toLocaleString("en-AU")} days across ${leadingTeam.peopleCount.toLocaleString("en-AU")} people.`
           : "No team leave values are available."}
@@ -71,7 +71,7 @@ export function LeaveDaysByTeamChart({ data }: LeaveDaysByTeamChartProps) {
         </BarChart>
       </ChartContainer>
       <div className="overflow-x-auto rounded-2xl bg-muted p-2">
-        <table className="w-full min-w-[32rem] text-sm">
+        <table className="w-full min-w-[32rem] text-label-lg">
           <caption className="p-3 text-left font-medium">
             Exact approved leave values by team
           </caption>

@@ -1314,3 +1314,80 @@ No JS errors, no horizontal overflow. The only failing request is
 expected to 404 outside Vercel.
 Visual review: homepage hero (sync diagram draws correctly), homepage full page,
 pricing cards before and after the nesting fix.
+
+---
+
+## Product app unslop pass (apps/app)
+
+Brief: remove generic AI defaults from every page of the authenticated app and
+restore intentional craft. Reference: DESIGN.md.
+
+### What was actually wrong
+
+The app was already well disciplined at the level this brief usually finds
+problems: three raw palette colours in 245 components, no purple gradients, no
+cream, sane z-index, no bounce easing, no nested Card components, every skeleton
+matching its final structure. The slop was one systemic problem and a short tail.
+
+**A two-speed type system.** The design system publishes a semantic scale that
+names intent: `text-body-*` at 1.6 line height for prose, `text-label-*` at 1.4
+for labels, `text-title-*` and `text-headline-*` for structure. The dashboard
+used it. The other thirty-odd screens did not: 397 declarations of Tailwind's
+generic `text-sm` and `text-xs`, plus five one-off arbitrary sizes, against 85
+semantic ones. Hierarchy was expressed as raw size rather than role, and body
+copy across the app sat at 1.43 leading instead of the specified 1.6. This is
+the "undifferentiated text, flat hierarchy" that DESIGN.md names as the Notion
+anti-reference.
+
+**Hero-metric card grids, nested inside cards.** `MetricTile` rendered a filled,
+rounded, padded panel inside `DashboardCardShell`'s `CardContent`, six to a
+grid, with four of the six tinted neutral. `SummaryFact` on both analytics pages
+did the same thing inside a tinted band. DESIGN.md prohibits both by name.
+
+The tail: `tracking-widest` (0.1em) on 21 uppercase eyebrows against a 0.05em
+spec cap; 29 `rounded-[20px]`/`rounded-[14px]` escapes for tokens that exist;
+`backdrop-blur` on the sticky header, which the Frost Means Floating Rule
+reserves for surfaces that float, and which had no reduced-transparency
+fallback; `bg-emerald-500/10` on a reconciliation result; two `shadow-lg` where
+`--elev-popover` and `--elev-toast` are defined; a `hover:scale-110` on a status
+marker dot; seven skeleton pulses that looped forever under reduced motion.
+
+### Changes
+
+- [x] Migrated all 435 type declarations onto the product scale, classified by
+      the owning element: prose to `body-*`, labels and controls to `label-*`,
+      headings to `title-*`/`headline-*`, and the two exact matches (0.6875rem,
+      2.25rem) onto `label-sm` and `display-sm`. Zero generic sizes remain.
+- [x] `MetricTile` is a stat, not a card: no fill, tone carried by the value's
+      colour plus a labelled status dot.
+- [x] `SummaryFact` unnested on both analytics pages; the page header there is
+      type-led instead of a second identical tinted slab.
+- [x] `tracking-widest` to `tracking-wider`; arbitrary radii to `rounded-xl` and
+      `rounded-md`.
+- [x] Sticky header: frost to an opaque surface with `--elev-sticky`.
+- [x] Emerald to the sage secondary container; `shadow-lg` to the named
+      elevation tokens; hover-scale removed.
+- [x] Skeleton pulses stop under `prefers-reduced-motion`.
+
+Left deliberately: the in-flight button spinners keep animating under reduced
+motion. They signal work in progress and the buttons already carry a stable verb
+and `aria-busy`, so freezing them would remove signal rather than add calm.
+
+Net: 81 files, 594 insertions, 505 deletions.
+
+### Verification
+
+PASS: `bun run check`, `bun run typecheck` (19 tasks), `turbo test --filter=app`
+(110 files, 559 tests), `turbo build --filter=app`.
+PASS: all eleven semantic utilities confirmed present in the compiled CSS with
+the sizes and line heights DESIGN.md specifies, so nothing was silently dropped.
+PASS: zero elements carry conflicting type classes after the migration.
+PASS: measured contrast on the rebuilt metric treatment in both themes; lowest
+is 6.43:1 against a 4.5:1 requirement.
+
+NOT VERIFIED in a browser: the authenticated routes need a live Clerk instance,
+which this environment does not have; every route redirects to `/sign-in` and
+Clerk rejects placeholder keys. Visual review was done by rendering the real
+components against the compiled stylesheet in Chromium (`MetricTile` in its two
+dashboard cards, the settings section header, people status and provenance
+chips, the empty state), light and dark.

@@ -211,10 +211,10 @@ export function AlternativeContactsPanel({
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h3 className="font-semibold text-foreground text-sm">
+          <h3 className="font-semibold text-foreground text-title-sm">
             Alternative contacts
           </h3>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             People to contact when this person is unavailable.
           </p>
         </div>
@@ -227,7 +227,7 @@ export function AlternativeContactsPanel({
       </div>
 
       {error ? (
-        <div className="rounded-2xl bg-destructive/10 p-3 text-destructive text-sm">
+        <div className="rounded-2xl bg-destructive/10 p-3 text-destructive text-label-lg">
           {error}
         </div>
       ) : null}
@@ -318,7 +318,7 @@ export function AlternativeContactsPanel({
       ) : null}
 
       {contacts.length === 0 ? (
-        <div className="rounded-2xl bg-surface-container-high p-6 text-muted-foreground text-sm">
+        <div className="rounded-2xl bg-surface-container-high p-6 text-label-lg text-muted-foreground">
           No alternative contacts.
           {canManage ? (
             <button
@@ -354,19 +354,19 @@ export function AlternativeContactsPanel({
                     {canManage ? (
                       <GripVerticalIcon className="size-4 text-muted-foreground" />
                     ) : null}
-                    <p className="font-medium text-sm">{contact.name}</p>
+                    <p className="font-medium text-body-sm">{contact.name}</p>
                   </div>
                   {contact.role ? (
-                    <p className="text-muted-foreground text-xs">
+                    <p className="text-label-md text-muted-foreground">
                       {contact.role}
                     </p>
                   ) : null}
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs">
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-label-md text-muted-foreground">
                     {contact.email ? <span>{contact.email}</span> : null}
                     {contact.phone ? <span>{contact.phone}</span> : null}
                   </div>
                   {contact.notes ? (
-                    <p className="mt-2 text-muted-foreground text-sm">
+                    <p className="mt-2 text-body-sm text-muted-foreground">
                       {contact.notes}
                     </p>
                   ) : null}
@@ -417,7 +417,7 @@ export function AlternativeContactsPanel({
                 ) : null}
               </div>
               {deleteTarget?.id === contact.id && (
-                <div className="mt-3 rounded-2xl bg-destructive/10 p-3 text-sm">
+                <div className="mt-3 rounded-2xl bg-destructive/10 p-3 text-label-lg">
                   <p className="text-destructive">
                     Delete {contact.name}? This cannot be undone.
                   </p>
@@ -461,7 +461,7 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <Label className="mb-2 block text-muted-foreground text-xs uppercase tracking-widest">
+      <Label className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
       </Label>
       {children}

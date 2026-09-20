@@ -36,7 +36,7 @@ export function TeamTodayCard({ state, orgQueryValue }: TeamTodayCardProps) {
             )}
             title="Needs attention today"
           />
-          <div className="grid grid-cols-2 gap-2 text-body-sm sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
             <MetricTile
               label="On leave"
               value={state.data.peopleOnLeaveCount}

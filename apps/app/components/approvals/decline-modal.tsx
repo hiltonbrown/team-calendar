@@ -121,7 +121,7 @@ export function DeclineModal({
       <div className="space-y-5">
         <SummaryBlock record={record} />
         <div className="space-y-2">
-          <label className="font-medium text-sm" htmlFor="decline-reason">
+          <label className="font-medium text-label-lg" htmlFor="decline-reason">
             Reason
           </label>
           <Textarea
@@ -132,11 +132,11 @@ export function DeclineModal({
             placeholder="Explain why this is being declined so the employee can adjust their plans."
             value={reason}
           />
-          <p className="text-muted-foreground text-xs">
+          <p className="text-label-md text-muted-foreground">
             {trimmedReason.length}/1000 characters
           </p>
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           The reason will be visible to the employee and sent to Xero Payroll.
         </p>
         {message ? (

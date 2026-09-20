@@ -45,12 +45,12 @@ export const HolidaysClient = ({
       />
 
       <div className="flex flex-col gap-4 rounded-2xl bg-muted p-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm">
-          <span className="font-semibold text-lg tabular-nums">
+        <p className="text-body-sm">
+          <span className="font-semibold text-body-lg tabular-nums">
             {importedCount}
           </span>{" "}
           imported and{" "}
-          <span className="font-semibold text-lg tabular-nums">
+          <span className="font-semibold text-body-lg tabular-nums">
             {customCount}
           </span>{" "}
           custom holidays are recorded for this organisation.
@@ -70,7 +70,7 @@ export const HolidaysClient = ({
           {upcoming.length > 0 ? (
             upcoming.map((holiday) => (
               <div
-                className="rounded-xl bg-muted/30 p-3 text-sm"
+                className="rounded-xl bg-muted/30 p-3 text-label-lg"
                 key={holiday.name + holiday.holiday_date.toISOString()}
               >
                 {holiday.name} · {holiday.country_code} ·{" "}
@@ -78,7 +78,7 @@ export const HolidaysClient = ({
               </div>
             ))
           ) : (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               No upcoming holidays are recorded. Open Public Holidays to refresh
               the source or add a custom date.
             </p>

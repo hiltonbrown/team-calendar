@@ -15,8 +15,8 @@ export const SettingsComingSoon = ({ feature }: SettingsComingSoonProps) => (
         />
       </div>
       <div>
-        <p className="font-medium text-sm">{feature}</p>
-        <p className="text-muted-foreground text-xs">
+        <p className="font-medium text-body-sm">{feature}</p>
+        <p className="text-label-md text-muted-foreground">
           Not available in the manual MVP
         </p>
       </div>

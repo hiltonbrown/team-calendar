@@ -88,7 +88,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                   </svg>
                 </div>
                 {sidebar.open ? (
-                  <span className="font-semibold text-[0.9375rem] tracking-[-0.01em]">
+                  <span className="font-semibold text-title-md">
                     {brandNameDisplay}
                   </span>
                 ) : null}
@@ -120,7 +120,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                               className="h-4 w-4 shrink-0"
                               strokeWidth={1.75}
                             />
-                            <span className="font-medium text-[0.8125rem]">
+                            <span className="font-medium text-label-lg">
                               {item.title}
                             </span>
                           </Link>
@@ -147,7 +147,7 @@ export const GlobalSidebar = ({ children }: GlobalSidebarProperties) => {
                     className="h-4 w-4 shrink-0"
                     strokeWidth={1.75}
                   />
-                  <span className="font-medium text-[0.8125rem]">
+                  <span className="font-medium text-label-lg">
                     {settingsNavItem.title}
                   </span>
                 </Link>

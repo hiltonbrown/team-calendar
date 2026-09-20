@@ -95,7 +95,7 @@ export function CalendarToolbar({
     router.push(withOrg(`/plans/new?${params.toString()}`, orgQueryValue));
   };
   return (
-    <div className="rounded-[20px] bg-muted p-4">
+    <div className="rounded-xl bg-muted p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -169,7 +169,7 @@ export function CalendarToolbar({
       </div>
       <ActiveFilterSummary labels={activeFilters} />
       <Button
-        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 shadow-lg md:hidden"
+        className="fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 shadow-[var(--elev-toast)] md:hidden"
         onClick={addRecord}
         type="button"
       >
@@ -230,7 +230,7 @@ function ScopeSelect({
 
 function ActiveFilterSummary({ labels }: { labels: ActiveFilterLabel[] }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-label-lg">
       <span className="text-muted-foreground">Currently showing</span>
       {labels.map(({ label, value }) => (
         <span
@@ -498,10 +498,14 @@ function FilterSelect({
   value: string;
 }) {
   return (
-    <div className="grid gap-2 text-sm">
-      <span className="font-medium text-muted-foreground text-xs">{label}</span>
+    <div className="grid gap-2 text-label-lg">
+      <span className="font-medium text-label-md text-muted-foreground">
+        {label}
+      </span>
       {description ? (
-        <span className="text-muted-foreground text-xs">{description}</span>
+        <span className="text-label-md text-muted-foreground">
+          {description}
+        </span>
       ) : null}
       <Select onValueChange={onValueChange} value={value}>
         <SelectTrigger aria-label={label}>

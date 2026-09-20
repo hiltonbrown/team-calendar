@@ -5,7 +5,7 @@ export const LoadingState = () => (
     role="status"
   >
     <p className="sr-only">Loading workspace</p>
-    <div className="h-24 animate-pulse rounded-2xl bg-muted" />
+    <div className="h-24 animate-pulse rounded-2xl bg-muted motion-reduce:animate-none" />
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       {["one", "two", "three", "four", "five", "six"].map((item) => (
         <div className="space-y-3 rounded-2xl bg-muted p-4" key={item}>

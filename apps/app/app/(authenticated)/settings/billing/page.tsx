@@ -95,27 +95,27 @@ const BillingPage = async ({ searchParams }: BillingPageProps) => {
           usage: summary.value.usage,
         }}
       />
-      <section className="rounded-[20px] bg-muted p-6">
-        <h2 className="font-semibold text-lg">Activation operations</h2>
+      <section className="rounded-xl bg-muted p-6">
+        <h2 className="font-semibold text-title-lg">Activation operations</h2>
         <p className="mb-4 text-muted-foreground">
           Durable milestones and current failures requiring attention.
         </p>
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
             <dt>Completed milestones</dt>
-            <dd className="font-semibold text-xl">
+            <dd className="font-semibold text-title-lg">
               {Object.values(activation.milestones).filter(Boolean).length}/6
             </dd>
           </div>
           <div>
             <dt>Sync and Xero failures</dt>
-            <dd className="font-semibold text-xl">
+            <dd className="font-semibold text-title-lg">
               {activation.failures.syncRecords + activation.failures.xeroWrites}
             </dd>
           </div>
           <div>
             <dt>Stripe delivery failures</dt>
-            <dd className="font-semibold text-xl">
+            <dd className="font-semibold text-title-lg">
               {activation.failures.stripeDeliveries}
             </dd>
           </div>

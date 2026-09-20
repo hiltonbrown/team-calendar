@@ -134,7 +134,7 @@ export function FeedDetail({
       {message && !confirmation ? (
         <p
           aria-live={message.tone === "error" ? "assertive" : "polite"}
-          className="rounded-[20px] bg-muted p-3 text-sm"
+          className="rounded-xl bg-muted p-3 text-body-sm"
           role={message.tone === "error" ? "alert" : "status"}
         >
           {message.text}
@@ -151,7 +151,7 @@ export function FeedDetail({
           {detail.name}
         </h2>
         {detail.description ? (
-          <p className="mt-1 text-muted-foreground text-sm">
+          <p className="mt-1 text-body-sm text-muted-foreground">
             {detail.description}
           </p>
         ) : null}
@@ -175,12 +175,12 @@ export function FeedDetail({
         }
       />
 
-      <section className="rounded-[20px] bg-muted p-5">
+      <section className="rounded-xl bg-muted p-5">
         <h3 className="font-semibold text-title-md">Preview and visibility</h3>
         <PreviewTabs previews={previews} />
       </section>
 
-      <details className="rounded-[20px] bg-muted p-5 text-sm">
+      <details className="rounded-xl bg-muted p-5 text-label-lg">
         <summary className="cursor-pointer font-semibold">
           Scope and privacy
         </summary>
@@ -208,7 +208,7 @@ export function FeedDetail({
       </details>
 
       {canManage ? (
-        <details className="rounded-[20px] bg-muted p-5 text-sm">
+        <details className="rounded-xl bg-muted p-5 text-label-lg">
           <summary className="cursor-pointer font-semibold">
             Token history and lifecycle
           </summary>
@@ -216,7 +216,7 @@ export function FeedDetail({
             <ul className="mt-4 space-y-2">
               {detail.tokenHistory.map((token) => (
                 <li
-                  className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                  className="flex flex-wrap items-center justify-between gap-2 text-label-md"
                   key={token.id}
                 >
                   <span className="font-mono">••••{token.id.slice(-4)}</span>
@@ -232,7 +232,7 @@ export function FeedDetail({
           ) : (
             <p className="mt-4 text-muted-foreground">No prior tokens.</p>
           )}
-          <p className="mt-4 text-muted-foreground text-xs">
+          <p className="mt-4 text-label-md text-muted-foreground">
             {detail.activeTokenHint
               ? `Active token created ${formatDate(detail.activeTokenHint.createdAt)}${detail.activeTokenHint.lastUsedAt ? `, last used ${formatDate(detail.activeTokenHint.lastUsedAt)}` : ", never used"}`
               : "This feed has no active token."}
@@ -329,7 +329,7 @@ function FeedConfirmationDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           {errorMessage ? (
-            <p className="text-destructive text-sm" role="alert">
+            <p className="text-body-sm text-destructive" role="alert">
               {errorMessage}
             </p>
           ) : null}
@@ -447,18 +447,18 @@ function PreviewTabs({
       {modes.map((mode) => (
         <TabsContent className="mt-4 space-y-3" key={mode} value={mode}>
           {(previews[mode] ?? []).length === 0 ? (
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               No upcoming events. Your feed will update automatically when leave
               or availability is added.
             </p>
           ) : (
             previews[mode]?.map((event) => (
               <div
-                className="rounded-2xl bg-background p-3 text-sm"
+                className="rounded-2xl bg-background p-3 text-label-lg"
                 key={event.sourceRecordId}
               >
                 <div className="font-medium">{event.summary}</div>
-                <div className="mt-1 text-muted-foreground text-xs">
+                <div className="mt-1 text-label-md text-muted-foreground">
                   {formatDate(new Date(event.startsAt))} to{" "}
                   {formatDate(new Date(event.endsAt))}
                 </div>

@@ -60,12 +60,12 @@ export function RequestInfoModal({
       title="Request more information"
     >
       <div className="space-y-5">
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           {record.employeeName}, {getAvailabilityRecordLabel(record.recordType)}
           , {formatDateRange(record.startsAt, record.endsAt)}
         </p>
         <div className="space-y-2">
-          <label className="font-medium text-sm" htmlFor="info-question">
+          <label className="font-medium text-label-lg" htmlFor="info-question">
             Question
           </label>
           <Textarea
@@ -75,16 +75,16 @@ export function RequestInfoModal({
             onChange={(event) => setQuestion(event.target.value)}
             value={question}
           />
-          <p className="text-muted-foreground text-xs">
+          <p className="text-label-md text-muted-foreground">
             {trimmedQuestion.length}/1000 characters
           </p>
         </div>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           The employee will receive a notification with your question. They can
           withdraw and edit their request if needed.
         </p>
         {message ? (
-          <p className="text-destructive text-sm" role="alert">
+          <p className="text-body-sm text-destructive" role="alert">
             {message}
           </p>
         ) : null}

@@ -76,7 +76,7 @@ export function CalendarCreateLauncher({
     <button
       aria-label={accessibleLabel}
       className={cn(
-        "inline-flex pointer-coarse:min-h-11 items-center justify-center gap-1 rounded-lg border border-border border-dashed px-2 py-1 font-medium text-muted-foreground text-xs outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
+        "inline-flex pointer-coarse:min-h-11 items-center justify-center gap-1 rounded-lg border border-border border-dashed px-2 py-1 font-medium text-label-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring",
         className
       )}
       onClick={navigate}

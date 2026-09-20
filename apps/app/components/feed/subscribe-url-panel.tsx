@@ -14,8 +14,8 @@ export function SubscribeUrlPanel({
 }) {
   return (
     <div className="rounded-2xl bg-primary-container p-4 text-on-primary-container">
-      <div className="font-semibold text-sm">Feed created</div>
-      <p className="mt-1 text-sm">
+      <div className="font-semibold text-label-lg">Feed created</div>
+      <p className="mt-1 text-body-sm">
         Copy this URL into your calendar app. You can return to the feed at any
         time to copy it again.
       </p>

@@ -101,7 +101,7 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
       <Header organisationId={organisationId} page="Sync health" />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
         <div>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             Monitor Xero data flow and reconciliation
           </p>
         </div>

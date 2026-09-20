@@ -260,7 +260,10 @@ export function LeaveApprovalsClient({
       <QueueSummary summary={summary} />
 
       <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 md:flex-row md:items-center">
-        <label className="grid gap-1 text-sm" htmlFor="approvals-status-filter">
+        <label
+          className="grid gap-1 text-label-lg"
+          htmlFor="approvals-status-filter"
+        >
           <span className="font-medium">Status</span>
           <Select
             onValueChange={(value) =>
@@ -290,7 +293,7 @@ export function LeaveApprovalsClient({
             </SelectContent>
           </Select>
         </label>
-        <label className="mt-5 flex items-center gap-2 text-sm">
+        <label className="mt-5 flex items-center gap-2 text-label-lg">
           <input
             checked={filters.includeFailed}
             onChange={(event) =>
@@ -311,7 +314,7 @@ export function LeaveApprovalsClient({
         />
       ) : (
         <div className="rounded-2xl bg-background">
-          <p className="flex flex-wrap items-center gap-1.5 px-4 pt-3 text-muted-foreground text-xs">
+          <p className="flex flex-wrap items-center gap-1.5 px-4 pt-3 text-label-md text-muted-foreground">
             <span>Tab to a row, then</span>
             <Kbd>A</Kbd>
             <span>approve</span>
@@ -322,7 +325,7 @@ export function LeaveApprovalsClient({
           </p>
           <table aria-label="Leave approval queue" className="block w-full">
             <thead className="hidden lg:block">
-              <tr className="hidden grid-cols-[1.2fr_0.8fr_1fr_1.1fr_0.8fr_auto] gap-4 px-4 py-3 text-muted-foreground text-xs lg:grid">
+              <tr className="hidden grid-cols-[1.2fr_0.8fr_1fr_1.1fr_0.8fr_auto] gap-4 px-4 py-3 text-label-md text-muted-foreground lg:grid">
                 <th className="text-left font-normal" scope="col">
                   Person
                 </th>
@@ -379,7 +382,7 @@ export function LeaveApprovalsClient({
                       </QueueDatum>
                       <QueueDatum label="Dates">
                         {formatDateRange(record.startsAt, record.endsAt)}
-                        <span className="block text-muted-foreground text-xs">
+                        <span className="block text-label-md text-muted-foreground">
                           {record.durationWorkingDays === null
                             ? "Duration unavailable"
                             : `${record.durationWorkingDays} working days`}
@@ -417,7 +420,7 @@ export function LeaveApprovalsClient({
                         {isRecordPending ? (
                           <span
                             aria-live="polite"
-                            className="text-muted-foreground text-xs"
+                            className="text-label-md text-muted-foreground"
                             role="status"
                           >
                             Updating {name}…
@@ -495,28 +498,30 @@ function QueueSummary({ summary }: { summary: ApprovalSummaryCounts }) {
   return (
     <section
       aria-labelledby="approval-queue-summary"
-      className="flex flex-col gap-4 rounded-[20px] bg-muted p-5 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-4 rounded-xl bg-muted p-5 sm:flex-row sm:items-center sm:justify-between"
     >
       <div>
-        <h3 className="font-semibold text-sm" id="approval-queue-summary">
+        <h3 className="font-semibold text-title-sm" id="approval-queue-summary">
           Approval queue
         </h3>
-        <p className="mt-1 font-semibold text-3xl tabular-nums">
+        <p className="mt-1 font-semibold text-headline-md tabular-nums">
           {summary.pending}
-          <span className="ml-2 font-normal text-muted-foreground text-sm">
+          <span className="ml-2 font-normal text-label-lg text-muted-foreground">
             pending
           </span>
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         {summary.failedSync > 0 ? (
-          <span className="rounded-xl bg-error-container px-3 py-2 font-medium text-on-error-container text-sm">
+          <span className="rounded-xl bg-error-container px-3 py-2 font-medium text-label-lg text-on-error-container">
             {summary.failedSync} failed sync
           </span>
         ) : (
-          <span className="text-muted-foreground text-sm">No failed syncs</span>
+          <span className="text-label-lg text-muted-foreground">
+            No failed syncs
+          </span>
         )}
-        <details className="text-sm">
+        <details className="text-label-lg">
           <summary className="cursor-pointer rounded-xl px-3 py-2 font-medium focus-visible:outline-[3px] focus-visible:outline-ring">
             This month
           </summary>
@@ -538,8 +543,8 @@ function QueueDatum({
   label: string;
 }) {
   return (
-    <td className="block min-w-0 text-sm">
-      <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+    <td className="block min-w-0 text-label-lg">
+      <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
         {label}
       </span>
       {children}
@@ -556,7 +561,7 @@ function PersonCell({ record }: { record: ApprovalItem }) {
       </Avatar>
       <div>
         <div className="font-medium">{name}</div>
-        <div className="text-muted-foreground text-xs">
+        <div className="text-label-md text-muted-foreground">
           {record.person.teamName ?? record.person.email}
         </div>
       </div>
@@ -583,7 +588,7 @@ function ActionButtons({
 }) {
   if (record.mutedActionNote) {
     return (
-      <span className="max-w-48 text-muted-foreground text-xs">
+      <span className="max-w-48 text-label-md text-muted-foreground">
         {record.mutedActionNote}
       </span>
     );
@@ -717,7 +722,7 @@ function DetailPanel({
           }
         />
       ) : null}
-      <div className="grid gap-2 text-sm md:grid-cols-3">
+      <div className="grid gap-2 text-label-lg md:grid-cols-3">
         <DetailItem label="Employee notes">
           {record.notesInternal?.trim() || "No notes provided."}
         </DetailItem>
@@ -770,7 +775,7 @@ function DetailItem({
 }) {
   return (
     <div>
-      <div className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
+      <div className="font-medium text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
       </div>
       <div>{children}</div>

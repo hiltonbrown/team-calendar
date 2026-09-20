@@ -38,14 +38,16 @@ export function CalendarEventPopover({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="font-semibold text-foreground">{event.displayName}</p>
-            <p className="text-muted-foreground text-sm">{recordTypeLabel}</p>
+            <p className="text-body-sm text-muted-foreground">
+              {recordTypeLabel}
+            </p>
           </div>
           {event.renderTreatment === "failed" && (
             <AlertTriangleIcon className="size-4 text-destructive" />
           )}
         </div>
 
-        <dl className="mt-4 grid gap-3 text-sm">
+        <dl className="mt-4 grid gap-3 text-label-lg">
           <Detail label="Status" value={statusLabel(event.approvalStatus)} />
           <Detail label="Source" value={calendarEventSourceLabel(event)} />
           <Detail label="When" value={formatEventDateRange(event)} />
@@ -62,7 +64,7 @@ export function CalendarEventPopover({
 
         {event.xeroWriteError ? (
           <div
-            className={`mt-4 rounded-2xl p-3 text-sm ${statusToneClasses.failed}`}
+            className={`mt-4 rounded-2xl p-3 text-label-lg ${statusToneClasses.failed}`}
           >
             {event.xeroWriteError}
           </div>
@@ -76,7 +78,7 @@ export function CalendarEventPopover({
               </Link>
             </Button>
           ) : (
-            <span className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-muted-foreground text-sm">
+            <span className="inline-flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-label-lg text-muted-foreground">
               <XIcon className="size-3" />
               View-only access
             </span>
@@ -90,7 +92,7 @@ export function CalendarEventPopover({
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      <dt className="font-medium text-label-md text-muted-foreground uppercase tracking-wide">
         {label}
       </dt>
       <dd className="mt-0.5 text-foreground">{value}</dd>

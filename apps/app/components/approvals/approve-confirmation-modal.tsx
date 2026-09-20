@@ -97,7 +97,7 @@ export function ApproveConfirmationModal({
     >
       <div className="space-y-5">
         <SummaryBlock record={record} />
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           This will send approval to Xero Payroll and notify the employee.
         </p>
         {message ? (
@@ -154,7 +154,7 @@ export function ApproveConfirmationModal({
 
 export function SummaryBlock({ record }: { record: ApprovalModalRecord }) {
   return (
-    <div className="rounded-2xl bg-muted p-4 text-sm">
+    <div className="rounded-2xl bg-muted p-4 text-label-lg">
       <dl className="grid gap-3">
         <SummaryRow label="Employee">{record.employeeName}</SummaryRow>
         <SummaryRow label="Leave type">
@@ -200,7 +200,7 @@ function SummaryRow({
 }) {
   return (
     <div className="grid gap-1">
-      <dt className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
+      <dt className="font-medium text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
       </dt>
       <dd className="text-foreground">{children}</dd>

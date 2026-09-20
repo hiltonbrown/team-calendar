@@ -37,10 +37,10 @@ export function CalendarScanPanel({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-base" id="today-in-view-title">
+          <h2 className="font-semibold text-title-md" id="today-in-view-title">
             {scanTitle(day)}
           </h2>
-          <p className="mt-1 text-muted-foreground text-sm">
+          <p className="mt-1 text-body-sm text-muted-foreground">
             {items.length === 0
               ? "No one is unavailable"
               : `${items.length} ${items.length === 1 ? "person is" : "people are"} unavailable`}
@@ -67,7 +67,7 @@ export function CalendarScanPanel({
 
       {remainingCount > 0 ? (
         <Link
-          className="mt-4 block font-medium text-primary text-sm hover:underline"
+          className="mt-4 block font-medium text-label-lg text-primary hover:underline"
           href={dayHref}
         >
           View {remainingCount} more{" "}
@@ -86,8 +86,10 @@ function ScanItem({ item }: { item: AvailabilityStatusItem }) {
         className={`mt-1.5 size-2 shrink-0 rounded-full ${toneClass(item.tone)}`}
       />
       <span className="min-w-0">
-        <span className="block truncate font-medium text-sm">{item.name}</span>
-        <span className="block truncate text-muted-foreground text-xs">
+        <span className="block truncate font-medium text-label-lg">
+          {item.name}
+        </span>
+        <span className="block truncate text-label-md text-muted-foreground">
           {item.statusLabel}
         </span>
       </span>

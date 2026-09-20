@@ -209,7 +209,10 @@ export function NewHolidayModal({
               />
             ) : null}
 
-            <div aria-live="polite" className="rounded-xl bg-muted p-4 text-sm">
+            <div
+              aria-live="polite"
+              className="rounded-xl bg-muted p-4 text-label-lg"
+            >
               <span className="font-medium">Scope preview: </span>
               {scopePreview}
             </div>

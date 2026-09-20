@@ -93,10 +93,10 @@ export function AnalyticsFilters({
   };
 
   return (
-    <div className="flex flex-wrap items-end gap-4 rounded-[20px] bg-muted p-4">
+    <div className="flex flex-wrap items-end gap-4 rounded-xl bg-muted p-4">
       <div className="flex flex-col gap-1.5">
         <Label
-          className="text-muted-foreground text-xs uppercase tracking-widest"
+          className="text-label-md text-muted-foreground uppercase tracking-wider"
           htmlFor="analytics-period"
         >
           Period
@@ -120,7 +120,7 @@ export function AnalyticsFilters({
       {personType ? (
         <div className="flex flex-col gap-1.5">
           <Label
-            className="text-muted-foreground text-xs uppercase tracking-widest"
+            className="text-label-md text-muted-foreground uppercase tracking-wider"
             htmlFor="analytics-person-type"
           >
             People
@@ -149,7 +149,7 @@ export function AnalyticsFilters({
         <>
           <div className="flex flex-col gap-1.5">
             <Label
-              className="text-muted-foreground text-xs"
+              className="text-label-md text-muted-foreground"
               htmlFor="analytics-from"
             >
               From
@@ -167,7 +167,7 @@ export function AnalyticsFilters({
             />
             {errors.start ? (
               <p
-                className="text-destructive text-xs"
+                className="text-destructive text-label-md"
                 id="analytics-from-error"
                 role="alert"
               >
@@ -177,7 +177,7 @@ export function AnalyticsFilters({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label
-              className="text-muted-foreground text-xs"
+              className="text-label-md text-muted-foreground"
               htmlFor="analytics-to"
             >
               To
@@ -193,7 +193,7 @@ export function AnalyticsFilters({
             />
             {errors.end ? (
               <p
-                className="text-destructive text-xs"
+                className="text-destructive text-label-md"
                 id="analytics-to-error"
                 role="alert"
               >

@@ -14,7 +14,7 @@ export function ViewerView() {
       <Card className="rounded-xl">
         <CardContent className="space-y-3 p-6">
           <h3 className="font-semibold">What you can do</h3>
-          <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
+          <ul className="list-inside list-disc space-y-1 text-label-lg text-muted-foreground">
             <li>Ask an admin to create your person profile in People</li>
             <li>Or ask to be invited to a different organisation</li>
           </ul>

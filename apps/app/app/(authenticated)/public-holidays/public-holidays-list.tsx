@@ -300,7 +300,7 @@ export function PublicHolidaysList({
                       isSuppressed && "line-through"
                     )}
                   >
-                    <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                       Date
                     </span>
                     {formatDate(new Date(holiday.holiday_date))}
@@ -311,7 +311,7 @@ export function PublicHolidaysList({
                       isSuppressed && "line-through"
                     )}
                   >
-                    <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                       Day
                     </span>
                     {formatDayOfWeek(new Date(holiday.holiday_date))}
@@ -322,13 +322,13 @@ export function PublicHolidaysList({
                       isSuppressed && "line-through"
                     )}
                   >
-                    <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                       Name
                     </span>
                     {holiday.name}
                   </TableCell>
                   <TableCell className="xl:table-cell xl:p-2">
-                    <span className="mb-1 block text-muted-foreground text-xs xl:hidden">
+                    <span className="mb-1 block text-label-md text-muted-foreground xl:hidden">
                       Type
                     </span>
                     <div className="flex flex-wrap gap-2">
@@ -347,8 +347,10 @@ export function PublicHolidaysList({
                       ) : null}
                     </div>
                   </TableCell>
-                  <TableCell className="whitespace-normal text-muted-foreground text-sm xl:table-cell xl:p-2">
-                    <span className="mb-1 block text-xs xl:hidden">Source</span>
+                  <TableCell className="whitespace-normal text-label-lg text-muted-foreground xl:table-cell xl:p-2">
+                    <span className="mb-1 block text-label-md xl:hidden">
+                      Source
+                    </span>
                     {sourceLabelForHoliday(holiday)}
                   </TableCell>
                   {canManage ? (
@@ -426,8 +428,8 @@ function ManagementActions({
   return (
     <div className="flex flex-col gap-3 rounded-2xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="font-medium text-sm">Holiday administration</p>
-        <p className="mt-1 text-muted-foreground text-sm">
+        <p className="font-medium text-body-sm">Holiday administration</p>
+        <p className="mt-1 text-body-sm text-muted-foreground">
           Refresh {refreshTargets.map((target) => target.label).join(", ")} for
           the selected year, or add a company-specific date.
         </p>
@@ -538,7 +540,7 @@ function FilterBar({
 }) {
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-2xl bg-muted p-4">
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-label-lg">
         <span className="font-medium">Year</span>
         <input
           className="min-h-11 rounded-xl bg-background px-3 py-2"
@@ -551,7 +553,7 @@ function FilterBar({
         />
       </label>
       <label
-        className="flex flex-col gap-1 text-sm"
+        className="flex flex-col gap-1 text-label-lg"
         htmlFor="holiday-location-filter"
       >
         <span className="font-medium">Location</span>
@@ -579,7 +581,7 @@ function FilterBar({
           </SelectContent>
         </Select>
       </label>
-      <label className="flex min-h-11 items-center gap-2 text-sm">
+      <label className="flex min-h-11 items-center gap-2 text-label-lg">
         <input
           checked={filters.includeSuppressed}
           onChange={(event) =>

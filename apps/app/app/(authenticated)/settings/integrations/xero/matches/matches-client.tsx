@@ -50,7 +50,7 @@ export function MatchesClient({ matches, organisationId }: MatchesClientProps) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-2xl bg-muted/30 p-4 text-sm">
+            <div className="rounded-2xl bg-muted/30 p-4 text-label-lg">
               <p className="font-medium">Possible match</p>
               <p className="text-muted-foreground">
                 {match.candidate_person

@@ -38,7 +38,7 @@ export function DismissibleOnboardingPanel({
     <section className="flex flex-col gap-4 rounded-2xl bg-muted p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <h2 className="font-semibold">Continue setup</h2>
-        <p className="mt-1 text-muted-foreground text-sm">
+        <p className="mt-1 text-body-sm text-muted-foreground">
           {onboarding.completedRequiredCount} of {onboarding.requiredCount}{" "}
           required steps complete
           {nextStep ? `, next: ${nextStep.title}.` : "."}

@@ -12,8 +12,8 @@ export function SettingSaveStatus({
       aria-live="polite"
       className={
         state === "error"
-          ? "min-h-5 text-destructive text-xs"
-          : "min-h-5 text-muted-foreground text-xs"
+          ? "min-h-5 text-destructive text-label-md"
+          : "min-h-5 text-label-md text-muted-foreground"
       }
       id={id}
     >

@@ -32,7 +32,7 @@ export function CalendarEventChip({
       <button
         aria-label={accessibleLabel}
         className={cn(
-          "flex pointer-coarse:min-h-11 w-full min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-left text-xs ring-1 transition hover:brightness-95",
+          "flex pointer-coarse:min-h-11 w-full min-w-0 items-center gap-1.5 rounded-xl px-2 py-1 text-left text-label-md ring-1 transition hover:brightness-95",
           style,
           event.renderTreatment === "dashed" &&
             "border border-dashed opacity-85",

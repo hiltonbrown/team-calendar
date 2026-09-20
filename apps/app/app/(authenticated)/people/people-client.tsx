@@ -294,27 +294,27 @@ export function PeopleClient({
       {syncMessage ? (
         <div
           aria-live={syncMessage.tone === "error" ? "assertive" : "polite"}
-          className="rounded-2xl bg-muted px-4 py-3 text-sm"
+          className="rounded-2xl bg-muted px-4 py-3 text-label-lg"
           role={syncMessage.tone === "error" ? "alert" : "status"}
         >
           {syncMessage.text}
         </div>
       ) : null}
       <div className="rounded-2xl bg-muted p-6">
-        <p className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
+        <p className="font-medium text-label-md text-muted-foreground uppercase tracking-wider">
           Directory
         </p>
         <div className="mt-2 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="font-semibold text-3xl text-foreground tracking-tight">
+            <h1 className="font-semibold text-foreground text-headline-md tracking-tight">
               People
             </h1>
-            <p className="mt-2 text-muted-foreground text-sm">
+            <p className="mt-2 text-body-sm text-muted-foreground">
               {totalCount} {totalCount === 1 ? "member" : "members"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <p className="text-muted-foreground text-sm">
+            <p className="text-body-sm text-muted-foreground">
               Profiles, balances and availability status for this organisation.
             </p>
             {canIncludeArchived && hasActiveXeroConnection && xeroTenantId ? (
@@ -369,7 +369,7 @@ export function PeopleClient({
           </div>
         </FilterField>
         <details className="rounded-2xl bg-surface-container-low p-4">
-          <summary className="cursor-pointer font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+          <summary className="cursor-pointer font-medium text-label-lg focus-visible:outline-[3px] focus-visible:outline-ring">
             More filters
             {activeFilterLabels.length > 0
               ? ` (${activeFilterLabels.length} active)`
@@ -458,7 +458,7 @@ export function PeopleClient({
               </Select>
             </FilterField>
             <div className="flex flex-wrap items-center gap-4 lg:col-span-5">
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-label-lg">
                 <input
                   defaultChecked={filters.xeroSyncFailedOnly}
                   name="xeroSyncFailedOnly"
@@ -468,7 +468,7 @@ export function PeopleClient({
                 Xero sync failed only
               </label>
               {canIncludeArchived ? (
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-label-lg">
                   <input
                     defaultChecked={filters.includeArchived}
                     name="includeArchived"
@@ -503,7 +503,7 @@ export function PeopleClient({
         <div className="rounded-2xl bg-muted">
           <table aria-label="People directory" className="block w-full">
             <thead className="hidden lg:block">
-              <tr className="grid grid-cols-[1.4fr_1fr_1fr_1fr_0.9fr_0.8fr] gap-4 px-4 py-3 text-left text-muted-foreground text-xs">
+              <tr className="grid grid-cols-[1.4fr_1fr_1fr_1fr_0.9fr_0.8fr] gap-4 px-4 py-3 text-left text-label-md text-muted-foreground">
                 <th className="font-normal" scope="col">
                   Person
                 </th>
@@ -545,7 +545,7 @@ export function PeopleClient({
                             {person.lastName}
                           </span>
                         </span>
-                        <span className="block break-all text-muted-foreground text-xs">
+                        <span className="block break-all text-label-md text-muted-foreground">
                           {person.email}
                         </span>
                       </span>
@@ -576,7 +576,7 @@ export function PeopleClient({
                       <PeopleProvenanceBadge xeroLinked={person.xeroLinked} />
                       {person.xeroSyncFailedCount > 0 ? (
                         <span
-                          className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-2 py-1 font-medium text-destructive text-xs"
+                          className="inline-flex items-center gap-1 rounded-xl bg-destructive/10 px-2 py-1 font-medium text-destructive text-label-md"
                           title={`${person.xeroSyncFailedCount} failed record${person.xeroSyncFailedCount === 1 ? "" : "s"}`}
                         >
                           <AlertTriangleIcon
@@ -761,7 +761,7 @@ function ReviewDialogBody({
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2Icon className="size-8 animate-spin text-muted-foreground" />
-        <p className="mt-4 text-muted-foreground text-sm">
+        <p className="mt-4 text-body-sm text-muted-foreground">
           Loading member and invitation states...
         </p>
       </div>
@@ -770,7 +770,7 @@ function ReviewDialogBody({
 
   if (error) {
     return (
-      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive text-sm">
+      <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive text-label-lg">
         <div className="flex items-center gap-2 font-medium">
           <AlertCircleIcon className="size-4" />
           <span>Error</span>
@@ -783,12 +783,12 @@ function ReviewDialogBody({
   if (resultData) {
     return (
       <div className="flex flex-col gap-4 py-4">
-        <div className="rounded-xl bg-emerald-500/10 p-4 text-emerald-800 dark:text-emerald-300">
+        <div className="rounded-xl bg-secondary p-4 text-secondary-foreground">
           <div className="flex items-center gap-2 font-semibold">
             <CheckCircle2Icon className="size-5" />
             <span>Reconciliation completed</span>
           </div>
-          <ul className="mt-3 list-inside list-disc space-y-1 text-sm">
+          <ul className="mt-3 list-inside list-disc space-y-1 text-label-lg">
             <li>{resultData.linkedCount} existing accounts linked</li>
             <li>{resultData.succeededCount} invitations sent</li>
             {resultData.failedCount > 0 ? (
@@ -806,7 +806,7 @@ function ReviewDialogBody({
     return (
       <div className="flex flex-col gap-4 py-2">
         <ReviewStatChips reviewData={reviewData} />
-        <div className="rounded-xl bg-muted/60 p-3 text-muted-foreground text-xs">
+        <div className="rounded-xl bg-muted/60 p-3 text-label-md text-muted-foreground">
           Invitations grant the{" "}
           <span className="font-medium text-foreground">viewer</span> role.
           One-to-one email matches will be linked to their Clerk account.
@@ -828,34 +828,34 @@ function ReviewStatChips({
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       <div className="rounded-xl bg-muted p-3 text-center">
-        <p className="font-semibold text-foreground text-lg">
+        <p className="font-semibold text-body-lg text-foreground">
           {reviewData.linkableCount}
         </p>
-        <p className="text-muted-foreground text-xs">Linkable</p>
+        <p className="text-label-md text-muted-foreground">Linkable</p>
       </div>
       <div className="rounded-xl bg-muted p-3 text-center">
-        <p className="font-semibold text-foreground text-lg">
+        <p className="font-semibold text-body-lg text-foreground">
           {reviewData.invitableCount}
         </p>
-        <p className="text-muted-foreground text-xs">Invitable</p>
+        <p className="text-label-md text-muted-foreground">Invitable</p>
       </div>
       <div className="rounded-xl bg-muted p-3 text-center">
-        <p className="font-semibold text-foreground text-lg">
+        <p className="font-semibold text-body-lg text-foreground">
           {reviewData.alreadyInvitedCount}
         </p>
-        <p className="text-muted-foreground text-xs">Invited</p>
+        <p className="text-label-md text-muted-foreground">Invited</p>
       </div>
       <div className="rounded-xl bg-muted p-3 text-center">
-        <p className="font-semibold text-foreground text-lg">
+        <p className="font-semibold text-body-lg text-foreground">
           {reviewData.memberCount}
         </p>
-        <p className="text-muted-foreground text-xs">Members</p>
+        <p className="text-label-md text-muted-foreground">Members</p>
       </div>
       <div className="rounded-xl bg-muted p-3 text-center">
-        <p className="font-semibold text-foreground text-lg">
+        <p className="font-semibold text-body-lg text-foreground">
           {reviewData.conflictCount}
         </p>
-        <p className="text-muted-foreground text-xs">Conflicts</p>
+        <p className="text-label-md text-muted-foreground">Conflicts</p>
       </div>
     </div>
   );
@@ -890,7 +890,7 @@ function ReviewCandidateTable({
             candidates.map((c) => (
               <TableRow key={c.id}>
                 <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">
+                <TableCell className="text-label-md text-muted-foreground">
                   {c.email ?? "—"}
                 </TableCell>
                 <TableCell>
@@ -946,7 +946,7 @@ function FilterField({
 }) {
   return (
     <div className={className}>
-      <Label className="mb-2 block text-muted-foreground text-xs uppercase tracking-widest">
+      <Label className="mb-2 block text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
       </Label>
       {children}
@@ -967,7 +967,7 @@ function Avatar({ person }: { person: PersonListItem }) {
     );
   }
   return (
-    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-container font-semibold text-on-primary-container text-sm">
+    <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary-container font-semibold text-label-lg text-on-primary-container">
       {initials || "?"}
     </span>
   );
@@ -981,8 +981,8 @@ function PeopleDatum({
   label: string;
 }) {
   return (
-    <td className="block min-w-0 text-muted-foreground text-sm">
-      <span className="mb-1 block text-xs lg:hidden">{label}</span>
+    <td className="block min-w-0 text-label-lg text-muted-foreground">
+      <span className="mb-1 block text-label-md lg:hidden">{label}</span>
       {children}
     </td>
   );
