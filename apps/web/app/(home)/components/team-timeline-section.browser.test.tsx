@@ -2,7 +2,8 @@
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { LivingCalendarStory } from "../../features/components/living-calendar-story";
 import { TeamTimelineSection } from "./team-timeline-section";
 
 const annualLeaveLabel =
@@ -11,11 +12,16 @@ const manualEntryLabel = /\d{4}, Manual entry$/;
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
-describe("TeamTimelineSection interactions", () => {
+describe.each([
+  ["Homepage", TeamTimelineSection],
+  ["Features", LivingCalendarStory],
+])("%s calendar interactions", (_surface, Calendar) => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2027, 0, 1, 12));
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -24,10 +30,11 @@ describe("TeamTimelineSection interactions", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    vi.useRealTimers();
   });
 
   it("exposes named staff groups and standalone date and source labels", () => {
-    act(() => root.render(<TeamTimelineSection />));
+    act(() => root.render(<Calendar />));
 
     expect(
       container.querySelectorAll(
@@ -44,9 +51,52 @@ describe("TeamTimelineSection interactions", () => {
     expect(annualLeave?.getAttribute("aria-label")).toMatch(annualLeaveLabel);
   });
 
+  it("keeps staff, departments and dates consistent across a year boundary", () => {
+    act(() => root.render(<Calendar />));
+    expect(container.querySelector(".tl-week-label")?.textContent).toBe(
+      "Mon 28 Dec to Sun 3 Jan"
+    );
+    expect(container.querySelector(".tl-week-sub")?.textContent).toBe(
+      "This week · 2026–2027"
+    );
+    expect(
+      Array.from(
+        container.querySelectorAll(".tl-staff-name"),
+        (node) => node.textContent
+      )
+    ).toEqual([
+      "Sarah Mitchell",
+      "Daniel Chen",
+      "Patrick Nolan",
+      "James O'Connor",
+      "Mia Tanaka",
+      "Ruben Park",
+    ]);
+    expect(
+      Array.from(
+        container.querySelectorAll(".tl-staff-role"),
+        (node) => node.textContent
+      )
+    ).toEqual([
+      "HR lead",
+      "Engineering",
+      "Sales",
+      "Operations",
+      "Design",
+      "Support",
+    ]);
+    const leave = container.querySelector<HTMLButtonElement>(
+      'button[aria-label^="Sarah Mitchell: Annual leave"]'
+    );
+    expect(leave?.getAttribute("aria-label")).toBe(
+      "Sarah Mitchell: Annual leave, Wednesday 30 December 2026 to Friday 1 January 2027, Synced from Xero"
+    );
+    expect(container.querySelectorAll(".tl-day-head")).toHaveLength(7);
+  });
+
   it("hydrates, changes weeks and exposes selected entry details", () => {
     act(() => {
-      root.render(<TeamTimelineSection />);
+      root.render(<Calendar />);
     });
 
     expect(container.querySelector(".tl-card--skeleton")).toBeNull();

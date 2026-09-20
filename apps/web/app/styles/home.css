@@ -459,7 +459,7 @@
 /* Responsive */
 @media (max-width: 1024px) {
   .tl-grid {
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: 200px 1fr;
   }
   .tl-block__label {
     font-size: 11px;
@@ -489,7 +489,7 @@
     align-items: flex-start;
   }
   .tl-grid {
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: 200px 1fr;
   }
   .tl-block {
     height: 44px;
@@ -503,9 +503,6 @@
   }
   .tl-row-staff {
     padding: 10px 12px;
-  }
-  .tl-staff-role {
-    display: none;
   }
   .tl-block__days {
     display: none;

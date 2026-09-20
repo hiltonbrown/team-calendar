@@ -191,3 +191,6 @@ actionable; keep one-off task evidence in the review for that task.
   duplicate product features.
 - Preserve the integrations hero when distilling lower-page content unless its
   replacement is explicitly requested; restore the user’s reference hero when asked.
+
+- When distilling Features, retain the Short answers section alongside the calendar
+  demo and teammate table; simplify its wording instead of removing it.

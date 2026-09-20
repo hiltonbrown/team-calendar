@@ -16,27 +16,29 @@ describe("Features calendar timing", () => {
     expect(html).toContain('id="leave-workflow"');
   });
 
-  it("includes the whole team with illustrative statuses and one primary action", () => {
+  it("introduces the whole team with one primary action", () => {
     const html = renderToStaticMarkup(
       React.createElement(InteractiveHeroSection)
     );
-
     expect(html.match(/<a /g)).toHaveLength(1);
     expect(html).toContain("See everyone’s");
     expect(html).toContain("whether they’re on payroll or not");
-    for (const group of [
-      "Employees",
-      "Directors",
-      "Subcontractors",
-      "Offshore staff",
-    ]) {
-      expect(html).toContain(`<dt>${group}</dt>`);
-    }
-    expect(html).toContain("From Xero Payroll");
-    expect(html.match(/Shared in Team Calendar/g)).toHaveLength(3);
-    expect(html).toContain("Examples of what your team can share");
-    expect(html).not.toContain("Availability Sandbox");
-    expect(html).not.toContain("See who&#x27;s covered");
-    expect(html).not.toContain("<button");
+    expect(html).toContain("directors, contractors and offshore staff");
+  });
+
+  it("retains the teammate comparison and all six Short answers", () => {
+    const html = renderToStaticMarkup(React.createElement(FeaturesPage));
+    expect(html).toContain("What each kind of teammate can do.");
+    expect(html).toContain("Short answers.");
+    expect(html.match(/class="ft-faq__q"/g)).toHaveLength(6);
+    const matrix = html.slice(
+      html.indexOf('class="ft-matrix__table"'),
+      html.indexOf("</table>")
+    );
+    expect(matrix.match(/<tr>/g)).toHaveLength(7);
+    expect(html).toContain("On Xero Payroll");
+    expect(html).toContain(
+      "Read-only feeds for Outlook, Google Calendar and Apple Calendar"
+    );
   });
 });

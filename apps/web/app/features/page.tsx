@@ -6,10 +6,10 @@ import "../styles/features.css";
 import "../styles/motion.css";
 import { MarketingIcon } from "../(home)/components/marketing-icons";
 import { integrationCapabilities } from "../integrations/capabilities";
+import { AnalyticsDemo } from "./components/analytics-demo";
 import { FinalCtaSection } from "./components/final-cta-section";
 import { InteractiveHeroSection } from "./components/interactive-hero";
 import { LivingCalendarStory } from "./components/living-calendar-story";
-import { ScrollReveal } from "./components/scroll-reveal";
 
 export const metadata: Metadata = createMetadata({
   description:
@@ -61,76 +61,82 @@ const matrixRows: MatrixRow[] = [
     contractors: <Mark kind="purple" label="Yes" />,
     directors: <Mark kind="purple" label="Yes" />,
     employees: <Mark kind="sage" label="Yes" />,
-    label: "Request leave & out-of-office",
-    sub: "Annual, sick, WFH, board days, anything that removes you from the plan",
+    label: "Request leave or share availability",
+    sub: "Annual leave, sick leave, working from home and time away",
   },
   {
     contractors: <Mark kind="mute" label="N/A" />,
     directors: <Mark kind="mute" label="N/A" />,
     employees: <Mark kind="sage" label="Two-way" />,
-    label: "Auto-sync from Xero",
-    sub: "Leave already keyed in Xero appears without re-entry",
+    label: "Sync leave with Xero",
+    sub: "Existing Xero leave appears without re-entry",
   },
   {
     contractors: <Mark kind="purple" label="Optional" />,
     directors: <Mark kind="mute" label="Self-managed" />,
     employees: <Mark kind="sage" label="Required" />,
     label: "Manager approvals",
-    sub: "Routed with team availability in view",
+    sub: "Review requests alongside team availability",
   },
   {
     contractors: <Mark kind="neutral" label="Yes" />,
     directors: <Mark kind="neutral" label="Yes" />,
     employees: <Mark kind="sage" label="Yes" />,
-    label: "Published to Outlook / Google / Apple",
-    sub: "Live .ics feed per person and per team",
+    label: "Subscribe in your calendar app",
+    sub: "Read-only feeds for Outlook, Google Calendar and Apple Calendar",
   },
   {
     contractors: <Mark kind="mute" label="No balance" />,
     directors: <Mark kind="mute" label="No balance" />,
     employees: <Mark kind="sage" label="Yes" />,
-    label: "Counted in leave balances",
-    sub: "Drawn from Xero Payroll where applicable",
+    label: "View leave balances",
+    sub: "Balances come from Xero Payroll",
   },
   {
     contractors: <Mark kind="neutral" label="Yes" />,
     directors: <Mark kind="neutral" label="Yes" />,
     employees: <Mark kind="sage" label="Yes" />,
-    label: "Visible to the whole team",
-    sub: "On the calendar everyone already uses",
+    label: "Share team availability",
+    sub: "See who is away and when",
   },
 ];
 
 const FeaturesMatrix = () => (
   <section className="ft-section">
     <div className="fmkt-container">
-      <p className="fmkt-overline">Coverage matrix</p>
-      <h2>What each kind of teammate can do.</h2>
+      <h2 id="teammate-comparison-title">What each kind of teammate can do.</h2>
       <p className="ft-section__lead">
-        The short version: everyone gets calendar presence. Only payroll people
-        get balances and the Xero round-trip.
+        Everyone can share availability. Xero sync and leave balances apply to
+        employees on payroll.
+      </p>
+      <p className="ft-matrix__hint" id="teammate-comparison-hint">
+        Scroll across to compare employees, contractors and directors.
       </p>
       <section
+        aria-describedby="teammate-comparison-hint"
         aria-label="Coverage matrix, scroll for more columns"
         className="ft-matrix"
         // biome-ignore lint/a11y/noNoninteractiveTabindex: labelled focusable scroll region per DESIGN.md's narrow-table pattern; tabIndex is required for keyboard users to reach the horizontal scroll
         tabIndex={0}
       >
-        <table className="ft-matrix__table">
+        <table
+          aria-labelledby="teammate-comparison-title"
+          className="ft-matrix__table"
+        >
           <thead>
             <tr>
-              <th>Capability</th>
-              <th>
+              <th scope="col">Capability</th>
+              <th scope="col">
                 Employees
                 <br />
                 <span className="ft-matrix__col-sub">On Xero Payroll</span>
               </th>
-              <th>
+              <th scope="col">
                 Contractors
                 <br />
                 <span className="ft-matrix__col-sub">Off payroll</span>
               </th>
-              <th>
+              <th scope="col">
                 Directors
                 <br />
                 <span className="ft-matrix__col-sub">Off payroll</span>
@@ -140,10 +146,10 @@ const FeaturesMatrix = () => (
           <tbody>
             {matrixRows.map((row) => (
               <tr key={row.label}>
-                <td>
+                <th scope="row">
                   {row.label}
                   <span className="ft-matrix__row-sub">{row.sub}</span>
-                </td>
+                </th>
                 <td>{row.employees}</td>
                 <td>{row.contractors}</td>
                 <td>{row.directors}</td>
@@ -168,19 +174,19 @@ const plannedRegionNames = integrationCapabilities.xeroPayrollRegions
 
 const faqs = [
   {
-    a: "No. They're added directly in Team Calendar and never appear in Xero or your pay runs. They only show up on the calendar.",
+    a: "No. Add them directly in Team Calendar. Their availability appears on the calendar without adding them to Xero or a pay run.",
     q: "Do contractors and directors need a Xero record?",
   },
   {
-    a: "It flows in on first connect. We don't ask you to re-enter it, and we don't change the leave types you've configured in Xero.",
+    a: "It syncs when you first connect. You do not need to re-enter it, and your Xero leave types stay unchanged.",
     q: "What happens to leave I've already keyed into Xero?",
   },
   {
-    a: "Yes. Outlook, Google and Apple subscribe to a read-only .ics feed per person or team. Edits happen in Team Calendar; each calendar app refreshes the subscription on its own schedule.",
+    a: "Yes. Edit entries in Team Calendar. Outlook, Google Calendar and Apple Calendar subscribe to read-only feeds. Calendar apps refresh on their own schedules.",
     q: "Is the calendar feed read-only?",
   },
   {
-    a: "Every entry carries its source. Sage means it came from Xero Payroll. Purple means it was added by hand in Team Calendar.",
+    a: "Yes. Select an entry to see its source. Sage entries come from Xero Payroll; purple entries are added in Team Calendar.",
     q: "Can I tell which entries came from where?",
   },
   {
@@ -188,16 +194,15 @@ const faqs = [
     q: "Which regions of Xero Payroll are supported?",
   },
   {
-    a: "Only if you map it to a Xero leave type. Out-of-office, WFH and travel default to calendar-only.",
-    q: "Does an out-of-office count against a leave balance?",
+    a: "No, unless you map the entry to a Xero leave type. Working from home, travel and other availability are calendar-only by default.",
+    q: "Does working from home or travel reduce leave balances?",
   },
 ] as const;
 
 const FeaturesFAQ = () => (
   <section className="ft-section ft-section--tight">
     <div className="fmkt-container">
-      <p className="fmkt-overline">Common questions</p>
-      <h2>Short answers.</h2>
+      <h2 id="ics-feeds">Short answers.</h2>
       <div className="ft-faq">
         {faqs.map((f) => (
           <div className="ft-faq__item" key={f.q}>
@@ -218,12 +223,9 @@ const FeaturesPage = () => (
       <InteractiveHeroSection />
     </div>
     <LivingCalendarStory />
-    <ScrollReveal>
-      <FeaturesMatrix />
-    </ScrollReveal>
-    <ScrollReveal>
-      <FeaturesFAQ />
-    </ScrollReveal>
+    <FeaturesMatrix />
+    <AnalyticsDemo />
+    <FeaturesFAQ />
     <FinalCtaSection />
   </main>
 );

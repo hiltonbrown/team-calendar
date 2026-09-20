@@ -1161,3 +1161,94 @@ rate was not measured. Browser closed; existing dev server retained.
 
 Review: all listed checks PASS. Integration NOT VERIFIED: the database guard
 continues to reject the configured non-local target. Content and controls unchanged.
+
+## Unify marketing demo calendars
+
+- [x] Inspect homepage benchmark and Features calendar differences.
+- [x] Share the homepage calendar rendering, staff and relative-week data with Features.
+- [x] Preserve the Features workflow narrative and remove superseded calendar styles.
+- [x] Verify desktop/mobile interactions, consistency and record repository gate results.
+
+Plan: retain the homepage visual design, reuse its complete calendar on Features
+at the same container width, and keep the workflow explanation beneath it.
+
+Calendar review: both pages render DemoTeamCalendar with identical desktop styling,
+all six staff, departments, entry spans and rolling week dates. Corrected contradictory
+leave notes and year labels spanning December/January. Full staff names and roles
+remain visible on mobile. Features retains its workflow copy beneath the calendar.
+PASS: browser comparison of calendar text, computed styles and width at 1440, 768,
+390 and 320px; week controls, entry details, focus return, no page overflow/errors;
+light/dark visual inspection; six interaction/date tests across both page components;
+repository lint, typecheck, unit suite, detector and git diff whitespace.
+Integration NOT VERIFIED: ALLOW_LOCAL_DATABASE_TESTS refuses the configured remote
+database. No database writes attempted. Existing development server retained;
+verification browsers closed. Screenshots: /tmp/calendar-{home,features}-{width}.png.
+
+## Distil and clarify Features
+
+- [x] Remove repeated hero examples and workflow narrative; retain the shared demo.
+- [x] Clarify table and Short answers copy while preserving their content.
+- [x] Verify desktop/mobile layout, calendar controls and repository checks.
+
+Direction: concise hero, interactive calendar, teammate table, Short answers and
+one short closing invitation. Retain all six FAQ topics as explicitly requested.
+
+Features distillation review: removed four hero examples, four repeated workflow
+paragraphs, redundant overlines and closing CTA explanation. Retained the shared
+calendar, all six comparison rows, all six Short answers and existing action links.
+Clarified source, sync, balances and calendar subscription language without changing
+capability values. Removed obsolete hero/story CSS and unnecessary reveal wrappers.
+PASS: desktop/mobile at 1440, 390 and 320px, dark visual inspection, calendar entry
+and week controls, keyboard table scrolling, no page overflow/errors, lint,
+typecheck, unit suite, detector and diff whitespace. Integration NOT VERIFIED:
+configured remote database rejected by ALLOW_LOCAL_DATABASE_TESTS guard. Browser
+closed, existing server retained. Evidence: /tmp/features-distill-*.png and logs.
+
+## Connected analytics demonstration
+
+- [x] Confirm connected-dashboard direction and placement.
+- [x] Build labelled sample data, coordinated trends, overlaps and coverage heatmap.
+- [x] Verify filters, arithmetic, accessibility, responsive visuals and record repository gates.
+
+Direction approved: one shared month and department selection, clickable coverage
+cells that reveal people away, leave utilisation bars and balance snapshot trend.
+Use lightweight SVG/CSS, meaningful labels and reduced-motion support. Insert after
+the teammate matrix and before Short answers. All figures are illustrative.
+
+Analytics review: added the approved connected dashboard between the teammate matrix
+and Short answers. Month bars, department selector and heatmap cells coordinate
+utilisation, balance snapshots and named overlapping absences. Next overlap cycles
+through team/day pairs. Narrow heatmaps retain department labels and reveal the
+selected day. Fictional Apr–Jun 2026 data is explicitly labelled; WFH counts as
+available, repeated absence records count each person once, no accrual calculation.
+PASS: seven data/interaction tests; full unit suite, repository lint and typecheck;
+browser controls and keyboard at 1440, 768, 390 and 320px; reduced-motion transitions,
+light/dark visuals, no page overflow/errors; diff whitespace. Integration NOT VERIFIED:
+configured remote target rejected by ALLOW_LOCAL_DATABASE_TESTS. No database writes.
+Detector invocation produced no diagnostic output, so no detector pass claimed.
+Physical-device performance was not measured. Browser closed; existing server retained.
+Evidence: /tmp/analytics-{width}.png, /tmp/analytics-dark-{width}.png and
+/tmp/analytics-{fix,check,types,tests,integration}.log.
+
+## Polish Features
+
+- [x] Refine section rhythm, table hierarchy and mobile scrolling affordances.
+- [x] Review keyboard focus, analytics state clarity and responsive readability.
+- [x] Verify desktop/mobile, themes, retained interactions and record repository gates.
+
+Plan: preserve all current sections and factual copy; improve table semantics and
+sticky mobile row labels, align headings, remove table decoration, clarify scrolling.
+
+Polish review: preserved all content and sections. Unified mobile heading sizes and
+section rhythm, enlarged FAQ body/chart labels, replaced table shadows/rules with
+tonal rows, added semantic row headers and table heading association. Comparison
+row labels stay visible during mobile scrolling; comparison/heatmap now explain
+horizontal scrolling. Added a three-pixel comparison focus ring and selected date
+to analytics live announcements. Removed one suppression made obsolete by this diff.
+PASS: browser at 1440, 768, 390 and 320px, table sticky labels and keyboard focus,
+calendar navigation, linked analytics, all six FAQs, no page overflow/errors;
+light/dark visual review; lint, typecheck, unit tests, detector, diff whitespace.
+Detector advisories remain in unrelated legacy styles and the intentionally enlarged
+SVG value labels (SVG units scale with the chart). Integration NOT VERIFIED:
+remote target rejected by ALLOW_LOCAL_DATABASE_TESTS. Browser closed; existing dev
+server retained. Evidence: /tmp/features-polish-*.png and matching logs.

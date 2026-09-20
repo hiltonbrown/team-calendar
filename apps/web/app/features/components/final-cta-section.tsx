@@ -6,17 +6,9 @@ export const FinalCtaSection = () => (
     <div className="fmkt-container">
       <div className="fmkt-cta__panel">
         <div className="fmkt-cta__content">
-          <div className="fmkt-pill fmkt-pill--inverse">
-            For Xero Payroll teams
-          </div>
           <h2 className="fmkt-cta__heading">
-            Bring approved leave straight onto your team&apos;s calendars.
+            Bring your team’s availability together.
           </h2>
-          <p className="fmkt-cta__copy">
-            Approved leave writes back to Xero and publishes to your team&apos;s
-            subscribed calendars. Calendar apps pick up changes on their own
-            refresh schedules.
-          </p>
           <div className="fmkt-cta__actions">
             <Link
               className="marketing-btn marketing-btn--primary"
