@@ -3,7 +3,7 @@ import localFont from 'next/font/local';
 
 const plusJakartaSans = localFont({
   display: 'swap',
-  src: '../../../.design-sync/fonts/plus-jakarta-sans.woff2',
+  src: '../fonts/plus-jakarta-sans.woff2',
   variable: '--font-plus-jakarta-sans',
   weight: '400 700',
 });
@@ -12,12 +12,12 @@ const lora = localFont({
   display: 'swap',
   src: [
     {
-      path: '../../../.design-sync/fonts/lora-regular.woff2',
+      path: '../fonts/lora-regular.woff2',
       style: 'normal',
       weight: '400 700',
     },
     {
-      path: '../../../.design-sync/fonts/lora-italic.woff2',
+      path: '../fonts/lora-italic.woff2',
       style: 'italic',
       weight: '400 700',
     },

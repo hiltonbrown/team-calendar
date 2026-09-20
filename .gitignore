@@ -105,13 +105,6 @@ Thumbs.db
 *.tmp
 tmp/
 
-# Design Sync
-.design-sync/.cache/
-.design-sync/learnings/
-.design-sync/node_modules/
-.ds-sync/
-ds-bundle/
-packages/design-system/styles/compiled.css
 tooling/release/.auth/
 tooling/release/test-results/
 tooling/release/playwright-report/

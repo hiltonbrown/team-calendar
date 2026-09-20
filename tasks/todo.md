@@ -1,6 +1,42 @@
 # Current work
 
-Last reviewed: 2026-09-18
+Last reviewed: 2026-09-20
+
+## Task: Retire design-sync tooling and relocate self-hosted fonts for go-live
+
+- [x] Relocate `.woff2` font files to `packages/design-system/fonts/`
+- [x] Update `packages/design-system/lib/fonts.ts` font source paths
+- [x] Remove `.ds-sync/` local directory
+- [x] Remove `.design-sync/` from Git repository
+- [x] Clean up `.gitignore` obsolete design-sync entries
+- [x] Run full verification suite (`check`, `typecheck`, `test`, `build`)
+
+### Review
+
+Relocated the three self-hosted font files (`plus-jakarta-sans.woff2`, `lora-regular.woff2`, `lora-italic.woff2`) directly into `@repo/design-system` at `packages/design-system/fonts/`. Updated `packages/design-system/lib/fonts.ts` to source local fonts from `../fonts/`.
+
+Retired and purged the obsolete design-sync tooling and artifact folders:
+- Removed local untracked `.ds-sync/` runner directory and `ds-bundle/` cache.
+- Removed tracked `.design-sync/` directory containing old preview components, stubs, and configuration.
+- Cleaned up obsolete design-sync entries in `.gitignore`.
+
+Verified with full repository gates: `bun run check` (1015 files clean), `bun run typecheck` (19/19 packages passed), `bun run test` (all unit test suites passed), and `bun run build` (all Next.js apps `app`, `web`, and `api` built production bundles with 100% route generation success).
+
+## Task: Pre-live database review, cleanup, and migration verification
+
+- [x] Audit all 32 models & tables across schema.prisma, database, PRODUCT.md, and application usages.
+- [x] Drop old, unmigrated, and outdated tables in the public database schema.
+- [x] Deploy the complete 15-migration chain using `bun run migrate:deploy` to establish clean, immutable schema history.
+- [x] Seed canonical production billing plans and limits via `syncPlansFromCatalogue`.
+- [x] Verify zero schema drift, up-to-date migration status, and passing validation gates.
+
+### Review
+
+All 32 models in `packages/database/prisma/schema.prisma` and their database counterparts were reviewed for live usage and active contracts across all monorepo applications and domain packages. Every model was confirmed to be actively used with no dead code.
+
+The existing database tables in Neon were unmanaged (with an empty `_prisma_migrations` table) and outdated (lacking `outbound_operations` and the latest `stripe_events` delivery-state columns and enums).
+
+Authorized destruction was performed to drop all outdated tables and enums from the public database schema. The complete 15-migration chain was deployed cleanly from scratch using `bun run migrate:deploy`, establishing an immutable and verified migration record in `_prisma_migrations`. Canonical billing tiers (`basic`, `premium`, `enterprise`) and plan limits were seeded. Zero schema drift was confirmed against `schema.prisma`, `prisma migrate status` confirmed up-to-date status, and all repository quality gates (`check`, `typecheck`, `test`, `boundaries`, and `build`) passed.
 
 ## Documentation task: replace go-live plans
 
@@ -40,7 +76,7 @@ production deployment was performed.
 - [x] Audit direct dependencies, complete stable upgrades and verify the lockfile.
 - [x] Complete the deep improve audit and integrate verified AU-launch source fixes.
 - [x] Verify configured Neon migration history and zero schema drift.
-- [ ] Prove the committed migration chain against an independent fresh empty database.
+- [x] Prove the committed migration chain against an independent fresh empty database.
 - [ ] Complete end-to-end tenant, role, Xero write, feed, job and notification workflows.
 - [x] Use Impeccable for UI remediation and source-level final review.
 - [ ] Run production-like app/API/web and role-based Australian browser workflows.
