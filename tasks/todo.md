@@ -2,6 +2,19 @@
 
 Last reviewed: 2026-09-20
 
+## Task: Fix turbo boundaries dependency declaration for vitest in @repo/email
+
+- [x] Add `"vitest": "^5.0.1"` to `devDependencies` in `packages/email/package.json`
+- [x] Add `"test": "NODE_ENV=test vitest run"` to `scripts` in `packages/email/package.json`
+- [x] Verify `bun run boundaries`, `bun run test --filter=@repo/email`, `bun run check`, and CI untestable workspace guard
+
+### Review
+
+Resolved `turbo boundaries` error where `packages/email/contact.test.ts` imported `vitest` without `vitest` being declared in `packages/email/package.json`:
+- Added `vitest` to `packages/email/package.json` under `devDependencies`.
+- Added the standard `test` script (`NODE_ENV=test vitest run`) to `packages/email/package.json`, ensuring the CI workspace test guard passes and `bun run test` executes `contact.test.ts`.
+- Verified `turbo boundaries` (992 files across 21 packages clean), unit test execution for `@repo/email` (all 3 tests passing), `bun run check` (1030 files clean), and the workspace test script guard.
+
 ## Task: Clarify homepage Xero to Outlook copy
 
 - [x] Check existing copy and supported calendar destinations.
@@ -1120,3 +1133,23 @@ whitespace check. Detector reports only advisory typography values retained from
 the explicitly requested original hero. Integration NOT VERIFIED: configured
 non-local database rejected by ALLOW_LOCAL_DATABASE_TESTS guard. Browser closed;
 existing development server preserved.
+
+## Interactive integration exchange map
+
+- [x] Build the approved read/write exchange diagram with persistent privacy exclusions.
+- [x] Verify selection, keyboard access, responsive layouts and reduced motion.
+- [x] Run repository gates and record results.
+
+Direction approved: lightweight SVG/CSS map, directional paths and selectable
+Reads/Writes. Preserve all data categories and the restored hero.
+
+
+Review: implemented the approved interactive exchange map with directional SVG
+paths, one brief trace on direction selection, persistent read/write records,
+and a separate Never reads boundary. Hero and provider directory preserved.
+PASS: desktop/mobile and dark-theme browser checks; click and keyboard selection;
+reduced-motion animation disabled; no overflow or page errors; detector;
+repository lint, typecheck, unit suite and diff whitespace check.
+Integration NOT VERIFIED: database guard rejects the configured non-local target
+under ALLOW_LOCAL_DATABASE_TESTS. No database writes attempted. Real-device frame
+rate was not measured. Browser closed; existing dev server retained.
