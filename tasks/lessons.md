@@ -23,6 +23,14 @@ actionable; keep one-off task evidence in the review for that task.
 - Hero copy must distinguish approved leave write-back to Xero from calendar
   publication of travel, out of office, WFH and other availability updates.
 
+- When constructing dynamic CSS class names with template literals, prefer
+  array filtering (`[baseClass, cond && activeClass].filter(Boolean).join(' ')`)
+  over inline template string concatenation to eliminate missing-space bugs.
+
+- Avoid broad child tag selectors like `.container span` that unintentionally match
+  and override nested badges or pill chips with higher CSS specificity. Use
+  targeted class names on direct child elements instead.
+
 - Keep the homepage sync diagram on a transparent canvas without a dot grid.
   Size the SVG independently of its wrapper, and avoid fixed minimum heights
   that leave empty space beneath the mobile alternative.
@@ -122,6 +130,10 @@ actionable; keep one-off task evidence in the review for that task.
 - Temporary external test resources require explicit user approval, isolated
   identifiers, and cleanup. Do not present a test as complete if its required
   database-backed coverage did not run.
+- In Next.js development mode, always use `http://localhost:<port>` rather than
+  `http://127.0.0.1:<port>` in headless browser/Playwright verification scripts.
+  Next.js enforces `allowedDevOrigins` (defaulting to `localhost`), blocking HMR
+  WebSockets and client chunk hydration when navigated via numeric IP.
 
 ## Repository hygiene
 

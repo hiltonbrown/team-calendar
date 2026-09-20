@@ -6,6 +6,50 @@ export type PricingCurrency = "AUD" | "NZD" | "GBP";
 export const isPricingCurrency = (value: string): value is PricingCurrency =>
   value === "AUD" || value === "NZD" || value === "GBP";
 
+export interface CountryOption {
+  readonly code: PricingCurrency;
+  readonly currencySymbol: string;
+  readonly flag: string;
+  readonly name: string;
+  readonly payrollRegionName: string;
+  readonly premiumPrice: string;
+  readonly starterPrice: string;
+  readonly xeroLabel: string;
+}
+
+export const countryOptions: readonly CountryOption[] = [
+  {
+    code: "AUD",
+    currencySymbol: "$",
+    flag: "🇦🇺",
+    name: "Australia",
+    payrollRegionName: "Australian",
+    premiumPrice: "$19",
+    starterPrice: "$9",
+    xeroLabel: "Xero Payroll",
+  },
+  {
+    code: "NZD",
+    currencySymbol: "$",
+    flag: "🇳🇿",
+    name: "New Zealand",
+    payrollRegionName: "New Zealand",
+    premiumPrice: "$21",
+    starterPrice: "$10",
+    xeroLabel: "Xero Payroll NZ",
+  },
+  {
+    code: "GBP",
+    currencySymbol: "£",
+    flag: "🇬🇧",
+    name: "United Kingdom",
+    payrollRegionName: "UK",
+    premiumPrice: "£11",
+    starterPrice: "£5",
+    xeroLabel: "Xero Payroll UK",
+  },
+] as const;
+
 export const pricingCurrencies = {
   AUD: { country: "Australia", label: "AUD" },
   GBP: { country: "United Kingdom", label: "GBP" },
@@ -50,18 +94,13 @@ export const paidPlanPresentation = {
 >;
 
 export const getCurrencyPricingState = (currency: PricingCurrency) => {
-  const region = pricingCurrencies[currency];
-  return currency === "AUD"
-    ? {
-        available: true as const,
-        currency,
-        heading: "Australian plans",
-        region,
-      }
-    : {
-        available: false as const,
-        currency,
-        heading: `${region.country} pricing is coming soon`,
-        region,
-      };
+  const country =
+    countryOptions.find((c) => c.code === currency) ?? countryOptions[0];
+  return {
+    available: true as const,
+    country,
+    currency,
+    heading: `${country.name} plans`,
+    region: { country: country.name, label: country.code },
+  };
 };

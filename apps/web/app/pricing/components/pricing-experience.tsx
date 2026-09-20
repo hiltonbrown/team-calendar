@@ -229,17 +229,17 @@ const PricingFinalCta = () => (
 export const PricingExperience = ({ mode }: { mode: LaunchMode }) => (
   <main className="fmkt-page fmkt-pricing-page" id="main-content" tabIndex={-1}>
     <section className="fmkt-pricing-hero">
-      <div className="fmkt-container fmkt-pricing-hero__grid">
-        <div className="fmkt-pricing-hero__intro">
+      <div className="fmkt-container">
+        <div className="fmkt-pricing-hero__content">
           <h1 className="fmkt-pricing-hero__title">
             {mode === "early_access"
               ? "Join Team Calendar’s Australian early access."
-              : "Straightforward plans for Australian Xero Payroll teams."}
+              : "Simple, straightforward pricing"}
           </h1>
           <p className="fmkt-pricing-hero__lead">
             {mode === "early_access"
               ? "A closed, guided cohort for teams ready to publish trusted leave and availability into the calendars they already use."
-              : "Choose by staff coverage, feed flexibility, analytics and support. AUD is selected by default."}
+              : "Transparent plans with no per-user fees or surprise add-ons. Every tier includes automated Xero Payroll leave sync, manual availability, and live calendar feeds."}
           </p>
           {mode === "paid" ? (
             <div className="fmkt-pricing-hero__trust-strip">
@@ -293,66 +293,6 @@ export const PricingExperience = ({ mode }: { mode: LaunchMode }) => (
               </span>
             </div>
           ) : null}
-        </div>
-
-        <div className="fmkt-pricing-hero__card-col">
-          {mode === "early_access" ? (
-            <div className="fmkt-pricing-hero__cohort-card">
-              <span className="fmkt-pricing-hero__cohort-badge">
-                Closed cohort
-              </span>
-              <strong className="fmkt-pricing-hero__cohort-highlight">
-                Guided
-              </strong>
-              <p className="fmkt-pricing-hero__cohort-text">
-                Eligibility and onboarding are confirmed directly with our team.
-              </p>
-            </div>
-          ) : (
-            <div className="fmkt-pricing-hero__overview-card">
-              <div className="fmkt-pricing-hero__overview-header">
-                <span className="fmkt-pricing-hero__overview-tag">
-                  Australia first
-                </span>
-                <span className="fmkt-pricing-hero__overview-currency">
-                  AUD
-                </span>
-              </div>
-              <div className="fmkt-pricing-hero__overview-tiers">
-                <div className="fmkt-pricing-hero__tier-row">
-                  <div>
-                    <strong>Starter</strong>
-                    <span className="fmkt-pricing-hero__tier-sub">
-                      Up to 9 staff
-                    </span>
-                  </div>
-                  <span className="fmkt-pricing-hero__tier-price">
-                    $9<span>/mo</span>
-                  </span>
-                </div>
-                <div className="fmkt-pricing-hero__tier-divider" />
-                <div className="fmkt-pricing-hero__tier-row fmkt-pricing-hero__tier-row--rec">
-                  <div>
-                    <div className="fmkt-pricing-hero__rec-label">
-                      <strong>Premium</strong>
-                      <span className="fmkt-pricing-hero__rec-chip">
-                        Popular
-                      </span>
-                    </div>
-                    <span className="fmkt-pricing-hero__tier-sub">
-                      Up to 50 staff
-                    </span>
-                  </div>
-                  <span className="fmkt-pricing-hero__tier-price">
-                    $19<span>/mo</span>
-                  </span>
-                </div>
-              </div>
-              <p className="fmkt-pricing-hero__overview-footnote">
-                Starter is $9/month. Premium is $19/month.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </section>

@@ -14,6 +14,7 @@ const navLinks = [
   { href: "/features", title: "Features" },
   { href: "/integrations", title: "Integrations" },
   { href: "/pricing", title: "Pricing" },
+  { href: "/contact", title: "Contact" },
 ];
 
 const isRouteActive = (pathname: string, href: string) => {

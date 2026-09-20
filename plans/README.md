@@ -1,12 +1,32 @@
-# Team Calendar implementation plan
+# Team Calendar implementation plans
 
-[Ship Team Calendar's Australian release](go-live.md) is the only active plan.
+[Ship Team Calendar's Australian release](go-live.md) is the active release programme.
 Reviewed against `80ac9f7` and the supplied working tree on 19 September 2026.
 **Plan status: IN PROGRESS. Production readiness is not yet verified.**
 
 | Plan | Priority | Status | Completion evidence |
 | --- | --- | --- | --- |
 | [Australian go-live](go-live.md) | P0 release programme | IN PROGRESS | Executor branch `codex/go-live-candidate`; Section 11 records current execution and verification |
+| [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | P1 correctness and shared onboarding | TODO | Planned at `246ba27`, 20 September 2026; source implementation and live round trips remain NOT VERIFIED |
+| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | P1 integration proof | TODO | Follow-up to 159; 26 scenarios, live/provider evidence, cleanup and report contract; live tests NOT VERIFIED |
+
+Plan 159 is the focused follow-up to the Xero audit. It covers import completeness,
+retry-safe jobs, shared credentials, employee reconciliation, AU approval semantics,
+guided onboarding and calendar freshness. It does not recreate the retired backlog
+or supersede unrelated release work. Execute its dependency table: reliability,
+connection and identity work can proceed independently; durable import precedes
+the final onboarding/calendar integration. The AU submission contract requires
+an explicit product decision before that behaviour changes. Reuse the release
+programme's existing recovery and owned-fixture infrastructure. Plan 159 records
+the current CI/local versus live-release verification distinction and rejected
+approaches; preserve all completed release evidence below.
+
+Plan 160 prepares the test harness alongside Plan 159, then verifies its deployed
+candidate and produces Markdown/JSON reports even when tests fail or prerequisites
+are missing. It does not repeat the implementation work. Full PASS depends on
+Plan 159's approved AU contract, live Xero/browser/job/data evidence, tenant
+isolation and verified cleanup. Executing the test/report task is distinct from
+passing the integration; source mocks and queued events cannot certify it.
 
 Execution began on 19 September 2026 in the isolated worktree
 `/home/hilton/.codex/worktrees/australian-go-live/teamcalendar`.

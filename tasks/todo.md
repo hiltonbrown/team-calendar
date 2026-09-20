@@ -2,19 +2,107 @@
 
 Last reviewed: 2026-09-20
 
-## Task: Pricing page Overdrive redesign (Direction 2: Living Calendar Feed Preview & Ambient Tonal Stage)
+## Task: Pricing hero redesign, remove plan overview & simulator, align with /integrations
 
-- [ ] Inspect existing pricing architecture, tokens, components, and test contracts
-- [ ] Craft the Living Calendar Feed Interactive Preview & Ambient Tonal Stage in `pricing-currency-selector.tsx`
-- [ ] Redesign Hero section: remove AI slop / awkward metrics, replace with authoritative, clear value proposition
-- [ ] Redesign Plan cards: elevated typography, authentic Lucide checkmarks, clear tier distinction, risk-free trial prompt
-- [ ] Redesign Comparison table: high-clarity tabular presentation with clean mobile cards and clear feature semantics
-- [ ] Overhaul FAQ section: add comprehensive, high-value Australian payroll customer questions & answers with native `<details>`
-- [ ] Add High-Conversion Conversion Section (Final CTA) with trust signals and direct sign-up prompts
-- [ ] Craft dedicated CSS styling honoring Team Calendar's design system tokens, Plus Jakarta Sans, and tonal layering
-- [ ] Verify browser rendering across Desktop (1440px), Tablet (768px), and Mobile (390px) in both Light and Dark themes
-- [ ] Run test verification (`pricing.test.ts`, `bun run check`, `bun run typecheck`, `bun run test`)
-- [ ] Document results in `tasks/todo.md`
+- [x] Remove hero plan overview card from `apps/web/app/pricing/components/pricing-experience.tsx`
+- [x] Update hero copy to focus on simple, straightforward pricing with clear value proposition
+- [x] Remove AI-slop feed simulator (`fmkt-feed-simulator-section`, mock calendar, chrome) from `apps/web/app/pricing/components/pricing-currency-selector.tsx`
+- [x] Refine `CountrySlider` design to align visually with the `/integrations` aesthetic (clean tonal surfaces, flag chips, smooth slider)
+- [x] Clean up CSS in `apps/web/app/styles/features.css` for hero and removed simulator elements
+- [x] Update tests in `apps/web/app/pricing/pricing.test.ts` and ensure all assertions pass
+- [x] Run repository quality gates (`bun run check`, `bun run typecheck`, `bun run test`)
+- [x] Verify visually via Playwright browser across Desktop (1440px), Tablet (768px), and Mobile (390px)
+
+### Review
+
+1. **Removed Plan Overview Card**: Removed the duplicate hero overview card (`.fmkt-pricing-hero__overview-card`) from [`apps/web/app/pricing/components/pricing-experience.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-experience.tsx) to give the page a clean, confident single-column hero matching `/integrations`.
+2. **Updated Copy for Simple, Straightforward Pricing**:
+   - Hero title: `"Simple, straightforward pricing"`.
+   - Hero lead: `"Transparent plans with no per-user fees or surprise add-ons. Every tier includes automated Xero Payroll leave sync, manual availability, and live calendar feeds."`
+   - Reassurance strip: 14-day free trial on all plans, connects in 2 minutes, no credit card required.
+3. **Removed Feed Simulator ("AI Slop")**:
+   - Removed the entire mock-calendar preview (`fmkt-feed-simulator-section`, simulated browser chrome with dots, fake calendar week, filter buttons, and pipeline pulses) from [`apps/web/app/pricing/components/pricing-currency-selector.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-currency-selector.tsx).
+4. **Visual Consistency with `/integrations`**:
+   - Styled the Country Slider with tonal surfaces, 20px radii, flag badges, and interactive state transitions aligned directly with the `/integrations` page design system.
+   - Positioned the plan cards (`PricingPlans`) immediately below the country selector for clear, immediate hierarchy.
+   - Cleaned up obsolete CSS rules and media queries in [`apps/web/app/styles/features.css`](file:///home/hilton/Documents/teamcalendar/apps/web/app/styles/features.css).
+5. **Verification**:
+   - `bun --filter web test`: 32 test files, 116 tests passed (including all 5 in `pricing.test.ts`).
+   - `bun run check`: 1,018 files passed with 0 errors or warnings.
+   - `bun run typecheck`: 19/19 packages passed cleanly.
+   - Playwright browser testing verified:
+     - Zero horizontal overflow on mobile (`scrollWidth === clientWidth === 390px`).
+     - Interactive country switching (AUD, NZD, GBP) updates plan prices, currency symbols, and notes seamlessly.
+     - Captured evidence: `reports/pricing-redesign-desktop-1440.png` and `reports/pricing-redesign-mobile-390.png`.
+
+- [x] Update `apps/web/app/pricing/constants.ts` Australia `xeroLabel` from `"Xero Payroll AU"` to `"Xero Payroll"`
+- [x] Update `apps/web/app/pricing/components/pricing-currency-selector.tsx` pipeline node label from `"Team Calendar Engine"` to `"Team Calendar"`
+- [x] Update `apps/web/app/pricing/components/pricing-comparison.tsx` replace all 8 occurrences of `"Not advertised"` with `"Contact Us"`
+- [x] Run verification tests and linting (`bun --filter web test`, `bun run check`, `bun run typecheck`, `bun run test`)
+- [x] Verify live rendering on `http://localhost:3001/pricing` via browser/playwright
+
+### Review
+
+1. **"Xero Payroll AU" $\rightarrow$ "Xero Payroll"**: Updated `xeroLabel` in [`apps/web/app/pricing/constants.ts`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/constants.ts) for Australia. The live calendar pipeline and country options now display "Xero Payroll".
+2. **"Team Calendar Engine" $\rightarrow$ "Team Calendar"**: Updated the middle canonical engine node header in [`apps/web/app/pricing/components/pricing-currency-selector.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-currency-selector.tsx) to "Team Calendar".
+3. **"Not advertised" $\rightarrow$ "Contact Us"**: Replaced all 8 occurrences of `"Not advertised"` in [`apps/web/app/pricing/components/pricing-comparison.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-comparison.tsx) with `"Contact Us"` across analytics, support, leave utilisation reports, clash detection, heatmaps, audit payroll export, staff seats, and calendar feed rows.
+4. **Automated Unit & Regression Tests**:
+   - Added explicit assertions in [`apps/web/app/pricing/pricing.test.ts`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/pricing.test.ts) verifying the presence of "Xero Payroll", "Team Calendar", and "Contact Us", and the absence of "Xero Payroll AU", "Team Calendar Engine", and "Not advertised".
+   - `bun --filter web test`: 5/5 tests passed.
+   - `bun run check`: 1018 files passed cleanly (0 errors).
+   - `bun run typecheck`: 19/19 packages passed cleanly.
+   - `bun run test`: all unit tests passed across monorepo (561 tests in `app`, 115 tests in `web`).
+5. **Browser Verification**:
+   - Verified via Playwright against running server at `http://localhost:3001/pricing`. Confirmed rendered content matches assertions with zero occurrences of stale copy and verified both desktop and mobile viewports. Captured visual evidence in `reports/verification-pipeline.png`, `reports/verification-compare.png`, and `reports/verification-compare-mobile.png`.
+
+## Task: Pricing page production-grade redesign with Country Slider & Premium Analytics
+
+- [x] Switch default `/pricing` route mode to `"paid"` so cold hits render the full production-grade pricing experience by default
+- [x] Build interactive Country Slider supporting Australia (AUD: $9/$19), New Zealand (NZD: $10/$21), and United Kingdom (GBP: £5/£11)
+- [x] Remove the words "Australia First" across hero, cards, and metadata
+- [x] Update hero headline to exact wording: `"Straightforward pricing"`
+- [x] Add rich details about analytics and reporting for the Premium plan across plan cards, comparison matrix, and FAQ
+- [x] Refactor components to satisfy strict Biome complexity limits, no nested ternaries, and no unnecessary conditions
+- [x] Verify Playwright browser interactions (slider dragging, stop clicking, URL updates, public holiday dynamic labels, mobile responsiveness)
+- [x] Run repository quality gates (`bun run check`, `bun run typecheck`, `bun run test`)
+- [x] Capture visual evidence screenshots across Desktop (AUD, NZD, GBP), Tablet, and Mobile
+
+### Review
+
+1. **Default Production-Grade Paid Mode**: Updated [`apps/web/app/pricing/page.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/page.tsx) and `.env.local` so cold visits to `/pricing` immediately render the full paid experience instead of the early-access holding screen.
+2. **Interactive Country Slider**: Created a responsive range slider with notch stops in [`apps/web/app/pricing/components/pricing-currency-selector.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-currency-selector.tsx) allowing instant switching between:
+   - 🇦🇺 **Australia (AUD)**: Starter $9/mo, Premium $19/mo, Xero Payroll AU, Australian Public Holiday
+   - 🇳🇿 **New Zealand (NZD)**: Starter $10/mo, Premium $21/mo, Xero Payroll NZ, New Zealand Public Holiday
+   - 🇬🇧 **United Kingdom (GBP)**: Starter £5/mo, Premium £11/mo, Xero Payroll UK, UK Public Holiday
+3. **Removed "Australia First" & Updated Headline**: Completely eradicated "Australia First" wording from the overview header and components. Updated main `<h1>` headline to the exact copy: `"Straightforward pricing"`.
+4. **Premium Analytics & Reporting Breakdown**:
+   - In [`apps/web/app/pricing/components/pricing-plans.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-plans.tsx), added a dedicated reporting breakdown box to the Premium card highlighting:
+     - Leave utilisation & balance trends
+     - Absence clash & overlap detection
+     - Department & team coverage heatmaps
+     - Audit-ready payroll exports (CSV)
+   - In [`apps/web/app/pricing/components/pricing-comparison.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-comparison.tsx), added four dedicated matrix rows: Leave utilisation reports, Absence clash detection, Coverage heatmaps, and Audit payroll export.
+   - In [`apps/web/app/pricing/components/pricing-faq.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-faq.tsx), added a dedicated question explaining the analytics and reporting capabilities of the Premium plan.
+5. **Quality Gates & Evidence**:
+   - `bun run check`: 1018 files passed (0 errors)
+   - `bun run typecheck`: 19/19 packages passed (0 errors)
+   - `bun run test`: all unit tests passed across domain packages, `web` (115 tests), and `app` (561 tests)
+   - Verified in headless browser via Playwright with 100% passing assertions and zero horizontal scroll on mobile (`390px`).
+   - Screenshots generated: `reports/pricing-desktop-aud.png`, `reports/pricing-desktop-nzd.png`, `reports/pricing-desktop-gbp.png`, `reports/pricing-tablet.png`, and `reports/pricing-mobile.png`.
+
+### Review
+
+Completely redesigned the `/pricing` marketing page on `apps/web` following **Direction 2: Living Calendar Feed Interactive Preview & Ambient Tonal Stage**:
+
+1. **Ambient Tonal Stage & Interactive Feed Simulator**: Built the interactive living calendar feed preview inside [`apps/web/app/pricing/components/pricing-currency-selector.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-currency-selector.tsx). It visualises the core product truth (Xero Payroll AU -> Canonical Engine -> Subscribed Apple/Outlook/Google Feeds), includes interactive filtering (All staff, Sydney office, Engineering), dynamic feed URL generation with single-click clipboard copying, and feed cards featuring realistic leave badges (Annual Leave, Sick Leave, WFH, Client site, Public Holiday).
+2. **Hero Section Redesign**: Replaced the awkward and generic metrics box with a crystal-clear Australian payroll value proposition, trust reassurance strip (14-day free trial, connects in 2 minutes, no credit card required), and a clean rate overview card highlighting Starter ($9/mo) and Premium ($19/mo).
+3. **Plan Cards Overhaul**: Redesigned Starter, Premium, and Enterprise cards in [`apps/web/app/pricing/components/pricing-plans.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-plans.tsx) with authentic SVG checkmarks, Plus Jakarta Sans typography, 20px radii, and balanced top-border badges for "Recommended" and "Multi-entity".
+4. **Comparison Matrix**: Authored a clear, accessible comparison table in [`apps/web/app/pricing/components/pricing-comparison.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-comparison.tsx) with semantic `<caption>`, `col`/`row` scopes, subtle column highlight for Premium, and dedicated mobile cards for smaller viewports.
+5. **Customer FAQ & Conversion Section**: Expanded the FAQ in [`apps/web/app/pricing/components/pricing-faq.tsx`](file:///home/hilton/Documents/teamcalendar/apps/web/app/pricing/components/pricing-faq.tsx) to address 8 critical customer questions using native `<details>` and `<summary>` elements with rotating chevrons. Added `PricingFinalCta` conversion banner with direct trial prompts and bank-grade encryption trust signals.
+6. **Responsive Design & Quality Gates**:
+   - Visual verification across Desktop (1440px), Tablet (768px), and Mobile (390px) via Playwright screenshots (`reports/fullpage-paid.png`, `reports/mobile-pricing.png`, `reports/tablet-pricing.png`, `reports/early-access-desktop.png`).
+   - Zero horizontal overflow on mobile (`scrollWidth === clientWidth === 390px`).
+   - All tests pass: `apps/web/app/pricing/pricing.test.ts` (5/5), `bun run check` (1017 files clean), `bun run typecheck` (19/19 packages clean), and `bun run test` (330 tests across domain packages, 115 tests in web).
 
 
 ## Task: Resolve CI integration test failure in @repo/jobs schedule-xero-syncs
@@ -589,3 +677,48 @@ reported by hook was left untouched. Browser sessions closed; the attempted
 sandbox dev process was stopped, and the pre-existing server was preserved.
 Evidence: /tmp/footer-results.json, /tmp/footer-{1440,390}-{light,dark}.png,
 /tmp/footer-{check,typecheck,test,integration}.log.
+
+## Contact in marketing navigation
+
+- [x] Confirm the shared navigation and existing Contact destination.
+- [x] Add Contact immediately after Pricing across header variants.
+- [x] Run checks and record results.
+
+Review: Contact follows Pricing in the shared desktop, mobile and no-JavaScript
+header navigation. PASS: 10 existing header tests, scoped Biome check,
+repository typecheck and git diff --check. FAIL: repository lint (two pricing
+issues) and unit suite (analytics test and worker timeouts). NOT VERIFIED:
+integration coverage, the local-database guard rejected the configured non-local
+connection. Logs: /tmp/contact-nav-{check,typecheck,test,integration}.log.
+
+## Integrations overdrive redesign
+
+- [x] Inspect existing page, product truth and approved combined direction.
+- [x] Build interactive connection map, scroll narrative and calendar demonstration.
+- [x] Verify responsive behaviour, controls, reduced motion and repository gates.
+- [x] Obtain independent finish review and document results.
+
+Direction: Persuade mode. Preserve existing brand tokens and factual content;
+replace the stacked-card composition with a wide connection diagram and a
+scroll-led illustrative leave journey ending in a filterable weekly calendar.
+No live data or instant calendar-delivery claims. Existing pricing edits preserved.
+
+Integrations redesign review: interactive three-system map, scroll-driven leave
+journey, stage-aware publication example and source filters implemented. Existing
+regional, data-scope, setup and security content retained. Independent reviewer
+returned fix for submitted-versus-published state contradiction; corrected and
+scored resolved, disposition ship for that fix. Scope-limited documentation in
+`.impeccable/surfaces/integrations.md`; existing global brand preserved.
+
+PASS: final repository check, typecheck and unit suite; seven integrations tests;
+320/390/768/1440px light/dark without horizontal overflow or page errors; scroll
+stages, map controls, filters, keyboard activation and 3px focus; reduced motion;
+200% text without main-content overflow; no-JavaScript narrative and setup link.
+NOT VERIFIED: database integration tests reject the configured non-local database
+under ALLOW_LOCAL_DATABASE_TESTS. No guard bypassed. No production deployment.
+Browser sessions closed; attempted temporary server exited because the existing
+server held the Next.js lock. Existing server left intact. Unrelated concurrent
+pricing, header, stylesheet and plan edits preserved.
+Evidence: `.impeccable/review/integrations/`, `/tmp/integrations-new-*.png`,
+`/tmp/integrations-redesign-*-final.log`, and
+`/tmp/integrations-redesign-integration.log`.

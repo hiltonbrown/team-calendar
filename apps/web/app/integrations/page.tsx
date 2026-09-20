@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { MarketingIcon } from "../(home)/components/marketing-icons";
 import { integrationCapabilities } from "./capabilities";
+import { ConnectionMap, IntegrationJourney } from "./integration-experience";
 import styles from "./integrations.module.css";
 
 export const metadata: Metadata = createMetadata({
@@ -28,27 +29,6 @@ const shippedRegionNames = integrationCapabilities.xeroPayrollRegions
 const plannedRegionNames = integrationCapabilities.xeroPayrollRegions
   .filter((region) => region.status === "planned")
   .map((region) => region.name);
-
-const flow = [
-  {
-    copy: "Employees, approved leave and balances sync from Xero. Leave requests and decisions sync back.",
-    icon: "sync",
-    label: "Two-way leave sync",
-    title: "Xero Payroll",
-  },
-  {
-    copy: "Staff request leave and share travel, WFH and other availability updates in one place.",
-    icon: "calendar",
-    label: "Your team’s availability",
-    title: "Team Calendar",
-  },
-  {
-    copy: "Approved leave and availability updates appear in Outlook, Google Calendar and Apple Calendar.",
-    icon: "link",
-    label: "Calendar subscriptions",
-    title: "Calendar feeds",
-  },
-] as const;
 
 const dataMoves = [
   {
@@ -148,28 +128,12 @@ const IntegrationsPage = () => (
               </Link>
             </div>
           </div>
-
-          <ol
-            aria-label="Two-way Xero leave sync and calendar subscriptions"
-            className={styles.path}
-          >
-            {flow.map((item, index) => (
-              <li className={styles.pathItem} key={item.title}>
-                <span className={styles.pathIcon}>
-                  <MarketingIcon id={item.icon} size={20} />
-                </span>
-                <span className={styles.pathLabel}>{item.label}</span>
-                <strong>{item.title}</strong>
-                <p>{item.copy}</p>
-                {index < flow.length - 1 ? (
-                  <span aria-hidden="true" className={styles.pathLine} />
-                ) : null}
-              </li>
-            ))}
-          </ol>
         </div>
+        <ConnectionMap />
       </div>
     </section>
+
+    <IntegrationJourney />
 
     <section className={styles.section}>
       <div className={`fmkt-container ${styles.split}`}>

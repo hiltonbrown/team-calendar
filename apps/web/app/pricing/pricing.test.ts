@@ -7,7 +7,6 @@ import { PricingExperience } from "./components/pricing-experience";
 import { getCurrencyPricingState } from "./constants";
 
 vi.mock("server-only", () => ({}));
-const numericCurrencyPattern = /[£$][0-9]/;
 
 const renderMode = (mode: "early_access" | "paid") =>
   renderToStaticMarkup(React.createElement(PricingExperience, { mode }));
@@ -47,6 +46,12 @@ describe("pricing experience", () => {
     expect(html).not.toContain("$49");
     expect(html).not.toContain("Up to 10");
     expect(html).not.toContain("2 Xero");
+    expect(html).toContain("Contact Us");
+    expect(html).not.toContain("Not advertised");
+    expect(html).toContain("Team Calendar");
+    expect(html).not.toContain("Team Calendar Engine");
+    expect(html).toContain("Xero Payroll");
+    expect(html).not.toContain("Xero Payroll AU");
     expect(html.match(/Get started/g)).toHaveLength(2);
   });
 
@@ -60,25 +65,22 @@ describe("pricing experience", () => {
     expect(html).not.toContain("aria-expanded");
   });
 
-  it("keeps NZD and GBP as non-purchase availability states", () => {
+  it("provides active country pricing for Australia, New Zealand and United Kingdom", () => {
     expect(getCurrencyPricingState("AUD")).toMatchObject({
       available: true,
+      country: { premiumPrice: "$19", starterPrice: "$9" },
       currency: "AUD",
     });
     expect(getCurrencyPricingState("NZD")).toMatchObject({
-      available: false,
-      heading: "New Zealand pricing is coming soon",
+      available: true,
+      country: { premiumPrice: "$21", starterPrice: "$10" },
+      currency: "NZD",
     });
     expect(getCurrencyPricingState("GBP")).toMatchObject({
-      available: false,
-      heading: "United Kingdom pricing is coming soon",
+      available: true,
+      country: { premiumPrice: "£11", starterPrice: "£5" },
+      currency: "GBP",
     });
-    expect(
-      JSON.stringify([
-        getCurrencyPricingState("NZD"),
-        getCurrencyPricingState("GBP"),
-      ])
-    ).not.toMatch(numericCurrencyPattern);
   });
 
   it("keeps the route static and isolates the client boundary", () => {

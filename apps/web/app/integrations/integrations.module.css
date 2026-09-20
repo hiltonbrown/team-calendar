@@ -53,68 +53,6 @@
   margin-top: 28px;
 }
 
-.path {
-  display: grid;
-  gap: 10px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.pathItem {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 14px;
-  min-width: 0;
-  padding: 18px;
-  background: var(--marketing-surface-lowest);
-  border-radius: 20px;
-}
-
-.pathIcon {
-  display: inline-flex;
-  grid-row: span 3;
-  align-items: center;
-  justify-content: center;
-  width: 42px;
-  height: 42px;
-  color: var(--marketing-primary);
-  background: color-mix(
-    in oklch,
-    var(--marketing-primary-container) 45%,
-    transparent
-  );
-  border-radius: 12px;
-}
-
-.pathLabel {
-  font: 600 0.75rem / 1.3 var(--marketing-font);
-  color: var(--marketing-on-surface-variant);
-  letter-spacing: 0.03em;
-}
-
-.path strong {
-  font: 600 1rem / 1.35 var(--marketing-font);
-  color: var(--marketing-on-surface);
-  letter-spacing: -0.01em;
-}
-
-.path p {
-  margin: 0;
-  font: 400 0.875rem / 1.55 var(--marketing-font);
-  color: var(--marketing-on-surface-variant);
-}
-
-.pathLine {
-  position: absolute;
-  bottom: -10px;
-  left: 39px;
-  width: 2px;
-  height: 10px;
-  background: var(--marketing-surface-highest);
-}
-
 .section {
   padding: clamp(64px, 8vw, 100px) 0;
 }
@@ -179,7 +117,7 @@
   );
 }
 
-.tonal .destination {
+:where(.tonal) .destination {
   background: var(--marketing-surface-lowest);
 }
 
@@ -237,15 +175,15 @@
   background: var(--marketing-surface-high);
 }
 
-.destination:first-child span {
+.destination:where(:first-child) span {
   color: var(--marketing-outlook-blue);
 }
 
-.destination:nth-child(2) span {
+.destination:where(:nth-child(2)) span {
   color: var(--marketing-google-blue);
 }
 
-.destination:nth-child(3) span {
+.destination:where(:nth-child(3)) span {
   color: var(--marketing-apple-red);
 }
 
@@ -334,7 +272,6 @@
   border-radius: 20px;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: This step marker cannot overlap the earlier destination selector; their component trees are unrelated. */
 .steps span {
   display: inline-flex;
   align-items: center;
@@ -368,7 +305,6 @@
   align-items: start;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: This sync icon cannot overlap the earlier destination selector; their component trees are unrelated. */
 .syncHeading > span {
   display: inline-flex;
   align-items: center;
@@ -457,5 +393,516 @@
   .regionCode,
   .regionStatus {
     border: 1px solid CanvasText;
+  }
+}
+
+/* The map and calendar share one narrative; colour identifies provenance. */
+.hero {
+  padding-bottom: 48px;
+}
+.heroGrid {
+  display: block;
+}
+.heroGrid > div {
+  max-width: 960px;
+}
+.title {
+  max-width: 960px;
+  font-size: clamp(2.75rem, 5.4vw, 5rem);
+}
+.lead {
+  max-width: 760px;
+}
+.connectionMap {
+  margin-top: 64px;
+}
+.nodes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 64px;
+}
+.node {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 28px 12px;
+  color: var(--marketing-on-surface);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 20px;
+  transition: background 180ms ease-out;
+}
+.node:hover {
+  background: var(--marketing-surface-container);
+}
+.node[aria-pressed="true"] {
+  background: var(--marketing-surface-lowest);
+}
+.node strong {
+  font-size: clamp(1.125rem, 2vw, 1.5rem);
+  font-weight: 600;
+}
+.node > span:not(.nodeIcon, .connector) {
+  font-size: 0.875rem;
+  color: var(--marketing-on-surface-variant);
+}
+.nodeIcon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  color: var(--marketing-primary);
+  background: var(--marketing-secondary-container);
+  border-radius: 16px;
+}
+.connector {
+  position: absolute;
+  top: 60px;
+  left: calc(100% + 12px);
+  width: 40px;
+  font-size: 32px;
+  color: var(--marketing-primary);
+}
+.connectionDetail {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 48px;
+  align-items: start;
+  min-height: 115px;
+  padding: 24px 0;
+  margin-top: 28px;
+}
+.connectionDetail p {
+  max-width: 65ch;
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.connectionDetail :where(p + p) {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  font-size: 0.9375rem;
+  color: var(--marketing-on-surface-variant);
+}
+.connectionDetail svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.interactionHint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--marketing-on-surface-variant);
+}
+.journey {
+  padding: 64px 0;
+  background: var(--marketing-surface);
+}
+.journeyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: clamp(32px, 5vw, 72px);
+  align-items: start;
+}
+.chapter {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 420px;
+  padding: 64px 0;
+}
+.chapter h2 {
+  margin: 0 0 24px;
+  font: 600 clamp(2rem, 3.2vw, 3rem) / 1.15 var(--marketing-font);
+  color: var(--marketing-on-surface);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.chapter p {
+  margin: 0 0 20px;
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--marketing-on-surface-variant);
+}
+.chapter a {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  min-height: 44px;
+}
+.stickyDemo {
+  position: sticky;
+  top: 112px;
+  padding-top: 48px;
+}
+.demoHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  font-size: 0.8125rem;
+  color: var(--marketing-on-surface-variant);
+}
+.demoHeading > span:first-child {
+  font-weight: 600;
+  color: var(--marketing-on-surface);
+}
+.progress {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.progress button {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px;
+  font-size: 0.875rem;
+  color: var(--marketing-on-surface-variant);
+  cursor: pointer;
+  background: var(--marketing-surface-container);
+  border: 0;
+  border-radius: 12px;
+}
+.progress button[aria-pressed="true"] {
+  color: var(--marketing-on-primary);
+  background: var(--marketing-primary);
+}
+.progress button:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.requestState {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  min-height: 100px;
+  padding: 20px 24px;
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+  border-radius: 20px 20px 0 0;
+}
+.requestState svg {
+  flex-shrink: 0;
+}
+.requestState strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+.requestState p {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.calendarDemo {
+  padding: 28px 24px 20px;
+  scroll-margin-top: 140px;
+  background: var(--marketing-surface-low);
+  border-radius: 0 0 20px 20px;
+}
+.calendarHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.calendarHeading h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.calendarHeading > span {
+  font-size: 0.8125rem;
+  color: var(--marketing-on-surface-variant);
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0;
+}
+.filters button {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  color: var(--marketing-on-surface-variant);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+}
+.filters button[aria-pressed="true"] {
+  font-weight: 600;
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-highest);
+}
+.filters button:hover {
+  background: var(--marketing-surface-container);
+}
+.week {
+  display: grid;
+  grid-template-rows: 36px repeat(3, 76px);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px 4px;
+  isolation: isolate;
+}
+.day {
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--marketing-on-surface-variant);
+  text-align: center;
+}
+.leaveEvent,
+.wfhEvent,
+.travelEvent {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 4px 8px;
+  align-content: center;
+  padding: 10px;
+  font-size: 0.8125rem;
+  border-radius: 12px;
+}
+.leaveEvent {
+  grid-row: 2;
+  grid-column: 1 / 4;
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+.wfhEvent {
+  grid-row: 3;
+  grid-column: 2 / 5;
+}
+.travelEvent {
+  grid-row: 4;
+  grid-column: 3 / 6;
+}
+.wfhEvent,
+.travelEvent {
+  color: var(--marketing-on-surface);
+  background: var(--marketing-surface-highest);
+}
+.leaveEvent span,
+.wfhEvent span,
+.travelEvent span {
+  grid-column: 2;
+  font-size: 0.75rem;
+}
+.calendarNote,
+.demoFootnote {
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--marketing-on-surface-variant);
+}
+.calendarNote {
+  min-height: 42px;
+  margin: 20px 0 0;
+}
+.demoFootnote {
+  max-width: 65ch;
+  margin: 16px 0 0;
+}
+.root button:focus-visible,
+.root a:focus-visible {
+  outline: 3px solid var(--marketing-primary);
+  outline-offset: 4px;
+}
+.root ::selection {
+  color: var(--marketing-on-secondary-container);
+  background: var(--marketing-secondary-container);
+}
+.root {
+  scrollbar-color: var(--marketing-outline) var(--marketing-surface);
+}
+.region,
+.destination,
+.dataPanel,
+.steps li {
+  padding: 20px 0;
+  background: transparent;
+  border-radius: 0;
+}
+.region[data-status="planned"],
+:where(.tonal) .destination {
+  background: transparent;
+}
+.region[data-status="shipped"] {
+  padding: 24px;
+  border-radius: 20px;
+}
+.dataGrid {
+  gap: 40px;
+}
+.dataPanel h3 {
+  margin-bottom: 24px;
+  font-size: 1.25rem;
+}
+.syncPanel {
+  background: var(--marketing-surface-low);
+}
+.compactHeader {
+  align-items: start;
+}
+.compactHeader .copy {
+  max-width: 560px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .requestState {
+    transition: background 250ms ease-out;
+  }
+  .requestState[data-stage="0"] {
+    color: var(--marketing-on-surface);
+    background: var(--marketing-surface-container);
+  }
+}
+@media (max-width: 1050px) {
+  .journeyGrid {
+    grid-template-columns: 1fr 1.2fr;
+    gap: 28px;
+  }
+  .calendarDemo {
+    padding: 20px 12px;
+  }
+  .filters {
+    gap: 2px;
+  }
+  .filters button {
+    padding: 8px;
+  }
+}
+@media (max-width: 760px) {
+  .connectionMap {
+    margin-top: 40px;
+  }
+  .nodes {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .node {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 6px 16px;
+    padding: 18px;
+    text-align: left;
+  }
+  .nodeIcon {
+    grid-row: span 2;
+    width: 48px;
+    height: 48px;
+  }
+  .connector {
+    top: calc(100% - 3px);
+    left: 36px;
+    font-size: 26px;
+    transform: rotate(90deg);
+  }
+  .connectionDetail {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    min-height: 190px;
+  }
+  .journeyGrid {
+    display: flex;
+    flex-direction: column;
+  }
+  .chapters {
+    display: contents;
+  }
+  .chapter {
+    min-height: 0;
+    padding: 28px 0;
+  }
+  .chapter h2 {
+    max-width: 22ch;
+  }
+  .stickyDemo {
+    position: static;
+    width: 100%;
+    padding-top: 12px;
+  }
+  .journey {
+    padding: 32px 0 56px;
+  }
+  .calendarDemo {
+    padding: 20px 12px;
+  }
+  .compactHeader .compactTitle {
+    margin-bottom: 24px;
+  }
+  .dataGrid {
+    gap: 8px;
+  }
+  .progress {
+    gap: 6px;
+  }
+  .progress button {
+    gap: 6px;
+  }
+  .node > span:not(.nodeIcon, .connector) {
+    font-size: 0.8125rem;
+  }
+}
+@media (forced-colors: active) {
+  .node,
+  .progress button,
+  .filters button,
+  .leaveEvent,
+  .wfhEvent,
+  .travelEvent {
+    border: 1px solid ButtonText;
+  }
+  .root button[aria-pressed="true"] {
+    outline: 3px solid Highlight;
+  }
+}
+
+.nodes,
+.progress,
+.filters {
+  min-width: 0;
+  padding: 0;
+  margin-inline: 0;
+  border: 0;
+}
+
+.pendingEvent {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  align-self: center;
+  max-width: 44ch;
+  padding: 10px;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--marketing-on-surface-variant);
+}
+.leaveEvent,
+.wfhEvent,
+.travelEvent {
+  overflow-wrap: anywhere;
+}
+.week {
+  grid-template-rows: 36px repeat(3, minmax(76px, auto));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .leaveEvent {
+    animation: publish-event 380ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes publish-event {
+    from {
+      clip-path: inset(0 100% 0 0 round 12px);
+    }
+    to {
+      clip-path: inset(0 0 0 0 round 12px);
+    }
   }
 }

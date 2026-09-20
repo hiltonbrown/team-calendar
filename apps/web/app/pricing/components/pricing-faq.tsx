@@ -13,6 +13,12 @@ const paidFaqs = [
   },
   {
     answer:
+      "Premium unlocks advanced analytics including team and department leave utilisation trends, real-time absence clash detection to prevent understaffing, visual coverage heatmaps, and audit-ready CSV exports for compliance and payroll reconciliation.",
+    question:
+      "What analytics and reporting features are included in the Premium plan?",
+  },
+  {
+    answer:
       "Every paid plan includes a 14-day free trial with full feature access. No credit card is required to sign up. If you decide not to continue, your feeds simply pause, and your Xero data remains completely untouched.",
     question: "Is there a free trial, and is a credit card required?",
   },

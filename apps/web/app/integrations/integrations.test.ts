@@ -4,6 +4,16 @@ import { describe, expect, it } from "vitest";
 import IntegrationsPage from "./page";
 
 describe("Integrations page", () => {
+  it("keeps submitted leave out of the illustrative published calendar", () => {
+    const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
+
+    expect(html).toContain("Illustrative example");
+    expect(html).toContain("Leave submitted");
+    expect(html).toContain("No leave event is published");
+    expect(html).not.toContain("Approved · Xero");
+    expect(html).toContain("2 example entries: manual availability");
+  });
+
   it("describes calendar refresh timing without promising client delivery", () => {
     const html = renderToStaticMarkup(React.createElement(IntegrationsPage));
 
