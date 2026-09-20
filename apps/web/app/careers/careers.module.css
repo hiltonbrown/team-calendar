@@ -17,7 +17,7 @@
   padding: 6px 12px;
   margin: 0;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.4;
   color: var(--marketing-on-secondary-container);
   text-transform: uppercase;
@@ -40,7 +40,7 @@
 .sectionHeading > p:first-child {
   margin: 0;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.4;
   color: var(--marketing-primary);
   text-transform: uppercase;

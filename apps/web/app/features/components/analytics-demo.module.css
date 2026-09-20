@@ -420,7 +420,7 @@
   color: var(--on-surface-variant);
 }
 .teamButton[aria-pressed="true"] {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--primary);
 }
 .cell {

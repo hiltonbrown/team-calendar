@@ -1252,3 +1252,65 @@ Detector advisories remain in unrelated legacy styles and the intentionally enla
 SVG value labels (SVG units scale with the chart). Integration NOT VERIFIED:
 remote target rejected by ALLOW_LOCAL_DATABASE_TESTS. Browser closed; existing dev
 server retained. Evidence: /tmp/features-polish-*.png and matching logs.
+
+---
+
+## Marketing site unslop pass (apps/web)
+
+Brief: remove generic AI defaults from every page of the marketing site and
+restore intentional craft. Reference: DESIGN.md.
+
+### What was actually wrong
+
+The palette, typography and token system were already brand-correct: sage-led,
+lavender-tinted neutrals, Plus Jakarta Sans with Lora as the editorial second
+voice. No purple gradients, no cream, no Inter. The slop was a ghost layer left
+by earlier rebuilds.
+
+- Three components imported by nothing: `benefits-strip.tsx`,
+  `calendar-visibility-section.tsx`, `scroll-reveal.tsx`.
+- 155 of 498 marketing CSS classes (31%) matched no markup.
+- 19 of 50 `--marketing-*` tokens had no consumer, including a whole
+  `.features-prototype` alias layer for a class that does not exist.
+- The scroll-choreography layer was inert: every `animation-timeline: --fmkt-slide`
+  rule pointed at a named timeline whose provider (`.fmkt-slide`) was never in the
+  markup, and a kill switch at the bottom of `motion.css` disabled the rest.
+- `section-cover-darken` painted `oklch(0% 0 0 / 0.18)` at `z-index: 50` over
+  three unpositioned sections, above the `z-index: 40` sticky header.
+- `.ft-flow__hub` set `color: #fff` over a `--marketing-primary` fill. In dark
+  mode that is white on `#8fd496`, about 1.7:1. Deleted with the dead block.
+- The pricing page had missed the design pass: fourteen weight-700 declarations
+  where DESIGN.md sets 600/500, a 24px radius plus 6px and 8px strays, seven
+  persistent ramp shadows up to `0 16px 40px`, and a dashed-border card nested
+  inside a card.
+- The same uppercase 0.76rem/700 eyebrow was redeclared on five pages.
+
+### Changes
+
+- [x] Deleted the three orphaned components.
+- [x] Pruned dead rules from `features.css`, `home.css`, `shell.css`, `motion.css`
+      and dead tokens from `tokens.css`. Re-audit: zero dead classes remain.
+- [x] Rewrote `motion.css` (842 to 165 lines) around one signature move: the hero
+      sync diagram drawing its own path. Dropped all below-fold parallax,
+      per-item nth-child depth staggering and the darken overlay.
+- [x] Weights onto the DESIGN.md scale: 600 display/headline, 500 label.
+- [x] Radii onto the ladder: 24 to 20, 8 and 6 to 12, 9 to 12, 5 to 4 with a
+      documented marker exception.
+- [x] Persistent shadows capped at a new `--marketing-shadow-hairline` token,
+      per the Hairline Ceiling Rule.
+- [x] Pricing analytics box: nested card to tonal inset (no border, no radius).
+- [x] Pricing final CTA: gradient plus sage border to a flat tonal band, so the
+      homepage green band stays the site's one drenched moment.
+
+Net: 2,889 deletions, 176 insertions.
+
+### Verification
+
+PASS: `bun run check`, `bun run typecheck` (19 tasks), `bunx vitest run` in
+apps/web (36 files, 134 tests), `turbo build --filter=web`.
+PASS: all 13 marketing routes at 1440px and 390px, light and dark, in Chromium.
+No JS errors, no horizontal overflow. The only failing request is
+`/_vercel/insights/script.js`, which the platform injects in production and is
+expected to 404 outside Vercel.
+Visual review: homepage hero (sync diagram draws correctly), homepage full page,
+pricing cards before and after the nesting fix.

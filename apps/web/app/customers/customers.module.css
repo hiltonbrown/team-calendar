@@ -69,7 +69,7 @@
 
 .heroAside p {
   margin: 8px 0 0;
-  font: 700 var(--text-label-md) / 1.3 var(--marketing-font);
+  font: 500 var(--text-label-md) / 1.3 var(--marketing-font);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -181,7 +181,7 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  font: 700 var(--text-label-lg) / 1 var(--marketing-font);
+  font: 500 var(--text-label-lg) / 1 var(--marketing-font);
   color: var(--marketing-on-primary);
   background: var(--marketing-primary);
   border-radius: 50%;
