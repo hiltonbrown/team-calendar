@@ -191,3 +191,33 @@ are implementation work, not a new permission gate.
   disabled. A reviewed candidate has not been deployed.
 - Host Bun 1.3.14 is not release evidence; candidate gates use the existing
   `/home/hilton/.bun/bin/bun` 1.4.0 executable.
+
+## Worktree consolidation and cleanup (20 September 2026)
+
+- [x] Inventory registered worktrees, branches, stashes and local changes.
+- [x] Confirm both secondary worktree commits are already included in `main`
+  and that `origin/main` matches the local main commit.
+- [x] Inspect ignored files and preserve any unique local configuration or
+  verification evidence before removing obsolete worktrees.
+- [x] Remove the two merged secondary worktrees and the merged candidate branch;
+  prune stale worktree and remote-tracking metadata.
+- [x] Verify the remaining worktree, commit reachability and clean Git status,
+  then record the result.
+
+### Review
+
+Both secondary worktree tips were already ancestors of `main` at `1910b3aa`:
+the candidate branch at `816b1811` and detached Kilo worktree at `e60aaba1`.
+Removed both worktrees, the merged `codex/go-live-candidate` branch and two
+empty preview directories. Pruned Git worktree and remote-tracking metadata.
+The main checkout is the only remaining worktree and branch.
+
+Preserved the ignored historical audit mirror at
+`.tmp/worktree-cleanup-2026-09-20/release-remote-mirror.git`. No uncommitted work,
+stashes or unique environment files were found in the removed worktrees.
+
+Verification: commit ancestry, remote main equality before this task's log
+commit, clean worktree status, no unmerged branches, `git diff --check` and
+`git fsck --full --no-dangling`. No application source changed, so application
+test suites were not rerun. The cleanup record is committed locally; no remote
+push or deployment was performed.
