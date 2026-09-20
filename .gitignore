@@ -66,7 +66,6 @@ apps/email/.react-email/
 
 # Deployment and local tooling
 .clerk/
-.codex/config.toml
 .idea/
 .kilo/
 .kilocode/
@@ -78,9 +77,11 @@ kilocode/
 # .claude/  Claude Code settings, subagents and installed skills
 # .agents/  cross-harness (Codex/generic) installed skills and plans
 # /agent/   legacy stray skill install, superseded by .agents/
+# /.codex/  Codex CLI local config and hooks
 /.claude/
 /.agents/
 /agent/
+/.codex/
 
 # VS Code local settings
 .vscode/*
