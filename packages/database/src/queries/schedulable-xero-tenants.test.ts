@@ -251,4 +251,71 @@ describe("listSchedulableXeroTenants", () => {
       })
     );
   });
+
+  it("gracefully omits tenants with missing connection or organisation relations without throwing", async () => {
+    const validTenantId = "tenant-uuid-valid";
+
+    mocks.tenantFindMany.mockResolvedValue([
+      {
+        clerk_org_id: "org_clerk_1",
+        id: "tenant-uuid-missing-conn",
+        last_approval_state_reconciled_at: null,
+        last_leave_balances_sync_at: null,
+        last_leave_records_sync_at: null,
+        last_people_sync_at: null,
+        organisation: { timezone: "Australia/Sydney" },
+        organisation_id: "org-uuid-1",
+        payroll_region: "AU",
+        sync_paused_at: null,
+        xero_connection: null,
+        xero_tenant_id: "provider-1",
+      },
+      {
+        clerk_org_id: "org_clerk_1",
+        id: "tenant-uuid-missing-org",
+        last_approval_state_reconciled_at: null,
+        last_leave_balances_sync_at: null,
+        last_leave_records_sync_at: null,
+        last_people_sync_at: null,
+        organisation: null,
+        organisation_id: "org-uuid-2",
+        payroll_region: "AU",
+        sync_paused_at: null,
+        xero_connection: {
+          disconnected_at: null,
+          revoked_at: null,
+          status: "active",
+        },
+        xero_tenant_id: "provider-2",
+      },
+      {
+        clerk_org_id: "org_clerk_1",
+        id: validTenantId,
+        last_approval_state_reconciled_at: null,
+        last_leave_balances_sync_at: null,
+        last_leave_records_sync_at: null,
+        last_people_sync_at: null,
+        organisation: { timezone: "Australia/Sydney" },
+        organisation_id: "org-uuid-3",
+        payroll_region: "AU",
+        sync_paused_at: null,
+        xero_connection: {
+          disconnected_at: null,
+          revoked_at: null,
+          status: "active",
+        },
+        xero_tenant_id: "provider-3",
+      },
+    ]);
+
+    const result = await listSchedulableXeroTenants({ limit: 10 });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.tenants).toHaveLength(1);
+    expect(result.value.tenants[0].databaseTenantId).toBe(validTenantId);
+  });
 });

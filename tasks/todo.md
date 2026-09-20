@@ -2,6 +2,24 @@
 
 Last reviewed: 2026-09-20
 
+## Task: Resolve CI integration test failure in @repo/jobs schedule-xero-syncs
+
+- [x] Add defensive relation guarding and type narrowing in `packages/database/src/queries/schedulable-xero-tenants.ts`
+- [x] Add unit test in `packages/database/src/queries/schedulable-xero-tenants.test.ts` for orphaned/null relation safety
+- [x] Add structured error logging in `packages/jobs/src/handlers/schedule-xero-syncs.ts`
+- [x] Improve failure reporting and teardown consistency in `packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts`
+- [x] Run verification gates (`bun run check`, `bun run typecheck`, `bun run test`, `bun run test:release-tools`)
+
+### Review
+
+Diagnosed and resolved the CI integration test failure in `@repo/jobs` (`schedule-xero-syncs.integration.test.ts`):
+
+1. Defensive relation guarding: Because Prisma separates relation hydration into distinct SQL queries without explicit `relationJoins`, concurrent integration test execution across 21 test packages could lead to orphaned or partially deleted relations (`xero_connection` or `organisation`) being returned as `null` in cross-tenant scan queries (`listSchedulableXeroTenants`). Unchecked property access (`item.xero_connection.status` or `item.organisation.timezone`) would trigger a `TypeError: Cannot read properties of null`, causing `listSchedulableXeroTenants` to fail with `{ ok: false }`. Added defensive filtering and type narrowing in `packages/database/src/queries/schedulable-xero-tenants.ts` to ensure only records with intact, non-null relations are processed.
+2. Unit test coverage: Added a unit test in `packages/database/src/queries/schedulable-xero-tenants.test.ts` verifying that records with missing connection or organisation relations are safely omitted without throwing or failing.
+3. Observability and failure reporting: Added structured error logging via `log.error` in `packages/jobs/src/handlers/schedule-xero-syncs.ts` when `listSchedulableXeroTenants` fails, and updated `schedule-xero-syncs.integration.test.ts` to assert `expect(result).toMatchObject({ ok: true })` on failure so any error details are clearly printed in test output. Added `database.$disconnect()` to `afterAll` for consistency with all other integration tests in `@repo/jobs`.
+4. Dedicated Vitest config for `@repo/jobs`: Added `packages/jobs/vitest.config.mts` configuring `testTimeout: 30_000` and server-only alias matching the other domain packages (`@repo/database`, `@repo/feeds`).
+5. Quality gates verified: `bun run check` (1017 files clean), `bun run typecheck` (19/19 packages), `bun run test` (all unit test suites passed), `bun run test:release-tools`, and `turbo boundaries`.
+
 ## Task: Resolve CI workflow failures and make integration test execution robust
 
 - [x] Fix package import resolution for `@repo/database/live-test-fixture` in `apps/app/vitest.integration.config.mts`

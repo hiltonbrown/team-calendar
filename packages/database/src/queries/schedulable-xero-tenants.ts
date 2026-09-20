@@ -182,7 +182,16 @@ export async function listSchedulableXeroTenants(
       }
     }
 
-    const tenants: SchedulableXeroTenant[] = items.map((item) => ({
+    const validItems = items.filter(
+      (
+        item
+      ): item is typeof item & {
+        organisation: NonNullable<typeof item.organisation>;
+        xero_connection: NonNullable<typeof item.xero_connection>;
+      } => Boolean(item.xero_connection && item.organisation)
+    );
+
+    const tenants: SchedulableXeroTenant[] = validItems.map((item) => ({
       clerkOrgId: item.clerk_org_id,
       connectionStatus: item.xero_connection.status,
       databaseTenantId: item.id,

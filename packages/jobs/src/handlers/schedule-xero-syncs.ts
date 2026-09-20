@@ -264,6 +264,12 @@ export async function scheduleXeroSyncsPage(
   });
 
   if (!listResult.ok) {
+    log.error(
+      "Failed to list schedulable Xero tenants in scheduleXeroSyncsPage",
+      {
+        error: listResult.error,
+      }
+    );
     return {
       error: listResult.error,
       ok: false,

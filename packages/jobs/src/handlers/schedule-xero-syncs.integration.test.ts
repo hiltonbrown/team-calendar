@@ -110,6 +110,9 @@ describe("scheduleXeroSyncs Integration", () => {
 
   afterAll(async () => {
     await cleanupTestFixtures();
+    if (database) {
+      await database.$disconnect();
+    }
   });
 
   it("scans database tenants and emits tenant-scoped events carrying matching Clerk Org and Organisation IDs", async () => {
@@ -119,6 +122,9 @@ describe("scheduleXeroSyncs Integration", () => {
     const now = new Date("2026-08-11T15:30:00.000Z"); // Wed 01:30 AM local
     const result = await scheduleXeroSyncsPage({ now });
 
+    if (!result.ok) {
+      expect(result).toMatchObject({ ok: true });
+    }
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;

@@ -332,6 +332,23 @@ describe("scheduleXeroSyncs Coordinator", () => {
       expect(res.value.dispatched).toBe(2); // 2 of 3 succeeded
       expect(mocks.dispatchSyncEvent).toHaveBeenCalledTimes(3);
     });
+
+    it("returns failure when listing schedulable Xero tenants fails", async () => {
+      mocks.listSchedulableXeroTenants.mockResolvedValue({
+        error: { code: "internal", message: "Database failure" },
+        ok: false,
+      });
+
+      const res = await scheduleXeroSyncsPage();
+
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error).toEqual({
+          code: "internal",
+          message: "Database failure",
+        });
+      }
+    });
   });
 
   describe("scheduleXeroSyncsFunction registration", () => {
