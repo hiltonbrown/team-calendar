@@ -107,4 +107,6 @@ jobs:
           bun run --cwd apps/email assert-render
 
       - name: Run integration tests
+        env:
+          ALLOW_LOCAL_DATABASE_TESTS: "1"
         run: bun run test:integration

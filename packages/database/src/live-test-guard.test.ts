@@ -74,4 +74,33 @@ describe("database unit-test isolation", () => {
       "protected manifest"
     );
   });
+
+  it("permits local test connections when ALLOW_LOCAL_DATABASE_TESTS is enabled", () => {
+    process.env.NODE_ENV = "test";
+    process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
+    process.env.DATABASE_URL =
+      "postgresql://user:password@localhost:5432/test_db";
+
+    expect(() => assertTestDatabaseConnectionAllowed()).not.toThrow();
+  });
+
+  it("permits 127.0.0.1 test connections when ALLOW_LOCAL_DATABASE_TESTS is enabled", () => {
+    process.env.NODE_ENV = "test";
+    process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
+    process.env.DATABASE_URL =
+      "postgresql://user:password@127.0.0.1:5432/test_db";
+
+    expect(() => assertTestDatabaseConnectionAllowed()).not.toThrow();
+  });
+
+  it("denies remote database connections with ALLOW_LOCAL_DATABASE_TESTS", () => {
+    process.env.NODE_ENV = "test";
+    process.env.ALLOW_LOCAL_DATABASE_TESTS = "1";
+    process.env.DATABASE_URL =
+      "postgresql://user:password@remote.neon.tech/production_db";
+
+    expect(() => assertTestDatabaseConnectionAllowed()).toThrow(
+      "ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection"
+    );
+  });
 });

@@ -91,6 +91,14 @@ actionable; keep one-off task evidence in the review for that task.
 - Update unit and integration expectations together when production behaviour
   changes. Use source history to distinguish a stale integration assertion from
   a production regression.
+- Use array format `{ find, replacement }` for Vitest path aliases when path
+  prefixes overlap (e.g. `@repo` and `@repo/database/live-test-fixture`). Object
+  syntax keys are subject to Biome alphabetical re-sorting, which causes shorter
+  prefixes to shadow specific subpaths.
+- Differentiate local ephemeral CI containers (`localhost`) from protected remote
+  databases. Scope local database test permissions (`ALLOW_LOCAL_DATABASE_TESTS=1`)
+  strictly to integration steps to preserve unit test network isolation while
+  allowing deterministic local test fixture allocation without remote manifests.
 - Temporary external test resources require explicit user approval, isolated
   identifiers, and cleanup. Do not present a test as complete if its required
   database-backed coverage did not run.

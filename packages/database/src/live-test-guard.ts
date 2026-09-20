@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { isLocalDatabase } from "./is-local-database";
 
 const manifestSchema = z.object({
   active: z.literal(true),
@@ -24,32 +25,44 @@ export const assertTestDatabaseConnectionAllowed = (): void => {
   if (process.env.NODE_ENV !== "test") {
     return;
   }
-  if (process.env.ALLOW_LIVE_DATABASE_TESTS !== "I_ACKNOWLEDGE_LIVE_MUTATION") {
-    throw new Error(
-      "Database connections are disabled in unit tests. Use the guarded live integration runner."
-    );
-  }
-  const manifestPath = process.env.TC_RELEASE_MANIFEST;
-  const runId = process.env.TC_RELEASE_RUN_ID;
   const databaseUrl = process.env.DATABASE_URL;
-  if (!(manifestPath && runId && databaseUrl)) {
-    throw new Error("Protected live integration inputs are incomplete");
+
+  if (process.env.ALLOW_LIVE_DATABASE_TESTS === "I_ACKNOWLEDGE_LIVE_MUTATION") {
+    const manifestPath = process.env.TC_RELEASE_MANIFEST;
+    const runId = process.env.TC_RELEASE_RUN_ID;
+    if (!(manifestPath && runId && databaseUrl)) {
+      throw new Error("Protected live integration inputs are incomplete");
+    }
+    const value: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const manifest = manifestSchema.parse(value);
+    const identity = new URL(databaseUrl);
+    if (
+      manifest.runId !== runId ||
+      manifest.namespace !== `release:run:${runId}` ||
+      decodeURIComponent(identity.pathname.slice(1)) !==
+        manifest.target.database ||
+      decodeURIComponent(identity.username) !== manifest.target.role ||
+      identity.hostname !== manifest.target.hostname ||
+      process.env.TC_RELEASE_DURABLE_VERIFIED !== runId ||
+      process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED !== runId
+    ) {
+      throw new Error(
+        "Live database identity does not match the protected manifest"
+      );
+    }
+    return;
   }
-  const value: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
-  const manifest = manifestSchema.parse(value);
-  const identity = new URL(databaseUrl);
-  if (
-    manifest.runId !== runId ||
-    manifest.namespace !== `release:run:${runId}` ||
-    decodeURIComponent(identity.pathname.slice(1)) !==
-      manifest.target.database ||
-    decodeURIComponent(identity.username) !== manifest.target.role ||
-    identity.hostname !== manifest.target.hostname ||
-    process.env.TC_RELEASE_DURABLE_VERIFIED !== runId ||
-    process.env.TC_RELEASE_ACTIVE_RUN_VERIFIED !== runId
-  ) {
+
+  if (process.env.ALLOW_LOCAL_DATABASE_TESTS === "1") {
+    if (databaseUrl && isLocalDatabase(databaseUrl)) {
+      return;
+    }
     throw new Error(
-      "Live database identity does not match the protected manifest"
+      "ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection."
     );
   }
+
+  throw new Error(
+    "Database connections are disabled in unit tests. Use the guarded live integration runner."
+  );
 };

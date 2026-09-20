@@ -6,30 +6,13 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import ws from "ws";
 import { PrismaClient } from "../generated/client";
 import { keys } from "../keys";
+import { isLocalDatabase } from "./is-local-database";
 import { createLazyClient } from "./lazy-client";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 declare global {
   var __teamCalendarDatabase: PrismaClient | undefined;
 }
-
-// The Neon serverless adapter speaks Neon's WebSocket protocol, which a plain
-// Postgres (local dev, CI service container) cannot answer. Detect a local host
-// and fall back to the node-postgres adapter so integration tests run against a
-// vanilla Postgres while production keeps using the Neon driver.
-const isLocalDatabase = (connectionString: string): boolean => {
-  try {
-    const { hostname } = new URL(connectionString);
-    return (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname.endsWith(".localhost")
-    );
-  } catch {
-    return false;
-  }
-};
 
 const createDatabaseClient = (): PrismaClient => {
   assertTestDatabaseConnectionAllowed();

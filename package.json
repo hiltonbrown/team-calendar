@@ -25,7 +25,7 @@
     "replay:stripe": "bun --conditions=react-server tooling/release/replay-stripe-event.ts",
     "stripe:failures": "bun --conditions=react-server tooling/release/list-failed-stripe-events.ts",
     "test": "turbo test",
-    "test:integration": "turbo test:integration",
+    "test:integration": "ALLOW_LOCAL_DATABASE_TESTS=1 turbo test:integration",
     "test:release": "playwright test --config tooling/release/playwright.config.ts",
     "test:release-analytics-privacy": "bun --no-env-file tooling/release/verify-browser-analytics-privacy.ts",
     "test:release-tools": "vitest run --config tooling/release/vitest.config.ts",

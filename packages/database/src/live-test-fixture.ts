@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { z } from "zod";
+import { isLocalDatabase } from "./is-local-database";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 
 export const LIVE_FIXTURE_SUITES = {
@@ -97,12 +98,73 @@ const uuidFrom = (value: string): string => {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
 };
 
+const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
+  const suiteIndex = suiteEntries.findIndex(([name]) => name === suite);
+  if (suiteIndex < 0) {
+    throw new Error("Live integration suite is not in the protected registry");
+  }
+  const suiteAllocation = suiteEntries[suiteIndex]?.[1];
+  if (!suiteAllocation) {
+    throw new Error("Live integration suite allocation is missing");
+  }
+  const offset = suiteEntries
+    .slice(0, suiteIndex)
+    .reduce((total, [, allocation]) => total + allocation.tenants, 0);
+  const count = suiteAllocation.tenants;
+  const tenants = Array.from({ length: count }, (_, index) => ({
+    clerkOrgId: `org_test_local_${String(offset + index + 1).padStart(3, "0")}`,
+    organisationId: uuidFrom(`local-tenant:${offset + index + 1}`),
+  }));
+
+  const globalOffset = (kind: GlobalKeyKind) =>
+    suiteEntries
+      .slice(0, suiteIndex)
+      .reduce(
+        (total, [, allocation]) => total + (allocation.globalKeys?.[kind] ?? 0),
+        0
+      );
+
+  return {
+    globalKey: (kind, index = 0) => {
+      const suiteCount = suiteAllocation.globalKeys?.[kind] ?? 0;
+      if (!(Number.isInteger(index) && index >= 0 && index < suiteCount)) {
+        throw new Error(`Suite does not own global key ${kind}:${index}`);
+      }
+      const slot = globalOffset(kind) + index + 1;
+      if (kind === "plan_id") {
+        return uuidFrom(`local-plan-id:${slot}`);
+      }
+      if (kind === "plan_key") {
+        return `local_plan_${slot}`;
+      }
+      return `evt_local_${slot}`;
+    },
+    id: (kind, index = 0) => uuidFrom(`local:${suite}:${kind}:${index}`),
+    key: (kind, index = 0) =>
+      `local_${createHash("sha256")
+        .update(`${suite}:${kind}:${index}`)
+        .digest("hex")
+        .slice(0, 16)}`,
+    runId: "00000000-0000-4000-8000-000000000000",
+    suite,
+    tenants,
+  };
+};
+
 export const allocateLiveTestFixture = (
   suite: LiveFixtureSuite
 ): LiveTestFixture => {
   assertTestDatabaseConnectionAllowed();
   const manifestPath = process.env.TC_RELEASE_MANIFEST;
   if (!manifestPath) {
+    const databaseUrl = process.env.DATABASE_URL;
+    if (
+      process.env.ALLOW_LOCAL_DATABASE_TESTS === "1" &&
+      databaseUrl &&
+      isLocalDatabase(databaseUrl)
+    ) {
+      return allocateLocalTestFixture(suite);
+    }
     throw new Error("Protected live fixture manifest path is required");
   }
   const manifest = manifestSchema.parse(

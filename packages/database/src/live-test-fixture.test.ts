@@ -198,4 +198,54 @@ describe("live fixture registry", () => {
       )
     ).toThrow("not in the protected registry");
   });
+
+  it("allocates disjoint deterministic slots for every suite in local database mode", () => {
+    delete process.env.TC_SOURCE_GATES;
+    delete process.env.TC_RELEASE_MANIFEST;
+    delete process.env.TC_RELEASE_RUN_ID;
+    delete process.env.ALLOW_LIVE_DATABASE_TESTS;
+    Object.assign(process.env, {
+      ALLOW_LOCAL_DATABASE_TESTS: "1",
+      DATABASE_URL:
+        "postgresql://postgres:postgres@localhost:5432/team-calendar_test",
+      NODE_ENV: "test",
+    });
+
+    const allocations = Object.keys(LIVE_FIXTURE_SUITES).map((suite) =>
+      allocateLiveTestFixture(suite as keyof typeof LIVE_FIXTURE_SUITES)
+    );
+    const allocatedClerkIds = allocations.flatMap((item) =>
+      item.tenants.map((tenant) => tenant.clerkOrgId)
+    );
+    const allocatedOrganisationIds = allocations.flatMap((item) =>
+      item.tenants.map((tenant) => tenant.organisationId)
+    );
+
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(21);
+    expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
+    expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
+    expect(new Set(allocatedOrganisationIds).size).toBe(
+      allocatedOrganisationIds.length
+    );
+
+    const allocatedGlobalKeys = allocations.flatMap((allocation) => {
+      const specification = LIVE_FIXTURE_SUITES[allocation.suite] as {
+        globalKeys?: Partial<
+          Record<"plan_id" | "plan_key" | "stripe_event", number>
+        >;
+      };
+      return (["plan_id", "plan_key", "stripe_event"] as const).flatMap(
+        (kind) =>
+          Array.from(
+            { length: specification.globalKeys?.[kind] ?? 0 },
+            (_, index) => `${kind}:${allocation.globalKey(kind, index)}`
+          )
+      );
+    });
+    expect(new Set(allocatedGlobalKeys).size).toBe(allocatedGlobalKeys.length);
+    expect(allocations[0]?.id("person")).toMatch(fixtureUuidPattern);
+    expect(allocations[0]?.tenants[0]?.organisationId).toMatch(
+      fixtureUuidPattern
+    );
+  });
 });
