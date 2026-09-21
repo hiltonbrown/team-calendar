@@ -188,7 +188,7 @@ export function SyncClient({
       {message ? (
         <div
           aria-live={message.tone === "error" ? "assertive" : "polite"}
-          className="rounded-2xl bg-muted px-4 py-3 text-sm"
+          className="rounded-2xl bg-muted px-4 py-3 text-label-lg"
           role={message.tone === "error" ? "alert" : "status"}
         >
           {message.text}
@@ -221,8 +221,8 @@ export function SyncClient({
       <section className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="font-semibold text-lg">Run history</h2>
-            <p className="text-muted-foreground text-sm">
+            <h2 className="font-semibold text-title-lg">Run history</h2>
+            <p className="text-body-sm text-muted-foreground">
               Runs are ordered from newest to oldest.
             </p>
           </div>
@@ -274,7 +274,7 @@ export function SyncClient({
               <p className="sr-only" id="sync-history-scroll-hint">
                 Scroll horizontally to review every run detail column.
               </p>
-              <table className="w-full min-w-[920px] text-left text-sm">
+              <table className="w-full min-w-[920px] text-left text-label-lg">
                 <thead className="text-muted-foreground">
                   <tr>
                     <th className="p-4 font-medium">Tenant</th>
@@ -436,11 +436,11 @@ function TenantCard({
           className="flex flex-col gap-3 rounded-2xl bg-warning-container p-4 text-on-warning-container"
           role="alert"
         >
-          <div className="flex items-center gap-2 font-medium text-sm">
+          <div className="flex items-center gap-2 font-medium text-label-lg">
             <AlertTriangleIcon aria-hidden="true" className="size-4" />
             Xero sync partially completed
           </div>
-          <p className="text-sm">{partialSuccessMessage(summary)}</p>
+          <p className="text-body-sm">{partialSuccessMessage(summary)}</p>
           <div>
             <Button asChild size="sm" variant="secondary">
               <Link
@@ -460,17 +460,17 @@ function TenantCard({
       ) : null}
 
       {summary.failedRunsLast30Days > 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-body-sm text-muted-foreground">
           Historical context: {historicalFailureSummary(summary)}
         </p>
       ) : null}
 
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-          <label className="grid flex-1 gap-1 text-sm" htmlFor={selectId}>
+          <label className="grid flex-1 gap-1 text-label-lg" htmlFor={selectId}>
             <span className="text-muted-foreground">Sync type</span>
             <select
-              className="h-9 w-full rounded-xl bg-background px-3 text-sm outline-none ring-ring focus-visible:ring-2"
+              className="h-9 w-full rounded-xl bg-background px-3 text-label-lg outline-none ring-ring focus-visible:ring-2"
               disabled={pendingSelected}
               id={selectId}
               onChange={(event) => {
@@ -498,12 +498,15 @@ function TenantCard({
             {pendingSelected || runningSelected ? "Running" : "Run sync"}
           </Button>
         </div>
-        <p className="text-muted-foreground text-sm" id={actionDescriptionId}>
+        <p
+          className="text-body-sm text-muted-foreground"
+          id={actionDescriptionId}
+        >
           {disabledReason ??
             `Runs ${runTypeLabel(selectedRunType).toLowerCase()} for ${summary.tenantName}.`}
         </p>
         {summary.currentRun && !runningSelected ? (
-          <p className="text-muted-foreground text-sm" role="status">
+          <p className="text-body-sm text-muted-foreground" role="status">
             Currently running: {runTypeLabel(summary.currentRun.runType)}.
           </p>
         ) : null}
@@ -524,13 +527,13 @@ function RunHistoryCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="truncate font-medium">{run.tenantName}</h3>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             {runTypeLabel(run.runType)}
           </p>
         </div>
         <StatusBadge status={run.status} />
       </div>
-      <dl className="grid grid-cols-2 gap-3 text-sm">
+      <dl className="grid grid-cols-2 gap-3 text-label-lg">
         <div>
           <dt className="text-muted-foreground">Started</dt>
           <dd>{formatDateTime(run.startedAt)}</dd>
@@ -703,7 +706,7 @@ function FilterBar({
           </Button>
         ) : null}
       </div>
-      <p aria-live="polite" className="text-muted-foreground text-sm">
+      <p aria-live="polite" className="text-body-sm text-muted-foreground">
         {activeFilterCount === 0
           ? "Showing all sync runs."
           : `${activeFilterCount} ${activeFilterCount === 1 ? "filter" : "filters"} active.`}
@@ -725,7 +728,7 @@ function SelectFilter({
 }) {
   const fieldId = `sync-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
-    <label className="grid gap-1 text-sm" htmlFor={fieldId}>
+    <label className="grid gap-1 text-label-lg" htmlFor={fieldId}>
       <span className="text-muted-foreground">{label}</span>
       <Select onValueChange={onChange} value={value}>
         <SelectTrigger
@@ -749,8 +752,8 @@ function SelectFilter({
 function SummaryCell({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-background p-3">
-      <dt className="text-muted-foreground text-xs">{label}</dt>
-      <dd className="mt-1 font-medium text-sm">{value}</dd>
+      <dt className="text-label-md text-muted-foreground">{label}</dt>
+      <dd className="mt-1 font-medium text-body-sm">{value}</dd>
     </div>
   );
 }
@@ -768,7 +771,7 @@ function ConnectionDot({
   }[status];
   return (
     <span
-      className="inline-flex items-center gap-2 text-muted-foreground text-sm"
+      className="inline-flex items-center gap-2 text-label-lg text-muted-foreground"
       title={
         status === "revoked"
           ? "Reconnect from the Xero integrations settings"

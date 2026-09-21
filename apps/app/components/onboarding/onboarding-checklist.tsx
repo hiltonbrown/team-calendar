@@ -33,17 +33,17 @@ export function OnboardingChecklist({
     >
       <div className="max-w-2xl">
         <h2
-          className="font-semibold text-2xl tracking-tight"
+          className="font-semibold text-headline-md tracking-tight"
           id="setup-checklist-title"
         >
           {state.isComplete ? "Setup complete" : "Finish the essentials"}
         </h2>
-        <p className="mt-2 text-muted-foreground text-sm">
+        <p className="mt-2 text-body-sm text-muted-foreground">
           Team Calendar works without Xero or completed onboarding. Complete the
           useful steps now, or return whenever you are ready.
         </p>
         <div className="mt-5 space-y-2">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-label-lg">
             <span className="font-medium">Required setup progress</span>
             <span className="text-muted-foreground">{progressLabel}</span>
           </div>
@@ -61,8 +61,8 @@ export function OnboardingChecklist({
           <div className="flex min-w-0 gap-3">
             <StatusBadge status={nextStep.status} />
             <div className="min-w-0">
-              <h3 className="font-semibold text-base">{nextStep.title}</h3>
-              <p className="mt-1 text-muted-foreground text-sm">
+              <h3 className="font-semibold text-title-md">{nextStep.title}</h3>
+              <p className="mt-1 text-body-sm text-muted-foreground">
                 {nextStep.description}
               </p>
             </div>
@@ -111,7 +111,7 @@ function StepGroup({
 }) {
   return (
     <details className="mt-4">
-      <summary className="flex min-h-11 cursor-pointer items-center font-medium text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <summary className="flex min-h-11 cursor-pointer items-center font-medium text-label-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {label}
       </summary>
       <ul className="space-y-1 pb-2">
@@ -123,8 +123,8 @@ function StepGroup({
             <div className="flex min-w-0 gap-3">
               <StatusBadge status={step.status} />
               <div className="min-w-0">
-                <h3 className="font-medium text-sm">{step.title}</h3>
-                <p className="mt-1 text-muted-foreground text-sm">
+                <h3 className="font-medium text-title-sm">{step.title}</h3>
+                <p className="mt-1 text-body-sm text-muted-foreground">
                   {step.description}
                 </p>
               </div>
@@ -158,7 +158,7 @@ function StatusBadge({ status }: { status: OnboardingStepStatus }) {
 
   return (
     <span
-      className={`mt-0.5 inline-flex h-7 min-w-16 items-center justify-center rounded-xl px-3 font-medium text-xs ${className}`}
+      className={`mt-0.5 inline-flex h-7 min-w-16 items-center justify-center rounded-xl px-3 font-medium text-label-md ${className}`}
     >
       {label}
     </span>

@@ -50,11 +50,11 @@ export function CalendarDayView({
         <div className="mb-4 space-y-2">
           {day.publicHolidays.map((holiday) => (
             <div
-              className={`rounded-2xl px-4 py-3 text-sm ${statusToneClasses.holiday}`}
+              className={`rounded-2xl px-4 py-3 text-label-lg ${statusToneClasses.holiday}`}
               key={holiday.name}
             >
               <p className="font-medium">{holiday.name}</p>
-              <p className="text-xs opacity-75">
+              <p className="text-label-md opacity-75">
                 {holiday.appliesToAllLocationsInView
                   ? "All locations"
                   : holiday.locationNames.join(", ")}
@@ -76,7 +76,7 @@ export function CalendarDayView({
         <div className="space-y-4">
           {allDayEvents.length > 0 && (
             <div className="space-y-2 rounded-2xl bg-background p-3">
-              <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+              <p className="font-medium text-label-md text-muted-foreground uppercase tracking-wide">
                 All day
               </p>
               <div className="grid gap-2 md:grid-cols-2">
@@ -114,7 +114,7 @@ export function CalendarDayView({
                   key={hour}
                 >
                   <time
-                    className="pt-1 text-muted-foreground text-xs tabular-nums"
+                    className="pt-1 text-label-md text-muted-foreground tabular-nums"
                     dateTime={startsAt}
                   >
                     {hourLabel}
@@ -164,7 +164,7 @@ function OffHoursGroup({
   }
   return (
     <section className="space-y-2 rounded-2xl bg-background p-3">
-      <h3 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+      <h3 className="font-medium text-label-md text-muted-foreground uppercase tracking-wide">
         {label}
       </h3>
       <div className="grid gap-2 md:grid-cols-2">

@@ -123,7 +123,7 @@ const FeedPage = async ({ searchParams }: FeedPageProps) => {
             <h1 className="font-semibold text-foreground text-headline-md">
               Feeds
             </h1>
-            <p className="mt-2 max-w-2xl text-muted-foreground text-sm">
+            <p className="mt-2 max-w-2xl text-body-sm text-muted-foreground">
               Publish approved availability to subscribed calendars. Each feed
               has a subscribe URL you can view and copy whenever you need it.
             </p>

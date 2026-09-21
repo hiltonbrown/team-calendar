@@ -12,12 +12,12 @@ export default function PlansLoading() {
         className="flex flex-1 flex-col gap-6 p-6 pt-0"
         role="status"
       >
-        <div className="h-40 animate-pulse rounded-[20px] bg-muted" />
-        <div className="h-28 animate-pulse rounded-[20px] bg-muted" />
-        <div className="space-y-3 rounded-[20px] bg-muted p-3">
+        <div className="h-40 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+        <div className="h-28 animate-pulse rounded-xl bg-muted motion-reduce:animate-none" />
+        <div className="space-y-3 rounded-xl bg-muted p-3">
           {PLAN_ROWS.map((row) => (
             <div
-              className="h-36 animate-pulse rounded-[20px] bg-background xl:h-16"
+              className="h-36 animate-pulse rounded-xl bg-background motion-reduce:animate-none xl:h-16"
               key={row}
             />
           ))}

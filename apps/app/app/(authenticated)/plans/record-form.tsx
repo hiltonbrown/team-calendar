@@ -210,7 +210,7 @@ export function RecordForm({
 
   if (people.length === 0) {
     return (
-      <div className="rounded-2xl bg-muted p-5 text-muted-foreground text-sm">
+      <div className="rounded-2xl bg-muted p-5 text-label-lg text-muted-foreground">
         Add a person profile before creating leave or availability records.
       </div>
     );
@@ -233,7 +233,7 @@ export function RecordForm({
         );
       }}
     >
-      <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
+      <div className="rounded-2xl bg-muted p-4 text-label-lg text-muted-foreground">
         <p>{dynamicPanel}</p>
         {isXeroLeave && hasActiveXeroConnection ? (
           <p className="mt-2 font-medium text-foreground">
@@ -250,7 +250,7 @@ export function RecordForm({
 
       {error ? (
         <div
-          className="rounded-2xl bg-error-container p-4 text-on-error-container text-sm"
+          className="rounded-2xl bg-error-container p-4 text-label-lg text-on-error-container"
           id="plan-form-error"
           ref={errorRef}
           role="alert"
@@ -275,7 +275,7 @@ export function RecordForm({
           >
             <span className="flex flex-col items-start gap-1">
               <span>Leave</span>
-              <span className="font-normal text-current/75 text-xs">
+              <span className="font-normal text-current/75 text-label-md">
                 Payroll leave sent to Xero
               </span>
             </span>
@@ -286,7 +286,7 @@ export function RecordForm({
           >
             <span className="flex flex-col items-start gap-1">
               <span>Availability</span>
-              <span className="font-normal text-current/75 text-xs">
+              <span className="font-normal text-current/75 text-label-md">
                 Calendar-only work status
               </span>
             </span>
@@ -314,7 +314,7 @@ export function RecordForm({
               </SelectContent>
             </Select>
           ) : (
-            <div className="rounded-xl bg-muted p-3 text-sm">
+            <div className="rounded-xl bg-muted p-3 text-label-lg">
               {selectedPerson?.label ?? "Current user"}
             </div>
           )}
@@ -506,11 +506,11 @@ function Field({
   return (
     <div className="space-y-2">
       {labelFor ? (
-        <Label className="text-xs" htmlFor={labelFor}>
+        <Label className="text-label-md" htmlFor={labelFor}>
           {label}
         </Label>
       ) : (
-        <div className="font-medium text-xs" id={labelId}>
+        <div className="font-medium text-label-md" id={labelId}>
           {label}
         </div>
       )}

@@ -110,10 +110,10 @@ export function PersonProfileContent({
           <div className="flex items-start gap-4">
             <Avatar profile={profile} />
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-2xl text-foreground tracking-tight">
+              <h2 className="font-semibold text-foreground text-headline-md tracking-tight">
                 {name}
               </h2>
-              <p className="text-muted-foreground text-sm">
+              <p className="text-body-sm text-muted-foreground">
                 {profile.header.jobTitle ?? "No job title"}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -148,7 +148,7 @@ export function PersonProfileContent({
           )}
 
           <div className="rounded-2xl bg-muted p-5">
-            <h3 className="font-semibold text-sm">Core fields</h3>
+            <h3 className="font-semibold text-title-sm">Core fields</h3>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field
                 label="Email"
@@ -219,12 +219,12 @@ export function PersonProfileContent({
               Edit profile
             </Button>
             {editMessage ? (
-              <span className="self-center text-muted-foreground text-sm">
+              <span className="self-center text-label-lg text-muted-foreground">
                 {editMessage}
               </span>
             ) : null}
             {refreshMessage ? (
-              <span className="self-center text-muted-foreground text-sm">
+              <span className="self-center text-label-lg text-muted-foreground">
                 {refreshMessage}
               </span>
             ) : null}
@@ -232,8 +232,8 @@ export function PersonProfileContent({
         </section>
 
         <aside className="rounded-2xl bg-muted p-5">
-          <h3 className="font-semibold text-sm">Current status</h3>
-          <div className="mt-4 space-y-3 text-sm">
+          <h3 className="font-semibold text-title-sm">Current status</h3>
+          <div className="mt-4 space-y-3 text-label-lg">
             <Field
               label="Status"
               locked={false}
@@ -282,7 +282,7 @@ export function PersonProfileContent({
         <div className="flex flex-wrap gap-2">
           {tabs.map((item) => (
             <button
-              className={`rounded-xl px-3 py-2 font-medium text-sm ${
+              className={`rounded-xl px-3 py-2 font-medium text-label-lg ${
                 tab === item.value
                   ? "bg-primary text-primary-foreground"
                   : "bg-surface-container-high text-muted-foreground"
@@ -356,7 +356,7 @@ function Avatar({ profile }: { profile: PersonProfile }) {
     );
   }
   return (
-    <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary-container font-semibold text-2xl text-on-primary-container">
+    <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-primary-container font-semibold text-on-primary-container text-title-lg">
       {initials || "?"}
     </span>
   );
@@ -375,13 +375,13 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <div className="flex items-center gap-1.5 text-muted-foreground text-xs uppercase tracking-widest">
+      <div className="flex items-center gap-1.5 text-label-md text-muted-foreground uppercase tracking-wider">
         {label}
         {locked ? (
           <LockIcon aria-label="Xero-owned field" className="size-3" />
         ) : null}
       </div>
-      <div className="mt-1 text-sm">{value}</div>
+      <div className="mt-1 text-label-lg">{value}</div>
     </div>
   );
 }
@@ -395,7 +395,7 @@ function RecordList({
 }) {
   if (records.length === 0) {
     return (
-      <div className="rounded-2xl bg-surface-container-high p-6 text-muted-foreground text-sm">
+      <div className="rounded-2xl bg-surface-container-high p-6 text-label-lg text-muted-foreground">
         {emptyLabel}
       </div>
     );
@@ -413,7 +413,7 @@ function RecordList({
         {records.map((record) => (
           <TableRow key={record.id}>
             <TableCell>{labelForValue(record.recordType)}</TableCell>
-            <TableCell className="text-muted-foreground text-sm">
+            <TableCell className="text-label-lg text-muted-foreground">
               {formatDateRange(record.startsAt, record.endsAt)}
             </TableCell>
             <TableCell>
@@ -492,7 +492,7 @@ function BalancesPanel({
 
   if (!(showXeroBalances || showManualEditor)) {
     return (
-      <div className="rounded-2xl bg-surface-container-high p-6 text-sm">
+      <div className="rounded-2xl bg-surface-container-high p-6 text-label-lg">
         <p className="font-medium">This profile is not linked to Xero.</p>
         <p className="mt-1 text-muted-foreground">
           {canEditManual
@@ -561,7 +561,7 @@ function BalancesPanel({
         </TableBody>
       </Table>
       {showXeroBalances ? (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-label-md text-muted-foreground">
           Last refreshed:{" "}
           {profile.balances.balancesLastFetchedAt
             ? formatDateTime(profile.balances.balancesLastFetchedAt)
@@ -570,33 +570,36 @@ function BalancesPanel({
       ) : null}
       {showManualEditor && canEditManual ? (
         <div className="grid gap-3 rounded-2xl bg-surface-container-high p-4 sm:grid-cols-[1fr_1fr_120px_120px_auto]">
-          <label className="flex flex-col gap-1 text-xs">
+          <label className="flex flex-col gap-1 text-label-md">
             Leave type reference
             <input
-              className="rounded-xl bg-background px-3 py-2 text-sm"
+              className="rounded-xl bg-background px-3 py-2 text-label-lg"
               onChange={(event) => setLeaveTypeXeroId(event.target.value)}
               value={leaveTypeXeroId}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs">
+          <label className="flex flex-col gap-1 text-label-md">
             Leave type name
             <input
-              className="rounded-xl bg-background px-3 py-2 text-sm"
+              className="rounded-xl bg-background px-3 py-2 text-label-lg"
               onChange={(event) => setLeaveTypeName(event.target.value)}
               value={leaveTypeName}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs">
+          <label className="flex flex-col gap-1 text-label-md">
             Balance
             <input
-              className="rounded-xl bg-background px-3 py-2 text-sm"
+              className="rounded-xl bg-background px-3 py-2 text-label-lg"
               inputMode="decimal"
               onChange={(event) => setBalance(event.target.value)}
               type="number"
               value={balance}
             />
           </label>
-          <label className="flex flex-col gap-1 text-xs" htmlFor="balance-unit">
+          <label
+            className="flex flex-col gap-1 text-label-md"
+            htmlFor="balance-unit"
+          >
             Unit
             <Select
               onValueChange={(value) =>
@@ -605,7 +608,7 @@ function BalancesPanel({
               value={balanceUnit}
             >
               <SelectTrigger
-                className="rounded-xl bg-background text-sm"
+                className="rounded-xl bg-background text-label-lg"
                 id="balance-unit"
               >
                 <SelectValue />
@@ -631,7 +634,7 @@ function BalancesPanel({
         </div>
       ) : null}
       {showManualEditor && !canEditManual && (
-        <p className="text-muted-foreground text-xs">
+        <p className="text-label-md text-muted-foreground">
           Only admins and owners can edit manual balances.
         </p>
       )}
@@ -640,8 +643,8 @@ function BalancesPanel({
           aria-live={message.tone === "error" ? "assertive" : "polite"}
           className={
             message.tone === "error"
-              ? "text-destructive text-xs"
-              : "text-muted-foreground text-xs"
+              ? "text-destructive text-label-md"
+              : "text-label-md text-muted-foreground"
           }
           role={message.tone === "error" ? "alert" : "status"}
         >

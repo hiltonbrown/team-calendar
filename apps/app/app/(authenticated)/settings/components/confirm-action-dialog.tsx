@@ -63,7 +63,10 @@ export const ConfirmActionDialog = ({
 
         {requireTyping ? (
           <div className="space-y-2 py-2">
-            <Label className="text-muted-foreground text-sm" htmlFor={inputId}>
+            <Label
+              className="text-label-lg text-muted-foreground"
+              htmlFor={inputId}
+            >
               Type{" "}
               <span className="font-semibold text-foreground">
                 {requireTyping}

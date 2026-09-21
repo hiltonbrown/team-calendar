@@ -1252,3 +1252,193 @@ Detector advisories remain in unrelated legacy styles and the intentionally enla
 SVG value labels (SVG units scale with the chart). Integration NOT VERIFIED:
 remote target rejected by ALLOW_LOCAL_DATABASE_TESTS. Browser closed; existing dev
 server retained. Evidence: /tmp/features-polish-*.png and matching logs.
+
+---
+
+## Marketing site unslop pass (apps/web)
+
+Brief: remove generic AI defaults from every page of the marketing site and
+restore intentional craft. Reference: DESIGN.md.
+
+### What was actually wrong
+
+The palette, typography and token system were already brand-correct: sage-led,
+lavender-tinted neutrals, Plus Jakarta Sans with Lora as the editorial second
+voice. No purple gradients, no cream, no Inter. The slop was a ghost layer left
+by earlier rebuilds.
+
+- Three components imported by nothing: `benefits-strip.tsx`,
+  `calendar-visibility-section.tsx`, `scroll-reveal.tsx`.
+- 155 of 498 marketing CSS classes (31%) matched no markup.
+- 19 of 50 `--marketing-*` tokens had no consumer, including a whole
+  `.features-prototype` alias layer for a class that does not exist.
+- The scroll-choreography layer was inert: every `animation-timeline: --fmkt-slide`
+  rule pointed at a named timeline whose provider (`.fmkt-slide`) was never in the
+  markup, and a kill switch at the bottom of `motion.css` disabled the rest.
+- `section-cover-darken` painted `oklch(0% 0 0 / 0.18)` at `z-index: 50` over
+  three unpositioned sections, above the `z-index: 40` sticky header.
+- `.ft-flow__hub` set `color: #fff` over a `--marketing-primary` fill. In dark
+  mode that is white on `#8fd496`, about 1.7:1. Deleted with the dead block.
+- The pricing page had missed the design pass: fourteen weight-700 declarations
+  where DESIGN.md sets 600/500, a 24px radius plus 6px and 8px strays, seven
+  persistent ramp shadows up to `0 16px 40px`, and a dashed-border card nested
+  inside a card.
+- The same uppercase 0.76rem/700 eyebrow was redeclared on five pages.
+
+### Changes
+
+- [x] Deleted the three orphaned components.
+- [x] Pruned dead rules from `features.css`, `home.css`, `shell.css`, `motion.css`
+      and dead tokens from `tokens.css`. Re-audit: zero dead classes remain.
+- [x] Rewrote `motion.css` (842 to 165 lines) around one signature move: the hero
+      sync diagram drawing its own path. Dropped all below-fold parallax,
+      per-item nth-child depth staggering and the darken overlay.
+- [x] Weights onto the DESIGN.md scale: 600 display/headline, 500 label.
+- [x] Radii onto the ladder: 24 to 20, 8 and 6 to 12, 9 to 12, 5 to 4 with a
+      documented marker exception.
+- [x] Persistent shadows capped at a new `--marketing-shadow-hairline` token,
+      per the Hairline Ceiling Rule.
+- [x] Pricing analytics box: nested card to tonal inset (no border, no radius).
+- [x] Pricing final CTA: gradient plus sage border to a flat tonal band, so the
+      homepage green band stays the site's one drenched moment.
+
+Net: 2,889 deletions, 176 insertions.
+
+### Verification
+
+PASS: `bun run check`, `bun run typecheck` (19 tasks), `bunx vitest run` in
+apps/web (36 files, 134 tests), `turbo build --filter=web`.
+PASS: all 13 marketing routes at 1440px and 390px, light and dark, in Chromium.
+No JS errors, no horizontal overflow. The only failing request is
+`/_vercel/insights/script.js`, which the platform injects in production and is
+expected to 404 outside Vercel.
+Visual review: homepage hero (sync diagram draws correctly), homepage full page,
+pricing cards before and after the nesting fix.
+
+---
+
+## Product app unslop pass (apps/app)
+
+Brief: remove generic AI defaults from every page of the authenticated app and
+restore intentional craft. Reference: DESIGN.md.
+
+### What was actually wrong
+
+The app was already well disciplined at the level this brief usually finds
+problems: three raw palette colours in 245 components, no purple gradients, no
+cream, sane z-index, no bounce easing, no nested Card components, every skeleton
+matching its final structure. The slop was one systemic problem and a short tail.
+
+**A two-speed type system.** The design system publishes a semantic scale that
+names intent: `text-body-*` at 1.6 line height for prose, `text-label-*` at 1.4
+for labels, `text-title-*` and `text-headline-*` for structure. The dashboard
+used it. The other thirty-odd screens did not: 397 declarations of Tailwind's
+generic `text-sm` and `text-xs`, plus five one-off arbitrary sizes, against 85
+semantic ones. Hierarchy was expressed as raw size rather than role, and body
+copy across the app sat at 1.43 leading instead of the specified 1.6. This is
+the "undifferentiated text, flat hierarchy" that DESIGN.md names as the Notion
+anti-reference.
+
+**Hero-metric card grids, nested inside cards.** `MetricTile` rendered a filled,
+rounded, padded panel inside `DashboardCardShell`'s `CardContent`, six to a
+grid, with four of the six tinted neutral. `SummaryFact` on both analytics pages
+did the same thing inside a tinted band. DESIGN.md prohibits both by name.
+
+The tail: `tracking-widest` (0.1em) on 21 uppercase eyebrows against a 0.05em
+spec cap; 29 `rounded-[20px]`/`rounded-[14px]` escapes for tokens that exist;
+`backdrop-blur` on the sticky header, which the Frost Means Floating Rule
+reserves for surfaces that float, and which had no reduced-transparency
+fallback; `bg-emerald-500/10` on a reconciliation result; two `shadow-lg` where
+`--elev-popover` and `--elev-toast` are defined; a `hover:scale-110` on a status
+marker dot; seven skeleton pulses that looped forever under reduced motion.
+
+### Changes
+
+- [x] Migrated all 435 type declarations onto the product scale, classified by
+      the owning element: prose to `body-*`, labels and controls to `label-*`,
+      headings to `title-*`/`headline-*`, and the two exact matches (0.6875rem,
+      2.25rem) onto `label-sm` and `display-sm`. Zero generic sizes remain.
+- [x] `MetricTile` is a stat, not a card: no fill, tone carried by the value's
+      colour plus a labelled status dot.
+- [x] `SummaryFact` unnested on both analytics pages; the page header there is
+      type-led instead of a second identical tinted slab.
+- [x] `tracking-widest` to `tracking-wider`; arbitrary radii to `rounded-xl` and
+      `rounded-md`.
+- [x] Sticky header: frost to an opaque surface with `--elev-sticky`.
+- [x] Emerald to the sage secondary container; `shadow-lg` to the named
+      elevation tokens; hover-scale removed.
+- [x] Skeleton pulses stop under `prefers-reduced-motion`.
+
+Left deliberately: the in-flight button spinners keep animating under reduced
+motion. They signal work in progress and the buttons already carry a stable verb
+and `aria-busy`, so freezing them would remove signal rather than add calm.
+
+Net: 81 files, 594 insertions, 505 deletions.
+
+### Verification
+
+PASS: `bun run check`, `bun run typecheck` (19 tasks), `turbo test --filter=app`
+(110 files, 559 tests), `turbo build --filter=app`.
+PASS: all eleven semantic utilities confirmed present in the compiled CSS with
+the sizes and line heights DESIGN.md specifies, so nothing was silently dropped.
+PASS: zero elements carry conflicting type classes after the migration.
+PASS: measured contrast on the rebuilt metric treatment in both themes; lowest
+is 6.43:1 against a 4.5:1 requirement.
+
+NOT VERIFIED in a browser: the authenticated routes need a live Clerk instance,
+which this environment does not have; every route redirects to `/sign-in` and
+Clerk rejects placeholder keys. Visual review was done by rendering the real
+components against the compiled stylesheet in Chromium (`MetricTile` in its two
+dashboard cards, the settings section header, people status and provenance
+chips, the empty state), light and dark.
+
+---
+
+## Pre-production review pass
+
+Re-audited all three commits before shipping. Two defects found and fixed, both
+mine; one pre-existing issue found and left alone; the risky automated passes
+verified clean.
+
+### Fixed
+
+- `px-1` on the two analytics page headers: an arbitrary 4px inset matching
+  nothing in the spacing scale. The parent's `p-6` gutter and `gap-6` rhythm
+  already place the block, so the class is gone.
+- The "Analytics" eyebrow above each of those headings was a `<p>`, so the type
+  migration's tag heuristic gave it prose leading. An eyebrow is a label:
+  `text-body-sm` to `text-label-lg`. These two were the only instances; a sweep
+  for uppercase labels carrying prose leading returned zero.
+
+### Verified clean
+
+- **CSS pruning.** The dangerous direction is a deleted rule that markup still
+  uses. Classes used in markup with no matching rule: 11 at baseline, the same
+  11 at HEAD, and the same 11 in the compiled stylesheet. Zero new orphans. The
+  `marketing-legal__*` block that the legal pages depend on is intact, confirmed
+  by computed style in the browser (760px measure, 40px gap, 36px/600 heading,
+  16px body at 1.7 leading).
+- **Type migration.** No replacement landed outside a class string. Only one
+  `text-body-sm` sits in a `cn()` call rather than a literal `className`, and it
+  is on a `<p>` holding an error message, where prose leading is right.
+- **Observability.** The earlier tests passed `configuration` explicitly and
+  never exercised `parseBetterStackConfiguration(keys())` with the real t3-env
+  proxy. Added five tests that do: partial group, empty, HTTP in production and
+  a malformed URL all report "configuration" without touching the fetcher, and
+  a complete HTTPS config still reaches the provider. That last case matters:
+  it proves the status feature was not simply switched off.
+- **No markup lost to formatting reflow.** Accessibility attribute counts match
+  the baseline exactly in both apps, once the three deleted orphan components
+  are accounted for (aria-label -2, aria-hidden -10, alt -1, all theirs). The
+  one addition is `aria-hidden` on MetricTile's new status dot.
+- **Builds.** app, api and web all compile with the partial Better Stack config
+  that broke the Vercel deploy.
+- **Routes.** 13 marketing routes at 1440px and 390px, light and dark: no JS
+  errors, no horizontal overflow. Legal pages checked separately.
+
+### Found, not fixed (pre-existing, outside this pass)
+
+`.marketing-legal__section ul` sets `padding-left` but no list marker, and
+Tailwind's preflight strips the default, so bullets on the privacy policy and
+terms pages render as indented paragraphs. Present at baseline. Worth a one-line
+fix later; not changed here to keep the production push to reviewed scope.

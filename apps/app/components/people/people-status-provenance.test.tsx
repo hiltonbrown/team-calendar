@@ -8,12 +8,12 @@ import {
 describe("People status and provenance", () => {
   afterEach(() => cleanup());
 
-  it("uses the shared 12px status chip treatment", () => {
+  it("uses the shared status chip treatment on the product type scale", () => {
     render(<PeopleStatusChip label="Available" statusKey="available" />);
 
     const chip = screen.getByText("Available");
     expect(chip.className).toContain("rounded-xl");
-    expect(chip.className).toContain("text-xs");
+    expect(chip.className).toContain("text-label-md");
   });
 
   it.each([

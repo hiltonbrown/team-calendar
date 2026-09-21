@@ -34,16 +34,18 @@ export function SubscribeUrlField({
   return (
     <div className="space-y-2">
       <div>
-        <div className="font-medium text-sm">Subscribe URL</div>
+        <div className="font-medium text-label-lg">Subscribe URL</div>
         {description ? (
-          <p className="mt-1 text-muted-foreground text-xs">{description}</p>
+          <p className="mt-1 text-label-md text-muted-foreground">
+            {description}
+          </p>
         ) : null}
       </div>
       {url ? (
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             aria-label={`Subscribe URL for ${feedName}`}
-            className="min-w-0 font-mono text-xs"
+            className="min-w-0 font-mono text-label-md"
             onFocus={(event) => event.currentTarget.select()}
             readOnly
             value={url}
@@ -58,17 +60,17 @@ export function SubscribeUrlField({
           </Button>
         </div>
       ) : (
-        <p className="rounded-xl bg-background p-3 text-muted-foreground text-sm">
+        <p className="rounded-xl bg-background p-3 text-body-sm text-muted-foreground">
           No active subscribe URL
         </p>
       )}
       {copyStatus === "copied" ? (
-        <p className="text-sm" role="status">
+        <p className="text-body-sm" role="status">
           Subscribe URL copied.
         </p>
       ) : null}
       {copyStatus === "error" ? (
-        <p className="text-destructive text-sm" role="alert">
+        <p className="text-body-sm text-destructive" role="alert">
           Could not copy the URL. Select the URL and copy it manually.
         </p>
       ) : null}

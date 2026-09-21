@@ -44,7 +44,7 @@ export function ApprovalQueueCard({
         />
       ) : (
         <div className="space-y-3 text-body-sm">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
             <MetricTile label="Pending" value={state.data.pendingCount} />
             <MetricTile
               label="Failed"

@@ -165,7 +165,7 @@ export const MembersClient = ({
       {/* Invite section */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base">Invite a member</CardTitle>
+          <CardTitle className="text-title-md">Invite a member</CardTitle>
           <CardDescription>
             Send an email invitation to add someone to your organisation.
           </CardDescription>
@@ -216,7 +216,7 @@ export const MembersClient = ({
       {/* Members table */}
       <Card className="rounded-2xl">
         <CardHeader className="pb-4">
-          <CardTitle className="text-base">
+          <CardTitle className="text-title-md">
             {members.length} {members.length === 1 ? "member" : "members"}
           </CardTitle>
         </CardHeader>
@@ -250,7 +250,7 @@ export const MembersClient = ({
                             alt={displayName}
                             src={member.imageUrl}
                           />
-                          <AvatarFallback className="text-xs">
+                          <AvatarFallback className="text-label-md">
                             {getInitials(
                               member.firstName,
                               member.lastName,
@@ -259,15 +259,15 @@ export const MembersClient = ({
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium text-sm leading-none">
+                          <p className="font-medium text-body-sm leading-none">
                             {displayName}
                             {isSelf && (
-                              <span className="ml-2 text-muted-foreground text-xs">
+                              <span className="ml-2 text-label-md text-muted-foreground">
                                 (you)
                               </span>
                             )}
                           </p>
-                          <p className="mt-0.5 text-muted-foreground text-xs">
+                          <p className="mt-0.5 text-label-md text-muted-foreground">
                             {member.emailAddress}
                           </p>
                         </div>
@@ -284,13 +284,13 @@ export const MembersClient = ({
                           }
                           value={member.role}
                         >
-                          <SelectTrigger className="h-11 w-32 text-xs">
+                          <SelectTrigger className="h-11 w-32 text-label-md">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             {ROLE_OPTIONS.map((opt) => (
                               <SelectItem
-                                className="text-xs"
+                                className="text-label-md"
                                 key={opt.value}
                                 value={opt.value}
                               >
@@ -298,7 +298,10 @@ export const MembersClient = ({
                               </SelectItem>
                             ))}
                             {isOwner && (
-                              <SelectItem className="text-xs" value="org:owner">
+                              <SelectItem
+                                className="text-label-md"
+                                value="org:owner"
+                              >
                                 Owner
                               </SelectItem>
                             )}
@@ -335,7 +338,7 @@ export const MembersClient = ({
       {pendingInvitations.length > 0 && (
         <Card className="rounded-2xl">
           <CardHeader className="pb-4">
-            <CardTitle className="text-base">Pending invitations</CardTitle>
+            <CardTitle className="text-title-md">Pending invitations</CardTitle>
             <CardDescription>
               These people have been invited but haven't accepted yet.
             </CardDescription>
@@ -361,13 +364,15 @@ export const MembersClient = ({
                           className="h-4 w-4 shrink-0 text-muted-foreground"
                           strokeWidth={1.75}
                         />
-                        <span className="text-sm">{inv.emailAddress}</span>
+                        <span className="text-label-lg">
+                          {inv.emailAddress}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="py-4">
                       <RoleBadge role={inv.role} />
                     </TableCell>
-                    <TableCell className="py-4 text-muted-foreground text-sm">
+                    <TableCell className="py-4 text-label-lg text-muted-foreground">
                       {new Date(inv.createdAt).toLocaleDateString()}
                     </TableCell>
                   </TableRow>

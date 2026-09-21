@@ -31,7 +31,7 @@ export function CalendarMonthView({
   return (
     <section className="space-y-3">
       {data.truncated ? (
-        <div className="rounded-2xl bg-muted p-4 text-muted-foreground text-sm">
+        <div className="rounded-2xl bg-muted p-4 text-label-lg text-muted-foreground">
           Showing {data.people.length} of {data.totalPeopleInScope} people.
           Narrow the scope or filters to see everyone.
         </div>
@@ -44,7 +44,7 @@ export function CalendarMonthView({
         <div className="grid min-w-[56rem] grid-cols-7 gap-1">
           {dayLabels.map((label) => (
             <div
-              className="p-2 text-center font-medium text-muted-foreground text-xs uppercase tracking-wide"
+              className="p-2 text-center font-medium text-label-md text-muted-foreground uppercase tracking-wide"
               key={label}
             >
               {label}
@@ -71,7 +71,7 @@ export function CalendarMonthView({
                   <div className="flex items-center justify-between">
                     <span
                       className={cn(
-                        "flex size-7 items-center justify-center rounded-xl font-medium text-sm tabular-nums",
+                        "flex size-7 items-center justify-center rounded-xl font-medium text-label-lg tabular-nums",
                         day.isToday && "bg-primary text-primary-foreground",
                         day.publicHolidays.length > 0 &&
                           "underline decoration-2 decoration-on-accent-container underline-offset-4"
@@ -81,7 +81,7 @@ export function CalendarMonthView({
                     </span>
                     {day.publicHolidays.length > 0 && (
                       <span
-                        className={`rounded-lg px-1.5 py-0.5 text-xs ${statusToneClasses.holiday}`}
+                        className={`rounded-lg px-1.5 py-0.5 text-label-md ${statusToneClasses.holiday}`}
                       >
                         Holiday
                       </span>
@@ -122,7 +122,7 @@ export function CalendarMonthView({
       </section>
       <section
         aria-label="Month agenda"
-        className="space-y-3 rounded-[20px] bg-muted p-3 md:hidden"
+        className="space-y-3 rounded-xl bg-muted p-3 md:hidden"
       >
         {data.days.map((day) => {
           const dateOnly = day.date.toISOString().slice(0, 10);
@@ -142,7 +142,7 @@ export function CalendarMonthView({
               key={dateOnly}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold text-sm">{dateLabel}</h3>
+                <h3 className="font-semibold text-title-sm">{dateLabel}</h3>
                 <Button asChild size="sm" variant="ghost">
                   <Link
                     href={withOrg(
@@ -156,7 +156,7 @@ export function CalendarMonthView({
               </div>
               {day.publicHolidays.map((holiday) => (
                 <p
-                  className={`mt-2 rounded-xl px-2.5 py-1.5 text-sm ${statusToneClasses.holiday}`}
+                  className={`mt-2 rounded-xl px-2.5 py-1.5 text-body-sm ${statusToneClasses.holiday}`}
                   key={holiday.name}
                 >
                   {holiday.name}
@@ -172,7 +172,7 @@ export function CalendarMonthView({
                     />
                   ))
                 ) : (
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-body-sm text-muted-foreground">
                     No leave or availability
                   </p>
                 )}

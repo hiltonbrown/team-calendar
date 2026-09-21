@@ -82,7 +82,7 @@ export function SubscribeInstructions({
     return (
       <section
         aria-labelledby="subscribe-heading"
-        className="rounded-[20px] bg-surface-container-low p-6"
+        className="rounded-xl bg-surface-container-low p-6"
       >
         <div className="flex max-w-2xl items-start gap-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-error-container text-on-error-container">
@@ -95,7 +95,7 @@ export function SubscribeInstructions({
             >
               Subscription options are unavailable
             </h2>
-            <p className="mt-2 text-muted-foreground text-sm">
+            <p className="mt-2 text-body-sm text-muted-foreground">
               Active feeds could not be loaded. Refresh the page to try again;
               your existing calendar subscriptions are not affected.
             </p>
@@ -117,7 +117,7 @@ export function SubscribeInstructions({
     return (
       <section
         aria-labelledby="subscribe-heading"
-        className="rounded-[20px] bg-surface-container-low p-6"
+        className="rounded-xl bg-surface-container-low p-6"
       >
         <div className="flex max-w-2xl items-start gap-4">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-container-high text-muted-foreground">
@@ -130,7 +130,7 @@ export function SubscribeInstructions({
             >
               How to subscribe
             </h2>
-            <p className="mt-2 text-muted-foreground text-sm">
+            <p className="mt-2 text-body-sm text-muted-foreground">
               An active feed is needed before you can add Team Calendar to a
               calendar app. Ask an administrator to activate a feed, or create
               one if you have access.
@@ -161,7 +161,7 @@ export function SubscribeInstructions({
   return (
     <section
       aria-labelledby="subscribe-heading"
-      className="overflow-hidden rounded-[20px] bg-surface-container-low"
+      className="overflow-hidden rounded-xl bg-surface-container-low"
     >
       <div className="grid gap-8 p-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:p-8">
         <div className="min-w-0">
@@ -171,14 +171,14 @@ export function SubscribeInstructions({
           >
             Put team availability on your calendar
           </h2>
-          <p className="mt-3 max-w-xl text-muted-foreground text-sm">
+          <p className="mt-3 max-w-xl text-body-sm text-muted-foreground">
             Choose a feed once. Your calendar keeps it up to date on its own
             refresh schedule.
           </p>
 
           <div className="mt-7 rounded-2xl bg-surface-container-lowest p-5">
             <div
-              className="font-medium text-foreground text-sm"
+              className="font-medium text-foreground text-label-lg"
               id="subscribe-feed-label"
             >
               Feed to subscribe
@@ -193,7 +193,7 @@ export function SubscribeInstructions({
               >
                 <SelectTrigger
                   aria-labelledby="subscribe-feed-label"
-                  className="mt-2 w-full rounded-[14px] bg-surface-container-lowest"
+                  className="mt-2 w-full rounded-md bg-surface-container-lowest"
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -207,7 +207,7 @@ export function SubscribeInstructions({
               </Select>
             ) : (
               <div
-                className="mt-2 rounded-[14px] bg-surface-container-high px-4 py-3 font-medium text-sm"
+                className="mt-2 rounded-md bg-surface-container-high px-4 py-3 font-medium text-label-lg"
                 id="subscribe-feed"
               >
                 {selectedFeed.name}
@@ -222,7 +222,7 @@ export function SubscribeInstructions({
               />
             </div>
 
-            <p className="mt-4 flex items-start gap-2 text-muted-foreground text-xs">
+            <p className="mt-4 flex items-start gap-2 text-label-md text-muted-foreground">
               <LockKeyholeIcon
                 aria-hidden="true"
                 className="mt-0.5 size-4 shrink-0"
@@ -240,7 +240,7 @@ export function SubscribeInstructions({
             </h3>
             <Badge variant="secondary">Live subscription</Badge>
           </div>
-          <p className="mt-2 text-muted-foreground text-sm">
+          <p className="mt-2 text-body-sm text-muted-foreground">
             Subscriptions stay connected as approved availability changes.
           </p>
 
@@ -346,7 +346,7 @@ export function SubscribeInstructions({
               aria-live={
                 launchMessage.tone === "error" ? "assertive" : "polite"
               }
-              className={`mt-4 rounded-xl px-4 py-3 text-sm ${
+              className={`mt-4 rounded-xl px-4 py-3 text-body-sm ${
                 launchMessage.tone === "error"
                   ? "bg-error-container text-on-error-container"
                   : "bg-secondary text-secondary-foreground"
@@ -369,10 +369,10 @@ export function SubscribeInstructions({
               <div className="grid gap-5 pb-2 sm:grid-cols-2">
                 {manualInstructions.map((instruction) => (
                   <div key={instruction.title}>
-                    <h4 className="font-medium text-foreground text-sm">
+                    <h4 className="font-medium text-foreground text-title-sm">
                       {instruction.title}
                     </h4>
-                    <p className="mt-1 text-muted-foreground text-sm">
+                    <p className="mt-1 text-body-sm text-muted-foreground">
                       {instruction.body}
                     </p>
                   </div>
@@ -407,10 +407,14 @@ function ProviderAction({
         </span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium text-foreground text-sm">{title}</h4>
-            <span className="text-muted-foreground text-xs">{meta}</span>
+            <h4 className="font-medium text-foreground text-title-sm">
+              {title}
+            </h4>
+            <span className="text-label-md text-muted-foreground">{meta}</span>
           </div>
-          <p className="mt-1 text-muted-foreground text-xs">{description}</p>
+          <p className="mt-1 text-label-md text-muted-foreground">
+            {description}
+          </p>
         </div>
       </div>
       {action}

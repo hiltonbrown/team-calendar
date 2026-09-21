@@ -129,7 +129,7 @@ export function AmbientCalendarField({
   return (
     <section
       aria-labelledby={`${id}-title`}
-      className="rounded-[20px] bg-surface-container p-4 sm:p-6"
+      className="rounded-xl bg-surface-container p-4 sm:p-6"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-2xl">
@@ -221,7 +221,7 @@ export function AmbientCalendarField({
                     <>
                       <span
                         aria-hidden="true"
-                        className={`mt-3 size-3 rounded-full ring-4 transition-transform duration-200 group-hover:scale-110 motion-reduce:transition-none ${tone.marker}`}
+                        className={`mt-3 size-3 rounded-full ring-4 ${tone.marker}`}
                       />
                       <span
                         className={`mt-3 line-clamp-1 font-medium text-label-sm ${tone.status}`}

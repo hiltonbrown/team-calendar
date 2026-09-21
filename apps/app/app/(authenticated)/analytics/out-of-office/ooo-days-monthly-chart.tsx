@@ -36,20 +36,20 @@ export function OooDaysMonthlyChart({
 
   return (
     <div className="space-y-5">
-      <p className="text-muted-foreground text-sm">
+      <p className="text-body-sm text-muted-foreground">
         Exact monthly values are listed by labelled type before the chart.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         {data.map((item) => (
           <section className="rounded-xl bg-muted p-3" key={String(item.month)}>
-            <h3 className="font-medium text-sm">{item.month}</h3>
+            <h3 className="font-medium text-title-sm">{item.month}</h3>
             <dl className="mt-2 space-y-1.5">
               {recordTypes.map((type) => (
                 <div className="flex justify-between gap-4" key={type}>
-                  <dt className="break-words text-muted-foreground text-sm">
+                  <dt className="break-words text-label-lg text-muted-foreground">
                     {labelForRecordType(type)}
                   </dt>
-                  <dd className="shrink-0 text-sm tabular-nums">
+                  <dd className="shrink-0 text-body-sm tabular-nums">
                     {formatDays(item[type])}
                   </dd>
                 </div>

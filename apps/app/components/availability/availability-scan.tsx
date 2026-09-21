@@ -30,8 +30,8 @@ export function AvailabilityScan({
     <section className="rounded-2xl bg-muted p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-base">{title}</h2>
-          <p className="mt-1 text-muted-foreground text-sm">
+          <h2 className="font-semibold text-title-md">{title}</h2>
+          <p className="mt-1 text-body-sm text-muted-foreground">
             {/* biome-ignore lint/suspicious/noLeakedRender: both ternary branches render a non-empty string (a template literal, or the required emptyTitle prop), so there is no falsy value that could leak into the DOM. */}
             {items.length > 0
               ? `${items.length} people need attention`
@@ -40,7 +40,7 @@ export function AvailabilityScan({
         </div>
         {actionHref && actionLabel ? (
           <Link
-            className="rounded-xl px-3 py-2 font-medium text-primary text-sm hover:bg-background"
+            className="rounded-xl px-3 py-2 font-medium text-label-lg text-primary hover:bg-background"
             href={actionHref}
           >
             {actionLabel}
@@ -49,7 +49,7 @@ export function AvailabilityScan({
       </div>
 
       {items.length === 0 ? (
-        <div className="mt-4 rounded-2xl bg-background p-4 text-muted-foreground text-sm">
+        <div className="mt-4 rounded-2xl bg-background p-4 text-label-lg text-muted-foreground">
           {emptyDescription}
         </div>
       ) : (
@@ -78,7 +78,7 @@ function AvailabilityScanRow({ item }: { item: AvailabilityStatusItem }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate font-medium text-sm">{item.name}</p>
+          <p className="truncate font-medium text-body-sm">{item.name}</p>
           <Badge
             className={cn(
               "rounded-xl border-0 ring-1",
@@ -92,7 +92,7 @@ function AvailabilityScanRow({ item }: { item: AvailabilityStatusItem }) {
             {item.statusLabel}
           </Badge>
         </div>
-        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground text-xs">
+        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-label-md text-muted-foreground">
           {item.startsAt || item.endsAt ? (
             <span className="inline-flex items-center gap-1">
               <CalendarDaysIcon className="size-3" />

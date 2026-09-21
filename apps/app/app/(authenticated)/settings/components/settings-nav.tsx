@@ -113,7 +113,9 @@ export const SettingsNav = ({ orgQueryValue }: SettingsNavProps) => {
                   {activeItem?.label ?? "Settings sections"}
                 </span>
               </span>
-              <span className="text-muted-foreground text-xs">Change</span>
+              <span className="text-label-md text-muted-foreground">
+                Change
+              </span>
             </Button>
           </SheetTrigger>
           <SheetContent
@@ -158,7 +160,7 @@ function SettingsNavigation({
     <nav aria-label="Settings sections" className="space-y-6 px-4 pb-6">
       {NAV_GROUPS.map((group) => (
         <div className="space-y-2" key={group.label}>
-          <p className="px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+          <p className="px-3 font-medium text-label-md text-muted-foreground uppercase tracking-wide">
             {group.label}
           </p>
           <ul className="space-y-1">
@@ -170,8 +172,8 @@ function SettingsNavigation({
                   aria-current={active ? "page" : undefined}
                   className={
                     active
-                      ? "flex min-h-11 items-center gap-3 rounded-xl bg-background px-3 font-medium text-foreground text-sm"
-                      : "flex min-h-11 items-center gap-3 rounded-xl px-3 text-muted-foreground text-sm hover:bg-background/70 hover:text-foreground"
+                      ? "flex min-h-11 items-center gap-3 rounded-xl bg-background px-3 font-medium text-foreground text-label-lg"
+                      : "flex min-h-11 items-center gap-3 rounded-xl px-3 text-label-lg text-muted-foreground hover:bg-background/70 hover:text-foreground"
                   }
                   href={withOrg(item.href, orgQueryValue)}
                 >

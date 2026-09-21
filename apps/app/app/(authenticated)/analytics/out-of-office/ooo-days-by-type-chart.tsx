@@ -29,7 +29,7 @@ export function OooDaysByTypeChart({ data }: OooDaysByTypeChartProps) {
   const [leadingType] = data;
   return (
     <div className="space-y-5">
-      <p className="text-muted-foreground text-sm">
+      <p className="text-body-sm text-muted-foreground">
         {leadingType
           ? `${leadingType.label} is the most common type at ${formatNumber(leadingType.days)} days.`
           : "No out-of-office type values are available."}
@@ -40,8 +40,10 @@ export function OooDaysByTypeChart({ data }: OooDaysByTypeChartProps) {
             className="flex items-baseline justify-between gap-4 rounded-xl bg-muted p-3"
             key={item.recordType}
           >
-            <dt className="break-words font-medium text-sm">{item.label}</dt>
-            <dd className="shrink-0 text-sm tabular-nums">
+            <dt className="break-words font-medium text-label-lg">
+              {item.label}
+            </dt>
+            <dd className="shrink-0 text-body-sm tabular-nums">
               {formatDays(item.days)}
             </dd>
           </div>

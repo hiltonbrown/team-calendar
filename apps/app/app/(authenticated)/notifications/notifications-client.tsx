@@ -270,7 +270,7 @@ export function NotificationsClient({
       ) : null}
       <section className="flex flex-col justify-between gap-4 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end">
         <div>
-          <p className="font-medium text-muted-foreground text-xs uppercase tracking-widest">
+          <p className="font-medium text-label-md text-muted-foreground uppercase tracking-wider">
             Inbox
           </p>
           <h1 className="mt-1 font-semibold text-foreground text-headline-md">
@@ -278,14 +278,20 @@ export function NotificationsClient({
               ? "Notifications"
               : "Notification preferences"}
           </h1>
-          <p className="mt-2 text-muted-foreground text-sm">{subtitle}</p>
+          <p className="mt-2 text-body-sm text-muted-foreground">{subtitle}</p>
           {status === "connecting" ? (
-            <p className="mt-2 text-muted-foreground text-xs" role="status">
+            <p
+              className="mt-2 text-label-md text-muted-foreground"
+              role="status"
+            >
               Connecting to live notifications…
             </p>
           ) : null}
           {status === "closed" ? (
-            <p className="mt-2 text-muted-foreground text-xs" role="status">
+            <p
+              className="mt-2 text-label-md text-muted-foreground"
+              role="status"
+            >
               Live notifications are unavailable. Updates may be delayed.
             </p>
           ) : null}
@@ -349,7 +355,7 @@ export function NotificationsClient({
           </div>
 
           <details className="rounded-2xl bg-muted px-4 py-3">
-            <summary className="cursor-pointer font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+            <summary className="cursor-pointer font-medium text-label-lg focus-visible:outline-[3px] focus-visible:outline-ring">
               Filter by event type
             </summary>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -397,14 +403,16 @@ export function NotificationsClient({
                       type="button"
                     >
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-sm">{item.title}</p>
+                        <p className="font-semibold text-body-sm">
+                          {item.title}
+                        </p>
                         {item.isUnread ? <Badge>Unread</Badge> : null}
                       </div>
-                      <p className="mt-1 line-clamp-2 text-muted-foreground text-sm">
+                      <p className="mt-1 line-clamp-2 text-body-sm text-muted-foreground">
                         {item.body}
                       </p>
                       <p
-                        className="mt-2 text-muted-foreground text-xs"
+                        className="mt-2 text-label-md text-muted-foreground"
                         title={formatFullDate(item.createdAt)}
                       >
                         {relativeTime(item.createdAt)}
@@ -437,7 +445,7 @@ export function NotificationsClient({
         <div className="space-y-6">
           {groupedTypes.map((group) => (
             <section className="space-y-3" key={group.category}>
-              <h2 className="font-semibold text-base">
+              <h2 className="font-semibold text-title-md">
                 {categoryLabel(group.category)}
               </h2>
               {group.items.map((type) => {
@@ -460,14 +468,16 @@ export function NotificationsClient({
                   >
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold text-sm">{row.label}</p>
+                        <p className="font-semibold text-body-sm">
+                          {row.label}
+                        </p>
                         {row.isDefault ? (
-                          <span className="text-muted-foreground text-xs">
+                          <span className="text-label-md text-muted-foreground">
                             Using default
                           </span>
                         ) : null}
                       </div>
-                      <p className="mt-1 text-muted-foreground text-sm">
+                      <p className="mt-1 text-body-sm text-muted-foreground">
                         {row.description}
                       </p>
                     </div>
@@ -697,7 +707,7 @@ function Toggle({
 }) {
   const disabledReason = "At least one delivery channel must stay enabled.";
   return (
-    <div className="text-sm">
+    <div className="text-label-lg">
       <div className="flex items-center gap-2">
         <Switch
           aria-describedby={disabled ? descriptionId : undefined}
@@ -710,7 +720,7 @@ function Toggle({
       </div>
       {disabled ? (
         <p
-          className="mt-1 max-w-52 text-muted-foreground text-xs"
+          className="mt-1 max-w-52 text-label-md text-muted-foreground"
           id={descriptionId}
         >
           {disabledReason}
@@ -738,8 +748,8 @@ function PreferenceReceipt({
       aria-live="polite"
       className={
         status === "error"
-          ? "text-destructive text-xs"
-          : "text-muted-foreground text-xs"
+          ? "text-destructive text-label-md"
+          : "text-label-md text-muted-foreground"
       }
       role={status === "error" ? "alert" : "status"}
     >

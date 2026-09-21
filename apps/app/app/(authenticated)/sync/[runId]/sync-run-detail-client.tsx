@@ -266,13 +266,13 @@ export function SyncRunDetailClient({
       <section className="space-y-6">
         <div className="space-y-2">
           <Link
-            className="text-muted-foreground text-sm"
+            className="text-label-lg text-muted-foreground"
             href={withOrg("/sync", orgQueryValue)}
           >
             Sync health / Run {run.id.slice(0, 8)}
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-semibold text-2xl">
+            <h1 className="font-semibold text-headline-md">
               {run.tenantName} {runTypeLabel(run.runType)}
             </h1>
             <StatusBadge status={run.status} />
@@ -280,7 +280,7 @@ export function SyncRunDetailClient({
               {triggerTypeLabel(run.triggerType)}
             </Badge>
           </div>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-body-sm text-muted-foreground">
             Started {formatDateTime(run.startedAt)}
             {run.completedAt
               ? `, completed ${formatDateTime(run.completedAt)}`
@@ -298,7 +298,7 @@ export function SyncRunDetailClient({
 
         {run.errorSummary ? (
           <div
-            className={`rounded-2xl p-4 text-sm ${statusToneClasses.failed}`}
+            className={`rounded-2xl p-4 text-label-lg ${statusToneClasses.failed}`}
           >
             <p>{run.errorSummary}</p>
             <p className="mt-2 text-muted-foreground">
@@ -310,8 +310,8 @@ export function SyncRunDetailClient({
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-lg">Failed records</h2>
-              <p className="text-muted-foreground text-sm">
+              <h2 className="font-semibold text-title-lg">Failed records</h2>
+              <p className="text-body-sm text-muted-foreground">
                 Raw payloads stay collapsed unless opened by an admin or owner.
               </p>
             </div>
@@ -344,23 +344,23 @@ export function SyncRunDetailClient({
                       type="button"
                     >
                       <span
-                        className="truncate font-mono text-sm"
+                        className="truncate font-mono text-label-lg"
                         title={record.sourceRemoteId ?? ""}
                       >
                         {record.sourceRemoteId ?? "No remote ID"}
                       </span>
                       <Badge variant="secondary">{record.recordType}</Badge>
                       <Badge variant="outline">{record.errorCode}</Badge>
-                      <span className="text-muted-foreground text-sm">
+                      <span className="text-label-lg text-muted-foreground">
                         {formatDateTime(record.createdAt)}
                       </span>
                     </button>
-                    <p className="mt-3 text-sm">
+                    <p className="mt-3 text-body-sm">
                       {firstLine(record.errorMessage)}
                     </p>
                     {isOpen && (
                       <div className="mt-4 space-y-3">
-                        <p className="whitespace-pre-wrap text-sm">
+                        <p className="whitespace-pre-wrap text-body-sm">
                           {record.errorMessage}
                         </p>
                         <Button
@@ -374,7 +374,7 @@ export function SyncRunDetailClient({
                             : "Show redacted raw payload"}
                         </Button>
                         {Object.hasOwn(rawPayloads, record.id) && (
-                          <pre className="overflow-auto rounded-xl bg-background p-3 text-xs">
+                          <pre className="overflow-auto rounded-xl bg-background p-3 text-label-md">
                             {JSON.stringify(rawPayloads[record.id], null, 2)}
                           </pre>
                         )}
@@ -402,7 +402,7 @@ export function SyncRunDetailClient({
         {message ? (
           <p
             aria-live={message.tone === "error" ? "assertive" : "polite"}
-            className="text-muted-foreground text-sm"
+            className="text-body-sm text-muted-foreground"
             role={message.tone === "error" ? "alert" : "status"}
           >
             {message.text}
@@ -419,7 +419,7 @@ export function SyncRunDetailClient({
           {rerunActionLabel(pendingAction, confirmRerun)}
         </Button>
         <p
-          className="text-muted-foreground text-sm"
+          className="text-body-sm text-muted-foreground"
           id="rerun-sync-description"
         >
           {rerunDisabledReason ??
@@ -441,7 +441,7 @@ export function SyncRunDetailClient({
                 : "Cancel running sync"}
             </Button>
             <p
-              className="text-muted-foreground text-sm"
+              className="text-body-sm text-muted-foreground"
               id="cancel-sync-description"
             >
               Stops future work after the current operation reaches a safe
@@ -460,7 +460,7 @@ export function SyncRunDetailClient({
           </Button>
         )}
         {timelineOpen ? (
-          <ol className="space-y-2 text-sm">
+          <ol className="space-y-2 text-label-lg">
             {timeline.map((event) => (
               <li key={event.id}>
                 <p className="font-medium">{event.action}</p>
@@ -495,12 +495,12 @@ function StatCell({ label, value }: { label: string; value: number }) {
       className={`rounded-2xl p-4 ${isFailed ? "bg-error-container" : "bg-muted"}`}
     >
       <p
-        className={`font-semibold text-3xl ${isFailed ? "text-destructive" : ""}`}
+        className={`font-semibold text-headline-md ${isFailed ? "text-destructive" : ""}`}
       >
         {value}
       </p>
       <p
-        className={`mt-1 text-sm ${isFailed ? "text-destructive" : "text-muted-foreground"}`}
+        className={`mt-1 text-body-sm ${isFailed ? "text-destructive" : "text-muted-foreground"}`}
       >
         {label}
       </p>

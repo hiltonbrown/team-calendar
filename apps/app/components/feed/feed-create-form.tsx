@@ -97,7 +97,7 @@ export function FeedCreateForm({
     <form action={submit} className="space-y-5">
       {error ? (
         <div
-          className="rounded-2xl bg-error-container p-3 text-on-error-container text-sm"
+          className="rounded-2xl bg-error-container p-3 text-label-lg text-on-error-container"
           role="alert"
         >
           {error}
@@ -112,7 +112,7 @@ export function FeedCreateForm({
         <Textarea id="feed-description" name="description" />
       </div>
       <fieldset className="space-y-2">
-        <legend className="font-medium text-sm">Privacy mode</legend>
+        <legend className="font-medium text-label-lg">Privacy mode</legend>
         <RadioGroup
           onValueChange={(value) =>
             setPrivacyMode(value as "masked" | "named" | "private")
@@ -120,7 +120,10 @@ export function FeedCreateForm({
           value={privacyMode}
         >
           {feedPrivacyOptions.map((option) => (
-            <div className="flex items-center gap-2 text-sm" key={option.value}>
+            <div
+              className="flex items-center gap-2 text-label-lg"
+              key={option.value}
+            >
               <RadioGroupItem
                 id={`privacy-${option.value}`}
                 value={option.value}
@@ -135,7 +138,7 @@ export function FeedCreateForm({
           ))}
         </RadioGroup>
       </fieldset>
-      <div className="flex items-center justify-between gap-4 rounded-2xl bg-muted p-3 text-sm">
+      <div className="flex items-center justify-between gap-4 rounded-2xl bg-muted p-3 text-label-lg">
         <Label htmlFor="include-public-holidays">Include public holidays</Label>
         <Switch
           checked={includeHolidays}
@@ -144,7 +147,7 @@ export function FeedCreateForm({
         />
       </div>
       <fieldset className="space-y-3">
-        <legend className="font-medium text-sm">Scope</legend>
+        <legend className="font-medium text-label-lg">Scope</legend>
         <RadioGroup
           onValueChange={(value) => setScopeChoice(value as ScopeChoice)}
           value={scopeChoice}
@@ -156,7 +159,7 @@ export function FeedCreateForm({
             ["person", "Specific people"],
             ...(canCreateOrgScope ? [["org", "All of organisation"]] : []),
           ].map(([value, label]) => (
-            <div className="flex items-center gap-2 text-sm" key={value}>
+            <div className="flex items-center gap-2 text-label-lg" key={value}>
               <RadioGroupItem id={`scope-${value}`} value={value} />
               <Label className="font-normal" htmlFor={`scope-${value}`}>
                 {label}

@@ -176,7 +176,7 @@ export function NotificationsBell({
         >
           <BellIcon className="size-4" />
           {badge && (
-            <span className="absolute top-0.5 right-0.5 min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center font-semibold text-destructive-foreground text-xs">
+            <span className="absolute top-0.5 right-0.5 min-w-5 rounded-full bg-destructive px-1.5 py-0.5 text-center font-semibold text-destructive-foreground text-label-md">
               {badge}
             </span>
           )}
@@ -184,24 +184,30 @@ export function NotificationsBell({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 rounded-2xl p-0">
         <div className="border-border border-b p-4">
-          <p className="font-semibold text-sm">Notifications</p>
-          <p className="text-muted-foreground text-xs">
+          <p className="font-semibold text-body-sm">Notifications</p>
+          <p className="text-label-md text-muted-foreground">
             {unreadCount > 0 ? `${unreadCount} unread` : "No new notifications"}
           </p>
           {status === "connecting" ? (
-            <p className="mt-2 text-muted-foreground text-xs" role="status">
+            <p
+              className="mt-2 text-label-md text-muted-foreground"
+              role="status"
+            >
               Connecting to live notifications…
             </p>
           ) : null}
           {status === "closed" ? (
-            <p className="mt-2 text-muted-foreground text-xs" role="status">
+            <p
+              className="mt-2 text-label-md text-muted-foreground"
+              role="status"
+            >
               Live notifications are unavailable. Updates may be delayed.
             </p>
           ) : null}
           {message ? (
             <p
               aria-live={message.tone === "error" ? "assertive" : "polite"}
-              className="mt-2 text-xs"
+              className="mt-2 text-label-md"
               role={message.tone === "error" ? "alert" : "status"}
             >
               {message.text}
@@ -209,7 +215,7 @@ export function NotificationsBell({
           ) : null}
         </div>
         {recent.length === 0 ? (
-          <div className="p-4 text-muted-foreground text-sm">
+          <div className="p-4 text-label-lg text-muted-foreground">
             No new notifications
           </div>
         ) : (
@@ -224,13 +230,13 @@ export function NotificationsBell({
                 >
                   <NotificationIcon iconKey={item.iconKey} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-sm">
+                    <span className="block truncate font-medium text-label-lg">
                       {item.title}
                     </span>
-                    <span className="block truncate text-muted-foreground text-xs">
+                    <span className="block truncate text-label-md text-muted-foreground">
                       {item.body}
                     </span>
-                    <span className="mt-1 block text-muted-foreground text-xs">
+                    <span className="mt-1 block text-label-md text-muted-foreground">
                       {relativeTime(item.createdAt)}
                     </span>
                   </span>

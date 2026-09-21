@@ -133,7 +133,9 @@ export const NewPersonClient = ({
           <div className="space-y-2">
             <Label htmlFor="job-title">
               Job title{" "}
-              <span className="text-muted-foreground text-sm">(optional)</span>
+              <span className="text-label-lg text-muted-foreground">
+                (optional)
+              </span>
             </Label>
             <Input
               id="job-title"

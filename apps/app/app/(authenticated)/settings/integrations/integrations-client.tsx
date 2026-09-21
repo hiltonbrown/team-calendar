@@ -74,7 +74,7 @@ export const IntegrationsClient = ({
             <Stat label="Stale or error" value={String(totals.stale)} />
             <Stat label="Not connected" value={String(totals.disconnected)} />
           </div>
-          <div className="space-y-2 rounded-2xl bg-muted/30 p-4 text-sm">
+          <div className="space-y-2 rounded-2xl bg-muted/30 p-4 text-label-lg">
             {organisations.map((organisation) => {
               const status = statusForConnection(organisation.xero_connection);
               const tenantName =
@@ -139,8 +139,8 @@ function statusForConnection(
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted/30 p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="font-medium text-sm">{value}</p>
+      <p className="text-label-md text-muted-foreground">{label}</p>
+      <p className="font-medium text-body-sm">{value}</p>
     </div>
   );
 }

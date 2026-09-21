@@ -1,6 +1,10 @@
 import "server-only";
 import type { Result } from "@repo/core";
-import { type BetterStackConfiguration, keys } from "../keys";
+import {
+  type BetterStackConfiguration,
+  keys,
+  parseBetterStackConfiguration,
+} from "../keys";
 import {
   type StatusPageResourceResponse,
   type StatusReportResponse,
@@ -234,7 +238,15 @@ export const getPublicStatus = async (
 ): Promise<Result<PublicStatusSnapshot, PublicStatusError>> => {
   let configuration: BetterStackConfiguration;
   try {
-    configuration = options.configuration ?? keys();
+    // keys() no longer enforces the Better Stack group rule, so apply it here:
+    // a partial group, a malformed URL, or plain HTTP in production all mean
+    // "not configured" rather than a call to the provider.
+    const raw = options.configuration ?? keys();
+    configuration = parseBetterStackConfiguration({
+      BETTERSTACK_API_KEY: raw.BETTERSTACK_API_KEY,
+      BETTERSTACK_STATUS_PAGE_ID: raw.BETTERSTACK_STATUS_PAGE_ID,
+      BETTERSTACK_STATUS_PAGE_URL: raw.BETTERSTACK_STATUS_PAGE_URL,
+    });
   } catch {
     return failure("configuration");
   }

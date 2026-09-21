@@ -60,18 +60,18 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
         title="Billing"
       />
       {summary.isOverLimit ? (
-        <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-sm">
+        <div className="rounded-2xl bg-destructive/10 p-4 text-destructive text-label-lg">
           This account is over one or more plan limits.
         </div>
       ) : null}
       {!earlyAccess && summary.billingSyncUnhealthy ? (
-        <div className="space-y-2 rounded-2xl bg-warning-container p-4 text-on-warning-container text-sm">
+        <div className="space-y-2 rounded-2xl bg-warning-container p-4 text-label-lg text-on-warning-container">
           <p>
             Billing changes are still being reconciled. Basic plan access
             applies until the latest Stripe event is repaired.
           </p>
           {summary.failedStripeEvents.length > 0 ? (
-            <ul className="space-y-1 font-mono text-xs">
+            <ul className="space-y-1 font-mono text-label-md">
               {summary.failedStripeEvents.map((event) => (
                 <li key={event.eventId}>
                   {event.eventId}: {event.errorCategory}
@@ -92,8 +92,8 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
         </CardHeader>
         <CardContent className="flex items-center justify-between gap-4">
           <div>
-            <p className="font-semibold text-2xl">{summary.plan.label}</p>
-            <p className="text-muted-foreground text-sm">
+            <p className="font-semibold text-title-lg">{summary.plan.label}</p>
+            <p className="text-body-sm text-muted-foreground">
               Billing period ends{" "}
               {summary.plan.currentPeriodEnd
                 ? summary.plan.currentPeriodEnd.toLocaleDateString("en-AU")
@@ -120,7 +120,7 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
             const barColour = usageBarColour(percentage);
             return (
               <div key={item.metricKey}>
-                <div className="mb-2 flex items-center justify-between text-sm">
+                <div className="mb-2 flex items-center justify-between text-label-lg">
                   <span>{item.label}</span>
                   <span>
                     {item.currentValue} / {unlimited ? "Unlimited" : item.limit}{" "}
@@ -149,7 +149,7 @@ export const BillingClient = ({ summary }: BillingClientProps) => {
               actions are disabled during closed early access.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-muted-foreground text-sm">
+          <CardContent className="space-y-2 text-label-lg text-muted-foreground">
             <p>
               Your organisation is participating in closed early access for
               Australian Xero Payroll teams. Pricing and commercial terms will

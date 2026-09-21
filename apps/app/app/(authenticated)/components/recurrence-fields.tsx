@@ -107,7 +107,7 @@ export const RecurrenceFields = ({
     <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 p-4">
       <div className="flex flex-col gap-2">
         <Label
-          className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+          className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
           htmlFor="recurrence-frequency"
         >
           Repeat
@@ -136,7 +136,7 @@ export const RecurrenceFields = ({
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-3">
                 <div className="flex flex-col gap-2">
                   <Label
-                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                     htmlFor="recurrence-interval"
                   >
                     Every
@@ -156,7 +156,7 @@ export const RecurrenceFields = ({
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label
-                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                     htmlFor="recurrence-unit"
                   >
                     Unit
@@ -189,7 +189,7 @@ export const RecurrenceFields = ({
 
               {rule.unit === "week" && (
                 <div className="flex flex-col gap-2">
-                  <Label className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest">
+                  <Label className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider">
                     Weekdays
                   </Label>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
@@ -219,7 +219,7 @@ export const RecurrenceFields = ({
               {(rule.unit === "month" || rule.unit === "year") && (
                 <div className="flex flex-col gap-2">
                   <Label
-                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                    className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                     htmlFor="recurrence-month-mode"
                   >
                     Month mode
@@ -255,7 +255,7 @@ export const RecurrenceFields = ({
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3">
             <div className="flex flex-col gap-2">
               <Label
-                className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                 htmlFor="recurrence-end-mode"
               >
                 Ends
@@ -285,7 +285,7 @@ export const RecurrenceFields = ({
             {rule.endMode === "count" ? (
               <div className="flex flex-col gap-2">
                 <Label
-                  className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                  className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                   htmlFor="recurrence-count"
                 >
                   Occurrences
@@ -307,7 +307,7 @@ export const RecurrenceFields = ({
             ) : (
               <div className="flex flex-col gap-2">
                 <Label
-                  className="font-bold text-label-sm text-muted-foreground uppercase tracking-widest"
+                  className="font-bold text-label-sm text-muted-foreground uppercase tracking-wider"
                   htmlFor="recurrence-until-date"
                 >
                   Repeat until

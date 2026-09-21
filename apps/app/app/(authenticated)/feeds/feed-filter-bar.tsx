@@ -70,7 +70,7 @@ export function FeedFilterBar({
         });
       }}
     >
-      <label className="flex flex-col gap-1 text-sm">
+      <label className="flex flex-col gap-1 text-label-lg">
         <span className="font-medium">Search</span>
         <input
           className="min-h-11 rounded-xl bg-background px-3 py-2"
@@ -80,7 +80,7 @@ export function FeedFilterBar({
         />
       </label>
       <label
-        className="flex flex-col gap-1 text-sm"
+        className="flex flex-col gap-1 text-label-lg"
         htmlFor="feed-status-filter"
       >
         <span className="font-medium">Status</span>
@@ -100,7 +100,7 @@ export function FeedFilterBar({
         </Select>
       </label>
       <label
-        className="flex flex-col gap-1 text-sm"
+        className="flex flex-col gap-1 text-label-lg"
         htmlFor="feed-privacy-filter"
       >
         <span className="font-medium">Privacy</span>
@@ -132,7 +132,10 @@ export function FeedFilterBar({
           Clear filters
         </Button>
       ) : null}
-      <p aria-live="polite" className="w-full text-muted-foreground text-xs">
+      <p
+        aria-live="polite"
+        className="w-full text-label-md text-muted-foreground"
+      >
         {activeFilterCount > 0
           ? `${activeFilterCount} ${activeFilterCount === 1 ? "filter" : "filters"} active.`
           : "Showing active and paused feeds."}

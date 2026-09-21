@@ -14,7 +14,7 @@
 .actionLabel {
   margin: 0;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.4;
   color: var(--marketing-primary);
   text-transform: uppercase;
@@ -98,7 +98,7 @@
 .topicNav > p {
   margin: 0 0 12px;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--marketing-on-surface-variant);
   letter-spacing: 0.03em;
 }
@@ -227,7 +227,7 @@
   height: 30px;
   margin-bottom: 22px;
   font-size: 0.8rem;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--marketing-on-primary);
   content: counter(flow);
   background: var(--marketing-primary);

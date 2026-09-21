@@ -131,7 +131,7 @@ export function FeedTable({
       {message && !confirmation ? (
         <p
           aria-live={message.tone === "error" ? "assertive" : "polite"}
-          className="m-3 rounded-2xl bg-background p-3 text-sm"
+          className="m-3 rounded-2xl bg-background p-3 text-body-sm"
           role={message.tone === "error" ? "alert" : "status"}
         >
           {message.text}
@@ -160,7 +160,7 @@ export function FeedTable({
               </AlertDialogDescription>
             </AlertDialogHeader>
             {message?.tone === "error" ? (
-              <p className="text-destructive text-sm" role="alert">
+              <p className="text-body-sm text-destructive" role="alert">
                 {message.text}
               </p>
             ) : null}
@@ -182,7 +182,7 @@ export function FeedTable({
           </AlertDialogContent>
         ) : null}
       </AlertDialog>
-      <div className="hidden gap-4 p-4 text-muted-foreground text-sm lg:grid lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr]">
+      <div className="hidden gap-4 p-4 text-label-lg text-muted-foreground lg:grid lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr]">
         <span>Feed</span>
         <span>Status</span>
         <span>Privacy</span>
@@ -194,7 +194,7 @@ export function FeedTable({
           <article className="rounded-2xl bg-background p-4" key={feed.id}>
             <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-[1.4fr_0.7fr_0.7fr_1fr_1fr]">
               <div>
-                <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+                <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
                   Feed
                 </span>
                 <Link
@@ -204,19 +204,19 @@ export function FeedTable({
                   {feed.name}
                 </Link>
                 {feed.description ? (
-                  <p className="mt-1 text-muted-foreground text-sm">
+                  <p className="mt-1 text-body-sm text-muted-foreground">
                     {feed.description}
                   </p>
                 ) : null}
               </div>
               <div>
-                <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+                <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
                   Status
                 </span>
                 <FeedStatusDot status={feed.status} />
               </div>
               <div>
-                <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+                <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
                   Privacy
                 </span>
                 <Badge variant="secondary">
@@ -224,16 +224,16 @@ export function FeedTable({
                 </Badge>
               </div>
               <div>
-                <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+                <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
                   Scope
                 </span>
-                <span className="text-sm">{feed.scopeSummary}</span>
+                <span className="text-label-lg">{feed.scopeSummary}</span>
               </div>
               <div>
-                <span className="mb-1 block text-muted-foreground text-xs lg:hidden">
+                <span className="mb-1 block text-label-md text-muted-foreground lg:hidden">
                   Activity
                 </span>
-                <div className="text-muted-foreground text-xs">
+                <div className="text-label-md text-muted-foreground">
                   {feed.activeTokenHint?.lastUsedAt
                     ? `Used ${formatRelative(feed.activeTokenHint.lastUsedAt)}`
                     : "Never used"}

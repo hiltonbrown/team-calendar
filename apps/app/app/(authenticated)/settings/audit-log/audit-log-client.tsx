@@ -82,7 +82,10 @@ export const AuditLogClient = ({
       <Card className="rounded-2xl">
         <CardContent className="p-4">
           <form className="grid items-end gap-4 md:grid-cols-5" method="get">
-            <label className="grid gap-1 text-sm" htmlFor="audit-date-from">
+            <label
+              className="grid gap-1 text-label-lg"
+              htmlFor="audit-date-from"
+            >
               <span className="text-muted-foreground">From</span>
               <Input
                 defaultValue={filters.dateFrom}
@@ -91,7 +94,7 @@ export const AuditLogClient = ({
                 type="date"
               />
             </label>
-            <label className="grid gap-1 text-sm" htmlFor="audit-date-to">
+            <label className="grid gap-1 text-label-lg" htmlFor="audit-date-to">
               <span className="text-muted-foreground">To</span>
               <Input
                 defaultValue={filters.dateTo}
@@ -100,7 +103,10 @@ export const AuditLogClient = ({
                 type="date"
               />
             </label>
-            <label className="grid gap-1 text-sm" htmlFor="audit-action-prefix">
+            <label
+              className="grid gap-1 text-label-lg"
+              htmlFor="audit-action-prefix"
+            >
               <span className="text-muted-foreground">Action prefix</span>
               <Input
                 defaultValue={filters.actionPrefix}
@@ -109,7 +115,10 @@ export const AuditLogClient = ({
                 placeholder="e.g. leave_request."
               />
             </label>
-            <label className="grid gap-1 text-sm" htmlFor="audit-entity-id">
+            <label
+              className="grid gap-1 text-label-lg"
+              htmlFor="audit-entity-id"
+            >
               <span className="text-muted-foreground">Entity ID</span>
               <Input
                 defaultValue={filters.searchEntityId}
@@ -135,27 +144,27 @@ export const AuditLogClient = ({
               <summary className="cursor-pointer list-none">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="font-medium text-sm">{event.action}</p>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="font-medium text-body-sm">{event.action}</p>
+                    <p className="text-label-md text-muted-foreground">
                       {event.entityType} · {event.entityId} ·{" "}
                       {event.actorDisplay}
                     </p>
                   </div>
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-label-md text-muted-foreground">
                     {event.createdAt.toLocaleString("en-AU")}
                   </div>
                 </div>
               </summary>
-              <div className="mt-4 space-y-3 text-sm">
-                <pre className="overflow-x-auto rounded-lg bg-background p-3 text-xs">
+              <div className="mt-4 space-y-3 text-label-lg">
+                <pre className="overflow-x-auto rounded-lg bg-background p-3 text-label-md">
                   {JSON.stringify(event.metadata, null, 2)}
                 </pre>
                 {details[event.id] ? (
                   <div className="grid gap-3 md:grid-cols-2">
-                    <pre className="overflow-x-auto rounded-lg bg-background p-3 text-xs">
+                    <pre className="overflow-x-auto rounded-lg bg-background p-3 text-label-md">
                       {JSON.stringify(details[event.id].beforeValue, null, 2)}
                     </pre>
-                    <pre className="overflow-x-auto rounded-lg bg-background p-3 text-xs">
+                    <pre className="overflow-x-auto rounded-lg bg-background p-3 text-label-md">
                       {JSON.stringify(details[event.id].afterValue, null, 2)}
                     </pre>
                   </div>

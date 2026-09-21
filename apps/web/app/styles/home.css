@@ -120,7 +120,8 @@
   place-items: center;
   width: 16px;
   height: 16px;
-  border-radius: 5px;
+  /* Legend marker geometry, not a surface radius. See DESIGN.md Corner Rule. */
+  border-radius: 4px;
 }
 .tl-swatch--sage {
   background: var(--secondary);
@@ -374,7 +375,7 @@
   height: 26px;
   color: var(--on-surface-variant);
   background: var(--surface-container);
-  border-radius: 9px;
+  border-radius: 12px;
 }
 .tl-detail-icon {
   display: grid;
@@ -454,9 +455,7 @@
 .tl-detail-close:hover {
   color: var(--on-surface);
   background: var(--surface-container);
-}
-
-/* Responsive */
+} /* Responsive */
 @media (max-width: 1024px) {
   .tl-grid {
     grid-template-columns: 200px 1fr;
@@ -526,7 +525,6 @@
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
-
 @media (forced-colors: active) {
   .tl-card,
   .tl-grid,
@@ -589,13 +587,11 @@
   font: 400 0.9375rem / 1.6 var(--font-sans);
   color: var(--on-surface-variant);
 }
-
 @media (max-width: 1024px) {
   .fmkt-problem__grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-
 @media (max-width: 640px) {
   .fmkt-problem {
     padding: 64px 0;
@@ -625,13 +621,11 @@
   gap: 1.5rem;
   margin-top: clamp(2.5rem, 5vw, 3.5rem);
 }
-
 @media (min-width: 640px) {
   .fmkt-problem__grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-
 @media (min-width: 1024px) {
   .fmkt-problem__grid {
     grid-template-columns: repeat(3, 1fr);

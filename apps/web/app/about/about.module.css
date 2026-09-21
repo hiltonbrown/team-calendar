@@ -128,7 +128,7 @@
 .meta {
   margin-bottom: 0.45rem;
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 500;
   line-height: 1.4;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -182,7 +182,7 @@
 
 .exampleRow span:last-child {
   font-size: 0.76rem;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--marketing-on-surface-muted);
   text-transform: uppercase;
 }

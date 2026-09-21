@@ -159,7 +159,7 @@ export const GeneralClient = ({
               id="account-slug"
               value={account.slug ?? "Not available"}
             />
-            <p className="text-muted-foreground text-xs">
+            <p className="text-label-md text-muted-foreground">
               Account slug is set when the account is created.
             </p>
           </div>
@@ -198,7 +198,7 @@ export const GeneralClient = ({
               value={COUNTRY_LABELS[organisation.countryCode]}
             />
             <p
-              className="text-muted-foreground text-xs"
+              className="text-label-md text-muted-foreground"
               id="country-description"
             >
               Country cannot be changed here. New Zealand and United Kingdom
@@ -242,7 +242,7 @@ export const GeneralClient = ({
           </div>
 
           {regionCode !== (organisation.regionCode ?? "") && (
-            <div className="rounded-xl bg-muted/50 p-3 text-sm">
+            <div className="rounded-xl bg-muted/50 p-3 text-label-lg">
               Changing the region affects public-holiday coverage. Existing
               custom and suppressed records are preserved.
             </div>

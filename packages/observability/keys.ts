@@ -51,6 +51,17 @@ export const parseBetterStackConfiguration = (
   return configuration;
 };
 
+/**
+ * Reads the observability environment. Sentry's DSN, org and project are read
+ * from here at build time by `next-config.ts`, so this must not throw on an
+ * unrelated feature's configuration.
+ *
+ * The Better Stack group rule (all three variables together, HTTPS in
+ * production) is enforced where it can act on the result: `bun run preflight`
+ * gates a deploy, and `getPublicStatus` refuses to call the provider and
+ * reports "not configured". Enforcing it here as well took the whole build
+ * down when a Vercel integration supplied only part of the group.
+ */
 export const keys = () => {
   const environment = createEnv({
     client: {
@@ -78,10 +89,6 @@ export const keys = () => {
       SENTRY_PROJECT: z.string().optional(),
     },
   });
-
-  if (typeof window === "undefined") {
-    parseBetterStackConfiguration(environment);
-  }
 
   return environment;
 };

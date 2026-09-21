@@ -93,7 +93,9 @@ export function XeroConnectClient({
               type="button"
             >
               <p className="font-medium">{tenant.tenantName}</p>
-              <p className="text-muted-foreground text-sm">{tenant.tenantId}</p>
+              <p className="text-body-sm text-muted-foreground">
+                {tenant.tenantId}
+              </p>
             </button>
           ))}
         </CardContent>
@@ -141,7 +143,7 @@ export function XeroConnectClient({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm">
+            <p className="text-body-sm">
               Selected tenant:{" "}
               <span className="font-medium">
                 {selectedTenant?.tenantName ?? "None selected"}

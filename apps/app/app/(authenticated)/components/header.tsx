@@ -26,16 +26,14 @@ export const Header = async ({
   const bell = await loadBellData(organisationId);
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-border border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-4 border-border border-b bg-background px-4 shadow-[var(--elev-sticky)]">
       <div className="flex items-center gap-3">
         <SidebarTrigger
           className="-ml-0.5 size-7"
           style={{ color: "var(--muted-foreground)" }}
         />
         <Separator className="h-4 opacity-40" orientation="vertical" />
-        <h1 className="font-semibold text-[0.9375rem] tracking-[-0.01em]">
-          {page}
-        </h1>
+        <h1 className="font-semibold text-title-md">{page}</h1>
       </div>
 
       <div className="flex items-center gap-2">
@@ -51,7 +49,7 @@ export const Header = async ({
         <ModeToggle />
         <Suspense
           fallback={
-            <div className="h-7 w-7 animate-pulse rounded-full bg-[var(--sidebar-accent)]" />
+            <div className="h-7 w-7 animate-pulse rounded-full bg-[var(--sidebar-accent)] motion-reduce:animate-none" />
           }
         >
           <CustomUserButton />

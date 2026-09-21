@@ -186,7 +186,7 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
             </CardHeader>
             <CardContent className="space-y-4">
               {connection?.last_error_message ? (
-                <div className="rounded-2xl bg-destructive/10 p-3 text-destructive text-sm">
+                <div className="rounded-2xl bg-destructive/10 p-3 text-destructive text-label-lg">
                   {connection.last_error_message}
                 </div>
               ) : null}
@@ -217,7 +217,7 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
               </div>
 
               {tenant?.leave_balances_stale_since ? (
-                <p className="text-muted-foreground text-xs">
+                <p className="text-label-md text-muted-foreground">
                   Rolling refresh in progress since{" "}
                   {formatTimestamp(tenant.leave_balances_stale_since)}
                 </p>
@@ -249,7 +249,7 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
 
               {tenant ? (
                 <details className="rounded-xl bg-muted/30 p-4">
-                  <summary className="cursor-pointer rounded-xl font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+                  <summary className="cursor-pointer rounded-xl font-medium text-label-lg focus-visible:outline-[3px] focus-visible:outline-ring">
                     Manual sync options
                   </summary>
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -273,7 +273,7 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
 
               {connection ? (
                 <details className="rounded-xl bg-muted/30 p-4">
-                  <summary className="cursor-pointer rounded-xl font-medium text-sm focus-visible:outline-[3px] focus-visible:outline-ring">
+                  <summary className="cursor-pointer rounded-xl font-medium text-label-lg focus-visible:outline-[3px] focus-visible:outline-ring">
                     Connection controls
                   </summary>
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -440,8 +440,8 @@ function formatTimestamp(value: Date | null): string {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted/30 p-3">
-      <p className="text-muted-foreground text-xs">{label}</p>
-      <p className="font-medium text-sm">{value}</p>
+      <p className="text-label-md text-muted-foreground">{label}</p>
+      <p className="font-medium text-body-sm">{value}</p>
     </div>
   );
 }
