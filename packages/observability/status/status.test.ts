@@ -399,6 +399,22 @@ describe("public Better Stack status", () => {
     });
   });
 
+  it("reports a partial configuration as not configured", async () => {
+    // keys() no longer throws on a partial group, so the status feature is
+    // what stops a half-configured deployment calling the provider.
+    const partial = await getPublicStatus({
+      configuration: { BETTERSTACK_API_KEY: "private-api-key" },
+      fetcher: () => {
+        throw new Error("the provider must not be called");
+      },
+    });
+
+    expect(partial).toMatchObject({
+      error: { code: "configuration" },
+      ok: false,
+    });
+  });
+
   it("maps malformed JSON to an invalid-response error", async () => {
     const result = await getPublicStatus({
       configuration,

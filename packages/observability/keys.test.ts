@@ -10,6 +10,7 @@ const configured = {
 describe("Better Stack environment configuration", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("allows the complete group to be absent", () => {
@@ -59,5 +60,18 @@ describe("Better Stack environment configuration", () => {
     vi.stubGlobal("window", {});
 
     expect(() => keys()).not.toThrow();
+  });
+
+  it("does not fail the build when only part of the group is set", () => {
+    // next-config.ts calls keys() to read SENTRY_ORG and SENTRY_PROJECT while
+    // Next.js loads next.config.ts. A Vercel integration that supplies only
+    // some Better Stack variables must not take the whole deployment down;
+    // the group rule belongs to preflight and to getPublicStatus.
+    vi.stubEnv("BETTERSTACK_API_KEY", configured.BETTERSTACK_API_KEY);
+    vi.stubEnv("BETTERSTACK_STATUS_PAGE_ID", "");
+    vi.stubEnv("BETTERSTACK_STATUS_PAGE_URL", "");
+
+    expect(() => keys()).not.toThrow();
+    expect(keys().BETTERSTACK_API_KEY).toBe(configured.BETTERSTACK_API_KEY);
   });
 });
