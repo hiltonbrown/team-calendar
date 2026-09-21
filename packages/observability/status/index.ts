@@ -241,8 +241,12 @@ export const getPublicStatus = async (
     // keys() no longer enforces the Better Stack group rule, so apply it here:
     // a partial group, a malformed URL, or plain HTTP in production all mean
     // "not configured" rather than a call to the provider.
-    configuration =
-      options.configuration ?? parseBetterStackConfiguration(keys());
+    const raw = options.configuration ?? keys();
+    configuration = parseBetterStackConfiguration({
+      BETTERSTACK_API_KEY: raw.BETTERSTACK_API_KEY,
+      BETTERSTACK_STATUS_PAGE_ID: raw.BETTERSTACK_STATUS_PAGE_ID,
+      BETTERSTACK_STATUS_PAGE_URL: raw.BETTERSTACK_STATUS_PAGE_URL,
+    });
   } catch {
     return failure("configuration");
   }
