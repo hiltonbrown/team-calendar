@@ -170,9 +170,9 @@ const LeaveReportsPage = async ({ searchParams }: LeaveReportsPageProps) => {
           customStart={fromParam}
           preset={preset}
         />
-        <section className="px-1">
+        <section>
           <div className="max-w-3xl space-y-2">
-            <p className="font-medium text-body-sm text-muted-foreground">
+            <p className="font-medium text-label-lg text-muted-foreground">
               Analytics
             </p>
             <h2 className="font-semibold text-headline-md tracking-normal">

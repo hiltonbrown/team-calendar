@@ -1391,3 +1391,54 @@ Clerk rejects placeholder keys. Visual review was done by rendering the real
 components against the compiled stylesheet in Chromium (`MetricTile` in its two
 dashboard cards, the settings section header, people status and provenance
 chips, the empty state), light and dark.
+
+---
+
+## Pre-production review pass
+
+Re-audited all three commits before shipping. Two defects found and fixed, both
+mine; one pre-existing issue found and left alone; the risky automated passes
+verified clean.
+
+### Fixed
+
+- `px-1` on the two analytics page headers: an arbitrary 4px inset matching
+  nothing in the spacing scale. The parent's `p-6` gutter and `gap-6` rhythm
+  already place the block, so the class is gone.
+- The "Analytics" eyebrow above each of those headings was a `<p>`, so the type
+  migration's tag heuristic gave it prose leading. An eyebrow is a label:
+  `text-body-sm` to `text-label-lg`. These two were the only instances; a sweep
+  for uppercase labels carrying prose leading returned zero.
+
+### Verified clean
+
+- **CSS pruning.** The dangerous direction is a deleted rule that markup still
+  uses. Classes used in markup with no matching rule: 11 at baseline, the same
+  11 at HEAD, and the same 11 in the compiled stylesheet. Zero new orphans. The
+  `marketing-legal__*` block that the legal pages depend on is intact, confirmed
+  by computed style in the browser (760px measure, 40px gap, 36px/600 heading,
+  16px body at 1.7 leading).
+- **Type migration.** No replacement landed outside a class string. Only one
+  `text-body-sm` sits in a `cn()` call rather than a literal `className`, and it
+  is on a `<p>` holding an error message, where prose leading is right.
+- **Observability.** The earlier tests passed `configuration` explicitly and
+  never exercised `parseBetterStackConfiguration(keys())` with the real t3-env
+  proxy. Added five tests that do: partial group, empty, HTTP in production and
+  a malformed URL all report "configuration" without touching the fetcher, and
+  a complete HTTPS config still reaches the provider. That last case matters:
+  it proves the status feature was not simply switched off.
+- **No markup lost to formatting reflow.** Accessibility attribute counts match
+  the baseline exactly in both apps, once the three deleted orphan components
+  are accounted for (aria-label -2, aria-hidden -10, alt -1, all theirs). The
+  one addition is `aria-hidden` on MetricTile's new status dot.
+- **Builds.** app, api and web all compile with the partial Better Stack config
+  that broke the Vercel deploy.
+- **Routes.** 13 marketing routes at 1440px and 390px, light and dark: no JS
+  errors, no horizontal overflow. Legal pages checked separately.
+
+### Found, not fixed (pre-existing, outside this pass)
+
+`.marketing-legal__section ul` sets `padding-left` but no list marker, and
+Tailwind's preflight strips the default, so bullets on the privacy policy and
+terms pages render as indented paragraphs. Present at baseline. Worth a one-line
+fix later; not changed here to keep the production push to reviewed scope.

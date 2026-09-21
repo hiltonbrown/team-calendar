@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -454,5 +454,76 @@ describe("public Better Stack status", () => {
     expect(network).toMatchObject({ error: { code: "network" }, ok: false });
     expect(timeout).toMatchObject({ error: { code: "timeout" }, ok: false });
     expect(JSON.stringify(network)).not.toContain("socket secret");
+  });
+});
+
+const BETTER_STACK_VARS = [
+  "BETTERSTACK_API_KEY",
+  "BETTERSTACK_STATUS_PAGE_ID",
+  "BETTERSTACK_STATUS_PAGE_URL",
+] as const;
+
+const stubBetterStackEnv = (env: Record<string, string>) => {
+  for (const name of BETTER_STACK_VARS) {
+    vi.stubEnv(name, env[name] ?? "");
+  }
+  vi.stubEnv("NODE_ENV", "production");
+};
+
+describe("getPublicStatus reading the environment through keys()", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it.each([
+    ["partial: api key only", { BETTERSTACK_API_KEY: "k" }],
+    ["none", {}],
+    [
+      "http in production",
+      {
+        BETTERSTACK_API_KEY: "k",
+        BETTERSTACK_STATUS_PAGE_ID: "1",
+        BETTERSTACK_STATUS_PAGE_URL: "http://status.example.com",
+      },
+    ],
+    [
+      "malformed url",
+      {
+        BETTERSTACK_API_KEY: "k",
+        BETTERSTACK_STATUS_PAGE_ID: "1",
+        BETTERSTACK_STATUS_PAGE_URL: "not-a-url",
+      },
+    ],
+  ])(
+    "reports %s as not configured without calling the provider",
+    async (_l, env) => {
+      stubBetterStackEnv(env as Record<string, string>);
+      const result = await getPublicStatus({
+        fetcher: () => {
+          throw new Error("PROVIDER WAS CALLED");
+        },
+      });
+      expect(result).toMatchObject({
+        error: { code: "configuration" },
+        ok: false,
+      });
+    }
+  );
+
+  it("accepts a complete https config and reaches the provider", async () => {
+    stubBetterStackEnv({
+      BETTERSTACK_API_KEY: "k",
+      BETTERSTACK_STATUS_PAGE_ID: "1",
+      BETTERSTACK_STATUS_PAGE_URL: "https://status.example.com",
+    });
+    let called = false;
+    const result = await getPublicStatus({
+      fetcher: () => {
+        called = true;
+        return Promise.resolve(new Response("{}", { status: 500 }));
+      },
+    });
+    expect(called).toBe(true);
+    expect(result.ok).toBe(false);
+    // 500 is a provider error, not a configuration error
+    expect(result).toMatchObject({ error: { code: "provider" } });
   });
 });
