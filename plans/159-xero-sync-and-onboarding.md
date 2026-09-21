@@ -1,5 +1,13 @@
 # Plan 159: Make Xero connection, leave sync and onboarding reliable
 
+> **Lifecycle scope superseded, 21 September 2026:**
+> [Plan 161](161-harden-xero-connection-lifecycle.md) replaces Step 3, finding X6
+> and their associated grant/mapping verification requirements. Read it before
+> editing connections or credentials. It requires one active binding per Xero
+> app/external tenant across accounts and makes a shared-grant redesign conditional
+> on verified provider behaviour. The superseded text below is historical context,
+> not an alternative implementation instruction. All other work remains active.
+
 > Executor: read this complete plan before editing. It is a planning deliverable,
 > not authority to deploy, change customer payroll, merge identities or disconnect
 > production connections. Implement source changes and tests when instructed;

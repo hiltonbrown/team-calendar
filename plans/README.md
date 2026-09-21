@@ -9,9 +9,30 @@ Reviewed against `80ac9f7` and the supplied working tree on 19 September 2026.
 | [Australian go-live](go-live.md) | P0 release programme | IN PROGRESS | Executor branch `codex/go-live-candidate`; Section 11 records current execution and verification |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | P1 correctness and shared onboarding | TODO | Planned at `246ba27`, 20 September 2026; source implementation and live round trips remain NOT VERIFIED |
 | [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | P1 integration proof | TODO | Follow-up to 159; 26 scenarios, live/provider evidence, cleanup and report contract; live tests NOT VERIFIED |
+| [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | P1 production connection safety | TODO | Planned at `585f6cb`, 21 September 2026; supersedes 159 Step 3 and its unconditional shared-grant prescription; source and live verification NOT VERIFIED |
+
+Plan 161 owns tenant binding, authorisation provenance, remote reconciliation,
+distributed rate enforcement, permission recovery, token deadlines and report-only
+inactivity assessment. Execute its binding guard first, then durable cleanup,
+shared limits and recovery. It selects one active binding per Xero app/external
+tenant across accounts, with historical mappings retained and a duplicate-data
+migration gate. A shared-grant schema is conditional on provider evidence.
+
+**Partially superseded:** Plan 159 Step 3, X6 and their corresponding verification
+criteria are stale; use Plan 161 for that work. Plan 159's independent import,
+identity, AU semantics and onboarding work remains TODO. Do not implement both
+lifecycle prescriptions. Plan 160 can prepare its harness alongside both plans;
+its final connection sign-off depends on Plan 161's regression and live evidence
+matrix as well as Plan 159's remaining integration work. Production readiness
+cannot be inferred from writing these plans.
+
+Considered and rejected for connection hardening: replacing server-side OAuth,
+deleting every unselected connection, treating invalid credentials as verified
+remote absence, login-only inactivity and an unconditional shared-grant redesign.
+Detailed reasons and provider evidence limits are in Plan 161.
 
 Plan 159 is the focused follow-up to the Xero audit. It covers import completeness,
-retry-safe jobs, shared credentials, employee reconciliation, AU approval semantics,
+retry-safe jobs, employee reconciliation, AU approval semantics,
 guided onboarding and calendar freshness. It does not recreate the retired backlog
 or supersede unrelated release work. Execute its dependency table: reliability,
 connection and identity work can proceed independently; durable import precedes

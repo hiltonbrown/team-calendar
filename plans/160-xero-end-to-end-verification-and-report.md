@@ -1,5 +1,13 @@
 # Plan 160: Verify the complete Xero integration and publish an evidence report
 
+> **Connection verification update, 21 September 2026:**
+> [Plan 161](161-harden-xero-connection-lifecycle.md) now owns connection lifecycle
+> implementation and replaces Plan 159's unconditional shared-grant prescription.
+> Add its regression/live evidence matrix to this report before connection
+> hardening sign-off. Prepare the harness independently; final verification depends
+> on the implemented candidate from both plans. Shared-family behaviour must be
+> established by provider evidence, not assumed from a prescribed schema.
+
 > Executor: this is a test-and-report follow-up, not a production feature rewrite.
 > Prepare the harness, then exercise the approved candidate using owned fixtures
 > and real provider evidence. Produce the report even if setup, testing or cleanup
