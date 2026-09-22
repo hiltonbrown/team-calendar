@@ -24,10 +24,13 @@ describe("shared security headers", () => {
     expect(hstsHeaders[0]?.value).not.toContain("preload");
   });
 
-  it("publishes the shared security headers for every supported app", async () => {
+  it("publishes shared headers and config for every supported app", async () => {
     const sharedHeaders = await config.headers?.();
     const headers = sharedHeaders?.[0]?.headers ?? [];
 
+    expect(config.experimental?.turbopackPluginRuntimeStrategy).toBe(
+      "workerThreads"
+    );
     expect(getHeaderOccurrences(headers, "Strict-Transport-Security")).toEqual([
       { key: "Strict-Transport-Security", value: "max-age=31536000" },
     ]);
