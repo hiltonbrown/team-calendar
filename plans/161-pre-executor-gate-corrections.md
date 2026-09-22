@@ -18,11 +18,34 @@
 
 - **Priority**: P1 - it gates all eight Xero hardening sub-plans
 - **Effort**: S
-- **Risk**: LOW (one new unit test, two `.env.example` comment blocks, one report file)
+- **Risk**: LOW (one shared Next.js setting, one unit assertion, two `.env.example` comment
+  blocks and one report file)
 - **Depends on**: none. **This must land before `plans/161a-xero-baseline-and-fixture-ownership.md`.**
 - **Category**: dx, tests
 - **Planned at**: commit `8652c31`, 22 September 2026
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
+
+### Execution record, 22 September 2026
+
+**DONE and independently approved at `c0c11f7`.** The isolated executor worktree is
+`/tmp/teamcalendar-161-pre` on branch `codex/xero-connection-hardening`.
+
+The first exact build exposed a host constraint in Turbopack's default plugin transport: its CSS
+worker attempted to create a child process and bind a local socket, which this execution host
+denied. Investigation of the installed Next.js 16.3.5 types and schema identified the supported
+correction, `experimental.turbopackPluginRuntimeStrategy: "workerThreads"`. It runs the same
+Turbopack plugin work in worker threads, keeps Turbopack as the production bundler, and removes
+the incompatible socket transport. The executor implemented it in the shared typed config and
+added an exact regression assertion without increasing the 37-test preflight tripwire.
+
+The reviewer read the full five-file diff and reran every Done criterion. `bun run check`,
+`bun run typecheck`, `bun run boundaries`, `bun run test`, the exact `bun run build`,
+`bun run --cwd packages/next-config test`, `bun run test:release-tools`,
+`bun run typecheck:release-tools` and `git diff 91f3bad..HEAD --check` all exited 0. The build
+reported the worker-thread strategy for app, API and web and completed 4/4 Turbo tasks. The
+package suite remained 3 files / 37 tests; release tools passed 11 files / 47 tests. Scope was
+clean, no 161a-161h file or charter changed, and the executor worktree was clean after its single
+commit.
 
 ## What already happened, so you do not redo it
 
@@ -172,30 +195,60 @@ that command only.
 **In scope:**
 - `plans/161-xero-execution-report.md` (create) - the baseline and preflight-gate record
 - `apps/app/.env.example`, `apps/api/.env.example` - comment lines only
+- `packages/next-config/index.ts` - select Turbopack's supported worker-thread plugin runtime
+- `packages/next-config/security-headers.test.ts` - extend an existing test with the config
+  assertion without changing the suite's 37-test count
 - `plans/README.md` (status row only)
 
 **Out of scope - do NOT touch:**
 - **Sub-plans 161a through 161h, and the charter.** Their gate corrections are already applied.
   Re-editing them will conflict with work already done.
-- **All of `packages/next-config/`.** Its preflight validator and its 37 tests are already
-  correct. You confirm the gate; you do not change it. **Do not relax preflight so a local run
+- `packages/next-config/preflight.ts`, `packages/next-config/preflight.test.ts` and every other
+  file under `packages/next-config/` except the two files explicitly listed in scope. The
+  preflight validator and its tests remain unchanged. **Do not relax preflight so a local run
   passes**, and do not add the `XERO_*` cases that 161c and 161e own.
 - `tooling/release/playwright.config.ts` and `tooling/release/e2e/`. The release suite correctly
   requires a deployed candidate. **Do not add local fallbacks or stub the `TC_*` variables.**
 - Any `keys.ts`. `DATABASE_URL` and `XERO_TOKEN_ENCRYPTION_KEY` are required on purpose.
   **Do not make either optional.**
 - Any real `.env*` file. You edit `.env.example` comments only.
-- All product code in `packages/` and `apps/` beyond the two `.env.example` files.
+- All product code in `packages/` and `apps/` beyond the two `.env.example` files and the two
+  scoped shared Next.js configuration files.
 
 ## Git workflow
 
 - Branch: `codex/xero-connection-hardening` (shared with 161a-161h), from the current
   release/execution branch.
-- Conventional commits. Suggested: `docs(plans): record verified gate baseline for xero hardening`,
-  then `test(next-config): cover preflight variable validation`.
+- Conventional commits. Suggested: `docs(plans): record verified gate baseline for xero hardening`.
 - Do NOT push or open a PR.
 
 ## Steps
+
+### Step 0: Use Turbopack's worker-thread plugin runtime
+
+In `packages/next-config/index.ts`, add an `experimental` block to the shared `NextConfig` with
+`turbopackPluginRuntimeStrategy: "workerThreads"`. Keep the existing `turbopack.root` setting
+unchanged. This is a supported Next.js 16.3.5 configuration value; do not add a cast or suppress
+TypeScript.
+
+In `packages/next-config/security-headers.test.ts`, extend the existing shared-config test with
+an exact assertion that the strategy is `"workerThreads"`. Keep the number of tests unchanged so
+the preflight tripwire remains 37. Rename the test if needed so its name accurately covers shared
+configuration rather than security headers alone.
+
+Run:
+
+```bash
+bun run --cwd packages/next-config test
+DATABASE_URL='postgresql://postgres:postgres@localhost:5432/teamcalendar' \
+  XERO_TOKEN_ENCRYPTION_KEY='<synthetic-32-byte-base64-placeholder>' bun run build
+```
+
+Use a syntactically valid synthetic value for the encryption key, never a real value. Expected:
+the package suite exits 0 with 37 tests and the exact repository build exits 0 using Turbopack.
+Record in the execution report that worker threads replaced only the plugin transport, not the
+bundler. If the build still fails with the same socket-binding error, inspect whether each app
+actually composes `@repo/next-config`; do not add Webpack fallback flags.
 
 ### Step 1: Record the verified baseline
 
@@ -216,9 +269,9 @@ bun run typecheck:release-tools
 Confirm `bun --version` reports 1.4.0 (the root `package.json` `packageManager` value) and Node
 satisfies `22 || >=24.0.0`.
 
-Compare against the table in "Current state". **If any gate that was green there is now red,
-that is a pre-existing failure on `main` and a STOP condition** - it is not something 161a-161h
-should inherit or work around.
+Compare against the table in "Current state". If any gate that was green there is now red after
+Step 0, investigate it as a repository failure. Do not report the current build as PASS unless
+the exact command exits 0, and do not substitute Webpack.
 
 **Verify**: `plans/161-xero-execution-report.md` contains a row per gate with an observed exit
 code, and every row reads 0.
@@ -296,8 +349,10 @@ too.
 
 ## Test plan
 
-**This plan writes no new tests.** The preflight validator already has 37 passing tests,
-including secret redaction. Adding cases for `XERO_APP_TIER`,
+**This plan adds one assertion to an existing test, without adding a test case.** It locks the
+shared Turbopack plugin runtime to worker threads so a regression back to socket-based child
+processes is detected while the package suite remains at 37 tests. The preflight validator
+already covers secret redaction. Adding cases for `XERO_APP_TIER`,
 `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` or `XERO_TOKEN_ENCRYPTION_KEYS_JSON` here would test
 variables that do not exist yet; 161c and 161e own those cases and extend the same file.
 
@@ -310,7 +365,7 @@ All must hold:
 
 - [ ] `bun run check` exits 0
 - [ ] `bun run typecheck` exits 0
-- [ ] `bun run build` exits 0
+- [ ] `bun run build` exits 0 with Turbopack after selecting the worker-thread plugin runtime
 - [ ] `bun run test` exits 0
 - [ ] `bun run boundaries` exits 0
 - [ ] `bun run --cwd packages/next-config test` exits 0 with **37 tests**, and that count is recorded in the execution report
@@ -320,7 +375,8 @@ All must hold:
 - [ ] `plans/161-xero-execution-report.md` records all seven baseline gates with observed exit codes, plus the preflight-gate test count
 - [ ] `grep -nE "bun run test:release([^-]|$)" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
 - [ ] `grep -n "bun run preflight" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
-- [ ] `git status --short` shows no modified file under `packages/` or `apps/` other than the two `.env.example` files
+- [ ] `git status --short` shows no modified file under `packages/` or `apps/` other than the two
+  `.env.example` files and the two scoped `packages/next-config` files
 - [ ] No plan file under `plans/161[a-h]-*.md` or the charter is modified by this plan
 - [ ] `plans/README.md` status row for 161-pre updated
 
@@ -328,9 +384,8 @@ All must hold:
 
 Stop and report; do not improvise:
 
-- **Any gate listed green in "Current state" is now red at HEAD.** That is a pre-existing failure
-  on `main` and must be understood before 161a starts, not absorbed into a sub-plan. Report the
-  command and its full output.
+- **Any gate listed green in "Current state" remains red after Step 0.** Investigate and report
+  the command with its full output. Do not replace Turbopack with Webpack or waive the build.
 - Step 4's greps show a Commands table or Done criteria checklist still listing `bun run preflight`
   or `bun run test:release`. A corrected document has been reverted; report which file and line.
 - You conclude that `preflight.ts` should accept a default app name, that a `TC_*` variable should
@@ -359,7 +414,7 @@ Stop and report; do not improvise:
   them, that change removed a boot-time guard and should be rejected in review.
 - 161c adds `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` and `XERO_TOKEN_ENCRYPTION_KEYS_JSON`; 161e
   adds `XERO_APP_TIER`. All three are specified as optional in development and test precisely so
-  they do not extend this problem, and each adds its own cases to the test file created here.
+  they do not extend this problem, and each adds its own cases to the existing preflight test.
 - If the turbo cache seems not to help in a worktree, that is `turbo.json:3`
   `globalDependencies: ["**/.env.*local", ...]` doing its job: absent env files hash differently.
   Do not "fix" it by committing an env file.

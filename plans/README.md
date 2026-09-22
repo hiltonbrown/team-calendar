@@ -27,7 +27,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 
 | Plan | Title | Priority | Effort | Risk | Depends on | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | TODO |
+| [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
 | [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | TODO |
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | TODO |
 | [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a | TODO |
@@ -78,12 +78,13 @@ block. The preflight and browser requirements were relocated, not deleted: they 
 criteria in the charter's Section 9.3, executed during the 161h rollout and the Plan 160
 campaign.
 
-**161-pre still runs first.** What remains in it is the work that touches the repository:
-recording the verified-green baseline below so later failures are attributable, marking
-`DATABASE_URL` and `XERO_TOKEN_ENCRYPTION_KEY` as mandatory in the two `.env.example` files, and
-confirming the preflight gate that 161e and 161h now depend on.
+**161-pre completed at `c0c11f7`.** It recorded the verified-green baseline, marked
+`DATABASE_URL` and `XERO_TOKEN_ENCRYPTION_KEY` as mandatory in the two `.env.example` files,
+confirmed the preflight gate that 161e and 161h depend on, and selected Next.js's worker-thread
+Turbopack plugin transport so the exact production build runs without local socket binding.
+Plan 161a is now unblocked.
 
-After 161-pre:
+With 161-pre done:
 
 - **161a** is the unblocked start. It registers the protected fixtures every later integration
   suite allocates from, so running 161b first risks mutating an unowned live record.

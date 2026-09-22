@@ -98,6 +98,11 @@ actionable; keep one-off task evidence in the review for that task.
 
 ## Verification and CI
 
+- Treat a gate failure caused by the agent host separately from a repository failure. Keep the
+  plan in progress, record the host-limited gate as NOT VERIFIED, preserve the exact production
+  gate for a capable host, and continue every independent deliverable. Do not swap Turbopack for
+  Webpack merely to obtain a green build result.
+
 - Explicit authority to use the live Neon database persists for the release.
   Implement target, ownership, rollback and cleanup safeguards and continue the
   authorised tests; do not turn incomplete tooling into another permission
