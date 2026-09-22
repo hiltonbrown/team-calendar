@@ -28,7 +28,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | Plan | Title | Priority | Effort | Risk | Depends on | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
-| [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | TODO |
+| [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; all local gates passed, 26 protected fixture suites registered |
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | TODO |
 | [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a | TODO |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | TODO |
@@ -82,12 +82,12 @@ campaign.
 `DATABASE_URL` and `XERO_TOKEN_ENCRYPTION_KEY` as mandatory in the two `.env.example` files,
 confirmed the preflight gate that 161e and 161h depend on, and selected Next.js's worker-thread
 Turbopack plugin transport so the exact production build runs without local socket binding.
-Plan 161a is now unblocked.
+Plan 161a completed at `6dc882b`; Plans 161b and 161c are now unblocked.
 
 With 161-pre done:
 
-- **161a** is the unblocked start. It registers the protected fixtures every later integration
-  suite allocates from, so running 161b first risks mutating an unowned live record.
+- **161a** is complete. It registered the protected fixtures every later integration suite
+  allocates from; 161b and 161c may now proceed against those reserved ownership slots.
 - **161b and 161c** can run in parallel. Coordinate their additive migrations into one wave.
 - **161d** needs 161b's binding generation and 161c's keyring before it moves a single token.
 - **161e** needs 161c's corrected transport, or it inherits the unbounded-body defect.

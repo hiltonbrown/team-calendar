@@ -19,7 +19,9 @@
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: LOW (no production code paths change; test infrastructure and documents only)
-- **Depends on**: none. This plan unblocks 161b through 161h.
+- **Depends on**: `plans/161-pre-executor-gate-corrections.md` (DONE). This plan unblocks
+  161b through 161h.
+- **Status**: DONE at executor commit `6dc882b`, independently reviewed 22 September 2026
 - **Category**: tests, docs
 - **Planned at**: commit `8652c31`, 22 September 2026 (re-stamped from `585f6cb`; the only changes between those commits are under `plans/`, so every source excerpt below is valid at both)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
@@ -130,6 +132,7 @@ rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
 - `packages/database/src/live-test-guard*.ts` and their tests
 - `tooling/release/integration-inventory.ts`, `write-protected-manifest.ts` and their tests
 - `plans/161-xero-provider-contract.md` (create)
+- `plans/161-xero-execution-report.md` (baseline, fixture contract and verification evidence)
 - `plans/README.md` (status row only)
 
 **Out of scope - do NOT touch:**
@@ -242,6 +245,12 @@ to cover the new global record kinds: credential owners, provider app identifier
 connection records, tenant bindings, OAuth attempt records, cleanup requests and attempts, and
 shared-store namespaces.
 
+At this baseline stage, "cleanup" means kind-qualified selection of manifest-owned values and
+writer validation. Do not add future table or Redis deletion to `tooling/release/cleanup.ts`
+before those resources exist. Plans 161d, 161e and 161f must wire the selector into the cleanup
+path for the resources they create; Plan 161h adds those concrete resources to the release
+cleanup inventory before any live campaign runs.
+
 Add a test proving a fixture **cannot** attach to or delete an existing unowned global record
 merely because an identifier matches. This is the single most important test in this plan.
 
@@ -312,3 +321,16 @@ Stop and report; do not improvise:
   its date first, then the code that cites it.
 - Rows left `NOT VERIFIED` are the programme's external blockers. They are tracked in the charter's
   sign-off criteria and must not be quietly marked verified later without a fresh primary source.
+
+## Execution record
+
+Executor commit `6dc882b` completed the plan in an isolated worktree. Independent review found
+and corrected the initial fixture-slot documentation and tightened the app-management contract
+ledger before approval. The final review reran every Done criterion successfully: database tests
+passed 16 files and 68 tests, release-tool tests passed 11 files and 49 tests, both type gates and
+the repository check passed, the registry count and both assertions are 26, and the diff is clean.
+
+The strict integration inventory remains at the 21 suites that currently exist. Each later plan
+must add its newly created test file to that inventory in the same commit; pre-listing absent files
+here would make the release-tool gate fail and would weaken rather than improve the reviewed
+inventory contract.
