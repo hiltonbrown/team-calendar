@@ -1,12 +1,31 @@
 # Plan 159: Make Xero connection, leave sync and onboarding reliable
 
-> **Lifecycle scope superseded, 21 September 2026:**
-> [Plan 161](161-harden-xero-connection-lifecycle.md) replaces Step 3, finding X6
-> and their associated grant/mapping verification requirements. Read it before
-> editing connections or credentials. It requires one active binding per Xero
-> app/external tenant across accounts and makes a shared-grant redesign conditional
-> on verified provider behaviour. The superseded text below is historical context,
-> not an alternative implementation instruction. All other work remains active.
+> **Lifecycle scope superseded, 22 September 2026:**
+> Plan 161 replaces **the whole of Step 3, and findings X5 and X6**, together with their
+> grant and mapping verification requirements. Plan 161 is no longer one document:
+>
+> - [`plans/161-harden-xero-connection-lifecycle.md`](161-harden-xero-connection-lifecycle.md)
+>   is the charter (shared boundaries, architecture, and the 40-case evidence matrix in
+>   its Section 8.3). It contains no unit bodies and is not an implementation spec.
+> - [`plans/161-pre-executor-gate-corrections.md`](161-pre-executor-gate-corrections.md)
+>   runs first, then sub-plans **161a** through **161h**.
+> - **X5** (reconnect replaces the tenant ID, `packages/xero/src/oauth/service.ts`) is
+>   implemented by [`161b`](161b-xero-immutable-tenant-binding.md).
+> - **X6** (per-connection tokens and locks) is implemented by
+>   [`161d`](161d-xero-canonical-credentials.md).
+>
+> **Do not implement Step 3.** Its text below is historical context only. Two points in it
+> are now actively contradicted and must not be followed:
+>
+> 1. Step 3.1's wrong-file reconnect guard is 161b's Step 3. Implementing both produces
+>    two competing guards in one transaction.
+> 2. Step 3.2 says "do not assume that global tenant uniqueness is the product policy
+>    across separate accounts". **Plan 161 has since selected exactly that policy**: at
+>    most one reserved internal binding per configured Xero app and external payroll
+>    tenant, including across Clerk accounts (charter Section 3, enforced by 161b's
+>    database constraint). Follow 161, not this paragraph.
+>
+> All other findings and steps in this plan remain active and unaffected.
 
 > Executor: read this complete plan before editing. It is a planning deliverable,
 > not authority to deploy, change customer payroll, merge identities or disconnect
@@ -24,6 +43,9 @@
   MED for orchestration; LOW for isolated presentation changes.
 - Categories: correctness, security, architecture, tests, performance and UX.
 - Planned at: `246ba27`, 20 September 2026.
+- **Re-verified at `8652c31`, 22 September 2026.** 97 files changed between the two
+  commits (1,554 insertions). Every `file:line` anchor in the evidence table below was
+  re-checked at `8652c31` and still resolves. See "Drift check" before starting.
 - Depends on: no new numbered plan. Reuse the fixture ownership, outbound
   operation recovery and release verification infrastructure already implemented
   under `plans/go-live.md`; validate its current state rather than repeat it.
@@ -36,6 +58,26 @@ preserves the earlier consolidation of the release backlog. Historical numbered
 plans end at 158; do not recreate them. The release programme remains active.
 For the defects listed here this plan supplies the detailed acceptance criteria;
 the release plan still owns release-wide gates and production rollout evidence.
+
+## Drift check, run before anything else
+
+```bash
+git rev-parse --short HEAD
+git status --short
+git diff --stat 8652c31..HEAD -- apps/app apps/api packages/xero packages/jobs \
+  packages/availability packages/database packages/notifications packages/feeds \
+  tooling/release PRODUCT.md
+```
+
+At the last review that diff was **empty against `8652c31`**, and every anchor in the
+evidence table resolved. If it is now non-empty, open each cited file and confirm the
+excerpt before proceeding; a mismatch is a STOP condition for that step only.
+
+This plan was originally written against `246ba27`. The tree moved substantially between
+the two commits, including new files in `tooling/release/` that did not exist at the
+original baseline (`consumer-isolation.ts`, `consumer-isolation.test.ts`). Read
+`tooling/release/consumer-isolation.ts` before touching release verification tooling in
+Step 8; extend it rather than building a parallel mechanism.
 
 ## Why this matters
 
@@ -72,11 +114,29 @@ claimed. X7 is supported by the provider contract, not a completed live test.
 
 ### Current-state excerpts for drift checking
 
-```typescript
-// packages/xero/src/au/read.ts:251, parse failure
-return { ok: true, value: { complete: false, leaveRecords, rawResponse } };
+All anchors below were re-verified at `8652c31`. Where the evidence table cites the
+guard and this block cites the return, both are correct and point at the two ends of the
+same construct. Excerpts are copied verbatim; if a comparison fails on whitespace alone,
+that is a formatting change, not drift.
 
-// packages/jobs/src/handlers/sync-xero-leave-records.ts:314,322
+```typescript
+// packages/xero/src/au/read.ts:245-254, parse failure.
+// Table cites :245 (the guard); this excerpt starts at :251 (the return).
+      if (!mappedPage.ok) {
+        log.warn("Xero leave record page could not be parsed", {
+          clerkOrgId: input.xeroTenant.clerk_org_id,
+          organisationId: input.xeroTenant.organisation_id,
+          page,
+        });
+        return {
+          ok: true,
+          value: { complete: false, leaveRecords, rawResponse },
+        };
+      }
+
+// packages/jobs/src/handlers/sync-xero-leave-records.ts:314, :317, :322.
+// An incomplete read still clears staleness and reports success.
+// The same shape repeats at :577, :605, :612 and :621; fix both sites.
 last_leave_records_sync_at: new Date(),
 leave_records_stale_since: null,
 const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
@@ -178,6 +238,27 @@ Run from the repository root unless a working directory is stated. The repo
 declares Bun 1.4.0 and Node 22 or >=24. Use its pinned toolchain for final evidence.
 All commands below are executor commands, not claims of execution by the advisor.
 
+**Fresh worktree setup.** This plan directs work into a `codex/xero-sync-onboarding`
+branch or isolated worktree. The repository's `.env*` files are gitignored
+(`.gitignore:35`), so a fresh worktree has none of them. From the worktree root:
+
+```bash
+bun install --frozen-lockfile
+```
+
+`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work
+with no further setup. **`bun run build` additionally requires two variables**, because
+`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`,
+and `packages/database/keys.ts:10` has no fallback:
+
+- `DATABASE_URL` - any syntactically valid Postgres URL suffices for a build; the client
+  is lazy and nothing connects. Do **not** point it at the real database.
+- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value suffices for a build.
+
+Supply them for the build command only. Do not create a committed `.env`, do not copy the
+developer's real values, and **do not make either variable optional in `keys.ts`** to
+avoid setting them.
+
 | Gate | Exact command | Expected result |
 | --- | --- | --- |
 | Lint | `bun run check` | Exit 0 |
@@ -188,7 +269,7 @@ All commands below are executor commands, not claims of execution by the advisor
 | CI integration | `bun run test:integration` | Exit 0 under the supported guarded test environment |
 | Release tooling | `bun run test:release-tools` and `bun run typecheck:release-tools` | Both exit 0 |
 | Whitespace | `git diff --check` | Exit 0 |
-| Browser suite | `bun run test:release` | Owned fixture and role scenarios pass, cleanup succeeds |
+| Filtered app Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | Exit 0; selects 6 files / 43 tests at this baseline |
 
 Earlier in this same audit, at this checkout, the following passed: 57 tests in
 the three jobs files and 17 tests in the three app files below. These are existing
@@ -641,8 +722,20 @@ already-open permitted calendar without a manual reload.
 8. Update the execution ledger below and release-plan Xero acceptance references.
    Do not claim overall launch readiness from this scoped plan alone.
 
-**Verify:** every root gate exits 0 in its supported environment; `bun run test:release`
-passes the owned scenarios and cleanup; the matrix has direct evidence per row.
+**Verify:** every root gate exits 0 in its supported environment and the matrix has direct
+evidence per row.
+
+**`bun run test:release` is not a local gate and must not be treated as one.** It is a
+deployed-candidate Playwright suite: `tooling/release/e2e/environment.ts:11-17` requires
+`TC_API_CANDIDATE_URL`, `TC_APP_CANDIDATE_URL`, `TC_WEB_CANDIDATE_URL`,
+`TC_DEPLOYED_CANDIDATE_SHA`, `TC_E2E_FIXTURE_MANIFEST` and `TC_RELEASE_MANIFEST`, all
+validated when the Playwright config is merely loaded, and
+`tooling/release/playwright.config.ts:22-33` declares Firefox and WebKit projects whose
+browsers are not installed by default. Write the browser assertions in
+`tooling/release/e2e/` as a deliverable, and execute them during the authorised release
+campaign owned by `plans/160-xero-end-to-end-verification-and-report.md`. Until that run,
+record the browser matrix as NOT VERIFIED. **Never stub the `TC_*` variables to make it
+run locally.**
 Production rollout remains a separate authorised action after reviewable evidence.
 
 ### Guarded integration verification at each implementation slice
@@ -664,8 +757,39 @@ target is unavailable; unit PASS must not mark the slice fully verified.
 
 Vitest positional filters may include additional integration files because the
 package script already supplies `.integration.test.ts`; a broader guarded run is
-acceptable, omission of the named cases is not. Register all new files in the
-reviewed inventory and owned allocation before any guarded live run.
+acceptable, omission of the named cases is not.
+
+**Register all new files in the reviewed inventory and owned allocation before any
+guarded live run.** Concretely, each of the four new `.integration.test.ts` files this
+plan creates needs an entry in `LIVE_FIXTURE_SUITES` in
+`packages/database/src/live-test-fixture.ts`, keyed by its repository-relative path,
+following the shape of the existing entries. An unregistered suite can allocate an
+unprotected slot and mutate records it does not own.
+
+**Known trap:** `packages/database/src/live-test-fixture.test.ts` asserts the exact suite
+count **twice**, at lines 92 and 224. Adding suites breaks both. Update both numbers in the
+same change. **Do not delete the assertion or loosen it to a range**: that count is precisely
+what stops an unregistered suite from allocating an unprotected slot.
+
+**Derive the number; do not assume it.** The baseline is 21 and this plan adds four, so 25 is
+correct *only if nothing else has landed first*. `plans/161a-xero-baseline-and-fixture-ownership.md`
+registers five further suites and bumps the same two assertions; if 161a landed first the
+baseline is 26 and the answer is 30. Read the real count out of the file:
+
+```bash
+grep -n "toHaveLength(" packages/database/src/live-test-fixture.test.ts
+grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts
+```
+
+The second command is authoritative. Both assertions must equal it.
+
+**Coordinate with Plan 161.** `plans/161a-xero-baseline-and-fixture-ownership.md` registers
+five further suites and bumps the same count. The four this plan adds
+(`sync-run-lifecycle`, `xero-person-reconciliation`, `initial-xero-sync`,
+`xero-sync-migration`) do not overlap 161a's five, but whichever lands second must
+recount rather than assume. If you hit a merge conflict on that assertion, the correct
+resolution is always `Object.keys(LIVE_FIXTURE_SUITES).length` as it actually is after
+the merge, verified by running `bun run --cwd packages/database test`.
 After deploying additive migrations to the approved test target, run the existing
 CI schema comparison from `packages/database`:
 `bunx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`.
@@ -685,9 +809,40 @@ schema check; they do not replace migration deployment evidence.
 - [ ] Members need no personal Xero OAuth; role and entity permissions remain enforced.
 - [ ] Calendar updates without manual reload and preserves filters/edits/privacy.
 - [ ] Root lint/build/types/boundaries/unit/integration and release-tool gates pass.
-- [ ] Browser/provider matrix passes with owned resources and verified cleanup.
+- [ ] Browser assertions are **written** in `tooling/release/e2e/`; their **execution** is
+      recorded NOT VERIFIED until the Plan 160 campaign runs them against a deployed
+      candidate. `bun run test:release` is not a local gate (see Step 8).
 - [ ] `git diff --check` passes; changed files are within scope and user changes are preserved.
 - [ ] Ledger and `plans/README.md` accurately distinguish source completion from live verification.
+
+Machine-checkable gates, all required:
+
+- [ ] `bun run check` exits 0
+- [ ] `bun run typecheck` exits 0
+- [ ] `bun run build` exits 0 (see "Fresh worktree setup" for the two required variables)
+- [ ] `bun run test` exits 0
+- [ ] `bun run boundaries` exits 0
+- [ ] `bun run test:release-tools` exits 0
+- [ ] `bun run typecheck:release-tools` exits 0
+- [ ] `git diff --check` exits 0
+- [ ] `bun run --cwd packages/jobs test` exits 0
+- [ ] `bun run --cwd packages/availability test` exits 0
+- [ ] `bun run --cwd packages/xero test` exits 0
+- [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
+- [ ] The two baseline commands still pass and their counts have only grown, never shrunk:
+      `bunx vitest run src/handlers/sync-xero-leave-records.test.ts src/handlers/sync-xero-people.test.ts src/handlers/schedule-xero-syncs.test.ts`
+      from `packages/jobs` reported **57 passed** at `8652c31`, and
+      `bunx vitest run lib/server/load-onboarding-state.test.ts 'app/(authenticated)/settings/integrations/xero/connect/_actions.test.ts' 'app/(authenticated)/calendar/page.test.tsx'`
+      from `apps/app` reported **17 passed**. A drop in either count means a regression
+      was deleted rather than fixed.
+- [ ] Both `toHaveLength(...)` assertions in `packages/database/src/live-test-fixture.test.ts`
+      equal the output of `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`,
+      every new `.integration.test.ts` file appears in `LIVE_FIXTURE_SUITES`, and
+      `bun run --cwd packages/database test` exits 0
+- [ ] `grep -nE "bun run test:release([^-]|$)" plans/159-xero-sync-and-onboarding.md` shows no
+      match inside the Commands table or this checklist. The `([^-]|$)` matters: a plain `\b`
+      would also match the legitimate `bun run test:release-tools` gate, which this plan uses
+- [ ] `git status --short` shows no file changed outside the permitted paths list
 
 ## Stop conditions and maintenance
 
@@ -697,6 +852,14 @@ grant identity cannot be verified; cross-account grant storage lacks a reviewed
 access boundary; or a live fixture/authority guard rejects the target. Continue
 independent work. Re-plan a slice if drift contradicts its evidence or it needs
 out-of-scope changes; do not repeatedly retry an unsafe assumption.
+
+**Step 3 is dead text.** If you find yourself implementing a wrong-file reconnect guard or
+a credential-owner record from this plan, stop: those are 161b and 161d. Two guards in one
+transaction is worse than none, because each will look correct in isolation.
+
+**The baseline test counts in the Done criteria are a regression tripwire.** 57 and 17 were
+measured at `8652c31`. A future change that makes either number fall has removed coverage;
+a reviewer should ask which test went and why before approving.
 
 Future status-mapping changes must update create, approval, withdrawal, inbound
 normalisation, publication and uncertainty recovery together. Person reconciliation
@@ -736,6 +899,7 @@ readiness from queue acknowledgement, a connection flag or a single page timesta
 | Item | Source status | Verification | Evidence / remaining action |
 | --- | --- | --- | --- |
 | Planning | COMPLETE | Current source reviewed | `246ba27`; no source changes |
+| Second plan review | COMPLETE | Re-verified all 11 finding anchors and both baseline test counts at `8652c31`; corrected the Plan 161 supersession note to name X5, 161b and 161d and flag the reversed cross-account uniqueness policy; relocated the unrunnable `bun run test:release` gate; added worktree env setup, the `LIVE_FIXTURE_SUITES` count trap and machine-checkable gates |
 | Plan review | COMPLETE | Independent cold review incorporated | Added verified grant-identity contract, shared-connection detach rules, per-batch fencing, resumed-snapshot semantics, durable state/dispatch contract and guarded per-slice integration commands |
 | Existing focused baseline | Unchanged | PASS, 74 tests in 6 files | Commands in baseline section, run during preceding audit |
 | Steps 1 through 8 | TODO | NOT VERIFIED | Execute only when implementation requested |

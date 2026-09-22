@@ -14,14 +14,31 @@
 | --- | --- |
 | Plan | 161, final consolidated execution specification |
 | Date | 21 September 2026 |
-| Source baseline | `585f6cb4d2532bfa23eb8fb455ad0d360d7e16fe` on `hiltonbrown/team-calendar` |
+| Source baseline | `8652c31`, re-stamped from `585f6cb4d2532bfa23eb8fb455ad0d360d7e16fe`. The only changes between those commits are under `plans/`, so every source excerpt below is valid at both. All sub-plans use `8652c31` |
 | Review scope | Attached Plan 161, this conversation, relevant repository source and existing plans, Xero references and the upstream `improve` execution contract |
 | Implementation status | TODO. No source implementation, database migration or live provider test was performed to produce this document |
 | Priority | P1 production-hardening programme; binding and credential correctness are release-blocking |
-| Change risk | High: credential adoption, cross-account infrastructure, migrations and external deletion |
-| Recommended repository path | `plans/161-xero-api-production-hardening.md` |
-| Existing local Plan 161 | Replace/reconcile its content in its existing path if present; do not keep competing active Plan 161 files |
-| Execution branch | Reuse the appropriate existing execution branch or use `codex/xero-connection-hardening` |
+| Effort | XL. Eight dependent units; each of B–H is an L on its own. Do not attempt in one sitting |
+| Change risk | HIGH: credential adoption, cross-account infrastructure, migrations and external deletion |
+| Category | security, correctness, migration, tech-debt |
+| Depends on | None. Coordinates with `plans/159-xero-sync-and-onboarding.md` and `plans/160-xero-end-to-end-verification-and-report.md` |
+| Plan file | `plans/161-harden-xero-connection-lifecycle.md`. This is the single active Plan 161; do not create a second Plan 161 file under any other name |
+| Execution branch | `codex/xero-connection-hardening`, created from the current release/execution branch. Do not push it |
+
+### 1.0 Drift check, run before anything else
+
+```bash
+git rev-parse --short HEAD
+git diff --stat 8652c31..HEAD -- \
+  packages/xero packages/database packages/jobs packages/core packages/availability \
+  packages/next-config apps/app apps/api tooling/release PRODUCT.md
+```
+
+At the time this plan was last reviewed, that diff was **empty**: no in-scope source file
+had changed since the baseline, so every excerpt in Section 2.0 was live. The permalink URLs in
+Section 10.1 stay pinned to `585f6cb` because that commit is immutable; read the local paths. If the diff is now
+non-empty, open each changed file listed in Section 2.0 and compare it against the excerpt
+before proceeding. A mismatch is a STOP condition (Section 9.5), not something to work around.
 
 The remote baseline was rechecked. This does not establish that the executor's local branch, uncommitted files, environment, database or deployment is unchanged or clean.
 
@@ -40,6 +57,65 @@ Maintain this plan, `plans/161-xero-provider-contract.md` and `plans/161-xero-ex
 Provider contracts must distinguish **public documentation**, **selected Team Calendar policy**, **source observation**, **inference** and **live verification**. No previous assistant verdict or historical test result is a substitute for fresh execution evidence.
 
 ## 2. Evidence and corrections carried into this plan
+
+### 2.0 Current state, verified at the baseline commit
+
+Every path and line below was opened and confirmed at `585f6cb` and re-confirmed at `8652c31`. Read these files locally.
+The GitHub URLs in Section 10.1 are a convenience only; the executor works from the local
+repository and must not depend on network access to read its own source.
+
+| File | Lines | Role, and what is wrong with it today |
+| --- | --- | --- |
+| `packages/xero/src/oauth/service.ts` | 2,361 total; `completeXeroTenantSelection` at 380; the rebinding `update` at 565-578; refresh-persistence reconciliation at 888-1010; disconnect at 1286-1490; `remoteRevoked` decisions at 1666-1669 | OAuth start/callback/selection, refresh, persistence recovery and disconnect all live here. H1, H2, H4, H6, H7 |
+| `packages/xero/src/rate-limit/limiter.ts` | 262 total; `XeroRateLimiter` at 79; `private readonly orgStates = new Map(...)` at 83; `concurrency = new Map(...)` at 84 | Process-local, per-instance rate state. H5 |
+| `packages/xero/src/rate-limit/xero-fetch.ts` | 191 total; `orgRateLimitKey` at 58 | Keys budgets by `{ clerkOrgId, organisationId }`, i.e. internal IDs, not the external Xero tenant. H5 |
+| `packages/xero/src/rate-limit/limits.ts` | 16 total | Hard-codes `XERO_CALLS_PER_DAY_PER_ORG = 5000` with no tier input, and `DEFAULT_MAX_WAIT_MS = 65_000`, which exceeds the 15s/20s OAuth transaction timeouts. H5, H6 |
+| `packages/xero/src/crypto/tokens.ts` | 93 total; `keyVersion: number` at 37; `keyVersion: 1` written at 54 | Envelope records a version but decryption uses one configured key; the field is metadata, not a selector. H10 |
+| `packages/core/src/redis-rest-transport.ts` | 288 total; `setupTimeoutSignal` at ~186; `cleanup()` at 243; `await response.json()` at 247 | The timeout is cancelled before the body is read, so a stalled body is unbounded. H9 |
+| `packages/core/src/ports/external-write-port.ts` | 110 total | Provider-neutral write error contract carrying `certainty`. Extend, do not replace. H8 |
+| `packages/xero/src/adapter/xero-write-adapter.ts` | 386 total; `getTenant` at 71-87 | `getTenant` returns `null` for both "not connected" and "could not be refreshed", collapsing distinct recovery categories. H8 |
+| `packages/database/prisma/schema.prisma` | 1,219 total | No unique constraint on an active external tenant binding. H1 |
+| `packages/database/src/live-test-fixture.ts` | 265 total; 21 suites registered | Owns tenant slots and a fixed set of global key kinds. H12 |
+| `packages/jobs/src/handlers/schedule-xero-syncs.ts` | 433 total | Reads credential/status fields directly; must move to the new resolver. H11 |
+| `packages/availability/src/xero-connection-state.ts` | 53 total; `hasActiveXeroConnection` consumed at `approvals/approval-service.ts:809,1152` and `people/people-service.ts:666` | Boolean connection state that hides infrastructure failure. H11 |
+
+The exact current text of the three behaviours this plan removes:
+
+```typescript
+// packages/xero/src/oauth/service.ts:565-578 - an existing internal XeroTenant
+// silently receives a different external ID on reconnect.
+update: {
+  payroll_region: payrollRegion,
+  tenant_name: selectedTenant.tenantName,
+  xero_tenant_id: selectedTenant.tenantId,
+}
+
+// packages/xero/src/oauth/service.ts:922-924 - different ciphertext alone
+// currently counts as committed recovery.
+const tokenChanged =
+  input.loadedRefreshTokenEncrypted !== null &&
+  current.refresh_token_encrypted !== input.loadedRefreshTokenEncrypted;
+
+// packages/xero/src/crypto/tokens.ts:54 - envelope metadata is not a key selector.
+keyVersion: 1,
+
+// packages/core/src/redis-rest-transport.ts:243-247 - the timer is cleared
+// before the body is consumed.
+cleanup();
+let payload: unknown;
+try {
+  payload = await response.json();
+```
+
+Conventions this plan must match, from `CLAUDE.md` and the existing code:
+
+- Service functions return `Result<T, E>` from `@repo/core`; route handlers map to HTTP. Do not throw for expected failures. See `packages/core/src/ports/external-write-port.ts` for the established error shape.
+- Named exports only, no default exports, no barrel files except at package root, strict TypeScript, no `any`, no unjustified `as`.
+- Zod on all external input, including every Xero response.
+- Database: `snake_case` plural tables, `snake_case` columns, `id`/`created_at`/`updated_at` on every table, `clerk_org_id` on every tenant-scoped table. Section 5.2 defines the only permitted exception and requires it to be documented and tested.
+- Unit tests are co-located as `foo.test.ts`. Integration tests live at the **package root** in `packages/database` (see the existing `packages/database/xero-tenancy.integration.test.ts`) and co-located under `src/` in `packages/xero` and `packages/jobs`.
+- Australian English in all UI copy, comments and documentation. No em dashes anywhere.
+- No `console.log`; use the `@repo/observability` logger.
 
 ### 2.1 Vetted source findings
 
@@ -83,7 +159,7 @@ keyVersion: 1,
 
 ### 2.2 Provider reference baseline
 
-Use the source register in Section 17. The readable current Xero FAQs establish 30-minute access-token life, expiry of unused refresh tokens after 60 days, the 30-minute lost-refresh-response recovery window, and permission-specific `WWW-Authenticate` handling. The pricing table distinguishes Starter's 1,000 daily tenant calls from 5,000 on higher tiers. The Identity specification establishes connection metadata, authorisation-event filtering and targeted DELETE outcomes. [X1], [X2], [X3], [X4], [X5]
+Use the source register in Section 10. The readable current Xero FAQs establish 30-minute access-token life, expiry of unused refresh tokens after 60 days, the 30-minute lost-refresh-response recovery window, and permission-specific `WWW-Authenticate` handling. The pricing table distinguishes Starter's 1,000 daily tenant calls from 5,000 on higher tiers. The Identity specification establishes connection metadata, authorisation-event filtering and targeted DELETE outcomes. [X1], [X2], [X3], [X4], [X5]
 
 The official SDK demonstrates one token set used to retrieve multiple authorised tenant connections and distinguishes connection deletion from whole-user token revocation. Its token interfaces include `xero_userid`, issuer, audience, client and scope claims. This supports separating credentials from tenant bindings, but does not justify treating unverified decoded claims as identity. [X6]
 
@@ -208,6 +284,20 @@ Fences protect local decisions. They cannot recall a provider request already se
 
 Binding regression tests and transport work can start independently after A. Assign one schema/credential-contract owner. Do not allow concurrent agents to implement incompatible ownership models in the same service. Remote cleanup remains off until its dependencies pass.
 
+Each unit is complete only when its own command below exits zero, in addition to the
+whole-repository gates in Section 8.1. Run the unit command before moving to the next unit.
+
+| Unit | Minimum command for that unit | Expected |
+| --- | --- | --- |
+| A | `bun run --cwd packages/database test` | exit 0; updated `live-test-fixture.test.ts` suite-count assertions pass |
+| B | `bun run --cwd packages/xero test && bun run --cwd packages/database test` | exit 0; new `completeXeroTenantSelection` rejection tests present and passing |
+| C | `bun run --cwd packages/core test && bun run --cwd packages/xero test` | exit 0; new transport deadline and crypto key-version tests present and passing |
+| D | `bun run --cwd packages/xero test` | exit 0; new `oauth/credential-owner.test.ts` passing |
+| E | `bun run --cwd packages/xero test` | exit 0; new `rate-limit/shared-store.test.ts` passing |
+| F | `bun run --cwd packages/xero test && bun run --cwd packages/jobs test` | exit 0; new `reconcile-xero-connections.test.ts` passing |
+| G | `bun run --cwd packages/availability test && bun run --cwd apps/app test` | exit 0; recovery-reason assertions present and passing |
+| H | `bun run test:release-tools && bun run typecheck:release-tools` | exit 0 |
+
 ### 6.1 Advisor and executor responsibilities
 
 Read the locally installed `improve` skill and its execution reference. The repository identifies `shadcn/improve`; current upstream describes a source-read-only advisor and a separate worktree executor. Do not silently edit or replace the installed skill. [S1], [S2]
@@ -220,397 +310,40 @@ After independent approval and required passing gates, the supervising host or e
 
 If the installed skill limits review rounds, obey its review mechanism and record its verdict accurately. A host may arrange a refined, scoped repair outside that advisor invocation; do not turn a review-round limit into a claim that the defect is solved, or silently waive a gate. Where worktree/subagent execution is unavailable, hand this complete plan to a separate implementation session and state that limitation. Do not simulate execution.
 
-## 7. Unit A: Baseline, provider contracts and safe test ownership
-
-### 7.1 Drift and toolchain
-
-Run these read-only checks first:
-
-```bash
-git status --short
-git rev-parse HEAD
-git diff --stat 585f6cb4d2532bfa23eb8fb455ad0d360d7e16fe..HEAD -- \
-  packages/xero packages/database packages/jobs packages/core packages/availability \
-  packages/next-config apps/app apps/api tooling/release PRODUCT.md plans
-
-git diff --stat
-git diff --cached --stat
-bun --version
-node --version
-```
-
-Read current `AGENTS.md`, `PRODUCT.md`, design guidance, root/workspace manifests, test guards and affected tests. Record changed symbols and equivalent completed work. Correct only affected steps for ordinary drift; do not restart the whole audit or recreate retired plans.
-
-The baseline declares Bun 1.4.0, Prisma 7.10.0 and Node `22 || >=24.0.0`. Use the checked-in pinned toolchain and lockfile, not a blanket dependency upgrade. In a fresh execution worktree, `bun install --frozen-lockfile` is an implementation prerequisite, not an advisor operation.
-
-### 7.2 Provider contract ledger
-
-Create `plans/161-xero-provider-contract.md` with a row for every actually called endpoint. Record method/path, token class, minimum documented scope, tenant-header requirement, pagination/completeness contract, idempotency/uncertain-outcome rules, deadline class, rate bucket, source URL/date and verification status.
-
-Cover code exchange, refresh, app-management token acquisition, user/app connection inventory, targeted deletion, organisation/region discovery, AU employee list/detail, leave list/detail, pay-item/settings lookups and existing supported AU writes. Discover all call sites rather than assuming those are the only endpoints.
-
-For management requests, explicitly confirm the singular token form parameter `scope`, the `app.connections` permission, response shape without a required refresh token, GET inventory scope and targeted DELETE. Where a guide is unreadable, use an authorised browser, maintained official specification or Xero support evidence. Do not generate guessed page numbers, filters, token audiences or management endpoints. Keep the destructive capability disabled until the missing contract is established, but implement and test the remaining client/lifecycle code.
-
-For user identity, select the documented verified claim/identity route. Distinguish an access token's expected API audience from an ID token's client audience. Do not request extra profile/email scopes merely to obtain a stable identifier already available through the verified contract.
-
-Record the actual app registration, configured callback, enabled scope availability, tier and relevant management entitlement from authorised configuration evidence. Store identifiers only in restricted records when necessary; never secret values. No portal access means those deployment facts remain NOT VERIFIED.
-
-### 7.3 Target and fixture controls
-
-Use the database already configured for this project. Do not create another Neon branch, PostgreSQL service or replacement environment. The repository's already-existing CI service is a separate pre-existing CI context; do not introduce a new one or substitute its results for the configured database evidence.
-
-Ordinary unit/build checks must use the existing isolation mechanisms and must not connect to the configured database or live Xero. Before integration commands, verify the actual target, fixture manifest, rollback/cleanup runner and applicable authority. `ALLOW_LOCAL_DATABASE_TESTS=1` does not authorise remote access or replace the remote manifest guard.
-
-Extend `LIVE_FIXTURE_SUITES`, manifest global-key allocation, inventory and cleanup to cover credential owners, app/provider IDs, bindings, OAuth attempts, cleanup requests/attempts and shared-store namespaces. Prove that a fixture cannot attach to or delete an existing unowned global owner or provider connection merely because an identifier matches.
-
-Database tests use synthetic provider identities and mocked HTTP. Real Xero tests separately use explicitly authorised owned files/authorisers. Redis integration uses the existing configured shared store with manifest-owned synthetic keys and a fake HTTP provider, not real Xero quota exhaustion. Test-only namespaces/app identities must not be selectable by production callers; the test runner cannot read or use real customer credentials. Never flush a shared store, scan/delete arbitrary prefixes or clean up with unrestricted `deleteMany`.
-
-### 7.4 Baseline gates
-
-Run database-free gates first and record pre-existing failures. Before any live test, inspect that test's setup/teardown and guarded execution path. Do not run the entire integration suite solely to discover whether it is safe.
-
-**Acceptance:** baseline commit/toolchain recorded; each contract row has evidence or an explicit unresolved external prerequisite; protected allocation/cleanup tests pass. Missing live evidence does not stop B/C unit implementation.
-
-## 8. Unit B: Immutable bindings and additive migration
-
-### 8.1 Characterisation and service guard
-
-Add failing regression tests around `completeXeroTenantSelection` before refactoring it. Reconnecting an existing internal organisation to a different external tenant must return `tenant_replacement_required` without altering that selection transaction's credentials, session state, bindings, payroll rows or sync dispatch.
-
-Separate intent kinds: `initial_binding` and `same_file_reauthorisation`. Bind the intended organisation at OAuth start. For a first account with no payroll organisation, an initial intent may create one only within that account and transaction. An unbound initial intent cannot be repurposed into reauthorisation of an arbitrary existing organisation.
-
-Within the ordered locks/transaction, revalidate user/account, current role, intended organisation, session expiry/single-use status, expected binding generation and selected provider connection. Confirm tenant type and AU region. Only then claim the session and create/update the scoped binding. Rejecting selection rolls back new local organisations and selection changes.
-
-Do not use cached UI selection or a caller-supplied tenant ID as authority. If remote inventory is stale or the selected link no longer resolves, fail safely without changing payroll identity. Generic collision messages disclose no customer or authoriser information.
-
-### 8.2 Schema and migration sequence
-
-1. Produce a read-only inventory of existing app/external-tenant associations, duplicates, retained data, old connection IDs, credential provenance and unknown remote outcomes. Report diagnostics privately.
-2. Generate an additive expansion migration for the target records, nullable references, history and constraints. Preserve all existing payroll FKs and IDs.
-3. Use the pinned Prisma schema-diff tooling to produce base SQL without a shadow database or new environment. Verify its installed `migrate diff --help` syntax first. A schema-to-schema diff or read-only configured-datasource-to-target-schema diff is acceptable; `migrate dev`, `db push`, reset, rebaseline and seeding are not.
-4. Add separate, explicit reviewed custom SQL for CHECK/composite/partial constraints that Prisma cannot express. Do not rewrite applied migrations or pretend custom SQL was generated automatically. Inspect SQL for destructive statements and unintended unrelated drift before any deployment.
-5. Apply expansion using `bun run migrate:deploy` only on the existing authorised target, then run an idempotent, manifest-aware backfill with a dry-run mode, collision report and restart checkpoints.
-6. Enforce final active-ownership constraints only after the collision gate passes. Existing collisions do not get an automatically chosen winner, merged data or a fabricated owner. Quarantine affected records and require the concrete ownership decision while unrelated work continues.
-7. Deploy switched readers/writers, verify them, then scrub obsolete duplicated credential columns. Dropping those columns is unnecessary for this plan and must not precede proof that all consumers migrated.
-
-Record the configured provider app identity explicitly for each legacy mapping. App/client-ID changes require a deliberate mapping transition, not a namespace reset. Distinguish encryption-key rotation from OAuth client-secret rotation and from changing the OAuth app itself.
-
-### 8.3 Lifecycle integrity
-
-Add `tenant_binding_conflict`, `tenant_replacement_required` and `connection_changed` typed outcomes. Preserve owner/admin checks and scoped queries. A callback started before disconnect cannot re-enable its old generation.
-
-Keep reservations through pending/unknown destructive cleanup. Reconnecting after completed disconnect is a fresh same-file intent. Do not let a retired record reuse an old generation or migrate retained data to another account.
-
-**Verification:** focused OAuth/action tests; configured-database uniqueness, scope/FK and concurrency tests; backfill dry-run/idempotence/collision tests. Verify the slot CHECK, external and internal uniqueness, multiple historical rows and zero automatic data merging.
-
-## 9. Unit C: Absolute deadlines, cancellation and encryption
-
-### 9.1 Transport contract
-
-Create an absolute operation deadline once at entry. Pass remaining time/cancellation through admission, lock acquisition, HTTP, complete body parsing, backoff and persistence. Recalculate after waiting; retries do not receive a new full deadline.
-
-For existing 15-second refresh transactions, use an initial provider budget of at most 10 seconds with bounded lock acquisition and explicit commit headroom. These are selected engineering budgets, not Xero limits. Enforce the remaining overall budget after the lock is acquired. Management deletion uses short database claims and separate bounded network attempts, not a longer interactive transaction.
-
-Make timeout/cancellation work through `response.json()`/text/stream consumption. Correct the core Redis transport's premature timer cleanup, detach abort listeners and release resources in `finally`. Test already-aborted input, headers followed by a stalled body, malformed JSON, caller cancellation and timeout during backoff. Preserve error redaction and typed `Result` returns.
-
-The Xero wrapper must own response-body lifetime, for example by executing a caller's body-consumer callback before releasing its concurrency permit. Returning an unmanaged `Response` while releasing the permit at headers is insufficient. Bound payload size by documented endpoint needs/configured limits and test oversized/malformed responses without logging payroll content.
-
-Use an allowlisted production provider origin/path contract. Do not follow arbitrary redirects with credentials, or allow response-provided URLs to exfiltrate bearer tokens. Tests use injected transports or explicitly guarded test origins; do not weaken production origin checks to make tests pass.
-
-### 9.2 Preserve remote-outcome certainty
-
-An admission, configuration, decryption or deadline failure **before request dispatch** is a definite non-attempt. A lost response **after dispatch** can be an unknown outcome. Carry phase/dispatch information in the neutral error contract and preserve the existing `ProviderWriteError.certainty` semantics.
-
-No generic retry wrapper may replay a non-idempotent payroll mutation after a network error, 5xx or uncertain response. Continue through the existing outbound-operation recovery path. A local abort limits local resources; it does not prove the provider cancelled processing.
-
-### 9.3 Version-aware encryption
-
-Preserve AES-256-GCM and existing version-one ciphertext readability. Add an explicit active encryption-key version and server-only version-to-key configuration, with validation of key sizes, envelope IV/auth-tag lengths and supported versions. Keep the legacy key mapping as version one during migration.
-
-Recommended configuration is `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` plus a secret `XERO_TOKEN_ENCRYPTION_KEYS_JSON` mapping version strings to base64 keys. Preserve `XERO_TOKEN_ENCRYPTION_KEY` as the legacy version-one source while migrating. Reject conflicting definitions for version one. Reuse an existing equivalent keyring if source drift has introduced it. Environment examples contain names and placeholder syntax only, never real keys.
-
-Use envelope key version for decryption. Missing/unknown versions and malformed/corrupt ciphertext yield a safe operational error, never plaintext fallback or blind key guessing. Key values never appear in errors, snapshots, logs or preflight output.
-
-Provide an idempotent re-encryption operation that writes with the active version and uses credential-version CAS. It must not overwrite a simultaneously refreshed/adopted token. Include owner records, unadopted OAuth candidates and retained recovery envelopes in the inventory. Verify all referenced key versions exist before switching writers. Retire an old key only after verifying no live retained envelope requires it and applying the operational backup/retention policy.
-
-Do not rotate real secrets merely because source now supports rotation. Do not scrub a canonical owner's credentials while another active binding still requires them.
-
-**Verification:** core transport, crypto, OAuth and wrapper unit suites; configured-database re-encryption/refresh-race tests. Unknown key version, damaged tag, slow body and lost acknowledgement must have distinct, redacted results.
-
-## 10. Unit D: Canonical credentials and safe OAuth adoption
-
-### 10.1 Verified identity and migration
-
-Use a maintained JWT/OIDC verification library already installed or add the smallest suitable direct dependency. Validate signature, trusted issuer/JWKS, approved algorithms, token class, audience, client binding, required identity claims and relevant time claims. Do not trust a token-provided arbitrary key URL. Bound/cache JWKS retrieval safely; key lookup failure is not permission to skip signature verification.
-
-Canonical key: configured provider app plus verified stable Xero authoriser identity. Never group by email, Clerk user, `authEventId`, unverified payload claims or equality of token strings. Persist the identity's evidence source.
-
-Expired historical tokens do not grant access. A dedicated migration-only verifier may use cryptographically verified historic identity metadata with correct issuer/client binding to associate candidates, but must record expiry and require fresh usable credentials before any payroll access. Otherwise retain the candidate as unverified and require controlled reauthorisation. Do not disable normal runtime expiry validation to make migration succeed, or bulk-refresh unidentified credentials concurrently.
-
-Where several legacy rows belong to one verified owner, retain encrypted candidates until a controlled selection establishes the usable canonical set. Do not pick by local row timestamp alone. Preserve non-secret migration history and explicitly reconcile every dependent binding. No silent merge of Clerk memberships or payroll rows occurs.
-
-### 10.2 OAuth exchange and adoption
-
-Persist the scoped OAuth intent before redirect. On callback, validate signed state/nonce and expiry, claim the exchange once, and persist an encrypted token candidate durably **before** connection inventory/region discovery. Record a remotely-issued but locally-lost token exchange as unknown; do not blindly reuse a one-time authorisation code after an ambiguous exchange.
-
-Verify the candidate's provider identity before adoption. Under the owner lock, re-read current versions and reconcile the candidate with the current credential set. Preserve verified issuance metadata and explicit attempt IDs. Arrival order or a same-second `iat` is not enough to prove which candidate supersedes another. When ordering is ambiguous, use controlled, serialised validity reconciliation; do not overwrite a known usable set with an unverified older candidate.
-
-Store one canonical token set per owner and make its connections available only through existing authorised bindings or a separately valid initial-selection transaction. Connection inventory returned for an authoriser is not permission to bind every tenant it contains.
-
-**Critical sequence:** connecting B may yield replacement credentials needed by already-connected A before B's local selection finishes. Adopt/reconcile verified canonical credentials independently of B's payroll binding. Abandoning B must not discard A's usable owner credentials. Conversely, credential adoption must not activate B, resurrect a disconnected A or create access to another Clerk account.
-
-The wrong-file invariant applies to the rejected **selection transaction**. It does not forbid safe owner-level credential reconciliation caused by the earlier valid OAuth exchange. Tests must distinguish these operations rather than asserting that no credential anywhere can change during a failed onboarding journey.
-
-Persist requested and provider-granted scopes separately, with known/unknown state. Missing scope data on refresh does not erase established metadata; an explicitly supplied change is recorded. Do not assume unknown scope data grants permission. Reauthorisation must preserve the scope/capability needs of existing active owner bindings unless a documented, deliberate permission change is being handled.
-
-Preserve remote connection IDs, tenant type, auth event and provider timestamps. Do not select a connection using only tenant name. Reauthorising the same payroll file with another Xero authoriser selects the new verified link while retaining the old link for safe reconciliation.
-
-### 10.3 Refresh and recovery
-
-Refresh through one owner-scoped coordinator using PostgreSQL locking and token-version CAS. Keep proactive near-expiry refresh, a controlled forced-refresh retry and existing persistence-recovery tests. Multiple callers must reuse the winning token rather than rotate independently.
-
-Record a refresh attempt before remote dispatch. After a valid response, persist the new encrypted pair and metadata atomically. If commit acknowledgement is lost, verify the attempt/token version and owner state, then revalidate the requesting binding. Different ciphertext alone, an emptied legacy column or an unrelated reconnect is not proof that this attempt succeeded.
-
-If the response is lost, preserve the previous refresh token's controlled recovery eligibility for Xero's documented 30-minute window. Record uncertainty once; retries cannot restart that window indefinitely. Schedule necessary recovery using existing Inngest infrastructure and owner IDs only, with no extra Vercel refresh cron. [X1]
-
-An invalid refresh grant affects that owner's credential usability and dependent bindings, not the asserted existence of remote connections. Invalid OAuth client credentials are an app-configuration incident, not evidence that every customer revoked access. Do not overwrite each customer's consent state because of a common app-secret failure.
-
-The fast path after another process rotates a token must still check owner state, scoped binding generation, selected connection and local disable. It must not return success solely because access-token ciphertext changed.
-
-### 10.4 Cut over all consumers
-
-Replace credential reads in AU adapters, resolution/read/write dispatch, manual refresh/disconnect, schedulable queries and job handlers with the new scoped resolver. Update `hasActiveXeroConnection` and related DTOs without hiding infrastructure failure as a user-disconnected state. Remove independently refreshing legacy fallback paths after cutover.
-
-The existing dormant-rotation maintenance becomes owner-deduplicated. Refresh owners still needed by authorised services; a lack of browser login is not expiry of the service relationship. Maintenance must not manufacture customer-activity evidence.
-
-**Verification:** same-owner/two-tenant and two-authoriser/same-tenant tests; two Clerk accounts sharing only credential infrastructure; reversed callback order; same-second candidates; failed inventory; abandoned selection; simultaneous refresh/reconnect/disconnect; unknown commit; scope metadata; key rotation; and expired historic migration. Use real database barriers for races, not arbitrary sleeps. Owned live provider tests separately prove the actual repeated-consent behaviour.
-
-## 11. Unit E: Shared rate limits, concurrency and admission
-
-### 11.1 Store and identity
-
-Implement `SharedXeroRateStore` and a Redis REST implementation under `packages/xero/src/rate-limit/`, using the corrected core transport. An injectable deterministic fake is permitted only in unit tests. Production never falls back to process-local Maps or an uncoordinated limiter when the shared store fails.
-
-Tenant resource keys use **provider app ID plus external Xero tenant ID**, not Clerk account, internal organisation, internal XeroTenant UUID, authoriser or deployment name. All caller deployments sharing the app must share these budgets. Reconnect and new internal records cannot reset a tenant's allowance.
-
-Use explicit endpoint classes: tenant Payroll/resource calls, user connection inventory, app connection management and OAuth token operations. Non-tenanted calls never consume a fabricated tenant allowance. Apply documented limits to their proper classes and explicit conservative operational caps where the provider has not published a class-specific ceiling. Label operational caps as application policy, not provider facts. Token acquisition must not depend on a payroll tenant's exhausted daily budget.
-
-### 11.2 Tier and configuration
-
-Require explicit `XERO_APP_TIER` configuration: `starter`, `core`, `plus`, `advanced` or `enterprise`. Map daily resource allowance to 1,000 for Starter and 5,000 for higher tiers unless a separately recorded provider entitlement overrides it. For ordinary tenant resource calls, configure 60 requests per rolling minute and five concurrent admissions, alongside the published application-wide ceiling of 10,000 requests per minute. Apply these only to the endpoint classes covered by the verified contract; non-tenanted operational throttles remain separately identified. Unknown tier blocks production readiness; there is no silent 5,000 default. [X2], [X3]
-
-Validate the shared-store endpoint, credentials, enabled epoch/configuration and provider app identity in every caller deployment. Do not expose secret values in preflight. Rapid Sync exemptions, premium limits and larger connection entitlements are not assumed. Provider connection-limit errors need a distinct actionable result, not a generic OAuth failure or invented local entitlement.
-
-### 11.3 Atomic accounting
-
-Use one atomic server-side admission operation per applicable resource request: prune expired accounting, inspect tenant minute/day and app minute budgets, shared provider cooldowns and concurrency, then reserve all applicable units or none. Verify that all script keys are supported in one atomic topology, including cluster hash-slot placement.
-
-Prefer strict rolling-window accounting until the provider's reset semantics are established. A full token bucket with continuous refill is not automatically a strict rolling-window cap. Use store time, stable request IDs, bounded retained records and reproducible boundary tests.
-
-Every **admitted HTTP attempt**, including retries, consumes a unit; failed admission consumes none. Use idempotent reservation IDs so an uncertain Redis response can be reconciled without duplicate admission. Distinguish attempt reservations from logical payroll operations.
-
-Concurrency permits are owner-specific and released idempotently after complete body consumption/cancellation. Lease lifetime exceeds the enforced local request/body deadline plus a documented margin. On crash, apply conservative expiry/recovery. Prove at most five admitted active local resource permits per applicable tenant; do not claim local deadlines prove that Xero has stopped executing an abandoned request.
-
-Keep the existing prohibition on ambiguous payroll retry. A `429` produces shared cooldown and appropriate retry metadata. If `Retry-After` exceeds the remaining operation deadline, return/defer to a durable inbound/maintenance retry; do not sleep through a request/transaction deadline. Never queue the payroll write itself.
-
-### 11.4 Headers, persistence and rollout safety
-
-Parse allowlisted remaining-limit headers and `Retry-After` seconds/date values. Reconcile remaining counts only as conservative ceilings after accounting for concurrent reservations and stale/out-of-order responses. A delayed higher header cannot replenish an already-spent budget. Missing headers retain local accounting; malformed values do not grant more allowance.
-
-Known exhausted state must survive process restarts. Verify store persistence and eviction behaviour. Use an explicitly initialised namespace/epoch and sentinel; runtime may not silently initialise a full allowance when required existing accounting disappears. Avoid intentional eviction of live accounting. A lost namespace, ambiguous partial operation or unavailable store denies new provider admission with a retryable infrastructure result.
-
-Record a bounded recovery procedure for lost limiter state: stop/quiesce callers, establish the provider's remaining allowances or conservatively wait out relevant windows, initialise the shared state under operator control, then resume. Do not flush live state or rotate the namespace to bypass quota.
-
-During initial cutover, drain old process-local callers and account for calls already made in the provider window. Deploying an empty shared store must not grant another full daily budget. Verify actual script behaviour and latency on the configured service; mock success does not prove distributed enforcement.
-
-**Verification:** independent clients/processes sharing the actual configured Redis REST service with owned synthetic keys; aggregate tenant and app budgets; five-permit admission; boundary bursts; idempotent reservation/release; crash and slow-body recovery; delayed headers; store loss/outage; missing configuration and retry deadline. Never generate real Xero quota exhaustion to test these cases.
-
-## 12. Unit F: Management client, durable disconnect and reconciliation
-
-### 12.1 Separate app-management client
-
-Implement a server-only client-credentials path for app connection management with the documented `app.connections` scope. Keep its response schema separate from the customer authorisation/refresh schema: management access tokens do not require a refresh token. Do not add management scope to the customer Payroll consent URL.
-
-Validate management token class, expiry and granted scope where returned. Keep its credentials distinct from customer access resolution. App-management tokens cannot be used by Payroll adapters or returned to client components. Cache only under a bounded server-side contract, with shared token-acquisition coordination to avoid an instance-wide token storm.
-
-Use the exact documented token form and connection endpoints verified in A. Verify app-wide inventory coverage, any filtering/pagination, target identifiers and DELETE semantics with owned fixtures. The current user-oriented Identity specification alone does not prove those management inventory details. Management authentication failure is an operational incident and must not trigger fallback to a guessed endpoint or whole-user revocation.
-
-Default to this management client for connection cleanup, so expired customer refresh tokens do not force retention of a duplicate refreshable credential set. A customer-token fallback may use the canonical owner coordinator when valid and explicitly necessary. Do not create independently rotating cleanup copies. There is no separate cleanup escrow by default; any unavoidable retention exception needs a bounded, documented security contract before activation.
-
-### 12.2 Local disable and truthful receipt
-
-A scoped explicit disconnect commits local disable, generation change and durable cleanup intent in one short transaction. Do not put remote DELETE in that transaction. Block new provider-operation admissions for the disabled binding; cancel unsent work and fence local result commits. Already dispatched payroll mutations may still complete and must retain their existing uncertain-outcome/reconciliation treatment.
-
-Freeze the authorised disconnect scope: the known app connection links for this bound payroll file, not every connection belonging to its authoriser. Reconcile additional links only after establishing that they fall within the same authorised request. App-wide inventory visibility is not deletion authority.
-
-Return a typed receipt through service, action, DTO, audit and interface:
-
-```typescript
-interface XeroDisconnectReceipt {
-  localDisabled: boolean;
-  cleanupRequestId: string;
-  remoteStatus:
-    | 'pending'
-    | 'confirmed_deleted'
-    | 'confirmed_absent'
-    | 'partially_confirmed'
-    | 'unknown'
-    | 'blocked_authorisation';
-  dataActionStatus: 'not_requested' | 'pending' | 'completed' | 'failed';
-}
-```
-
-The precise public type may match existing conventions, but these distinctions must survive. Raw remote identifiers and sensitive provider evidence are not employee-facing DTO fields. Remove live `remoteRevoked` receipt consumers after migration.
-
-Preserve soft-disconnect retention and existing explicitly chosen destructive-data behaviour. Make data removal a separate idempotent step with its own result, including a destructive request made after an earlier soft disconnect. Do not purge before needed provenance/intents are durable. Preserve binding/audit history and manual availability, and invoke existing publication/cache invalidation where required. No implicit data retention change is authorised.
-
-### 12.3 Cleanup records and state machine
-
-Use these logical per-target remote states:
-
-| State | Meaning |
-| --- | --- |
-| `pending` | Eligible authorised target, no issued request recorded |
-| `claimed` | Current worker owns a bounded claim; dispatch is not yet recorded |
-| `dispatching` | Durable marker exists before the provider request; a crash can leave its outcome unknown |
-| `confirmed_deleted` | Explicit successful deletion of the intended remote link |
-| `confirmed_absent` | Reliable absence of the intended link under the verified endpoint/coverage contract |
-| `unknown` | The request may have executed or evidence is insufficient |
-| `blocked_authorisation` | Management/fallback authorisation prevents confirmation |
-| `cancelled` | Unsent task superseded or no longer authorised |
-
-Each attempt records its own ID, target connection/app/tenant, expected binding generation, request scope, lease owner/expiry, dispatch/deadline times, safe error/correlation metadata, retry timing and outcome evidence. Non-secret tombstones survive secret scrubbing.
-
-A verified targeted DELETE `204` confirms deletion; a valid targeted endpoint's `404` can confirm absence. A misrouted endpoint, incomplete inventory, 401/403, invalid refresh grant, timeout or 5xx cannot. Use the exact validated connection UUID and authentication/endpoint contract; do not classify every generic 404 as successful cleanup. [X5]
-
-Maintain the target set and aggregate outcome explicitly. One successful authoriser-link deletion does not confirm that every required connection for the payroll file was removed. Conversely, never revoke an owner's entire refresh grant merely to remove one binding. [X6]
-
-### 12.4 Worker, retries and reconnect fencing
-
-Implement `packages/jobs/src/handlers/reconcile-xero-connections.ts` with bounded ID enumeration and scoped target processing. Register through existing Inngest exports/serve registration. Durable intent and a periodic sweep recover missed dispatch. Use deterministic intent IDs and database claims; Inngest delivery deduplication alone is insufficient. Payloads contain IDs/generations, never credentials or payroll payloads.
-
-Before dispatch, take the ordered locks, validate the exact target, scope, references and generation, then durably mark dispatch. A cancelled/old unsent task must make no remote call. Record remote responses in a short subsequent transaction with attempt-owner checks. Late responses may record historical outcome but cannot reactivate or overwrite a newer local lifecycle.
-
-Reconnect/start/selection must not create a conflicting replacement while a destructive request is in flight or its outcome is unknown. A worker lease timeout does not prove that its earlier DELETE stopped. An inventory snapshot alone may show present absence without proving that a delayed destructive request can no longer affect a reused connection ID.
-
-Permit automatic reconnect after all relevant issued attempts have a safe terminal outcome, or after verified provider identity semantics prove a late request cannot affect the new connection. Do not assume a reconnect always generates a different connection ID. Test delayed DELETE and identifier reuse with a fault-injecting provider.
-
-Retry known-safe targeted cleanup under the same reservation with bounded exponential backoff, jitter and shared provider cooldown. Unknown attempts require reconciliation first; avoid concurrent destructive retries. Authentication failures require operational recovery rather than an unbounded hot loop. Deadlines cannot be reset indefinitely.
-
-### 12.5 Abandoned sessions and superseded authorisers
-
-Before clearing successful, expired or cancelled OAuth sessions, atomically retain non-secret auth-event/inventory provenance and possible cleanup candidates. Candidate status is not deletion authority.
-
-Only clean up an unselected connection when the evidence establishes it was created by the relevant abandoned/partial flow, has no legitimate active reference and falls within the approved cleanup policy. Protect previously connected files returned by the same author's inventory. Unknown historic or foreign inventory remains report-only.
-
-Reauthorisation by authoriser B must preserve authoriser A's remote link until its retirement is justified. A blanket tenant-level protection rule must not prevent legitimate removal of A's obsolete link when B's current verified link serves the same binding. Evaluate exact connection/owner references, not tenant ID alone. Deleting A's obsolete link must not impair A's different payroll files.
-
-### 12.6 Operator resolution, not a hidden dead end
-
-Add a restricted operator report and resolution procedure for unknown cleanup. Include request/attempt IDs, safe correlation information, targeted link, dispatch chronology, latest authoritative inventory evidence and required next action. Define an operational alert threshold, responsible owner and escalation route in configuration/runbook; thresholds are application policy, not Xero mandates.
-
-For ambiguous issued DELETE, the procedure must either obtain provider-supported terminal evidence or establish safe identity separation before releasing the reservation. Preserve an escalation record when Xero support is needed. Do not offer a "force reconnect" button that discards unresolved destructive history, and do not mark support escalation as confirmed provider deletion.
-
-**Verification:** request/body/DB/dispatch faults; 204/404/auth/rate/transient outcomes; local disable survives provider failure; missed delivery recovers; only owned targets are deleted; post-soft-disconnect data requests complete correctly; superseded authorisers remain isolated; old, late and duplicate work cannot corrupt a new generation; unknown state has an executable operator route.
-
-## 13. Unit G: Permission-aware recovery and caller integration
-
-### 13.1 Central error/recovery contract
-
-Add a shared classifier at the provider boundary and carry a typed recovery reason through `XeroWriteError`, read Results and the neutral external-write port. Preserve compatibility where possible instead of scattering unrelated string codes.
-
-| Evidence | Required response |
-| --- | --- |
-| Valid insufficient-scope challenge | `update_permissions`; no refresh attempt |
-| Rejected/expired access token without a scope indication | At most one owner-coordinated refresh/reload and one safe retry |
-| Insufficient scope on that retry | Still `update_permissions`, not generic stale credentials |
-| Invalid refresh grant after controlled reconciliation | `reauthorise`; remote connection state remains independently known/unknown |
-| Specific verified authoriser/tenant access denial | `check_xero_access`; affect the relevant link/capability, not unrelated tenants |
-| Generic 403 | Actionable permission/access error without inventing the precise cause |
-| Invalid OAuth client credentials or unreadable local encryption key | Operational configuration incident; do not tell every user they revoked consent |
-| 429 | Shared cooldown and retry timing, no consent-revocation inference |
-| 5xx/network/deadline after dispatch | Retry/defer reads; preserve unknown outcome for mutations |
-| Store/configuration/decryption/deadline failure before dispatch | Definite non-attempt with appropriate operational/retry message |
-
-Parse both `insufficent_scope` as printed in Xero's FAQ and standard `insufficient_scope`, including supported Bearer challenge formatting. Do not use substring matches against arbitrary raw bodies as authority. [X4]
-
-A generic `getTenant() => null` must not erase a rate-limit, deadline, key or permission problem. Preserve recovery reason and request phase all the way to the user/job. Never convert an uncertain payroll write to a safe retry just because its wrapper classified the later refresh result differently.
-
-### 13.2 Capability and job behaviour
-
-Permission can vary by endpoint and tenant even for one credential owner. Store capability-specific recovery state where needed. A read-only operation need not be disabled solely because an unrelated write permission is absent. Credential-owner failure and tenant-specific access failure have different scope.
-
-Classify both initial and retry responses. Background reads must not repeatedly refresh a grant that requires additional consent. Jobs consume typed retry metadata, use durable waits/retries for transient failures and surface terminal recovery needs. Service functions retain `Result`; job adapters translate retryable failure into the appropriate Inngest retry contract rather than resolving a failed job as success.
-
-Thread binding generation into schedulers, manual sync dispatch and direct provider callers. Reject or cancel work admitted for an obsolete generation. Before persisting fetched data or a user-visible write result, validate the applicable current lifecycle or route the already-issued operation to existing reconciliation. Coordinate these narrow changes with Plan 159's run lifecycle; do not invent a second import orchestration system.
-
-Complete the endpoint-to-scope matrix. Do not assume broad/read Payroll scopes are redundant merely because Accounting scopes changed. Only adjust requested scopes when the endpoint contract and an owned consent test support the change. Do not disconnect working customers to force a scope migration as part of this plan.
-
-### 13.3 Interface and audit
-
-Use existing Impeccable guidance and design-system components for every changed interface. Keep scope to Xero status, selection, errors, disconnect progress and recovery actions. Test keyboard/focus, loading/error states, light/dark and Australian English. Do not expose raw provider IDs or cross-account conflict details unnecessarily.
-
-Use truthful copy, for example:
-
-- "Sync stopped. Xero disconnection is pending."
-- "Disconnected from Xero."
-- "Update Xero permissions to continue."
-- "Xero access needs to be renewed."
-- "Xero is temporarily unavailable. Try again after [time]."
-
-Do not present a queued job as a completed sync, a disabled connection as remotely deleted or a temporary store failure as customer revocation. Preserve existing authorised historical visibility and feed behaviour, with applicable stale/status messages rather than fabricated freshness.
-
-Audit only allowlisted metadata: scoped operation IDs, reasons, transitions, attempt/version identifiers, correlation IDs and safe timing. Redact tokens, authorisation codes, state/nonces, URLs containing secrets, raw provider headers and payroll content. Restricted diagnostic records still require retention/access controls; "admin-only" does not make unrestricted raw logging acceptable.
-
-**Verification:** exact refresh-call counts and recovery reason assertions; background retry tests; pre-dispatch versus post-dispatch mutation tests; scope isolation; browser status/action tests and secret-redaction tests. Preserve all existing outbound duplicate-prevention regressions.
-
-## 14. Unit H: Inactivity, operational readiness and rollout
-
-### 14.1 Report-only inactivity assessment
-
-Implement a pure evaluator and scoped reporting query. Separate customer/service activity from API polling and token maintenance. Consider actual onboarding completion, active entitlement or authorised early-access service, enabled publication, feed consumption, explicit sync pause, cancellation/archive and retention decisions.
-
-No recent login is not inactivity. Successful polling cannot make an abandoned account appear customer-active. Missing evidence is unknown. Verify how existing feed usage records treat cached and 304 requests before relying on them. Use current evidence rather than adding invasive analytics solely for cleanup.
-
-Store policy version, candidate reason, uncertainty and review status. This plan sends no inactivity notices and performs no automatic inactivity-driven DELETE. Explicit disconnect and provably abandoned OAuth cleanup use their separate authorised paths.
-
-Provide an operator-reviewed candidate report and a defined hand-off to the same targeted cleanup workflow. Future execution requires its concrete authority and notice/retention policy. Do not claim report-only classification alone proves an operational removal process or Xero certification. [X11], [X12]
-
-### 14.2 Monitoring and configuration
-
-Track safe aggregate metrics for refresh conflicts/failures, recovery age, permission-required bindings, disabled-but-remote-unknown bindings, cleanup attempts/age, budget denials, shared-store failures, deadline/body failures and migration conflicts. Avoid high-cardinality customer identity in public telemetry. Configure alert ownership and document remediation.
-
-Preflight must validate the intended app identity/tier, callback, required scopes/capabilities, encryption key versions, shared rate store and execution mode for both app/API caller deployments. Verify all deployments sharing an OAuth app use the same canonical credential/lock domain as well as the same rate-budget domain. Separate databases with the same app/user credentials cannot each act as independent canonical owners. Do not solve that conflict by silently copying credentials or creating another Xero app.
-
-Retain preview connection gating and registered callback behaviour. No secrets in preflight output. Review developer-portal ownership, collaborator access and responsibility for OAuth secret, encryption key and operational credential rotation. Portal collaboration is separate from Team Calendar customer roles. [X16]
-
-### 14.3 Enablement controls
-
-Use explicit configuration for canonical-credential cutover, shared-limiter readiness and remote-cleanup execution. Reuse an existing equivalent mechanism where present; do not create a generic feature-flag package. Defaults must fail safely: missing destructive-cleanup approval/configuration keeps processing report-only, while production readiness remains incomplete.
-
-The binding guard is not a discretionary feature toggle. Once enabled, no rollback may restore silent payroll-file replacement. Similarly, loss of the shared store must not switch production back to process-local quota admission.
-
-### 14.4 Rollout sequence
-
-1. Capture source/database/configuration fingerprints, owned fixture inventory and recovery evidence. Produce a restricted duplicate/provenance report.
-2. Apply additive expansion migrations on the existing authorised database. Verify constraints, backup/recovery provisions and unchanged payroll identity/counts.
-3. Perform resumable credential/binding migration and verify all resolvable rows. Quarantine ambiguous rows with explicit recovery state; never choose account owners automatically.
-4. Quiesce/drain incompatible old token writers and process-local rate callers across deployments. Canonical owner coordination and distributed budgets must not be undercut by an old deployment.
-5. Switch credential readers/writers and binding guards; verify error/capability handling, callback and refresh recovery. Account conservatively for pre-cutover provider usage when enabling shared budgets.
-6. Deploy and verify management read/report mode. Observe candidate sets and protected active references before enabling deletion.
-7. Enable targeted cleanup only after authority, documented endpoint contract, owned live outcomes, generation fencing and operator recovery gates pass.
-8. Run final configured-database, actual shared-store, browser and authorised live-provider scenarios on the same candidate. Record final merged/deployed SHA separately where deployment was authorised.
-9. Scrub superseded secret copies only after canonical references and recovery envelopes are proven. Keep non-secret history and applicable old key material for legitimate retained ciphertext until safe retirement.
-
-### 14.5 Rollback
-
-Stop new provider admissions/cleanup workers when required, preserve local disable, reservations, attempt history and adopted canonical credentials, and restore only a compatible reviewed code version. Do not restore stale refresh tokens from a backup and immediately use them; restore service through controlled provider reconciliation or reauthorisation.
-
-Do not reverse additive migrations by deleting payroll data. Never revert to silent rebinding, legacy independent token rotation or fail-open rate limiting. Unresolved issued DELETE requests remain unresolved even after application rollback. Report the actual reduced service and required operator action.
-
-## 15. Verification commands and required scenarios
-
-### 15.1 Commands
+## 7. Executable sub-plans
+
+This document is the **programme charter**. It holds the boundaries, the target architecture, the
+evidence matrix and the reference register that all eight units share. It is **not itself
+executable**: the work lives in the eight sub-plans below, each written to the handoff-plan
+template so a single executor with no other context can run one unit end to end.
+
+Execute them in this order. Each sub-plan carries its own Current state excerpts, Commands,
+Scope, Steps with verification gates, Test plan, Done criteria, STOP conditions and Maintenance
+notes, and each repeats whatever it needs from this charter rather than referring back to it.
+
+| Sub-plan | Unit | What will be true when it lands | Effort | Risk | Depends on |
+| --- | --- | --- | --- | --- | --- |
+| [161a](161a-xero-baseline-and-fixture-ownership.md) | A | Provider contract ledger exists; protected fixtures own every record kind the later plans create | M | LOW | none |
+| [161b](161b-xero-immutable-tenant-binding.md) | B | An internal payroll entity can no longer silently acquire a different external Xero tenant, enforced in the service **and** in the database | L | HIGH | 161a |
+| [161c](161c-xero-deadlines-and-key-versioning.md) | C | One absolute deadline survives lock waits, retries and response bodies; token encryption resolves a real keyring by envelope version | M | MED | 161a |
+| [161d](161d-xero-canonical-credentials.md) | D | One canonical credential set per **verified Xero authoriser**, reached only through `resolveXeroAccess`; changed ciphertext is no longer treated as proof of a committed refresh | L | HIGH | 161b, 161c |
+| [161e](161e-xero-shared-rate-limits.md) | E | Rate budgets are shared across deployments, keyed by external Xero tenant, tier-aware and fail-closed | L | HIGH | 161a, 161c; consumes 161d |
+| [161f](161f-xero-management-cleanup.md) | F | Disconnect commits locally at once and returns a receipt that can say `unknown` honestly; remote deletion is fenced, per-target and narrowly authorised | L | HIGH | 161b, 161c, 161d, 161e |
+| [161g](161g-xero-permission-recovery.md) | G | Every distinct failure has its own actionable recovery reason, and no caller reads credentials directly | L | MED | 161d, 161e; integrates 161f |
+| [161h](161h-xero-rollout-and-inactivity.md) | H | Report-only inactivity assessment, metrics, preflight, evidence runner and a documented rollout and rollback | M | MED | 161b-161g |
+
+161a is the only unblocked starting point. After it, 161b and 161c can proceed in parallel; assign
+**one** owner to the schema and credential contract so two agents cannot implement incompatible
+ownership models in the same service. Remote cleanup (161f) stays disabled until its dependencies
+pass.
+
+Sections 8 to 14 of earlier revisions of this charter described each unit inline. That content now
+lives in the sub-plans, which are the authority. Sections 1 to 6 below remain the shared contract;
+Sections 15 to 17 remain the shared verification matrix, sign-off criteria and references.
+
+## 8. Verification commands and required scenarios
+
+### 8.1 Commands
 
 Commands below are defined by the inspected repository manifests unless explicitly marked as a new deliverable. Run workspace tests in the correct workspace. A fresh build may be needed before final typechecking to generate Next route types.
 
@@ -631,7 +364,7 @@ Commands below are defined by the inspected repository manifests unless explicit
 | Focused provider integration | `bun run --cwd packages/xero test:integration` | Owned database/shared-store scenarios execute, as selected by existing configuration |
 | Release tooling | `bun run test:release-tools` | Exit zero |
 | Release-tool types | `bun run typecheck:release-tools` | Exit zero |
-| Browser release suite | `bun run test:release` | Guarded owned browser fixtures, changed Xero flows and cleanup pass |
+| Browser release suite, **deployed candidate only** | `bun run test:release` | Guarded owned browser fixtures, changed Xero flows and cleanup pass. Requires six `TC_*` variables and Firefox/WebKit; runs in the Plan 160 campaign, never as a sub-plan Done criterion |
 | Authorised additive migration | `bun run migrate:deploy` | Reviewed migration applies to the existing selected target |
 | Whitespace | `git diff --check` | Exit zero |
 
@@ -639,7 +372,9 @@ Integration scripts currently set `ALLOW_LOCAL_DATABASE_TESTS` and match `.integ
 
 Use the existing Plan 160/release manifest runner for real provider evidence. Extend its interface rather than guessing a CLI name or creating another testing system. Document the exact executable invocation in the execution report once implemented. This new runner/report capability is a deliverable, not a command claimed to exist at the baseline.
 
-### 15.2 Test locations and patterns
+### 8.2 Test locations and patterns
+
+Each sub-plan names its own new test files and the existing test to model on. The list below is the programme-wide view; it is not a second source of truth.
 
 Extend existing `src/oauth/service.test.ts`, `service.integration.test.ts`, `disconnect.integration.test.ts`, crypto tests, `src/adapter/auth-recovery.test.ts`, rate-limit tests, scheduler tests, Xero tenancy tests and app connect/settings action tests.
 
@@ -662,7 +397,21 @@ packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts
 
 Match existing test configuration and module boundaries. Do not create empty files to satisfy path checks. Name actual assertions in the evidence report. Use deterministic clocks, controlled HTTP faults, database barriers and independent store clients. Distinguish a mock provider with real infrastructure from real Xero evidence.
 
-### 15.3 Mandatory regression/evidence matrix
+### 8.3 Mandatory regression/evidence matrix
+
+Each case below is owned by exactly one sub-plan, which is responsible for implementing and
+evidencing it:
+
+| Sub-plan | Owns cases |
+| --- | --- |
+| 161a | none directly; supplies the fixture ownership and provider ledger every other case relies on |
+| 161b | 161-01, 161-03, 161-04, 161-05, 161-06, 161-36 |
+| 161c | 161-16, 161-30, 161-38 |
+| 161d | 161-02, 161-07, 161-08, 161-09, 161-10, 161-11, 161-12, 161-13, 161-14, 161-15 |
+| 161e | 161-26, 161-27, 161-28, 161-29 |
+| 161f | 161-17, 161-18, 161-19, 161-20, 161-21, 161-22, 161-23, 161-24, 161-25 |
+| 161g | 161-31, 161-32, 161-33, 161-34, 161-37 |
+| 161h | 161-35, 161-39, 161-40 |
 
 Legend: **U** unit/fault injection; **D** configured real database with owned fixtures; **R** actual configured shared Redis; **B** guarded browser; **X** authorised owned Xero provider evidence. Do not force provider-side faults or rate exhaustion simply to obtain X evidence; synthetic faults prove those failure paths and safe live cases prove the real contract.
 
@@ -709,9 +458,9 @@ Legend: **U** unit/fault injection; **D** configured real database with owned fi
 | 161-39 | Final code has no independently rotating legacy credential consumers and no direct quota bypass | Source audit, U, D |
 | 161-40 | Same candidate passes required gates, safe rollout controls and reduced-service/rollback procedures | D, R, B, authorised X |
 
-## 16. Completion, evidence and blocked operations
+## 9. Completion, evidence and blocked operations
 
-### 16.1 Evidence schema
+### 9.1 Evidence schema
 
 Produce Markdown and machine-readable JSON even when prerequisites are missing or tests fail. Each required case records:
 
@@ -737,7 +486,7 @@ Use separate top-level status for source checks, configured-database tests, dist
 
 The runner exits zero only when all required selected cases pass; use non-zero for failed assertions or missing mandatory prerequisites and record which. A required skipped scenario is NOT_VERIFIED. Never report a mocked HTTP test as live Xero proof, or a single-process fake as distributed-store proof.
 
-### 16.2 Source implementation complete
+### 9.2 Source implementation complete
 
 - [ ] All units' source changes, new meaningful tests, migrations, configuration validation and documentation are implemented within scope.
 - [ ] Database-free lint/build/types/boundary/unit gates and release-tool tests/types pass on the final reviewed source candidate.
@@ -752,7 +501,7 @@ The runner exits zero only when all required selected cases pass; use non-zero f
 
 An approved source-only change can be integrated with unsafe/unverified runtime capabilities kept disabled. This is not a production-readiness approval. Keep the plan IN PROGRESS while mandatory infrastructure/provider evidence is outstanding.
 
-### 16.3 Production-hardening sign-off
+### 9.3 Production-hardening sign-off
 
 - [ ] Source-completion criteria hold on the integrated candidate.
 - [ ] Reviewed additive migrations and protected integration suites pass on the existing configured database, with verified fixture cleanup.
@@ -767,37 +516,71 @@ An approved source-only change can be integrated with unsafe/unverified runtime 
 
 Report Plan 159/160/go-live status separately. Plan 161 cannot certify AU payroll semantics, import completeness, full product readiness or Xero App Store approval by implication.
 
-### 16.4 When to pause an affected operation
+### 9.4 When to pause an affected operation
 
 Pause only the dependent operation and record the exact evidence/action needed when ownership is ambiguous, a live target is unowned, an external mutation lacks authority, the required provider contract cannot be established, current shared-store topology cannot enforce the design, legacy identities cannot be verified, or a migration would require prohibited reset/purge behaviour.
 
 Continue independent implementation and tests. Fix failing code and tests rather than requesting another planning round. Do not introduce arbitrary "stop after two failures" behaviour into the product implementation; the installed advisor's own review limits are separate. Never bypass guards, invent a provider capability, claim a test ran or make a larger retention/payroll product decision to avoid a blocked gate.
 
-## 17. Reference register and execution hand-off
+### 9.5 Executor STOP conditions
 
-### 17.1 Current source map
+Stop and report; do not improvise, do not widen scope to route around any of these:
+
+- The drift check in Section 1.0 is non-empty **and** any file in Section 2.0 no longer matches its excerpt at the stated symbol. Report the actual current code.
+- `packages/xero/src/oauth/service.ts` no longer contains `completeXeroTenantSelection`, or the rebinding `update` block has already been changed by other work.
+- A unit's gate command in Section 6 fails twice after a reasonable fix attempt.
+- The fix appears to require editing a file outside the Section 4 allowed paths. Report the exact path and why.
+- Unit A cannot establish the management endpoint contract from primary sources. Implement and test the rest of Unit F with deletion disabled; do not guess endpoints, pagination, token audiences or filters.
+- The backfill in Unit B finds existing `(provider_app_id, external_tenant_id)` collisions. Quarantine them, report the count and the affected internal organisation IDs, and continue with the remaining units. Never pick a winner automatically.
+- Any identity cannot be established by verified JWT claims. Retain the candidate as unverified and report; do not fall back to email, Clerk user ID, `authEventId` or token-string equality.
+- Applying a migration would require `migrate dev`, `db push`, reset, rebaseline or seeding against the configured database.
+- A live provider or shared-store test would need to touch a target the fixture manifest does not own.
+- You are about to write an env var value, token, authorisation code, `state`/nonce, or any part of `XERO_TOKEN_ENCRYPTION_KEY`/`XERO_CLIENT_SECRET` into a file, log, snapshot, test fixture, job payload or report. Stop.
+
+**Assumptions that, if false, are STOP conditions:** that one external Xero payroll tenant should map to at most one active internal binding (Section 3); that `app.connections` client-credentials management is available to this app's tier; and that the configured Redis REST service supports the atomic multi-key script topology Unit E requires.
+
+### 9.6 Maintenance notes
+
+For whoever owns this code after the change lands:
+
+- **`XeroCredentialOwner` has no `clerk_org_id` by design.** That breaks the otherwise universal repository rule in `CLAUDE.md` ("`clerk_org_id` on every tenant-scoped table", "every query filters by `clerk_org_id`"). Update `CLAUDE.md` and `PRODUCT.md` to record the exception and its boundary, and add a test that fails if a customer-scoped record is added without both scope IDs. A reviewer who does not know about the exception will either revert it or, worse, generalise it.
+- **`resolveXeroAccess` is the single choke point.** Any new Xero call site must go through it. In review, grep for direct reads of credential columns and for `new XeroRateLimiter`; either is a regression.
+- **Binding generation and token version are different fences** and are easy to confuse in later work. Binding generation fences payroll access; token version fences credential adoption. Never compare or reuse one for the other.
+- **The rate limiter becomes fail-closed.** Anyone later adding a `catch` that falls back to local admission when the shared store is unavailable reintroduces H5 across deployments. Sub-plan 161h Step 5 makes this non-revertible on purpose.
+- **Deferred out of this plan:** NZ and UK activation, automatic inactivity-driven deletion, customer notices, any replacement-file or cross-account transfer workflow, and OAuth client-secret rotation. Each needs its own plan and its own authority.
+- **What a reviewer should scrutinise first:** the migration SQL in Unit B, the DELETE authorisation scope freeze in sub-plan 161f Step 3, and every place a `Result` error is mapped to user-visible copy in sub-plan 161g Step 7, because a misclassification there tells a customer they revoked consent when the app's own credentials failed.
+
+## 10. Reference register and execution hand-off
+
+### 10.1 Current source map
 
 Repository references are pinned to the inspected baseline. Paths are executable investigation targets, not claims that every file in the repository was newly audited.
 
-| Reference | Source |
-| --- | --- |
-| R1 | [OAuth selection, refresh, disconnect and persistence recovery][R1] |
-| R2 | [Prisma connection, tenant and OAuth session models][R2] |
-| R3 | [Current process-local limiter][R3] |
-| R4 | [Current HTTP wrapper][R4] |
-| R5 | [Version-one encryption implementation][R5] |
-| R6 | [Shared Redis REST transport][R6] |
-| R7 | [Provider-neutral write-error contract][R7] |
-| R8 | [Xero write adapter][R8] |
-| R9 | [Protected integration fixture allocation][R9] |
-| R10 | [Scheduler and dormant refresh maintenance][R10] |
-| R11 | [Root executable scripts/toolchain][R11] |
-| R12 | [Database scripts and Prisma version][R12] |
-| R13 | [Plan 159][R13] |
-| R14 | [Plan 160][R14] |
-| R15 | [Release plan index][R15] |
+Read the **local path**. The URL is a convenience for a human reader; the executor must not
+require network access to read this repository's own source.
 
-### 17.2 Xero and skill references
+| Reference | Local path | Source |
+| --- | --- | --- |
+| R1 | `packages/xero/src/oauth/service.ts` | [OAuth selection, refresh, disconnect and persistence recovery][R1] |
+| R2 | `packages/database/prisma/schema.prisma` | [Prisma connection, tenant and OAuth session models][R2] |
+| R3 | `packages/xero/src/rate-limit/limiter.ts` | [Current process-local limiter][R3] |
+| R4 | `packages/xero/src/rate-limit/xero-fetch.ts` | [Current HTTP wrapper][R4] |
+| R5 | `packages/xero/src/crypto/tokens.ts` | [Version-one encryption implementation][R5] |
+| R6 | `packages/core/src/redis-rest-transport.ts` | [Shared Redis REST transport][R6] |
+| R7 | `packages/core/src/ports/external-write-port.ts` | [Provider-neutral write-error contract][R7] |
+| R8 | `packages/xero/src/adapter/xero-write-adapter.ts` | [Xero write adapter][R8] |
+| R9 | `packages/database/src/live-test-fixture.ts` | [Protected integration fixture allocation][R9] |
+| R10 | `packages/jobs/src/handlers/schedule-xero-syncs.ts` | [Scheduler and dormant refresh maintenance][R10] |
+| R11 | `package.json` | [Root executable scripts/toolchain][R11] |
+| R12 | `packages/database/package.json` | [Database scripts and Prisma version][R12] |
+| R13 | `plans/159-xero-sync-and-onboarding.md` | [Plan 159][R13] |
+| R14 | `plans/160-xero-end-to-end-verification-and-report.md` | [Plan 160][R14] |
+| R15 | `plans/README.md` | [Release plan index][R15] |
+| R16 | `packages/xero/src/rate-limit/limits.ts` | Hard-coded published limits, no tier input |
+| R17 | `packages/availability/src/xero-connection-state.ts` | `hasActiveXeroConnection` boolean state |
+| R18 | `CLAUDE.md`, `AGENTS.md`, `PRODUCT.md`, `DESIGN.md`, `.impeccable.md` | Repository conventions, domain truth and design system |
+
+### 10.2 Xero and skill references
 
 Readable FAQs/specification/SDK evidence was checked during this conversation. Several detailed guide URLs returned a JavaScript shell in the final retrieval; retain that distinction in the provider ledger and re-read the full relevant contracts during Unit A. A link in this list does not establish live access or entitlement.
 
@@ -824,13 +607,23 @@ Readable FAQs/specification/SDK evidence was checked during this conversation. S
 | S1 | [Improve skill][S1]: advisor versus executor responsibilities |
 | S2 | [Improve execution/reconciliation reference][S2]: worktree hand-off and independent review |
 
-### 17.3 Plan index reconciliation
+### 10.3 Plan index reconciliation
 
-Use one active Plan 161 row. Suggested index text:
+Plan 161 is one charter plus eight executable sub-plans. `plans/README.md` carries a row for the
+charter and a row for each of 161a through 161h, so each unit's status can move independently.
+Do not create a second Plan 161 file under any other name.
 
-> **161: Xero API production hardening, TODO.** Owns Plan 159 X5/X6 and Step 3 through this consolidated binding, credential, transport and cleanup contract. Plan 159 retains import, people, AU semantics and onboarding work. Plan 160 supplies end-to-end evidence. Implement in units A–H. Required live and distributed-store verification starts NOT VERIFIED; no readiness claim follows from planning.
+> **161: Xero API production hardening, charter, IN PROGRESS.** Owns Plan 159 X5/X6 and Step 3
+> through this consolidated binding, credential, transport and cleanup contract. Plan 159 retains
+> import, people, AU semantics and onboarding work. Plan 160 supplies end-to-end evidence.
+> Execute sub-plans 161a through 161h in order. Required live and distributed-store verification
+> starts NOT VERIFIED; no readiness claim follows from planning.
 
-### 17.4 Executor report
+The charter moves to DONE only when every sub-plan is DONE **and** Section 9.3's
+production-hardening sign-off criteria pass. A sub-plan reaching DONE certifies its own unit and
+nothing else.
+
+### 10.4 Executor report
 
 Return the skill's required execution report and attach the detailed evidence:
 

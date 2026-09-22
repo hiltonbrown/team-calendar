@@ -1,12 +1,22 @@
 # Plan 160: Verify the complete Xero integration and publish an evidence report
 
-> **Connection verification update, 21 September 2026:**
-> [Plan 161](161-harden-xero-connection-lifecycle.md) now owns connection lifecycle
-> implementation and replaces Plan 159's unconditional shared-grant prescription.
-> Add its regression/live evidence matrix to this report before connection
-> hardening sign-off. Prepare the harness independently; final verification depends
-> on the implemented candidate from both plans. Shared-family behaviour must be
-> established by provider evidence, not assumed from a prescribed schema.
+> **Connection verification update, 22 September 2026:**
+> Plan 161 now owns connection lifecycle implementation and replaces Plan 159's
+> unconditional shared-grant prescription. It is no longer one document. Read:
+>
+> - [`plans/161-harden-xero-connection-lifecycle.md`](161-harden-xero-connection-lifecycle.md)
+>   is the **charter**. Its **Section 8.3** holds the 40-case regression and evidence
+>   matrix (IDs `161-01` to `161-40`) that must be folded into this report before
+>   connection hardening sign-off, and **Section 9.3** holds the production sign-off
+>   criteria this report feeds.
+> - [`plans/161-pre-executor-gate-corrections.md`](161-pre-executor-gate-corrections.md)
+>   plus sub-plans **161a** through **161h** hold the implementation. Each sub-plan owns a
+>   named subset of the 40 cases; the charter's Section 8.3 has the ownership table.
+>
+> Prepare the harness independently; final verification depends on the implemented
+> candidate from Plan 159 and from sub-plans 161a-161h. Shared-family behaviour must be
+> established by provider evidence, not assumed from a prescribed schema. Do not treat
+> the charter as an implementation spec: it deliberately contains no unit bodies.
 
 > Executor: this is a test-and-report follow-up, not a production feature rewrite.
 > Prepare the harness, then exercise the approved candidate using owned fixtures
@@ -24,11 +34,47 @@
 - Risk: HIGH for live payroll/credential changes; LOW for offline harness tests.
 - Category: tests, correctness verification, operational reporting.
 - Planned at: `246ba27`, 20 September 2026, including uncommitted Plan 159.
+- **Re-baselined at `8652c31`, 22 September 2026.** See "Drift check" below: 97 files
+  changed between the two commits, including files this plan cites.
 - Depends on: `plans/159-xero-sync-and-onboarding.md` for expected behaviour and
   the approved AU submission/approval contract. Harness preparation and baseline
   diagnostics can proceed before its implementation; a full PASS cannot.
 - Related: `plans/go-live.md` owns release-wide deployment and fixture controls.
   Reuse its tools; this plan owns Xero scenario results and the final Xero report.
+
+## Drift check, run before anything else
+
+```bash
+git rev-parse --short HEAD
+git status --short
+git diff --stat 8652c31..HEAD -- tooling/release packages/xero packages/jobs \
+  packages/availability packages/database apps/app apps/api
+```
+
+At the last review that diff was **empty against `8652c31`**. Every excerpt in
+"Current evidence and harness gaps" was confirmed live at that commit. If the diff is
+now non-empty, open each cited file and compare before proceeding; a mismatch is a
+STOP condition.
+
+**This plan was originally written against `246ba27`, and the tree has moved a long way
+since.** Between `246ba27` and `8652c31`, 97 files changed (1,554 insertions). The
+following in-scope files changed and their excerpts were re-verified for this revision:
+`tooling/release/database-guard.ts` (+94), `tooling/release/cleanup.ts` (+7),
+`tooling/release/run-live-integration.ts` (+10),
+`packages/database/src/live-test-guard.ts` (+13).
+
+**Read this before starting Step 2.** Two files that did **not exist** at the original
+baseline have since landed and directly overlap Step 2's consumer-isolation work:
+
+- `tooling/release/consumer-isolation.ts` (103 lines)
+- `tooling/release/consumer-isolation.test.ts` (141 lines)
+
+`consumer-isolation.ts` already performs a live read-back against the real Inngest API
+with freshness and clock-skew bounds, exporting `assertConsumerIsolationReadBack`, and
+`tooling/release/database-guard.ts` consumes it through the `consumerIsolation` field on
+the manifest schema. **Extend that module; do not build a second, parallel isolation
+mechanism beside it.** If you find yourself writing a new Inngest inventory reader, stop
+and re-read `consumer-isolation.ts` first.
 
 ## Outcome and boundaries
 
@@ -54,30 +100,62 @@ Read these files before implementation; excerpts identify the observed baseline.
 
 | Evidence | Existing behaviour | Required improvement in test proof |
 | --- | --- | --- |
-| `tooling/release/e2e/admin-and-roles.spec.ts:10` | Accepts `/Sync (queued\|succeeded\|completed)/i` after clicking people sync | Require exact dispatched run, terminal job result, persisted source IDs and UI contents |
-| `tooling/release/e2e/provider-snapshot-cli.ts:39` | Joins outbound operations with `op.action = 'submit'` | Support approved create-on-approval semantics and inbound-only records without assuming a submit operation |
-| `tooling/release/e2e/provider-snapshot.ts:35` | Requires local and normalised remote status to be identical | Compare documented remote state to action-aware local intent; Xero rejection can represent local withdrawal |
-| `tooling/release/e2e/environment.ts:71` | Compares supplied candidate SHA, manifest and local HEAD | Verify deployed revisions independently; an environment-variable assertion is insufficient |
+| `tooling/release/e2e/admin-and-roles.spec.ts:24-26` | Accepts `/Sync (queued\|succeeded\|completed)/i` after clicking people sync | Require exact dispatched run, terminal job result, persisted source IDs and UI contents |
+| `tooling/release/e2e/provider-snapshot-cli.ts:42` | Joins outbound operations with `op.action = 'submit'` | Support approved create-on-approval semantics and inbound-only records without assuming a submit operation |
+| `tooling/release/e2e/provider-snapshot.ts:37-54` | Requires local and normalised remote status to be identical | Compare documented remote state to action-aware local intent; Xero rejection can represent local withdrawal |
+| `tooling/release/e2e/environment.ts:70-79` | Compares supplied candidate SHA, manifest and local HEAD | Verify deployed revisions independently; an environment-variable assertion is insufficient |
 | `tooling/release/e2e/journey-ledger.ts` | Tracks intended/returned/reconciled local create IDs | Track remote identity, uncertain outcomes and provider cleanup separately |
 | `tooling/release/e2e/global.teardown.ts:7` | Asserts ledger reconciliation before attempting cleanup | Always attempt independently safe reconciliation/cleanup, then report remaining failures |
-| `tooling/release/cleanup.ts:187` | Deletes scoped local rows after checking active runs | Reconcile remote leave/connections before deleting local evidence/credentials |
-| `tooling/release/database-guard.ts:95` | Requires every inventoried consumer to be paused | Live E2E needs a separately verified execution mode allowing the owned jobs to run |
+| `tooling/release/cleanup.ts:194-195` | Deletes scoped local rows after checking active runs | Reconcile remote leave/connections before deleting local evidence/credentials |
+| `tooling/release/database-guard.ts:113-142` | Requires every inventoried consumer to be paused | Live E2E needs a separately verified execution mode allowing the owned jobs to run |
 | `tooling/release/playwright.config.ts` | Single worker, zero retries, role setup, 90-second test timeout, retained traces/videos | Preserve mutation serialisation; allow bounded job waits and avoid recording OAuth credentials |
 
 These are HIGH-confidence observations, not claims that production was tested.
 The live manifestation remains NOT VERIFIED. Their fix effort is M/L and MED/HIGH
 risk because a false positive or unsafe cleanup would undermine the whole report.
 
+All line numbers above were re-verified at `8652c31`. The four load-bearing excerpts,
+copied exactly:
+
 ```typescript
-// admin-and-roles.spec.ts, existing assertion is insufficient
+// tooling/release/e2e/admin-and-roles.spec.ts:24-26
+// A queued toast is accepted as success. Nothing proves a job ran.
 await expect(page.getByRole("status")).toContainText(
   /Sync (queued|succeeded|completed)/i
 );
 
-// global.teardown.ts, current ordering blocks cleanup on ledger failure
-assertJourneyLedgerReconciled();
-const cleanup = spawnSync("bun", [/* cleanup.ts, manifest, --apply */]);
+// tooling/release/e2e/global.teardown.ts:5-7
+// The assertion throws before cleanup is even attempted, so an unreconciled
+// ledger leaves owned fixtures behind instead of triggering teardown.
+export default function globalTeardown() {
+  const environment = releaseEnvironment();
+  assertJourneyLedgerReconciled();
+
+// tooling/release/e2e/provider-snapshot-cli.ts:41-42
+// The join assumes a 'submit' operation exists, so inbound-only records and
+// create-on-approval semantics cannot be observed at all.
+     LEFT JOIN outbound_operations op
+       ON op.availability_record_id = ar.id AND op.action = 'submit'
+
+// tooling/release/e2e/environment.ts:70-79
+// This compares a supplied environment variable against local git HEAD. It
+// proves the operator typed a matching SHA, never that the SHA is deployed.
+  const sourceSha = execFileSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf8",
+  }).trim();
+  if (
+    manifest.candidateSha !== sourceSha ||
+    parsed.TC_DEPLOYED_CANDIDATE_SHA !== sourceSha
+  ) {
+    throw new Error(
+      "Release browser suite refused a source, deployment or manifest SHA mismatch"
+    );
+  }
 ```
+
+`tooling/release/playwright.config.ts:60-69` was also re-verified exactly as described:
+`retries: 0`, `timeout: 90_000`, `workers: 1`, `screenshot: "only-on-failure"`,
+`trace: "retain-on-failure"`, `video: "retain-on-failure"`.
 
 The preceding audit passed 74 existing focused unit/component tests. Do not
 copy those results into this plan's final candidate report as fresh evidence.
@@ -99,6 +177,69 @@ Permitted edits during later execution:
   upgrades. Existing Playwright/Vitest/Clerk tooling is already declared.
 - `plans/160-xero-end-to-end-verification-and-report.md`, `plans/README.md`,
   `reports/xero-e2e/` for sanitised final reports and evidence indexes.
+
+### Out of scope: do NOT touch
+
+- Any application, service or schema behaviour in `packages/` or `apps/`. This plan
+  **measures** the integration; it does not change it. A defect found here is referred to
+  Plan 159 or a sub-plan of 161, never fixed inline.
+- `packages/next-config/bin/preflight.ts` and `packages/next-config/preflight.ts`.
+  Preflight correctly requires production configuration; do not relax it to make a run pass.
+- `packages/database/keys.ts` and `packages/xero/keys.ts`. `DATABASE_URL` and
+  `XERO_TOKEN_ENCRYPTION_KEY` are deliberately required with no fallback. **Do not make
+  either optional** to make a worktree build. See "Fresh worktree setup" below.
+- The existing all-consumers-paused database-fixture mode in
+  `tooling/release/database-guard.ts`. You add a **separate** Xero E2E mode beside it; the
+  existing mode's behaviour stays byte-for-byte unchanged and its tests must still pass.
+- `tooling/release/consumer-isolation.ts` beyond additive extension. Do not fork it.
+- Any real `.env*` file, `tooling/release/.auth/`, or stored refresh tokens.
+- The NZ and UK adapters. They are outside this Australian certification.
+
+### Protected output directory
+
+The plan requires raw browser artefacts, OAuth traces and any credential-bearing output to
+stay out of version control. **The gitignore already provides exactly three safe locations**
+(`.gitignore:110-112`):
+
+```
+tooling/release/.auth/
+tooling/release/test-results/
+tooling/release/playwright-report/
+```
+
+Use `tooling/release/test-results/<run-id>/` as the `--output tooling/release/test-results/<run-id>`
+target in every command in the runbook. Confirm before the first run:
+
+```bash
+git check-ignore -v tooling/release/test-results
+```
+
+It must print a matching `.gitignore` rule. **`reports/xero-e2e/` is NOT gitignored** and
+must therefore receive only the two sanitised report files. If you ever need a fourth
+location, add it to `.gitignore` in the same commit that first writes to it, and verify with
+`git check-ignore` before the run, not after.
+
+### Fresh worktree setup
+
+This plan directs harness work into an isolated `codex/xero-e2e-verification` worktree. The
+repository's `.env*` files are gitignored (`.gitignore:35`), so a fresh worktree has none of
+them. From the worktree root:
+
+```bash
+bun install --frozen-lockfile
+```
+
+`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with
+no further setup. **`bun run build` additionally requires two variables**, because
+`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
+`packages/database/keys.ts:10` has no fallback:
+
+- `DATABASE_URL` - any syntactically valid Postgres URL suffices for a build; the client is
+  lazy and nothing connects. Do **not** point it at the real database.
+- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value suffices for a build.
+
+Supply them for the build command only. Do not create a committed `.env`, do not copy the
+developer's real values, and do not make either variable optional to avoid setting them.
 
 No application/service/schema behaviour changes belong to this plan. If actual
 tenant fencing or grant-safe cleanup requires application work not yet supplied
@@ -161,6 +302,12 @@ payroll targets before the first mutation. Unit fixture validation is not live p
 
 ## Step 2: Make the harness capable of honest live evidence
 
+0. **Read `tooling/release/consumer-isolation.ts` and `consumer-isolation.test.ts` first.**
+   Neither existed when this plan was first written. `consumer-isolation.ts` already
+   live-verifies Inngest consumer state against the real API with freshness and clock-skew
+   bounds, exporting `assertConsumerIsolationReadBack`, and `database-guard.ts` consumes it
+   via the manifest's `consumerIsolation` field. Extend it. If you are about to write a new
+   Inngest inventory reader, you have duplicated it: stop and re-read.
 1. Add a distinct manifest mode for Xero E2E. Retain the existing all-consumers-
    paused database-fixture mode unchanged. The E2E mode lists allowed worker
    functions, owned tenant IDs, generation/run identity, prior consumer state
@@ -487,8 +634,8 @@ Use Bun 1.4.0 and the repository-supported Node version for candidate evidence.
 | CI integration | `bun run test:integration` | Exit 0 in CI's supported local guarded environment |
 | Authorised live database integration | `bun run tooling/release/run-live-integration.ts --manifest <protected-db-fixture-manifest>` | Existing ownership/cleanup gates pass; not a substitute for Xero E2E |
 | Xero preflight, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --preflight` | Validate-only report; no fixture/payroll mutation; records missing prerequisites |
-| Xero full run, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --output <protected-run-directory>` | Every scenario accounted for; provider/UI evidence and cleanup; reports emitted |
-| Interrupted-run recovery, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --recover --output <same-protected-run-directory>` | Reconcile/cleanup/report only; no replay of uncertain mutations |
+| Xero full run, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --output tooling/release/test-results/<run-id>` | Every scenario accounted for; provider/UI evidence and cleanup; reports emitted |
+| Interrupted-run recovery, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --recover --output tooling/release/test-results/<same-run-id>` | Reconcile/cleanup/report only; no replay of uncertain mutations |
 | Re-render, new | `bun run tooling/release/xero-report.ts --input <sanitised-run-json> --output reports/xero-e2e` | Offline validation and Markdown/JSON output; original evidence retained |
 | Whitespace | `git diff --check` | Exit 0 |
 
@@ -513,16 +660,48 @@ restriction separately and use the authorised OAuth-capable target for X01.
 
 ## Done criteria and execution ledger
 
-- [ ] Plan 159 contract, implementation and exact deployed candidate identified.
-- [ ] Harness rejects false queued success and independently verifies all evidence layers.
-- [ ] Protected mode permits only owned jobs and cleanup safely restores prior state.
-- [ ] All 26 scenario IDs/subcases have an honest result with supporting evidence.
-- [ ] LIVE/CONTROLLED evidence and multi-page/expiry limitations are explicit.
+Harness gates, all machine-checkable and all required:
+
+- [ ] `bun run check` exits 0
+- [ ] `bun run typecheck` exits 0
+- [ ] `bun run test` exits 0
+- [ ] `bun run boundaries` exits 0
+- [ ] `bun run build` exits 0 (see "Fresh worktree setup" for the two required variables)
+- [ ] `bun run test:release-tools` exits 0, with no required test skipped
+- [ ] `bun run typecheck:release-tools` exits 0
+- [ ] `git diff --check` exits 0
+- [ ] `git check-ignore -q tooling/release/test-results` exits 0
+- [ ] `git status --short` lists no file under `packages/` or `apps/`
+- [ ] The preflight runner emits both reports with **26** scenarios accounted for:
+      `bun run tooling/release/run-xero-e2e.ts --manifest <m> --preflight` then
+      `jq '.scenarios | length' <run-json>` returns `26`
+- [ ] Every scenario status is one of `PASS`, `FAIL`, `NOT VERIFIED`:
+      `jq -r '.scenarios[].status' <run-json> | sort -u` returns only those values
+- [ ] No scenario carries a fabricated timestamp on a non-executed case:
+      `jq '[.scenarios[] | select(.status=="NOT VERIFIED" and .startedAt!=null)] | length'
+      returns `0`
+- [ ] The runner exits 2 (not 0) on a deliberately incomplete preflight run
+- [ ] A renderer unit test exists for each of: all-pass, failed, blocked setup, missing
+      evidence, missing scenario, duplicate ID, wrong evidence mode, retained unsafe
+      provider record, cleanup failure
+- [ ] `grep -rn "retain-on-failure" tooling/release/xero-e2e.config.ts` shows trace and
+      video disabled for the OAuth project specifically
+- [ ] No secret in any committed report:
+      `grep -rniE "(bearer |refresh_token|authorization:|sk_|whsec_|storageState)" reports/xero-e2e/`
+      returns no matches
+
+Campaign criteria, satisfied by evidence rather than by a command:
+
+- [ ] Plan 159 contract, sub-plans 161a-161h status, and the exact deployed candidate identified.
+- [ ] Harness rejects false queued success and independently verifies all four evidence layers.
+- [ ] Protected mode permits only owned jobs; cleanup restores the verified prior state.
+- [ ] All 26 scenario IDs and every registered subcase have an honest result.
+- [ ] LIVE versus CONTROLLED evidence, and multi-page and expiry limitations, are explicit.
 - [ ] Unknown external outcomes are reconciled without duplicate writes.
-- [ ] Provider/local cleanup and outside-owned invariants are verified or reported failed.
-- [ ] Human-readable and JSON reports generated even on setup/test/cleanup failure.
+- [ ] Provider and local cleanup and outside-owned invariants are verified or reported failed.
+- [ ] Both reports were generated even on setup, test or cleanup failure.
 - [ ] Final response links the report and states verdict, counts and material limits.
-- [ ] Index records execution complete separately from integration PASS.
+- [ ] `plans/README.md` records execution complete separately from integration PASS.
 
 The test campaign can finish with FAIL or NOT VERIFIED: reporting that result is
 a completed test/report task, not a passed integration. Plan 159 fixes remain
@@ -533,6 +712,7 @@ product production readiness.
 | --- | --- | --- |
 | Planning | COMPLETE | Source/harness inspected at `246ba27`; plan only |
 | Independent plan review | COMPLETE | Incorporated independent provider oracle, early-failure reports, explicit subcases and protected connection/recovery cohorts |
+| Second plan review | COMPLETE | Re-baselined `246ba27` to `8652c31`; corrected six wrong file:line anchors; named the protected output directory; recorded the new `consumer-isolation.ts` overlap; added worktree env setup, an out-of-scope list and machine-checkable gates |
 | Harness implementation | TODO | New interfaces not yet implemented |
 | Live Xero campaign | NOT VERIFIED | Not run in this planning task |
 | Final execution report | PENDING | Generated by Steps 3 through 5, including failures |
@@ -552,6 +732,25 @@ scenario catalogue and report schema together. A scheduled-sync test needs a
 real scheduled execution; an expiry simulation and read mock must remain labelled.
 Maintain full scenario accounting when new Playwright projects or fixtures are
 added, and keep all retained auth/browser material private.
+
+Further maintenance notes:
+
+- **This plan's cited line numbers rot fast.** `tooling/release/` changed by 97 files
+  between the original baseline and the current one. Re-run the drift check and re-verify
+  every excerpt before each campaign; treat a mismatch as a STOP, not as a rounding error.
+- **The independent provider oracle in Step 2.6 is the most valuable requirement here and
+  the easiest to quietly lose.** If a future change makes the oracle reuse the production
+  status mapper, the same mapper bug makes app and oracle agree incorrectly and every
+  LIVE status assertion becomes worthless. Reject that change in review.
+- **`--output` must always land inside a gitignored directory.** The three safe paths are
+  in `.gitignore:110-112`. A report directory that is not ignored will commit OAuth traces,
+  storage state and payroll payloads. Verify with `git check-ignore` before a run.
+- The runner's exit codes are load-bearing: 0 only on overall PASS, 1 on FAIL, 2 on NOT
+  VERIFIED or invalid evidence. A change that makes a missing report exit 0 silently
+  certifies an unverified release.
+- Plan 161's 40-case matrix lives in the charter's Section 8.3 and is owned unit-by-unit by
+  sub-plans 161a-161h. When a sub-plan changes its cases, this report's coverage table must
+  change with it.
 
 ## Considered and rejected
 
