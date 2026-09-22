@@ -87,3 +87,54 @@ The required greps were run against `plans/161[a-h]-*.md`:
 - No 161a-161h plan or charter file was modified.
 - No real `.env` file was modified; only comments were added to the two `.env.example`
   files.
+
+## Baseline
+
+```text
+$ git rev-parse HEAD
+b7610d54dfc8ee15abfdb4e974ad5ae4d2149772
+
+$ git status --short
+
+$ bun --version
+1.4.0
+
+$ node --version
+v24.21.0
+```
+
+## Fixture ownership contract
+
+The protected fixture registry now has 26 suites. The five newly reserved suites
+own these tenant slots and global key kinds:
+
+| Suite | Owned tenant slots | Global key kinds | Cleanup selection path |
+|---|---:|---|---|
+| `packages/database/xero-lifecycle-migration.integration.test.ts` | 22-23 | `credential_owner`, `provider_app`, `provider_connection`, `tenant_binding`, `oauth_attempt`, `cleanup_request`, `cleanup_attempt`, `shared_store_namespace` | `selectOwnedGlobalKeyValues`, then the owning migration test's manifest-scoped cleanup |
+| `packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts` | 31-32 | `provider_connection`, `tenant_binding`, `cleanup_request`, `cleanup_attempt` | `selectOwnedGlobalKeyValues`, then reconciliation cleanup in plan 161f |
+| `packages/xero/src/oauth/connection-cleanup.integration.test.ts` | 43-44 | `provider_connection`, `tenant_binding`, `cleanup_request`, `cleanup_attempt` | `selectOwnedGlobalKeyValues`, then targeted cleanup in plan 161f |
+| `packages/xero/src/oauth/credential-owner.integration.test.ts` | 45-46 | `credential_owner`, `provider_app`, `oauth_attempt` | `selectOwnedGlobalKeyValues`, then credential-owner cleanup in plan 161d |
+| `packages/xero/src/rate-limit/shared-store.integration.test.ts` | 50-51 | `shared_store_namespace` | `selectOwnedGlobalKeyValues`, then shared-store namespace cleanup in plan 161e |
+
+Global ownership is kind-qualified. A raw identifier that is owned under one
+kind cannot be selected under another kind, and a similar unowned value is
+preserved. The writer rejects unsupported or duplicate manifest global keys.
+No future database table or Redis key is touched by this baseline plan.
+
+## Plan 161a verification
+
+- `bun install --frozen-lockfile`: exit 0, no dependency changes.
+- After registering the five suites, `bun run --cwd packages/database test`
+  produced the required two exact-count failures (`21` expected versus `26`)
+  before the assertions were updated.
+- `bun run --cwd packages/database test`: exit 0, 16 files and 68 tests passed.
+- `bun run check`: exit 0, 1033 files checked with no fixes pending.
+- `bun run typecheck`: exit 0, 19 of 19 Turbo tasks passed.
+- `bun run test:release-tools`: exit 0 outside the restricted sandbox, 11 files
+  and 49 tests passed. The first restricted run's local IPC assertion was an
+  environment-only bind failure and was rerun faithfully outside the sandbox.
+- `bun run typecheck:release-tools`: exit 0.
+- `git diff --check`: exit 0.
+- `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`:
+  `26`.
+- `grep -c '^|' plans/161-xero-provider-contract.md`: `16`.

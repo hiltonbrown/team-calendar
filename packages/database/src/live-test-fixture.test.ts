@@ -3,8 +3,10 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   allocateLiveTestFixture,
+  LIVE_FIXTURE_GLOBAL_KEY_KINDS,
   LIVE_FIXTURE_SUITES,
   REQUIRED_LIVE_FIXTURE_TENANT_SLOTS,
+  selectOwnedGlobalKeyValues,
 } from "./live-test-fixture";
 
 const runId = "11111111-1111-4111-8111-111111111111";
@@ -64,6 +66,38 @@ describe("live fixture registry", () => {
               { length: 5 },
               (_, index) => `stripe_event:evt_release_${index}`
             ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `credential_owner:owner_release_${index}`
+            ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `provider_app:app_release_${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `provider_connection:connection_release_${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `tenant_binding:binding_release_${index}`
+            ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `oauth_attempt:oauth_release_${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `cleanup_request:request_release_${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `cleanup_attempt:attempt_release_${index}`
+            ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `shared_store_namespace:store_release_${index}`
+            ),
           ],
           organisationIds,
         },
@@ -89,7 +123,7 @@ describe("live fixture registry", () => {
       item.tenants.map((tenant) => tenant.organisationId)
     );
 
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(21);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(26);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
@@ -98,15 +132,14 @@ describe("live fixture registry", () => {
     const allocatedGlobalKeys = allocations.flatMap((allocation) => {
       const specification = LIVE_FIXTURE_SUITES[allocation.suite] as {
         globalKeys?: Partial<
-          Record<"plan_id" | "plan_key" | "stripe_event", number>
+          Record<(typeof LIVE_FIXTURE_GLOBAL_KEY_KINDS)[number], number>
         >;
       };
-      return (["plan_id", "plan_key", "stripe_event"] as const).flatMap(
-        (kind) =>
-          Array.from(
-            { length: specification.globalKeys?.[kind] ?? 0 },
-            (_, index) => `${kind}:${allocation.globalKey(kind, index)}`
-          )
+      return LIVE_FIXTURE_GLOBAL_KEY_KINDS.flatMap((kind) =>
+        Array.from(
+          { length: specification.globalKeys?.[kind] ?? 0 },
+          (_, index) => `${kind}:${allocation.globalKey(kind, index)}`
+        )
       );
     });
     expect(new Set(allocatedGlobalKeys).size).toBe(allocatedGlobalKeys.length);
@@ -199,6 +232,104 @@ describe("live fixture registry", () => {
     ).toThrow("not in the protected registry");
   });
 
+  it("keeps global ownership kind-qualified during cleanup selection", () => {
+    const manifestGlobalKeys = [
+      "provider_app:shared-identifier",
+      "cleanup_request:owned-request",
+      "shared_store_namespace:owned-store",
+    ];
+
+    expect(
+      selectOwnedGlobalKeyValues({
+        candidates: ["shared-identifier", "foreign-identifier"],
+        kind: "credential_owner",
+        manifestGlobalKeys,
+      })
+    ).toEqual([]);
+    expect(
+      selectOwnedGlobalKeyValues({
+        candidates: ["shared-identifier", "foreign-identifier"],
+        kind: "provider_app",
+        manifestGlobalKeys,
+      })
+    ).toEqual(["shared-identifier"]);
+
+    for (const kind of LIVE_FIXTURE_GLOBAL_KEY_KINDS.slice(3)) {
+      const ownedValue = `owned-${kind}`;
+      expect(
+        selectOwnedGlobalKeyValues({
+          candidates: [ownedValue, `foreign-${kind}`],
+          kind,
+          manifestGlobalKeys: [`${kind}:${ownedValue}`],
+        })
+      ).toEqual([ownedValue]);
+    }
+  });
+
+  it("rejects an allocation when a colliding identifier is owned under another kind", () => {
+    writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        active: true,
+        durableManifestConfirmed: true,
+        namespace: `release:run:${runId}`,
+        owned: {
+          clerkOrgIds,
+          globalKeys: [
+            ...Array.from({ length: 7 }, (_, index) => `plan_id:plan-${index}`),
+            ...Array.from({ length: 7 }, (_, index) => `plan_key:key-${index}`),
+            ...Array.from(
+              { length: 5 },
+              (_, index) => `stripe_event:event-${index}`
+            ),
+            "provider_app:shared-identifier",
+            "provider_app:app-2",
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `provider_connection:connection-${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `tenant_binding:binding-${index}`
+            ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `oauth_attempt:oauth-${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `cleanup_request:request-${index}`
+            ),
+            ...Array.from(
+              { length: 3 },
+              (_, index) => `cleanup_attempt:attempt-${index}`
+            ),
+            ...Array.from(
+              { length: 2 },
+              (_, index) => `shared_store_namespace:store-${index}`
+            ),
+          ],
+          organisationIds,
+        },
+        runId,
+        target: {
+          database: "database",
+          endpointId: "endpoint",
+          hostname: "host",
+          role: "role",
+        },
+        version: 1,
+      })
+    );
+    configureEnvironment();
+
+    expect(() =>
+      allocateLiveTestFixture(
+        "packages/database/xero-lifecycle-migration.integration.test.ts"
+      )
+    ).toThrow("credential_owner");
+  });
+
   it("allocates disjoint deterministic slots for every suite in local database mode", () => {
     delete process.env.TC_SOURCE_GATES;
     delete process.env.TC_RELEASE_MANIFEST;
@@ -221,7 +352,7 @@ describe("live fixture registry", () => {
       item.tenants.map((tenant) => tenant.organisationId)
     );
 
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(21);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(26);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
@@ -231,15 +362,14 @@ describe("live fixture registry", () => {
     const allocatedGlobalKeys = allocations.flatMap((allocation) => {
       const specification = LIVE_FIXTURE_SUITES[allocation.suite] as {
         globalKeys?: Partial<
-          Record<"plan_id" | "plan_key" | "stripe_event", number>
+          Record<(typeof LIVE_FIXTURE_GLOBAL_KEY_KINDS)[number], number>
         >;
       };
-      return (["plan_id", "plan_key", "stripe_event"] as const).flatMap(
-        (kind) =>
-          Array.from(
-            { length: specification.globalKeys?.[kind] ?? 0 },
-            (_, index) => `${kind}:${allocation.globalKey(kind, index)}`
-          )
+      return LIVE_FIXTURE_GLOBAL_KEY_KINDS.flatMap((kind) =>
+        Array.from(
+          { length: specification.globalKeys?.[kind] ?? 0 },
+          (_, index) => `${kind}:${allocation.globalKey(kind, index)}`
+        )
       );
     });
     expect(new Set(allocatedGlobalKeys).size).toBe(allocatedGlobalKeys.length);
