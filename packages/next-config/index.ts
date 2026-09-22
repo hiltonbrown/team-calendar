@@ -14,6 +14,9 @@ export const securityHeaders = [
 ];
 
 export const config: NextConfig = {
+  experimental: {
+    turbopackPluginRuntimeStrategy: "workerThreads",
+  },
   // biome-ignore lint/suspicious/useAwait: headers is async
   async headers() {
     return [{ headers: securityHeaders, source: "/(.*)" }];
