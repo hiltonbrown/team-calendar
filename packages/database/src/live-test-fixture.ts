@@ -32,10 +32,32 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { plan_id: 3, plan_key: 3 },
     tenants: 2,
   },
+  "packages/database/xero-lifecycle-migration.integration.test.ts": {
+    globalKeys: {
+      cleanup_attempt: 1,
+      cleanup_request: 1,
+      credential_owner: 1,
+      oauth_attempt: 1,
+      provider_app: 1,
+      provider_connection: 1,
+      shared_store_namespace: 1,
+      tenant_binding: 1,
+    },
+    tenants: 2,
+  },
   "packages/database/xero-tenancy.integration.test.ts": { tenants: 2 },
   "packages/feeds/index.integration.test.ts": { tenants: 3 },
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts":
     { tenants: 2 },
+  "packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts": {
+    globalKeys: {
+      cleanup_attempt: 1,
+      cleanup_request: 1,
+      provider_connection: 1,
+      tenant_binding: 1,
+    },
+    tenants: 2,
+  },
   "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts": {
     tenants: 2,
   },
@@ -48,8 +70,25 @@ export const LIVE_FIXTURE_SUITES = {
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts": {
     tenants: 2,
   },
+  "packages/xero/src/oauth/connection-cleanup.integration.test.ts": {
+    globalKeys: {
+      cleanup_attempt: 1,
+      cleanup_request: 1,
+      provider_connection: 1,
+      tenant_binding: 1,
+    },
+    tenants: 2,
+  },
+  "packages/xero/src/oauth/credential-owner.integration.test.ts": {
+    globalKeys: { credential_owner: 1, oauth_attempt: 1, provider_app: 1 },
+    tenants: 2,
+  },
   "packages/xero/src/oauth/disconnect.integration.test.ts": { tenants: 2 },
   "packages/xero/src/oauth/service.integration.test.ts": { tenants: 1 },
+  "packages/xero/src/rate-limit/shared-store.integration.test.ts": {
+    globalKeys: { shared_store_namespace: 1 },
+    tenants: 2,
+  },
 } as const;
 
 export type LiveFixtureSuite = keyof typeof LIVE_FIXTURE_SUITES;
@@ -67,7 +106,37 @@ const manifestSchema = z.object({
   version: z.literal(1),
 });
 
-type GlobalKeyKind = "plan_id" | "plan_key" | "stripe_event";
+export const LIVE_FIXTURE_GLOBAL_KEY_KINDS = [
+  "plan_id",
+  "plan_key",
+  "stripe_event",
+  "credential_owner",
+  "provider_app",
+  "provider_connection",
+  "tenant_binding",
+  "oauth_attempt",
+  "cleanup_request",
+  "cleanup_attempt",
+  "shared_store_namespace",
+] as const;
+
+export type GlobalKeyKind = (typeof LIVE_FIXTURE_GLOBAL_KEY_KINDS)[number];
+
+const globalKeyHasKind = (key: string, kind: GlobalKeyKind): boolean =>
+  key.startsWith(`${kind}:`);
+
+export const selectOwnedGlobalKeyValues = (input: {
+  candidates: readonly string[];
+  kind: GlobalKeyKind;
+  manifestGlobalKeys: readonly string[];
+}): string[] => {
+  const ownedValues = new Set(
+    input.manifestGlobalKeys
+      .filter((key) => globalKeyHasKind(key, input.kind))
+      .map((key) => key.slice(input.kind.length + 1))
+  );
+  return input.candidates.filter((value) => ownedValues.has(value));
+};
 
 const suiteEntries = Object.entries(LIVE_FIXTURE_SUITES) as [
   LiveFixtureSuite,
@@ -131,11 +200,25 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
         throw new Error(`Suite does not own global key ${kind}:${index}`);
       }
       const slot = globalOffset(kind) + index + 1;
-      if (kind === "plan_id") {
-        return uuidFrom(`local-plan-id:${slot}`);
+      if (
+        kind === "plan_id" ||
+        kind === "credential_owner" ||
+        kind === "provider_connection" ||
+        kind === "tenant_binding" ||
+        kind === "oauth_attempt" ||
+        kind === "cleanup_request" ||
+        kind === "cleanup_attempt"
+      ) {
+        return uuidFrom(`local-${kind}:${slot}`);
       }
       if (kind === "plan_key") {
         return `local_plan_${slot}`;
+      }
+      if (kind === "provider_app") {
+        return `local_provider_app_${slot}`;
+      }
+      if (kind === "shared_store_namespace") {
+        return `local_shared_store_${slot}`;
       }
       return `evt_local_${slot}`;
     },
@@ -219,7 +302,7 @@ export const allocateLiveTestFixture = (
   }
   const marker = `${manifest.runId}:${suite}`;
   const globalKeysByKind = (kind: GlobalKeyKind) =>
-    manifest.owned.globalKeys.filter((key) => key.startsWith(`${kind}:`));
+    manifest.owned.globalKeys.filter((key) => globalKeyHasKind(key, kind));
   const globalOffset = (kind: GlobalKeyKind) =>
     suiteEntries
       .slice(0, suiteIndex)
@@ -227,7 +310,7 @@ export const allocateLiveTestFixture = (
         (total, [, allocation]) => total + (allocation.globalKeys?.[kind] ?? 0),
         0
       );
-  for (const kind of ["plan_id", "plan_key", "stripe_event"] as const) {
+  for (const kind of LIVE_FIXTURE_GLOBAL_KEY_KINDS) {
     const required = suiteEntries.reduce(
       (total, [, allocation]) => total + (allocation.globalKeys?.[kind] ?? 0),
       0

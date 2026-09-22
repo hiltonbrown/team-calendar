@@ -82,4 +82,86 @@ describe("protected manifest writer", () => {
     expect(JSON.parse(readFileSync(output, "utf8"))).toEqual(manifest);
     expect(statSync(output).mode.toString(8).slice(-3)).toBe("600");
   });
+
+  it("accepts the Xero lifecycle global-key kinds", () => {
+    const output = join(
+      mkdtempSync(join(tmpdir(), "tc-manifest-")),
+      "run.json"
+    );
+    const lifecycleKinds = [
+      "credential_owner",
+      "provider_app",
+      "provider_connection",
+      "tenant_binding",
+      "oauth_attempt",
+      "cleanup_request",
+      "cleanup_attempt",
+      "shared_store_namespace",
+    ];
+    const result = spawnSync(
+      "bun",
+      [
+        "run",
+        "tooling/release/write-protected-manifest.ts",
+        "--output",
+        output,
+        "--candidate-sha",
+        candidateSha,
+      ],
+      {
+        env: {
+          ...process.env,
+          TC_PROTECTED_MANIFEST_BASE64: Buffer.from(
+            JSON.stringify({
+              ...manifest,
+              owned: {
+                ...manifest.owned,
+                globalKeys: lifecycleKinds.map((kind) => `${kind}:fixture`),
+              },
+            })
+          ).toString("base64"),
+        },
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(output, "utf8")).owned.globalKeys).toEqual(
+      lifecycleKinds.map((kind) => `${kind}:fixture`)
+    );
+  });
+
+  it("rejects unsupported or duplicate global ownership keys", () => {
+    for (const globalKeys of [
+      ["unsupported:fixture"],
+      ["provider_app:"],
+      ["provider_app:fixture", "provider_app:fixture"],
+    ]) {
+      const output = join(
+        mkdtempSync(join(tmpdir(), "tc-manifest-")),
+        "run.json"
+      );
+      const result = spawnSync(
+        "bun",
+        [
+          "run",
+          "tooling/release/write-protected-manifest.ts",
+          "--output",
+          output,
+          "--candidate-sha",
+          candidateSha,
+        ],
+        {
+          env: {
+            ...process.env,
+            TC_PROTECTED_MANIFEST_BASE64: Buffer.from(
+              JSON.stringify({
+                ...manifest,
+                owned: { ...manifest.owned, globalKeys },
+              })
+            ).toString("base64"),
+          },
+        }
+      );
+      expect(result.status).not.toBe(0);
+    }
+  });
 });
