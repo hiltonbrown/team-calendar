@@ -217,8 +217,11 @@ In `service.test.ts`, next to the disconnect tests at `:1454-1608`, add:
 1. The DELETE throws (injected `fetchImpl` rejects). Assert the call returns `ok: true` and that
    the transaction mock received the local disable write (`status: "disconnected"`). Today it
    returns `network_error` and writes nothing, so this fails.
-2. "Already disconnected" and "remote 404" must produce different receipts. Today both are
-   `remoteRevoked: false`, so this fails.
+2. Disconnecting a connection with **no** recorded remote link, and disconnecting one **with** a
+   recorded link whose DELETE returns 404, must produce different receipts (after this plan:
+   `not_applicable` versus `left_in_place` under the default `report_only`). Today both return
+   `remoteRevoked: false`, so this fails. Assert on the receipt's `remoteStatus` field, which does
+   not exist yet (the test fails on that too, which is expected).
 
 **Verify**: `bun run --cwd packages/xero test` → fails on exactly these two. Paste into a "161f"
 section of the execution report.
@@ -511,7 +514,8 @@ freezing excludes a same-authoriser connection for a different tenant.
 2. No remote link → binding retired immediately, receipt `not_applicable`.
 3. Destructive request: data changes match today's `finaliseLocalXeroDisconnect` exactly and
    `dataActionStatus` is `completed`.
-4. Reconnect while an attempt is `unknown` is rejected with `cleanup_unresolved`.
+4. With `XERO_REMOTE_CLEANUP_MODE=enabled`, reconnect while an attempt is `unknown` is rejected
+   with `cleanup_unresolved`.
 
 `reconcile-xero-connections.test.ts` / `.integration.test.ts`:
 5. `report_only`: disconnect retires the binding at once, attempts are `cancelled`/`report_only`,
