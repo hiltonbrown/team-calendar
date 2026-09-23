@@ -1,4 +1,5 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository convention.
+import { Pool, type PoolClient } from "pg";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { database, payroll_region } from "./index.js";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
@@ -12,8 +13,32 @@ const providerAppId = fixture.globalKey("provider_app");
 const tenantId = fixture.id("provider-tenant");
 const tenantScopes = fixture.tenants.map((tenant) => tenant.clerkOrgId);
 const ACTIVE_SLOT_CHECK = /xero_tenants_active_slot_check/;
-const IMMUTABLE_TENANT_ID = /xero_tenants_xero_tenant_id_immutable/;
-const RESERVED_BINDING_KEY = /xero_tenants_reserved_binding_key/;
+const sqlPool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL,
+  max: 2,
+});
+
+const constraintName = (error: unknown): string | null => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "constraint" in error &&
+    typeof error.constraint === "string"
+  ) {
+    return error.constraint;
+  }
+  return null;
+};
+
+const captureError = async (operation: Promise<unknown>): Promise<unknown> => {
+  try {
+    await operation;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected database operation to fail");
+};
 
 async function cleanTestData() {
   const where = { clerk_org_id: { in: tenantScopes } };
@@ -69,17 +94,19 @@ beforeEach(cleanTestData);
 afterAll(async () => {
   await cleanTestData();
   await database.$disconnect();
+  await sqlPool.end();
 });
 
 describe("Xero tenant binding reservation constraints", () => {
   it("rejects direct rebinding while accepting a same-file update", async () => {
     const binding = await createBinding(0, { activeSlot: 1 });
-    await expect(
-      database.xeroTenant.update({
-        data: { xero_tenant_id: fixture.id("unreserved-provider-tenant") },
-        where: { id: binding.id },
-      })
-    ).rejects.toThrow(IMMUTABLE_TENANT_ID);
+    const error = await captureError(
+      sqlPool.query(
+        "UPDATE xero_tenants SET xero_tenant_id = $1 WHERE id = $2",
+        [fixture.id("unreserved-provider-tenant"), binding.id]
+      )
+    );
+    expect(constraintName(error)).toBe("xero_tenants_xero_tenant_id_immutable");
 
     const persisted = await database.xeroTenant.findUniqueOrThrow({
       where: { id: binding.id },
@@ -87,12 +114,14 @@ describe("Xero tenant binding reservation constraints", () => {
     expect(persisted.id).toBe(binding.id);
     expect(persisted.xero_tenant_id).toBe(tenantId);
 
-    const sameFile = await database.xeroTenant.update({
-      data: { xero_tenant_id: tenantId },
-      where: { id: binding.id },
+    const sameFile = await sqlPool.query(
+      "UPDATE xero_tenants SET xero_tenant_id = $1 WHERE id = $2 RETURNING id, xero_tenant_id",
+      [tenantId, binding.id]
+    );
+    expect(sameFile.rows[0]).toEqual({
+      id: binding.id,
+      xero_tenant_id: tenantId,
     });
-    expect(sameFile.id).toBe(binding.id);
-    expect(sameFile.xero_tenant_id).toBe(tenantId);
   });
 
   it.each([0, 2, -1])("rejects active_slot %i", async (activeSlot) => {
@@ -116,9 +145,24 @@ describe("Xero tenant binding reservation constraints", () => {
 
   it("rejects two reserved rows for one provider app and Xero file", async () => {
     await createBinding(0, { activeSlot: 1 });
-    await expect(createBinding(1, { activeSlot: 1 })).rejects.toThrow(
-      RESERVED_BINDING_KEY
+    const slot = await createSlot(1);
+    const error = await captureError(
+      sqlPool.query(
+        `INSERT INTO xero_tenants
+          (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1)`,
+        [
+          fixture.id("binding", 1),
+          slot.tenant.clerkOrgId,
+          slot.tenant.organisationId,
+          slot.connection.id,
+          tenantId,
+          payroll_region.AU,
+          providerAppId,
+        ]
+      )
     );
+    expect(constraintName(error)).toBe("xero_tenants_reserved_binding_key");
   });
 
   it("allows two retired rows alongside one reserved row", async () => {
@@ -145,49 +189,52 @@ describe("Xero tenant binding reservation constraints", () => {
 
   it("allows exactly one of two concurrent reservations", async () => {
     const [first, second] = await Promise.all([createSlot(0), createSlot(1)]);
-    const slots = [first, second];
-    let ready = 0;
-    let releaseBarrier: (() => void) | undefined;
-    const barrier = new Promise<void>((resolve) => {
-      releaseBarrier = resolve;
-    });
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-    const boundedBarrier = Promise.race([
-      barrier,
-      new Promise<void>((_, reject) => {
-        timeoutHandle = setTimeout(
-          () => reject(new Error("Concurrent reservation barrier timed out")),
-          10_000
+    const clients = await Promise.all([sqlPool.connect(), sqlPool.connect()]);
+    const reserve = async (
+      client: PoolClient,
+      slot: Awaited<ReturnType<typeof createSlot>>,
+      index: number
+    ) => {
+      await client.query("BEGIN");
+      try {
+        await client.query(
+          "SELECT id FROM organisations WHERE id = $1 FOR UPDATE",
+          [first.tenant.organisationId]
         );
-      }),
-    ]);
-    const attempts = slots.map((slot, index) =>
-      database.$transaction(
-        async (tx) => {
-          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${index + 161_000})`;
-          ready += 1;
-          if (ready === 2) {
-            releaseBarrier?.();
-          }
-          await boundedBarrier;
-          return tx.xeroTenant.create({
-            data: {
-              active_slot: 1,
-              clerk_org_id: slot.tenant.clerkOrgId,
-              id: fixture.id("binding", index),
-              organisation_id: slot.tenant.organisationId,
-              payroll_region: payroll_region.AU,
-              provider_app_id: providerAppId,
-              xero_connection_id: slot.connection.id,
-              xero_tenant_id: tenantId,
-            },
-          });
-        },
-        { timeout: 15_000 }
-      )
-    );
-    const outcomes = await Promise.allSettled(attempts);
-    clearTimeout(timeoutHandle);
+        const result = await client.query(
+          `INSERT INTO xero_tenants
+            (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+           RETURNING id`,
+          [
+            fixture.id("binding", index),
+            slot.tenant.clerkOrgId,
+            slot.tenant.organisationId,
+            slot.connection.id,
+            tenantId,
+            payroll_region.AU,
+            providerAppId,
+          ]
+        );
+        await client.query("COMMIT");
+        return result.rows[0];
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      }
+    };
+
+    let outcomes: PromiseSettledResult<unknown>[];
+    try {
+      outcomes = await Promise.allSettled([
+        reserve(clients[0], first, 0),
+        reserve(clients[1], second, 1),
+      ]);
+    } finally {
+      for (const client of clients) {
+        client.release();
+      }
+    }
     expect(
       outcomes.filter((outcome) => outcome.status === "fulfilled")
     ).toHaveLength(1);
@@ -195,8 +242,7 @@ describe("Xero tenant binding reservation constraints", () => {
       (outcome) => outcome.status === "rejected"
     );
     expect(rejected).toHaveLength(1);
-    expect(rejected[0]?.reason).toMatchObject({ code: "P2002" });
-    expect(String(rejected[0]?.reason)).toContain(
+    expect(constraintName(rejected[0]?.reason)).toBe(
       "xero_tenants_reserved_binding_key"
     );
   });
