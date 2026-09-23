@@ -149,8 +149,8 @@ describe("Xero tenant binding reservation constraints", () => {
     const error = await captureError(
       sqlPool.query(
         `INSERT INTO xero_tenants
-          (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 1)`,
+          (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now(), now())`,
         [
           fixture.id("binding", 1),
           slot.tenant.clerkOrgId,
@@ -203,8 +203,8 @@ describe("Xero tenant binding reservation constraints", () => {
         );
         const result = await client.query(
           `INSERT INTO xero_tenants
-            (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 1)
+            (id, clerk_org_id, organisation_id, xero_connection_id, xero_tenant_id, payroll_region, provider_app_id, active_slot, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 1, now(), now())
            RETURNING id`,
           [
             fixture.id("binding", index),

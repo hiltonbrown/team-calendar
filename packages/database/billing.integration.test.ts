@@ -29,6 +29,8 @@ const testEventIds = [
   fixture.globalKey("stripe_event", 3),
   fixture.globalKey("stripe_event", 4),
 ] as const;
+const [dedupeEventId, flipEventId, repairEventId, lateDuplicateEventId] =
+  testEventIds;
 // These manifest-owned keys intentionally avoid the production catalogue while
 // exercising the same database path, whose public API is typed to catalogue keys.
 const fixturePlanKey = (index: number) =>
@@ -235,7 +237,7 @@ describe("billing queries integration", () => {
   });
 
   test("recordStripeEvent called twice with the same id produces exactly one row (dedupe key)", async () => {
-    const eventId = "evt_test_066_billing_dup";
+    const eventId = dedupeEventId;
 
     await recordStripeEvent(eventId, "customer.subscription.updated");
     await recordStripeEvent(eventId, "customer.subscription.updated");
@@ -250,7 +252,7 @@ describe("billing queries integration", () => {
   });
 
   test("isStripeEventProcessed flips from false to true after recording", async () => {
-    const eventId = "evt_test_066_billing_flip";
+    const eventId = flipEventId;
 
     expect(await isStripeEventProcessed(eventId)).toBe(false);
 
@@ -308,7 +310,7 @@ describe("billing queries integration", () => {
   });
 
   test("a failed receipt remains retryable and is repaired in place", async () => {
-    const eventId = "evt_test_066_billing_repair";
+    const eventId = repairEventId;
     const context = {
       clerkOrgId: testClerkOrgIdA,
       eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
@@ -340,7 +342,7 @@ describe("billing queries integration", () => {
   });
 
   test("a late failing duplicate cannot downgrade a completed receipt", async () => {
-    const eventId = "evt_test_066_billing_dup";
+    const eventId = lateDuplicateEventId;
     const context = {
       clerkOrgId: testClerkOrgIdA,
       eventCreatedAt: new Date("2026-09-19T00:00:00.000Z"),
