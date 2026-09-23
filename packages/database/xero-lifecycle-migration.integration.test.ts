@@ -138,34 +138,42 @@ describe("Xero tenant binding reservation constraints", () => {
       }),
     ]);
     const attempts = slots.map((slot, index) =>
-      database.$transaction(async (tx) => {
-        await tx.$queryRaw`SELECT pg_advisory_xact_lock(${index + 161_000})`;
-        ready += 1;
-        if (ready === 2) {
-          releaseBarrier?.();
-        }
-        await boundedBarrier;
-        return tx.xeroTenant.create({
-          data: {
-            active_slot: 1,
-            clerk_org_id: slot.tenant.clerkOrgId,
-            id: fixture.id("binding", index),
-            organisation_id: slot.tenant.organisationId,
-            payroll_region: payroll_region.AU,
-            provider_app_id: providerAppId,
-            xero_connection_id: slot.connection.id,
-            xero_tenant_id: tenantId,
-          },
-        });
-      })
+      database.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT pg_advisory_xact_lock(${index + 161_000})`;
+          ready += 1;
+          if (ready === 2) {
+            releaseBarrier?.();
+          }
+          await boundedBarrier;
+          return tx.xeroTenant.create({
+            data: {
+              active_slot: 1,
+              clerk_org_id: slot.tenant.clerkOrgId,
+              id: fixture.id("binding", index),
+              organisation_id: slot.tenant.organisationId,
+              payroll_region: payroll_region.AU,
+              provider_app_id: providerAppId,
+              xero_connection_id: slot.connection.id,
+              xero_tenant_id: tenantId,
+            },
+          });
+        },
+        { timeout: 15_000 }
+      )
     );
     const outcomes = await Promise.allSettled(attempts);
     clearTimeout(timeoutHandle);
     expect(
       outcomes.filter((outcome) => outcome.status === "fulfilled")
     ).toHaveLength(1);
-    expect(
-      outcomes.filter((outcome) => outcome.status === "rejected")
-    ).toHaveLength(1);
+    const rejected = outcomes.filter(
+      (outcome) => outcome.status === "rejected"
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toMatchObject({ code: "P2002" });
+    expect(String(rejected[0]?.reason)).toContain(
+      "xero_tenants_reserved_binding_key"
+    );
   });
 });

@@ -175,3 +175,14 @@ remote, and the protected live runner requires a release manifest, run ID and
 consumer-isolation prerequisites that are unavailable in the local environment.
 Do not use `ALLOW_LOCAL_DATABASE_TESTS` against this remote target or count
 direct SQL checks as those suite results.
+
+Follow-up development database probe: the first rollback-only SQL attempt
+failed before inserting tenant rows because PostgreSQL rejected `interval $4`;
+its transaction rolled back. The corrected probe used savepoints and one
+outer transaction, then rolled it back. The CHECK rejected `active_slot` values
+`0`, `2` and `-1` with `xero_tenants_active_slot_check`, accepted `1`, the
+unique key rejected a second reserved binding with
+`xero_tenants_reserved_binding_key`, and two retired bindings for the same pair
+coexisted. A post-rollback query confirmed no probe organisation remained.
+These are extra database constraint checks, not a run of either named
+integration suite.
