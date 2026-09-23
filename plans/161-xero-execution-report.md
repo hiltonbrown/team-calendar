@@ -159,9 +159,10 @@ new migrations applied, one row bound to the configured provider app with
 and reserved-binding unique index present.
 
 Production ordering: deploy migration A, run the backfill dry-run, apply the
-backfill only with zero collisions, then deploy migration B in a separate
-deployment. This execution validated that order on the development database;
-it was not a production rollout.
+backfill only with zero collisions, then deploy migrations B and C together in
+a later deployment. Never claim immutable binding with B alone. This execution
+validated the order on the development database; it was not a production
+rollout.
 
 Verification: `bun run check`, `bun run typecheck`, Xero units, database units,
 `bun run test` (18/18 tasks), Prisma validation and release tooling passed.
@@ -186,3 +187,13 @@ unique key rejected a second reserved binding with
 coexisted. A post-rollback query confirmed no probe organisation remained.
 These are extra database constraint checks, not a run of either named
 integration suite.
+
+Review reconciliation: migration C adds a trigger that rejects direct changes
+to `xero_tenant_id` on an existing row. It was applied after a read-only target
+and migration-history check. A rollback-only SQL probe confirmed a change to
+an unreserved file raised SQLSTATE `23514` with
+`xero_tenants_xero_tenant_id_immutable`, a same-file update succeeded, and the
+internal row ID and external file ID remained unchanged. The outer transaction
+rolled back; a post-query found no probe organisation. Migration C was read
+back as applied. The named integration suites remain NOT VERIFIED until their
+protected runner prerequisites are available and the suites actually pass.

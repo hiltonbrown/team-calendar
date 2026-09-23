@@ -12,6 +12,7 @@ const providerAppId = fixture.globalKey("provider_app");
 const tenantId = fixture.id("provider-tenant");
 const tenantScopes = fixture.tenants.map((tenant) => tenant.clerkOrgId);
 const ACTIVE_SLOT_CHECK = /xero_tenants_active_slot_check/;
+const IMMUTABLE_TENANT_ID = /xero_tenants_xero_tenant_id_immutable/;
 const RESERVED_BINDING_KEY = /xero_tenants_reserved_binding_key/;
 
 async function cleanTestData() {
@@ -71,6 +72,29 @@ afterAll(async () => {
 });
 
 describe("Xero tenant binding reservation constraints", () => {
+  it("rejects direct rebinding while accepting a same-file update", async () => {
+    const binding = await createBinding(0, { activeSlot: 1 });
+    await expect(
+      database.xeroTenant.update({
+        data: { xero_tenant_id: fixture.id("unreserved-provider-tenant") },
+        where: { id: binding.id },
+      })
+    ).rejects.toThrow(IMMUTABLE_TENANT_ID);
+
+    const persisted = await database.xeroTenant.findUniqueOrThrow({
+      where: { id: binding.id },
+    });
+    expect(persisted.id).toBe(binding.id);
+    expect(persisted.xero_tenant_id).toBe(tenantId);
+
+    const sameFile = await database.xeroTenant.update({
+      data: { xero_tenant_id: tenantId },
+      where: { id: binding.id },
+    });
+    expect(sameFile.id).toBe(binding.id);
+    expect(sameFile.xero_tenant_id).toBe(tenantId);
+  });
+
   it.each([0, 2, -1])("rejects active_slot %i", async (activeSlot) => {
     const binding = await createBinding(0, { activeSlot: null });
     await expect(
