@@ -7,56 +7,80 @@
 >
 > **Drift check (run first)**:
 > ```bash
-> git diff --stat 8652c31..HEAD -- \
->   packages/xero/src/oauth packages/database/prisma packages/xero/src/crypto
+> git log --oneline 6b934be..HEAD -- packages/xero packages/database/prisma apps/api/app/api/xero
 > ```
-> At the time this plan was written that diff was empty. If it is now non-empty, compare the
-> "Current state" excerpts below against the live code before proceeding. A mismatch is a STOP
-> condition.
+> Expect commits from 161b and 161c only. Confirm 161b's columns exist
+> (`grep -n "binding_generation\|active_slot\|expected_binding_generation" packages/database/prisma/schema.prisma`
+> returns matches) and 161c's keyring exists (`ls packages/xero/src/crypto/keyring.ts`). Then
+> re-check every `file:line` in "Current state"; 161b and 161c moved lines in `oauth/service.ts`,
+> so locate each excerpt by its function name and treat a changed **body** as a STOP condition.
 
 ## Status
 
 - **Priority**: P1
-- **Effort**: L
+- **Effort**: L (the largest plan in the programme; see Maintenance notes on splitting)
 - **Risk**: HIGH (credential migration; a mistake here logs every customer out of Xero)
-- **Depends on**: `plans/161b-xero-immutable-tenant-binding.md` (binding generation and the
-  additive migration framework) and `plans/161c-xero-deadlines-and-key-versioning.md`
-  (the keyring and the deadline contract)
+- **Depends on**: `plans/161b-xero-immutable-tenant-binding.md` (binding columns on `XeroTenant`,
+  `provider_app_id`, `expected_binding_generation`) and
+  `plans/161c-xero-deadlines-and-key-versioning.md` (keyring, `decryptXeroToken` with a required `keyVersion` argument,
+  `XeroDeadline`, `reencryptXeroTokens`). Both must be DONE.
 - **Category**: security, bug, migration
-- **Planned at**: commit `8652c31`, 22 September 2026 (re-stamped from `585f6cb`; the only changes between those commits are under `plans/`, so every source excerpt below is valid at both)
+- **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b and 161c)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
 ## Why this matters
 
-OAuth credentials are currently stored per internal `XeroConnection`, and refresh locks are keyed
-the same way. But Xero issues one token set per **authorising Xero user**, and that one token set
-covers every tenant that user has connected. So when a customer with two payroll files
-reauthorises the second one, Xero rotates the refresh token that the first file was also relying
-on. Today each connection refreshes independently, races the other, and one of them ends up
-holding a dead refresh token.
+OAuth credentials are stored per internal `XeroConnection`, and refresh locks are keyed the same
+way. But Xero issues one token set per **authorising Xero user**, covering every tenant that user
+has connected. When a customer with two payroll files reauthorises the second one, Xero rotates
+the refresh token the first file was also relying on. Each connection refreshes independently,
+races the other, and one ends up holding a dead refresh token.
 
-Worse, the current persistence-recovery logic treats *any* change in stored ciphertext as proof
-that this attempt's refresh committed:
+The current persistence-recovery logic also treats a change in stored ciphertext as proof that
+this attempt's refresh committed:
 
 ```typescript
-// packages/xero/src/oauth/service.ts:922-924
+// packages/xero/src/oauth/service.ts:922-924, inside reconcileRefreshPersistenceFailure
 const tokenChanged =
   input.loadedRefreshTokenEncrypted !== null &&
   current.refresh_token_encrypted !== input.loadedRefreshTokenEncrypted;
 ```
 
-An unrelated reconnect, a re-encryption pass, or a scrubbed column all satisfy that condition. The
-process then reports a successful rotation it never performed.
+An unrelated reconnect, a 161c re-encryption pass, or a scrubbed column all satisfy that. The
+process then reports a rotation it never performed.
 
-This plan separates the credential identity (one per verified Xero authoriser) from the payroll
-binding (one per internal organisation), so credentials can be coordinated without any binding
-gaining access it should not have.
+This plan separates the credential identity (one per configured app and verified Xero authoriser)
+from the payroll binding (one per internal organisation, on `XeroTenant`, from 161b), so
+credentials are coordinated without any binding gaining access it should not have.
+
+## Design decisions already made (do not revisit)
+
+1. **The binding is `XeroTenant`** (161b). Do **not** create a `XeroTenantBinding` model. This
+   plan adds two nullable references to `XeroTenant`: `xero_credential_owner_id` and
+   `xero_provider_connection_id`.
+2. **Provider app ID is `XERO_CLIENT_ID`**, the same value 161b writes to
+   `XeroTenant.provider_app_id`.
+3. **Authoriser identity comes from the access token.** The app requests no `openid` scope
+   (`service.ts:25-28` lists `offline_access` and payroll scopes), so there is no ID token. Xero
+   access tokens are JWTs signed by `https://identity.xero.com`; the stable user identifier is the
+   `xero_userid` claim. Step 3 confirms this against Xero's documentation before relying on it.
+   **Do not add `openid`, `profile` or `email` scopes.**
+4. **Transition by mirror-write, not a flag.** Until 161g migrates every reader, legacy code still
+   decrypts tokens from `XeroConnection` columns. So whenever the owner coordinator adopts or
+   refreshes a token set, it writes the same envelope into the `XeroConnection` rows of every
+   **reserved** binding that references that owner, in the same transaction. Only the coordinator
+   ever calls Xero's token endpoint for an owned binding. A binding with
+   `xero_credential_owner_id = NULL` (not yet backfilled) keeps today's per-connection refresh
+   unchanged. 161h scrubs the mirrored columns after 161g lands.
+5. **Refresh recovery runs from the existing cron.** No new Inngest function. The existing
+   `schedule-xero-syncs` job (cron every 15 minutes) calls one new exported function. No Vercel
+   cron.
 
 ## Current state
 
 ### Where credentials live
 
-`packages/database/prisma/schema.prisma:461-493`, `XeroConnection`:
+`packages/database/prisma/schema.prisma:461-493`, `XeroConnection` (before 161b/161c):
 
 ```prisma
 model XeroConnection {
@@ -79,393 +103,627 @@ model XeroConnection {
 }
 ```
 
-`XeroOAuthSession` (`schema.prisma:529-559`) carries a parallel set of encrypted token columns
-plus `available_tenants_json`, `selected_tenant_id` and `expires_at`.
+`XeroOAuthSession` (`schema.prisma:529-559`) carries a parallel set of encrypted token columns plus
+`available_tenants_json` (each entry `{ connectionId, tenantId, tenantName }`),
+`selected_tenant_id`, `expires_at` and, after 161b, `expected_binding_generation`. It is created in
+`completeXeroOAuth` on the **callback**, after token exchange.
 
-Note `organisation_id` is `@unique` on `XeroConnection`: one connection per payroll entity. That
-invariant stays. What changes is that the **tokens** move off this row.
+### The OAuth start
 
-### The defective recovery path
+`apps/api/app/api/xero/oauth/start/route.ts` checks the caller is an admin or owner, then calls the
+**synchronous** `buildXeroOAuthStartUrl({ clerkOrgId, organisationId, returnTo, userId })`
+(`service.ts:121`), sets an `xero_oauth_nonce` cookie and redirects. Nothing is persisted before
+the redirect; the signed `state` carries the intent.
 
-`packages/xero/src/oauth/service.ts` - `reconcileRefreshPersistenceFailure` takes
-`loadedRefreshTokenEncrypted: null | string` (declared around line 888) and reaches the
-`tokenChanged` comparison quoted above at lines 922-924. Around line 987-1003 it writes
-`refresh_token_encrypted: input.loadedRefreshTokenEncrypted` back.
+### The refresh path
 
-Transaction timeouts in this file are at lines 694 (`{ timeout: 15_000 }`), 1246 and 1291.
-Plan 161c may already have adjusted these; read them, do not assume.
+- `refreshXeroOAuthConnection` (`service.ts:655`) and `ensureFreshXeroConnection`
+  (`service.ts:1068`) take `pg_advisory_xact_lock` keyed on the **connection ID**
+  (`service.ts:669`, `:1149`; disconnect uses the same key at `:1315`), call `exchangeToken`
+  inside `$transaction(..., { timeout: 15_000 })` (`:694`, `:1246`), and on an ambiguous
+  persistence failure call `reconcileRefreshPersistenceFailure` (`:885`, not exported; reached via
+  `:698` and `:1250`).
+- Inside it, lines 987-1003 run an `updateMany` that **uses** `refresh_token_encrypted:
+  input.loadedRefreshTokenEncrypted` as a compare-and-set filter in its `where`, and sets
+  `expires_at: now` and `last_error_code: "refresh_persist_failed"`.
+- The existing unit test `service.test.ts:1199` ("recovers rotated credentials when proactive
+  refresh persistence is ambiguous") is the model for Step 1.
 
-### Consumers that read credentials directly today
+### Everyone who calls the refresh functions
 
-- `packages/xero/src/adapter/xero-write-adapter.ts` - `getTenant` at lines 71-87
-- `packages/jobs/src/handlers/schedule-xero-syncs.ts` (433 lines)
-- `packages/availability/src/xero-connection-state.ts` (53 lines), exporting
-  `hasActiveXeroConnection`, consumed at `packages/availability/src/approvals/approval-service.ts:809`
-  and `:1152`, and `packages/availability/src/people/people-service.ts:666`
-- `packages/xero/src/au/read.ts`, `packages/xero/src/au/write.ts`
+`ensureFreshXeroConnection`: `adapter/xero-write-adapter.ts:76`, `adapter/auth-recovery.ts`,
+`packages/jobs/src/handlers/schedule-xero-syncs.ts:225`, `sync-xero-people.ts:662`,
+`sync-xero-leave-balances.ts:560`, `sync-xero-leave-records.ts:742`,
+`reconcile-xero-approval-state.ts:233`. `refreshXeroOAuthConnection`:
+`apps/app/app/(authenticated)/settings/integrations/xero/_actions.ts:79`.
 
-This plan cuts over the credential **resolution**. Full caller migration and error classification
-are plan 161g.
+Because all of them go through these two functions, rewiring the two functions onto the owner
+coordinator changes refresh behaviour for every caller **without touching the callers**. That is
+the point of this plan. Callers that decrypt tokens themselves (`au/read.ts`, `au/write.ts`,
+`nz/read.ts`, `uk/read.ts`, and the jobs above at e.g. `sync-xero-people.ts:702`) keep working
+because of the mirror-write. 161g migrates them.
+
+### Fixture and inventory state
+
+- `packages/xero/src/oauth/credential-owner.integration.test.ts` is registered in
+  `LIVE_FIXTURE_SUITES` (`packages/database/src/live-test-fixture.ts`) with 2 tenant slots and
+  global keys `credential_owner`, `oauth_attempt`, `provider_app`. It is **not** yet in the
+  release inventory allowlist `tooling/release/integration-inventory.ts` (`EXPECTED_INTEGRATION_TESTS`).
+- Plan 161a requires 161d to add its new tables to the owned-fixture cleanup path. Owned global
+  keys are read with `fixture.globalKey(kind)` (index 0 only: each kind is allocated once), **not**
+  `fixture.id(...)`, which returns unowned per-suite UUIDs. Use `fixture.globalKey("credential_owner")`
+  as the owner row `id`, and set `process.env.XERO_CLIENT_ID = fixture.globalKey("provider_app")`
+  in the suite's `vi.hoisted` block so every owner and provider-connection row carries an owned
+  `provider_app_id`. The suite's `afterAll` deletes only rows with that `provider_app_id` or those
+  IDs, following the `cleanTestData` pattern in `packages/database/xero-tenancy.integration.test.ts`.
+- `jose` is present in `bun.lock` only as a transitive dependency.
 
 ### Repository conventions to match
 
-- Service functions return `Result<T, E>` from `@repo/core`. Do not throw for expected failures.
-- Named exports only. No default exports. Strict TypeScript, no `any`, no unjustified `as`.
-- Zod on all external input, including every Xero response and every JWT claim set.
-- Branded domain ID types live in `packages/core`. Add one for the new owner ID.
+- `Result<T, E>` from `@repo/core`. Named exports only. Strict TypeScript, no `any`.
+- Zod on all external input, including every JWT claim set.
+- Branded domain IDs are declared in `packages/core/index.ts:25-29`. Add `XeroCredentialOwnerId`
+  there the same way.
 - Tables `snake_case` plural, columns `snake_case`, `id`/`created_at`/`updated_at` on every table.
-- **Every tenant-scoped table carries `clerk_org_id` and every query filters by it.** This plan
-  introduces the one deliberate exception; see Step 2.
+- **Every tenant-scoped table carries `clerk_org_id`.** This plan introduces the one deliberate
+  exception (Step 2).
 - Integration tests co-located under `src/` in `packages/xero`.
 - Australian English. **No em dashes anywhere.** No `console.log`.
 
 ## Commands you will need
 
-**Fresh worktree setup.** This repository's `.env*` files are gitignored (`.gitignore:35`), so
-a new worktree has none of them. Before running any gate, from the worktree root:
+**Fresh worktree setup.** From the worktree root: `bun install --frozen-lockfile`. `bun run build`
+additionally needs a syntactically valid `DATABASE_URL` and a 32-byte base64
+`XERO_TOKEN_ENCRYPTION_KEY` (e.g. `openssl rand -base64 32`) for that command only.
+
+**Local integration database (every `test:integration` and `migrate:deploy`).**
 
 ```bash
-bun install --frozen-lockfile
+docker run -d --name tc-161-pg -p 5432:5432 \
+  -e POSTGRES_USER=team-calendar -e POSTGRES_PASSWORD=team-calendar \
+  -e POSTGRES_DB=team-calendar_test postgres:16
+export DATABASE_URL=postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
+echo "$DATABASE_URL" | grep -q '@localhost:5432/' && echo LOCAL_OK   # must print LOCAL_OK
+bun run migrate:deploy
 ```
 
-`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with no
-further setup. **`bun run build` additionally requires two variables**, because
-`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
-`packages/database/keys.ts:10` has no fallback:
+Never run `migrate:deploy` against a non-localhost database. If no local database is available,
+record integration gates `NOT_VERIFIED: no local database` in the execution report and set the
+README status `BLOCKED (integration gates not run)`. A run that collects zero tests from a file
+this plan names is a failure.
 
-- `DATABASE_URL` - any syntactically valid Postgres URL is enough for a build; the client is
-  lazy and nothing connects. Do **not** point it at the real database.
-- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value is enough for a build.
-
-Supply them for the build command only. **Do not create a committed `.env` file, do not copy the
-developer's real values, and do not make either variable optional in `keys.ts` to avoid setting
-them.**
-
-**Two commands are not local gates and appear in no Done criteria here.**
-`bun run preflight <app|api|web>` is a production deployment gate: it requires a positional
-argument and the production-only variables `NEXT_PUBLIC_LAUNCH_MODE`, four Sentry variables and
-three Better Stack variables. `bun run test:release` is a deployed-candidate Playwright suite:
-`tooling/release/e2e/environment.ts:11-17` requires six `TC_*` variables validated when the
-config is merely loaded, and `tooling/release/playwright.config.ts:22-33` declares Firefox and
-WebKit projects whose browsers are not installed by default. Both run during the Plan 161h
-rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
+**Not local gates:** `bun run preflight` and `bun run test:release`.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Lint | `bun run check` | exit 0 |
 | Types | `bun run typecheck` | exit 0 |
+| Boundaries | `bun run boundaries` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
-| Xero integration (guarded) | `bun run --cwd packages/xero test:integration` | exit 0 |
-| Database integration (guarded) | `bun run --cwd packages/database test:integration` | exit 0 |
-| Apply reviewed migration | `bun run migrate:deploy` | exit 0, authorised target only |
+| Database units | `bun run --cwd packages/database test` | exit 0 |
+| Prisma validate | `(cd packages/database && bunx prisma validate)` | exit 0 |
+| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
+| Xero integration | `bun run --cwd packages/xero test:integration` | exit 0, `credential-owner.integration.test.ts` collected |
+| Database integration | `bun run --cwd packages/database test:integration` | exit 0 |
+| Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
 
 ## Scope
 
 **In scope:**
-- `packages/database/prisma/schema.prisma` and a new additive migration
-- `packages/database/src/queries/` and its export wrappers
+- `packages/database/prisma/schema.prisma` and one new additive migration
+  `<timestamp>_add_xero_credential_owner/`
+- `packages/database/src/queries/xero-credential-owner.ts` (create), its wrapper
+  `packages/database/queries/xero-credential-owner.ts`, and the matching `exports` entry in
+  `packages/database/package.json`
+- `packages/database/src/xero-credential-owner-backfill.ts` and `.test.ts` (create; pure planning
+  logic) and `packages/database/scripts/backfill-xero-credential-owner.ts` (create; thin CLI in
+  the style of 161b's binding backfill) plus a `backfill:xero-credential-owner` script entry in
+  `packages/database/package.json`
+- `packages/xero/scripts/plan-legacy-credential-owners.ts` (create) and a
+  `plan:legacy-credential-owners` script entry in `packages/xero/package.json`
+- `packages/database/xero-lifecycle-migration.integration.test.ts` (add backfill and
+  scope-column tests; the suite already owns `credential_owner` and `provider_app` keys)
 - `packages/xero/src/oauth/service.ts`
-- `packages/xero/src/oauth/credential-owner.ts` (create)
-- `packages/xero/src/oauth/credential-owner.test.ts` (create)
+- `packages/xero/src/oauth/identity.ts` and `identity.test.ts` (create; JWT verification)
+- `packages/xero/src/oauth/credential-owner.ts` and `credential-owner.test.ts` (create; coordinator,
+  resolver, recovery sweep)
 - `packages/xero/src/oauth/credential-owner.integration.test.ts` (create)
+- `packages/xero/src/oauth/reencrypt-tokens.ts` (extend to the new ciphertext table)
 - `packages/xero/src/oauth/service.test.ts`, `service.integration.test.ts`
-- `packages/core/src/` - the new branded ID type only
-- `packages/xero/index.ts`, `packages/xero/package.json` (a JWT/JWKS dependency, if needed)
-- Root `bun.lock`, only if a dependency is genuinely required
-- `plans/README.md` (status row only)
+- `packages/xero/index.ts` (exports), `packages/xero/package.json` (add `jose` as a direct
+  dependency), root `bun.lock` (that one addition only)
+- `packages/core/index.ts` (the `XeroCredentialOwnerId` brand only)
+- `apps/api/app/api/xero/oauth/start/route.ts` (await the now-async start function; nothing else)
+- `packages/jobs/src/handlers/schedule-xero-syncs.ts` (one call to `recoverXeroRefreshAttempts`;
+  nothing else) and its unit test
+- `tooling/release/integration-inventory.ts` and `.test.ts` (add
+  `credential-owner.integration.test.ts`; bump the suite count in the message)
+- `CLAUDE.md` and `PRODUCT.md` (the `clerk_org_id` exception paragraph only)
+- `plans/161-xero-provider-contract.md` (one row: access-token identity claims)
+- `plans/161-xero-execution-report.md` (append a 161d section), `plans/README.md` (status row)
 
 **Out of scope - do NOT touch:**
 - `packages/xero/src/rate-limit/` - 161e.
-- `packages/xero/src/adapter/`, `packages/availability/`, `packages/jobs/` - caller migration
-  and error classification are 161g. You add the resolver; 161g moves the callers onto it.
+- `packages/xero/src/adapter/`, `au/`, `nz/`, `uk/`, `packages/availability/`, and every job
+  handler except the one line above. They keep reading mirrored columns until 161g.
 - Remote connection **deletion**. 161f owns every DELETE.
-- **Dropping the old credential columns on `XeroConnection`.** They stay, unread, until 161h's
-  rollout proves every consumer migrated. Dropping them here is the single fastest way to
-  lock every customer out.
+- **Dropping or scrubbing the credential columns on `XeroConnection`.** They are the mirror.
 - Any real credential rotation or any change to a live customer's consent.
 
 ## Git workflow
 
-- Branch: `codex/xero-connection-hardening` (shared across 161a–161h).
-- Conventional commits. Suggested: `feat(database): add xero credential owner model`, then
-  `feat(xero): verify authoriser identity before credential adoption`, then
-  `fix(xero): require attempt version to confirm refresh persistence`.
+- Branch: `codex/xero-connection-hardening` (shared across 161a-161h).
+- Conventional commits, e.g. `test(xero): prove ciphertext change is not refresh proof`,
+  `feat(database): add xero credential owner model`, `feat(xero): verify xero access token identity`,
+  `feat(xero): coordinate refresh through credential owner`, `feat(xero): persist oauth intent before redirect`.
 - Do NOT push or open a PR.
 
 ## Steps
 
 ### Step 1: Prove the defective recovery path
 
-Add to `packages/xero/src/oauth/service.test.ts` a test where
-`reconcileRefreshPersistenceFailure` runs while the stored ciphertext has changed **for an
-unrelated reason** (simulate a re-encryption pass rewriting the same plaintext under a new key
-version). Assert the function does **not** report a successful rotation.
+In `packages/xero/src/oauth/service.test.ts`, copy the structure of the test at `:1199` and drive
+`reconcileRefreshPersistenceFailure` through `ensureFreshXeroConnection` (it is not exported). Two
+tests:
 
-Add a second test where the stored refresh token column has been **emptied** (`""`, which is its
-schema default). Assert that is not reported as success either.
+1. The re-read row's `refresh_token_encrypted` differs from the loaded value **because it was
+   re-encrypted** (same plaintext, `token_key_version` 2). Assert the result is **not** reported
+   as a successful rotation.
+2. The re-read row's `refresh_token_encrypted` is `""` (the schema default after a scrub). Assert
+   not success either.
 
-**Verify**: `bun run --cwd packages/xero test` → fails on both new tests. That proves the defect.
-Record the output.
+**Verify**: `bun run --cwd packages/xero test` → fails on exactly these two tests. Paste the output
+into a "161d" section of `plans/161-xero-execution-report.md`.
 
-### Step 2: Add the three records
+### Step 2: Add the records
 
-In `packages/database/prisma/schema.prisma`, add three models. Names are recommended; if 161b
-already created an equivalent, extend it rather than duplicating.
+Add to `schema.prisma`. The repository convention is "Enums at database level", so the
+status fields are Prisma enums with these exact names:
 
-**`XeroCredentialOwner`** - provider app ID plus verified Xero authoriser ID, unique together.
-Encrypted canonical access and refresh envelopes, encryption version, `token_version`,
-`credential_generation`, token expiry, granted scopes with provenance, last verified, adopted and
-rotated timestamps, and refresh-attempt and recovery state.
+```prisma
+enum xero_credential_usability {
+  usable
+  reauthorisation_required
+}
 
-**`XeroProviderConnection`** - provider app ID plus the exact remote connection ID, unique
-together. External tenant ID, tenant type, verified authoriser association when established,
-`auth_event_id`, provider timestamps, observation source/time/coverage, remote lifecycle status.
+enum xero_refresh_attempt_outcome {
+  pending
+  superseded
+  committed
+  lost_response
+  failed
+}
 
-**`XeroTenantBinding`** - both internal scope IDs, references to organisation/connection/tenant,
-immutable external tenant and app identity, the selected provider connection and credential owner,
-lifecycle generation, reserved slot, retirement reason and timestamps.
+enum xero_provider_connection_status {
+  present
+  absent_confirmed
+  unknown
+}
 
-**The deliberate convention exception.** `XeroCredentialOwner` and the app-wide provider inventory
-are **system infrastructure**, not customer-owned payroll rows. They get **no `clerk_org_id`**.
-Do not attach a synthetic one to satisfy the repository rule. Record the exception in `CLAUDE.md`
-and `PRODUCT.md`, and add a test asserting that every **customer-scoped** record still carries
-both scope IDs, so the exception cannot quietly spread.
+enum xero_oauth_intent_kind {
+  initial_binding
+  same_file_reauthorisation
+}
 
-Every customer binding, session intent, local status change, cleanup request and payroll operation
-keeps both internal scope identifiers. The sole further exception is an onboarding session that
-has no payroll organisation yet; that stays bound to its initiating Clerk account and user.
+enum xero_token_exchange_status {
+  not_started
+  dispatching
+  exchanged
+  unknown
+}
 
-**Verify**: `bunx prisma validate --schema=packages/database/prisma/schema.prisma` exits 0.
-Generate additive SQL as in 161b Step 5 (`bunx prisma migrate diff --help` first; `migrate dev`,
-`db push`, reset, rebaseline and seed are prohibited). Read the SQL: **no `DROP`, no rename.**
-Then `bun run migrate:deploy` → exit 0.
+model XeroCredentialOwner {
+  id                        String                    @id @default(uuid()) @db.Uuid
+  provider_app_id           String
+  xero_user_id              String
+  identity_evidence         String                    // "access_token_jwt" | "legacy_access_token_jwt"
+  access_token_encrypted    String
+  access_token_iv           String
+  access_token_auth_tag     String
+  refresh_token_encrypted   String
+  refresh_token_iv          String
+  refresh_token_auth_tag    String
+  token_key_version         Int
+  token_version             Int                       @default(1)
+  last_refresh_attempt_id   String?                   @db.Uuid
+  token_expires_at          DateTime
+  granted_scopes            String[]
+  granted_scopes_known      Boolean                   @default(false)
+  usability                 xero_credential_usability @default(usable)
+  last_verified_at          DateTime?
+  last_adopted_at           DateTime?
+  last_rotated_at           DateTime?
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime                  @updatedAt
+  refresh_attempts          XeroRefreshAttempt[]
+  provider_connections      XeroProviderConnection[]
+  tenants                   XeroTenant[]
+  @@unique([provider_app_id, xero_user_id])
+  @@map("xero_credential_owners")
+}
 
-### Step 3: Verify authoriser identity properly
+model XeroRefreshAttempt {
+  id                       String                       @id @default(uuid()) @db.Uuid
+  xero_credential_owner_id String                       @db.Uuid
+  expected_token_version   Int
+  dispatched_at            DateTime?
+  uncertain_since          DateTime?
+  recovery_deadline        DateTime?
+  outcome                  xero_refresh_attempt_outcome @default(pending)
+  // Previous refresh token kept only for Xero's 30-minute retry grace window; scrubbed after.
+  recovery_token_encrypted String?
+  recovery_token_iv        String?
+  recovery_token_auth_tag  String?
+  recovery_key_version     Int?
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+  owner XeroCredentialOwner @relation(fields: [xero_credential_owner_id], references: [id])
+  @@index([outcome, recovery_deadline])
+  @@index([xero_credential_owner_id])
+  @@map("xero_refresh_attempts")
+}
 
-Use a maintained JWT/OIDC verification library (prefer one already installed; otherwise add the
-smallest suitable direct dependency). Validate: signature, trusted issuer via JWKS, approved
-algorithms, token class, audience, client binding, required identity claims, and time claims.
-
-- **Do not trust a token-supplied key URL.** Pin the issuer and its JWKS endpoint.
-- Bound and cache JWKS retrieval. A JWKS lookup failure is **not** permission to skip signature
-  verification.
-- Distinguish an access token's expected API audience from an ID token's client audience.
-
-The canonical key is **configured provider app + verified stable Xero authoriser identity**.
-Never group by email, Clerk user ID, `auth_event_id`, an unverified payload claim, or equality of
-token strings. Persist the evidence source for the identity.
-
-Do not request extra profile or email scopes to obtain an identifier the verified contract
-already provides.
-
-**Verify**: `bun run --cwd packages/xero test` → exit 0, with new `credential-owner.test.ts`
-covering a valid token, a wrong issuer, a wrong audience, a bad signature, a disallowed
-algorithm, and a JWKS fetch failure (which must fail closed).
-
-### Step 4: Migrate legacy credentials
-
-Expired historical tokens grant no access. A **migration-only** verifier may use cryptographically
-verified historic identity metadata, with correct issuer and client binding, to associate a
-legacy row with an owner - but it must record the expiry and require fresh usable credentials
-before any payroll access. Otherwise retain the row as an unverified candidate needing controlled
-reauthorisation.
-
-**Never disable runtime expiry validation to make migration succeed.** Never bulk-refresh
-unidentified credentials concurrently.
-
-Where several legacy rows belong to one verified owner, retain the encrypted candidates until a
-controlled selection establishes the canonical set. **Do not pick by local row timestamp alone.**
-Preserve non-secret migration history and reconcile every dependent binding explicitly. No Clerk
-membership and no payroll row is merged.
-
-Record the configured provider app identity explicitly for each legacy mapping. A change of app or
-client ID is a deliberate mapping transition, not a namespace reset. Keep encryption-key rotation,
-OAuth client-secret rotation and changing the OAuth app conceptually separate.
-
-**Verify**: `bun run --cwd packages/database test:integration` → exit 0, with a backfill test
-proving idempotence, preservation of every payroll ID, and safe quarantine of ambiguous rows.
-
-### Step 5: Build the resolver choke point
-
-Add the single server-only route to credentials:
-
-```typescript
-resolveXeroAccess({
-  clerkOrgId,
-  organisationId,
-  expectedBindingGeneration,
-  capability,
-  deadline,
-});
+model XeroProviderConnection {
+  id                       String                          @id @default(uuid()) @db.Uuid
+  provider_app_id          String
+  remote_connection_id     String
+  xero_tenant_id           String
+  tenant_type              String?
+  xero_credential_owner_id String?                         @db.Uuid
+  auth_event_id            String?
+  provider_created_at      DateTime?
+  provider_updated_at      DateTime?
+  observed_at              DateTime
+  observed_via             String                          // "user_inventory" | "management_inventory"
+  remote_status            xero_provider_connection_status @default(present)
+  created_at               DateTime                        @default(now())
+  updated_at               DateTime                        @updatedAt
+  owner   XeroCredentialOwner? @relation(fields: [xero_credential_owner_id], references: [id])
+  tenants XeroTenant[]
+  @@unique([provider_app_id, remote_connection_id])
+  @@index([provider_app_id, xero_tenant_id])
+  @@index([xero_credential_owner_id])
+  @@map("xero_provider_connections")
+}
 ```
 
-It proves the scoped active binding, its selected remote connection, its current verified
-credential owner and the required capability before returning server-internal access.
+Add to `XeroTenant`:
 
-- A raw owner ID or external tenant ID is **never** sufficient authority.
-- Do **not** export an unrestricted global credential query to application actions.
-- System enumeration returns routing IDs and safe metadata, never credentials.
-- Linking the same Xero authoriser across two Clerk accounts coordinates **credentials only**. It
-  creates no membership, no binding, no foreign-account visibility and no management authority.
+```prisma
+  xero_credential_owner_id    String?                 @db.Uuid
+  xero_provider_connection_id String?                 @db.Uuid
+  credential_owner            XeroCredentialOwner?    @relation(fields: [xero_credential_owner_id], references: [id])
+  provider_connection         XeroProviderConnection? @relation(fields: [xero_provider_connection_id], references: [id])
+  @@index([xero_credential_owner_id])
+  @@index([xero_provider_connection_id])
+```
 
-**Verify**: `bun run --cwd packages/xero test` → exit 0.
-`grep -rn "refresh_token_encrypted" apps/` returns no matches (no application code reads
-ciphertext directly).
+Add to `XeroOAuthSession`: `intent_kind xero_oauth_intent_kind?`, `nonce_hash String?`,
+`token_exchange_status xero_token_exchange_status?` (null on rows created before this migration,
+which are treated as `exchanged`), and make `token_expires_at` and `available_tenants_json`
+nullable (a session now exists before the exchange).
 
-### Step 6: Make OAuth exchange and adoption safe
+**The deliberate convention exception.** `XeroCredentialOwner`, `XeroRefreshAttempt` and
+`XeroProviderConnection` are **system infrastructure**, not customer-owned payroll rows. They get
+**no `clerk_org_id`**. Add one paragraph to the Database conventions section of `CLAUDE.md` and to
+the data-model section of `PRODUCT.md` naming these three tables and the reason. Add a test to
+`packages/database/xero-lifecycle-migration.integration.test.ts` that queries
+`information_schema.columns` and asserts every table **except** those three and a fixed,
+explicit allowlist of existing non-tenant tables has a `clerk_org_id` column (build the allowlist
+from the tables that lack it today and record it in the test).
 
-Persist the scoped OAuth intent **before** redirect: immutable intent kind
-(`initial_binding` or `same_file_reauthorisation`), intended payroll organisation, initiating user
-and account, nonce binding, expected lifecycle generation, and expiry.
+Generate SQL as in 161b (`migrate diff --from-config-datasource --to-schema --script` from
+`packages/database`, into a new `<timestamp>_add_xero_credential_owner/migration.sql`). Read it:
+**no `DROP`, no rename**; the nullability relaxations on `xero_oauth_sessions` appear as
+`ALTER COLUMN ... DROP NOT NULL`, which is expected and is the only allowed `DROP` text.
 
-On callback: validate signed state, nonce and expiry; claim the exchange exactly once; persist an
-encrypted token candidate durably **before** connection inventory or region discovery. A token
-exchange that Xero issued but this process lost is recorded as **unknown**. Do not blindly reuse a
-one-time authorisation code after an ambiguous exchange.
+**Verify**: `(cd packages/database && bunx prisma validate)` → exit 0.
+`grep "DROP" <new migration.sql> | grep -v "DROP NOT NULL"` prints nothing.
+`bun run migrate:deploy` (after `LOCAL_OK`) → exit 0.
 
-Verify the candidate's provider identity before adoption. Under the owner lock, re-read current
-versions and reconcile the candidate against the current set. Arrival order and a same-second
-`iat` are **not** proof of which candidate supersedes another; when ordering is ambiguous, use
-controlled serialised validity reconciliation. Never overwrite a known usable set with an
-unverified older candidate.
+### Step 3: Verify authoriser identity
 
-**The critical sequence.** Connecting file B can yield replacement credentials that already
-connected file A depends on, before B's local selection finishes. So: adopt and reconcile verified
-canonical credentials **independently of B's payroll binding**. Abandoning B must not discard A's
-usable credentials. Conversely, adopting credentials must not activate B, resurrect a disconnected
-A, or create access to another Clerk account.
+First confirm the claim contract. Read Xero's token documentation
+(`https://developer.xero.com/documentation/guides/oauth2/token-types`, already cited in
+`plans/161-xero-provider-contract.md`) and record one new ledger row: issuer, JWKS URL, expected
+`aud`, the `client_id` claim, and the stable user claim (`xero_userid`), with status `DOCUMENTED`.
+If the documentation does not establish a stable user identifier claim in the **access token**,
+STOP: the whole owner model depends on it.
 
-Note the boundary carefully: 161b's wrong-file invariant applies to the rejected **selection
-transaction**. It does not forbid safe owner-level credential reconciliation caused by the earlier
-valid OAuth exchange. Your tests must distinguish these two operations rather than asserting that
-no credential anywhere may change during a failed onboarding journey.
+Add `jose` as a direct dependency of `packages/xero` (`bun add jose --cwd packages/xero`, pinning
+the version already in `bun.lock`). Create `packages/xero/src/oauth/identity.ts`:
 
-Persist requested and provider-granted scopes separately with known/unknown state. Missing scope
-data on a refresh does not erase established metadata. Unknown scope data does not grant
-permission. Preserve remote connection IDs, tenant type, auth event and provider timestamps.
-**Never select a connection by tenant name.**
+```typescript
+export async function verifyXeroAccessTokenIdentity(
+  accessToken: string,
+  deps?: { jwks?: JWTVerifyGetKey; now?: () => Date }
+): Promise<Result<{ xeroUserId: string; authEventId: string | null; expiresAt: Date }, XeroIdentityError>>;
+```
 
-**Verify**: `bun run --cwd packages/xero test:integration` → exit 0.
+- Issuer and JWKS URL are **constants** from the ledger row; never read a key URL from the token.
+- `createRemoteJWKSet` with a cooldown and timeout; a JWKS failure returns an error. **Never skip
+  signature verification.**
+- Allow `RS256` only (or exactly what the ledger records).
+- Check `iss`, `aud`, `exp`/`nbf`, and that `client_id` equals `keys().XERO_CLIENT_ID`.
+- Parse the claim set with Zod; `xero_userid` must be a non-empty string.
+- A **migration-only** variant `verifyLegacyXeroAccessTokenIdentity` accepts an expired token
+  (signature, issuer, audience and client still verified) and returns `expired: true`.
 
-### Step 7: Coordinate refresh and recovery
+Never group owners by email, Clerk user ID, `auth_event_id`, an unverified claim, or token string
+equality.
 
-Refresh through one owner-scoped coordinator using PostgreSQL transaction-scoped advisory locking
-and token-version compare-and-set. Keep proactive near-expiry refresh, the controlled
-forced-refresh retry, and the existing persistence-recovery tests. Concurrent callers reuse the
-winning token rather than each rotating.
+**Verify**: `bun run --cwd packages/xero test` → exit 0 with `identity.test.ts` covering, using a
+locally generated key pair and an injected JWKS: valid token; wrong issuer; wrong audience; wrong
+`client_id`; bad signature; `HS256`; JWKS failure (fails closed); missing `xero_userid`.
 
-Lock order, applied consistently everywhere: **credential-owner locks in sorted order, then
-external app/tenant-binding locks in sorted order, then internal connection locks in sorted order,
-then OAuth session and cleanup row claims.** Re-read non-locking lookups after acquisition. Never
-acquire in the reverse order from any other path.
+### Step 4: The owner coordinator and the resolver
 
-Record a refresh attempt **before** remote dispatch: attempt ID, expected credential and token
-version, dispatch time, uncertainty start, recovery deadline, outcome. **Never persist a raw
-refresh token in an attempt log.**
+In `packages/xero/src/oauth/credential-owner.ts`:
 
-Now fix Step 1's defect: after a lost commit acknowledgement, confirm success by checking the
-**attempt ID and token version** and the owner's current lifecycle state, then revalidate the
-requesting binding. Changed ciphertext alone, an emptied legacy column, or an unrelated reconnect
-is not proof.
+**Lock order** (write it as a comment at the top of the file and follow it everywhere):
+credential-owner locks in sorted order, then binding locks (keyed by internal `XeroTenant.id`) in
+sorted order, then internal connection locks in sorted order, then OAuth session and cleanup-row
+claims. Keys: owner `hashtextextended('xero-owner:' || id, 0)`, binding
+`hashtextextended('xero-binding:' || id, 0)`. The **existing** connection lock key
+`hashtextextended(connectionId, 0)` (`service.ts:669`, `:1149`, `:1315`) stays exactly as it is;
+its comment at `service.ts:1146-1148` requires every token-rotation write path to take it, and
+mirror-writes (below) do. Any path that also takes an owner lock takes it **first**. Bound every
+lock wait with `SET LOCAL lock_timeout = '<remainingMs(deadline)>ms'` issued as the first statement
+of the transaction; a JavaScript timer cannot interrupt `pg_advisory_xact_lock`.
 
-If the **response** is lost, preserve the previous refresh token's controlled recovery eligibility
-for Xero's documented 30-minute window (see `plans/161-xero-provider-contract.md`). Record the
-uncertainty once; retries must not restart that window indefinitely. Schedule recovery through
-existing Inngest infrastructure carrying owner IDs only. **Do not add a Vercel cron for refresh.**
+**Mirror-write** (used by refresh and adoption): inside the same transaction, after taking the
+connection locks in sorted order, write the owner's `access_token_*`, `refresh_token_*`,
+`token_key_version`, `token_encrypted_at`, `expires_at` (from `token_expires_at`) and
+`last_refreshed_at` into every `XeroConnection` whose `XeroTenant` has this owner,
+`active_slot = 1`, and whose connection has `status` in (`active`, `stale`),
+`disconnected_at IS NULL` and `revoked_at IS NULL`. A disconnected connection never receives
+tokens again.
 
-An invalid refresh grant affects that owner's credential usability and its dependent bindings. It
-is **not** evidence about whether remote connections still exist. Invalid OAuth **client**
-credentials are an app-configuration incident: do not overwrite every customer's consent state
-because the app secret broke.
+`refreshXeroCredentialOwner({ ownerId, expectedTokenVersion, deadline })`:
+1. **Transaction A (short, committed before any HTTP):** insert a `XeroRefreshAttempt` with
+   `outcome: "pending"`, `expected_token_version`, `dispatched_at: now`, and the current refresh
+   token copied into `recovery_token_*` (the grace-window copy). Committing first is what makes
+   the attempt durable; if the process dies anywhere after this, recovery can see it.
+2. **Transaction B:** take the owner lock (with `lock_timeout`), re-read the owner. If
+   `token_version > expectedTokenVersion`, another caller already refreshed: mark this attempt
+   `superseded`, scrub its `recovery_token_*`, return the current set (concurrent callers reuse
+   the winner). Otherwise call `exchangeToken` with the 161c `XeroDeadline` and an `orgKey` of
+   `xero-owner:<ownerId>` (161e replaces this with its `token` rate class).
+3. On success, still in B: write the new envelope, `token_version: { increment: 1 }`,
+   `last_refresh_attempt_id: <this attempt>`, `last_rotated_at`; mark the attempt `committed` and
+   scrub its `recovery_token_*`; mirror-write.
+4. On a lost response (a `XeroFetchError` with `dispatched: true`, or no parseable reply): end B
+   without writing the owner; in a new short transaction mark the attempt `lost_response`, set
+   `uncertain_since` once (never reset on retry) and `recovery_deadline = uncertain_since + 30
+   minutes`. The retained token stays.
+5. An invalid-grant response sets owner `usability: "reauthorisation_required"`. It says nothing
+   about whether remote connections exist. An invalid **client** response
+   (`client_credentials_invalid` today) is an app-configuration incident: return the error, write
+   nothing to owners or bindings.
+
+A lost **commit** of B shows up as an attempt still `pending` after B's caller saw an error.
+Recovery decides it by reading the owner: `last_refresh_attempt_id === attempt.id` and
+`token_version === expected_token_version + 1` means committed; otherwise treat as
+`lost_response`.
+
+Fix the Step 1 defect: `reconcileRefreshPersistenceFailure` decides success only by that
+attempt-ID and token-version rule. Changed ciphertext, an emptied column, or a different attempt is
+not proof. For bindings not yet owned (`xero_credential_owner_id IS NULL`), keep the legacy
+per-connection logic but remove the ciphertext-inequality success inference there too (treat it as
+"unknown: reload and re-check expiry").
+
+Rewire `ensureFreshXeroConnection` and `refreshXeroOAuthConnection`: if the connection's tenant has
+an owner, delegate to `refreshXeroCredentialOwner`; otherwise the legacy path. Their exported
+signatures and result types do not change.
+
+`resolveXeroAccess({ clerkOrgId, organisationId, expectedBindingGeneration, capability, deadline })`
+is exported from `packages/xero` for `packages/xero` internals and `packages/jobs` (161g). It is
+**not** called from `apps/`. It:
+
+- loads the `XeroTenant` scoped by both IDs with its `XeroConnection`, and requires
+  `active_slot = 1`, connection `status` in (`active`, `stale`), `disconnected_at IS NULL`,
+  `revoked_at IS NULL`, and `binding_generation === expectedBindingGeneration` when provided;
+- **owned binding**: requires owner `usability: "usable"`, refreshes through the coordinator when
+  within 5 minutes of `token_expires_at`, and decrypts the owner envelope;
+- **unowned binding** (`xero_credential_owner_id IS NULL`, not yet backfilled): calls the legacy
+  `ensureFreshXeroConnection` path and decrypts the connection columns. This keeps unverified
+  legacy customers working after 161g moves every caller onto the resolver;
+- capability: if `granted_scopes_known` and the capability's scope is absent, return
+  `capability_missing`. If scopes are unknown, proceed and let Xero's response decide; the resolver
+  never records a capability as granted from unknown data;
+- returns `{ accessToken, xeroTenantId, payrollRegion, bindingGeneration, tokenVersion | null }` or
+  a typed error (`not_connected`, `disconnected`, `generation_changed`, `reauthorisation_required`,
+  `capability_missing`, `configuration_error`). A raw owner ID or external tenant ID is never
+  accepted as input.
+
+`recoverXeroRefreshAttempts({ now })`: for attempts `pending` older than 2 minutes, apply the
+lost-commit rule above. For `lost_response` with `recovery_deadline > now`, retry the refresh once
+with the retained token under the owner lock. After the deadline, scrub `recovery_token_*`, mark
+`failed`, and set the owner to `reauthorisation_required`. Call it once from
+`schedule-xero-syncs.ts` alongside the existing dormant-rotation call; payloads carry owner IDs
+only.
+
+Extend `reencryptXeroTokens` (161c) to cover `xero_credential_owners` and non-null
+`recovery_token_*` columns with the same compare-and-set rule (include `token_version` in the
+owner `where`).
 
 **Verify**: `bun run --cwd packages/xero test` → exit 0 including both Step 1 tests.
+`bun run --cwd packages/jobs test` → exit 0.
+
+### Step 5: Persist the OAuth intent before redirect, and adopt safely
+
+Make `buildXeroOAuthStartUrl` async (no rename). Before returning the URL it creates a
+`XeroOAuthSession` with `status: "pending"`, `intent_kind` (`initial_binding` when
+`organisationId` is null or the organisation has no `XeroTenant`, else `same_file_reauthorisation`),
+`clerk_org_id`, `organisation_id`, `created_by_user_id`, `nonce_hash` (hex SHA-256 of the nonce it
+puts in the cookie), `expected_binding_generation` (moved here from the callback),
+`token_exchange_status: "not_started"`, and `expires_at: now + 15 minutes` (the same lifetime the
+callback uses today). Put the session ID in the signed state. Update the start route to `await` it.
+
+Update `getPendingXeroOAuthSession` (`service.ts:268`) and the internal `loadPendingSession`
+(`service.ts:1911`) to select only sessions whose `token_exchange_status` is `exchanged` or `NULL`
+(pre-migration rows), so a session created at start is never offered for tenant selection.
+
+On callback, `completeXeroOAuth`:
+1. validates signed state, the cookie nonce against the stored `nonce_hash` (constant-time
+   compare of the hashes), and expiry;
+2. claims the session with an `updateMany` compare-and-set `not_started` → `dispatching`; a second
+   callback for the same session finds zero rows and is rejected, so an authorisation code is never
+   exchanged twice;
+3. exchanges the code. On success sets `exchanged` and **immediately** persists the encrypted
+   candidate tokens on the session, before inventory or region discovery. On a
+   `XeroFetchError` with `dispatched: true` sets `unknown` and returns an error asking the user to
+   start again. A session left in `dispatching` by a crash is treated as `unknown`;
+4. verifies identity (Step 3); upserts `XeroCredentialOwner` for `(provider_app_id,
+   xero_user_id)` under the owner lock. If an owner exists, **adopt** the candidate only when its
+   verified `exp` is later than the owner's `token_expires_at`, or the owner is not usable; arrival
+   order and equal `iat` are not proof. Adoption increments `token_version` and mirror-writes.
+   Adoption never activates, creates or revives a binding;
+5. upserts one `XeroProviderConnection` per inventory entry (`observed_via: "user_inventory"`),
+   linking the owner. **Never select a connection by tenant name.**
+
+In `completeXeroTenantSelection`, the `XeroConnection` upsert now writes the **owner's current
+envelope** (not the session's candidate tokens) whenever the session's identity resolved to an
+owner, so the connection mirror always equals the owner. It also sets `xero_credential_owner_id`
+and `xero_provider_connection_id` on the tenant row. 161b's wrong-file guard still applies to the
+**selection**; owner adoption in callback step 4 is a separate, earlier operation and may
+legitimately change credentials that another file of the same authoriser uses.
+
+Persist requested scopes (the constant list) and granted scopes (from the token response `scope`
+field when present; otherwise leave `granted_scopes_known` unchanged). Missing scope data on a
+refresh never erases known scopes.
+
+**Verify**: `bun run --cwd packages/xero test` → exit 0.
 `bun run --cwd packages/xero test:integration` → exit 0.
+
+### Step 6: Backfill legacy credentials
+
+Two phases, because verification needs `@repo/xero` and `packages/database` must not import it.
+
+**Phase 1** - `packages/xero/scripts/plan-legacy-credential-owners.ts`, run as
+`bun run --cwd packages/xero plan:legacy-credential-owners --out <path>`: for each reserved
+binding, decrypt the connection's access token, call `verifyLegacyXeroAccessTokenIdentity`, and
+write a JSON array of `{ tenantId, xeroUserId: string | null }` to `<path>`. No tokens, no names.
+Follow the style of `packages/database/seed.ts` for constructing clients in a script.
+
+**Phase 2** - `packages/database/scripts/backfill-xero-credential-owner.ts`
+(`bun run --cwd packages/database backfill:xero-credential-owner --identities <path> --provider-app-id <id>`,
+default `--dry-run`, `--apply` to write), calling the pure planner in
+`packages/database/src/xero-credential-owner-backfill.ts`.
+
+Planner rules:
+- **An expired access token is normal and says nothing about the refresh token** (Xero access
+  tokens last 30 minutes; refresh tokens last much longer). A verified identity, expired or not,
+  creates or reuses one owner per `(provider_app_id, xero_user_id)` with `usability: "usable"`,
+  copying that binding's connection envelope. The first coordinated refresh proves it; an invalid
+  grant then sets `reauthorisation_required` through the normal path.
+- A group of **one** binding is attached to its owner.
+- A group of **two or more** bindings (same Xero user, several payroll files) cannot have its
+  canonical set chosen without a live refresh, which this plan does not perform. Leave every
+  binding in the group unowned (legacy path, unchanged behaviour) and list the group. These are
+  attached later when a user reauthorises (Step 5 adoption) or through a controlled refresh in the
+  161h rollout. Never pick by row timestamp.
+- Unverifiable rows (`xeroUserId: null`) stay unowned and are listed.
+- No Clerk membership and no payroll row is merged. A rerun changes nothing.
+
+**Verify**: `bun run --cwd packages/database test` → exit 0 with planner tests: idempotent rerun,
+unverifiable row left unowned, an expired-but-verified single binding owned and `usable`, a
+two-binding group left unowned and reported.
+
+### Step 7: Integration evidence
+
+Create `packages/xero/src/oauth/credential-owner.integration.test.ts` using its fixture
+allocation (2 tenant slots, `credential_owner`/`oauth_attempt`/`provider_app` keys); delete only
+owned keys in `afterAll`. Add it to `tooling/release/integration-inventory.ts` in sorted order and
+bump the `N-suite` count in both the message and its test.
+
+**Verify**: `bun run --cwd packages/xero test:integration` → exit 0 listing the new file.
+`bun run test:release-tools` → exit 0.
 
 ## Test plan
 
-`packages/xero/src/oauth/credential-owner.test.ts` (new):
-1. Valid token verifies; wrong issuer, wrong audience, bad signature and disallowed algorithm
-   each fail with distinct errors.
-2. JWKS fetch failure fails **closed**. Assert verification is not skipped.
-3. Grouping is by verified authoriser ID. Assert two tokens with the same email but different
-   verified subjects produce two owners.
+`identity.test.ts` (new): the eight Step 3 cases, plus two tokens with the same email-like claim
+but different `xero_userid` produce two identities.
 
-`packages/xero/src/oauth/credential-owner.integration.test.ts` (new; uses the fixture slot
-registered by 161a):
-4. **Same authoriser, two payroll files**: both share coordinated usable credentials, and neither
-   gains payroll access to the other. Assert both directions.
-5. **Same verified authoriser, two Clerk accounts**: no cross-account access, no new binding, no
-   membership. This is the isolation test that matters most.
-6. **Authorise B then abandon selection**: A remains serviceable, B is not implicitly bound.
-7. Reversed callback arrival order and same-second `iat` candidates cannot overwrite a known newer
-   usable set.
-8. Token exchange succeeds but inventory, body parsing or persistence fails: the candidate and
-   attempt remain recoverable, and the authorisation code is not blindly replayed.
-9. Concurrent refresh, adoption, disconnect and re-encryption: the winning token is not lost and
-   no disconnected binding is resurrected. Use real database barriers, **not sleeps**.
-10. Lost commit acknowledgement, and grace-window expiry, produce distinct controlled recoveries.
-11. Expired historic credentials migrate to an owner but do **not** grant payroll access.
-12. Legacy duplicates and unverifiable identities stop the affected backfill safely; a rerun
-    preserves every payroll ID.
+`credential-owner.test.ts` (new, mocked database): lock order is owner before connection in every
+exported function (assert call order on the `$queryRaw` mock); invalid client response writes
+nothing; `resolveXeroAccess` rejects a stale generation, a retired binding, an unusable owner, and
+unknown scope data.
 
-`packages/xero/src/oauth/service.test.ts` (extend):
-13. The two Step 1 regressions: unrelated ciphertext change, and emptied column, are not success.
-14. No token, authorisation code, `state` or nonce appears in any log, error, DTO or job payload.
+`credential-owner.integration.test.ts` (new, local database):
+1. **Same authoriser, two payroll files** (tenant slots 1 and 2 in one Clerk org): one owner,
+   both bindings mirror the same envelope, and `resolveXeroAccess` for org A never returns org B's
+   tenant ID. Assert both directions.
+2. **Same authoriser, two Clerk accounts** (the two tenant slots use different Clerk org IDs): no
+   binding, membership or visibility crosses; `resolveXeroAccess` with the other account's IDs
+   returns not found.
+3. **Authorise B then abandon selection**: A's binding remains usable with the adopted set; B has
+   no binding.
+4. A candidate with an earlier `exp` than the current owner set is not adopted.
+5. Exchange succeeds but persistence of inventory fails: the session keeps the encrypted
+   candidate and `token_exchange_status: "exchanged"`; a replayed callback does not exchange again.
+6. Two concurrent `refreshXeroCredentialOwner` calls: exactly one token-endpoint call (count on
+   the injected fetch), both receive the same `token_version`. Barrier: hold the owner advisory
+   lock in a third connection and release it. No sleeps.
+7. Lost commit acknowledgement vs lost response vs grace-window expiry produce three different
+   attempt outcomes.
+8. A re-encryption pass during a refresh does not overwrite the refreshed token.
+9. A refresh does not mirror tokens into a binding's connection whose `status` is `disconnected`,
+   and `resolveXeroAccess` returns `disconnected` for it.
+10. An unowned (legacy) binding still resolves through the legacy refresh path.
+
+`service.test.ts` (extend): the two Step 1 regressions; no token, code, state or nonce in any
+log call (spy on the logger) or returned error.
 
 ## Done criteria
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
+- [ ] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
 - [ ] `bun run --cwd packages/xero test` exits 0, including the Step 1 regressions
-- [ ] `bun run --cwd packages/xero test:integration` exits 0, including tests 4, 5 and 9
-- [ ] `bun run --cwd packages/database test:integration` exits 0
+- [ ] `bun run --cwd packages/database test` and `bun run --cwd packages/jobs test` exit 0
+- [ ] `bun run --cwd packages/xero test:integration` exits 0 locally and lists `credential-owner.integration.test.ts`
+- [ ] `bun run --cwd packages/database test:integration` exits 0 locally
+- [ ] `bun run test:release-tools` exits 0
 - [ ] `git diff --check` exits 0
-- [ ] `grep -rn "refresh_token_encrypted\|access_token_encrypted" apps/` returns no matches
-- [ ] `grep -c "DROP " packages/database/prisma/migrations/*/migration.sql` returns 0 for the new migration
-- [ ] The old credential columns on `XeroConnection` still exist in `schema.prisma`
-- [ ] `CLAUDE.md` and `PRODUCT.md` record the `XeroCredentialOwner` `clerk_org_id` exception
-- [ ] `git status --short` shows no modified file outside the In scope list
+- [ ] `grep -n "model XeroTenantBinding" packages/database/prisma/schema.prisma` returns no matches
+- [ ] `grep -n "tokenChanged" packages/xero/src/oauth/service.ts` returns no matches
+- [ ] `grep -rn "resolveXeroAccess\|refreshXeroCredentialOwner" apps/ --include=*.ts --include=*.tsx` returns no matches
+- [ ] `grep -n "access_token_encrypted" packages/database/prisma/schema.prisma` still shows the `XeroConnection` column
+- [ ] `grep -n "xero_credential_owners" CLAUDE.md PRODUCT.md` returns a match in each
+- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
 - [ ] `plans/README.md` status row for 161d updated
 
 ## STOP conditions
 
 Stop and report; do not improvise:
 
-- The `tokenChanged` comparison is no longer at `packages/xero/src/oauth/service.ts:922-924`, or
-  `reconcileRefreshPersistenceFailure` no longer exists. Report the current code.
-- **An identity cannot be established from verified JWT claims.** Retain the candidate as
-  unverified and report it. Never fall back to email, Clerk user ID, `auth_event_id` or token
-  string equality, however convenient.
-- The backfill finds legacy rows that map to one owner but whose canonical set cannot be chosen
-  without guessing. Quarantine, report the count, and stop. **Do not pick by timestamp.**
-- Adding a JWT library would require upgrading an unrelated dependency or changing `bun.lock`
-  beyond that one addition. Report the dependency graph conflict.
-- A step's verification fails twice after a reasonable fix attempt.
-- You conclude the old credential columns must be dropped for something to work. They must not.
-  Report what is blocked.
+- Xero's documentation does not establish a stable user identifier in the access token.
+- 161b or 161c is not DONE, or `reconcileRefreshPersistenceFailure` no longer contains the
+  ciphertext comparison.
+- An identity cannot be verified for a row. Leave it unowned and list it; never fall back to
+  email, Clerk user ID, `auth_event_id` or token equality.
+- The backfill finds bindings that share an owner but whose canonical set cannot be chosen
+  without guessing. Report and change nothing for that group.
+- Adding `jose` changes `bun.lock` beyond that one package.
+- A caller outside the in-scope files would need editing for the rewired refresh to compile.
+- Any change would require dropping or scrubbing `XeroConnection` credential columns.
 - You are about to write a token, authorisation code, `state`, nonce, or key material into a file,
-  log, snapshot, fixture, job payload or report. Stop.
-- You are about to trigger a real refresh against a live customer's credentials. Owned live
-  fixtures only.
+  log, snapshot, fixture, job payload or report, or to refresh a real customer's credentials.
+- A step's verification fails twice after a reasonable fix attempt.
 
 ## Maintenance notes
 
-- **`XeroCredentialOwner` has no `clerk_org_id` by design**, breaking the otherwise universal rule
-  in `CLAUDE.md`. Step 2 documents it. A reviewer who does not know this will either revert it or,
-  worse, generalise it to customer tables. The test added in Step 2 is the guard.
-- **`resolveXeroAccess` is the single choke point.** Every new Xero call site goes through it. In
-  review, grep for direct reads of credential columns; any hit is a regression.
-- **Token version and binding generation are different fences.** Token version fences credential
-  adoption; binding generation (161b) fences payroll access. They are not interchangeable and
-  confusing them produces code that passes review and fails in production.
-- **"Ciphertext changed" is never proof of anything.** That inference is what this plan removes.
-  If a future change reintroduces a ciphertext comparison as a success signal, reject it.
-- The old credential columns on `XeroConnection` are dead but present. 161h scrubs them only after
-  proving every consumer migrated. Until then, a reader that still uses them is a live bug, which
-  is why 161g exists.
-- In review, scrutinise: the JWKS failure path (does it ever skip verification?), the candidate
-  reconciliation ordering logic, and every place a refresh outcome is turned into a user-visible
-  message.
+- **Mirror-write is temporary and load-bearing.** Until 161g lands, any path that writes owner
+  tokens without mirroring leaves legacy readers with dead tokens. After 161g, 161h's rollout
+  scrubs the mirrors. Never add a new reader of the mirrored columns.
+- **The three system tables have no `clerk_org_id` by design.** The schema test guards against the
+  exception spreading.
+- **Token version and binding generation are different fences.**
+- **"Ciphertext changed" is never proof.** Reject any reintroduction.
+- Consider executing this plan as two reviewed units if the executor struggles: Steps 1-4 (schema,
+  identity, coordinator) and Steps 5-7 (intent, adoption, backfill). The step order already allows
+  a clean stop after Step 4.
+- In review, scrutinise: the JWKS failure path, candidate adoption ordering, the mirror-write set
+  (reserved bindings of **this** owner only), and every lock acquisition's order.

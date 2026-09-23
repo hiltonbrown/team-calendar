@@ -1,4 +1,4 @@
-# Plan 161f: Make Xero disconnection durable, narrowly authorised and truthful about unknown outcomes
+# Plan 161f: Make disconnect commit locally at once, move remote deletion to a fenced worker, and return a truthful receipt
 
 > **Executor instructions**: Follow this plan step by step. Run every verification command and
 > confirm the expected result before moving to the next step. If anything in "STOP conditions"
@@ -7,136 +7,143 @@
 >
 > **Drift check (run first)**:
 > ```bash
-> git diff --stat 8652c31..HEAD -- \
->   packages/xero/src/oauth packages/jobs/src/handlers \
->   'apps/app/app/(authenticated)/settings/integrations/xero'
+> git log --oneline 6b934be..HEAD -- packages/xero/src/oauth packages/jobs/src \
+>   "apps/app/app/(authenticated)/settings/integrations/xero" packages/database/prisma
 > ```
-> At the time this plan was written that diff was empty. If it is now non-empty, compare the
-> "Current state" excerpts below against the live code before proceeding. A mismatch is a STOP
-> condition.
+> Expect commits from 161b-161e only. Confirm they landed: `resolveXeroAccess` and
+> `refreshXeroCredentialOwner` exist in `packages/xero/src/oauth/credential-owner.ts` (161d),
+> `xeroRateKeys` exists in `packages/xero/src/rate-limit/xero-fetch.ts` (161e). Then locate each
+> excerpt below by function name; a changed body is a STOP condition.
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: L
-- **Risk**: HIGH (this plan issues irreversible DELETE requests to a customer's Xero account)
-- **Depends on**: 161b (binding generation), 161c (deadlines), 161d (credential owner and
-  resolver), 161e (shared admission). All four must be complete.
+- **Risk**: HIGH (this plan can issue irreversible DELETE requests to a customer's Xero account)
+- **Depends on**: 161b (binding columns), 161c (deadlines, `XeroFetchError`), 161d (credential
+  owner, `XeroProviderConnection`, lock order), 161e (`app_management` rate class). All DONE.
 - **Category**: bug, security
-- **Planned at**: commit `8652c31`, 22 September 2026 (re-stamped from `585f6cb`; the only changes between those commits are under `plans/`, so every source excerpt below is valid at both)
+- **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b-161e)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
 ## Why this matters
 
-Disconnect currently returns a single boolean, `remoteRevoked`, and sets it to `false` for two
-completely different situations: "there was no remote connection to revoke" and "we tried and do
-not know what happened". A customer told "not revoked" cannot tell whether their data link to
-Xero is actually gone.
+`disconnectXeroOAuthConnection` runs the remote DELETE **inside** a 20-second database
+transaction, and the whole disconnect succeeds or fails with it:
 
-Worse, the remote revocation is attempted inline, and session scrubbing wipes the connection
-inventory before the outcome is durable. If the process dies between issuing the DELETE and
-recording the result, there is no record that a destructive request is outstanding. A subsequent
-reconnect can then land on a connection that a late DELETE is still about to remove.
+- If the DELETE times out, fails on the network, returns 5xx, 401 or 403, the function returns an
+  error and **nothing is disabled locally**. The customer asked to stop syncing and sync keeps
+  running.
+- If it succeeds, the receipt is a single boolean, `remoteRevoked`, which is `false` for four
+  different situations: already disconnected, no remote link recorded, refresh grant invalid after
+  a 401, and remote 404. Only the last one is evidence about Xero.
+- A DELETE response lost after Xero processed it leaves no record that a destructive request is
+  outstanding, so a later reconnect can land on a link that a late DELETE removes.
 
-This plan makes the local disable commit immediately and durably, moves the remote deletion to a
-fenced background worker with per-target state, and replaces the boolean with a receipt that can
-say "unknown" honestly.
+This plan makes the local disable commit immediately and durably, records a cleanup request with
+per-target state, moves the remote DELETE to a fenced background worker using Xero's
+app-management client, and replaces the boolean with a receipt that can say `unknown` honestly.
+
+**Behaviour change to be aware of.** Remote deletion is gated by `XERO_REMOTE_CLEANUP_MODE`,
+default `report_only`. Until an operator sets `enabled` (a 161h rollout step), disconnect no longer
+removes the remote Xero link at all, where today it tries once inline with the customer's token.
+The receipt says so truthfully (`remoteStatus: "pending"`). This is intentional: the charter keeps
+destructive cleanup off until its evidence gates pass.
 
 ## Current state
 
-### The boolean receipt
+### Disconnect today
 
-`packages/xero/src/oauth/service.ts:116`:
+Single caller: `disconnectXeroAction` in
+`apps/app/app/(authenticated)/settings/integrations/xero/_actions.ts:130`, via the export in
+`packages/xero/index.ts:9`. The action checks the typed confirmation, calls
+`disconnectXeroOAuthConnection({ clerkOrgId, connectionId, destructive, organisationId, performedByUserId })`,
+maps any error to `unknownError(result.error.message)`, writes an `auditEvent` whose `metadata`
+includes `remoteRevoked: result.value.remoteRevoked` (`:150-153`), and returns
+`{ ok: true, value: { disconnected: true } }`. `remoteRevoked` never reaches the client.
 
-```typescript
-| { ok: true; value: { remoteRevoked: boolean } }
-```
+`packages/xero/src/oauth/service.ts`:
 
-and at lines 1286 and 1312:
+- `disconnectXeroOAuthConnection` (`:1283`) wraps `disconnectXeroOAuthConnectionWithClient` in
+  `database.$transaction(..., { timeout: 20_000 })` (`:1289-1292`); any throw becomes
+  `unknown_error`.
+- `disconnectXeroOAuthConnectionWithClient` (`:1308`) takes
+  `pg_advisory_xact_lock(hashtextextended(connectionId, 0))`, loads the connection, returns
+  `{ disconnected: true, remoteRevoked: false }` if already `disconnected` (`:1322-1327`), calls
+  `prepareConnectionForDisconnect` (may refresh the token, `:1363-1424`), then
+  `revokePreparedXeroConnection` (a 401 triggers one refresh and retry, `:1459-1485`; no
+  authorisation connection ID or a terminal authorisation returns `remoteRevoked: false` at
+  `:1439`; invalid refresh grant after 401 returns `false` at `:1470`), then
+  `finaliseLocalXeroDisconnect` (`:1560-1648`).
+- `revokeXeroConnectionAtSource` (`:1650`) sends `DELETE https://api.xero.com/connections/{xero_authorisation_connection_id}`
+  with the **customer** access token via `xeroFetch` with `maxAttempts: 1`; 2xx → `true`, 404 →
+  `false` (`:1669`), any throw → `network_error` (`:1685-1693`), other statuses → an error.
+- `finaliseLocalXeroDisconnect` blanks the token columns and sets `status: "disconnected"`. When
+  `destructive` it also deletes `leaveBalance` and `xeroPersonMatch` rows, archives Xero-sourced
+  persons and nulls their `clerk_user_id`, nulls `xero_employee_id` on all persons, archives
+  Xero-sourced `availabilityRecord`s, and deletes `syncRun` and `xeroSyncCursor` rows for the
+  tenant. It calls no feed or publication invalidation. It never deletes the `XeroConnection` or
+  `XeroTenant` row.
 
-```typescript
-Result<{ disconnected: true; remoteRevoked: boolean }, XeroOAuthError>
-```
+`remoteRevoked` appears at `service.ts:116, 1286, 1312, 1358, 1434, 1456, 1482`, and in
+`_actions.ts:152`, `_actions.test.ts:85`, `service.test.ts:1454, 1522, 1547, 1608`,
+`disconnect.integration.test.ts:89, 109`.
 
-The `false` value is produced at lines 1324, 1439 and 1470 for **absence**, and again at 1669 for
-**failure**:
+OAuth session scrubbing is a separate cron path: `scrubInactiveXeroOAuthSessionCredentials`
+(`service.ts:321-368`) blanks tokens and `available_tenants_json`, called only from
+`packages/jobs/src/handlers/schedule-xero-syncs.ts:365`.
 
-```typescript
-// packages/xero/src/oauth/service.ts:1666-1669
-      return { ok: true, value: { remoteRevoked: true } };
-    }
-    // ...
-      return { ok: true, value: { remoteRevoked: false } };
-```
+### Provider contract
 
-The disconnect transaction is wrapped with `{ timeout: 20_000 }` at line 1291 (plan 161c may have
-adjusted this; read the current value).
+`plans/161-xero-provider-contract.md` records, as **DOCUMENTED**: `POST https://identity.xero.com/connect/token`
+with `grant_type=client_credentials` and the singular form parameter `scope=app.connections`
+returns `access_token`, `expires_in`, `token_type` and **no refresh token**; that token may call
+`GET https://api.xero.com/connections` and `DELETE https://api.xero.com/connections/{connectionId}`.
+Only this app's management-tier enablement and credential provisioning are **NOT VERIFIED**. The
+client-credentials request uses the existing `XERO_CLIENT_ID` and `XERO_CLIENT_SECRET`.
 
-### Live consumers of the boolean
+### Jobs
 
-- `apps/app/app/(authenticated)/settings/integrations/xero/_actions.ts:152` - `remoteRevoked: result.value.remoteRevoked`
-- `apps/app/app/(authenticated)/settings/integrations/xero/_actions.test.ts:85`
-- `packages/xero/src/oauth/service.test.ts:1454, 1522, 1547, 1608`
-- `packages/xero/src/oauth/disconnect.integration.test.ts:89, 109`
+`packages/jobs/src/functions.ts` exports the `functions` array that `apps/api/app/api/inngest/route.ts`
+serves; adding a function there registers it. Handler files follow `<job>.ts`, `<job>.test.ts`,
+`<job>.integration.test.ts`. Models: `schedule-xero-syncs.ts` for a **cron** trigger
+(`*/15 * * * *`), `reconcile-xero-approval-state.ts` for an **event** trigger. The new job is cron-only:
+`packages/xero` cannot send an Inngest event (`@repo/jobs` already depends on `@repo/xero`, so the
+reverse import is a cycle).
 
-All must be migrated. The grep in "Done criteria" is how you confirm it.
+### Fixtures and inventory
 
-### Where the worker goes
-
-`packages/jobs/src/handlers/` contains the existing Inngest handlers and follows a strict naming
-convention: `<job-name>.ts`, `<job-name>.test.ts`, `<job-name>.integration.test.ts`. Existing
-examples to model on: `reconcile-xero-approval-state.ts`, `schedule-xero-syncs.ts`,
-`reconcile-feed-publications.ts`.
-
-The jobs listed in `CLAUDE.md` today are `sync-xero-people`, `sync-xero-leave-records`,
-`sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache` and
-`reconcile-xero-approval-state`. You are adding one.
+Registered in `LIVE_FIXTURE_SUITES` (not yet in `tooling/release/integration-inventory.ts`):
+`packages/xero/src/oauth/connection-cleanup.integration.test.ts` and
+`packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts`, each with 2 tenants
+and `provider_connection`, `tenant_binding`, `cleanup_request`, `cleanup_attempt` keys.
+`packages/database/xero-lifecycle-migration.integration.test.ts` (created by 161b) owns
+`cleanup_request` and `cleanup_attempt` keys too.
 
 ### Repository conventions to match
 
-- Service functions return `Result<T, E>` from `@repo/core`. Do not throw for expected failures.
-- Named exports only. No default exports. Strict TypeScript, no `any`, no unjustified `as`.
+- `Result<T, E>` from `@repo/core`. Named exports only. Strict TypeScript, no `any`.
 - Zod on all external input, including every Xero response.
-- **Jobs carry both `clerk_org_id` and `organisation_id` in their event payload and never rely on
-  session context.** Inbound upserts are idempotent. Record-level failures do not fail the run.
-- **Outbound writes are synchronous and user-triggered; maintenance jobs never replay a payroll
-  mutation.** Deleting a connection is not a payroll mutation, which is why it may be a job.
-- Raw Xero error payloads go to `xero_write_error_raw` for admin audit only; a plain-language
-  version goes in `xero_write_error`. **Never expose a raw Xero error code to an employee.**
-- Australian English. **No em dashes anywhere.** No `console.log`.
-- Use `packages/design-system` components and the guidance in `DESIGN.md` / `.impeccable.md` for
-  any UI change.
+- **Jobs carry `clerk_org_id` and `organisation_id` in their event payload and never rely on
+  session context.** Record-level failures do not fail the run.
+- **Maintenance jobs never replay a payroll mutation.** Deleting a connection is not a payroll
+  mutation, which is why it may be a job.
+- Raw provider payloads never reach an employee-facing surface.
+- UI: `packages/design-system` components, `DESIGN.md` and `.impeccable.md`. Australian English.
+  **No em dashes anywhere.** No `console.log`.
 
 ## Commands you will need
 
-**Fresh worktree setup.** This repository's `.env*` files are gitignored (`.gitignore:35`), so
-a new worktree has none of them. Before running any gate, from the worktree root:
+**Fresh worktree setup**: `bun install --frozen-lockfile`. Build needs a valid-looking
+`DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that command only.
 
-```bash
-bun install --frozen-lockfile
-```
+**Local integration database and store**: use exactly the Postgres block from 161b ("Local
+integration database") and the SRH block from 161e ("Local shared store"), including the
+`LOCAL_OK` check before `bun run migrate:deploy`. If either is unavailable, record integration
+gates `NOT_VERIFIED` in the execution report and set README status `BLOCKED (integration gates not run)`.
+A run that collects zero tests from a file this plan names is a failure.
 
-`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with no
-further setup. **`bun run build` additionally requires two variables**, because
-`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
-`packages/database/keys.ts:10` has no fallback:
-
-- `DATABASE_URL` - any syntactically valid Postgres URL is enough for a build; the client is
-  lazy and nothing connects. Do **not** point it at the real database.
-- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value is enough for a build.
-
-Supply them for the build command only. **Do not create a committed `.env` file, do not copy the
-developer's real values, and do not make either variable optional in `keys.ts` to avoid setting
-them.**
-
-**Two commands are not local gates and appear in no Done criteria here.**
-`bun run preflight <app|api|web>` is a production deployment gate: it requires a positional
-argument and the production-only variables `NEXT_PUBLIC_LAUNCH_MODE`, four Sentry variables and
-three Better Stack variables. `bun run test:release` is a deployed-candidate Playwright suite:
-`tooling/release/e2e/environment.ts:11-17` requires six `TC_*` variables validated when the
-config is merely loaded, and `tooling/release/playwright.config.ts:22-33` declares Firefox and
-WebKit projects whose browsers are not installed by default. Both run during the Plan 161h
-rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
+**Not local gates:** `bun run preflight`, `bun run test:release`.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
@@ -144,343 +151,431 @@ rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
 | Types | `bun run typecheck` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
 | Jobs units | `bun run --cwd packages/jobs test` | exit 0 |
+| Database units | `bun run --cwd packages/database test` | exit 0 |
 | App Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | exit 0 |
-| Xero integration (guarded) | `bun run --cwd packages/xero test:integration` | exit 0 |
-| Jobs integration (guarded) | `bun run --cwd packages/jobs test:integration` | exit 0 |
-| Filtered app Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | exit 0 |
+| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
+| Xero integration | `bun run --cwd packages/xero test:integration` | exit 0 |
+| Jobs integration | `bun run --cwd packages/jobs test:integration` | exit 0 |
+| Database integration | `bun run --cwd packages/database test:integration` | exit 0 |
+| Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
 
 ## Scope
 
 **In scope:**
-- `packages/xero/src/oauth/management-client.ts`, `connection-cleanup.ts` and their tests (create)
-- `packages/xero/src/oauth/connection-cleanup.integration.test.ts` (create)
-- `packages/xero/src/oauth/service.ts`, `service.test.ts`, `disconnect.integration.test.ts`
-- `packages/database/prisma/schema.prisma` and a new additive migration (cleanup request/attempt)
-- `packages/jobs/src/handlers/reconcile-xero-connections.ts` plus its two tests (create)
-- `packages/jobs/src/` events, functions and registration exports
-- `apps/api/` Inngest registration
-- `apps/app/app/(authenticated)/settings/integrations/xero/` actions, client, DTOs and tests
-- Existing feed/publication invalidation helpers, **only** where destructive disconnect requires them
-- `plans/README.md` (status row only)
+- `packages/database/prisma/schema.prisma` and one new additive migration
+  `<timestamp>_add_xero_cleanup_requests/`
+- `packages/database/src/queries/xero-cleanup.ts` (create), its wrapper
+  `packages/database/queries/xero-cleanup.ts`, and the `exports` entry in
+  `packages/database/package.json`
+- `packages/database/generated/` (regenerated by `prisma generate`; tracked in git)
+- `packages/xero/scripts/reissue-xero-cleanup.ts` (create) and its `packages/xero/package.json`
+  script entry
+- `packages/database/xero-lifecycle-migration.integration.test.ts` (cleanup-state tests)
+- `packages/xero/src/oauth/management-client.ts`, `management-client.test.ts` (create)
+- `packages/xero/src/oauth/connection-cleanup.ts`, `connection-cleanup.test.ts`,
+  `connection-cleanup.integration.test.ts` (create)
+- `packages/xero/src/oauth/service.ts` (the disconnect functions, plus the reconnect fence and the
+  `cleanup_unresolved` code in `completeXeroTenantSelection`), `service.test.ts`,
+  `disconnect.integration.test.ts`
+- `packages/xero/keys.ts`, `keys.test.ts` (`XERO_REMOTE_CLEANUP_MODE`)
+- `packages/xero/index.ts` (exports)
+- `packages/jobs/src/handlers/reconcile-xero-connections.ts`, `.test.ts`, `.integration.test.ts` (create)
+- `packages/jobs/src/functions.ts`
+- `apps/app/app/(authenticated)/settings/integrations/xero/_actions.ts`, `_actions.test.ts`,
+  `xero-client.tsx`, `xero-client.test.tsx`
+- `tooling/release/integration-inventory.ts` and `.test.ts` (add the two new suites)
+- `tooling/release/e2e/` (one new spec file for the disconnect states; written, not run)
+- `apps/app/.env.example`, `apps/api/.env.example` (commented `XERO_REMOTE_CLEANUP_MODE`)
+- `plans/161-xero-execution-report.md` (161f section, including the operator procedure),
+  `plans/README.md` (status row)
 
 **Out of scope - do NOT touch:**
 - Credential storage and refresh - 161d. You **consume** the owner coordinator.
-- Rate limiting internals - 161e. You **consume** the shared admission.
+- Rate limiting internals - 161e. You **consume** the `app_management` class.
 - Error classification and recovery reasons - 161g.
 - Inactivity assessment - 161h. This plan deletes only on an **explicit** user disconnect.
 - **Whole-user token revocation.** Never revoke an owner's entire grant to remove one binding.
-- UID generation, calendar semantics or feed rendering. Invalidation only.
-- Any change to data retention policy. Preserve existing soft-disconnect retention exactly.
+- Feed rendering, UID generation, calendar semantics. The destructive branch's data changes stay
+  exactly as they are today.
+- `CLAUDE.md` job list - 161h updates the documentation.
 
 ## Git workflow
 
-- Branch: `codex/xero-connection-hardening` (shared across 161a–161h).
-- Conventional commits. Suggested: `feat(xero): add app management client`, then
-  `feat(xero): record durable cleanup intent on disconnect`, then
-  `feat(jobs): add reconcile-xero-connections handler`, then
-  `refactor(app): replace boolean disconnect receipt`.
+- Branch: `codex/xero-connection-hardening` (shared across 161a-161h).
+- Conventional commits, e.g. `feat(database): add xero cleanup request records`,
+  `feat(xero): add app management client`, `feat(xero): commit disconnect locally before cleanup`,
+  `feat(jobs): add reconcile-xero-connections`, `refactor(app): show xero disconnect receipt`.
 - Do NOT push or open a PR.
 
 ## Steps
 
-### Step 1: Prove the two-meanings defect
+### Step 1: Prove the defect
 
-Add a test to `packages/xero/src/oauth/service.test.ts` (model on the existing disconnect tests at
-lines 1454-1608) with two cases:
+In `service.test.ts`, next to the disconnect tests at `:1454-1608`, add:
 
-- No remote connection exists. Today: `remoteRevoked: false`.
-- A remote connection exists and the DELETE times out. Today: also `remoteRevoked: false`.
+1. The DELETE throws (injected `fetchImpl` rejects). Assert the call returns `ok: true` and that
+   the transaction mock received the local disable write (`status: "disconnected"`). Today it
+   returns `network_error` and writes nothing, so this fails.
+2. "Already disconnected" and "remote 404" must produce different receipts. Today both are
+   `remoteRevoked: false`, so this fails.
 
-Assert these produce **different** results. It will fail, because today they do not.
+**Verify**: `bun run --cwd packages/xero test` → fails on exactly these two. Paste into a "161f"
+section of the execution report.
 
-**Verify**: `bun run --cwd packages/xero test` → fails on the new test. Record the output.
+### Step 2: Cleanup records (schema first)
 
-### Step 2: Build the app-management client
+Add to `schema.prisma`:
 
-Create `packages/xero/src/oauth/management-client.ts`: a **server-only** client-credentials path
-for app connection management using the `app.connections` scope.
+```prisma
+model XeroCleanupRequest {
+  id                 String   @id @default(uuid()) @db.Uuid
+  clerk_org_id       String
+  organisation_id    String   @db.Uuid
+  xero_tenant_id     String   @db.Uuid   // internal XeroTenant.id (FK below)
+  binding_generation Int                 // XeroTenant.binding_generation after the disconnect increment
+  requested_by_user_id String
+  destructive        Boolean
+  data_action_status xero_cleanup_data_action_status
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+  attempts           XeroCleanupAttempt[]
+  organisation       Organisation @relation(fields: [organisation_id], references: [id])
+  xero_tenant        XeroTenant   @relation(fields: [xero_tenant_id], references: [id])
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@map("xero_cleanup_requests")
+}
 
-- Keep its response schema **separate** from the customer authorisation/refresh schema. A
-  management access token does **not** carry a refresh token; a shared schema will reject it.
-- **Do not add management scope to the customer Payroll consent URL.**
-- Validate the token class, expiry and granted scope where returned.
-- Management tokens must never reach a Payroll adapter and must never be returned to a client
-  component. Cache only under a bounded server-side contract, with shared acquisition
-  coordination so instances do not stampede.
-- Use the **exact** token form parameter and endpoints recorded in
-  `plans/161-xero-provider-contract.md` by plan 161a. If those rows are `NOT VERIFIED`,
-  implement the client and its tests but keep deletion **disabled** (see Step 7) and say so.
-  **Never guess an endpoint, a pagination parameter, a filter or a token audience.**
-- A management authentication failure is an **operational incident**. It must not fall back to a
-  guessed endpoint and must not escalate to whole-user revocation.
-
-Default to this client for cleanup, so an expired customer refresh token does not force retaining
-a duplicate refreshable credential set. A customer-token fallback may use the 161d owner
-coordinator when valid and explicitly necessary. **Do not create independently rotating cleanup
-copies, and do not create a cleanup credential escrow.**
-
-**Verify**: `bun run --cwd packages/xero test` → exit 0 for `management-client.test.ts`,
-including a test asserting a management token cannot be passed to a Payroll adapter.
-
-### Step 3: Split local disable from remote deletion
-
-A scoped explicit disconnect commits, in **one short transaction**: the local disable, the binding
-generation change, and a durable cleanup intent. **The remote DELETE is not in that transaction.**
-
-Also in that transaction: block new provider admissions for the disabled binding, cancel unsent
-work, and fence local result commits. An already-dispatched payroll mutation may still complete
-and keeps its existing uncertain-outcome treatment; do not try to recall it.
-
-**Freeze the authorised scope**: the known app connection links for **this bound payroll file**,
-not every connection belonging to its authoriser. App-wide inventory visibility is not deletion
-authority. Reconcile additional links only after establishing they fall inside the same authorised
-request.
-
-Before clearing a successful, expired or cancelled OAuth session, **atomically retain** the
-non-secret auth-event and inventory provenance and any cleanup candidates. Candidate status is not
-deletion authority. Non-secret tombstones survive secret scrubbing.
-
-**Verify**: `bun run --cwd packages/xero test:integration` → exit 0 for a test asserting the local
-disable is committed even when the provider is unreachable.
-
-### Step 4: Replace the boolean with a receipt
-
-Thread this through service, action, DTO, audit and interface:
-
-```typescript
-interface XeroDisconnectReceipt {
-  localDisabled: boolean;
-  cleanupRequestId: string;
-  remoteStatus:
-    | 'pending'
-    | 'confirmed_deleted'
-    | 'confirmed_absent'
-    | 'partially_confirmed'
-    | 'unknown'
-    | 'blocked_authorisation';
-  dataActionStatus: 'not_requested' | 'pending' | 'completed' | 'failed';
+model XeroCleanupAttempt {
+  id                          String    @id @default(uuid()) @db.Uuid
+  clerk_org_id                String
+  organisation_id             String    @db.Uuid
+  xero_cleanup_request_id     String    @db.Uuid
+  provider_app_id             String
+  remote_connection_id        String
+  expected_binding_generation Int
+  state                       xero_cleanup_attempt_state @default(pending)
+  lease_owner                 String?
+  lease_expires_at            DateTime?
+  dispatched_at               DateTime?
+  deadline_at                 DateTime?
+  next_attempt_at             DateTime?
+  retry_count                 Int       @default(0)
+  outcome_reason              String?   // safe, allowlisted code; never a raw payload
+  correlation_id              String?
+  created_at                  DateTime  @default(now())
+  updated_at                  DateTime  @updatedAt
+  request XeroCleanupRequest @relation(fields: [xero_cleanup_request_id], references: [id])
+  @@unique([xero_cleanup_request_id, remote_connection_id])
+  @@index([state, next_attempt_at])
+  @@index([clerk_org_id])
+  @@map("xero_cleanup_attempts")
 }
 ```
 
-Match existing naming conventions if they differ, but **these distinctions must survive**. Raw
-remote identifiers and sensitive provider evidence are not employee-facing DTO fields.
-
-Migrate every consumer listed in "Current state". Preserve soft-disconnect retention and the
-existing explicitly chosen destructive-data behaviour. Make data removal a **separate idempotent
-step** with its own result, including when a destructive request follows an earlier soft
-disconnect. Do not purge before provenance and intents are durable. Preserve binding and audit
-history and manual availability, and invoke existing publication/cache invalidation where
-required.
-
-UI copy for the new states, in Australian English, using `packages/design-system` components:
-
-- "Sync stopped. Xero disconnection is pending."
-- "Disconnected from Xero."
-
-Test keyboard and focus behaviour, loading and error states, and light and dark.
-
-**Verify**:
-`bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` → exit 0.
-`grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx` → no matches.
-
-### Step 5: Per-target cleanup state
-
-Add cleanup request and attempt records to the schema (additive migration; the same rules as 161b
-Step 5 apply: `migrate diff` only, read the SQL, no `DROP`, no rename).
-
-A request holds the scoped local intent and a **frozen** target set. Each attempt records its own
-ID, the exact target connection/app/tenant, the expected binding generation, the request scope,
-the lease owner and expiry, dispatch and deadline times, safe error and correlation metadata,
-retry timing and outcome evidence.
-
+Add the matching back-relation fields (`XeroCleanupRequest[]`) to `Organisation` and `XeroTenant`,
+and two enums (the repository convention is "Enums at database level"):
+`enum xero_cleanup_data_action_status { not_requested pending completed failed }` and
+`enum xero_cleanup_attempt_state { pending claimed dispatching confirmed_deleted confirmed_absent unknown blocked_authorisation cancelled }`.
 Per-target states:
 
 | State | Meaning |
 |---|---|
-| `pending` | Eligible authorised target, no issued request recorded |
-| `claimed` | Current worker owns a bounded claim; dispatch not yet recorded |
-| `dispatching` | Durable marker written before the provider request; a crash leaves the outcome unknown |
-| `confirmed_deleted` | Explicit successful deletion of the intended remote link |
-| `confirmed_absent` | Reliable absence under the verified endpoint and coverage contract |
+| `pending` | Authorised target, no request issued |
+| `claimed` | A worker holds a bounded lease; dispatch not recorded |
+| `dispatching` | Durable marker written **before** the provider request; a crash leaves the outcome unknown |
+| `confirmed_deleted` | Targeted DELETE returned 2xx |
+| `confirmed_absent` | The verified targeted DELETE endpoint returned 404 for the exact ID |
 | `unknown` | The request may have executed, or evidence is insufficient |
-| `blocked_authorisation` | Management or fallback authorisation prevents confirmation |
-| `cancelled` | Unsent task superseded or no longer authorised |
+| `blocked_authorisation` | Management authorisation failed (401/403 from the token or DELETE call) |
+| `cancelled` | Never dispatched and no longer to be: superseded by a reconnect, or recorded under `report_only` (`outcome_reason: "report_only"`) |
 
-A verified targeted DELETE `204` confirms deletion. A **valid targeted endpoint's** `404` can
-confirm absence. A misrouted endpoint, incomplete inventory, 401, 403, an invalid refresh grant, a
-timeout or a 5xx confirm nothing. Use the exact validated connection UUID. **Do not classify every
-generic 404 as successful cleanup.**
+Generate the migration with 161b's **schema-to-schema** diff
+(`--from-schema <before.prisma> --to-schema prisma/schema.prisma --script`, run from
+`packages/database`). Read it: only `CREATE TYPE`, `CREATE TABLE`, `CREATE INDEX`, foreign keys;
+no `DROP`.
 
-Maintain the target set and the aggregate outcome explicitly: one successful link deletion does
-not confirm every required connection for the payroll file was removed. **A multi-target request
-must never report overall remote success while any required target is unresolved.**
+Add `packages/database/src/queries/xero-cleanup.ts`, its wrapper
+`packages/database/queries/xero-cleanup.ts`, and the matching `exports` entry in
+`packages/database/package.json` (copy the pattern of an existing entry such as
+`./queries/outbound-operations`). Functions, each filtering by `clerk_org_id` and
+`organisation_id` except the sweep:
+`createXeroCleanupRequest`, `claimXeroCleanupAttempt` (compare-and-set on `state` and lease),
+`markXeroCleanupAttemptDispatching`, `recordXeroCleanupAttemptOutcome` (compare-and-set on attempt
+ID and lease owner), `listDueXeroCleanupAttempts` (system sweep; returns attempt IDs and scope IDs
+only).
 
-**Verify**: `bun run --cwd packages/database test:integration` → exit 0 for the new state tests.
+**Verify**: `bun run migrate:deploy` (after `LOCAL_OK`) → exit 0. `bun run --cwd packages/database test:integration`
+→ exit 0 with new tests in `xero-lifecycle-migration.integration.test.ts`: a claim by a second
+lease owner fails while the first lease is live; an outcome write with a stale lease owner is
+rejected; attempts are unique per request and remote connection.
+
+### Step 3: The app-management client
+
+Create `management-client.ts`, **server-only**:
+
+- `getXeroManagementToken({ deadline })`: `POST https://identity.xero.com/connect/token` with
+  HTTP Basic `XERO_CLIENT_ID:XERO_CLIENT_SECRET`, body `grant_type=client_credentials&scope=app.connections`,
+  through `xeroFetch` with `rateClass: { kind: "app_management", providerAppId }`. Parse with a
+  **separate** Zod schema: `access_token`, `expires_in`, `token_type`, optional `scope`; no
+  `refresh_token`. Cache in module memory until 60 seconds before expiry; a concurrent miss shares
+  one in-flight promise.
+- `deleteXeroConnection({ remoteConnectionId, deadline })`: validate `remoteConnectionId` is a
+  UUID, `DELETE https://api.xero.com/connections/{id}` with the management token and
+  `maxAttempts: 1`, `retryOnAmbiguousFailure: false`. Return a typed outcome:
+  `deleted` (2xx), `absent` (404), `auth_failed` (401/403), `rate_limited` (429, with
+  `retryAfterMs`), `server_error` (5xx), `not_sent` (a `XeroFetchError` with `dispatched: false`),
+  `unknown` (any other throw or `dispatched: true` error).
+- The returned token type is branded (`XeroManagementAccessToken`) so it cannot be passed where a
+  customer access token is expected. **Do not add `app.connections` to the customer consent scopes.**
+
+**Verify**: `bun run --cwd packages/xero test` → exit 0 with `management-client.test.ts`.
+
+### Step 4: Split local disable from remote deletion
+
+Add `XERO_REMOTE_CLEANUP_MODE: z.enum(["report_only", "enabled"]).optional()` to
+`packages/xero/keys.ts`; absent means `report_only`. Add a commented placeholder to both
+`.env.example` files.
+
+Create `packages/xero/src/oauth/connection-cleanup.ts`. It holds the pure and database logic for
+this plan's cleanup: `freezeCleanupTargets` (below), `aggregateXeroDisconnectReceipt` (Step 5),
+`getXeroDisconnectReceipt` (Step 5), and `mapDeleteOutcomeToState` (Step 6). `service.ts` and the
+job import from it.
+
+Rewrite `disconnectXeroOAuthConnectionWithClient` so the transaction contains **no HTTP**:
+
+1. Take locks in the 161d order: owner (if any), then the binding lock
+   `hashtextextended('xero-binding:' || <XeroTenant.id>, 0)`, then the existing connection lock.
+   Load the connection and tenant scoped by both IDs.
+2. If already `disconnected`, return the receipt of the latest request for this tenant (or
+   `remoteStatus: "not_applicable"` if none).
+3. Run today's `finaliseLocalXeroDisconnect` unchanged (status, token blanking, destructive data
+   changes) and set `XeroTenant.binding_generation: { increment: 1 }`. 161d's resolver and
+   mirror-write already refuse `disconnected` connections, so sync and credential use stop here.
+4. `freezeCleanupTargets`: if the tenant has an owner, the `XeroProviderConnection` rows for this
+   tenant's `(provider_app_id, xero_tenant_id)` whose `xero_credential_owner_id` equals that owner;
+   **if the tenant has no owner, only the legacy `xero_authorisation_connection_id`**. Add the legacy
+   ID too when set and not already included. Never add connections of the same authoriser for other
+   tenants, and never match on a `NULL` owner.
+5. Create one `XeroCleanupRequest` (`binding_generation` and each attempt's
+   `expected_binding_generation` set to the value **after** the increment in step 3;
+   `data_action_status` `completed` if destructive else `not_requested`) with one attempt per
+   target.
+6. Retirement: if there are **no** targets, or `XERO_REMOTE_CLEANUP_MODE` is `report_only`, create
+   the attempts directly as `cancelled` with `outcome_reason: "report_only"` (or none when there are
+   no targets) and retire the binding in the same transaction (`active_slot: null`, `retired_at`,
+   `retirement_reason: "disconnected"`). Nothing will ever be dispatched for them, so there is
+   nothing to fence and the file must not stay reserved. Only in `enabled` mode do attempts start
+   `pending` and the binding stay reserved until the worker resolves them.
+
+No Inngest event is sent: `packages/xero` cannot import `@repo/jobs` (jobs already depends on xero).
+The Step 6 cron sweep picks up new attempts within 15 minutes.
+
+Remove `prepareConnectionForDisconnect`'s refresh and `revokePreparedXeroConnection` from the
+disconnect path, and delete `revokeXeroConnectionAtSource`; the inline DELETE is gone.
+
+**Verify**: `bun run --cwd packages/xero test` → exit 0 including both Step 1 tests.
+
+### Step 5: The receipt
+
+Replace `{ disconnected: true; remoteRevoked: boolean }` with:
+
+```typescript
+export interface XeroDisconnectReceipt {
+  cleanupRequestId: string | null;
+  dataActionStatus: "not_requested" | "pending" | "completed" | "failed";
+  localDisabled: true;
+  remoteStatus:
+    | "not_applicable"      // no remote link was recorded
+    | "left_in_place"       // report_only: the remote link was deliberately not removed
+    | "pending"             // enabled mode: targets recorded, none resolved yet
+    | "confirmed_deleted"
+    | "confirmed_absent"
+    | "partially_confirmed" // some targets confirmed, others unresolved
+    | "unknown"
+    | "blocked_authorisation";
+}
+```
+
+`aggregateXeroDisconnectReceipt(attemptStates)` applies these rules in order:
+1. no attempts → `not_applicable`;
+2. all `cancelled` with reason `report_only` → `left_in_place`;
+3. any `unknown` or `dispatching` → `unknown`;
+4. any `blocked_authorisation` → `blocked_authorisation`;
+5. every attempt `confirmed_deleted`/`confirmed_absent`/`cancelled` → `confirmed_deleted` if any
+   was deleted, else `confirmed_absent`;
+6. some confirmed and some `pending`/`claimed` → `partially_confirmed`;
+7. otherwise → `pending`.
+Never report overall success while any target is unresolved. `getXeroDisconnectReceipt({ clerkOrgId,
+organisationId, cleanupRequestId })` loads the attempts and applies it.
+
+In `_actions.ts`, return `{ disconnected: true, receipt }` (no raw IDs beyond `cleanupRequestId`),
+and write `remoteStatus` instead of `remoteRevoked` into the audit metadata. In `xero-client.tsx`
+show, with existing `packages/design-system` components:
+
+- `not_applicable`: "Disconnected from Xero."
+- `left_in_place`: "Sync stopped. Team Calendar no longer uses this Xero connection. To remove it
+  from Xero as well, open Connected apps in Xero."
+- `pending`: "Sync stopped. Xero disconnection is pending."
+- `confirmed_deleted` / `confirmed_absent`: "Disconnected from Xero."
+- `partially_confirmed` / `unknown` / `blocked_authorisation`: "Sync stopped. We could not confirm
+  the Xero disconnection. Our team has been notified."
+
+Update every `remoteRevoked` occurrence listed in "Current state".
+
+**Verify**: `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` → exit 0.
+`grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules`
+→ no matches.
 
 ### Step 6: The worker
 
-Create `packages/jobs/src/handlers/reconcile-xero-connections.ts` with bounded ID enumeration and
-scoped target processing. Register it through the existing Inngest exports and `apps/api` serve
-registration, following `reconcile-xero-approval-state.ts` exactly.
+Create `packages/jobs/src/handlers/reconcile-xero-connections.ts` exporting
+`reconcileXeroConnectionsFunction`, triggered by cron `*/15 * * * *` only (model on
+`schedule-xero-syncs.ts`). Add it to `functions` in `packages/jobs/src/functions.ts`.
 
-- Durable intent plus a periodic sweep recovers missed dispatch. Use deterministic intent IDs and
-  **database claims**; Inngest delivery deduplication alone is not sufficient.
-- Payloads carry IDs and generations. **Never credentials, never payroll payloads.**
-- Before dispatch: take the ordered locks (161d's order: credential owners sorted, then bindings
-  sorted, then internal connections sorted, then session/cleanup claims), validate the exact
-  target, scope, references and generation, then durably mark `dispatching`.
-- A cancelled or superseded unsent task makes **no** remote call.
-- Record the response in a short subsequent transaction with attempt-owner checks. A late response
-  may record historical outcome but must not reactivate or overwrite a newer local lifecycle.
+For each due attempt (bounded batch of 50):
+1. If `XERO_REMOTE_CLEANUP_MODE` is not `enabled`: make **no** provider call; leave `pending`.
+2. `claimXeroCleanupAttempt` with a 2-minute lease. A `claimed` attempt whose lease expired is
+   claimable again (it was never dispatched).
+3. **One transaction, under the binding lock** (`hashtextextended('xero-binding:' || tenantId, 0)`,
+   the same lock reconnect takes in step "Reconnect fencing" below): re-read the tenant; if
+   `binding_generation` differs from `expected_binding_generation` (a reconnect happened), set the
+   attempt `cancelled` and stop; otherwise set it `dispatching` with `dispatched_at`. Commit.
+   Because the check and the marker share one transaction under the lock reconnect also takes, no
+   reconnect can slip between them.
+4. Call `deleteXeroConnection` outside any transaction.
+5. Record the outcome with `recordXeroCleanupAttemptOutcome` (attempt ID and lease owner checked),
+   via `mapDeleteOutcomeToState`: `deleted` → `confirmed_deleted`; `absent` → `confirmed_absent`;
+   `auth_failed`, or a failed management-token call (401/403) → `blocked_authorisation`;
+   `not_sent`, a management-token network failure, or `rate_limited` → back to `pending` with
+   `next_attempt_at` (from `retryAfterMs`, else exponential backoff with jitter, base 1 minute,
+   cap 1 hour, no maximum: a definitely-unsent attempt never becomes `unknown`); `server_error` and
+   `unknown` → `unknown`.
+6. An attempt found in `dispatching` with an expired lease becomes `unknown`.
+7. When every attempt of a request is `confirmed_*` or `cancelled`, retire the binding in a
+   transaction under the binding lock, only if `binding_generation` still equals the request's
+   `binding_generation`.
 
-**Reconnect fencing.** Reconnect, start and selection must not create a conflicting replacement
-while a destructive request is in flight or its outcome is unknown. A worker lease timeout does
-not prove its earlier DELETE stopped. An inventory snapshot showing present absence does not prove
-a delayed destructive request cannot affect a reused connection ID. Permit automatic reconnect
-only when every issued attempt has a safe terminal outcome, or verified provider identity
-semantics prove a late request cannot affect the new connection. **Do not assume a reconnect
-always yields a different connection ID.** Test delayed DELETE and identifier reuse with a
-fault-injecting provider.
+**Reconnect fencing.** In `completeXeroTenantSelection`, take the binding lock before the 161b
+guard. If the tenant has any attempt in `claimed`, `dispatching` or `unknown`, throw 161b's
+`TenantSelectionRejectedError` with a new code `cleanup_unresolved` (message: "A previous Xero
+disconnection is still being confirmed. Try again later or contact support."). Otherwise mark the
+tenant's `pending` attempts `cancelled`. 161b's selection then increments `binding_generation`, so
+any later worker pass sees the change. Do not assume a reconnect yields a different remote
+connection ID.
 
-Retry known-safe targeted cleanup under the same reservation with bounded exponential backoff,
-jitter and the 161e shared cooldown. **Unknown attempts require reconciliation before any retry**;
-never run concurrent destructive retries for one target. An authentication failure goes to
-operational recovery, not an unbounded hot loop. Deadlines cannot be reset indefinitely.
+**Leaving `unknown`.** An operator may re-issue the **same** targeted DELETE for an `unknown`
+attempt while reconnect remains fenced: a 2xx gives `confirmed_deleted`, a targeted 404 gives
+`confirmed_absent`. Add `reissueXeroCleanupAttempt({ attemptId, operatorUserId })` to
+`connection-cleanup.ts` (it re-enters step 3 with the attempt's existing generation) and a
+`packages/xero/scripts/reissue-xero-cleanup.ts` wrapper with a `cleanup:reissue` script entry in
+`packages/xero/package.json`. It is never called automatically.
 
-**Verify**: `bun run --cwd packages/jobs test && bun run --cwd packages/jobs test:integration`
-→ exit 0.
+Job payloads carry IDs and generations only.
 
-### Step 7: Superseded authorisers, and the operator route
+**Verify**: `bun run --cwd packages/jobs test && bun run --cwd packages/jobs test:integration` →
+exit 0 listing `reconcile-xero-connections.integration.test.ts`.
 
-Clean up an unselected connection only when the evidence establishes it was created by the
-relevant abandoned or partial flow, has no legitimate active reference, and falls inside the
-approved cleanup policy. Protect previously connected files returned by the same authoriser's
-inventory. Unknown historic or foreign inventory stays **report-only**.
+### Step 7: Operator procedure, inventory and browser spec
 
-Reauthorisation by authoriser B must preserve authoriser A's remote link until its retirement is
-justified. But a blanket tenant-level protection rule must not block legitimately removing A's
-obsolete link once B's verified link serves the same binding. Evaluate **exact connection and
-owner references**, never tenant ID alone. Deleting A's obsolete link must not affect A's other
-payroll files.
+Write the `unknown`/`blocked_authorisation` operator procedure into the 161f section of the
+execution report: how to list them (`xero_cleanup_attempts` by state and age), the required
+evidence to resolve (a later authoritative `GET /connections` inventory showing absence is
+**report-only evidence**, not a confirmation), the escalation route to Xero support, and an alert
+threshold (application policy: any `unknown` older than 24 hours). **No "force reconnect" button.**
 
-Add a restricted operator report and resolution procedure for `unknown` cleanup: request and
-attempt IDs, safe correlation information, the targeted link, dispatch chronology, the latest
-authoritative inventory evidence, and the required next action. Define an alert threshold,
-responsible owner and escalation route in configuration and the runbook; thresholds are
-application policy, not Xero mandates.
+Add both new integration suites to `tooling/release/integration-inventory.ts` in sorted order and
+bump the `N-suite` count in the message and test.
 
-For an ambiguous issued DELETE, the procedure must either obtain provider-supported terminal
-evidence or establish safe identity separation before releasing the reservation. Preserve an
-escalation record when Xero support is needed. **Do not build a "force reconnect" button that
-discards unresolved destructive history, and never mark a support escalation as confirmed
-provider deletion.**
+Write one Playwright spec under `tooling/release/e2e/` (model on an existing spec there) asserting
+the three receipt messages. It runs in the Plan 160 campaign, not locally; record it
+`NOT_VERIFIED` in the execution report.
 
-Gate execution behind explicit configuration, reusing an existing mechanism rather than creating a
-feature-flag package. **The default must fail safe**: missing destructive-cleanup approval or
-configuration keeps the system report-only.
-
-**Verify**: `bun run check && bun run typecheck && bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` → all exit 0.
-
-Write the browser assertions in `tooling/release/e2e/`. They execute during the Plan 160 campaign against a deployed candidate, not locally; record them NOT_VERIFIED in the evidence report until that run.
+**Verify**: `bun run test:release-tools && bun run typecheck:release-tools` → exit 0.
 
 ## Test plan
 
-`packages/xero/src/oauth/management-client.test.ts` (new):
-1. A management token response **without** a refresh token parses correctly.
-2. A management token cannot be handed to a Payroll adapter. Assert the type or guard rejects it.
-3. A management authentication failure produces an operational incident, not a fallback call and
-   not a revocation.
+`management-client.test.ts`: a token response with no `refresh_token` parses; a customer token
+type is rejected where `XeroManagementAccessToken` is required (a `// @ts-expect-error` line);
+each DELETE status maps to its outcome; a 401 on the token call does not attempt any DELETE.
 
-`packages/xero/src/oauth/connection-cleanup.test.ts` (new):
-4. `204` → `confirmed_deleted`. A valid targeted `404` → `confirmed_absent`. A 401, a 403, a 429,
-   a 5xx and a timeout each map to a **distinct** non-confirming outcome. Six separate assertions.
-5. A generic 404 from a **misrouted** endpoint is **not** `confirmed_absent`.
-6. Multi-target aggregate: one success plus one unresolved target reports `partially_confirmed`,
-   never overall success.
-7. The Step 1 regression: absence and unknown are different results.
+`connection-cleanup.test.ts` / `service.test.ts`: the two Step 1 regressions; the receipt
+aggregate for each combination (all deleted → `confirmed_deleted`; one deleted plus one
+`unknown` → `unknown`; one deleted plus one `pending` → `partially_confirmed`); target
+freezing excludes a same-authoriser connection for a different tenant.
 
-`packages/xero/src/oauth/connection-cleanup.integration.test.ts` (new; fixture slot from 161a):
-8. The local disable stays committed through a total provider outage; the receipt reads
-   `pending` or `unknown` truthfully.
-9. Session scrubbing preserves non-secret provenance, and no duplicate independently rotating
-   cleanup token survives.
-10. An unselected prior connection and a foreign connection are both protected from deletion.
-11. Superseded authoriser A's obsolete link can be removed without affecting A's other files.
-12. Repeat soft disconnect, a later destructive request, and a failed data action are all
-    idempotent and truthful.
+`connection-cleanup.integration.test.ts` (local DB):
+1. With `XERO_REMOTE_CLEANUP_MODE=enabled`, local disable commits with zero provider calls and the
+   receipt is `pending`.
+2. No remote link → binding retired immediately, receipt `not_applicable`.
+3. Destructive request: data changes match today's `finaliseLocalXeroDisconnect` exactly and
+   `dataActionStatus` is `completed`.
+4. Reconnect while an attempt is `unknown` is rejected with `cleanup_unresolved`.
 
-`packages/jobs/src/handlers/reconcile-xero-connections.test.ts` and its integration pair (new):
-13. An old, cancelled, unsent task makes **no** provider call. Assert the transport was not called.
-14. A crash before dispatch and a crash after dispatch recover differently and neither
-    double-deletes.
-15. Lost and duplicate Inngest delivery both converge without uncontrolled duplicate deletion.
-16. A delayed DELETE plus connection-ID reuse cannot corrupt a new generation. Use a
-    fault-injecting provider.
-17. A job payload contains no credential and no payroll content. Assert on the serialised payload.
+`reconcile-xero-connections.test.ts` / `.integration.test.ts`:
+5. `report_only`: disconnect retires the binding at once, attempts are `cancelled`/`report_only`,
+   the receipt is `left_in_place`, and the worker makes no provider call.
+6. A cancelled or superseded unsent attempt makes no provider call.
+7. Crash after `dispatching` (simulate by leaving the marker with an expired lease) → `unknown`,
+   not retried.
+8. Two concurrent sweeps dispatch at most once per attempt.
+9. Reconnect while an attempt is `claimed` is rejected; after the claim's lease expires and the
+   attempt returns to `pending`, reconnect cancels it and the worker makes no call.
+10. `reissueXeroCleanupAttempt` on an `unknown` attempt with a targeted 404 yields
+    `confirmed_absent` and allows retirement.
 
-`apps/app/.../xero/_actions.test.ts` and `xero-client.test.tsx` (extend):
-18. Each `remoteStatus` value renders its correct Australian English copy.
-19. No raw provider identifier or Xero error code appears in the employee-facing DTO.
+`xero-client.test.tsx` / `_actions.test.ts`: each receipt maps to its copy; the returned DTO has
+no remote connection ID and no provider error code.
 
 ## Done criteria
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including the Step 1 regression
-- [ ] `bun run --cwd packages/jobs test` exits 0
+- [ ] `bun run check`, `bun run typecheck` exit 0
+- [ ] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
 - [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
-- [ ] `bun run --cwd packages/xero test:integration` exits 0
-- [ ] `bun run --cwd packages/jobs test:integration` exits 0
-- [ ] Browser assertions for the new disconnect states exist in `tooling/release/e2e/`; their execution is recorded NOT_VERIFIED pending the Plan 160 campaign
+- [ ] `bun run --cwd packages/xero test:integration`, `bun run --cwd packages/jobs test:integration`, `bun run --cwd packages/database test:integration` exit 0 locally, listing the new suites
+- [ ] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
 - [ ] `git diff --check` exits 0
-- [ ] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx` returns **no matches**
-- [ ] `grep -c "DROP " packages/database/prisma/migrations/*/migration.sql` returns 0 for the new migration
-- [ ] `reconcile-xero-connections` is registered in the `apps/api` Inngest serve handler
-- [ ] Destructive cleanup is **disabled by default** in configuration
-- [ ] `git status --short` shows no modified file outside the In scope list
+- [ ] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
+- [ ] `grep -n "reconcileXeroConnectionsFunction" packages/jobs/src/functions.ts` returns a match
+- [ ] `grep -n "report_only" packages/xero/keys.ts` returns a match and `keys.test.ts` asserts the absent default is `report_only`
+- [ ] `grep -c "revokeXeroConnectionAtSource\|revokePreparedXeroConnection" packages/xero/src/oauth/service.ts` prints `0` (the inline revoke is gone)
+- [ ] A spec under `tooling/release/e2e/` references the three receipt messages; the execution report records it `NOT_VERIFIED`
+- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
 - [ ] `plans/README.md` status row for 161f updated
 
 ## STOP conditions
 
 Stop and report; do not improvise:
 
-- **The app-management endpoint rows in `plans/161-xero-provider-contract.md` are `NOT VERIFIED`.**
-  This is an **expected** outcome, not a failure. Implement and test everything else, keep
-  deletion disabled, and report which rows are unresolved. **Never guess the endpoint, the
-  pagination parameters, the filters or the token audience.**
-- The `app.connections` scope is not available to this app's tier. Report it; deletion stays off.
-- `remoteRevoked` no longer exists in `packages/xero/src/oauth/service.ts`. Someone has already
-  changed the receipt; report the current shape.
-- You cannot determine, for a given target, whether a DELETE was issued. That is precisely the
-  `unknown` state. Record it and route it to the operator procedure. **Do not retry it** and do
-  not release the reservation.
-- A reconnect would need to proceed while a destructive request's outcome is unknown. Block the
-  reconnect and report; do not add a bypass.
-- You are about to call DELETE against anything other than an explicitly owned live fixture, or
-  to revoke a whole-user grant. Stop.
-- You are about to put a credential, an authorisation code, a raw Xero error payload or payroll
-  content into a job payload, a log, a DTO or a test snapshot. Stop.
+- 161b-161e are not all DONE.
+- The management token call is rejected for this app in any environment you are authorised to use
+  (tier or provisioning). Keep `report_only`, finish everything else, report.
+- A disconnect change would alter what the destructive branch deletes or archives today.
+- You cannot tell whether a DELETE was issued for an attempt. That is `unknown`; do not retry it and
+  do not retire the binding.
+- A reconnect would need to proceed while an attempt is `dispatching` or `unknown`.
+- You are about to call DELETE against anything other than an owned test fixture, or to revoke a
+  whole-user grant.
+- You are about to put a credential, authorisation code, raw Xero payload or payroll content into a
+  job payload, log, DTO or snapshot.
 - A step's verification fails twice after a reasonable fix attempt.
 
 ## Maintenance notes
 
-- **`unknown` is a real, permanent state and must stay reachable.** The pressure in later work
-  will be to collapse it into `confirmed_absent` so the UI looks tidy. That would mean telling a
-  customer their Xero link is gone when nobody knows. Test 7 and test 8 guard this.
-- **App-wide inventory visibility is not deletion authority.** The frozen target set in Step 3 is
-  the boundary. Any future change that widens deletion to "everything this authoriser owns" is a
-  serious regression; a reviewer should treat a change to the scope freeze as the highest-risk
-  hunk in any diff touching this code.
-- **A generic 404 never confirms absence.** Only a valid targeted endpoint's 404 does. This
-  distinction is easy to lose in a refactor of the error mapper.
-- The worker's `dispatching` marker must be written **before** the request and must be durable. If
-  a future change moves it after the call for performance, crash recovery silently breaks and no
-  test on the happy path will notice. Test 14 is the guard.
-- In review, scrutinise: the scope freeze, the state-transition table, the reconnect fencing
-  condition, and any code that maps a provider error to a `remoteStatus`.
-- Deferred, with reasons: automatic inactivity-driven deletion (161h, and it remains report-only),
-  customer notices, bulk connection management, and any cleanup credential escrow (which would
-  need its own bounded security contract before it could be activated).
+- **`unknown` is a real, permanent state.** Collapsing it into `confirmed_absent` tells a customer
+  their Xero link is gone when nobody knows.
+- **The target freeze in Step 4 is the deletion authority boundary.** Widening it to "everything
+  this authoriser owns" is the highest-risk change anyone can make to this code.
+- **The `dispatching` marker must commit before the request.** Moving it after for performance
+  silently breaks crash recovery; test 7 guards it.
+- The reservation survives disconnect until cleanup resolves. Same-organisation same-file reconnect
+  still works (161b's guard only blocks other organisations and other files); other accounts cannot
+  claim the file meanwhile.
+- 161h's rollout sets `XERO_REMOTE_CLEANUP_MODE=enabled` only after its evidence gates pass.
+- In review, scrutinise: the target freeze, the state transition code, reconnect fencing, and the
+  provider-outcome mapping.
+- Deferred: inactivity-driven deletion (161h, report-only), customer notices, bulk management,
+  cleanup credential escrow.

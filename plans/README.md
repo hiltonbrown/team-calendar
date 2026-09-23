@@ -30,11 +30,11 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
 | [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; all local gates passed, 26 protected fixture suites registered |
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | TODO |
-| [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a | TODO |
+| [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | TODO |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | TODO |
 | [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | TODO |
 | [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | TODO |
-| [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e | TODO |
+| [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | TODO |
 | [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | TODO |
 
 Status values: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` (with a one-line reason),
@@ -88,7 +88,11 @@ With 161-pre done:
 
 - **161a** is complete. It registered the protected fixtures every later integration suite
   allocates from; 161b and 161c may now proceed against those reserved ownership slots.
-- **161b and 161c** can run in parallel. Coordinate their additive migrations into one wave.
+- **161b then 161c, sequentially.** Both edit `completeXeroTenantSelection`,
+  `loadPendingSession` and `service.integration.test.ts`, and share the local test database.
+- **161e** needs only 161a and 161c (its rate keys use `XERO_CLIENT_ID` directly); it may run
+  before or after 161d.
+- **161g** reads 161f's cleanup records for the `disconnect_pending` state, so it follows 161f.
 - **161d** needs 161b's binding generation and 161c's keyring before it moves a single token.
 - **161e** needs 161c's corrected transport, or it inherits the unbounded-body defect.
 - **161f** needs all four: it fences deletion on binding generation, uses the owner coordinator
@@ -96,6 +100,18 @@ With 161-pre done:
 - **161g** finishes 161d's cutover. Leaving it undone means the new owner model coexists with
   legacy readers that refresh independently, which is the exact failure 161d exists to prevent.
 - **161h** documents the rollout for 161b-161g and produces false readiness signals if run early.
+
+**Review of 161b-161h at `6b934be` (23 September 2026).** All seven plans were re-verified
+against the code and rewritten where they had drifted or conflicted. Programme-wide decisions now
+recorded in the plans: the binding lives on the existing `XeroTenant` row (no
+`XeroTenantBinding` table); provider app ID is `XERO_CLIENT_ID`; every plan that adds an
+integration suite also adds it to `tooling/release/integration-inventory.ts`; integration and
+migration gates run only against a local Postgres (and, from 161e, a local Redis REST store), and
+are recorded `NOT_VERIFIED` with status `BLOCKED`, never `DONE`, when those are unavailable;
+161d keeps legacy readers working by mirror-writing owner tokens until 161g; `@repo/availability`
+never imports `@repo/xero`; remote cleanup defaults to `report_only` via
+`XERO_REMOTE_CLEANUP_MODE`, which **stops today's inline remote revoke until an operator enables
+it**.
 
 **A single owner must hold the schema and credential contract across 161b, 161d and 161f.**
 Two agents implementing ownership models concurrently in the same service will produce

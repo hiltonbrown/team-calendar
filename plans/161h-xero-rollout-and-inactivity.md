@@ -1,4 +1,4 @@
-# Plan 161h: Add report-only inactivity assessment, monitoring and a safe rollout for the Xero hardening programme
+# Plan 161h: Report-only inactivity assessment, lifecycle metrics, preflight, evidence runner and a documented rollout
 
 > **Executor instructions**: Follow this plan step by step. Run every verification command and
 > confirm the expected result before moving to the next step. If anything in "STOP conditions"
@@ -7,250 +7,355 @@
 >
 > **Drift check (run first)**:
 > ```bash
-> git diff --stat 8652c31..HEAD -- \
->   packages/xero/src packages/next-config tooling/release
+> grep -E "^\| \[161[b-g]\]" plans/README.md
 > ```
-> At the time this plan was written that diff was empty. If it is now non-empty, compare the
-> "Current state" excerpts below against the live code before proceeding. A mismatch is a STOP
-> condition.
+> Every row must say DONE, or `BLOCKED (integration gates not run)` for a plan whose code is
+> complete and whose only gap is an unavailable local database or store; list those in the rollout
+> document as outstanding evidence. Any other status is a STOP. Then confirm the names this plan relies on exist:
+> `grep -n "XERO_REMOTE_CLEANUP_MODE\|XERO_APP_TIER\|XERO_RATE_NAMESPACE_EPOCH\|XERO_TOKEN_ENCRYPTION_KEYS_JSON" packages/xero/keys.ts`
+> returns all four, and `grep -n "initialiseXeroRateNamespace" packages/xero/src/rate-limit/shared-store.ts`
+> matches. Any miss is a STOP condition.
 
 ## Status
 
-- **Priority**: P2 for the inactivity evaluator; **P1** for the rollout and monitoring work,
-  which is what makes 161b–161g deployable
+- **Priority**: P2 for the inactivity evaluator; **P1** for metrics, preflight and the rollout
+  document, which make 161b-161g deployable
 - **Effort**: M
 - **Risk**: MED for code, HIGH for the rollout sequence it describes
-- **Depends on**: 161b, 161c, 161d, 161e, 161f and 161g. All six.
+- **Depends on**: 161b, 161c, 161d, 161e, 161f and 161g. All six DONE.
 - **Category**: dx, docs, direction
-- **Planned at**: commit `8652c31`, 22 September 2026 (re-stamped from `585f6cb`; the only changes between those commits are under `plans/`, so every source excerpt below is valid at both)
+- **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b-161g)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
 ## Why this matters
 
-Two things remain after 161b–161g land.
-
 **Operational visibility.** The programme adds distributed budgets, a credential owner model,
 fenced bindings and an asynchronous cleanup worker. Each has a failure mode that is silent without
-metrics: refresh conflicts, ageing unknown cleanups, budget denials, shared-store outages,
-migration conflicts. Deploying all of that without instrumentation means the first signal of a
-problem is a customer complaint.
+signals: refresh conflicts, ageing unknown cleanups, budget denials, shared-store outages,
+migration conflicts. Without instrumentation the first signal is a customer complaint.
 
-**Inactivity, carefully.** Xero's best-practice guidance asks integrators to identify and clean up
-inactive connections. The dangerous version of that feature deletes a paying customer's connection
-because nobody logged in last month. This plan builds only the **evaluator and the report**. It
-sends no notice and deletes nothing, because the evidence needed to distinguish "abandoned" from
-"working exactly as intended, headlessly" is subtle and the cost of getting it wrong is a
-customer's payroll integration.
+**Inactivity, carefully.** Xero's guidance asks integrators to identify inactive connections. The
+dangerous version deletes a paying customer's connection because nobody logged in last month. This
+plan builds only a **pure evaluator and a report**. It sends no notice and deletes nothing.
+
+**A rollout that can actually be followed.** 161b-161g each left ordering constraints (two-phase
+migrations, two-phase backfills, namespace initialisation, cleanup enablement, mirror scrubbing).
+This plan writes them down in one sequence.
 
 ## Current state
 
-- `packages/next-config/bin/preflight.ts` - the preflight entry point, run by `bun run preflight`.
-- `packages/xero/keys.ts` (76 lines) - env validation via `@t3-oss/env-nextjs` `createEnv` with
-  `emptyStringAsUndefined: true`, plus a module-load `keys()` call that blocks boot outside test.
-  By this point 161c has added the encryption keyring variables and 161e has added `XERO_APP_TIER`.
-- `packages/observability` - Sentry and the structured logger. **All logging goes through it;
-  there is no `console.log` in production code.**
-- `packages/analytics` - PostHog and Vercel analytics.
-- `tooling/release/` - the release harness: `run-live-integration.ts`, `verify-live-target.ts`,
-  `write-protected-manifest.ts`, `integration-inventory.ts`, `cleanup.ts`,
-  `playwright.config.ts`, `vitest.config.ts`, `migration-check.ts`.
-- Feed usage records: check how they treat cached and `304` responses **before** relying on them
-  as activity evidence. A feed that is being polled and returning 304 is an actively used feed.
+### Preflight
 
-### Signals that already exist and must be respected
+- `packages/next-config/bin/preflight.ts` (34 lines) is the CLI entry for
+  `bun run preflight <app|api|web>`.
+- `packages/next-config/preflight.ts` (245 lines) holds `runProductionPreflight`, which validates
+  **only the current process's environment** (`envVars`). For `app` and `api` it checks
+  `DATABASE_URL`, `XERO_TOKEN_ENCRYPTION_KEY`, `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, Clerk keys,
+  and (after 161e) `XERO_APP_TIER`, `XERO_RATE_NAMESPACE_EPOCH` and the KV pair. It does not check
+  `XERO_REDIRECT_URI`. Errors name variables, never values.
+- `packages/next-config/preflight.test.ts` is its test suite.
 
-Onboarding completion state, active entitlement (`clerk_org_subscriptions`, via
-`packages/billing`), authorised early-access service, enabled publication, feed consumption,
-explicit sync pause (`XeroTenant.sync_paused_at`), and cancellation or archive state.
+Preflight cannot see another deployment's configuration. Any cross-deployment rule must be enforced
+at runtime through something the deployments share (the shared rate store), plus a written rollout
+check.
+
+### Enablement controls that already exist (do not create new ones)
+
+| Control | Where | Safe default |
+|---|---|---|
+| Remote cleanup execution | `XERO_REMOTE_CLEANUP_MODE` in `packages/xero/keys.ts` (161f) | absent = `report_only` |
+| Shared limiter readiness | namespace sentinel set by `initialiseXeroRateNamespace` (161e); epoch from `XERO_RATE_NAMESPACE_EPOCH` | no sentinel = all admission denied |
+| Canonical credential cutover | per binding: `XeroTenant.xero_credential_owner_id` set by the 161d backfill; `NULL` keeps the legacy path | unbackfilled = legacy path |
+
+Two of these are **not** discretionary toggles: the binding guard (161b) and the shared limiter
+(161e). Once enabled, no rollback may restore silent payroll-file replacement or process-local
+admission.
+
+### Observability
+
+`packages/observability` exports `log` (`log.ts`), `error.ts`, `scrubber.ts`, Sentry init and a
+`status/` folder. **There is no metrics API.** Emit metrics as structured log events at `info`
+level with a fixed `metric` field, which the log pipeline (Better Stack) can aggregate. Do not add
+a metrics dependency.
+
+### Inactivity signals that exist
+
+- `XeroTenant.sync_paused_at` (`schema.prisma:503`).
+- `ClerkOrgSubscription.status` (`schema.prisma:1161-1181`; table `clerk_org_subscriptions`).
+- `FeedToken.last_used_at`, written by `markTokenUsed` in `packages/feeds/src/render/render-feed.ts:341-359`,
+  **throttled to once an hour**. The route `apps/api/app/ical/[token]/route.ts` renders before its
+  304 check (`:63` then `:107-117`), so origin 304s update it; but responses carry
+  `Cache-Control: max-age=3600`, so a client or intermediate cache may not revisit the origin for
+  up to an hour. Treat `last_used_at` as lagging by up to about two hours.
+- `XeroConnection.status`, `Organisation.archived_at`.
+- Onboarding completion is **not stored**; it is derived at request time in
+  `apps/app/lib/server/load-onboarding-state.ts`. The evaluator receives it as `unknown`.
+
+### Release tooling
+
+`tooling/release/` contains `run-live-integration.ts`, `run-source-gates.ts`,
+`verify-live-target.ts`, `write-protected-manifest.ts`, `integration-inventory.ts`, `cleanup.ts`,
+`migration-check.ts`, `playwright.config.ts`, `vitest.config.ts` and `e2e/`. Its tests run with
+`bun run test:release-tools`. `run-live-integration.ts` (202 lines) is a top-level-await script
+with no tests: it throws at `:28` without `--manifest` and asserts live database authority, so it
+cannot be exercised locally as a whole.
+
+### Documentation anchors
+
+`CLAUDE.md` "Inngest job rules" job list (around `:405`) and environment table (around `:443`);
+`AGENTS.md` has its own job list (`:314`) and environment table (around `:357`). 161d already added the
+system-table `clerk_org_id` exception to `CLAUDE.md` and `PRODUCT.md`; do not add it again.
 
 ### Repository conventions to match
 
-- Service functions return `Result<T, E>` from `@repo/core`. Named exports only. No `any`.
-- Zod on all external input. **No `console.log`; use `@repo/observability`.**
+- `Result<T, E>`. Named exports only. No `any`. Zod on external input.
+- **No `console.log`; use `@repo/observability`.**
 - Optional env vars with a format constraint must be **absent**, never `""`.
 - Australian English. **No em dashes anywhere.**
 
 ## Commands you will need
 
-**Fresh worktree setup.** This repository's `.env*` files are gitignored (`.gitignore:35`), so
-a new worktree has none of them. Before running any gate, from the worktree root:
+**Fresh worktree setup**: `bun install --frozen-lockfile`. `bun run build` needs a valid-looking
+`DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that command only.
 
-```bash
-bun install --frozen-lockfile
-```
+**Local integration database**: 161b's "Local integration database" block with the `LOCAL_OK`
+check, for Step 2's migration only.
 
-`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with no
-further setup. **`bun run build` additionally requires two variables**, because
-`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
-`packages/database/keys.ts:10` has no fallback:
-
-- `DATABASE_URL` - any syntactically valid Postgres URL is enough for a build; the client is
-  lazy and nothing connects. Do **not** point it at the real database.
-- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value is enough for a build.
-
-Supply them for the build command only. **Do not create a committed `.env` file, do not copy the
-developer's real values, and do not make either variable optional in `keys.ts` to avoid setting
-them.**
-
-**Two commands are not local gates and appear in no Done criteria here.**
-`bun run preflight <app|api|web>` is a production deployment gate: it requires a positional
-argument and the production-only variables `NEXT_PUBLIC_LAUNCH_MODE`, four Sentry variables and
-three Better Stack variables. `bun run test:release` is a deployed-candidate Playwright suite:
-`tooling/release/e2e/environment.ts:11-17` requires six `TC_*` variables validated when the
-config is merely loaded, and `tooling/release/playwright.config.ts:22-33` declares Firefox and
-WebKit projects whose browsers are not installed by default. Both run during the Plan 161h
-rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
+**Not local gates:** `bun run preflight` and `bun run test:release` run during the rollout this
+plan documents.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Lint | `bun run check` | exit 0 |
 | Types | `bun run typecheck` | exit 0 |
-| Build | `bun run build` | exit 0 |
+| Build | `bun run build` (with the two variables) | exit 0 |
 | All units | `bun run test` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
+| Database units | `bun run --cwd packages/database test` | exit 0 |
 | next-config units | `bun run --cwd packages/next-config test` | exit 0 |
+| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
 | Release tool tests | `bun run test:release-tools` | exit 0 |
 | Release tool types | `bun run typecheck:release-tools` | exit 0 |
-| Filtered app Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
 
 ## Scope
 
 **In scope:**
-- `packages/xero/src/oauth/inactivity-policy.ts` and `inactivity-policy.test.ts` (create)
-- `packages/database/src/queries/` - the scoped reporting query
-- `packages/database/prisma/schema.prisma` and an additive migration for the policy record
-- `packages/observability` instrumentation for the new metrics
-- `packages/next-config/` preflight validation
-- `packages/xero/keys.ts`, `keys.test.ts`
-- App and API `.env.example`
-- `tooling/release/` runners, manifest and cleanup support, the JSON evidence schema and its tests
-- `PRODUCT.md`, `CLAUDE.md` (job list and the credential-owner exception), `AGENTS.md`
+- `packages/xero/src/oauth/inactivity-policy.ts`, `inactivity-policy.test.ts` (create; pure)
+- `packages/xero/src/oauth/inactivity-report.ts`, `inactivity-report.test.ts` (create; gathers
+  inputs and records classifications)
+- `packages/xero/src/metrics.ts`, `metrics.test.ts` (create)
+- `packages/xero/scripts/xero-inactivity-report.ts` (create) and a `report:xero-inactivity`
+  script entry in `packages/xero/package.json`
+- Metric call sites (one-line additions, except the age calculation noted in Step 3):
+  `packages/xero/src/oauth/credential-owner.ts`, `packages/xero/src/rate-limit/limiter.ts`,
+  `packages/xero/src/rate-limit/xero-fetch.ts`, `packages/xero/src/adapter/xero-write-adapter.ts`,
+  `packages/jobs/src/handlers/reconcile-xero-connections.ts`
+- `packages/xero/src/rate-limit/shared-store.ts`, `admission.lua.ts` and `limiter.ts` (the
+  credential-domain check in Step 4 only)
+- `packages/database/src/queries/xero-cleanup.ts` (one query: oldest `unknown` attempt age)
+- `packages/xero/scripts/initialise-xero-rate-namespace.ts` (add `--credential-domain-id`)
+- `tooling/release/xero-evidence.ts`, `xero-evidence.test.ts` (create) and
+  `tooling/release/run-live-integration.ts` (import and call the writer only)
+- `packages/database/prisma/schema.prisma` and one additive migration
+  `<timestamp>_add_xero_inactivity_classifications/`
+- `packages/database/src/queries/xero-inactivity-signals.ts` (create) and its export wrapper
+- `packages/xero/keys.ts`, `keys.test.ts` (`XERO_CREDENTIAL_DOMAIN_ID`)
+- `packages/next-config/preflight.ts`, `preflight.test.ts`
+- `apps/app/.env.example`, `apps/api/.env.example`
+- `CLAUDE.md`, `AGENTS.md`, `PRODUCT.md` (job list, environment table, lifecycle model)
 - `plans/161-xero-execution-report.md`, `plans/README.md`
-- `tasks/todo.md`, `tasks/lessons.md`
+- `tasks/todo.md`, `tasks/lessons.md` (append only)
 
 **Out of scope - do NOT touch:**
-- **Any automatic deletion driven by inactivity.** This plan is report-only, absolutely.
-- **Any customer notice or email.** No inactivity notice is sent under this plan.
-- `packages/xero/src/oauth/` lifecycle logic - 161d and 161f own it.
-- `packages/xero/src/rate-limit/` internals - 161e.
-- Creating a generic feature-flag package. Reuse an existing mechanism.
-- Adding invasive analytics purely to support cleanup. Use evidence that already exists.
-- Any real deployment, push, or production mutation. This plan **describes** the rollout; it does
-  not perform it.
+- **Any automatic deletion driven by inactivity**, or any customer notice or email.
+- Lifecycle logic in `packages/xero/src/oauth/` beyond the named files and one-line metric calls.
+- Rate-limit logic beyond the Step 4 domain check and one metric line.
+- `packages/feeds` (read `FeedToken.last_used_at` through the new database query instead).
+- Creating a feature-flag package or a new switch; use the controls in "Current state".
+- Any real deployment, push, backfill run, migration against a real database, or production
+  mutation. This plan **documents** the rollout.
 
 ## Git workflow
 
-- Branch: `codex/xero-connection-hardening` (shared across 161a–161h).
-- Conventional commits. Suggested: `feat(xero): add report-only inactivity evaluator`, then
-  `feat(observability): instrument xero lifecycle metrics`, then
-  `docs: record xero hardening rollout and rollback procedure`.
+- Branch: `codex/xero-connection-hardening` (shared across 161a-161h).
+- Conventional commits, e.g. `feat(xero): add report-only inactivity evaluator`,
+  `feat(xero): emit xero lifecycle metrics`, `feat(xero): refuse a foreign credential domain`,
+  `feat(release): record xero evidence cases`, `docs: record xero hardening rollout and rollback`.
 - Do NOT push or open a PR.
 
 ## Steps
 
 ### Step 1: The inactivity evaluator, as a pure function
 
-Create `packages/xero/src/oauth/inactivity-policy.ts` exporting a **pure** evaluator: inputs in,
-classification out, no database access and no side effects. That purity is what makes the policy
-testable against the adversarial cases in the test plan.
+Create `packages/xero/src/oauth/inactivity-policy.ts`:
 
-Rules it must encode:
+```typescript
+export const XERO_INACTIVITY_POLICY_VERSION = 1;
+export interface XeroInactivityInputs {
+  now: Date;
+  bindingReserved: boolean;
+  syncPaused: boolean;
+  organisationArchived: boolean;
+  subscriptionActive: boolean | "unknown";
+  onboardingComplete: boolean | "unknown";
+  feedLastUsedAt: Date | null | "unknown";
+  lastHumanActivityAt: Date | null | "unknown";   // login or in-app action, not sync
+}
+export type XeroInactivityClassification =
+  | { kind: "active"; reason: string }
+  | { kind: "unknown"; reason: string }
+  | { kind: "candidate"; reason: string };
+export function classifyXeroInactivity(inputs: XeroInactivityInputs): XeroInactivityClassification;
+```
 
-- **Separate customer or service activity from API polling and token maintenance.** Our own
-  scheduled sync succeeding every hour is evidence the integration works, **not** evidence a human
-  is using it, and equally not evidence of abandonment.
-- **No recent login is not inactivity.** A published calendar feed consumed by Outlook with nobody
-  ever opening the app is the product working as designed.
-- Successful polling cannot make an abandoned account look customer-active.
-- **Missing evidence is `unknown`**, never `inactive`.
-- Consider: onboarding completion, active entitlement or authorised early access, enabled
-  publication, feed consumption, explicit sync pause, cancellation or archive, and retention
-  decisions.
-- Verify how existing feed usage records treat cached and `304` requests before relying on them.
-  A 304 means the feed **is** being consumed.
+No imports other than types. No database, no clock (the caller passes `now`), no logging. Rules:
 
-Store the policy version, the candidate reason, the uncertainty and the review status alongside
-each classification, so a later policy change does not silently reinterpret old classifications.
+- Our own scheduled sync success is **not** an input. Polling neither proves use nor abandonment.
+- A feed used within the last 30 days → `active` (the 30 days is application policy and must exceed
+  the two-hour `last_used_at` lag; comment this).
+- `syncPaused`, `subscriptionActive === true` → `active`.
+- `candidate` only when **all** of: binding reserved; not paused; `subscriptionActive === false`
+  (known); `feedLastUsedAt` known and more than 30 days ago, or known `null` (never used);
+  `lastHumanActivityAt` known and more than 90 days ago, or known `null`. `organisationArchived`
+  true satisfies the subscription and activity conditions on its own (reason
+  `"organisation archived"`).
+- If any of those three signals is `"unknown"` and no `active` rule matched → `unknown`, never
+  `candidate`.
+- `onboardingComplete` is recorded in the reason text only; it never decides a classification
+  (it is always `"unknown"` today).
+- No login alone never makes a `candidate` while a feed is in use.
 
 **Verify**: `bun run --cwd packages/xero test` → exit 0 for `inactivity-policy.test.ts`.
 
-### Step 2: The scoped report
+### Step 2: Signals query and the report
 
-Add a scoped reporting query and an operator-reviewed candidate report, with a defined hand-off to
-161f's targeted cleanup workflow. Future execution of that hand-off needs its own concrete
-authority plus a notice and retention policy; it is not authorised here.
+Add to `schema.prisma`:
 
-**This plan sends no inactivity notice and performs no automatic inactivity-driven DELETE.**
-Explicit disconnect and provably abandoned OAuth cleanup use their own paths in 161f.
+```prisma
+model XeroInactivityClassification {
+  id              String   @id @default(uuid()) @db.Uuid
+  clerk_org_id    String
+  organisation_id String   @db.Uuid
+  xero_tenant_id  String   @db.Uuid
+  policy_version  Int
+  kind            String   // "active" | "unknown" | "candidate"
+  reason          String
+  review_status   String   @default("unreviewed")  // "unreviewed" | "reviewed_keep" | "reviewed_escalate"
+  classified_at   DateTime @default(now())
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@map("xero_inactivity_classifications")
+}
+```
 
-Do not claim that a report-only classification proves an operational removal process exists, or
-that it satisfies any Xero certification requirement.
+Generate the migration as in 161b and apply it locally.
+
+Create `packages/database/src/queries/xero-inactivity-signals.ts`: for reserved bindings, return
+the raw signal values listed in "Current state" (scope IDs included in each row; no credentials,
+no names). Human activity: the most recent `AuditEvent` with a non-null `actor_user_id` for that
+Clerk organisation (read the model in `schema.prisma` around `:1100` for its scope columns); if the
+model cannot be scoped to the organisation, return `"unknown"`.
+
+Create `packages/xero/src/oauth/inactivity-report.ts` exporting
+`buildXeroInactivityReport({ now })` that maps signals to inputs, calls the evaluator, and inserts
+one `XeroInactivityClassification` per binding. It performs no other write and imports nothing
+from the cleanup code. `packages/xero/scripts/xero-inactivity-report.ts` (run as
+`bun run --cwd packages/xero report:xero-inactivity`) calls it and prints counts by `kind`; it is
+the only caller. No job runs it.
 
 **Verify**: `bun run --cwd packages/xero test && bun run --cwd packages/database test` → exit 0.
-`grep -rn "delete\|DELETE" packages/xero/src/oauth/inactivity-policy.ts` → no matches.
+`grep -nE "\.delete(Many)?\(|method: \"DELETE\"|connection-cleanup|management-client" packages/xero/src/oauth/inactivity-policy.ts packages/xero/src/oauth/inactivity-report.ts`
+returns no matches.
 
 ### Step 3: Metrics
 
-Track safe aggregate metrics through `packages/observability`:
+Create `packages/xero/src/metrics.ts`:
 
-refresh conflicts and failures; recovery age; permission-required bindings;
-disabled-but-remote-unknown bindings; cleanup attempts and their age; budget denials;
-shared-store failures; deadline and body failures; migration conflicts.
+```typescript
+export type XeroMetricName =
+  | "xero.refresh.conflict" | "xero.refresh.failed"
+  | "xero.binding.permission_required" | "xero.cleanup.unknown_oldest_age_hours"
+  | "xero.admission.denied" | "xero.store.unavailable" | "xero.fetch.deadline_exceeded";
+export type XeroMetricLabels = Partial<{
+  reason: XeroRecoveryReason | RateLimitDeniedReason | "credential_domain_mismatch";
+  class: XeroRateClass["kind"];
+  outcome: "committed" | "superseded" | "lost_response" | "failed";
+}>;
+export function emitXeroMetric(name: XeroMetricName, value: number, labels?: XeroMetricLabels): void;
+```
 
-**Avoid high-cardinality customer identity in public telemetry.** Aggregate counts and buckets,
-not per-customer series. Configure alert ownership and document remediation for each.
+Label values are closed string unions, so an organisation, user or tenant ID cannot type-check as
+a label. `emitXeroMetric` calls `log.info` with `{ metric: name, value, ...labels }`.
 
-**Verify**: `bun run --cwd packages/xero test` → exit 0, with a test asserting no
-`clerk_org_id`, `organisation_id` or user ID appears in an emitted metric label.
+Emit at: refresh outcomes in `credential-owner.ts` (`conflict` on `superseded`, `failed`);
+admission denials in `limiter.ts`; `XeroFetchError` `deadline_exceeded` in `xero-fetch.ts`;
+`update_permissions` classifications in `xero-write-adapter.ts`; and once per sweep in
+`reconcile-xero-connections.ts`, the age in hours of the oldest `unknown` attempt (the one piece of
+new logic: a single `MIN(updated_at)` query through a new function in 161f's
+`packages/database/src/queries/xero-cleanup.ts`, which is added to this plan's scope).
+Backfill conflicts are reported by the backfill CLIs' own output, not as metrics.
 
-### Step 4: Preflight
+In the execution report, list each metric with its alert threshold (application policy) and the
+remediation, pointing to the 161e and 161f operator procedures.
 
-Extend preflight to validate, for **both** the app and API caller deployments: the intended app
-identity and tier, the callback URL, required scopes and capabilities, the encryption key
-versions, the shared rate store, and the execution mode.
+**Verify**: `bun run --cwd packages/xero test` → exit 0, with a `metrics.test.ts` case containing
+`// @ts-expect-error` on a call that passes a UUID string as `reason`, and a case asserting the
+logged object has only the keys `metric`, `value` and the given labels.
 
-Verify that **all deployments sharing an OAuth app use the same canonical credential and lock
-domain as well as the same rate-budget domain.** Two separate databases using the same app and
-user credentials cannot each act as an independent canonical owner: they will fight over the same
-refresh token. **Do not resolve that by copying credentials between them or by creating a second
-Xero app.** Detect it and fail preflight.
+### Step 4: Preflight and the credential domain
 
-Retain preview connection gating and the registered callback behaviour. **No secret value appears
-in preflight output.**
+Add `XERO_CREDENTIAL_DOMAIN_ID` to `packages/xero/keys.ts` (optional; a UUID). It names the
+database that owns canonical credentials for this Xero app.
 
-**Verify**: `bun run --cwd packages/next-config test` → exit 0, including new tests that the preflight validator reports each new Xero variable as missing when unset, rejects two deployments sharing one OAuth app but not one credential domain, and never echoes a value.
+Preflight (`packages/next-config/preflight.ts`, `app` and `api`): require
+`XERO_CREDENTIAL_DOMAIN_ID`, `XERO_REDIRECT_URI` (must be `https`), and keep 161e's checks. Error
+text names variables only.
+
+Runtime rule (shared store): `initialiseXeroRateNamespace({ epoch, assumeSpentDaily,
+credentialDomainId })` also writes `credentialDomainId` into the namespace sentinel. The admission
+script (`admission.lua.ts`) receives the deployment's `XERO_CREDENTIAL_DOMAIN_ID` as an argument
+and returns a new denial reason `credential_domain_mismatch` (add it to `RateLimitDeniedReason`;
+`xeroFetch` treats it like `infrastructure`) when the sentinel's value differs. In production an
+unset `XERO_CREDENTIAL_DOMAIN_ID` makes the store deny everything (preflight already requires it);
+in development and test the memory store skips the check. This detects two databases sharing one store and one Xero app. It cannot
+detect two deployments that also use different stores; the rollout checklist in Step 7 covers that
+by inspection.
+
+Add commented placeholders for the new variables to both `.env.example` files. Update the 161e
+`rate:initialise-namespace` script to take `--credential-domain-id`.
+
+**Verify**: `bun run --cwd packages/next-config test` → exit 0 with new cases: each new variable
+reported when missing; a non-https redirect URI rejected; captured output contains no value.
+`bun run --cwd packages/xero test` → exit 0 with a mismatch-denies test using the in-memory store.
 `bun run build && bun run typecheck` → exit 0.
 
-The real `bun run preflight <app|api|web>` runs during the rollout in Step 7 against a configured deployment. It is not a gate here.
+### Step 5: Enablement controls
 
-### Step 5: Enablement controls, failing safe
+Do not add a switch. In `CLAUDE.md` (environment table) and `AGENTS.md` (environment table),
+document the three controls from "Current state" and state that the binding guard and the shared
+limiter are not discretionary.
 
-Use explicit configuration for three switches: canonical-credential cutover, shared-limiter
-readiness, and remote-cleanup execution. Reuse an existing mechanism; do not create a feature-flag
-package.
-
-**Defaults fail safe.** Missing destructive-cleanup approval or configuration keeps the system
-report-only while production readiness stays incomplete.
-
-Two of these are **not** discretionary toggles, and the code and documentation must say so:
-
-- **The binding guard.** Once enabled, no rollback may restore silent payroll-file replacement.
-- **The shared limiter.** Loss of the shared store must not switch production back to
-  process-local quota admission.
-
-**Verify**: `bun run test` → exit 0.
-`bun run --cwd packages/xero test` → exit 0 with a test asserting the default configuration leaves
-destructive cleanup disabled.
+**Verify**: `grep -n "XERO_REMOTE_CLEANUP_MODE" CLAUDE.md AGENTS.md` returns a match in each.
 
 ### Step 6: The evidence runner
 
-Extend the existing Plan 160 / release manifest runner in `tooling/release/`. **Do not invent a
-new CLI name and do not create a second testing system.** Document the exact executable invocation
-in `plans/161-xero-execution-report.md` once implemented.
+Create `tooling/release/xero-evidence.ts`, a pure module:
 
-Produce Markdown **and** machine-readable JSON, even when prerequisites are missing or tests fail.
-Each required case records:
+```typescript
+export const XERO_EVIDENCE_CASES: readonly XeroEvidenceCase[]; // from charter Section 8.3
+export function buildXeroEvidence(input: {
+  results: Partial<Record<XeroEvidenceCaseId, XeroEvidenceObservation>>;
+  prerequisites: Record<string, boolean>;
+  candidateSha: string;
+  deployedSha: string | null;
+}): { json: XeroEvidenceReport; markdown: string; exitCode: 0 | 1 };
+export function writeXeroEvidence(dir: string, report: ReturnType<typeof buildXeroEvidence>): void;
+```
+
+Each case in the report carries:
 
 ```text
 caseId, requirement, requiredEvidenceLevels,
@@ -262,160 +367,135 @@ restrictedEvidenceLocations, fixtureOwnershipReference,
 cleanupStatus, remainingAction
 ```
 
-Use separate top-level status values for source checks, configured-database tests,
-distributed-store tests, browser tests and live provider verification. Record the local
-integration SHA and any deployed SHA **separately**.
+Separate top-level statuses for source checks, configured database, distributed store, browser and
+live provider. `exitCode` is 0 **only** when every required case is PASS; a missing result or a
+false prerequisite yields `NOT_VERIFIED` and exit code 1, and the report names the missing
+prerequisite. An observation whose `evidenceLevel` is `mock` can never satisfy a `live_provider`
+requirement. In `run-live-integration.ts`, import the module and, in a `finally` around its
+existing work, write both files to a `--evidence-dir` argument when given. Do not change anything
+else in that script.
 
-The runner exits zero **only** when all required selected cases pass. Use a non-zero exit for a
-failed assertion or a missing mandatory prerequisite, and record which. A required skipped
-scenario is `NOT_VERIFIED`, never `PASS`.
+Document the exact invocation in the execution report.
 
-**Never report a mocked HTTP test as live Xero proof, or a single-process fake as distributed-store
-proof.** Real provider identifiers and customer diagnostics belong in access-controlled evidence,
-not a public repository report.
-
-**Verify**: `bun run test:release-tools && bun run typecheck:release-tools` → exit 0.
+**Verify**: `bun run test:release-tools && bun run typecheck:release-tools` → exit 0 with tests
+12-14 in `xero-evidence.test.ts`.
 
 ### Step 7: Document the rollout and the rollback
 
-Write the following into `plans/161-xero-execution-report.md`. This is documentation of a
-**procedure**; executing it needs its own authority and is not part of this plan.
+Write into `plans/161-xero-execution-report.md`, under "Rollout procedure (not executed)":
 
-**Rollout sequence:**
+1. Capture source, database and configuration fingerprints and the owned fixture inventory.
+   Inspect every deployment using the Xero app and confirm they share one database
+   (`XERO_CREDENTIAL_DOMAIN_ID`) and one store.
+2. Deploy 161b migration A. Run `backfill:xero-tenant-binding --dry-run`; with zero collisions run
+   `--apply`. Only then deploy 161b migration B (its guard aborts otherwise). Deploy 161c-161f
+   additive migrations. Verify constraints and **unchanged payroll row counts**.
+3. Initialise the rate namespace with
+   `bun run --cwd packages/xero rate:initialise-namespace --epoch <e> --assume-spent-daily --credential-domain-id <id>`
+   before any deployment running 161e code serves traffic; an empty store is not a fresh daily
+   allowance. Drain every deployment still running the process-local limiter first.
+4. Run the 161d two-phase credential-owner backfill (identity plan, then `--dry-run`, then
+   `--apply`). Bindings it cannot verify stay on the legacy path and are listed for controlled
+   reauthorisation. **Never choose account owners automatically.**
+5. Deploy 161g. Unowned (legacy) bindings keep working through 161d's legacy fallback inside
+   `resolveXeroAccess`. Verify recovery reasons, the callback and refresh recovery on owned
+   fixtures. Groups of bindings sharing one Xero user that the backfill left unowned are attached
+   by a controlled reauthorisation, one customer at a time, with that customer's agreement.
+6. With `XERO_REMOTE_CLEANUP_MODE` unset, observe cleanup requests and targets in report-only mode.
+7. Set `XERO_REMOTE_CLEANUP_MODE=enabled` only after the management-token provisioning row in the
+   provider ledger is verified, owned live DELETE outcomes pass, and the operator procedure is
+   staffed.
+8. Run the evidence runner against the same candidate; record local and deployed SHAs separately.
+9. Scrub the mirrored `XeroConnection` credential columns (and remove 161d's mirror-write in a
+   follow-up) only after every reserved binding has an owner and no reader remains. Keep old key
+   material while any envelope references it.
 
-1. Capture source, database and configuration fingerprints, the owned fixture inventory and
-   recovery evidence. Produce a restricted duplicate and provenance report.
-2. Apply the additive expansion migrations on the existing authorised database. Verify the
-   constraints, the backup and recovery provisions, and **unchanged payroll identity and counts**.
-3. Run the resumable credential and binding migration; verify every resolvable row. Quarantine
-   ambiguous rows with explicit recovery state. **Never choose account owners automatically.**
-4. Quiesce and drain incompatible old token writers and process-local rate callers across every
-   deployment. Canonical coordination and distributed budgets must not be undercut by an old
-   deployment still running.
-5. Switch credential readers/writers and binding guards; verify error and capability handling, the
-   callback, and refresh recovery. Account **conservatively** for pre-cutover provider usage when
-   enabling shared budgets: an empty store does not mean a fresh daily allowance.
-6. Deploy and verify management **read and report mode**. Observe the candidate sets and the
-   protected active references before enabling any deletion.
-7. Enable targeted cleanup only after authority, the documented endpoint contract, owned live
-   outcomes, generation fencing and the operator recovery gate all pass.
-8. Run the final configured-database, real shared-store, browser and authorised live-provider
-   scenarios on the same candidate. Record the final merged or deployed SHA separately.
-9. Scrub superseded secret copies **only after** canonical references and recovery envelopes are
-   proven. Keep non-secret history and the old key material needed by legitimately retained
-   ciphertext until it can be safely retired.
+Rollback: stop provider admission and the cleanup worker where needed; preserve local disables,
+reservations, attempt history and adopted credentials; restore only a compatible reviewed version.
+Do not restore stale refresh tokens from a backup and use them. Do not reverse additive migrations
+by deleting payroll data. **Never revert to silent rebinding, independent token rotation or
+fail-open rate limiting.** An unresolved issued DELETE stays unresolved after a code rollback.
 
-**Rollback:**
+**Verify**: `grep -c "Rollout procedure (not executed)" plans/161-xero-execution-report.md` prints `1`.
 
-Stop new provider admissions and cleanup workers where required. Preserve the local disable state,
-the reservations, the attempt history and the adopted canonical credentials. Restore only a
-compatible reviewed code version.
+### Step 8: Documentation
 
-**Do not restore stale refresh tokens from a backup and immediately use them.** Restore service
-through controlled provider reconciliation or reauthorisation.
+- `CLAUDE.md` and `AGENTS.md`: add `reconcile-xero-connections` to both Inngest job lists; add
+  `XERO_APP_TIER`, `XERO_RATE_NAMESPACE_EPOCH`, `XERO_CREDENTIAL_DOMAIN_ID`,
+  `XERO_REMOTE_CLEANUP_MODE`, `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION`,
+  `XERO_TOKEN_ENCRYPTION_KEYS_JSON` to both environment tables.
+- `PRODUCT.md`: the credential owner, provider connection and binding-on-`XeroTenant` model.
+- `tasks/todo.md`, `tasks/lessons.md`: append scoped entries; preserve history.
+- `plans/README.md`: status rows for 161b-161h.
 
-Do not reverse the additive migrations by deleting payroll data. **Never revert to silent
-rebinding, legacy independent token rotation, or fail-open rate limiting.** An unresolved issued
-DELETE stays unresolved after an application rollback; rolling back the code does not recall it.
-Report the actual reduced service and the required operator action.
-
-**Verify**: `bun run check && bun run typecheck && git diff --check` → all exit 0.
-
-### Step 8: Update the documentation
-
-- `CLAUDE.md`: add `reconcile-xero-connections` to the Inngest job list; add the new environment
-  variables to the environment table; record the `XeroCredentialOwner` `clerk_org_id` exception.
-- `PRODUCT.md`: record the credential owner, provider connection and tenant binding model.
-- `AGENTS.md`: the architecture sections affected.
-- `tasks/todo.md` and `tasks/lessons.md`: scoped entries. **Preserve existing history.**
-- `plans/README.md`: status rows for 161a–161h.
-
-**Verify**: `grep -n "reconcile-xero-connections" CLAUDE.md` returns a match.
+**Verify**: `grep -c "reconcile-xero-connections" CLAUDE.md AGENTS.md` prints at least `1` for each.
 
 ## Test plan
 
-`packages/xero/src/oauth/inactivity-policy.test.ts` (new). These cases are adversarial on purpose;
-each is a way the naive version of this feature deletes a real customer's connection:
+`inactivity-policy.test.ts` (new):
+1. **An active calendar feed with no login for six months is not a candidate.**
+2. A feed used 2 hours ago (within the `last_used_at` lag) counts as use.
+3. `syncPaused` is `active`, not a candidate.
+4. An active subscription is `active`.
+5. Scheduled sync success is not an input (type-level: the inputs have no such field).
+6. Any `"unknown"` input yields `unknown`, never `candidate`.
+7. The full candidate case carries a reason; the report row stores `policy_version`.
+8. Purity: same inputs twice give equal outputs; the module has no runtime imports (assert on the
+   file's import lines).
 
-1. **An active calendar feed with no login for six months is not inactive.** The headline case:
-   the product working exactly as designed looks like abandonment to a login-based policy.
-2. A feed returning `304` counts as consumption, not silence.
-3. Deliberately paused sync (`sync_paused_at` set) is not inactivity.
-4. An active entitlement or authorised early-access service is not inactivity.
-5. Our own successful scheduled polling does **not** make an abandoned account look active.
-6. Missing evidence classifies as `unknown`, never `inactive`.
-7. Incomplete onboarding plus no feed plus no entitlement is a **candidate**, and the record
-   carries a reason and the policy version.
-8. The evaluator is pure: the same inputs give the same output and it performs no I/O.
-
-Instrumentation and configuration tests:
-9. No emitted metric label contains `clerk_org_id`, `organisation_id` or a user ID.
-10. Default configuration leaves destructive cleanup disabled.
-11. Preflight rejects two deployments sharing one OAuth app but not one credential domain.
-12. Preflight output contains no secret value. Assert on the captured output.
+Instrumentation and configuration:
+9. A UUID passed as a label fails to type-check, and the logged object carries only `metric`, `value` and labels.
+10. Preflight reports each new variable when missing and never echoes a value.
+11. A different `XERO_CREDENTIAL_DOMAIN_ID` from the recorded one denies admission.
 
 `tooling/release/` tests:
-13. The evidence runner exits non-zero when a mandatory prerequisite is missing, and records which.
-14. A required skipped scenario is recorded `NOT_VERIFIED`, never `PASS`.
-15. A mocked HTTP result is not recorded as live provider evidence.
+12. The runner exits non-zero when a mandatory prerequisite is missing and records which.
+13. A required skipped case is `NOT_VERIFIED`, never `PASS`.
+14. A mocked-transport result is never recorded at the live-provider level.
 
 ## Done criteria
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run build` exits 0
-- [ ] `bun run test` exits 0
-- [ ] `bun run --cwd packages/next-config test` exits 0, including the new preflight validator tests
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `bun run typecheck:release-tools` exits 0
-- [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
+- [ ] `bun run check`, `bun run typecheck`, `bun run build` (with the two variables), `bun run test` exit 0
+- [ ] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
+- [ ] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
 - [ ] `git diff --check` exits 0
-- [ ] `grep -rn "DELETE\|delete" packages/xero/src/oauth/inactivity-policy.ts` returns no matches
-- [ ] `grep -n "reconcile-xero-connections" CLAUDE.md` returns a match
-- [ ] The evidence runner produces both Markdown and JSON when run with a deliberately missing prerequisite, and exits non-zero
-- [ ] `git status --short` shows no modified file outside the In scope list
-- [ ] `plans/README.md` status rows for 161a-161h reflect actual state
+- [ ] `grep -nE "\.delete(Many)?\(|method: \"DELETE\"|connection-cleanup|management-client" packages/xero/src/oauth/inactivity-policy.ts packages/xero/src/oauth/inactivity-report.ts` returns no matches
+- [ ] `grep -c "reconcile-xero-connections" CLAUDE.md AGENTS.md` shows at least 1 in each
+- [ ] `grep -n "XERO_REMOTE_CLEANUP_MODE" CLAUDE.md AGENTS.md` matches in each
+- [ ] `grep -c "Rollout procedure (not executed)" plans/161-xero-execution-report.md` prints `1`
+- [ ] `xero-evidence.test.ts` includes a case where a prerequisite is `false`: `buildXeroEvidence` returns `exitCode: 1`, both `json` and `markdown` are non-empty and name the prerequisite, and `writeXeroEvidence` writes both files to a temporary directory
+- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [ ] `plans/README.md` status rows for 161b-161h reflect actual state
 
 ## STOP conditions
 
 Stop and report; do not improvise:
 
-- Any of 161b–161g is incomplete. This plan's monitoring and rollout describe **their** behaviour;
-  documenting a rollout for code that does not exist produces a false readiness signal. Report
-  which plans are outstanding.
-- You are about to send an inactivity notice, or to delete anything on the basis of an inactivity
-  classification. **Neither is authorised by this plan, in any form, for any account.**
-- Existing feed usage records turn out **not** to distinguish a cached or `304` request from no
-  request at all. Then feed consumption is not usable evidence. Report it and mark those
-  classifications `unknown` rather than inferring inactivity.
-- Preflight detects two deployments sharing an OAuth app but not a credential domain. Report it.
-  **Do not resolve it by copying credentials or by creating a second Xero app.**
-- Adding a metric would require high-cardinality customer identity in public telemetry. Aggregate
-  instead, or report that the metric is not safely obtainable.
+- Any of 161b-161g is not DONE, or the drift-check names are missing.
+- You are about to send an inactivity notice, or to delete or disable anything because of an
+  inactivity classification.
+- Feed usage evidence cannot be read through the database query. Classify those bindings
+  `unknown`.
+- Adding a metric would require an organisation, user or tenant identifier as a label.
+- Wiring the writer into `run-live-integration.ts` would require changing its live-authority
+  checks or argument contract beyond adding `--evidence-dir`.
+- You are about to perform any rollout step, run a backfill against a real database, push, deploy
+  or mutate production.
 - A step's verification fails twice after a reasonable fix attempt.
-- You are about to perform the rollout rather than document it, or to push, deploy or mutate
-  production. This plan writes a procedure. Executing it is a separate, authorised act.
 
 ## Maintenance notes
 
-- **The inactivity evaluator is pure and report-only, and both properties are load-bearing.**
-  The pressure over time will be to "just wire it up" to the cleanup worker from 161f, which is
-  one small change away and would make the system delete customer connections on a heuristic.
-  Any change that gives this module database write access or a cleanup dependency should be
-  treated as a product decision requiring explicit authority, not a refactor.
-- **Test 1 is the test that matters.** A calendar feed consumed by Outlook for six months with
-  nobody logging in is the product succeeding. Any future policy change must keep that case
-  passing.
-- The policy version is stored per classification so that changing the policy does not silently
-  reinterpret historical candidates. Keep writing it.
-- Preflight's credential-domain check catches a configuration mistake that is invisible until two
-  deployments start fighting over one refresh token, at which point customers see random
-  disconnections. Do not relax it to unblock an environment.
-- In review, scrutinise: anything that gives the inactivity module a side effect, any metric label
-  carrying customer identity, and any change to the evidence runner's exit-code logic (a runner
-  that exits zero on a skipped mandatory scenario silently certifies an unverified release).
-- **Deferred, and each needs its own plan and authority:** executing the rollout; actual inactivity
-  cleanup with a notice and retention policy; retiring `XERO_TOKEN_ENCRYPTION_KEY`; dropping the
-  legacy credential columns on `XeroConnection`; and NZ or UK activation.
+- **The evaluator is pure and the report is write-only to its own table.** Wiring it to 161f's
+  cleanup is a product decision needing explicit authority, not a refactor.
+- **Test 1 is the test that matters.** A feed consumed for six months with no login is the product
+  succeeding.
+- `policy_version` is stored per classification so policy changes do not reinterpret history.
+- The credential-domain check catches a configuration mistake that otherwise shows up as random
+  disconnections when two databases fight over one refresh token. Do not relax it.
+- In review, scrutinise: any side effect in the inactivity modules, any metric label, and the
+  runner's exit-code logic.
+- **Deferred, each needing its own plan and authority:** executing the rollout; inactivity cleanup
+  with notice and retention policy; retiring `XERO_TOKEN_ENCRYPTION_KEY`; dropping the mirrored
+  credential columns; removing 161d's mirror-write; NZ or UK activation.

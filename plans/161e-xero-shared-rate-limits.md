@@ -1,4 +1,4 @@
-# Plan 161e: Replace process-local Xero rate limiting with a shared, fail-closed distributed budget
+# Plan 161e: Share Xero rate budgets across deployments, keyed by external tenant, tier-aware and fail-closed
 
 > **Executor instructions**: Follow this plan step by step. Run every verification command and
 > confirm the expected result before moving to the next step. If anything in "STOP conditions"
@@ -7,51 +7,50 @@
 >
 > **Drift check (run first)**:
 > ```bash
-> git diff --stat 8652c31..HEAD -- \
->   packages/xero/src/rate-limit packages/core/src/redis-rest-transport.ts packages/xero/keys.ts
+> git log --oneline 6b934be..HEAD -- packages/xero/src/rate-limit packages/core/src/redis-rest-transport.ts \
+>   packages/xero/keys.ts packages/next-config .github/workflows/ci.yml
 > ```
-> At the time this plan was written that diff was empty. If it is now non-empty, compare the
-> "Current state" excerpts below against the live code before proceeding. A mismatch is a STOP
-> condition.
+> Expect only 161b-161d commits. Confirm 161c landed: `grep -n "finally" packages/core/src/redis-rest-transport.ts`
+> matches, and `packages/xero/src/rate-limit/deadline.ts` exists. Re-check each
+> `file:line` below by function name; a changed body is a STOP condition.
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH (fail-closed admission: a mistake stops all Xero traffic rather than degrading)
-- **Depends on**: `plans/161a-xero-baseline-and-fixture-ownership.md` (the shared-store namespace
-  fixtures and the rate-bucket column of the provider contract ledger) and
-  `plans/161c-xero-deadlines-and-key-versioning.md` (the corrected transport and the deadline
-  contract). Consumes `resolveXeroAccess` from
-  `plans/161d-xero-canonical-credentials.md` where available.
+- **Depends on**: `plans/161a-xero-baseline-and-fixture-ownership.md` (DONE; fixture namespace) and
+  `plans/161c-xero-deadlines-and-key-versioning.md` (bounded transport, `XeroDeadline`,
+  `acquire(orgKey, { maxWaitMs })`). 161b is not required (rate keys use `XERO_CLIENT_ID`
+  directly). If 161d has landed, its `refreshXeroCredentialOwner` also calls `exchangeToken`
+  with a placeholder `xero-owner:<id>` key; convert it to the `token` class too.
 - **Category**: bug, security
-- **Planned at**: commit `8652c31`, 22 September 2026 (re-stamped from `585f6cb`; the only changes between those commits are under `plans/`, so every source excerpt below is valid at both)
+- **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b and 161c)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
 ## Why this matters
 
 Xero's rate limits are enforced per **Xero tenant** across every caller using the same app. Team
-Calendar's limiter holds its counters in in-process `Map`s and keys them by **internal** IDs. Three
-consequences follow, and all three are live today:
+Calendar's limiter holds its counters in in-process `Map`s and keys them by **internal** IDs:
 
 1. Every Vercel instance starts with a fresh full budget, so the real aggregate can be many times
    the permitted rate.
-2. Reconnecting a payroll file mints new internal IDs, which resets that tenant's allowance even
-   though Xero's counter did not move.
-3. The daily allowance is hard-coded at 5,000, which is correct only for non-Starter tiers. On
-   Starter the real ceiling is 1,000 and the app will blow through it.
+2. The key is `clerkOrgId:organisationId`, not the external tenant, so anything that changes the
+   internal identity (a new payroll entity for the same file after a retired binding, for example)
+   starts a new allowance although Xero's counter did not move.
+3. The daily allowance is hard-coded at 5,000, correct only for non-Starter tiers. On Starter the
+   ceiling is 1,000.
 
-When the limiter is wrong, the failure is not local: Xero throttles the whole app, and every
+When the limiter is wrong the failure is not local: Xero throttles the whole app, and every
 customer's sync stops.
 
 ## Current state
 
 ### Process-local state
 
-`packages/xero/src/rate-limit/limiter.ts` (262 lines):
+`packages/xero/src/rate-limit/limiter.ts` (262 lines). `RateLimitAcquireResult` (`:31-35`):
 
 ```typescript
-// packages/xero/src/rate-limit/limiter.ts:31-35
 export type RateLimitDeniedReason = "concurrency" | "daily" | "minute";
 
 export type RateLimitAcquireResult =
@@ -59,26 +58,16 @@ export type RateLimitAcquireResult =
   | { ok: true; release: () => void };
 ```
 
-```typescript
-// packages/xero/src/rate-limit/limiter.ts:79-84
-export class XeroRateLimiter {
-  // ...
-  private readonly orgStates = new Map<string, OrgState>();
-  private readonly concurrency = new Map<string, ConcurrencyState>();
-```
+`XeroRateLimiter` (`:79`) holds `private readonly orgStates = new Map<string, OrgState>()` and
+`private readonly concurrency = new Map<string, ConcurrencyState>()` (`:83-84`). `OrgState` is two
+continuously refilling `TokenBucket`s (`day`, `minute`), which is not a strict rolling-window cap.
+The class comment (`:76-78`) points to "BLOCKED.md item D"; that file does not exist.
 
-`OrgState` holds two `TokenBucket`s (`day` and `minute`), each with `capacity`, `lastRefillMs`,
-`refillPerMs` and `tokens`. That is a **continuously refilling token bucket**, which is not the
-same thing as a strict rolling-window cap.
-
-### Wrong key identity
+### Key identity
 
 `packages/xero/src/rate-limit/xero-fetch.ts:55-65`:
 
 ```typescript
-// Build the org-scoped limiter key from the tenant identity already threaded
-// through every Xero call. Falls back to the clerk org id alone for OAuth
-// bootstrap calls made before an Organisation row exists.
 export function orgRateLimitKey(input: {
   clerkOrgId: string;
   organisationId?: null | string;
@@ -89,315 +78,408 @@ export function orgRateLimitKey(input: {
 }
 ```
 
-Both components are internal identifiers. Neither is the external Xero tenant ID that Xero
-actually counts against.
+Every `xeroFetch` call site passes `orgKey` built by `orgRateLimitKey`:
 
-Call sites: `packages/xero/src/au/read.ts` (lines 93, 225, 302, 386, 458),
-`packages/xero/src/au/write.ts:185`, `packages/xero/src/oauth/service.ts` (186, 434, 775, 1511),
-`packages/xero/src/uk/read.ts:62` and the NZ equivalent.
+- Tenant payroll calls: `au/read.ts` (93, 225, 302, 386, 458), `au/write.ts:185`,
+  `nz/read.ts` (62, 325, 532, 620), `uk/read.ts` (62, 332, 555, 643), and in `oauth/service.ts`
+  `inferPayrollRegionForTenant` (`GET /api.xro/2.0/Organisation`, built at `:434`).
+- OAuth token calls: `exchangeToken` (`service.ts:2004`), keyed from `:186` (callback) and `:775`
+  (refresh).
+- User connection inventory: `fetchConnections` (`service.ts:2130`), called from `:199`.
+- Connection deletion: `revokeXeroConnectionAtSource` (`service.ts:1650`), keyed from `:1511`.
 
-### Hard-coded limits
+Each of those helpers takes `orgKey` as a parameter (`:1652/1662`, `:1852/1872`, `:2008/2037`,
+`:2132/2141`). Every tenant payroll call site also has the external tenant ID in hand, because it
+sends the `Xero-Tenant-Id` header.
 
-`packages/xero/src/rate-limit/limits.ts` (16 lines, complete at baseline):
+### Limits
 
-```typescript
-export const XERO_CALLS_PER_MINUTE_PER_ORG = 60;
-export const XERO_CALLS_PER_DAY_PER_ORG = 5000;
-export const XERO_CONCURRENT_REQUESTS_PER_ORG = 5;
-export const XERO_CALLS_PER_MINUTE_APP_WIDE = 10_000;
-```
+`packages/xero/src/rate-limit/limits.ts` after 161c keeps the four published constants
+(`XERO_CALLS_PER_MINUTE_PER_ORG = 60`, `XERO_CALLS_PER_DAY_PER_ORG = 5000`,
+`XERO_CONCURRENT_REQUESTS_PER_ORG = 5`, `XERO_CALLS_PER_MINUTE_APP_WIDE = 10_000`),
+`DEFAULT_MAX_WAIT_MS = 65_000`, and 161c's operation budgets. Read the file; do not assume.
 
-Plan 161c replaced `DEFAULT_MAX_WAIT_MS` in this file. Read the current contents; do not assume.
+### The store
 
-### The store to build on
+`packages/core/src/redis-rest-transport.ts` exports `executeRedisRestCommand`, which sends one
+Upstash-style REST command (JSON array body, bearer token). `EVAL` is therefore available as a
+single atomic command. The KV variables are declared today only in `packages/feeds/keys.ts:10-15`
+as an **optional** pair, and preflight checks them as optional-together
+(`packages/next-config/preflight.ts:194`, `checkPair`). Both `.env.example` files have them
+commented out.
 
-`packages/core/src/redis-rest-transport.ts` - the Redis REST transport, with its body-deadline
-defect fixed by 161c. The configured service is the existing Vercel KV-compatible store
-(`KV_REST_API_URL`, `KV_REST_API_TOKEN`).
+### Tests and fixtures
+
+- `packages/xero/src/rate-limit/xero-fetch.test.ts:181-190` tests `orgRateLimitKey`.
+- `packages/xero/src/rate-limit/shared-store.integration.test.ts` is registered in
+  `LIVE_FIXTURE_SUITES` with one `shared_store_namespace` global key (local value
+  `local_shared_store_N`). It is **not** in `tooling/release/integration-inventory.ts`.
+- CI (`.github/workflows/ci.yml`) runs `bun run test:integration` with a Postgres service and **no
+  Redis**. A new integration suite that needs Redis will fail CI unless CI gains a Redis service.
+- `packages/next-config/preflight.test.ts` is the preflight suite.
+
+### Provider contract
+
+`plans/161-xero-provider-contract.md` records, per endpoint, a "Rate bucket" column describing the
+**current** org-keyed behaviour. Update it (Step 7) to the classes this plan introduces.
 
 ### Repository conventions to match
 
-- Service functions return `Result<T, E>` from `@repo/core`. Do not throw for expected failures.
-- Named exports only. No default exports. Strict TypeScript, no `any`, no unjustified `as`.
-- Zod on all external input, including every store response and every response header parsed.
+- `Result<T, E>` from `@repo/core`. Named exports only. Strict TypeScript, no `any`.
+- Zod on all external input, including every store response and every parsed response header.
 - Integration tests co-located under `src/` in `packages/xero`.
+- Optional env vars with a format constraint must be absent, never `""`.
 - Australian English. **No em dashes anywhere.** No `console.log`.
 
 ## Commands you will need
 
-**Fresh worktree setup.** This repository's `.env*` files are gitignored (`.gitignore:35`), so
-a new worktree has none of them. Before running any gate, from the worktree root:
+**Fresh worktree setup.** `bun install --frozen-lockfile`. `bun run build` additionally needs a
+syntactically valid `DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that
+command only.
+
+**Local shared store (Step 6 onwards).** Upstash's REST protocol is served locally by the
+`serverless-redis-http` container in front of Redis:
 
 ```bash
-bun install --frozen-lockfile
+docker network create tc-161-net 2>/dev/null || true
+docker run -d --name tc-161-redis --network tc-161-net redis:7
+docker run -d --name tc-161-srh --network tc-161-net -p 8079:80 \
+  -e SRH_MODE=env -e SRH_TOKEN=local-test-token \
+  -e SRH_CONNECTION_STRING=redis://tc-161-redis:6379 hiett/serverless-redis-http:latest
+export TC_TEST_KV_REST_API_URL=http://localhost:8079
+export TC_TEST_KV_REST_API_TOKEN=local-test-token
 ```
 
-`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with no
-further setup. **`bun run build` additionally requires two variables**, because
-`packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
-`packages/database/keys.ts:10` has no fallback:
+`local-test-token` is a throwaway value for a local container, not a secret. The shared-store
+integration suite must refuse any `TC_TEST_KV_REST_API_URL` whose host is not `localhost`/`127.0.0.1`
+unless the protected live-manifest mode from `packages/database/src/live-test-guard.ts` is active.
+The suite also needs the local Postgres used by every other integration suite (see 161b's
+"Local integration database" block; same `docker run` and `DATABASE_URL`).
 
-- `DATABASE_URL` - any syntactically valid Postgres URL is enough for a build; the client is
-  lazy and nothing connects. Do **not** point it at the real database.
-- `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value is enough for a build.
+If Docker is unavailable, record the integration gate `NOT_VERIFIED: no local store` in the
+execution report and set the README status `BLOCKED (integration gates not run)`.
 
-Supply them for the build command only. **Do not create a committed `.env` file, do not copy the
-developer's real values, and do not make either variable optional in `keys.ts` to avoid setting
-them.**
-
-**Two commands are not local gates and appear in no Done criteria here.**
-`bun run preflight <app|api|web>` is a production deployment gate: it requires a positional
-argument and the production-only variables `NEXT_PUBLIC_LAUNCH_MODE`, four Sentry variables and
-three Better Stack variables. `bun run test:release` is a deployed-candidate Playwright suite:
-`tooling/release/e2e/environment.ts:11-17` requires six `TC_*` variables validated when the
-config is merely loaded, and `tooling/release/playwright.config.ts:22-33` declares Firefox and
-WebKit projects whose browsers are not installed by default. Both run during the Plan 161h
-rollout and the Plan 160 campaign. **Never stub either to make it run locally.**
+**Not local gates:** `bun run preflight` and `bun run test:release`.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
 | Lint | `bun run check` | exit 0 |
 | Types | `bun run typecheck` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
-| Xero integration (guarded) | `bun run --cwd packages/xero test:integration` | exit 0 |
+| Xero integration (local DB + store) | `bun run --cwd packages/xero test:integration` | exit 0, `shared-store.integration.test.ts` collected |
 | next-config units | `bun run --cwd packages/next-config test` | exit 0 |
+| Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
 
 ## Scope
 
 **In scope:**
-- `packages/xero/src/rate-limit/shared-store.ts` (create)
-- `packages/xero/src/rate-limit/shared-store.test.ts` (create)
-- `packages/xero/src/rate-limit/shared-store.integration.test.ts` (create)
+- `packages/xero/src/rate-limit/shared-store.ts`, `shared-store.test.ts`,
+  `shared-store.integration.test.ts` (create)
+- `packages/xero/src/rate-limit/admission.lua.ts` (create; the Lua script as an exported string)
+- `packages/xero/src/rate-limit/memory-store.ts` (create; see Step 4)
 - `packages/xero/src/rate-limit/limiter.ts`, `limits.ts`, `xero-fetch.ts` and their tests
+- Every `xeroFetch` call site (list them with
+  `grep -rn "xeroFetch(" packages/xero/src --include=*.ts | grep -v "\.test\.ts"`; the list in
+  "Current state" plus any 161d added), **only** to pass the new rate class; this includes the
+  `oauth/service.ts` and `oauth/credential-owner.ts` helper signatures that carry `orgKey`
+- `packages/xero/scripts/initialise-xero-rate-namespace.ts` (create) and a
+  `rate:initialise-namespace` script entry in `packages/xero/package.json`
 - `packages/xero/keys.ts`, `packages/xero/keys.test.ts`
 - `packages/xero/index.ts` (exports only)
-- `packages/next-config/` preflight validation, app and API `.env.example`
-- The `orgRateLimitKey` call sites listed above, **only** to pass the external tenant ID
+- `packages/next-config/preflight.ts` and `preflight.test.ts`
+- `apps/app/.env.example`, `apps/api/.env.example` (commented `XERO_APP_TIER` placeholder)
+- `.github/workflows/ci.yml` (add the Redis and SRH services and two env vars to the Test job)
+- `tooling/release/integration-inventory.ts` and `.test.ts` (add the shared-store suite)
+- `plans/161-xero-provider-contract.md` (Rate bucket column only)
+- `plans/161-xero-execution-report.md` (append a 161e section, including the operator recovery
+  procedure from Step 6)
 - `plans/README.md` (status row only)
 
 **Out of scope - do NOT touch:**
-- `packages/xero/src/oauth/` credential logic - 161d. You may change the rate-key argument at the
-  four call sites in `service.ts` and nothing else in that file.
+- `packages/xero/src/oauth/` beyond the rate-key threading above. Credential logic is 161d.
 - `packages/xero/src/crypto/` - 161c.
-- Remote deletion and cleanup - 161f.
-- Error classification and recovery reasons - 161g.
+- `packages/feeds/keys.ts`. Declare the KV pair in `packages/xero/keys.ts` independently.
+- Remote deletion and cleanup - 161f. Error classification - 161g.
 - **Any real Xero quota exhaustion.** Every exhaustion test uses a fake HTTP provider against the
-  real store. Never throttle the live app to produce evidence.
+  local store.
 
 ## Git workflow
 
-- Branch: `codex/xero-connection-hardening` (shared across 161a–161h).
-- Conventional commits. Suggested: `feat(xero): add shared rate store`, then
-  `fix(xero): key rate budgets by external xero tenant`, then
-  `feat(xero): require explicit app tier for daily allowance`.
+- Branch: `codex/xero-connection-hardening` (shared across 161a-161h).
+- Conventional commits, e.g. `feat(xero): add shared rate store`,
+  `fix(xero): key rate budgets by external xero tenant`,
+  `feat(xero): require explicit app tier for daily allowance`, `ci: add local redis for shared rate store tests`.
 - Do NOT push or open a PR.
 
 ## Steps
 
 ### Step 1: Prove the key identity defect
 
-Add a test to `packages/xero/src/rate-limit/xero-fetch.test.ts` (model on the existing
-`orgRateLimitKey` tests at lines 181-190) showing that two internal organisations bound to the
-**same** external Xero tenant receive two independent budgets. Assert the behaviour you want:
-one shared budget. It will fail.
+In `xero-fetch.test.ts`, next to the `orgRateLimitKey` tests, add two tests of the key function
+you are about to introduce, written against today's function so they fail:
 
-Add a second test showing a reconnect that changes the internal connection ID resets the
-tenant's allowance. Assert it must not. It will fail.
+1. Two different internal `(clerkOrgId, organisationId)` pairs for the **same** external tenant
+   must yield the **same** key.
+2. The same internal pair with two different external tenants must yield **different** keys.
 
-**Verify**: `bun run --cwd packages/xero test` → fails on both. Record the output.
+**Verify**: `bun run --cwd packages/xero test` → fails on both. Paste the output into a "161e"
+section of the execution report.
 
-### Step 2: Build the shared store
+### Step 2: Define endpoint classes and keys
 
-Create `SharedXeroRateStore` and a Redis REST implementation in
-`packages/xero/src/rate-limit/shared-store.ts`, using the corrected core transport from 161c.
+Replace `orgRateLimitKey` with:
 
-An injectable deterministic fake is permitted **in unit tests only**. Production must never fall
-back to process-local `Map`s or to an uncoordinated limiter when the shared store fails.
+```typescript
+export type XeroRateClass =
+  | { kind: "tenant"; providerAppId: string; xeroTenantId: string }
+  | { kind: "token"; providerAppId: string }
+  | { kind: "user_inventory"; providerAppId: string }
+  | { kind: "app_management"; providerAppId: string };
+export function xeroRateKeys(rateClass: XeroRateClass, namespaceEpoch: string): string[];
+```
 
-**Verify**: `bun run --cwd packages/xero test` → exit 0 for the new store's unit tests.
+- `providerAppId` is `keys().XERO_CLIENT_ID` (the same definition 161b uses for
+  `XeroTenant.provider_app_id`). Add a test-only fallback in `packages/xero/keys.ts` next to the
+  existing `XERO_CLIENT_SECRET` one (`keys.ts:30-32`): when `NODE_ENV === "test"` and it is unset,
+  set `process.env.XERO_CLIENT_ID = "test-xero-client-id"`. Outside test, an unset client ID makes
+  store construction return a configuration error (connect is disabled without it anyway).
+- Every key starts with the hash-tagged prefix `xero:{<providerAppId>}:` so all keys for one app
+  share a Redis Cluster hash slot and one `EVAL` can touch them atomically.
+- `tenant` keys: tenant minute window, tenant day window, tenant concurrency set, tenant cooldown,
+  plus the app-wide minute window. The other classes use their own window and never touch a tenant
+  key, so **token acquisition is never blocked by a tenant's exhausted daily budget**.
+- Include the store namespace/epoch (Step 5) in every key.
 
-### Step 3: Fix the key identity
+Change `XeroFetchInput.orgKey: string` to `rateClass: XeroRateClass`. Update every call site:
+tenant payroll calls pass `{ kind: "tenant", providerAppId, xeroTenantId }` using the tenant ID
+they already send as `Xero-Tenant-Id`; `exchangeToken` uses `token`; `fetchConnections` uses
+`user_inventory`; `revokeXeroConnectionAtSource` uses `app_management`. Change only the helper
+parameter types needed to pass it through.
 
-Tenant resource keys use **provider app ID plus external Xero tenant ID**. Not the Clerk account,
-not the internal organisation, not the internal `XeroTenant` UUID, not the authoriser, not the
-deployment name. Every caller deployment that shares the app shares these budgets.
+**Verify**: `bun run --cwd packages/xero test` → exit 0 including both Step 1 tests (rewritten
+against `xeroRateKeys`). `bun run typecheck` → exit 0.
 
-Update `orgRateLimitKey` (rename it if the name no longer fits) and every call site listed in
-"Current state" to pass the external tenant ID. Obtain it through `resolveXeroAccess` where 161d
-has landed; otherwise read it from `XeroTenant.xero_tenant_id`.
+### Step 3: Make the tier explicit
 
-Use explicit endpoint classes, each with its own bucket:
+In `packages/xero/keys.ts` add:
 
-- tenant Payroll and resource calls
-- user connection inventory
-- app connection management
-- OAuth token operations
+- `XERO_APP_TIER`: `z.enum(["starter", "core", "plus", "advanced", "enterprise"]).optional()`.
+- `KV_REST_API_URL` (`z.string().url().optional()`) and `KV_REST_API_TOKEN`
+  (`z.string().min(1).optional()`), both-or-neither.
 
-A non-tenanted call must never consume a fabricated tenant allowance. In particular, **token
-acquisition must not be blocked by a payroll tenant's exhausted daily budget** - that is how a
-transient quota problem turns into a total outage.
+Export `resolveXeroDailyAllowance(): number`: 1,000 for `starter`, 5,000 otherwise. When
+`XERO_APP_TIER` is unset: in `NODE_ENV === "production"` it is a configuration error (the store
+factory in Step 4 returns an error, which denies admission); otherwise use `starter` and log once
+through `@repo/observability/log` at warn level. `bun run test`, `build` and `typecheck` must pass
+with the tier unset.
 
-**Verify**: `bun run --cwd packages/xero test` → exit 0 including both Step 1 tests.
+In `limits.ts`, keep `XERO_CALLS_PER_DAY_PER_ORG` only as the documented non-Starter published
+figure and stop using it directly for admission. Comment which values are Xero published limits
+(per-minute 60, concurrency 5, app-wide 10,000, daily 1,000/5,000 by tier) and which are
+application policy (the inventory, token and management class caps you choose; use 60 per minute
+per app for each and label them as policy).
 
-### Step 4: Make the tier explicit
+Also add `XERO_RATE_NAMESPACE_EPOCH` (`z.string().regex(/^[a-z0-9-]{1,32}$/).optional()`);
+outside production an unset epoch means `"dev"`.
 
-Add `XERO_APP_TIER` to `packages/xero/keys.ts`, accepting exactly
-`starter | core | plus | advanced | enterprise`.
+In `packages/next-config/preflight.ts`, for `app` and `api`: `checkPresent("XERO_APP_TIER")`,
+`checkPresent("XERO_RATE_NAMESPACE_EPOCH")`, and change the KV pair from optional-together to
+required (`checkPresent` on both). Error text names the variable only.
 
-Map the daily resource allowance to **1,000 for Starter** and **5,000 for higher tiers**, unless a
-separately recorded provider entitlement in `plans/161-xero-provider-contract.md` overrides it.
-For ordinary tenant resource calls keep 60 per rolling minute and five concurrent admissions,
-alongside the published application-wide ceiling of 10,000 per minute. Apply these only to the
-endpoint classes the verified contract covers; label any other cap as **application policy**, not
-a Xero fact.
-
-Scope requiredness precisely: **required in production**, optional in development and test with a
-conservative `starter` fallback that logs once. An unset tier must not break `bun run test`,
-`bun run build` or `bun run typecheck`, or every contributor is blocked by a deployment fact they
-do not have. There is no silent 5,000 default in production.
-
-Add the variable name with a placeholder to the app and API `.env.example`. Never a real value.
+Add `# XERO_APP_TIER=starter` and `# XERO_RATE_NAMESPACE_EPOCH=2026-09` to both `.env.example`
+files.
 
 **Verify**: `bun run --cwd packages/xero test && bun run typecheck` → exit 0.
-`bun run --cwd packages/next-config test` → exit 0, including a new unit test asserting that preflight reports `XERO_APP_TIER` as missing when unset and never echoes a value. Do **not** run `bun run preflight` as a gate; see "Fresh worktree setup".
+`bun run --cwd packages/next-config test` → exit 0 with new cases: tier missing is reported, KV
+missing is reported, and a captured output containing a set token does not contain its value.
 
-### Step 5: Atomic admission
+### Step 4: The shared store and atomic admission
 
-Use **one** atomic server-side operation per applicable request. It must, in a single atomic step:
-prune expired accounting; inspect the tenant minute and day budgets, the app minute budget, shared
-provider cooldowns and concurrency; then reserve **all** applicable units or none.
+Create the `SharedXeroRateStore` interface in `shared-store.ts` with
+`reserve(input) → Promise<Result<{ reservationId }, Denied | Unavailable>>` and
+`release(reservationId) → Promise<void>`, and a Redis REST implementation over
+`executeRedisRestCommand`. Create `memory-store.ts`, an in-memory implementation with the same
+semantics (windows, concurrency, cooldown, sentinel pre-initialised).
 
-Verify every script key is reachable in one atomic topology, including cluster hash-slot
-placement. If the configured service cannot guarantee that, STOP and report; do not split the
-operation into non-atomic parts.
+Store selection, in one exported `getSharedXeroRateStore()`:
+- KV pair configured → Redis REST store.
+- KV pair absent and `NODE_ENV` is `test` or `development` → memory store, with one warn log in
+  development. This is what keeps every existing test that stubs global `fetch` and uses the
+  default limiter (`au/read.test.ts`, `nz/read.test.ts`, `uk/read.test.ts`, `au/write.test.ts`,
+  `oauth/service.test.ts`, and the jobs integration suites) passing unchanged, and keeps
+  `bun run dev` usable without Redis.
+- KV pair absent, tier missing, or client ID missing with `NODE_ENV === "production"` → a store
+  whose every `reserve` returns `infrastructure`. **Never a memory store in production.**
 
-Prefer strict rolling-window accounting until Xero's reset semantics are established in the
-provider ledger. A continuously refilling token bucket is not a strict rolling-window cap; the
-current `TokenBucket` implementation is the thing being replaced. Use store time, stable request
-IDs, bounded retained records and reproducible boundary tests.
+The admission script (`admission.lua.ts`) runs as **one** `EVAL`. In a single step it: reads store
+time with `redis.call("TIME")`; checks the namespace sentinel (Step 5) and denies if absent;
+prunes expired entries from each sorted-set window (`ZREMRANGEBYSCORE`); checks tenant minute,
+tenant day, app minute, tenant cooldown and tenant concurrency (`ZCARD`); then either adds the
+reservation ID to **every** applicable set or to none. Reservation IDs are caller-generated UUIDs;
+re-running with an existing ID returns the existing result without double-counting. Concurrency
+entries carry a lease expiry of the operation's `remainingMs` plus 5 seconds (documented margin)
+and are pruned by expiry, so a crashed holder frees its slot conservatively.
 
-**Every admitted HTTP attempt, including a retry, consumes a unit. A failed admission consumes
-none.** Use idempotent reservation IDs so an uncertain store response can be reconciled without
-double-admitting. Keep attempt reservations distinct from logical payroll operations.
+Rewrite `XeroRateLimiter` to call the store; remove both `Map`s and `TokenBucket`. Keep today's
+waiting contract: `acquire(orgKey, { maxWaitMs, leaseMs })` calls `reserve`, and on a `minute`,
+`concurrency` or `cooldown` denial retries with backoff (250 ms doubling to 2 s, jittered) until
+`maxWaitMs` elapses; `daily` and `infrastructure` denials return immediately. `leaseMs` is the
+concurrency lease (pass `remainingMs(deadline) + 5_000` from `xeroFetch`). The returned
+`release` becomes `() => Promise<void>`; it removes the reservation from the **concurrency** set
+only (window entries stay, because the call was made) and is idempotent. `xeroFetch` awaits it in
+its `finally`.
 
-Concurrency permits are owner-specific and released idempotently after the body is fully consumed
-or the request is cancelled. The lease lifetime must exceed the enforced request-and-body deadline
-from 161c plus a documented margin. On crash, apply conservative expiry. Prove at most five
-admitted active local resource permits per tenant. Do **not** claim a local deadline proves Xero
-stopped executing an abandoned request.
+Extend `RateLimitDeniedReason` with `"cooldown"` and `"infrastructure"`. `xeroFetch` maps denials
+to the existing synthetic 429 **except** `infrastructure`, which throws the 161c
+`XeroFetchError` with a new code `"admission_unavailable"` and `dispatched: false`.
 
-Keep the existing prohibition on ambiguous payroll retry. A 429 produces a shared cooldown plus
-retry metadata. If `Retry-After` exceeds the remaining operation deadline, return or defer to a
-durable inbound/maintenance retry rather than sleeping through a transaction deadline.
-**Never queue the payroll write itself.**
+Every admitted attempt, including a retry, is a new reservation; a denied admission consumes
+nothing. Keep the existing prohibition on ambiguous payroll retry. On a 429, write a tenant
+cooldown (`SET ... PX`) from `Retry-After` (seconds or HTTP date, via the existing
+`parseRetryAfter`); non-tenant classes get the same cooldown on their own class key. If
+`Retry-After` exceeds `remainingMs(deadline)`, return the 429 to the caller
+instead of sleeping. **Never queue the payroll write itself.**
+
+**Verify**: `bun run --cwd packages/xero test` → exit 0 with the unit tests below.
+`grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` → `0`.
+
+### Step 5: Headers, namespace and cutover safety
+
+Parse `X-MinLimit-Remaining`, `X-DayLimit-Remaining` and `X-AppMinLimit-Remaining` (confirm these
+names against the ledger's source; if Xero documents different names, use those and update the
+ledger). Treat them as **ceilings only**: if a header reports fewer remaining than the store
+believes, add placeholder entries to the window so the store never admits more than Xero says
+remain; a header reporting **more** remaining never removes entries. Missing headers change
+nothing; malformed values grant nothing.
+
+Namespace: every key includes an epoch string. The store refuses admission unless a sentinel key
+`xero:{<app>}:<epoch>:initialised` exists. Export
+`initialiseXeroRateNamespace({ epoch, assumeSpentDaily })` for operators; it sets the sentinel and,
+when `assumeSpentDaily` is true, pre-fills each known tenant's day window so an empty store does
+not hand out a fresh daily budget. The runtime never creates the sentinel itself. The epoch is `XERO_RATE_NAMESPACE_EPOCH` (Step 3); the integration suite uses the fixture's
+`shared_store_namespace` global key (`fixture.globalKey("shared_store_namespace")`).
+
+Create `packages/xero/scripts/initialise-xero-rate-namespace.ts` (run as
+`bun run --cwd packages/xero rate:initialise-namespace --epoch <e> [--assume-spent-daily]`), a thin
+wrapper that refuses to run without both flags explicit and prints only counts.
+
+**Cutover warning (write it into the execution report):** a production deployment running this
+code denies **all** Xero traffic until an operator runs that script against the production store.
+161h's rollout sequences it.
+
+Write the operator procedure into the execution report's 161e section: quiesce callers; either wait
+out the daily window or initialise with `assumeSpentDaily: true`; set the sentinel; resume.
+**Never flush live state or rotate the epoch to bypass quota.**
 
 **Verify**: `bun run --cwd packages/xero test` → exit 0.
 
-### Step 6: Headers, persistence and cutover safety
+### Step 6: Integration evidence, CI and inventory
 
-Parse allowlisted remaining-limit headers and `Retry-After` in both seconds and date form.
-Reconcile remaining counts as **conservative ceilings only**, after accounting for concurrent
-reservations and out-of-order responses. A delayed higher header must not replenish an
-already-spent budget. Missing headers retain local accounting; malformed values grant nothing.
+Create `shared-store.integration.test.ts` against the local SRH store (and local Postgres for the
+fixture allocation). It constructs its Redis REST store directly from **its own** variables,
+`TC_TEST_KV_REST_API_URL` and `TC_TEST_KV_REST_API_TOKEN`, and fails (not skips) if they are unset.
+The global `KV_REST_API_*` variables stay unset in test runs, so every other integration suite
+keeps using the memory store. Use only keys under the fixture's `shared_store_namespace` epoch, and delete
+exactly those keys in `afterAll` (`SCAN` with the namespaced pattern, then `DEL`), following 161a's
+owned-cleanup rule. Refuse to run against a non-local store unless in live-manifest mode.
 
-A known exhausted state must survive process restarts. Use an explicitly initialised
-namespace/epoch plus a sentinel. The runtime must **not** silently initialise a full allowance
-when required accounting disappears: a lost namespace, an ambiguous partial operation, or an
-unavailable store denies new provider admission with a retryable infrastructure result.
+Add to `.github/workflows/ci.yml` Test job two services: `redis` (`image: redis:7`) and `srh`
+(`image: hiett/serverless-redis-http:latest`, `ports: ["8079:80"]`, env `SRH_MODE: env`,
+`SRH_TOKEN: local-test-token`, `SRH_CONNECTION_STRING: redis://redis:6379`; inside Actions the
+Redis service is reachable by its service key, not the local container name). Add
+`TC_TEST_KV_REST_API_URL: http://localhost:8079` and `TC_TEST_KV_REST_API_TOKEN: local-test-token`
+to the "Run integration tests" step's `env` only. Add the suite to `tooling/release/integration-inventory.ts` in
+sorted order and bump the `N-suite` count in both the message and its test.
 
-Document a bounded recovery procedure for lost limiter state: quiesce callers, establish remaining
-allowances or conservatively wait out the relevant windows, initialise shared state under operator
-control, then resume. **Never flush live state or rotate the namespace to bypass quota.**
+Replace the `BLOCKED.md item D` comment in `limiter.ts` with a one-line pointer to this plan.
 
-During cutover, drain old process-local callers and account for calls already made in the current
-provider window. **Deploying an empty shared store must not hand out another full daily budget.**
+**Verify**: with the local containers running, `bun run --cwd packages/xero test:integration` →
+exit 0 listing `shared-store.integration.test.ts`. `bun run test:release-tools` → exit 0.
 
-Validate the store endpoint, credentials, enabled epoch and provider app identity in every caller
-deployment, and confirm all deployments sharing the OAuth app share one budget domain. Never
-expose a secret in preflight output.
+### Step 7: Update the provider ledger
 
-**Verify**: `bun run --cwd packages/xero test:integration` → exit 0 against the real configured
-store, using manifest-owned synthetic keys and a fake HTTP provider.
+In `plans/161-xero-provider-contract.md`, rewrite the "Rate bucket" cell of each row to the class
+it now uses (`tenant`, `token`, `user_inventory`, `app_management`) and mark application-policy
+caps as such.
+
+**Verify**: `grep -c "Bootstrap org bucket" plans/161-xero-provider-contract.md` → `0`.
 
 ## Test plan
 
-`packages/xero/src/rate-limit/shared-store.test.ts` (new, deterministic fake store):
-1. Reserve-all-or-none: a request needing minute + day + concurrency reserves nothing when any
-   one is exhausted.
-2. Rolling-window boundaries: a burst straddling a window edge does not over-admit.
-3. Idempotent reservation: replaying the same request ID does not double-admit.
-4. A delayed header reporting a higher remaining count does not replenish a spent budget.
-5. Malformed `Retry-After` and malformed headers grant no extra allowance.
-6. Non-tenanted token acquisition is admitted while the tenant's daily budget is exhausted.
+`shared-store.test.ts` (new, in-memory fake):
+1. Reserve-all-or-none when any one window is exhausted.
+2. A burst straddling a minute boundary does not over-admit (strict rolling window).
+3. Replaying the same reservation ID does not double-admit.
+4. A header reporting more remaining does not replenish; one reporting fewer reduces admission.
+5. Malformed `Retry-After` and malformed limit headers grant nothing.
+6. A `token` class reservation succeeds while the tenant's day window is exhausted.
+7. Missing namespace sentinel denies with `infrastructure`.
 
-`packages/xero/src/rate-limit/shared-store.integration.test.ts` (new; real configured store,
-manifest-owned keys from 161a, fake HTTP provider):
-7. **Two independent client instances** share one aggregate tenant minute, day and concurrency
-   budget. This is the test that proves the defect is fixed; a single-process fake cannot.
-8. App-wide allowance aggregates across tenants.
-9. Exactly five concurrent admissions per tenant; the sixth is denied.
-10. Permit release is idempotent, and a crashed holder's permit expires conservatively.
-11. Store loss, an ambiguous partial result and an outage all **deny** admission. Assert no
-    process-local fallback path is reachable.
-12. A restart does not reset a known exhausted state.
+`shared-store.integration.test.ts` (new, local SRH + Redis):
+8. **Two independent `SharedXeroRateStore` instances** share one tenant minute, day and
+   concurrency budget (sum of admissions never exceeds the cap).
+9. The app-wide minute window aggregates across two tenants.
+10. Exactly five concurrent admissions per tenant; the sixth is denied; release is idempotent; an
+    unreleased lease expires after its lease time.
+11. Stopping SRH mid-test (or pointing a second instance at a closed port) denies admission; assert
+    no in-process fallback admitted anything.
+12. A new store instance (simulated restart) still sees an exhausted state.
 
-`packages/xero/src/rate-limit/xero-fetch.test.ts` (extend):
-13. The two Step 1 regressions: same external tenant shares one budget; reconnect does not reset.
-14. Missing `XERO_APP_TIER` in a simulated production environment blocks readiness; in test it
-    falls back to `starter` and logs once.
+`xero-fetch.test.ts` and `keys.test.ts` (extend):
+13. The Step 1 regressions against `xeroRateKeys`.
+14. Tier unset: production configuration error; test environment falls back to `starter` and logs
+    once.
+15. `infrastructure` denial throws `XeroFetchError` with `code: "admission_unavailable"` and
+    `dispatched: false`; `fetchImpl` is not called.
 
 ## Done criteria
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including both Step 1 regressions
-- [ ] `bun run --cwd packages/xero test:integration` exits 0, including tests 7 and 11
-- [ ] `bun run --cwd packages/next-config test` exits 0, including the new `XERO_APP_TIER` preflight-validation test
+- [ ] `bun run check`, `bun run typecheck` exit 0
+- [ ] `bun run --cwd packages/xero test` exits 0, including tests 1-7 and 13-15
+- [ ] `bun run --cwd packages/xero test:integration` exits 0 locally and lists `shared-store.integration.test.ts` (tests 8-12)
+- [ ] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
+- [ ] `bun run test:release-tools` exits 0
 - [ ] `git diff --check` exits 0
-- [ ] `grep -n "new Map" packages/xero/src/rate-limit/limiter.ts` returns no matches for budget or concurrency state
-- [ ] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src/` shows the value is derived from the configured tier, not a bare 5000 constant
-- [ ] `git status --short` shows no modified file outside the In scope list
+- [ ] `grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` prints `0`
+- [ ] `grep -rn "orgRateLimitKey" packages/ apps/ --include=*.ts --include=*.tsx` returns no matches
+- [ ] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src --include=*.ts | grep -v "limits.ts\|\.test\.ts"` returns no matches
+- [ ] `grep -n "serverless-redis-http" .github/workflows/ci.yml` returns a match
+- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
 - [ ] `plans/README.md` status row for 161e updated
 
 ## STOP conditions
 
 Stop and report; do not improvise:
 
-- **The configured Redis REST service cannot support the atomic multi-key topology Step 5
-  requires** (for example, keys land in different cluster hash slots and no single atomic
-  operation covers them). Report the exact limitation. **Do not** split the reservation into
-  several non-atomic calls; that reintroduces over-admission with extra complexity.
-- `packages/core/src/redis-rest-transport.ts` still cancels its timeout before body parsing,
-  meaning 161c has not landed. This plan's store will inherit the defect. Stop.
-- An integration test would need to touch a store key the fixture manifest does not own, or would
-  require flushing the store. Both are prohibited.
-- A step's verification fails twice after a reasonable fix attempt.
-- You conclude that production needs a local fallback when the store is unavailable. It does not;
-  that is the defect. Report what is failing instead.
-- You are about to generate real Xero quota exhaustion, or call live Xero to observe a 429.
-  Synthetic faults prove the failure paths.
+- The Redis REST service cannot run one `EVAL` over all keys for an app (hash-tagged keys still
+  land in different slots, or `EVAL` is disabled). **Do not** split the reservation into several
+  calls.
+- 161b or 161c has not landed (see the drift check).
+- An integration test would need to touch a store key outside the fixture namespace, or to flush
+  the store.
+- You conclude that production needs a local fallback when the store is unavailable. It does not.
+- Xero's documented response header names differ from Step 5 and the ledger cannot be updated
+  from a primary source.
+- You are about to generate real Xero quota exhaustion or call live Xero.
 - You are about to print `KV_REST_API_TOKEN`, `XERO_CLIENT_SECRET` or any key into preflight
-  output, a log, a test snapshot or a report. Stop.
+  output, a log, a snapshot or a report.
+- A step's verification fails twice after a reasonable fix attempt.
 
 ## Maintenance notes
 
-- **The limiter is now fail-closed, deliberately.** Anyone later adding a `catch` that falls back
-  to local admission when the store is unavailable reintroduces the original defect across every
-  deployment at once. Test 11 is the guard. Plan 161h Step 5 makes this non-revertible.
-- **Budgets are keyed by external Xero tenant, never internal IDs.** If a future change threads a
-  new call site through `xeroFetch`, it must pass the external tenant ID. A reviewer should check
-  every new `orgKey` argument.
-- The daily allowance depends on `XERO_APP_TIER`, which is a **commercial** fact about the Xero
-  app, not a code constant. When the plan tier changes, that env var must change with it, or the
-  app will either self-throttle or exceed the real ceiling.
-- Distinguish, in every future change, Xero's published limits (recorded in
-  `plans/161-xero-provider-contract.md` with a source and date) from our operational caps
-  (in `limits.ts`, commented as application policy). Merging the two loses the provenance.
-- In review, scrutinise: the atomicity of the admission operation, the permit release path on
-  every exit including the throwing one, and any code that turns a store failure into a
-  non-retryable user-facing error.
-- Deferred: a Rapid Sync exemption, premium limits and larger connection entitlements are not
-  assumed anywhere. If Xero grants one, it is recorded in the ledger first, then consumed here.
+- **The limiter is fail-closed, deliberately.** A future `catch` that falls back to local admission
+  reintroduces the defect across every deployment at once. Test 11 is the guard; 161h makes this a
+  non-discretionary rollout rule.
+- **Budgets are keyed by provider app plus external tenant.** Any new `xeroFetch` call site must
+  pass a `rateClass`; review each one.
+- `XERO_APP_TIER` is a **commercial** fact about the Xero app. When the plan changes, the variable
+  must change with it.
+- The epoch and sentinel make "empty store" mean "closed", not "fresh budget". Never let the
+  runtime create the sentinel.
+- 161f's management client uses the `app_management` class; 161g's classifier consumes the
+  `admission_unavailable` code.
+- In review, scrutinise: the Lua script's all-or-none path, lease expiry, the release path on every
+  exit, and any code that turns a store failure into a user-facing "not connected".
