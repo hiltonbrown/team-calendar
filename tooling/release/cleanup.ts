@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { createStandaloneDatabaseClient } from "../../packages/database/src/standalone-client.js";
 import { assertActiveRunOwner } from "./active-run-registry.js";
 import { assertConsumerIsolationReadBack } from "./consumer-isolation.js";
 import {
@@ -48,7 +49,11 @@ if (
   throw new Error("Cleanup requires both manifest-owned tenancy keys");
 }
 
-const { database } = await import("../../packages/database/index.js");
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  throw new Error("DATABASE_URL is required");
+}
+const database = createStandaloneDatabaseClient(databaseUrl);
 const scopedTables = [
   "outbound_operations",
   "notification_email_queue",
