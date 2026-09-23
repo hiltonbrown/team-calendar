@@ -25,6 +25,14 @@
 - **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; every excerpt below was re-read at `6b934be`)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
+### Execution reconciliation, 23 September 2026
+
+The user explicitly authorised using the database configured in the local environment files as a **development** database for this execution, including data-changing validation. This supersedes this plan's `LOCAL_OK` prerequisite for that target only. Do not print or copy credentials. Before applying a migration or backfill, identify the target without exposing its URL, inspect applied migrations and existing tenant bindings, and preserve the migration and backfill ordering. The production rollout ordering below still applies to production.
+
+The repository's integration-test guard does not accept a remote URL with `ALLOW_LOCAL_DATABASE_TESTS=1`. Do not disable or spoof that guard. Remote integration tests must use the existing protected live-run machinery in `tooling/release/`, with its manifest, fixture ownership, durable read-back and consumer-isolation checks. If that machinery cannot be satisfied, complete all independent implementation and checks, record the database suites as `NOT VERIFIED`, and continue reconciliation of the verification path without claiming `DONE`.
+
+Review of executor commit `a1fdf33` found a correctness gap in this plan: the reservation unique index prevents duplicate active rows, but still permits an `UPDATE` that changes one row's `xero_tenant_id` to an unreserved value. That violates this plan's immutability claim. The added Step 5a, migration C and test 12 close the gap. They supersede the earlier instruction that migration B alone completes database enforcement.
+
 ## Why this matters
 
 A Team Calendar `Organisation` is a payroll entity. It owns exactly one `XeroConnection`, which
@@ -283,6 +291,7 @@ file `packages/database/prisma.config.ts` is resolved relative to the working di
 - `packages/database/prisma/schema.prisma` (`XeroTenant`, `XeroOAuthSession` only)
 - `packages/database/prisma/migrations/<timestamp>_add_xero_tenant_binding_reservation/` (create)
 - `packages/database/prisma/migrations/<timestamp>_enforce_xero_tenant_binding_reservation/` (create)
+- `packages/database/prisma/migrations/<later timestamp>_prevent_xero_tenant_rebinding/` (create, Step 5a)
 - `packages/database/scripts/backfill-xero-tenant-binding.ts` (create)
 - `packages/database/src/xero-tenant-binding-backfill.ts` and `.test.ts` (create; the pure,
   testable backfill logic the script calls)
@@ -555,10 +564,10 @@ Because `active_slot` is nullable and PostgreSQL treats `NULL`s as distinct in a
 any number of **retired** rows for the same external tenant coexist while at most one
 **reserved** row can exist. Do not add `NULLS NOT DISTINCT`. That is the intended semantics.
 
-**Production ordering (record it in the execution report; do not perform it).** Migrations A and
-B must ship in **separate** deployments: deploy A, run the backfill dry-run, run it with `--apply`
-only if the collision report is empty, then deploy B. Plan 161h's rollout procedure references
-this.
+**Production ordering (record it in the execution report; do not perform it).** Migration A must
+ship separately from B and C: deploy A, run the backfill dry-run, run it with `--apply` only if
+the collision report is empty, then deploy B and C together. Do not deploy B alone as a claim of
+immutable binding. Plan 161h's rollout procedure must be updated to reference both B and C.
 
 **Verify**:
 - Against the local database (after `LOCAL_OK`):
@@ -570,6 +579,28 @@ this.
   zero updates for those rows.
 - `grep -c "DROP " packages/database/prisma/migrations/<timestamp>_enforce_xero_tenant_binding_reservation/migration.sql` → `0`
 - `bun run migrate:deploy` (after `LOCAL_OK`) → exit 0
+
+### Step 5a: Enforce row-level immutability (review reconciliation)
+
+The unique reservation index does not reject a direct update from Xero file A to unreserved file
+B on the same `xero_tenants` row. Add a third, additive migration after B named
+`<later timestamp>_prevent_xero_tenant_rebinding`. Prisma cannot express an OLD-versus-NEW
+constraint, so this migration consists only of a reviewed PostgreSQL trigger function and its
+`BEFORE UPDATE OF xero_tenant_id` trigger on `xero_tenants`. Reject the change when
+`NEW.xero_tenant_id IS DISTINCT FROM OLD.xero_tenant_id`; return `NEW` otherwise. Raise a stable,
+named `23514` constraint error (`xero_tenants_xero_tenant_id_immutable`) with a generic message
+that contains no tenant ID or customer data. Never rewrite existing `xero_tenant_id` values.
+
+Add database integration test 12 below. On the authorised development database, apply migration
+C after checking the target and migration history, then use one explicit SQL transaction with
+`ROLLBACK` to prove that changing a fixture row to an unreserved tenant ID is rejected by the
+named trigger, while setting the same ID is accepted. Check that the transaction left no probe
+rows. This direct SQL probe is additional evidence; it is not a PASS for the protected integration
+suite.
+
+**Verify**: Prisma validation, `bun run check`, `bun run typecheck`, the database unit suite,
+`git diff --check`, and migration C contains no `DROP`, rename, or change to another table. The
+protected database integration suite must collect and pass test 12 before 161b is marked DONE.
 
 ### Step 6: Prove the constraints and the rollback against a real database
 
@@ -647,6 +678,9 @@ Database (`packages/database/xero-lifecycle-migration.integration.test.ts`, real
 11. The same `xero_tenant_id` under two **different** `provider_app_id` values
     (`fixture.globalKey("provider_app", 0)` and `fixture.globalKey("provider_app", 1)`) may both be
     reserved (the key is per configured app).
+12. Directly updating an existing `XeroTenant.xero_tenant_id` to a different, unreserved external
+    tenant ID fails with `xero_tenants_xero_tenant_id_immutable`; writing the same ID succeeds.
+    Assert the existing row and its attached internal ID are unchanged after rejection.
 
 ## Done criteria
 
@@ -660,7 +694,8 @@ All must hold:
 - [ ] `bun run --cwd packages/xero test:integration` exits 0 and lists `service.integration.test.ts`
 - [ ] `bun run test:release-tools` exits 0 (the inventory allowlist includes the new suite)
 - [ ] `git diff --check` exits 0
-- [ ] `grep -c "DROP " <each of the two new migration.sql files>` prints `0` for both
+- [ ] `grep -c "DROP " <each of the three new migration.sql files>` prints `0` for all three
+- [ ] migration C rejects direct `xero_tenant_id` changes, allows same-value updates, and contains no `DROP`
 - [ ] `grep -n "class TenantSelectionRejectedError" packages/xero/src/oauth/service.ts` returns one match
 - [ ] `awk '/xeroTenant.upsert/,/where: \{ xero_connection_id/' packages/xero/src/oauth/service.ts | grep -c "xero_tenant_id: selectedTenant.tenantId"` prints `1` (the `create` branch only)
 - [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list (plan files may carry reviewer edits)

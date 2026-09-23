@@ -388,7 +388,8 @@ Write into `plans/161-xero-execution-report.md`, under "Rollout procedure (not e
    Inspect every deployment using the Xero app and confirm they share one database
    (`XERO_CREDENTIAL_DOMAIN_ID`) and one store.
 2. Deploy 161b migration A. Run `backfill:xero-tenant-binding --dry-run`; with zero collisions run
-   `--apply`. Only then deploy 161b migration B (its guard aborts otherwise). Deploy 161c-161f
+   `--apply`. Only then deploy 161b migrations B and C together (B's guard aborts without the
+   backfill; C prevents changing an existing tenant row's external Xero file). Deploy 161c-161f
    additive migrations. Verify constraints and **unchanged payroll row counts**.
 3. Initialise the rate namespace with
    `bun run --cwd packages/xero rate:initialise-namespace --epoch <e> --assume-spent-daily --credential-domain-id <id>`
