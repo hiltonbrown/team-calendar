@@ -625,7 +625,7 @@ describe("release list-query evidence", () => {
 
   test("matches every people status filter to the current-status oracle", async () => {
     const at = new Date("2026-10-03T14:30:00.000Z");
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(at);
 
     const losAngelesLocationId = fixture.id("people-location", 0);
@@ -899,7 +899,7 @@ describe("release list-query evidence", () => {
   });
 
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
     const findMany = vi.spyOn(database.availabilityRecord, "findMany");
     const count = vi.spyOn(database.availabilityRecord, "count");
@@ -985,7 +985,7 @@ describe("release list-query evidence", () => {
   });
 
   test("paginates equal timestamps after cursor deletion and supports all history", async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
     const equalStartsAt = new Date("2026-06-10T00:00:00.000Z");
     const equalCreatedAt = new Date("2026-05-01T00:00:00.000Z");
