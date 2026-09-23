@@ -686,21 +686,21 @@ Database (`packages/database/xero-lifecycle-migration.integration.test.ts`, real
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including U1-U5
-- [ ] `bun run --cwd packages/database test` exits 0, including the backfill unit tests
-- [ ] `bun run --cwd packages/database test:integration` exits 0 and lists `xero-lifecycle-migration.integration.test.ts` with 5+ tests
-- [ ] `bun run --cwd packages/xero test:integration` exits 0 and lists `service.integration.test.ts`
-- [ ] `bun run test:release-tools` exits 0 (the inventory allowlist includes the new suite)
-- [ ] `git diff --check` exits 0
-- [ ] `grep -c "DROP " <each of the three new migration.sql files>` prints `0` for all three
-- [ ] migration C rejects direct `xero_tenant_id` changes, allows same-value updates, and contains no `DROP`
-- [ ] `grep -n "class TenantSelectionRejectedError" packages/xero/src/oauth/service.ts` returns one match
-- [ ] `awk '/xeroTenant.upsert/,/where: \{ xero_connection_id/' packages/xero/src/oauth/service.ts | grep -c "xero_tenant_id: selectedTenant.tenantId"` prints `1` (the `create` branch only)
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list (plan files may carry reviewer edits)
-- [ ] `plans/161-xero-execution-report.md` has a 161b section with the Step 1 failure output and the production ordering note
-- [ ] `plans/README.md` status row for 161b updated
+- [x] `bun run check` exits 0
+- [x] `bun run typecheck` exits 0
+- [x] `bun run --cwd packages/xero test` exits 0, including U1-U5
+- [x] `bun run --cwd packages/database test` exits 0, including the backfill unit tests
+- [x] `bun run --cwd packages/database test:integration` exits 0 and lists `xero-lifecycle-migration.integration.test.ts` with 5+ tests
+- [x] `bun run --cwd packages/xero test:integration` exits 0 and lists `service.integration.test.ts`
+- [x] `bun run test:release-tools` exits 0 (the inventory allowlist includes the new suite)
+- [x] `git diff --check` exits 0
+- [x] `grep -c "DROP " <each of the three new migration.sql files>` prints `0` for all three
+- [x] migration C rejects direct `xero_tenant_id` changes, allows same-value updates, and contains no `DROP`
+- [x] `grep -n "class TenantSelectionRejectedError" packages/xero/src/oauth/service.ts` returns one match
+- [x] `awk '/xeroTenant.upsert/,/where: \{ xero_connection_id/' packages/xero/src/oauth/service.ts | grep -c "xero_tenant_id: selectedTenant.tenantId"` prints `1` (the `create` branch only)
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list (plan files may carry reviewer edits)
+- [x] `plans/161-xero-execution-report.md` has a 161b section with the Step 1 failure output and the production ordering note
+- [x] `plans/README.md` status row for 161b updated
 
 ## STOP conditions
 

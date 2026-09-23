@@ -203,3 +203,7 @@ actionable; keep one-off task evidence in the review for that task.
 - When an executable plan hits an environment obstacle, report the exact issue,
   reconcile the plan with new user authorisation, and continue independent
   work. Keep blocked checks marked NOT VERIFIED until their actual gates run.
+
+- When the user explicitly rules out a local database, do not offer localhost,
+  Docker or a local fallback again. Use only the authorised online database
+  through the protected live runner, and keep blocked live gates explicit.

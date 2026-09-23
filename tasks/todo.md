@@ -1,6 +1,19 @@
 # Current work
 
-Last reviewed: 2026-09-20
+Last reviewed: 2026-09-24
+
+## Task: Complete Plan 161b against the guarded online Neon database
+
+- [x] Reconcile the current candidate and audit live Neon, KV, Inngest and fixture prerequisites without exposing secrets.
+- [x] Repair the protected manifest, cleanup and workflow path without weakening database guards.
+- [x] Establish exact target identity, restore evidence, durable manifest read-back, active-run ownership and consumer isolation.
+- [x] Run the complete guarded live integration inventory against Neon and confirm the 161b database and Xero service suites pass.
+- [x] Recover and clean manifest-owned fixtures, preserve unrelated catalogue and customer data, and release the active-run fence.
+- [x] Run affected source gates, record evidence, update Plan 161b to DONE and commit the completion record.
+
+### Review
+
+Completed against the guarded online Neon target. The exact 22-suite inventory passed 6/6 Turbo tasks and 158 tests; all manifest-owned counts read back as zero, the outside-owned catalogue digest was unchanged, and the active-run lock was released. Plan 161b is DONE.
 
 ## Task: Fix turbo boundaries dependency declaration for vitest in @repo/email
 

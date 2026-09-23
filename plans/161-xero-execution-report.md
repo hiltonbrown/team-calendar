@@ -197,3 +197,54 @@ internal row ID and external file ID remained unchanged. The outer transaction
 rolled back; a post-query found no probe organisation. Migration C was read
 back as applied. The named integration suites remain NOT VERIFIED until their
 protected runner prerequisites are available and the suites actually pass.
+
+### Protected online verification, 24 September 2026
+
+The user authorised the configured online Neon database and explicitly approved the
+consumer-isolation fallback required by the provider retention limit: exactly one
+production Inngest environment, zero active apps, zero archived apps, and zero
+running, queued or paused runs. The final evidence was collected immediately before
+the run and revalidated by the guarded runner.
+
+The successful protected candidate was `bade686f19531f96eb5513218b9217a5a3fd87cb`.
+The manifest was persisted once in KV under a unique release namespace and owned 53
+Clerk organisation IDs, 53 internal organisation IDs and 41 typed global keys. SQL
+read-back matched Neon project `soft-dream-28768887`, branch
+`br-frosty-union-a7sc6dl7`, endpoint `ep-cold-pond-a7ar2epd`, database `neondb` and
+role `neondb_owner`. Restore evidence recorded timeline
+`73cb5a3404beeb6412275bed23ffa160` at LSN `0/47830F58`. All 18 applied migration
+checksums matched the candidate.
+
+The guarded `run-live-integration.ts` inventory passed all 6 Turbo tasks and all 22
+reviewed integration files, 158 tests total:
+
+- app: 1 file, 2 tests passed;
+- availability: 3 files, 21 tests passed;
+- database: 10 files, 41 tests passed, including 9 Xero lifecycle migration tests;
+- feeds: 1 file, 15 tests passed;
+- jobs: 5 files, 65 tests passed;
+- Xero: 2 files, 14 tests passed, including the tenant-selection service suite.
+
+Remediation during execution preserved the live safety boundary. The cleanup CLI now
+uses a package-owned standalone Prisma client instead of the server-only application
+client. Constraint tests inspect PostgreSQL constraint metadata directly, concurrent
+reservation tests use two transactions coordinated by `SELECT ... FOR UPDATE`, billing
+receipts use manifest-owned Stripe event keys, and deterministic availability tests fake
+`Date` only so Neon network timers remain operational.
+
+The successful runner exited 0 after cleanup. Independent read-back found zero rows
+for every manifest-owned table and implemented global fixture selector, reproduced the unchanged
+outside-owned catalogue digest
+`41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`, and
+confirmed that `release:active-run` was absent. Three stale hard-coded billing test
+receipts created by an earlier failed attempt were identified by exact test IDs and
+deleted; the current tests no longer use unowned IDs.
+
+Final source gates passed: `bun run check`, `bun run typecheck`, Xero units (21 files,
+335 tests), database units (17 files, 72 tests), release tooling (13 files, 65 tests),
+Prisma validation, migration safety greps and `git diff --check`.
+
+Outcome: Plan 161b is DONE. The production ordering remains unchanged: deploy
+migration A, dry-run and apply the backfill only with zero collisions, then deploy
+migrations B and C together. This verification does not claim that a separate rollout
+was performed during this run.
