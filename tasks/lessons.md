@@ -199,3 +199,7 @@ actionable; keep one-off task evidence in the review for that task.
 
 - When distilling Features, retain the Short answers section alongside the calendar
   demo and teammate table; simplify its wording instead of removing it.
+
+- When an executable plan hits an environment obstacle, report the exact issue,
+  reconcile the plan with new user authorisation, and continue independent
+  work. Keep blocked checks marked NOT VERIFIED until their actual gates run.

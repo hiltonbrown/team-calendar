@@ -28,10 +28,12 @@ export type AggregateXeroOAuthSession = {
 
 export type XeroOAuthSessionAvgAggregateOutputType = {
   token_key_version: number | null
+  expected_binding_generation: number | null
 }
 
 export type XeroOAuthSessionSumAggregateOutputType = {
   token_key_version: number | null
+  expected_binding_generation: number | null
 }
 
 export type XeroOAuthSessionMinAggregateOutputType = {
@@ -53,6 +55,7 @@ export type XeroOAuthSessionMinAggregateOutputType = {
   selected_tenant_id: string | null
   selected_tenant_name: string | null
   selected_payroll_region: $Enums.payroll_region | null
+  expected_binding_generation: number | null
   expires_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -77,6 +80,7 @@ export type XeroOAuthSessionMaxAggregateOutputType = {
   selected_tenant_id: string | null
   selected_tenant_name: string | null
   selected_payroll_region: $Enums.payroll_region | null
+  expected_binding_generation: number | null
   expires_at: Date | null
   created_at: Date | null
   updated_at: Date | null
@@ -102,6 +106,7 @@ export type XeroOAuthSessionCountAggregateOutputType = {
   selected_tenant_id: number
   selected_tenant_name: number
   selected_payroll_region: number
+  expected_binding_generation: number
   expires_at: number
   created_at: number
   updated_at: number
@@ -111,10 +116,12 @@ export type XeroOAuthSessionCountAggregateOutputType = {
 
 export type XeroOAuthSessionAvgAggregateInputType = {
   token_key_version?: true
+  expected_binding_generation?: true
 }
 
 export type XeroOAuthSessionSumAggregateInputType = {
   token_key_version?: true
+  expected_binding_generation?: true
 }
 
 export type XeroOAuthSessionMinAggregateInputType = {
@@ -136,6 +143,7 @@ export type XeroOAuthSessionMinAggregateInputType = {
   selected_tenant_id?: true
   selected_tenant_name?: true
   selected_payroll_region?: true
+  expected_binding_generation?: true
   expires_at?: true
   created_at?: true
   updated_at?: true
@@ -160,6 +168,7 @@ export type XeroOAuthSessionMaxAggregateInputType = {
   selected_tenant_id?: true
   selected_tenant_name?: true
   selected_payroll_region?: true
+  expected_binding_generation?: true
   expires_at?: true
   created_at?: true
   updated_at?: true
@@ -185,6 +194,7 @@ export type XeroOAuthSessionCountAggregateInputType = {
   selected_tenant_id?: true
   selected_tenant_name?: true
   selected_payroll_region?: true
+  expected_binding_generation?: true
   expires_at?: true
   created_at?: true
   updated_at?: true
@@ -297,6 +307,7 @@ export type XeroOAuthSessionGroupByOutputType = {
   selected_tenant_id: string | null
   selected_tenant_name: string | null
   selected_payroll_region: $Enums.payroll_region | null
+  expected_binding_generation: number | null
   expires_at: Date
   created_at: Date
   updated_at: Date
@@ -345,6 +356,7 @@ export type XeroOAuthSessionWhereInput = {
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.IntNullableFilter<"XeroOAuthSession"> | number | null
   expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   created_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
@@ -371,6 +383,7 @@ export type XeroOAuthSessionOrderByWithRelationInput = {
   selected_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrderInput | Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrderInput | Prisma.SortOrder
   expires_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -400,6 +413,7 @@ export type XeroOAuthSessionWhereUniqueInput = Prisma.AtLeast<{
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.IntNullableFilter<"XeroOAuthSession"> | number | null
   expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   created_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
@@ -426,6 +440,7 @@ export type XeroOAuthSessionOrderByWithAggregationInput = {
   selected_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrderInput | Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrderInput | Prisma.SortOrder
   expires_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -459,6 +474,7 @@ export type XeroOAuthSessionScalarWhereWithAggregatesInput = {
   selected_tenant_id?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableWithAggregatesFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.IntNullableWithAggregatesFilter<"XeroOAuthSession"> | number | null
   expires_at?: Prisma.DateTimeWithAggregatesFilter<"XeroOAuthSession"> | Date | string
   created_at?: Prisma.DateTimeWithAggregatesFilter<"XeroOAuthSession"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"XeroOAuthSession"> | Date | string
@@ -483,6 +499,7 @@ export type XeroOAuthSessionCreateInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -509,6 +526,7 @@ export type XeroOAuthSessionUncheckedCreateInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -533,6 +551,7 @@ export type XeroOAuthSessionUpdateInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -559,6 +578,7 @@ export type XeroOAuthSessionUncheckedUpdateInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -584,6 +604,7 @@ export type XeroOAuthSessionCreateManyInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -608,6 +629,7 @@ export type XeroOAuthSessionUpdateManyMutationInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -633,6 +655,7 @@ export type XeroOAuthSessionUncheckedUpdateManyInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -668,6 +691,7 @@ export type XeroOAuthSessionCountOrderByAggregateInput = {
   selected_tenant_id?: Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrder
   expires_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -675,6 +699,7 @@ export type XeroOAuthSessionCountOrderByAggregateInput = {
 
 export type XeroOAuthSessionAvgOrderByAggregateInput = {
   token_key_version?: Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrder
 }
 
 export type XeroOAuthSessionMaxOrderByAggregateInput = {
@@ -696,6 +721,7 @@ export type XeroOAuthSessionMaxOrderByAggregateInput = {
   selected_tenant_id?: Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrder
   expires_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -720,6 +746,7 @@ export type XeroOAuthSessionMinOrderByAggregateInput = {
   selected_tenant_id?: Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrder
   expires_at?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
@@ -727,6 +754,7 @@ export type XeroOAuthSessionMinOrderByAggregateInput = {
 
 export type XeroOAuthSessionSumOrderByAggregateInput = {
   token_key_version?: Prisma.SortOrder
+  expected_binding_generation?: Prisma.SortOrder
 }
 
 export type XeroOAuthSessionCreateNestedManyWithoutOrganisationInput = {
@@ -798,6 +826,7 @@ export type XeroOAuthSessionCreateWithoutOrganisationInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -822,6 +851,7 @@ export type XeroOAuthSessionUncheckedCreateWithoutOrganisationInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -876,6 +906,7 @@ export type XeroOAuthSessionScalarWhereInput = {
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.IntNullableFilter<"XeroOAuthSession"> | number | null
   expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   created_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
@@ -900,6 +931,7 @@ export type XeroOAuthSessionCreateManyOrganisationInput = {
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
+  expected_binding_generation?: number | null
   expires_at: Date | string
   created_at?: Date | string
   updated_at?: Date | string
@@ -924,6 +956,7 @@ export type XeroOAuthSessionUpdateWithoutOrganisationInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -948,6 +981,7 @@ export type XeroOAuthSessionUncheckedUpdateWithoutOrganisationInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -972,6 +1006,7 @@ export type XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationInput = {
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
+  expected_binding_generation?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -999,6 +1034,7 @@ export type XeroOAuthSessionSelect<ExtArgs extends runtime.Types.Extensions.Inte
   selected_tenant_id?: boolean
   selected_tenant_name?: boolean
   selected_payroll_region?: boolean
+  expected_binding_generation?: boolean
   expires_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -1025,6 +1061,7 @@ export type XeroOAuthSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   selected_tenant_id?: boolean
   selected_tenant_name?: boolean
   selected_payroll_region?: boolean
+  expected_binding_generation?: boolean
   expires_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -1051,6 +1088,7 @@ export type XeroOAuthSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   selected_tenant_id?: boolean
   selected_tenant_name?: boolean
   selected_payroll_region?: boolean
+  expected_binding_generation?: boolean
   expires_at?: boolean
   created_at?: boolean
   updated_at?: boolean
@@ -1077,12 +1115,13 @@ export type XeroOAuthSessionSelectScalar = {
   selected_tenant_id?: boolean
   selected_tenant_name?: boolean
   selected_payroll_region?: boolean
+  expected_binding_generation?: boolean
   expires_at?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "access_token_encrypted" | "access_token_iv" | "access_token_auth_tag" | "refresh_token_encrypted" | "refresh_token_iv" | "refresh_token_auth_tag" | "token_key_version" | "token_encrypted_at" | "token_expires_at" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
+export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "access_token_encrypted" | "access_token_iv" | "access_token_auth_tag" | "refresh_token_encrypted" | "refresh_token_iv" | "refresh_token_auth_tag" | "token_key_version" | "token_encrypted_at" | "token_expires_at" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expected_binding_generation" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
 export type XeroOAuthSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.XeroOAuthSession$organisationArgs<ExtArgs>
 }
@@ -1118,6 +1157,7 @@ export type $XeroOAuthSessionPayload<ExtArgs extends runtime.Types.Extensions.In
     selected_tenant_id: string | null
     selected_tenant_name: string | null
     selected_payroll_region: $Enums.payroll_region | null
+    expected_binding_generation: number | null
     expires_at: Date
     created_at: Date
     updated_at: Date
@@ -1564,6 +1604,7 @@ export interface XeroOAuthSessionFieldRefs {
   readonly selected_tenant_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly selected_tenant_name: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly selected_payroll_region: Prisma.FieldRef<"XeroOAuthSession", 'payroll_region'>
+  readonly expected_binding_generation: Prisma.FieldRef<"XeroOAuthSession", 'Int'>
   readonly expires_at: Prisma.FieldRef<"XeroOAuthSession", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"XeroOAuthSession", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"XeroOAuthSession", 'DateTime'>

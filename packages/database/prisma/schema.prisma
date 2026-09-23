@@ -498,6 +498,11 @@ model XeroTenant {
   organisation_id                   String         @db.Uuid
   xero_connection_id                String         @unique @db.Uuid
   xero_tenant_id                    String
+  provider_app_id                   String
+  active_slot                       Int?
+  binding_generation                Int            @default(1)
+  retired_at                        DateTime?
+  retirement_reason                 String?
   tenant_name                       String?
   payroll_region                    payroll_region
   sync_paused_at                    DateTime?
@@ -523,6 +528,7 @@ model XeroTenant {
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([xero_tenant_id])
+  @@unique([provider_app_id, xero_tenant_id, active_slot], map: "xero_tenants_reserved_binding_key")
   @@map("xero_tenants")
 }
 
@@ -546,6 +552,7 @@ model XeroOAuthSession {
   selected_tenant_id      String?
   selected_tenant_name    String?
   selected_payroll_region payroll_region?
+  expected_binding_generation Int?
   expires_at              DateTime
   created_at              DateTime                  @default(now())
   updated_at              DateTime                  @updatedAt

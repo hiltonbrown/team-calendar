@@ -75,6 +75,7 @@
   "types": "./index.ts",
   "scripts": {
     "analyze": "prisma generate --no-hints --schema=./prisma/schema.prisma",
+    "backfill:xero-tenant-binding": "bun scripts/backfill-xero-tenant-binding.ts",
     "build": "prisma generate --no-hints --schema=./prisma/schema.prisma",
     "clean": "git clean -xdf .cache .turbo dist node_modules",
     "seed": "bun run seed.ts",

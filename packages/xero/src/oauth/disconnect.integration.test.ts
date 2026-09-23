@@ -183,6 +183,7 @@ async function createTenantFixture(tenant: typeof tenantA) {
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
       payroll_region: "AU",
+      provider_app_id: process.env.XERO_CLIENT_ID ?? "test-xero-client-id",
       tenant_name: `Tenant ${tenant.clerkOrgId}`,
       xero_connection_id: tenant.connectionId,
       xero_tenant_id: `xero-${tenant.clerkOrgId}`,
