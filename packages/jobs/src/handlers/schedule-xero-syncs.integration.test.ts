@@ -81,6 +81,7 @@ async function setupTenant(tenant: typeof tenantA, timezone: string) {
       id: tenant.databaseTenantId,
       organisation_id: tenant.organisationId,
       payroll_region: "AU",
+      provider_app_id: process.env.XERO_CLIENT_ID ?? "test-xero-client-id",
       xero_connection_id: tenant.xeroConnectionId,
       xero_tenant_id: tenant.providerTenantId,
     },

@@ -85,6 +85,7 @@ export type XeroOAuthError =
   | { code: "already_refreshed"; message: string }
   | { code: "connect_disabled"; message: string }
   | { code: "client_credentials_invalid"; message: string }
+  | { code: "connection_changed"; message: string }
   | { code: "connection_inactive"; message: string }
   | { code: "invalid_country"; message: string }
   | { code: "invalid_organisation_selection"; message: string }
@@ -95,7 +96,9 @@ export type XeroOAuthError =
   | { code: "organisation_not_found"; message: string }
   | { code: "refresh_token_invalid"; message: string }
   | { code: "session_not_found"; message: string }
+  | { code: "tenant_binding_conflict"; message: string }
   | { code: "tenant_not_found"; message: string }
+  | { code: "tenant_replacement_required"; message: string }
   | { code: "unknown_error"; message: string };
 
 interface SuccessfulRefreshAttempt {
@@ -117,6 +120,21 @@ type RevokeConnectionResult =
   | { error: XeroOAuthError; httpStatus: null | number; ok: false };
 
 class OrganisationSelectionRaceError extends Error {}
+
+class TenantSelectionRejectedError extends Error {
+  readonly code:
+    | "connection_changed"
+    | "tenant_binding_conflict"
+    | "tenant_replacement_required";
+
+  constructor(
+    code: TenantSelectionRejectedError["code"],
+    options?: ErrorOptions
+  ) {
+    super(code, options);
+    this.code = code;
+  }
+}
 
 export function buildXeroOAuthStartUrl(input: {
   clerkOrgId: string;
@@ -206,6 +224,16 @@ export async function completeXeroOAuth(input: {
   const encryptedAccessToken = encryptXeroToken(token.value.access_token);
   const encryptedRefreshToken = encryptXeroToken(token.value.refresh_token);
 
+  const existingTenant = state.value.organisationId
+    ? await database.xeroTenant.findFirst({
+        select: { binding_generation: true },
+        where: {
+          clerk_org_id: state.value.clerkOrgId,
+          organisation_id: state.value.organisationId,
+        },
+      })
+    : null;
+
   const session = await database.xeroOAuthSession.create({
     data: {
       access_token_auth_tag: encryptedAccessToken.authTag,
@@ -220,6 +248,7 @@ export async function completeXeroOAuth(input: {
       },
       clerk_org_id: state.value.clerkOrgId,
       created_by_user_id: state.value.userId,
+      expected_binding_generation: existingTenant?.binding_generation ?? null,
       expires_at: sessionExpiresAt,
       organisation_id: state.value.organisationId,
       refresh_token_auth_tag: encryptedRefreshToken.authTag,
@@ -462,6 +491,11 @@ export async function completeXeroTenantSelection(input: {
     return organisation;
   }
 
+  const providerAppId = keys().XERO_CLIENT_ID;
+  if (!providerAppId) {
+    return oauthNotConfigured();
+  }
+
   const encryptedAccessToken = encryptXeroToken(accessToken);
   const encryptedRefreshToken = encryptXeroToken(refreshToken);
   const now = new Date();
@@ -508,6 +542,41 @@ export async function completeXeroTenantSelection(input: {
         throw new OrganisationSelectionRaceError();
       }
       const organisationId = selectedOrganisation.id;
+
+      const existing = await tx.xeroTenant.findFirst({
+        select: {
+          active_slot: true,
+          binding_generation: true,
+          xero_tenant_id: true,
+        },
+        where: {
+          clerk_org_id: input.clerkOrgId,
+          organisation_id: organisationId,
+        },
+      });
+      if (existing && existing.xero_tenant_id !== selectedTenant.tenantId) {
+        throw new TenantSelectionRejectedError("tenant_replacement_required");
+      }
+      if (
+        existing &&
+        session.expected_binding_generation !== null &&
+        existing.binding_generation !== session.expected_binding_generation
+      ) {
+        throw new TenantSelectionRejectedError("connection_changed");
+      }
+
+      const reserved = await tx.xeroTenant.findFirst({
+        select: { id: true },
+        where: {
+          active_slot: 1,
+          NOT: { organisation_id: organisationId },
+          provider_app_id: providerAppId,
+          xero_tenant_id: selectedTenant.tenantId,
+        },
+      });
+      if (reserved) {
+        throw new TenantSelectionRejectedError("tenant_binding_conflict");
+      }
 
       const nextConnection = await tx.xeroConnection.upsert({
         create: {
@@ -560,23 +629,45 @@ export async function completeXeroTenantSelection(input: {
         where: { organisation_id: organisationId },
       });
 
-      const nextTenant = await tx.xeroTenant.upsert({
-        create: {
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: organisationId,
-          payroll_region: payrollRegion,
-          tenant_name: selectedTenant.tenantName,
-          xero_connection_id: nextConnection.id,
-          xero_tenant_id: selectedTenant.tenantId,
-        },
-        select: { id: true },
-        update: {
-          payroll_region: payrollRegion,
-          tenant_name: selectedTenant.tenantName,
-          xero_tenant_id: selectedTenant.tenantId,
-        },
-        where: { xero_connection_id: nextConnection.id },
-      });
+      let nextTenant: { id: string };
+      try {
+        nextTenant = await tx.xeroTenant.upsert({
+          create: {
+            active_slot: 1,
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: organisationId,
+            payroll_region: payrollRegion,
+            provider_app_id: providerAppId,
+            tenant_name: selectedTenant.tenantName,
+            xero_connection_id: nextConnection.id,
+            xero_tenant_id: selectedTenant.tenantId,
+          },
+          select: { id: true },
+          update: {
+            active_slot: 1,
+            binding_generation: { increment: 1 },
+            payroll_region: payrollRegion,
+            provider_app_id: providerAppId,
+            retired_at: null,
+            retirement_reason: null,
+            tenant_name: selectedTenant.tenantName,
+          },
+          where: { xero_connection_id: nextConnection.id },
+        });
+      } catch (error) {
+        if (
+          // biome-ignore lint/suspicious/noUnnecessaryConditions: Preserve the structural Prisma error guard.
+          error !== null &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "P2002"
+        ) {
+          throw new TenantSelectionRejectedError("tenant_binding_conflict", {
+            cause: error,
+          });
+        }
+        throw error;
+      }
 
       await tx.xeroOAuthSession.update({
         data: {
@@ -605,6 +696,20 @@ export async function completeXeroTenantSelection(input: {
       };
     });
   } catch (error) {
+    if (error instanceof TenantSelectionRejectedError) {
+      const messages = {
+        connection_changed:
+          "This Xero connection changed while you were connecting. Start the connection again.",
+        tenant_binding_conflict:
+          "This Xero file is already connected in Team Calendar and cannot be connected again.",
+        tenant_replacement_required:
+          "This payroll entity is already connected to a different Xero file. Connect the original Xero file, or add a new payroll entity for this one.",
+      };
+      return {
+        error: { code: error.code, message: messages[error.code] },
+        ok: false,
+      };
+    }
     if (error instanceof OrganisationSelectionRaceError) {
       return {
         error: {
@@ -1920,6 +2025,7 @@ async function loadPendingSession(input: {
       access_token_iv: null | string;
       available_tenants_json: unknown;
       expires_at: Date;
+      expected_binding_generation: null | number;
       id: string;
       organisation_id: null | string;
       refresh_token_auth_tag: null | string;
@@ -1937,6 +2043,7 @@ async function loadPendingSession(input: {
       access_token_encrypted: true,
       access_token_iv: true,
       available_tenants_json: true,
+      expected_binding_generation: true,
       expires_at: true,
       id: true,
       organisation_id: true,

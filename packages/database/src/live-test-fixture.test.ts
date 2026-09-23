@@ -71,7 +71,7 @@ describe("live fixture registry", () => {
               (_, index) => `credential_owner:owner_release_${index}`
             ),
             ...Array.from(
-              { length: 2 },
+              { length: 4 },
               (_, index) => `provider_app:app_release_${index}`
             ),
             ...Array.from(

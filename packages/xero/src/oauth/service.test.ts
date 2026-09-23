@@ -25,6 +25,7 @@ const dbMock = vi.hoisted(() => ({
     updateMany: vi.fn(),
   },
   xeroTenant: {
+    findFirst: vi.fn(),
     upsert: vi.fn(),
   },
 }));
@@ -135,6 +136,8 @@ beforeEach(() => {
   dbMock.xeroOAuthSession.updateMany.mockReset();
   dbMock.xeroOAuthSession.updateMany.mockResolvedValue({ count: 1 });
   dbMock.xeroTenant.upsert.mockReset();
+  dbMock.xeroTenant.findFirst.mockReset();
+  dbMock.xeroTenant.findFirst.mockResolvedValue(null);
   feedMock.ensureDefaultCalendarFeed.mockReset();
   feedMock.ensureDefaultCalendarFeed.mockResolvedValue({
     ok: true,
@@ -284,6 +287,54 @@ describe("buildXeroOAuthStartUrl", () => {
 });
 
 describe("completeXeroOAuth", () => {
+  it("records the current binding generation for an existing payroll entity", async () => {
+    const start = buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      organisationId: "90000000-0000-4000-8000-000000000002",
+    });
+    expect(start.ok).toBe(true);
+    if (!start.ok) {
+      return;
+    }
+    dbMock.xeroTenant.findFirst.mockResolvedValueOnce({
+      binding_generation: 7,
+    });
+    dbMock.xeroOAuthSession.create.mockResolvedValueOnce({ id: "session_1" });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            access_token: "access-token",
+            expires_in: 1800,
+            refresh_token: "refresh-token",
+          })
+        )
+        .mockResolvedValueOnce(Response.json([]))
+    );
+
+    const result = await completeXeroOAuth({
+      code: "authorisation-code",
+      nonce: start.value.nonce,
+      state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(dbMock.xeroTenant.findFirst).toHaveBeenCalledWith({
+      select: { binding_generation: true },
+      where: {
+        clerk_org_id: "org_1",
+        organisation_id: "90000000-0000-4000-8000-000000000002",
+      },
+    });
+    expect(dbMock.xeroOAuthSession.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ expected_binding_generation: 7 }),
+      })
+    );
+  });
+
   it("stores the Xero authorisation connection id in the pending session", async () => {
     const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
@@ -1735,6 +1786,118 @@ describe("completeXeroTenantSelection", () => {
     expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
   });
 
+  it("rejects reconnecting an existing payroll entity to another Xero file", async () => {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+      ...buildPendingSession(),
+      organisation_id: organisationId,
+    });
+    dbMock.organisation.findMany.mockResolvedValue([
+      { country_code: "AU", id: organisationId },
+    ]);
+    dbMock.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      id: organisationId,
+    });
+    dbMock.xeroTenant.findFirst.mockResolvedValue({
+      active_slot: 1,
+      binding_generation: 1,
+      xero_tenant_id: "XERO-AAA",
+    });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      organisationId,
+      sessionId,
+      tenantId,
+      userId: "user_1",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "tenant_replacement_required" },
+      ok: false,
+    });
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects an outdated binding generation", async () => {
+    mockExistingSelection(3);
+    dbMock.xeroTenant.findFirst.mockResolvedValueOnce({
+      active_slot: 1,
+      binding_generation: 4,
+      xero_tenant_id: tenantId,
+    });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      organisationId,
+      sessionId,
+      tenantId,
+      userId: "user_1",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "connection_changed" },
+      ok: false,
+    });
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects a reservation held elsewhere without identifying its owner", async () => {
+    mockExistingSelection(3);
+    dbMock.xeroTenant.findFirst
+      .mockResolvedValueOnce({
+        active_slot: 1,
+        binding_generation: 3,
+        xero_tenant_id: tenantId,
+      })
+      .mockResolvedValueOnce({ id: "other-reservation" });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      organisationId,
+      sessionId,
+      tenantId,
+      userId: "user_1",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "tenant_binding_conflict" },
+      ok: false,
+    });
+    if (!result.ok) {
+      expect(result.error.message).not.toContain("other-reservation");
+      expect(result.error.message).not.toContain(organisationId);
+      expect(result.error.message).not.toContain(clerkOrgId);
+      expect(result.error.message).not.toContain("user_1");
+    }
+    expect(dbMock.xeroTenant.upsert).not.toHaveBeenCalled();
+  });
+
+  it("reconnects to the same file without updating its external tenant ID", async () => {
+    mockExistingSelection(3);
+    dbMock.xeroTenant.findFirst.mockResolvedValueOnce({
+      active_slot: 1,
+      binding_generation: 3,
+      xero_tenant_id: tenantId,
+    });
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId,
+      organisationId,
+      sessionId,
+      tenantId,
+      userId: "user_1",
+    });
+
+    expect(result.ok).toBe(true);
+    const upsert = dbMock.xeroTenant.upsert.mock.calls[0]?.[0];
+    expect(upsert?.update).not.toHaveProperty("xero_tenant_id");
+    expect(upsert?.update).toMatchObject({
+      active_slot: 1,
+      binding_generation: { increment: 1 },
+    });
+  });
+
   it.each(["NZ", "UK"])(
     "rejects an unsupported %s payroll tenant before persistence",
     async (countryCode) => {
@@ -1848,6 +2011,7 @@ describe("completeXeroTenantSelection", () => {
           },
         ],
       },
+      expected_binding_generation: null,
       expires_at: new Date("2026-07-07T00:15:00.000Z"),
       id: sessionId,
       organisation_id: null,
@@ -1857,6 +2021,21 @@ describe("completeXeroTenantSelection", () => {
       return_to: "/settings/integrations/xero",
       token_expires_at: new Date("2026-07-07T00:30:00.000Z"),
     };
+  }
+
+  function mockExistingSelection(expectedGeneration: number) {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+      ...buildPendingSession(),
+      expected_binding_generation: expectedGeneration,
+      organisation_id: organisationId,
+    });
+    dbMock.organisation.findMany.mockResolvedValue([
+      { country_code: "AU", id: organisationId },
+    ]);
+    dbMock.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      id: organisationId,
+    });
   }
 });
 

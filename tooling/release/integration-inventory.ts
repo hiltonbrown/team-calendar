@@ -23,6 +23,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/database/plan_limits.integration.test.ts",
   "packages/database/public-holidays.integration.test.ts",
   "packages/database/src/seed/seed.integration.test.ts",
+  "packages/database/xero-lifecycle-migration.integration.test.ts",
   "packages/database/xero-tenancy.integration.test.ts",
   "packages/feeds/index.integration.test.ts",
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts",
@@ -41,7 +42,7 @@ export const assertExpectedIntegrationInventory = (
     JSON.stringify(inventory) !== JSON.stringify(EXPECTED_INTEGRATION_TESTS)
   ) {
     throw new Error(
-      "Live integration inventory differs from the reviewed 21-suite allowlist"
+      "Live integration inventory differs from the reviewed 22-suite allowlist"
     );
   }
 };

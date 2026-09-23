@@ -138,3 +138,40 @@ No future database table or Redis key is touched by this baseline plan.
 - `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`:
   `26`.
 - `grep -c '^|' plans/161-xero-provider-contract.md`: `16`.
+
+## Plan 161b execution, 23 September 2026
+
+Step 1 red regression: `bun run --cwd packages/xero test` failed only the new
+`completeXeroTenantSelection > rejects reconnecting an existing payroll entity
+to another Xero file` test (330 passed, 1 failed). The assertion expected
+`{ error: { code: "tenant_replacement_required" }, ok: false }` but received
+`{ ok: true }`. After the guard, the Xero unit suite passed (335 tests).
+
+The user authorised the database configured in local development environment
+files for this run. Read-only inspection identified the `neondb` database in
+`public` on the configured Neon development target, with the previous latest
+migration `20260919110000_harden_outbound_recovery`, one Xero tenant row and no
+candidate reservation collision. Migration A applied successfully, followed by
+a dry-run backfill (1 row, 1 update, 0 collisions) and an applied backfill with
+the same counts. Migration B then applied successfully. Read-back found both
+new migrations applied, one row bound to the configured provider app with
+`active_slot = 1` and `binding_generation = 1`, and both the CHECK constraint
+and reserved-binding unique index present.
+
+Production ordering: deploy migration A, run the backfill dry-run, apply the
+backfill only with zero collisions, then deploy migration B in a separate
+deployment. This execution validated that order on the development database;
+it was not a production rollout.
+
+Verification: `bun run check`, `bun run typecheck`, Xero units, database units,
+`bun run test` (18/18 tasks), Prisma validation and release tooling passed.
+The first `bun run test` attempt failed because the protected fixture unit
+manifest still allocated two provider app keys after the suite allocation rose
+to four; its exact count was updated and the rerun passed. The first restricted
+`test:release-tools` run failed its local IPC test (48/49 passed); the required
+rerun outside the restricted sandbox passed (49/49). The named database and
+Xero integration suites are **NOT VERIFIED**: the authorised database is
+remote, and the protected live runner requires a release manifest, run ID and
+consumer-isolation prerequisites that are unavailable in the local environment.
+Do not use `ALLOW_LOCAL_DATABASE_TESTS` against this remote target or count
+direct SQL checks as those suite results.

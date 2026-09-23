@@ -28,16 +28,34 @@ let scrubInactiveXeroOAuthSessionCredentials: ServiceModule["scrubInactiveXeroOA
 const allocation = allocateLiveTestFixture(
   "packages/xero/src/oauth/service.integration.test.ts"
 );
+function requireFixtureTenant(index: number) {
+  const tenant = allocation.tenants[index];
+  if (!tenant) {
+    throw new Error(`Fixture tenant slot ${index} is missing`);
+  }
+  return tenant;
+}
+
+const primaryTenant = requireFixtureTenant(0);
+const secondaryTenant = requireFixtureTenant(1);
 const fixture = {
-  clerkOrgId: allocation.tenants[0]?.clerkOrgId as string,
+  clerkOrgId: primaryTenant.clerkOrgId,
   connectionId: allocation.id("connection"),
-  organisationId: allocation.tenants[0]?.organisationId as string,
+  organisationId: primaryTenant.organisationId,
+  providerTenantId: allocation.id("provider-tenant", 0),
+  second: {
+    clerkOrgId: secondaryTenant.clerkOrgId,
+    connectionId: allocation.id("connection", 1),
+    organisationId: secondaryTenant.organisationId,
+    tenantId: allocation.id("tenant", 1),
+  },
   sessionId: allocation.id("session"),
   tenantId: allocation.id("tenant"),
 } as const;
 
 describe("ensureFreshXeroConnection integration", () => {
   beforeAll(async () => {
+    process.env.XERO_CLIENT_ID = allocation.globalKey("provider_app");
     const [cryptoModule, databaseModule, serviceModule] = await Promise.all([
       import("../crypto/tokens"),
       import("@repo/database"),
@@ -251,7 +269,7 @@ describe("ensureFreshXeroConnection integration", () => {
           tenants: [
             {
               connectionId: "xero-authorisation-1",
-              tenantId: "xero-provider-tenant-1",
+              tenantId: fixture.providerTenantId,
               tenantName: "Integration Payroll",
             },
           ],
@@ -288,7 +306,7 @@ describe("ensureFreshXeroConnection integration", () => {
       clerkOrgId: fixture.clerkOrgId,
       organisationId: fixture.organisationId,
       sessionId: fixture.sessionId,
-      tenantId: "xero-provider-tenant-1",
+      tenantId: fixture.providerTenantId,
       userId: "user_integration_1",
     };
 
@@ -444,6 +462,143 @@ describe("ensureFreshXeroConnection integration", () => {
       })
     );
   });
+
+  it("rolls back the session claim and credential update on wrong-file reconnect", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    const before = await database.xeroConnection.findUniqueOrThrow({
+      where: { id: fixture.connectionId },
+    });
+    const replacementId = allocation.id("provider-tenant", 1);
+    await createSelectionSession({ tenantId: replacementId });
+    stubAustralianPayroll();
+
+    const result = await selectTenant(replacementId);
+
+    expect(result).toMatchObject({
+      error: { code: "tenant_replacement_required" },
+      ok: false,
+    });
+    const tenant = await database.xeroTenant.findUniqueOrThrow({
+      where: { id: fixture.tenantId },
+    });
+    const after = await database.xeroConnection.findUniqueOrThrow({
+      where: { id: fixture.connectionId },
+    });
+    const session = await database.xeroOAuthSession.findUniqueOrThrow({
+      where: { id: fixture.sessionId },
+    });
+    expect(tenant.xero_tenant_id).toBe(fixture.providerTenantId);
+    expect(after).toMatchObject({
+      access_token_auth_tag: before.access_token_auth_tag,
+      access_token_encrypted: before.access_token_encrypted,
+      access_token_iv: before.access_token_iv,
+      refresh_token_auth_tag: before.refresh_token_auth_tag,
+      refresh_token_encrypted: before.refresh_token_encrypted,
+      refresh_token_iv: before.refresh_token_iv,
+      token_encrypted_at: before.token_encrypted_at,
+      token_key_version: before.token_key_version,
+    });
+    expect(session.status).toBe("pending");
+  });
+
+  it("preserves tenant identity and advances generation on same-file reconnect", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    await createSelectionSession({ tenantId: fixture.providerTenantId });
+    stubAustralianPayroll();
+
+    const result = await selectTenant(fixture.providerTenantId);
+
+    expect(result.ok).toBe(true);
+    const tenant = await database.xeroTenant.findUniqueOrThrow({
+      where: { id: fixture.tenantId },
+    });
+    expect(tenant.id).toBe(fixture.tenantId);
+    expect(tenant.binding_generation).toBe(2);
+    expect(tenant.active_slot).toBe(1);
+  });
+
+  it("rolls back a new payroll entity when another slot reserves the Xero file", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId, true);
+    await createSelectionSession({
+      clerkOrgId: fixture.clerkOrgId,
+      organisationId: null,
+      tenantId: fixture.providerTenantId,
+    });
+    stubAustralianPayroll();
+
+    const result = await completeXeroTenantSelection({
+      clerkOrgId: fixture.clerkOrgId,
+      sessionId: fixture.sessionId,
+      tenantId: fixture.providerTenantId,
+      userId: "user_integration_1",
+    });
+
+    expect(result).toMatchObject({
+      error: { code: "tenant_binding_conflict" },
+      ok: false,
+    });
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(0);
+    expect(
+      await database.xeroOAuthSession.findUniqueOrThrow({
+        where: { id: fixture.sessionId },
+      })
+    ).toMatchObject({ status: "pending" });
+  });
+
+  it.each(["expired", "completed", "other-user"])(
+    "rejects a %s session without writing a binding",
+    async (kind) => {
+      await cleanTestData();
+      await createOrganisation();
+      await createSelectionSession({
+        expiresAt: kind === "expired" ? new Date("2020-01-01") : undefined,
+        status: kind === "completed" ? "completed" : "pending",
+        userId: kind === "other-user" ? "another-user" : undefined,
+      });
+      stubAustralianPayroll();
+
+      const result = await selectTenant(fixture.providerTenantId);
+
+      expect(result).toMatchObject({
+        error: { code: "session_not_found" },
+        ok: false,
+      });
+      expect(
+        await database.xeroConnection.count({
+          where: { clerk_org_id: fixture.clerkOrgId },
+        })
+      ).toBe(0);
+    }
+  );
+
+  it("revives a retired same-file binding and advances generation", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    await database.xeroTenant.update({
+      data: { active_slot: null, retired_at: new Date() },
+      where: { id: fixture.tenantId },
+    });
+    await createSelectionSession({ tenantId: fixture.providerTenantId });
+    stubAustralianPayroll();
+
+    expect((await selectTenant(fixture.providerTenantId)).ok).toBe(true);
+    expect(
+      await database.xeroTenant.findUniqueOrThrow({
+        where: { id: fixture.tenantId },
+      })
+    ).toMatchObject({
+      active_slot: 1,
+      binding_generation: 2,
+      retired_at: null,
+    });
+  });
 });
 
 async function createOrganisation() {
@@ -461,16 +616,118 @@ async function cleanTestData() {
   if (!database) {
     return;
   }
-  await database.xeroOAuthSession.deleteMany({
-    where: { clerk_org_id: fixture.clerkOrgId },
+  const where = {
+    clerk_org_id: { in: [fixture.clerkOrgId, fixture.second.clerkOrgId] },
+  };
+  await database.xeroOAuthSession.deleteMany({ where });
+  await database.xeroTenant.deleteMany({ where });
+  await database.xeroConnection.deleteMany({ where });
+  await database.organisation.deleteMany({ where });
+}
+
+async function seedBoundTenant(providerTenantId: string, secondSlot = false) {
+  const slot = secondSlot ? fixture.second : fixture;
+  await database.organisation.create({
+    data: {
+      clerk_org_id: slot.clerkOrgId,
+      country_code: "AU",
+      id: slot.organisationId,
+      name: "Binding integration fixture",
+    },
   });
-  await database.xeroTenant.deleteMany({
-    where: { clerk_org_id: fixture.clerkOrgId },
+  const accessToken = encryptXeroToken("original-access-token");
+  const refreshToken = encryptXeroToken("original-refresh-token");
+  await database.xeroConnection.create({
+    data: {
+      access_token_auth_tag: accessToken.authTag,
+      access_token_encrypted: accessToken.encrypted,
+      access_token_iv: accessToken.iv,
+      clerk_org_id: slot.clerkOrgId,
+      expires_at: new Date(Date.now() + 60_000),
+      id: slot.connectionId,
+      organisation_id: slot.organisationId,
+      refresh_token_auth_tag: refreshToken.authTag,
+      refresh_token_encrypted: refreshToken.encrypted,
+      refresh_token_iv: refreshToken.iv,
+      status: "active",
+    },
   });
-  await database.xeroConnection.deleteMany({
-    where: { clerk_org_id: fixture.clerkOrgId },
+  await database.xeroTenant.create({
+    data: {
+      active_slot: 1,
+      clerk_org_id: slot.clerkOrgId,
+      id: slot.tenantId,
+      organisation_id: slot.organisationId,
+      payroll_region: "AU",
+      provider_app_id: allocation.globalKey("provider_app"),
+      xero_connection_id: slot.connectionId,
+      xero_tenant_id: providerTenantId,
+    },
   });
-  await database.organisation.deleteMany({
-    where: { clerk_org_id: fixture.clerkOrgId },
+}
+
+async function createSelectionSession(
+  input: {
+    clerkOrgId?: string;
+    expiresAt?: Date;
+    organisationId?: null | string;
+    status?: "pending" | "completed";
+    tenantId?: string;
+    userId?: string;
+  } = {}
+) {
+  const accessToken = encryptXeroToken("selection-access-token");
+  const refreshToken = encryptXeroToken("selection-refresh-token");
+  await database.xeroOAuthSession.create({
+    data: {
+      access_token_auth_tag: accessToken.authTag,
+      access_token_encrypted: accessToken.encrypted,
+      access_token_iv: accessToken.iv,
+      available_tenants_json: {
+        tenants: [
+          {
+            connectionId: "xero-authorisation-1",
+            tenantId: input.tenantId ?? fixture.providerTenantId,
+            tenantName: "Integration Payroll",
+          },
+        ],
+      },
+      clerk_org_id: input.clerkOrgId ?? fixture.clerkOrgId,
+      created_by_user_id: input.userId ?? "user_integration_1",
+      expected_binding_generation: input.organisationId === null ? null : 1,
+      expires_at: input.expiresAt ?? new Date("2099-01-01T00:30:00.000Z"),
+      id: fixture.sessionId,
+      organisation_id:
+        input.organisationId === undefined
+          ? fixture.organisationId
+          : input.organisationId,
+      refresh_token_auth_tag: refreshToken.authTag,
+      refresh_token_encrypted: refreshToken.encrypted,
+      refresh_token_iv: refreshToken.iv,
+      return_to: "/settings/integrations/xero",
+      status: input.status ?? "pending",
+      token_expires_at: new Date("2099-01-01T00:20:00.000Z"),
+    },
+  });
+}
+
+function stubAustralianPayroll() {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      Response.json({
+        Organisations: [{ CountryCode: "AU", Name: "Integration Payroll" }],
+      })
+    )
+  );
+}
+
+function selectTenant(tenantId: string) {
+  return completeXeroTenantSelection({
+    clerkOrgId: fixture.clerkOrgId,
+    organisationId: fixture.organisationId,
+    sessionId: fixture.sessionId,
+    tenantId,
+    userId: "user_integration_1",
   });
 }
