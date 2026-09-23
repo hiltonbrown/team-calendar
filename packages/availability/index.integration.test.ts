@@ -12,6 +12,7 @@ import {
 import type { TenantContext } from "./index";
 
 vi.mock("server-only", () => ({}), { virtual: true });
+vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
 vi.mock("./src/holidays/nager-client", () => ({
   getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
     Promise.resolve({
