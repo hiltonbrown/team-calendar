@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { parseReleaseManifest } from "./database-guard.js";
+import { isSupportedGlobalFixtureKey } from "./global-fixture-keys.js";
 
 const outputFlag = process.argv.indexOf("--output");
 const outputPath = outputFlag >= 0 ? process.argv[outputFlag + 1] : undefined;
@@ -29,27 +30,8 @@ const manifest = parseReleaseManifest(decoded);
 if (manifest.candidateSha !== candidateSha) {
   throw new Error("The protected manifest does not match the candidate SHA");
 }
-const supportedGlobalKeyPrefixes = [
-  "fixture-namespace:",
-  "plan_id:",
-  "plan_key:",
-  "stripe_event:",
-  "credential_owner:",
-  "provider_app:",
-  "provider_connection:",
-  "tenant_binding:",
-  "oauth_attempt:",
-  "cleanup_request:",
-  "cleanup_attempt:",
-  "shared_store_namespace:",
-] as const;
 if (
-  manifest.owned.globalKeys.some(
-    (key) =>
-      !supportedGlobalKeyPrefixes.some(
-        (prefix) => key.startsWith(prefix) && key.length > prefix.length
-      )
-  )
+  manifest.owned.globalKeys.some((key) => !isSupportedGlobalFixtureKey(key))
 ) {
   throw new Error("The protected manifest contains an unsupported global key");
 }

@@ -159,6 +159,38 @@ export const assertLiveDatabaseAuthority = (input: {
   return manifest;
 };
 
+export const persistDurableManifest = async (
+  manifest: ReleaseManifest,
+  input: { url?: string; token?: string }
+): Promise<void> => {
+  if (!(input.url && input.token)) {
+    throw new Error("Durable manifest KV configuration is required");
+  }
+  const response = await fetch(input.url.replace(TRAILING_SLASH, ""), {
+    body: JSON.stringify([
+      "SET",
+      manifest.namespace,
+      JSON.stringify(manifest),
+      "NX",
+    ]),
+    headers: {
+      Authorization: `Bearer ${input.token}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error("Durable manifest persistence failed");
+  }
+  const envelope = z
+    .object({ result: z.string().nullable() })
+    .parse(await response.json());
+  if (envelope.result !== "OK") {
+    throw new Error("Durable manifest namespace already exists");
+  }
+  await assertDurableManifestReadBack(manifest, input);
+};
+
 export const assertDurableManifestReadBack = async (
   manifest: ReleaseManifest,
   input: { url?: string; token?: string }

@@ -84,20 +84,16 @@ export const assertConsumerIsolationReadBack = async (
     }
   }
   const runs = await request(
-    `runs?limit=100&from=${encodeURIComponent(environment.createdAt)}`
+    "runs?limit=100&status=RUNNING&status=QUEUED&status=PAUSED"
   );
   const range = runs.metadata.timeRange;
-  if (
-    !range ||
-    Date.parse(range.from) > Date.parse(environment.createdAt) ||
-    Date.parse(range.until) < Date.parse(environment.createdAt)
-  ) {
-    throw new Error(
-      "Inngest run inventory does not cover the environment lifetime"
-    );
+  if (!range) {
+    throw new Error("Inngest non-terminal run inventory has no time range");
   }
   assertFresh(range.until, Date.now());
   if (runs.data.length !== 0) {
-    throw new Error("Consumer isolation requires zero Inngest runs");
+    throw new Error(
+      "Consumer isolation requires zero running, queued or paused Inngest runs"
+    );
   }
 };

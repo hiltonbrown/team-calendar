@@ -7,6 +7,7 @@ import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
   LIVE_DATABASE_ACKNOWLEDGEMENT,
+  persistDurableManifest,
 } from "./database-guard.js";
 
 const runId = "018f47d8-3c0a-7f95-8c77-44f4be5c3210";
@@ -242,5 +243,45 @@ describe("live database guard", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+
+  it("persists the protected manifest once and confirms exact read-back", async () => {
+    const manifest = assertLiveDatabaseAuthority(validInput());
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ result: "OK" }))
+      .mockResolvedValueOnce(
+        Response.json({ result: JSON.stringify(manifest) })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(
+      persistDurableManifest(manifest, {
+        token: "test-token",
+        url: "https://kv.example.test/",
+      })
+    ).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://kv.example.test");
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "POST" });
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual([
+      "SET",
+      manifest.namespace,
+      JSON.stringify(manifest),
+      "NX",
+    ]);
+  });
+
+  it("rejects a reused durable manifest namespace", async () => {
+    const manifest = assertLiveDatabaseAuthority(validInput());
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(Response.json({ result: null }))
+    );
+    await expect(
+      persistDurableManifest(manifest, {
+        token: "test-token",
+        url: "https://kv.example.test",
+      })
+    ).rejects.toThrow("already exists");
   });
 });

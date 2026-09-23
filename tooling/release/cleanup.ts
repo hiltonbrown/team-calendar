@@ -5,6 +5,7 @@ import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
+import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
 
 const flag = process.argv.indexOf("--manifest");
 const manifestPath = flag >= 0 ? process.argv[flag + 1] : undefined;
@@ -89,14 +90,8 @@ const planIds = manifest.owned.globalKeys
 const planKeys = manifest.owned.globalKeys
   .filter((key) => key.startsWith("plan_key:"))
   .map((key) => key.slice("plan_key:".length));
-const unknownGlobalKeys = manifest.owned.globalKeys.filter(
-  (key) =>
-    !(
-      key.startsWith("stripe_event:") ||
-      key.startsWith("plan_id:") ||
-      key.startsWith("plan_key:") ||
-      key.startsWith("fixture-namespace:")
-    )
+const unknownGlobalKeys = unsupportedGlobalFixtureKeys(
+  manifest.owned.globalKeys
 );
 if (unknownGlobalKeys.length > 0) {
   throw new Error("Cleanup manifest contains unsupported global fixture keys");

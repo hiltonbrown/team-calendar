@@ -63,11 +63,14 @@ const verify = () =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("unregistered Inngest isolation", () => {
-  it("revalidates the production identity, both app inventories and full-lifetime runs", async () => {
+  it("revalidates production identity, all app inventories and non-terminal runs", async () => {
     const fetchMock = installResponses();
     await expect(verify()).resolves.toBeUndefined();
     expect(fetchMock).toHaveBeenCalledTimes(4);
     expect(fetchMock.mock.calls[2]?.[0]).toContain("archived=true");
+    expect(fetchMock.mock.calls[3]?.[0]).toContain("status=RUNNING");
+    expect(fetchMock.mock.calls[3]?.[0]).toContain("status=QUEUED");
+    expect(fetchMock.mock.calls[3]?.[0]).toContain("status=PAUSED");
   });
 
   it.each([401, 403, 500])("fails closed on API status %i", async (status) => {
@@ -102,13 +105,13 @@ describe("unregistered Inngest isolation", () => {
     await expect(verify()).rejects.toThrow();
   });
 
-  it("rejects incomplete run-history coverage", async () => {
+  it("rejects missing non-terminal run time-range evidence", async () => {
     installResponses({
       3: envelope([], {
-        metadata: { fetchedAt: now, timeRange: { from: now, until: now } },
+        metadata: { fetchedAt: now },
       }),
     });
-    await expect(verify()).rejects.toThrow("environment lifetime");
+    await expect(verify()).rejects.toThrow("no time range");
   });
 
   it("rejects stale manifest evidence before contacting the provider", async () => {
