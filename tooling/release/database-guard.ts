@@ -23,6 +23,7 @@ const manifestSchema = z.object({
     })
     .optional(),
   durableManifestConfirmed: z.literal(true),
+  mode: z.literal("database-fixture").optional(),
   namespace: z.string().regex(/^release:run:[0-9a-f-]{36}$/),
   owned: z.object({
     clerkOrgIds: z.array(z.string()).default([]),

@@ -81,6 +81,25 @@ const validInput = () => ({
 afterEach(() => vi.unstubAllEnvs());
 
 describe("live database guard", () => {
+  it.each(["xero-e2e", "unknown-mode"])(
+    "rejects foreign mode %s before authority",
+    (mode) => {
+      expect(() =>
+        assertLiveDatabaseAuthority({
+          ...validInput(),
+          manifestPath: writeManifest({ mode }),
+        })
+      ).toThrow();
+    }
+  );
+  it("preserves an explicit ordinary fixture mode", () => {
+    expect(
+      assertLiveDatabaseAuthority({
+        ...validInput(),
+        manifestPath: writeManifest({ mode: "database-fixture" }),
+      }).runId
+    ).toBe(runId);
+  });
   it("rejects missing isolation and missing pause evidence", () => {
     expect(() =>
       assertLiveDatabaseAuthority({
