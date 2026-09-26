@@ -1,6 +1,33 @@
 # Current work
 
-Last reviewed: 2026-09-24
+Last reviewed: 2026-09-27
+
+## Task: Reconcile Plans 160 through 161h, 27 September 2026
+
+- [x] Read the original plans and independently reconcile their requirements against integrated source, migrations and meaningful regression assertions.
+- [x] Apply the canonical online-only lesson in `tasks/lessons.md:211–215`: use the authorised Neon target through the protected live runner, with fresh ownership, restore, consumer isolation and cleanup evidence; no localhost or Docker database.
+- [x] Correct and commit the five confirmed production gaps: terminal cleanup retirement recovery, snapshot-bound legacy identity application, readiness evidence, production keyring/configuration preflight, and unavailable/pending recovery actions.
+- [x] Rerun the complete protected online inventory on the corrected domain candidate: 27 files, 246 tests and six uncached tasks PASS.
+- [x] Verify all 21 applied migration checksums, zero pending migrations, clean integrity checks and Prisma schema comparison reporting no difference.
+- [x] Independently read back zero residue across all 39 owned selectors, unchanged outside-owned catalogue and unchanged counts totalling 204 pre-existing rows; confirm cleanup PASS and released active fence.
+- [x] Implement and verify independent X24 ICS and X25 read-only layout/focus/live-announcement helpers, including actual Chromium probes on controlled static HTML; preserve application/provider evidence boundaries.
+- [ ] Finish independent review and correction of the complete Plan 160 catalogue, strict report, intent/recovery ledger, observer provenance, mode guards and protected execution wiring.
+- [ ] Run final uncached combined source gates and relevant builds on the frozen combined candidate, including release-tool and meaningful fault regressions.
+- [ ] Run a final guard-positive protected online campaign covering the final ordinary-runner mode guards; refresh authority, migrations, cleanup and outside-owned comparisons again.
+- [ ] Reconcile all per-plan status/checklists and publish accurate scenario/subcase and charter evidence without promoting aggregate suite results to case-specific PASS.
+- [ ] Complete the authorised final commit/merge hand-off after the combined candidate passes its required checks.
+- [ ] Obtain the separately authorised real provider/application-browser observations and charter sign-off when sanctioned fixtures, approved AU contract, deployed revisions, role sessions and enforced worker isolation are available.
+
+### Review
+
+The five scoped production corrections are committed as `707dcf2` (cleanup retirement recovery), `634d179` (verified legacy credential snapshot application), `e90308e` (readiness evidence), `5194124` (preflight validation) and `97cb795` (recovery action matrix). Their focused regressions pass. None adds DDL or rewrites an existing migration. Preserve the first protected campaign's failure record; the corrected second campaign is the successful evidence recorded here.
+
+Corrected protected online campaign: candidate `1d58d147eb8395a56cb748dd894ad7d21f9b1f41`, run `c0c28ca3-25da-4409-948f-94079e9e0b5f`, all 27 files / 246 tests / six uncached tasks PASS. It includes the thirteen new persisted cleanup/backfill cases and owned real Redis assertions. Fresh read-back confirms 21 matching applied migrations, zero pending, twelve clean integrity checks, the immutable trigger enabled, schema comparison with no difference, all 39 residue selectors empty, the outside-owned catalogue unchanged and all pre-existing table counts unchanged, totalling 204 rows. Runner evidence records complete phase, inventory PASS, cleanup PASS, exit zero and released fence. No customer backfill, credential mutation or provider action was performed.
+
+Plan 160 remains under final source review. The independently committed read-only helper slice `9d924b8` passed 38 focused tests, scoped lint and release-tool TypeScript, including four actual Chromium tests using controlled static HTML. These probes verify helper behaviour, not deployed application or provider journeys. Final combined gates/builds and a final guard-positive campaign are still pending and must not inherit the earlier candidate's PASS.
+
+Real provider consent, payroll mutations, permission/refresh/cleanup contracts, authenticated application-browser journeys, production rollout and charter sign-off remain NOT VERIFIED or unexecuted. All 26 scenarios, 92 registered subcases and forty charter cases require their own valid observations; aggregate source/database success does not create those observations. Remote cleanup remains report-only. The current authority, candidate evidence and per-plan boundaries are maintained in `plans/160-161-reconciliation.md`.
+
 
 ## Task: Complete Plan 161b against the guarded online Neon database
 
