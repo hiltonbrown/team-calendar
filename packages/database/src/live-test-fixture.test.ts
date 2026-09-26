@@ -67,15 +67,15 @@ describe("live fixture registry", () => {
               (_, index) => `stripe_event:evt_release_${index}`
             ),
             ...Array.from(
-              { length: 2 },
+              { length: 6 },
               (_, index) => `credential_owner:owner_release_${index}`
             ),
             ...Array.from(
-              { length: 4 },
+              { length: 8 },
               (_, index) => `provider_app:app_release_${index}`
             ),
             ...Array.from(
-              { length: 3 },
+              { length: 25 },
               (_, index) => `provider_connection:connection_release_${index}`
             ),
             ...Array.from(
@@ -87,11 +87,11 @@ describe("live fixture registry", () => {
               (_, index) => `oauth_attempt:oauth_release_${index}`
             ),
             ...Array.from(
-              { length: 3 },
+              { length: 40 },
               (_, index) => `cleanup_request:request_release_${index}`
             ),
             ...Array.from(
-              { length: 3 },
+              { length: 40 },
               (_, index) => `cleanup_attempt:attempt_release_${index}`
             ),
             ...Array.from(
@@ -285,7 +285,7 @@ describe("live fixture registry", () => {
             "provider_app:shared-identifier",
             "provider_app:app-2",
             ...Array.from(
-              { length: 3 },
+              { length: 25 },
               (_, index) => `provider_connection:connection-${index}`
             ),
             ...Array.from(
@@ -297,11 +297,11 @@ describe("live fixture registry", () => {
               (_, index) => `oauth_attempt:oauth-${index}`
             ),
             ...Array.from(
-              { length: 3 },
+              { length: 40 },
               (_, index) => `cleanup_request:request-${index}`
             ),
             ...Array.from(
-              { length: 3 },
+              { length: 40 },
               (_, index) => `cleanup_attempt:attempt-${index}`
             ),
             ...Array.from(

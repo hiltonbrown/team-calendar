@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { keys } from "./keys";
+import { keys, resolveXeroDailyAllowance } from "./keys";
 
 describe("XERO_TOKEN_ENCRYPTION_KEY env validation at startup", () => {
   const originalEnv = process.env.XERO_TOKEN_ENCRYPTION_KEY;
@@ -118,5 +118,58 @@ describe("Xero encryption keyring configuration", () => {
     configure();
     vi.stubEnv("XERO_TOKEN_ENCRYPTION_KEYS_JSON", ring);
     expect(() => keys()).toThrow("Invalid environment variables");
+  });
+});
+
+describe("Xero commercial daily allowance", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("uses Starter when tier is unset outside production", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("XERO_APP_TIER", undefined);
+    expect(resolveXeroDailyAllowance()).toBe(1000);
+  });
+  it("requires explicit tier in production", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("XERO_APP_TIER", undefined);
+    expect(() => resolveXeroDailyAllowance()).toThrow("XERO_APP_TIER");
+  });
+  it("resolves tier ceilings", () => {
+    vi.stubEnv("XERO_APP_TIER", "core");
+    expect(resolveXeroDailyAllowance()).toBe(5000);
+    vi.stubEnv("XERO_APP_TIER", "starter");
+    expect(resolveXeroDailyAllowance()).toBe(1000);
+  });
+  it("rejects half configured KV credentials without values", () => {
+    vi.stubEnv("KV_REST_API_URL", "https://invalid.example");
+    vi.stubEnv("KV_REST_API_TOKEN", undefined);
+    expect(() => keys()).toThrow("Invalid environment variables");
+  });
+});
+
+it("warns only once for an unset non-production tier", async () => {
+  vi.stubEnv("NODE_ENV", "test");
+  vi.stubEnv("XERO_APP_TIER", undefined);
+  vi.resetModules();
+  const { log } = await import("@repo/observability/log");
+  const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+  const fresh = await import("./keys");
+  expect(fresh.resolveXeroDailyAllowance()).toBe(1000);
+  expect(fresh.resolveXeroDailyAllowance()).toBe(1000);
+  expect(warn).toHaveBeenCalledTimes(1);
+  warn.mockRestore();
+  vi.unstubAllEnvs();
+});
+
+describe("Xero remote cleanup mode", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("defaults to report_only when absent", () => {
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", undefined);
+    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("report_only");
+  });
+  it("requires an explicit recognised rollout mode", () => {
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "enabled");
+    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("enabled");
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "automatic");
+    expect(() => keys()).toThrow();
   });
 });

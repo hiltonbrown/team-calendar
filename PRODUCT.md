@@ -298,12 +298,12 @@ Outbound write failures are surfaced synchronously to the user in plain language
 
 #### Rate limits
 
-- 60 API calls per minute per connected organisation
-- 5,000 API calls per day per connected organisation
-- Five concurrent requests maximum per connected organisation
+- 60 API calls per minute per external Xero tenant and provider app
+- 1,000 API calls per day on Starter, 5,000 on higher commercial tiers, per external Xero tenant and provider app
+- Five concurrent requests maximum per external Xero tenant and provider app
 - 10,000 calls per minute app-wide
 
-Rate limiting, backoff, and retry logic live inside this package.
+Rate limiting, backoff, and retry logic live inside this package. Admission uses a shared, atomic store across deployments and fails closed when that store or its explicitly initialised namespace is unavailable.
 
 ### `packages/availability`
 

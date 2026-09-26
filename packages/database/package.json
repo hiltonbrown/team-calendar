@@ -73,6 +73,18 @@
     "./queries/xero-credential-owner": {
       "types": "./queries/xero-credential-owner.ts",
       "default": "./queries/xero-credential-owner.ts"
+    },
+    "./live-shared-store-fixture": {
+      "types": "./src/live-shared-store-fixture.ts",
+      "default": "./src/live-shared-store-fixture.ts"
+    },
+    "./live-test-guard": {
+      "types": "./src/live-test-guard.ts",
+      "default": "./src/live-test-guard.ts"
+    },
+    "./queries/xero-cleanup": {
+      "types": "./queries/xero-cleanup.ts",
+      "default": "./queries/xero-cleanup.ts"
     }
   },
   "main": "./index.ts",

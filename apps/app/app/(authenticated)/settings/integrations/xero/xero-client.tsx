@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  Alert,
+  AlertDescription,
+} from "@repo/design-system/components/ui/alert";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -10,6 +14,7 @@ import {
   CardTitle,
 } from "@repo/design-system/components/ui/card";
 import { toast } from "@repo/design-system/components/ui/sonner";
+import type { XeroDisconnectReceipt } from "@repo/xero";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
@@ -31,6 +36,9 @@ interface XeroClientProps {
 
 export const XeroClient = ({ organisations }: XeroClientProps) => {
   const router = useRouter();
+  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(
+    null
+  );
   const [isPending, startTransition] = useTransition();
   const [disconnectTarget, setDisconnectTarget] = useState<{
     connectionId: string;
@@ -73,13 +81,15 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         mode: disconnectTarget.mode,
         organisationId: disconnectTarget.organisationId,
       });
-      const successMessage =
-        disconnectTarget.mode === "destructive"
-          ? "Xero disconnected and Xero-linked data purged."
-          : "Xero disconnected. Historical data is now read-only.";
-      toast[result.ok ? "success" : "error"](
-        result.ok ? successMessage : result.error.message
+      if (!result.ok) {
+        toast.error(result.error.message);
+        return;
+      }
+      const message = disconnectReceiptMessage(
+        result.value.receipt.remoteStatus
       );
+      setDisconnectMessage(message);
+      toast.message(message);
 
       if (result.ok) {
         setDisconnectTarget(null);
@@ -150,6 +160,15 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         description="Each payroll organisation has one Xero connection and tenant. Connection status is shared with every administrator in this account."
         title="Xero Payroll"
       />
+
+      {disconnectMessage !== null && (
+        <Alert
+          className="rounded-[20px] border-0 bg-surface-container"
+          role="status"
+        >
+          <AlertDescription>{disconnectMessage}</AlertDescription>
+        </Alert>
+      )}
 
       {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Organisation card renders status, stats, sync actions, and disconnect confirmation */}
       {organisations.map((organisation) => {
@@ -444,4 +463,21 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="font-medium text-body-sm">{value}</p>
     </div>
   );
+}
+
+function disconnectReceiptMessage(
+  status: XeroDisconnectReceipt["remoteStatus"]
+): string {
+  switch (status) {
+    case "not_applicable":
+    case "confirmed_deleted":
+    case "confirmed_absent":
+      return "Disconnected from Xero.";
+    case "left_in_place":
+      return "Sync stopped. Team Calendar no longer uses this Xero connection. To remove it from Xero as well, open Connected apps in Xero.";
+    case "pending":
+      return "Sync stopped. Xero disconnection is pending.";
+    default:
+      return "Sync stopped. We could not confirm the Xero disconnection. Contact support for help.";
+  }
 }

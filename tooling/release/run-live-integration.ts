@@ -16,7 +16,10 @@ import {
   assertExpectedIntegrationInventory,
   discoverIntegrationTests,
 } from "./integration-inventory.js";
-import { buildLiveIntegrationEnvironment } from "./live-run-environment.js";
+import {
+  buildLiveIntegrationEnvironment,
+  buildLiveIntegrationTestEnvironment,
+} from "./live-run-environment.js";
 import { type LiveRunMode, resolveLiveRunAction } from "./live-run-mode.js";
 
 const manifestFlag = process.argv.indexOf("--manifest");
@@ -154,7 +157,7 @@ try {
     });
     const result = spawnSync("bun", ["run", "test:integration"], {
       cwd: root,
-      env: childEnvironment,
+      env: buildLiveIntegrationTestEnvironment(childEnvironment),
       stdio: "inherit",
     });
     status = result.status ?? 1;

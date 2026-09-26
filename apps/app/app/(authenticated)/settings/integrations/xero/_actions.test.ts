@@ -82,7 +82,12 @@ describe("xero settings integration server actions", () => {
     });
     mocks.disconnectXeroOAuthConnection.mockResolvedValue({
       ok: true,
-      value: { remoteRevoked: true },
+      value: {
+        cleanupRequestId: "00000000-0000-4000-8000-000000000004",
+        dataActionStatus: "not_requested",
+        localDisabled: true,
+        remoteStatus: "left_in_place",
+      },
     });
   });
 
@@ -197,6 +202,43 @@ describe("xero settings integration server actions", () => {
         ok: false,
       });
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+    });
+
+    it("returns only the receipt DTO and audits the truthful remote status", async () => {
+      mocks.disconnectXeroOAuthConnection.mockResolvedValue({
+        ok: true,
+        value: {
+          cleanupRequestId: null,
+          dataActionStatus: "not_requested",
+          localDisabled: true,
+          providerErrorCode: "private-provider-code",
+          remoteConnectionId: "private-target",
+          remoteStatus: "unknown",
+        },
+      });
+      const result = await disconnectXeroAction({
+        confirmationText: orgName,
+        connectionId,
+        mode: "soft",
+        organisationId,
+      });
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          disconnected: true,
+          receipt: {
+            cleanupRequestId: null,
+            dataActionStatus: "not_requested",
+            localDisabled: true,
+            remoteStatus: "unknown",
+          },
+        },
+      });
+      expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          metadata: { mode: "soft", remoteStatus: "unknown" },
+        }),
+      });
     });
 
     it("passes destructive flag correctly to disconnect service", async () => {

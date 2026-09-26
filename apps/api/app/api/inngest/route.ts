@@ -1,6 +1,8 @@
 import { functions, inngest } from "@repo/jobs";
 import { serve } from "inngest/next";
 
+export const maxDuration = 300;
+
 const handlers = serve({
   client: inngest,
   functions,

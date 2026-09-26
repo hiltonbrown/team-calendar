@@ -407,7 +407,7 @@ describe("ensureFreshXeroConnection integration", () => {
     ).toBe("expired");
   });
 
-  it("preserves local credentials until Xero confirms disconnect", async () => {
+  it("disables orphan legacy connections locally with a truthful idempotent receipt and no HTTP", async () => {
     await cleanTestData();
     await createOrganisation();
     const accessToken = encryptXeroToken("disconnect-access-token");
@@ -430,10 +430,10 @@ describe("ensureFreshXeroConnection integration", () => {
         xero_authorisation_connection_id: "xero-authorisation-1",
       },
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 503 }))
-    );
+    const fetchSpy = vi
+      .fn()
+      .mockRejectedValue(new Error("No provider request is authorised"));
+    vi.stubGlobal("fetch", fetchSpy);
     const input = {
       clerkOrgId: fixture.clerkOrgId,
       connectionId: fixture.connectionId,
@@ -442,23 +442,19 @@ describe("ensureFreshXeroConnection integration", () => {
       performedByUserId: "user_integration_1",
     };
 
-    const failed = await disconnectXeroOAuthConnection(input);
-
-    expect(failed.ok).toBe(false);
-    const preserved = await database.xeroConnection.findUniqueOrThrow({
-      where: { id: fixture.connectionId },
-    });
-    expect(preserved.status).toBe("active");
-    expect(preserved.access_token_encrypted).toBe(accessToken.encrypted);
-    expect(preserved.refresh_token_encrypted).toBe(refreshToken.encrypted);
-
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
-    );
     const disconnected = await disconnectXeroOAuthConnection(input);
-
-    expect(disconnected.ok).toBe(true);
+    expect(disconnected).toEqual({
+      ok: true,
+      value: {
+        cleanupRequestId: null,
+        dataActionStatus: "not_requested",
+        localDisabled: true,
+        remoteStatus: "left_in_place",
+      },
+    });
+    const repeated = await disconnectXeroOAuthConnection(input);
+    expect(repeated).toEqual(disconnected);
+    expect(fetchSpy).not.toHaveBeenCalled();
     const cleared = await database.xeroConnection.findUniqueOrThrow({
       where: { id: fixture.connectionId },
     });

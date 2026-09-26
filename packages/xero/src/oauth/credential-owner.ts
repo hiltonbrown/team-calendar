@@ -16,6 +16,12 @@ import {
 import { XERO_TOKEN_OPERATION_BUDGET_MS } from "../rate-limit/limits";
 import { verifyXeroAccessTokenIdentity } from "./identity";
 import {
+  boundXeroLocks,
+  lockXeroBinding,
+  lockXeroConnection,
+  lockXeroOwner,
+} from "./locks";
+import {
   ensureFreshXeroConnection,
   exchangeToken,
   type XeroOAuthError,
@@ -23,33 +29,6 @@ import {
 
 const SCOPE_SEPARATOR = /\s+/;
 
-// Lock order: sorted owners, sorted bindings, sorted connections, then session claims.
-// SQL lock_timeout is the first transaction statement, bounded by the absolute deadline.
-export async function boundXeroLocks(
-  tx: Prisma.TransactionClient,
-  deadline: XeroDeadline
-) {
-  const budget = remainingMs(deadline);
-  if (budget < 1) {
-    throw new Error("Xero operation deadline exceeded");
-  }
-  await tx.$executeRaw`SELECT set_config('lock_timeout', ${`${budget}ms`}, true)`;
-}
-export async function lockXeroOwner(tx: Prisma.TransactionClient, id: string) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-owner:${id}`}, 0))::text AS acquired`;
-}
-export async function lockXeroBinding(
-  tx: Prisma.TransactionClient,
-  id: string
-) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-binding:${id}`}, 0))::text AS acquired`;
-}
-export async function lockXeroConnection(
-  tx: Prisma.TransactionClient,
-  id: string
-) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))::text AS acquired`;
-}
 export function ownerMirror(owner: XeroCredentialOwner) {
   return {
     access_token_auth_tag: owner.access_token_auth_tag,
@@ -173,7 +152,10 @@ export async function refreshXeroCredentialOwner(input: {
         const exchanged = await exchangeToken({
           deadline: input.deadline,
           grantType: "refresh_token",
-          orgKey: `xero-owner:${owner.id}`,
+          rateClass: {
+            kind: "token",
+            providerAppId: keys().XERO_CLIENT_ID ?? "",
+          },
           refreshToken: token,
         });
         if (!exchanged.ok) {

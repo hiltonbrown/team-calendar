@@ -2,7 +2,7 @@ import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
 import { tryDecryptXeroToken } from "../crypto/tokens";
-import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
+import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   XeroEmployee,
   XeroEmployeeMapFailure,
@@ -59,10 +59,11 @@ export async function fetchEmployees(input: {
           },
           method: "GET",
         },
-        orgKey: orgRateLimitKey({
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
-        }),
+        rateClass: {
+          kind: "tenant",
+          providerAppId: keys().XERO_CLIENT_ID ?? "",
+          xeroTenantId: input.xeroTenant.xero_tenant_id,
+        },
         url: `${baseUrl()}/payroll.xro/2.0/employees?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
@@ -329,10 +330,11 @@ export async function fetchUkLeaveForEmployee(input: {
         },
         method: "GET",
       },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
+      rateClass: {
+        kind: "tenant",
+        providerAppId: keys().XERO_CLIENT_ID ?? "",
+        xeroTenantId: input.xeroTenant.xero_tenant_id,
+      },
       url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
         employeeId
       )}/leave`,
@@ -552,10 +554,11 @@ export async function fetchUkLeaveBalancesForEmployee(input: {
         },
         method: "GET",
       },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
+      rateClass: {
+        kind: "tenant",
+        providerAppId: keys().XERO_CLIENT_ID ?? "",
+        xeroTenantId: input.xeroTenant.xero_tenant_id,
+      },
       url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
         employeeId
       )}/leaveBalances`,
@@ -640,10 +643,11 @@ export async function fetchUkLeaveApplicationStatus(
         },
         method: "GET",
       },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
+      rateClass: {
+        kind: "tenant",
+        providerAppId: keys().XERO_CLIENT_ID ?? "",
+        xeroTenantId: input.xeroTenant.xero_tenant_id,
+      },
       url: `${baseUrl()}/payroll.xro/2.0/employees/${encodeURIComponent(
         employeeId
       )}/leave/${encodeURIComponent(leaveApplicationId)}`,

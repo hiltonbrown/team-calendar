@@ -1,4 +1,5 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
+
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   afterAll,
@@ -9,6 +10,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { lockXeroOwner } from "./locks";
 
 const fixture = allocateLiveTestFixture(
   "packages/xero/src/oauth/credential-owner.integration.test.ts"
@@ -271,7 +273,7 @@ describe("canonical credential owner integration", () => {
     });
     const blocker = database.$transaction(
       async (tx) => {
-        await api.lockXeroOwner(tx, ownerId);
+        await lockXeroOwner(tx, ownerId);
         entered();
         await released;
       },

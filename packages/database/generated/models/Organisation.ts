@@ -305,6 +305,7 @@ export type OrganisationWhereInput = {
   public_holidays?: Prisma.PublicHolidayListRelationFilter
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentListRelationFilter
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionNullableScalarRelationFilter, Prisma.XeroConnectionWhereInput> | null
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestListRelationFilter
   xero_tenants?: Prisma.XeroTenantListRelationFilter
   xero_oauth_sessions?: Prisma.XeroOAuthSessionListRelationFilter
   xero_person_matches?: Prisma.XeroPersonMatchListRelationFilter
@@ -347,6 +348,7 @@ export type OrganisationOrderByWithRelationInput = {
   public_holidays?: Prisma.PublicHolidayOrderByRelationAggregateInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentOrderByRelationAggregateInput
   xero_connection?: Prisma.XeroConnectionOrderByWithRelationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestOrderByRelationAggregateInput
   xero_tenants?: Prisma.XeroTenantOrderByRelationAggregateInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionOrderByRelationAggregateInput
   xero_person_matches?: Prisma.XeroPersonMatchOrderByRelationAggregateInput
@@ -392,6 +394,7 @@ export type OrganisationWhereUniqueInput = Prisma.AtLeast<{
   public_holidays?: Prisma.PublicHolidayListRelationFilter
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentListRelationFilter
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionNullableScalarRelationFilter, Prisma.XeroConnectionWhereInput> | null
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestListRelationFilter
   xero_tenants?: Prisma.XeroTenantListRelationFilter
   xero_oauth_sessions?: Prisma.XeroOAuthSessionListRelationFilter
   xero_person_matches?: Prisma.XeroPersonMatchListRelationFilter
@@ -476,6 +479,7 @@ export type OrganisationCreateInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -518,6 +522,7 @@ export type OrganisationUncheckedCreateInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -560,6 +565,7 @@ export type OrganisationUpdateInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -602,6 +608,7 @@ export type OrganisationUncheckedUpdateInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -1126,6 +1133,20 @@ export type OrganisationUpdateOneRequiredWithoutAudit_eventsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutAudit_eventsInput, Prisma.OrganisationUpdateWithoutAudit_eventsInput>, Prisma.OrganisationUncheckedUpdateWithoutAudit_eventsInput>
 }
 
+export type OrganisationCreateNestedOneWithoutXero_cleanup_requestsInput = {
+  create?: Prisma.XOR<Prisma.OrganisationCreateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedCreateWithoutXero_cleanup_requestsInput>
+  connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutXero_cleanup_requestsInput
+  connect?: Prisma.OrganisationWhereUniqueInput
+}
+
+export type OrganisationUpdateOneRequiredWithoutXero_cleanup_requestsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganisationCreateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedCreateWithoutXero_cleanup_requestsInput>
+  connectOrCreate?: Prisma.OrganisationCreateOrConnectWithoutXero_cleanup_requestsInput
+  upsert?: Prisma.OrganisationUpsertWithoutXero_cleanup_requestsInput
+  connect?: Prisma.OrganisationWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrganisationUpdateToOneWithWhereWithoutXero_cleanup_requestsInput, Prisma.OrganisationUpdateWithoutXero_cleanup_requestsInput>, Prisma.OrganisationUncheckedUpdateWithoutXero_cleanup_requestsInput>
+}
+
 export type OrganisationCreateWithoutOrganisation_settingsInput = {
   id?: string
   clerk_org_id: string
@@ -1154,6 +1175,7 @@ export type OrganisationCreateWithoutOrganisation_settingsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -1195,6 +1217,7 @@ export type OrganisationUncheckedCreateWithoutOrganisation_settingsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -1252,6 +1275,7 @@ export type OrganisationUpdateWithoutOrganisation_settingsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -1293,6 +1317,7 @@ export type OrganisationUncheckedUpdateWithoutOrganisation_settingsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -1333,6 +1358,7 @@ export type OrganisationCreateWithoutTeamsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -1374,6 +1400,7 @@ export type OrganisationUncheckedCreateWithoutTeamsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -1431,6 +1458,7 @@ export type OrganisationUpdateWithoutTeamsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -1472,6 +1500,7 @@ export type OrganisationUncheckedUpdateWithoutTeamsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -1513,6 +1542,7 @@ export type OrganisationCreateWithoutLocationsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -1554,6 +1584,7 @@ export type OrganisationUncheckedCreateWithoutLocationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -1611,6 +1642,7 @@ export type OrganisationUpdateWithoutLocationsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -1652,6 +1684,7 @@ export type OrganisationUncheckedUpdateWithoutLocationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -1693,6 +1726,7 @@ export type OrganisationCreateWithoutPeopleInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -1734,6 +1768,7 @@ export type OrganisationUncheckedCreateWithoutPeopleInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -1791,6 +1826,7 @@ export type OrganisationUpdateWithoutPeopleInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -1832,6 +1868,7 @@ export type OrganisationUncheckedUpdateWithoutPeopleInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -1873,6 +1910,7 @@ export type OrganisationCreateWithoutAlternative_contactsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -1914,6 +1952,7 @@ export type OrganisationUncheckedCreateWithoutAlternative_contactsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -1971,6 +2010,7 @@ export type OrganisationUpdateWithoutAlternative_contactsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -2012,6 +2052,7 @@ export type OrganisationUncheckedUpdateWithoutAlternative_contactsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2053,6 +2094,7 @@ export type OrganisationCreateWithoutXero_connectionInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionCreateNestedManyWithoutOrganisationInput
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -2094,6 +2136,7 @@ export type OrganisationUncheckedCreateWithoutXero_connectionInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedCreateNestedManyWithoutOrganisationInput
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -2151,6 +2194,7 @@ export type OrganisationUpdateWithoutXero_connectionInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUpdateManyWithoutOrganisationNestedInput
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -2192,6 +2236,7 @@ export type OrganisationUncheckedUpdateWithoutXero_connectionInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2234,6 +2279,7 @@ export type OrganisationCreateWithoutXero_tenantsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutOrganisationInput
@@ -2275,6 +2321,7 @@ export type OrganisationUncheckedCreateWithoutXero_tenantsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutOrganisationInput
@@ -2332,6 +2379,7 @@ export type OrganisationUpdateWithoutXero_tenantsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutOrganisationNestedInput
@@ -2373,6 +2421,7 @@ export type OrganisationUncheckedUpdateWithoutXero_tenantsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2414,6 +2463,7 @@ export type OrganisationCreateWithoutXero_oauth_sessionsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutOrganisationInput
@@ -2455,6 +2505,7 @@ export type OrganisationUncheckedCreateWithoutXero_oauth_sessionsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutOrganisationInput
@@ -2512,6 +2563,7 @@ export type OrganisationUpdateWithoutXero_oauth_sessionsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutOrganisationNestedInput
@@ -2553,6 +2605,7 @@ export type OrganisationUncheckedUpdateWithoutXero_oauth_sessionsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2594,6 +2647,7 @@ export type OrganisationCreateWithoutXero_sync_cursorsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -2635,6 +2689,7 @@ export type OrganisationUncheckedCreateWithoutXero_sync_cursorsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -2692,6 +2747,7 @@ export type OrganisationUpdateWithoutXero_sync_cursorsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -2733,6 +2789,7 @@ export type OrganisationUncheckedUpdateWithoutXero_sync_cursorsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2773,6 +2830,7 @@ export type OrganisationCreateWithoutAvailability_recordsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -2814,6 +2872,7 @@ export type OrganisationUncheckedCreateWithoutAvailability_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -2871,6 +2930,7 @@ export type OrganisationUpdateWithoutAvailability_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -2912,6 +2972,7 @@ export type OrganisationUncheckedUpdateWithoutAvailability_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -2954,6 +3015,7 @@ export type OrganisationCreateWithoutOutbound_operationsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -2995,6 +3057,7 @@ export type OrganisationUncheckedCreateWithoutOutbound_operationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3052,6 +3115,7 @@ export type OrganisationUpdateWithoutOutbound_operationsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -3093,6 +3157,7 @@ export type OrganisationUncheckedUpdateWithoutOutbound_operationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -3133,6 +3198,7 @@ export type OrganisationCreateWithoutAvailability_publicationsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -3174,6 +3240,7 @@ export type OrganisationUncheckedCreateWithoutAvailability_publicationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3231,6 +3298,7 @@ export type OrganisationUpdateWithoutAvailability_publicationsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -3272,6 +3340,7 @@ export type OrganisationUncheckedUpdateWithoutAvailability_publicationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -3313,6 +3382,7 @@ export type OrganisationCreateWithoutLeave_balancesInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -3354,6 +3424,7 @@ export type OrganisationUncheckedCreateWithoutLeave_balancesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3411,6 +3482,7 @@ export type OrganisationUpdateWithoutLeave_balancesInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -3452,6 +3524,7 @@ export type OrganisationUncheckedUpdateWithoutLeave_balancesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -3494,6 +3567,7 @@ export type OrganisationCreateWithoutXero_person_matchesInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutOrganisationInput
@@ -3535,6 +3609,7 @@ export type OrganisationUncheckedCreateWithoutXero_person_matchesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3592,6 +3667,7 @@ export type OrganisationUpdateWithoutXero_person_matchesInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutOrganisationNestedInput
@@ -3633,6 +3709,7 @@ export type OrganisationUncheckedUpdateWithoutXero_person_matchesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -3673,6 +3750,7 @@ export type OrganisationCreateWithoutPublic_holiday_jurisdictionsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -3714,6 +3792,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holiday_jurisdictionsInput 
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3771,6 +3850,7 @@ export type OrganisationUpdateWithoutPublic_holiday_jurisdictionsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -3812,6 +3892,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holiday_jurisdictionsInput 
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -3853,6 +3934,7 @@ export type OrganisationCreateWithoutPublic_holidaysInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -3894,6 +3976,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holidaysInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -3951,6 +4034,7 @@ export type OrganisationUpdateWithoutPublic_holidaysInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -3992,6 +4076,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holidaysInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4033,6 +4118,7 @@ export type OrganisationCreateWithoutPublic_holiday_assignmentsInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionCreateNestedManyWithoutOrganisationInput
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4074,6 +4160,7 @@ export type OrganisationUncheckedCreateWithoutPublic_holiday_assignmentsInput = 
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedCreateNestedManyWithoutOrganisationInput
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -4131,6 +4218,7 @@ export type OrganisationUpdateWithoutPublic_holiday_assignmentsInput = {
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUpdateManyWithoutOrganisationNestedInput
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -4172,6 +4260,7 @@ export type OrganisationUncheckedUpdateWithoutPublic_holiday_assignmentsInput = 
   public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4213,6 +4302,7 @@ export type OrganisationCreateWithoutFeedsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4254,6 +4344,7 @@ export type OrganisationUncheckedCreateWithoutFeedsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -4311,6 +4402,7 @@ export type OrganisationUpdateWithoutFeedsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -4352,6 +4444,7 @@ export type OrganisationUncheckedUpdateWithoutFeedsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4393,6 +4486,7 @@ export type OrganisationCreateWithoutFeed_tokensInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4434,6 +4528,7 @@ export type OrganisationUncheckedCreateWithoutFeed_tokensInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -4491,6 +4586,7 @@ export type OrganisationUpdateWithoutFeed_tokensInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -4532,6 +4628,7 @@ export type OrganisationUncheckedUpdateWithoutFeed_tokensInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4574,6 +4671,7 @@ export type OrganisationCreateWithoutNotificationsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4615,6 +4713,7 @@ export type OrganisationUncheckedCreateWithoutNotificationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -4672,6 +4771,7 @@ export type OrganisationUpdateWithoutNotificationsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -4713,6 +4813,7 @@ export type OrganisationUncheckedUpdateWithoutNotificationsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4754,6 +4855,7 @@ export type OrganisationCreateWithoutNotification_preferencesInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4795,6 +4897,7 @@ export type OrganisationUncheckedCreateWithoutNotification_preferencesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -4852,6 +4955,7 @@ export type OrganisationUpdateWithoutNotification_preferencesInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -4893,6 +4997,7 @@ export type OrganisationUncheckedUpdateWithoutNotification_preferencesInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -4934,6 +5039,7 @@ export type OrganisationCreateWithoutNotification_email_queueInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -4975,6 +5081,7 @@ export type OrganisationUncheckedCreateWithoutNotification_email_queueInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -5032,6 +5139,7 @@ export type OrganisationUpdateWithoutNotification_email_queueInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -5073,6 +5181,7 @@ export type OrganisationUncheckedUpdateWithoutNotification_email_queueInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -5114,6 +5223,7 @@ export type OrganisationCreateWithoutSync_runsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -5155,6 +5265,7 @@ export type OrganisationUncheckedCreateWithoutSync_runsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -5212,6 +5323,7 @@ export type OrganisationUpdateWithoutSync_runsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -5253,6 +5365,7 @@ export type OrganisationUncheckedUpdateWithoutSync_runsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -5294,6 +5407,7 @@ export type OrganisationCreateWithoutFailed_recordsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -5335,6 +5449,7 @@ export type OrganisationUncheckedCreateWithoutFailed_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -5392,6 +5507,7 @@ export type OrganisationUpdateWithoutFailed_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -5433,6 +5549,7 @@ export type OrganisationUncheckedUpdateWithoutFailed_recordsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -5474,6 +5591,7 @@ export type OrganisationCreateWithoutAudit_eventsInput = {
   public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
@@ -5515,6 +5633,7 @@ export type OrganisationUncheckedCreateWithoutAudit_eventsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
   xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutOrganisationInput
   xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
@@ -5572,6 +5691,7 @@ export type OrganisationUpdateWithoutAudit_eventsInput = {
   public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
@@ -5613,12 +5733,197 @@ export type OrganisationUncheckedUpdateWithoutAudit_eventsInput = {
   public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
   public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
   xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
   sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutOrganisationNestedInput
   failed_records?: Prisma.FailedRecordUncheckedUpdateManyWithoutOrganisationNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
+  notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedUpdateManyWithoutOrganisationNestedInput
+  organisation_settings?: Prisma.OrganisationSettingsUncheckedUpdateOneWithoutOrganisationNestedInput
+}
+
+export type OrganisationCreateWithoutXero_cleanup_requestsInput = {
+  id?: string
+  clerk_org_id: string
+  name: string
+  country_code: string
+  region_code?: string | null
+  is_active?: boolean
+  timezone?: string | null
+  locale?: string | null
+  fiscal_year_start?: number | null
+  working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: string | null
+  archived_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  teams?: Prisma.TeamCreateNestedManyWithoutOrganisationInput
+  locations?: Prisma.LocationCreateNestedManyWithoutOrganisationInput
+  people?: Prisma.PersonCreateNestedManyWithoutOrganisationInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutOrganisationInput
+  alternative_contacts?: Prisma.AlternativeContactCreateNestedManyWithoutOrganisationInput
+  availability_records?: Prisma.AvailabilityRecordCreateNestedManyWithoutOrganisationInput
+  availability_publications?: Prisma.AvailabilityPublicationCreateNestedManyWithoutOrganisationInput
+  feeds?: Prisma.FeedCreateNestedManyWithoutOrganisationInput
+  feed_tokens?: Prisma.FeedTokenCreateNestedManyWithoutOrganisationInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionCreateNestedManyWithoutOrganisationInput
+  public_holidays?: Prisma.PublicHolidayCreateNestedManyWithoutOrganisationInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentCreateNestedManyWithoutOrganisationInput
+  xero_connection?: Prisma.XeroConnectionCreateNestedOneWithoutOrganisationInput
+  xero_tenants?: Prisma.XeroTenantCreateNestedManyWithoutOrganisationInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionCreateNestedManyWithoutOrganisationInput
+  xero_person_matches?: Prisma.XeroPersonMatchCreateNestedManyWithoutOrganisationInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutOrganisationInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutOrganisationInput
+  failed_records?: Prisma.FailedRecordCreateNestedManyWithoutOrganisationInput
+  audit_events?: Prisma.AuditEventCreateNestedManyWithoutOrganisationInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutOrganisationInput
+  notification_preferences?: Prisma.NotificationPreferenceCreateNestedManyWithoutOrganisationInput
+  notification_email_queue?: Prisma.NotificationEmailQueueCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationCreateNestedManyWithoutOrganisationInput
+  organisation_settings?: Prisma.OrganisationSettingsCreateNestedOneWithoutOrganisationInput
+}
+
+export type OrganisationUncheckedCreateWithoutXero_cleanup_requestsInput = {
+  id?: string
+  clerk_org_id: string
+  name: string
+  country_code: string
+  region_code?: string | null
+  is_active?: boolean
+  timezone?: string | null
+  locale?: string | null
+  fiscal_year_start?: number | null
+  working_hours_per_day?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: string | null
+  archived_at?: Date | string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  teams?: Prisma.TeamUncheckedCreateNestedManyWithoutOrganisationInput
+  locations?: Prisma.LocationUncheckedCreateNestedManyWithoutOrganisationInput
+  people?: Prisma.PersonUncheckedCreateNestedManyWithoutOrganisationInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutOrganisationInput
+  alternative_contacts?: Prisma.AlternativeContactUncheckedCreateNestedManyWithoutOrganisationInput
+  availability_records?: Prisma.AvailabilityRecordUncheckedCreateNestedManyWithoutOrganisationInput
+  availability_publications?: Prisma.AvailabilityPublicationUncheckedCreateNestedManyWithoutOrganisationInput
+  feeds?: Prisma.FeedUncheckedCreateNestedManyWithoutOrganisationInput
+  feed_tokens?: Prisma.FeedTokenUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holidays?: Prisma.PublicHolidayUncheckedCreateNestedManyWithoutOrganisationInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_connection?: Prisma.XeroConnectionUncheckedCreateNestedOneWithoutOrganisationInput
+  xero_tenants?: Prisma.XeroTenantUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_person_matches?: Prisma.XeroPersonMatchUncheckedCreateNestedManyWithoutOrganisationInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutOrganisationInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutOrganisationInput
+  failed_records?: Prisma.FailedRecordUncheckedCreateNestedManyWithoutOrganisationInput
+  audit_events?: Prisma.AuditEventUncheckedCreateNestedManyWithoutOrganisationInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganisationInput
+  notification_preferences?: Prisma.NotificationPreferenceUncheckedCreateNestedManyWithoutOrganisationInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUncheckedCreateNestedManyWithoutOrganisationInput
+  outbound_operations?: Prisma.OutboundOperationUncheckedCreateNestedManyWithoutOrganisationInput
+  organisation_settings?: Prisma.OrganisationSettingsUncheckedCreateNestedOneWithoutOrganisationInput
+}
+
+export type OrganisationCreateOrConnectWithoutXero_cleanup_requestsInput = {
+  where: Prisma.OrganisationWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrganisationCreateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedCreateWithoutXero_cleanup_requestsInput>
+}
+
+export type OrganisationUpsertWithoutXero_cleanup_requestsInput = {
+  update: Prisma.XOR<Prisma.OrganisationUpdateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedUpdateWithoutXero_cleanup_requestsInput>
+  create: Prisma.XOR<Prisma.OrganisationCreateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedCreateWithoutXero_cleanup_requestsInput>
+  where?: Prisma.OrganisationWhereInput
+}
+
+export type OrganisationUpdateToOneWithWhereWithoutXero_cleanup_requestsInput = {
+  where?: Prisma.OrganisationWhereInput
+  data: Prisma.XOR<Prisma.OrganisationUpdateWithoutXero_cleanup_requestsInput, Prisma.OrganisationUncheckedUpdateWithoutXero_cleanup_requestsInput>
+}
+
+export type OrganisationUpdateWithoutXero_cleanup_requestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.StringFieldUpdateOperationsInput | string
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  locale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  teams?: Prisma.TeamUpdateManyWithoutOrganisationNestedInput
+  locations?: Prisma.LocationUpdateManyWithoutOrganisationNestedInput
+  people?: Prisma.PersonUpdateManyWithoutOrganisationNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutOrganisationNestedInput
+  alternative_contacts?: Prisma.AlternativeContactUpdateManyWithoutOrganisationNestedInput
+  availability_records?: Prisma.AvailabilityRecordUpdateManyWithoutOrganisationNestedInput
+  availability_publications?: Prisma.AvailabilityPublicationUpdateManyWithoutOrganisationNestedInput
+  feeds?: Prisma.FeedUpdateManyWithoutOrganisationNestedInput
+  feed_tokens?: Prisma.FeedTokenUpdateManyWithoutOrganisationNestedInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUpdateManyWithoutOrganisationNestedInput
+  public_holidays?: Prisma.PublicHolidayUpdateManyWithoutOrganisationNestedInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUpdateManyWithoutOrganisationNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneWithoutOrganisationNestedInput
+  xero_tenants?: Prisma.XeroTenantUpdateManyWithoutOrganisationNestedInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUpdateManyWithoutOrganisationNestedInput
+  xero_person_matches?: Prisma.XeroPersonMatchUpdateManyWithoutOrganisationNestedInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutOrganisationNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutOrganisationNestedInput
+  failed_records?: Prisma.FailedRecordUpdateManyWithoutOrganisationNestedInput
+  audit_events?: Prisma.AuditEventUpdateManyWithoutOrganisationNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutOrganisationNestedInput
+  notification_preferences?: Prisma.NotificationPreferenceUpdateManyWithoutOrganisationNestedInput
+  notification_email_queue?: Prisma.NotificationEmailQueueUpdateManyWithoutOrganisationNestedInput
+  outbound_operations?: Prisma.OutboundOperationUpdateManyWithoutOrganisationNestedInput
+  organisation_settings?: Prisma.OrganisationSettingsUpdateOneWithoutOrganisationNestedInput
+}
+
+export type OrganisationUncheckedUpdateWithoutXero_cleanup_requestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  country_code?: Prisma.StringFieldUpdateOperationsInput | string
+  region_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  is_active?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  timezone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  locale?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fiscal_year_start?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  working_hours_per_day?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reporting_unit?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  teams?: Prisma.TeamUncheckedUpdateManyWithoutOrganisationNestedInput
+  locations?: Prisma.LocationUncheckedUpdateManyWithoutOrganisationNestedInput
+  people?: Prisma.PersonUncheckedUpdateManyWithoutOrganisationNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutOrganisationNestedInput
+  alternative_contacts?: Prisma.AlternativeContactUncheckedUpdateManyWithoutOrganisationNestedInput
+  availability_records?: Prisma.AvailabilityRecordUncheckedUpdateManyWithoutOrganisationNestedInput
+  availability_publications?: Prisma.AvailabilityPublicationUncheckedUpdateManyWithoutOrganisationNestedInput
+  feeds?: Prisma.FeedUncheckedUpdateManyWithoutOrganisationNestedInput
+  feed_tokens?: Prisma.FeedTokenUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holiday_jurisdictions?: Prisma.PublicHolidayJurisdictionUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holidays?: Prisma.PublicHolidayUncheckedUpdateManyWithoutOrganisationNestedInput
+  public_holiday_assignments?: Prisma.PublicHolidayAssignmentUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_connection?: Prisma.XeroConnectionUncheckedUpdateOneWithoutOrganisationNestedInput
+  xero_tenants?: Prisma.XeroTenantUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_oauth_sessions?: Prisma.XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_person_matches?: Prisma.XeroPersonMatchUncheckedUpdateManyWithoutOrganisationNestedInput
+  xero_sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutOrganisationNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutOrganisationNestedInput
+  failed_records?: Prisma.FailedRecordUncheckedUpdateManyWithoutOrganisationNestedInput
+  audit_events?: Prisma.AuditEventUncheckedUpdateManyWithoutOrganisationNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_preferences?: Prisma.NotificationPreferenceUncheckedUpdateManyWithoutOrganisationNestedInput
   notification_email_queue?: Prisma.NotificationEmailQueueUncheckedUpdateManyWithoutOrganisationNestedInput
@@ -5644,6 +5949,7 @@ export type OrganisationCountOutputType = {
   public_holiday_jurisdictions: number
   public_holidays: number
   public_holiday_assignments: number
+  xero_cleanup_requests: number
   xero_tenants: number
   xero_oauth_sessions: number
   xero_person_matches: number
@@ -5670,6 +5976,7 @@ export type OrganisationCountOutputTypeSelect<ExtArgs extends runtime.Types.Exte
   public_holiday_jurisdictions?: boolean | OrganisationCountOutputTypeCountPublic_holiday_jurisdictionsArgs
   public_holidays?: boolean | OrganisationCountOutputTypeCountPublic_holidaysArgs
   public_holiday_assignments?: boolean | OrganisationCountOutputTypeCountPublic_holiday_assignmentsArgs
+  xero_cleanup_requests?: boolean | OrganisationCountOutputTypeCountXero_cleanup_requestsArgs
   xero_tenants?: boolean | OrganisationCountOutputTypeCountXero_tenantsArgs
   xero_oauth_sessions?: boolean | OrganisationCountOutputTypeCountXero_oauth_sessionsArgs
   xero_person_matches?: boolean | OrganisationCountOutputTypeCountXero_person_matchesArgs
@@ -5780,6 +6087,13 @@ export type OrganisationCountOutputTypeCountPublic_holiday_assignmentsArgs<ExtAr
 /**
  * OrganisationCountOutputType without action
  */
+export type OrganisationCountOutputTypeCountXero_cleanup_requestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.XeroCleanupRequestWhereInput
+}
+
+/**
+ * OrganisationCountOutputType without action
+ */
 export type OrganisationCountOutputTypeCountXero_tenantsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.XeroTenantWhereInput
 }
@@ -5883,6 +6197,7 @@ export type OrganisationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   public_holidays?: boolean | Prisma.Organisation$public_holidaysArgs<ExtArgs>
   public_holiday_assignments?: boolean | Prisma.Organisation$public_holiday_assignmentsArgs<ExtArgs>
   xero_connection?: boolean | Prisma.Organisation$xero_connectionArgs<ExtArgs>
+  xero_cleanup_requests?: boolean | Prisma.Organisation$xero_cleanup_requestsArgs<ExtArgs>
   xero_tenants?: boolean | Prisma.Organisation$xero_tenantsArgs<ExtArgs>
   xero_oauth_sessions?: boolean | Prisma.Organisation$xero_oauth_sessionsArgs<ExtArgs>
   xero_person_matches?: boolean | Prisma.Organisation$xero_person_matchesArgs<ExtArgs>
@@ -5964,6 +6279,7 @@ export type OrganisationInclude<ExtArgs extends runtime.Types.Extensions.Interna
   public_holidays?: boolean | Prisma.Organisation$public_holidaysArgs<ExtArgs>
   public_holiday_assignments?: boolean | Prisma.Organisation$public_holiday_assignmentsArgs<ExtArgs>
   xero_connection?: boolean | Prisma.Organisation$xero_connectionArgs<ExtArgs>
+  xero_cleanup_requests?: boolean | Prisma.Organisation$xero_cleanup_requestsArgs<ExtArgs>
   xero_tenants?: boolean | Prisma.Organisation$xero_tenantsArgs<ExtArgs>
   xero_oauth_sessions?: boolean | Prisma.Organisation$xero_oauth_sessionsArgs<ExtArgs>
   xero_person_matches?: boolean | Prisma.Organisation$xero_person_matchesArgs<ExtArgs>
@@ -5997,6 +6313,7 @@ export type $OrganisationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     public_holidays: Prisma.$PublicHolidayPayload<ExtArgs>[]
     public_holiday_assignments: Prisma.$PublicHolidayAssignmentPayload<ExtArgs>[]
     xero_connection: Prisma.$XeroConnectionPayload<ExtArgs> | null
+    xero_cleanup_requests: Prisma.$XeroCleanupRequestPayload<ExtArgs>[]
     xero_tenants: Prisma.$XeroTenantPayload<ExtArgs>[]
     xero_oauth_sessions: Prisma.$XeroOAuthSessionPayload<ExtArgs>[]
     xero_person_matches: Prisma.$XeroPersonMatchPayload<ExtArgs>[]
@@ -6432,6 +6749,7 @@ export interface Prisma__OrganisationClient<T, Null = never, ExtArgs extends run
   public_holidays<T extends Prisma.Organisation$public_holidaysArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$public_holidaysArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublicHolidayPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   public_holiday_assignments<T extends Prisma.Organisation$public_holiday_assignmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$public_holiday_assignmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublicHolidayAssignmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   xero_connection<T extends Prisma.Organisation$xero_connectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$xero_connectionArgs<ExtArgs>>): Prisma.Prisma__XeroConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  xero_cleanup_requests<T extends Prisma.Organisation$xero_cleanup_requestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$xero_cleanup_requestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroCleanupRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   xero_tenants<T extends Prisma.Organisation$xero_tenantsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$xero_tenantsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroTenantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   xero_oauth_sessions<T extends Prisma.Organisation$xero_oauth_sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$xero_oauth_sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroOAuthSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   xero_person_matches<T extends Prisma.Organisation$xero_person_matchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organisation$xero_person_matchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroPersonMatchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -7184,6 +7502,30 @@ export type Organisation$xero_connectionArgs<ExtArgs extends runtime.Types.Exten
    */
   include?: Prisma.XeroConnectionInclude<ExtArgs> | null
   where?: Prisma.XeroConnectionWhereInput
+}
+
+/**
+ * Organisation.xero_cleanup_requests
+ */
+export type Organisation$xero_cleanup_requestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroCleanupRequest
+   */
+  select?: Prisma.XeroCleanupRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroCleanupRequest
+   */
+  omit?: Prisma.XeroCleanupRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroCleanupRequestInclude<ExtArgs> | null
+  where?: Prisma.XeroCleanupRequestWhereInput
+  orderBy?: Prisma.XeroCleanupRequestOrderByWithRelationInput | Prisma.XeroCleanupRequestOrderByWithRelationInput[]
+  cursor?: Prisma.XeroCleanupRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.XeroCleanupRequestScalarFieldEnum | Prisma.XeroCleanupRequestScalarFieldEnum[]
 }
 
 /**

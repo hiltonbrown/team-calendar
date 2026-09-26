@@ -15,6 +15,16 @@ jobs:
     runs-on: ubuntu-latest
 
     services:
+      redis:
+        image: redis:7
+      srh:
+        image: hiett/serverless-redis-http:latest
+        ports:
+          - 8079:80
+        env:
+          SRH_MODE: env
+          SRH_TOKEN: local-test-token
+          SRH_CONNECTION_STRING: redis://redis:6379
       postgres:
         image: postgres:16
         env:
@@ -109,4 +119,6 @@ jobs:
       - name: Run integration tests
         env:
           ALLOW_LOCAL_DATABASE_TESTS: "1"
+          TC_TEST_KV_REST_API_URL: http://localhost:8079
+          TC_TEST_KV_REST_API_TOKEN: local-test-token
         run: bun run test:integration

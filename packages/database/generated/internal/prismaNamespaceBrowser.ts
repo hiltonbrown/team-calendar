@@ -85,7 +85,9 @@ export const ModelName = {
   PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
   UsageCounter: 'UsageCounter',
-  StripeEvent: 'StripeEvent'
+  StripeEvent: 'StripeEvent',
+  XeroCleanupRequest: 'XeroCleanupRequest',
+  XeroCleanupAttempt: 'XeroCleanupAttempt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -868,6 +870,46 @@ export const StripeEventScalarFieldEnum = {
 } as const
 
 export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
+
+
+export const XeroCleanupRequestScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_tenant_id: 'xero_tenant_id',
+  binding_generation: 'binding_generation',
+  requested_by_user_id: 'requested_by_user_id',
+  destructive: 'destructive',
+  data_action_status: 'data_action_status',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCleanupRequestScalarFieldEnum = (typeof XeroCleanupRequestScalarFieldEnum)[keyof typeof XeroCleanupRequestScalarFieldEnum]
+
+
+export const XeroCleanupAttemptScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_cleanup_request_id: 'xero_cleanup_request_id',
+  provider_app_id: 'provider_app_id',
+  remote_connection_id: 'remote_connection_id',
+  expected_binding_generation: 'expected_binding_generation',
+  state: 'state',
+  lease_owner: 'lease_owner',
+  lease_expires_at: 'lease_expires_at',
+  dispatched_at: 'dispatched_at',
+  deadline_at: 'deadline_at',
+  next_attempt_at: 'next_attempt_at',
+  retry_count: 'retry_count',
+  outcome_reason: 'outcome_reason',
+  correlation_id: 'correlation_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCleanupAttemptScalarFieldEnum = (typeof XeroCleanupAttemptScalarFieldEnum)[keyof typeof XeroCleanupAttemptScalarFieldEnum]
 
 
 export const SortOrder = {

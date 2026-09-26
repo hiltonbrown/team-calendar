@@ -1075,6 +1075,40 @@ export type Enumstripe_event_delivery_stateWithAggregatesFilter<$PrismaModel = n
   _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
 }
 
+export type Enumxero_cleanup_data_action_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
+}
+
+export type Enumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
+}
+
+export type Enumxero_cleanup_attempt_stateFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
+}
+
+export type Enumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
+}
+
 export type NestedUuidFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -2116,6 +2150,40 @@ export type NestedEnumstripe_event_delivery_stateWithAggregatesFilter<$PrismaMod
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
   _max?: Prisma.NestedEnumstripe_event_delivery_stateFilter<$PrismaModel>
+}
+
+export type NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
+}
+
+export type NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_data_action_status | Prisma.Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_data_action_status[] | Prisma.ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_data_action_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_data_action_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cleanup_data_action_statusFilter<$PrismaModel>
+}
+
+export type NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
+}
+
+export type NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_cleanup_attempt_state | Prisma.Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_cleanup_attempt_state[] | Prisma.ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel> | $Enums.xero_cleanup_attempt_state
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
 }
 
 

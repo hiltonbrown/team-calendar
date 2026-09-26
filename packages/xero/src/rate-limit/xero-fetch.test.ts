@@ -1,15 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 import { XeroRateLimiter } from "./limiter";
-import { orgRateLimitKey, parseRetryAfter, xeroFetch } from "./xero-fetch";
+import { MemorySharedXeroRateStore } from "./memory-store";
+import { xeroRateKeys } from "./shared-store";
+import { parseRetryAfter, xeroFetch } from "./xero-fetch";
 
+let testTime = Date.now();
+const rateClass = {
+  kind: "tenant" as const,
+  providerAppId: "test-app",
+  xeroTenantId: "org-a",
+};
 function permissiveLimiter(): XeroRateLimiter {
-  return new XeroRateLimiter({
-    appCallsPerMinute: 1_000_000,
-    callsPerDayPerOrg: 1_000_000,
-    callsPerMinutePerOrg: 1_000_000,
-    concurrentRequestsPerOrg: 1000,
-    maxWaitMs: 0,
-  });
+  return new XeroRateLimiter(
+    {
+      appCallsPerMinute: 1_000_000,
+      callsPerDayPerOrg: 1_000_000,
+      callsPerMinutePerOrg: 1_000_000,
+      concurrentRequestsPerOrg: 1000,
+      maxWaitMs: 0,
+    },
+    {
+      now: () => testTime,
+      store: new MemorySharedXeroRateStore({
+        limits: {
+          appCallsPerMinute: 1_000_000,
+          callsPerDayPerOrg: 1_000_000,
+          callsPerMinutePerOrg: 1_000_000,
+          concurrentRequestsPerOrg: 1000,
+        },
+        now: () => testTime,
+      }),
+    }
+  );
 }
 
 function recordingSleep() {
@@ -18,6 +40,7 @@ function recordingSleep() {
     calls,
     sleep: (ms: number) => {
       calls.push(ms);
+      testTime += ms;
       return Promise.resolve();
     },
   };
@@ -34,7 +57,7 @@ describe("xeroFetch", () => {
     const { calls, sleep } = recordingSleep();
 
     const response = await xeroFetch(
-      { orgKey: "org-a", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter(), sleep }
     );
 
@@ -52,7 +75,7 @@ describe("xeroFetch", () => {
     const { calls, sleep } = recordingSleep();
 
     const response = await xeroFetch(
-      { orgKey: "org-a", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter(), sleep }
     );
 
@@ -65,7 +88,7 @@ describe("xeroFetch", () => {
     const exhausted = new XeroRateLimiter({ callsPerDayPerOrg: 0 });
 
     const response = await xeroFetch(
-      { orgKey: "org-a", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: exhausted }
     );
 
@@ -80,7 +103,7 @@ describe("xeroFetch", () => {
     const { calls, sleep } = recordingSleep();
 
     const response = await xeroFetch(
-      { maxAttempts: 2, orgKey: "org-a", url: "https://api.xero.com/x" },
+      { maxAttempts: 2, rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter(), sleep }
     );
 
@@ -96,7 +119,7 @@ describe("xeroFetch", () => {
     const { calls, sleep } = recordingSleep();
 
     const response = await xeroFetch(
-      { orgKey: "org-a", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter(), sleep }
     );
 
@@ -113,7 +136,7 @@ describe("xeroFetch", () => {
 
     const response = await xeroFetch(
       {
-        orgKey: "org-a",
+        rateClass,
         retryOnAmbiguousFailure: false,
         url: "https://api.xero.com/x",
       },
@@ -133,7 +156,7 @@ describe("xeroFetch", () => {
 
     const response = await xeroFetch(
       {
-        orgKey: "org-a",
+        rateClass,
         retryOnAmbiguousFailure: false,
         url: "https://api.xero.com/x",
       },
@@ -152,7 +175,7 @@ describe("xeroFetch", () => {
     await expect(
       xeroFetch(
         {
-          orgKey: "org-a",
+          rateClass,
           retryOnAmbiguousFailure: false,
           url: "https://api.xero.com/x",
         },
@@ -169,7 +192,7 @@ describe("xeroFetch", () => {
     const { sleep } = recordingSleep();
 
     const response = await xeroFetch(
-      { orgKey: "org-a", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter(), sleep }
     );
 
@@ -178,16 +201,15 @@ describe("xeroFetch", () => {
   });
 });
 
-describe("orgRateLimitKey", () => {
-  it("combines clerk org and organisation ids", () => {
-    expect(
-      orgRateLimitKey({ clerkOrgId: "org_1", organisationId: "payroll_1" })
-    ).toBe("org_1:payroll_1");
+describe("external tenant identity regression", () => {
+  it("shares keys for one external tenant across internal bindings", () => {
+    const first = { ...rateClass, clerkOrgId: "one", organisationId: "one" };
+    const second = { ...rateClass, clerkOrgId: "two", organisationId: "two" };
+    expect(xeroRateKeys(first, "test")).toEqual(xeroRateKeys(second, "test"));
   });
-
-  it("falls back to the clerk org id when no organisation is set", () => {
-    expect(orgRateLimitKey({ clerkOrgId: "org_1", organisationId: null })).toBe(
-      "org_1"
+  it("separates tenants despite identical internal bindings", () => {
+    expect(xeroRateKeys(rateClass, "test")).not.toEqual(
+      xeroRateKeys({ ...rateClass, xeroTenantId: "other" }, "test")
     );
   });
 });
@@ -229,7 +251,7 @@ it("holds and releases permit through a stalled body deadline", async () => {
     xeroFetch(
       {
         deadline: { expiresAtMs: Date.now() + 30 },
-        orgKey: "org",
+        rateClass,
         url: "https://api.xero.com/x",
       },
       { fetchImpl, limiter }
@@ -247,7 +269,7 @@ it("retains the last 429 when backoff exceeds remaining budget", async () => {
   const response = await xeroFetch(
     {
       deadline: { expiresAtMs: Date.now() + 1000 },
-      orgKey: "org",
+      rateClass,
       url: "https://api.xero.com/x",
     },
     { fetchImpl, limiter: permissiveLimiter() }
@@ -261,7 +283,7 @@ it("bounds admission by remaining deadline", async () => {
   await xeroFetch(
     {
       deadline: { expiresAtMs: Date.now() + 1000 },
-      orgKey: "org",
+      rateClass,
       url: "https://api.xero.com/x",
     },
     { fetchImpl: vi.fn().mockResolvedValue(new Response("{}")), limiter }
@@ -274,7 +296,7 @@ it("rejects oversized content with a safe error", async () => {
   const secret = "synthetic-private-response";
   await expect(
     xeroFetch(
-      { maxBodyBytes: 3, orgKey: "org", url: "https://api.xero.com/x" },
+      { maxBodyBytes: 3, rateClass, url: "https://api.xero.com/x" },
       {
         fetchImpl: vi.fn().mockResolvedValue(new Response(secret)),
         limiter: permissiveLimiter(),
@@ -292,7 +314,7 @@ it("rejects redirects without forwarding credentials", async () => {
     .mockResolvedValue(Response.redirect("https://other.example", 302));
   await expect(
     xeroFetch(
-      { orgKey: "org", url: "https://api.xero.com/x" },
+      { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: permissiveLimiter() }
     )
   ).rejects.toMatchObject({ code: "redirect_rejected", dispatched: true });
@@ -302,7 +324,7 @@ it("rejects redirects without forwarding credentials", async () => {
 it("rejects foreign origins before dispatch", async () => {
   const fetchImpl = vi.fn();
   await expect(
-    xeroFetch({ orgKey: "org", url: "https://other.example/x" }, { fetchImpl })
+    xeroFetch({ rateClass, url: "https://other.example/x" }, { fetchImpl })
   ).rejects.toMatchObject({ code: "origin_rejected", dispatched: false });
   expect(fetchImpl).not.toHaveBeenCalled();
 });
@@ -314,10 +336,7 @@ it("rejects configured foreign API origin in production", async () => {
   const fetchImpl = vi.fn();
   try {
     await expect(
-      xeroFetch(
-        { orgKey: "org", url: "https://other.example/x" },
-        { fetchImpl }
-      )
+      xeroFetch({ rateClass, url: "https://other.example/x" }, { fetchImpl })
     ).rejects.toMatchObject({ code: "origin_rejected", dispatched: false });
   } finally {
     process.env.NODE_ENV = previous;
@@ -334,7 +353,7 @@ it("buffers successful JSON before releasing permit", async () => {
   const release = vi.fn();
   vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
   const response = await xeroFetch(
-    { orgKey: "org", url: "https://api.xero.com/x" },
+    { rateClass, url: "https://api.xero.com/x" },
     {
       fetchImpl: vi.fn().mockResolvedValue(new Response('{"ok":true}')),
       limiter,
@@ -345,7 +364,7 @@ it("buffers successful JSON before releasing permit", async () => {
 });
 it("preserves bodyless 204", async () => {
   const response = await xeroFetch(
-    { orgKey: "org", url: "https://api.xero.com/x" },
+    { rateClass, url: "https://api.xero.com/x" },
     {
       fetchImpl: vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
       limiter: permissiveLimiter(),
@@ -363,7 +382,7 @@ it("rejects an expired operation without admission or dispatch", async () => {
     xeroFetch(
       {
         deadline: { expiresAtMs: Date.now() - 1 },
-        orgKey: "org",
+        rateClass,
         url: "https://api.xero.com/x",
       },
       { fetchImpl, limiter }
@@ -386,7 +405,7 @@ it("bounds an unresponsive fetch and releases its permit", async () => {
     xeroFetch(
       {
         deadline: { expiresAtMs: Date.now() + 30 },
-        orgKey: "org",
+        rateClass,
         url: "https://api.xero.com/x",
       },
       { fetchImpl, limiter }
@@ -405,11 +424,97 @@ it("does not retry caller cancellation", async () => {
     xeroFetch(
       {
         init: { signal: caller.signal },
-        orgKey: "org",
+        rateClass,
         url: "https://api.xero.com/x",
       },
       { fetchImpl, limiter: permissiveLimiter() }
     )
   ).rejects.toMatchObject({ name: "AbortError" });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
+});
+
+it("denies unavailable admission before dispatch", async () => {
+  const fetchImpl = vi.fn();
+  const limiter = new XeroRateLimiter(
+    {},
+    {
+      store: {
+        observe: async () => undefined,
+        release: async () => undefined,
+        reserve: async () => ({
+          error: { reason: "infrastructure" },
+          ok: false,
+        }),
+      },
+    }
+  );
+  await expect(
+    xeroFetch(
+      { rateClass, url: "https://api.xero.com/x" },
+      { fetchImpl, limiter }
+    )
+  ).rejects.toMatchObject({ code: "admission_unavailable", dispatched: false });
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+it("preserves dispatched success when lease release fails", async () => {
+  const limiter = new XeroRateLimiter(
+    {},
+    {
+      store: {
+        observe: async () => undefined,
+        release: () =>
+          Promise.reject(new Error("Synthetic unavailable release")),
+        reserve: async (input) => ({
+          ok: true,
+          value: { reservationId: input.reservationId },
+        }),
+      },
+    }
+  );
+  const fetchImpl = vi
+    .fn()
+    .mockResolvedValue(new Response("accepted", { status: 200 }));
+  const response = await xeroFetch(
+    {
+      rateClass,
+      retryOnAmbiguousFailure: false,
+      url: "https://api.xero.com/x",
+    },
+    { fetchImpl, limiter }
+  );
+  expect(response.status).toBe(200);
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+});
+
+it("reports operation expiry before admission infrastructure failure", async () => {
+  const { createXeroDeadline } = await import("./deadline");
+  const { RedisSharedXeroRateStore } = await import("./shared-store");
+  const store = new RedisSharedXeroRateStore({
+    epoch: "test",
+    fetchImpl: () =>
+      new Promise(() => {
+        /* Unresponsive transport. */
+      }),
+    limits: {
+      appCallsPerMinute: 10,
+      callsPerDayPerOrg: 10,
+      callsPerMinutePerOrg: 10,
+      concurrentRequestsPerOrg: 5,
+    },
+    token: "test",
+    url: "https://invalid.example",
+  });
+  const fetchImpl = vi.fn();
+  await expect(
+    xeroFetch(
+      {
+        deadline: createXeroDeadline(10),
+        rateClass,
+        url: "https://api.xero.com/x",
+      },
+      { fetchImpl, limiter: new XeroRateLimiter({}, { store }) }
+    )
+  ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
+  expect(fetchImpl).not.toHaveBeenCalled();
 });

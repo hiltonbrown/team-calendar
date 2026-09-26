@@ -6,9 +6,13 @@ import {
   XERO_DEFAULT_OPERATION_BUDGET_MS,
   XERO_MAX_RESPONSE_BYTES,
 } from "./limits";
+import type { XeroRateClass } from "./shared-store";
 
 // Default reactive-retry budget for transient failures (429 and 5xx). The first
 // attempt is the real call; the rest are backed-off retries.
+const RETRY_SECONDS_REGEX = /^\d+(\.\d+)?$/;
+const RETRY_DATE_REGEX =
+  /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_CAP_MS = 8000;
@@ -29,7 +33,7 @@ export interface XeroFetchInput {
   maxBodyBytes?: number;
   // Identity the limiter buckets are keyed by. Built from the connected
   // organisation so one org cannot starve another.
-  orgKey: string;
+  rateClass: XeroRateClass;
   // Set false for requests that create something in Xero. A 429 is still
   // retried because Xero rejected the request before processing it, but a 5xx
   // or a dropped connection is ambiguous: Xero may have completed the write and
@@ -59,18 +63,6 @@ function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
-}
-
-// Build the org-scoped limiter key from the tenant identity already threaded
-// through every Xero call. Falls back to the clerk org id alone for OAuth
-// bootstrap calls made before an Organisation row exists.
-export function orgRateLimitKey(input: {
-  clerkOrgId: string;
-  organisationId?: null | string;
-}): string {
-  return input.organisationId
-    ? `${input.clerkOrgId}:${input.organisationId}`
-    : input.clerkOrgId;
 }
 
 // Single choke point for every Xero HTTP call. Acquires per-org budget through
@@ -161,12 +153,17 @@ async function performAttempt(
     throw new XeroFetchError("deadline_exceeded", false);
   }
   input.init?.signal?.throwIfAborted();
-  const gate = await limiter.acquire(input.orgKey, {
+  const gate = await limiter.acquire(input.rateClass, {
+    deadline,
+    leaseMs: remainingMs(deadline) + 5000,
     maxWaitMs: Math.min(DEFAULT_MAX_WAIT_MS, remainingMs(deadline)),
   });
   if (!gate.ok) {
     if (remainingMs(deadline) === 0) {
       throw new XeroFetchError("deadline_exceeded", false);
+    }
+    if (gate.reason === "infrastructure") {
+      throw new XeroFetchError("admission_unavailable", false);
     }
     return rateLimitedResponse(gate.reason);
   }
@@ -192,11 +189,17 @@ async function performAttempt(
       });
       throw new XeroFetchError("redirect_rejected", true);
     }
-    return await bufferResponse(
+    const buffered = await bufferResponse(
       fetched,
       signal,
       input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
     );
+    const headers = new Headers(buffered.headers);
+    if (buffered.status !== 429) {
+      headers.delete("Retry-After");
+    }
+    await limiter.observe(input.rateClass, headers, deadline);
+    return buffered;
   } catch (error) {
     if (controller.signal.aborted) {
       // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
@@ -204,13 +207,14 @@ async function performAttempt(
     }
     throw error;
   } finally {
-    gate.release();
+    await gate.release();
     clearTimeout(timeout);
   }
 }
 
 export class XeroFetchError extends Error {
   readonly code:
+    | "admission_unavailable"
     | "body_too_large"
     | "deadline_exceeded"
     | "origin_rejected"
@@ -351,8 +355,11 @@ export function parseRetryAfter(headerValue: null | string): null | number {
     return null;
   }
   const seconds = Number(headerValue);
-  if (Number.isFinite(seconds)) {
+  if (RETRY_SECONDS_REGEX.test(headerValue) && Number.isFinite(seconds)) {
     return Math.max(0, seconds * 1000);
+  }
+  if (!RETRY_DATE_REGEX.test(headerValue)) {
+    return null;
   }
   const dateMs = Date.parse(headerValue);
   if (Number.isNaN(dateMs)) {

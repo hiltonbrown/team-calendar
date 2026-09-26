@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  countSharedStoreFixtureKeys,
+  deleteSharedStoreFixtureKeys,
+} from "../../packages/database/src/live-shared-store-fixture.js";
 import { createStandaloneDatabaseClient } from "../../packages/database/src/standalone-client.js";
 import { assertActiveRunOwner } from "./active-run-registry.js";
 import { assertConsumerIsolationReadBack } from "./consumer-isolation.js";
@@ -10,6 +14,7 @@ import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
 import {
   assertXeroFixtureInfrastructureOwned,
   countXeroFixtureInfrastructure,
+  deleteXeroCleanupFixtures,
   deleteXeroFixtureInfrastructure,
   lockXeroFixtureInfrastructure,
 } from "./xero-fixture-cleanup.js";
@@ -144,12 +149,18 @@ const outsideOwnedCatalogueDigest = async () => {
     .update(JSON.stringify({ limits, plans }))
     .digest("hex");
 };
+const sharedStoreInput = {
+  globalKeys: manifest.owned.globalKeys,
+  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
+};
 const catalogueDigestBefore = await outsideOwnedCatalogueDigest();
 await assertXeroFixtureInfrastructureOwned(database, manifest.owned);
 const counts: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+counts.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
 }
@@ -217,6 +228,7 @@ if (mode === "--apply") {
   await database.$transaction(async (transaction) => {
     await lockXeroFixtureInfrastructure(transaction);
     await assertXeroFixtureInfrastructureOwned(transaction, manifest.owned);
+    await deleteXeroCleanupFixtures(transaction, manifest.owned);
     for (const table of scopedTables) {
       await transaction.$executeRawUnsafe(
         `DELETE FROM "${table}" WHERE ${scopedSql}`,
@@ -266,12 +278,14 @@ if (mode === "--apply") {
       ...scopedValues
     );
   });
+  await deleteSharedStoreFixtureKeys(sharedStoreInput);
 }
 
 const residue: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+residue.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   residue[table] = await countRows(table, scopedSql, scopedValues);
 }
