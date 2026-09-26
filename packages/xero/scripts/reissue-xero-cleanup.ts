@@ -1,7 +1,5 @@
 import { parseArgs } from "node:util";
-import { database } from "@repo/database";
 import { z } from "zod";
-import { reissueXeroCleanupAttempt } from "../src/oauth/connection-cleanup";
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -40,25 +38,41 @@ async function main(): Promise<void> {
       organisationId: values["organisation-id"],
     });
   if (!input.success) {
-    throw new Error(
-      "Explicit scope, operator, frozen app, remote UUID, generation and --confirm-reissue are required"
+    process.stderr.write(
+      "Explicit scope, operator, frozen app, remote UUID, generation and --confirm-reissue are required.\n"
     );
-  }
-  const result = await reissueXeroCleanupAttempt(input.data);
-  if (!result.ok) {
-    process.stderr.write("Targeted Xero cleanup reissue rejected.\n");
     process.exitCode = 1;
     return;
   }
-  process.stdout.write(
-    `Targeted cleanup receipt: ${result.value.remoteStatus}\n`
-  );
-}
-main()
-  .catch(() => {
+  const { keys } = await import("../keys.js");
+  if (keys().XERO_REMOTE_CLEANUP_MODE !== "enabled") {
     process.stderr.write(
-      "Targeted Xero cleanup reissue failed. Check the explicit frozen target and scope.\n"
+      "Targeted Xero cleanup reissue rejected: remote cleanup is report-only.\n"
     );
     process.exitCode = 1;
-  })
-  .finally(() => database.$disconnect());
+    return;
+  }
+  const [{ database }, { reissueXeroCleanupAttempt }] = await Promise.all([
+    import("@repo/database"),
+    import("../src/oauth/connection-cleanup.js"),
+  ]);
+  try {
+    const result = await reissueXeroCleanupAttempt(input.data);
+    if (!result.ok) {
+      process.stderr.write("Targeted Xero cleanup reissue rejected.\n");
+      process.exitCode = 1;
+      return;
+    }
+    process.stdout.write(
+      `Targeted cleanup receipt: ${result.value.remoteStatus}\n`
+    );
+  } finally {
+    await database.$disconnect();
+  }
+}
+main().catch(() => {
+  process.stderr.write(
+    "Targeted Xero cleanup reissue failed. Check the explicit frozen target and scope.\n"
+  );
+  process.exitCode = 1;
+});

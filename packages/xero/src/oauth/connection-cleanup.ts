@@ -13,7 +13,7 @@ import {
 } from "@repo/database/queries/xero-cleanup";
 import { keys } from "../../keys";
 import { createXeroDeadline } from "../rate-limit/deadline";
-import { boundXeroLocks, lockXeroBinding } from "./credential-owner";
+import { boundXeroLocks, lockXeroBinding } from "./locks";
 import { deleteXeroConnection } from "./management-client";
 
 export interface XeroDisconnectReceipt {

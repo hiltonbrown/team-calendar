@@ -29,14 +29,16 @@ import {
 } from "./connection-cleanup";
 import {
   adoptXeroCredential,
-  boundXeroLocks,
-  lockXeroBinding,
-  lockXeroConnection,
-  lockXeroOwner,
   ownerMirror,
   refreshXeroCredentialOwner,
 } from "./credential-owner";
 import { verifyXeroAccessTokenIdentity } from "./identity";
+import {
+  boundXeroLocks,
+  lockXeroBinding,
+  lockXeroConnection,
+  lockXeroOwner,
+} from "./locks";
 
 const XERO_AUTHORISE_URL = "https://login.xero.com/identity/connect/authorize";
 const XERO_CONNECTIONS_URL = "https://api.xero.com/connections";
