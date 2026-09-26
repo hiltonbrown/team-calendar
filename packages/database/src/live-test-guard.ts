@@ -10,6 +10,7 @@ const manifestSchema = z.object({
     })
     .optional(),
   durableManifestConfirmed: z.literal(true),
+  mode: z.literal("database-fixture").optional(),
   namespace: z.string().min(1),
   runId: z.string().uuid(),
   target: z.object({

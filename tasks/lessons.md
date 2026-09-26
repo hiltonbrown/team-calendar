@@ -222,3 +222,7 @@ actionable; keep one-off task evidence in the review for that task.
 - Archive is not evidence of abandonment when subscription, human or feed history is unknown. Keep active signals first, then unknown protection, then candidate evaluation.
 - Preserve recent consumption across token rotation for active feeds; a new token with no timestamp must not erase historical use. Unreadable individual signals remain unknown while other proven active signals still decide activity.
 - Charter readiness requires each exact assertion at every required evidence level. A successful integration suite exit cannot establish forty case-level PASS observations.
+
+## Plans 160 to 161h live verification reminder, 27 September 2026
+
+- The Plan 161 online Neon rule at lines 211 to 215 remains authoritative. A synthetic build URL is only a build setting, never the integration-test target. Once domain fixes are frozen, begin their regression campaign through the protected live runner with refreshed ownership, restore, consumer isolation and cleanup evidence while independent harness work continues. Do not delay live verification behind unrelated harness builds or revisit local database setup.

@@ -226,6 +226,45 @@ export async function listDueXeroCleanupAttempts(input: {
   }));
 }
 
+/** Recover retirement after a committed confirmation. Enumerate routing identifiers only. */
+export async function listResolvedXeroCleanupRequests(
+  input: { limit?: number; client?: Client } = {}
+): Promise<
+  { requestId: string; clerkOrgId: string; organisationId: string }[]
+> {
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 50);
+  return await (input.client ?? database).$queryRaw`
+    SELECT request.id::text AS "requestId",
+           request.clerk_org_id AS "clerkOrgId",
+           request.organisation_id::text AS "organisationId"
+    FROM xero_cleanup_requests AS request
+    JOIN xero_tenants AS tenant
+      ON tenant.id = request.xero_tenant_id
+      AND tenant.clerk_org_id = request.clerk_org_id
+      AND tenant.organisation_id = request.organisation_id
+      AND tenant.binding_generation = request.binding_generation
+    JOIN xero_connections AS connection
+      ON connection.id = tenant.xero_connection_id
+      AND connection.clerk_org_id = request.clerk_org_id
+      AND connection.organisation_id = request.organisation_id
+    WHERE tenant.active_slot = 1 AND tenant.retired_at IS NULL
+      AND connection.status = 'disconnected'
+      AND EXISTS (
+        SELECT 1 FROM xero_cleanup_attempts AS attempt
+        WHERE attempt.xero_cleanup_request_id = request.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM xero_cleanup_attempts AS attempt
+        WHERE attempt.xero_cleanup_request_id = request.id
+          AND (attempt.state NOT IN ('confirmed_deleted', 'confirmed_absent', 'cancelled')
+            OR attempt.clerk_org_id <> request.clerk_org_id
+            OR attempt.organisation_id <> request.organisation_id
+            OR attempt.expected_binding_generation <> request.binding_generation)
+      )
+    ORDER BY request.created_at ASC, request.id ASC LIMIT ${limit}
+  `;
+}
+
 /** Aggregate-only system health query, with no customer payload or identifiers returned. */
 export async function getOldestUnknownXeroCleanupUpdatedAt(
   input: { client?: Client } = {}

@@ -1,9 +1,11 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository convention.
 import { database } from "@repo/database";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { listResolvedXeroCleanupRequests } from "@repo/database/queries/xero-cleanup";
 import {
   processXeroCleanupAttempt,
   reissueXeroCleanupAttempt,
+  retireResolvedCleanupRequest,
 } from "@repo/xero";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -181,6 +183,164 @@ describe("fenced Xero cleanup worker", () => {
       ).state
     ).toBe("unknown");
   });
+  it("recovers a persisted final confirmation after retirement failure without another provider call", async () => {
+    const input = await seed();
+    const confirmed = await database.xeroCleanupAttempt.updateMany({
+      data: { outcome_reason: "absent", state: "confirmed_absent" },
+      where: {
+        clerk_org_id: scope.clerkOrgId,
+        id: input.attemptId,
+        organisation_id: scope.organisationId,
+      },
+    });
+    expect(confirmed.count).toBe(1);
+    const retirementScope = {
+      ...scope,
+      requestId: input.attempt.xero_cleanup_request_id,
+    };
+    // The lazy proxy resolves property reads but has no method descriptors to spy on.
+    const resolvedDatabase = globalThis.__teamCalendarDatabase;
+    if (!resolvedDatabase) {
+      throw new Error("Expected the seeded database client to be initialised");
+    }
+    const failed = vi
+      .spyOn(resolvedDatabase, "$transaction")
+      .mockRejectedValueOnce(new Error("retirement interrupted"));
+    try {
+      await expect(
+        retireResolvedCleanupRequest(retirementScope)
+      ).rejects.toThrow("retirement interrupted");
+      expect(failed).toHaveBeenCalledTimes(1);
+    } finally {
+      failed.mockRestore();
+    }
+    expect(
+      await database.xeroCleanupAttempt.findFirstOrThrow({
+        where: {
+          clerk_org_id: scope.clerkOrgId,
+          id: input.attemptId,
+          organisation_id: scope.organisationId,
+        },
+      })
+    ).toMatchObject({ outcome_reason: "absent", state: "confirmed_absent" });
+    expect(
+      await database.xeroTenant.findFirstOrThrow({
+        where: {
+          clerk_org_id: scope.clerkOrgId,
+          id: input.binding.id,
+          organisation_id: scope.organisationId,
+        },
+      })
+    ).toMatchObject({
+      active_slot: 1,
+      binding_generation: 2,
+      retired_at: null,
+    });
+    const requests = await listResolvedXeroCleanupRequests({ limit: 50 });
+    expect(requests).toContainEqual(retirementScope);
+    process.env.XERO_REMOTE_CLEANUP_MODE = "report_only";
+    await retireResolvedCleanupRequest(retirementScope);
+    const retired = await database.xeroTenant.findFirstOrThrow({
+      where: {
+        clerk_org_id: scope.clerkOrgId,
+        id: input.binding.id,
+        organisation_id: scope.organisationId,
+      },
+    });
+    expect(retired).toMatchObject({
+      active_slot: null,
+      binding_generation: 2,
+      retirement_reason: "disconnected",
+    });
+    expect(retired.retired_at).not.toBeNull();
+    await retireResolvedCleanupRequest(retirementScope);
+    expect(
+      (
+        await database.xeroTenant.findFirstOrThrow({
+          where: {
+            clerk_org_id: scope.clerkOrgId,
+            id: input.binding.id,
+            organisation_id: scope.organisationId,
+          },
+        })
+      ).retired_at
+    ).toEqual(retired.retired_at);
+    expect(await listResolvedXeroCleanupRequests()).not.toContainEqual(
+      retirementScope
+    );
+    expect(management.delete).not.toHaveBeenCalled();
+  });
+  it.each([
+    "unknown",
+    "changed_generation",
+    "reconnected",
+    "empty",
+    "foreign_scope",
+  ] as const)(
+    "does not release %s reservations from terminal recovery",
+    async (condition) => {
+      const input = await seed(
+        condition === "unknown" ? "unknown" : "cancelled"
+      );
+      if (condition === "changed_generation") {
+        await database.xeroTenant.updateMany({
+          data: { binding_generation: 3 },
+          where: {
+            clerk_org_id: scope.clerkOrgId,
+            id: input.binding.id,
+            organisation_id: scope.organisationId,
+          },
+        });
+      } else if (condition === "reconnected") {
+        await database.xeroConnection.updateMany({
+          data: { disconnected_at: null, status: "active" },
+          where: {
+            clerk_org_id: scope.clerkOrgId,
+            id: input.binding.xero_connection_id,
+            organisation_id: scope.organisationId,
+          },
+        });
+      } else if (condition === "empty") {
+        await database.xeroCleanupAttempt.deleteMany({
+          where: {
+            clerk_org_id: scope.clerkOrgId,
+            id: input.attemptId,
+            organisation_id: scope.organisationId,
+          },
+        });
+      }
+      const request = {
+        ...scope,
+        requestId: input.attempt.xero_cleanup_request_id,
+      };
+      if (condition === "foreign_scope") {
+        await retireResolvedCleanupRequest({
+          ...request,
+          organisationId:
+            fixture.tenants[1]?.organisationId ?? input.binding.id,
+        });
+        await retireResolvedCleanupRequest({
+          ...request,
+          clerkOrgId: fixture.tenants[1]?.clerkOrgId ?? "foreign-fixture",
+        });
+      } else {
+        expect(await listResolvedXeroCleanupRequests()).not.toContainEqual(
+          request
+        );
+        await retireResolvedCleanupRequest(request);
+      }
+      expect(
+        await database.xeroTenant.findFirstOrThrow({
+          where: {
+            clerk_org_id: scope.clerkOrgId,
+            id: input.binding.id,
+            organisation_id: scope.organisationId,
+          },
+        })
+      ).toMatchObject({ active_slot: 1, retired_at: null });
+      expect(management.delete).not.toHaveBeenCalled();
+    }
+  );
   it("two concurrent workers dispatch at most once", async () => {
     const input = await seed();
     management.delete.mockImplementationOnce(async () => {

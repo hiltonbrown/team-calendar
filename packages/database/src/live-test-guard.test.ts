@@ -15,6 +15,43 @@ afterEach(() => {
 });
 
 describe("database unit-test isolation", () => {
+  it.each(["xero-e2e", "unknown-mode"])(
+    "rejects foreign manifest mode %s rather than stripping it",
+    (mode) => {
+      const runId = "00000000-0000-4000-8000-000000000001";
+      const manifestPath = join(
+        mkdtempSync(join(tmpdir(), "tc-mode-")),
+        "manifest.json"
+      );
+      writeFileSync(
+        manifestPath,
+        JSON.stringify({
+          active: true,
+          durableManifestConfirmed: true,
+          mode,
+          namespace: `release:run:${runId}`,
+          runId,
+          target: {
+            database: "release_db",
+            endpointId: "endpoint",
+            hostname: "example.neon.tech",
+            role: "owner",
+          },
+          version: 1,
+        })
+      );
+      Object.assign(process.env, {
+        ALLOW_LIVE_DATABASE_TESTS: "I_ACKNOWLEDGE_LIVE_MUTATION",
+        DATABASE_URL: "postgresql://owner:unused@example.neon.tech/release_db",
+        NODE_ENV: "test",
+        TC_RELEASE_ACTIVE_RUN_VERIFIED: runId,
+        TC_RELEASE_DURABLE_VERIFIED: runId,
+        TC_RELEASE_MANIFEST: manifestPath,
+        TC_RELEASE_RUN_ID: runId,
+      });
+      expect(() => assertTestDatabaseConnectionAllowed()).toThrow();
+    }
+  );
   it("denies a test connection when only DATABASE_URL is present", () => {
     process.env.NODE_ENV = "test";
     process.env.DATABASE_URL = "postgresql://user:password@localhost/database";

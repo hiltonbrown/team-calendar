@@ -1,6 +1,39 @@
 # Current work
 
-Last reviewed: 2026-09-24
+Last reviewed: 2026-09-27
+
+## Task: Reconcile Plans 160 through 161h, 27 September 2026
+
+- [x] Read the original plans and independently reconcile their requirements against integrated source, migrations and meaningful regression assertions.
+- [x] Apply the canonical online-only lesson in `tasks/lessons.md:211–215`: use the authorised Neon target through the protected live runner, with fresh ownership, restore, consumer isolation and cleanup evidence; no localhost or Docker database.
+- [x] Correct and commit the five confirmed production gaps: terminal cleanup retirement recovery, snapshot-bound legacy identity application, readiness evidence, production keyring/configuration preflight, and unavailable/pending recovery actions.
+- [x] Rerun the complete protected online inventory on the corrected domain candidate: 27 files, 246 tests and six uncached tasks PASS.
+- [x] Verify all 21 applied migration checksums, zero pending migrations, clean integrity checks and Prisma schema comparison reporting no difference.
+- [x] Independently read back zero residue across all 39 owned selectors, unchanged outside-owned catalogue and unchanged counts totalling 204 pre-existing rows; confirm cleanup PASS and released active fence.
+- [x] Implement and verify independent X24 ICS and X25 read-only layout/focus/live-announcement helpers, including actual Chromium probes on controlled static HTML; preserve application/provider evidence boundaries.
+- [x] Finish independent review and correction of the complete Plan 160 catalogue, strict report, intent/recovery ledger, observer provenance, mode guards and protected execution wiring.
+- [x] Run final uncached combined source gates and relevant builds on the frozen combined candidate, including release-tool and meaningful fault regressions.
+- [x] Run a final guard-positive protected online campaign covering the final ordinary-runner mode guards; refresh authority, migrations, cleanup and outside-owned comparisons again.
+- [x] Reconcile all per-plan status/checklists and publish accurate scenario/subcase and charter evidence without promoting aggregate suite results to case-specific PASS.
+- [ ] Complete the authorised final commit/merge hand-off after the combined candidate passes its required checks.
+- [ ] Obtain the separately authorised real provider/application-browser observations and charter sign-off when sanctioned fixtures, approved AU contract, deployed revisions, role sessions and enforced worker isolation are available.
+
+### Review
+
+The five scoped production corrections are committed as `707dcf2` (cleanup retirement recovery), `634d179` (verified legacy credential snapshot application), `e90308e` (readiness evidence), `5194124` (preflight validation) and `97cb795` (recovery action matrix). Their focused regressions pass. None adds DDL or rewrites an existing migration. Preserve the first protected campaign's failure record; the corrected second campaign is the successful evidence recorded here.
+
+Corrected protected online campaign: candidate `1d58d147eb8395a56cb748dd894ad7d21f9b1f41`, run `c0c28ca3-25da-4409-948f-94079e9e0b5f`, all 27 files / 246 tests / six uncached tasks PASS. It includes the thirteen new persisted cleanup/backfill cases and owned real Redis assertions. Fresh read-back confirms 21 matching applied migrations, zero pending, twelve clean integrity checks, the immutable trigger enabled, schema comparison with no difference, all 39 residue selectors empty, the outside-owned catalogue unchanged and all pre-existing table counts unchanged, totalling 204 rows. Runner evidence records complete phase, inventory PASS, cleanup PASS, exit zero and released fence. No customer backfill, credential mutation or provider action was performed.
+
+Plan 160 source/harness implementation and independent review are complete at `5d2e57bb963a4d34304aa5094e1df1548f01d0a1`. Root source review and the separate cold review passed, including 22 focused tests. All 30 release-tool files / 395 tests PASS, strict release-tool types PASS and repository lint PASS across 1,153 files. The actual missing-manifest CLI exits 2 and emits both reports with all 26 scenarios, 92 registered subcases and forty charter cases NOT VERIFIED, with null unexecuted timings. Playwright discovery accounts for 97 tests (92 registered subcases plus five guards), and direct unguarded configuration refuses execution. Missing evidence remains NOT VERIFIED.
+
+Full uncached source gates on `b211d87` passed 2,810 unit tests across 18 tasks, 19 type-check tasks, four builds and boundaries across 1,072 files / 21 packages. These results remain valid because `apps`, `packages`, `scripts` and `bun.lock` are byte-identical on the final harness candidate; the changed release tooling receives the separately recorded final 395-test/type/lint verification. The read-only helper slice `9d924b8` additionally passed 38 focused tests, including four actual Chromium tests using controlled static HTML. Those probes verify helper behaviour, not deployed application or provider journeys.
+
+Final guard-positive protected online campaign `21e2bdb1-ea5b-4acd-ac8f-f484130731ce` passed on candidate `5d2e57bb963a4d34304aa5094e1df1548f01d0a1`: 27 files / 246 tests / six uncached tasks, 9m45.969s. Fresh exact ownership, restore evidence, durable manifest and strict consumer isolation preceded admission. Terminal evidence records complete phase, inventory PASS, cleanup PASS, exit zero and released fence. Independent post-run verification confirms all 39 owned selectors empty, unchanged outside-owned catalogue, all 38 table counts and all-column content hashes identical across 204 pre-existing rows, all 21 migration checksums matching, zero pending migrations, twelve clean integrity checks, immutable trigger enabled and Prisma schema comparison with no difference. Ten independent observer SQL statements were prepared read-only against Neon without executing customer queries. Five temporary private credential files were removed. The earlier failed and successful campaigns remain preserved separately.
+
+Root completed the per-plan reconciliation and reviewed all six sanitised public JSON/Markdown reports. The [sanitised Markdown report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) and [JSON report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.json) identify the reviewed source and successful database campaign while retaining 0 LIVE / 0 CONTROLLED execution, all 26 scenarios / 92 subcases / forty charter cases NOT VERIFIED and null unexecuted timings. Documentation closure is complete; the final merge checkbox remains open until root performs the actual merge.
+
+Real provider consent, payroll mutations, permission/refresh/cleanup contracts, authenticated application-browser journeys, production rollout and charter sign-off remain NOT VERIFIED or unexecuted. All 26 scenarios, 92 registered subcases and forty charter cases require their own valid observations; aggregate source/database success does not create those observations. Remote cleanup remains report-only. The current authority, candidate evidence and per-plan boundaries are maintained in `plans/160-161-reconciliation.md`.
+
 
 ## Task: Complete Plan 161b against the guarded online Neon database
 
@@ -1544,3 +1577,23 @@ Protected online Neon campaign `f7578441-2838-4361-9ced-0f59a19d73c3` passed all
 Post-run cleanup PASS: all 39 owned selectors are empty, active fence released and outside-owned catalogue unchanged. All 204 pre-existing rows across 37 tables retain their exact per-table counts; the new classification table has zero rows. Restricted JSON/Markdown artefacts have mode 0600 and record inventory PASS, cleanup PASS, exit zero and released fence. Temporary private verification credentials were removed. All 40 charter cases remain NOT_VERIFIED without separate assertion provenance; deployed SHA remains null. Provider/browser behaviour and production rollout remain NOT VERIFIED or unexecuted; cleanup stays `report_only`.
 
 Documentation closure copies the reviewer plan, DONE index and execution report exactly, preserves all prior task history and keeps runtime/schema/generated files byte-identical to the approved candidate. Shared absolute-path handoff replaced inline dispatch packaging. No merge, push or deployment.
+
+## Plans 160 to 161h reconciliation: cleanup retirement recovery
+
+- [x] Independently read complete Plans 161d, 161e and 161f, source contracts and regression coverage.
+- [x] Prove a persisted final confirmation survives a failed retirement without replaying DELETE.
+- [x] Add bounded scoped reconciliation of nonempty terminal requests under current binding generation.
+- [x] Preserve report-only, unresolved, foreign-scope, reconnected and retired binding protections.
+- [x] Run focused unit and static integration type gates; freeze for root-owned full/live verification.
+
+Review: the new restart regression first failed against the original worker (1 failed, 7 passed). The scoped terminal-request sweep and retirement guards now pass 9 job and 19 cleanup unit tests, changed-file lint, whitespace and strict integration-fixture types. Six new protected integration scenarios cover a persisted final confirmation plus failed retirement, report-only recovery without provider dispatch, idempotence, generation change, reconnect, unknown, empty authority and foreign scopes. They are written but not executed by this executor; root owns full gates and the protected online campaign. No schema change, database operation or provider operation was performed by this executor.
+
+## Plans 160 to 161h reconciliation: verified backfill snapshot
+
+- [x] Identify stale identity artefact race between verified JWT planning and locked application.
+- [x] Bind each identity to its provider app, both scopes, generation, connection and encrypted credential fingerprint.
+- [x] Reject stale, foreign, disconnected or retired snapshots before owner creation or attachment.
+- [x] Exercise the actual guarded apply function with unit and existing protected integration fixtures.
+- [x] Run focused source gates; freeze for root-owned full and protected live verification.
+
+Review: 35 focused database tests (artefact, actual locked apply and unchanged pure planner) pass. Both operator scripts and the existing lifecycle fixture pass strict TypeScript; nine changed files pass lint and whitespace. Actual package CLI rejects missing intent and an old unversioned artefact with exit 1 before any SQL, using a synthetic invalid-domain database URL. Seven new registered lifecycle cases exercise the same actual guarded application function with owned synthetic envelopes: unchanged verified expired singleton, idempotent planner rerun, reauthorisation, key change, generation, retirement, disconnect and foreign scopes. These integration cases are written but await the root-owned protected online campaign. Identity still comes from verified JWT claims; fingerprints only bind that proof to the exact encrypted snapshot. No customer backfill, schema change or provider request was performed. An automatic permission-review timeout on one large edit command was reconciled by smaller approved edits; no unsafe action was inferred or bypassed.

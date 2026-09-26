@@ -17,6 +17,68 @@ export interface PreflightResult {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const POSITIVE_VERSION_REGEX = /^[1-9]\d*$/;
+const BASE64_REGEX = /^[a-zA-Z0-9+/]*={0,2}$/;
+const NAMESPACE_EPOCH_REGEX = /^[a-z0-9-]{1,32}$/;
+const validKeyVersion = z
+  .string()
+  .regex(POSITIVE_VERSION_REGEX)
+  .refine((value) => Number.isSafeInteger(Number(value)));
+const validEncryptionKey = z
+  .string()
+  .refine(
+    (value) =>
+      BASE64_REGEX.test(value) && Buffer.from(value, "base64").length === 32
+  );
+const keyringSchema = z.record(validKeyVersion, validEncryptionKey);
+
+const validateXeroEncryption = (
+  envVars: Record<string, string | undefined>
+): string[] => {
+  const errors: string[] = [];
+  const legacyKey = envVars.XERO_TOKEN_ENCRYPTION_KEY;
+  if (legacyKey && !validEncryptionKey.safeParse(legacyKey).success) {
+    errors.push(
+      "XERO_TOKEN_ENCRYPTION_KEY must be a valid 32-byte base64-encoded string"
+    );
+  }
+  const activeVersion = envVars.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION || "1";
+  const validActiveVersion = validKeyVersion.safeParse(activeVersion).success;
+  if (!validActiveVersion) {
+    errors.push(
+      "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION must be a positive safe integer"
+    );
+  }
+  let ring: Record<string, string> = {};
+  const rawRing = envVars.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
+  if (rawRing) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawRing);
+    } catch {
+      // Only fixed variable names are reported, never key material or parser errors.
+    }
+    const result = keyringSchema.safeParse(parsed);
+    if (result.success) {
+      ring = result.data;
+    } else {
+      errors.push(
+        "XERO_TOKEN_ENCRYPTION_KEYS_JSON must map positive safe integer versions to valid 32-byte base64 keys"
+      );
+    }
+  }
+  if (ring["1"] && ring["1"] !== legacyKey) {
+    errors.push(
+      "XERO_TOKEN_ENCRYPTION_KEYS_JSON conflicts with XERO_TOKEN_ENCRYPTION_KEY for version 1"
+    );
+  }
+  if (validActiveVersion && activeVersion !== "1" && !ring[activeVersion]) {
+    errors.push(
+      "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION must resolve in XERO_TOKEN_ENCRYPTION_KEYS_JSON"
+    );
+  }
+  return errors;
+};
 
 const isValidUrl = (value: string): boolean => {
   try {
@@ -187,6 +249,11 @@ export const runProductionPreflight = (
   if (appName === "app" || appName === "api") {
     checkPresent("DATABASE_URL");
     checkPresent("XERO_TOKEN_ENCRYPTION_KEY");
+    checkedVars.push(
+      "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION",
+      "XERO_TOKEN_ENCRYPTION_KEYS_JSON"
+    );
+    errors.push(...validateXeroEncryption(envVars));
     checkPresent("XERO_CLIENT_ID");
     checkPresent("XERO_CLIENT_SECRET");
     if (
@@ -204,8 +271,25 @@ export const runProductionPreflight = (
     checkPresent("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
     checkPresent("CLERK_SECRET_KEY");
 
-    checkPresent("XERO_APP_TIER");
-    checkPresent("XERO_RATE_NAMESPACE_EPOCH");
+    if (
+      checkPresent("XERO_APP_TIER") &&
+      !z
+        .enum(["starter", "core", "plus", "advanced", "enterprise"])
+        .safeParse(envVars.XERO_APP_TIER).success
+    ) {
+      errors.push("XERO_APP_TIER must be a supported commercial tier");
+    }
+    if (
+      checkPresent("XERO_RATE_NAMESPACE_EPOCH") &&
+      !z
+        .string()
+        .regex(NAMESPACE_EPOCH_REGEX)
+        .safeParse(envVars.XERO_RATE_NAMESPACE_EPOCH).success
+    ) {
+      errors.push(
+        "XERO_RATE_NAMESPACE_EPOCH must contain 1 to 32 lowercase letters, digits or hyphens"
+      );
+    }
     checkPresent("KV_REST_API_URL");
     checkPresent("KV_REST_API_TOKEN");
   }

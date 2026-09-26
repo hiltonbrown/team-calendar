@@ -71,6 +71,7 @@ function input(results: XeroEvidenceInput["results"] = {}): XeroEvidenceInput {
 }
 function completeInput(): XeroEvidenceInput {
   const value = input();
+  value.deployedSha = candidateSha;
   for (const scenario of XERO_EVIDENCE_CASES) {
     value.results[scenario.caseId] = scenario.requiredEvidenceLevels.map(
       (level) => observation(scenario.caseId, level)
@@ -124,8 +125,8 @@ describe("Xero charter evidence", () => {
     expect(report.json.cases.every((entry) => entry.status === "PASS")).toBe(
       true
     );
-    expect(report.json.deployedSha).toBeNull();
-    expect(report.markdown).toContain("Deployed SHA: NOT_VERIFIED");
+    expect(report.json.deployedSha).toBe(candidateSha);
+    expect(report.markdown).toContain(`Deployed SHA: ${candidateSha}`);
   });
   it("writes both reports and names a false mandatory prerequisite", () => {
     const value = completeInput();
@@ -341,10 +342,34 @@ describe("Xero charter evidence", () => {
   it("keeps deployed and local candidate SHAs separate", () => {
     const value = completeInput();
     value.deployedSha = "e".repeat(40);
-    expect(buildXeroEvidence(value).json).toMatchObject({
+    const report = buildXeroEvidence(value);
+    expect(report.json).toMatchObject({
       candidateSha,
       deployedSha: "e".repeat(40),
     });
+    expect(report.json.status).toBe("NOT_VERIFIED");
+    expect(report.exitCode).toBe(1);
+    expect(report.json.validationErrors).toContain(
+      "Deployed candidate does not match assessed source"
+    );
+    expect(
+      report.json.cases.every((scenario) => scenario.status === "PASS")
+    ).toBe(true);
+  });
+  it("requires actual deployment evidence without inventing a deployed SHA", () => {
+    const value = completeInput();
+    value.deployedSha = null;
+    const report = buildXeroEvidence(value);
+    expect(report.json.status).toBe("NOT_VERIFIED");
+    expect(report.exitCode).toBe(1);
+    expect(report.json.deployedSha).toBeNull();
+    expect(report.markdown).toContain("Deployed SHA: NOT_VERIFIED");
+    expect(report.json.validationErrors).toContain(
+      "Deployed candidate evidence is missing"
+    );
+    expect(
+      report.json.cases.every((scenario) => scenario.status === "PASS")
+    ).toBe(true);
   });
   it("retains per-level assertion, target, ownership and cleanup evidence", () => {
     const value = completeInput();
@@ -378,6 +403,59 @@ describe("Xero charter evidence", () => {
     ).toBe(true);
     expect(report.markdown).toContain("Runner inventoryStatus: PASS");
   });
+  it("requires successful inventory, cleanup and fence release for runner-backed readiness", () => {
+    const runner = {
+      cleanupStatus: "PASS",
+      exitCode: 0,
+      fenceState: "released",
+      inventoryStatus: "PASS",
+      outcome: "PASS",
+      phase: "complete",
+    };
+    const report = buildXeroEvidence({ ...completeInput(), runner });
+    expect(report.json.runner).toEqual(runner);
+    expect(report.json.status).toBe("PASS");
+    expect(report.exitCode).toBe(0);
+  });
+  it.each([
+    { phase: "authority" },
+    { phase: "ownership" },
+    { phase: "inventory" },
+    { phase: "consumer_isolation" },
+    { phase: "baseline" },
+    { phase: "snapshot" },
+    { phase: "tests" },
+    { phase: "cleanup" },
+    { phase: "release" },
+    { inventoryStatus: "NOT_VERIFIED" },
+    { cleanupStatus: "NOT_VERIFIED" },
+    { fenceState: "held" },
+    { fenceState: "not_acquired" },
+    { fenceState: "unknown" },
+    { failurePhase: "tests" },
+    { failurePhase: "cleanup" },
+    { outcome: "NOT_VERIFIED" },
+  ])(
+    "rejects incomplete or contradictory successful runner metadata: %j",
+    (override) => {
+      const runner = {
+        cleanupStatus: "PASS",
+        exitCode: 0,
+        fenceState: "released",
+        inventoryStatus: "PASS",
+        outcome: "PASS",
+        phase: "complete",
+        ...override,
+      };
+      const report = buildXeroEvidence({ ...completeInput(), runner });
+      expect(report.json.runner).toEqual(runner);
+      expect(report.json.status).toBe("NOT_VERIFIED");
+      expect(report.exitCode).toBe(1);
+      expect(
+        report.json.cases.every((scenario) => scenario.status === "PASS")
+      ).toBe(true);
+    }
+  );
   it("retains failed cleanup and held fence without inventing case assertions", () => {
     const value = {
       ...input(),
@@ -426,6 +504,39 @@ describe("Xero charter evidence", () => {
     }
   );
   it.each([
+    [
+      {
+        cleanupStatus: "PASS",
+        exitCode: 0,
+        fenceState: "released",
+        inventoryStatus: "PASS",
+        outcome: "FAIL",
+        phase: "complete",
+      },
+      "FAIL",
+    ],
+    [
+      {
+        cleanupStatus: "FAIL",
+        exitCode: 0,
+        fenceState: "held",
+        inventoryStatus: "PASS",
+        outcome: "NOT_VERIFIED",
+        phase: "cleanup",
+      },
+      "FAIL",
+    ],
+    [
+      {
+        cleanupStatus: "PASS",
+        exitCode: 0,
+        fenceState: "released",
+        inventoryStatus: "FAIL",
+        outcome: "NOT_VERIFIED",
+        phase: "complete",
+      },
+      "FAIL",
+    ],
     [
       {
         cleanupStatus: "PASS",

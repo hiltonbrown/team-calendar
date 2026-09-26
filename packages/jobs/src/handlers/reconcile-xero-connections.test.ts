@@ -17,14 +17,18 @@ const mocks = vi.hoisted(() => ({
   metric: vi.fn(),
   oldest: vi.fn(),
   process: vi.fn(),
+  resolved: vi.fn(),
+  retire: vi.fn(),
 }));
 vi.mock("@repo/database/queries/xero-cleanup", () => ({
   getOldestUnknownXeroCleanupUpdatedAt: mocks.oldest,
   listDueXeroCleanupAttempts: mocks.list,
+  listResolvedXeroCleanupRequests: mocks.resolved,
 }));
 vi.mock("@repo/xero", () => ({
   emitXeroMetric: mocks.metric,
   processXeroCleanupAttempt: mocks.process,
+  retireResolvedCleanupRequest: mocks.retire,
 }));
 vi.mock("@repo/observability/log", () => ({ log: { error: mocks.error } }));
 vi.mock("../client", () => ({
@@ -47,6 +51,8 @@ describe("cleanup sweep", () => {
     mocks.metric.mockReset();
     mocks.oldest.mockReset().mockResolvedValue(null);
     mocks.list.mockResolvedValue([]);
+    mocks.resolved.mockReset().mockResolvedValue([]);
+    mocks.retire.mockReset().mockResolvedValue(undefined);
     mocks.process.mockReset().mockResolvedValue(undefined);
   });
   it("isolates record failures and passes only scoped routing identifiers", async () => {
@@ -74,6 +80,26 @@ describe("cleanup sweep", () => {
       limit: 50,
       now: expect.any(Date),
     });
+  });
+  it("revisits terminal requests after retirement failure without dispatching another DELETE", async () => {
+    const request = {
+      clerkOrgId: "org",
+      organisationId: "entity",
+      requestId: "request",
+    };
+    mocks.resolved.mockResolvedValue([request]);
+    mocks.retire.mockRejectedValueOnce(new Error("retirement unavailable"));
+    expect(await reconcileXeroConnections()).toEqual({
+      failed: 1,
+      processed: 0,
+    });
+    expect(await reconcileXeroConnections()).toEqual({
+      failed: 0,
+      processed: 1,
+    });
+    expect(mocks.retire).toHaveBeenNthCalledWith(1, request);
+    expect(mocks.retire).toHaveBeenNthCalledWith(2, request);
+    expect(mocks.process).not.toHaveBeenCalled();
   });
   it.each([
     [new Date("2026-09-26T04:30:00Z"), 7.5],
@@ -121,6 +147,37 @@ describe("cleanup sweep", () => {
       }
     }
   );
+  it("runs terminal recovery in its own durable scoped step and isolates retirement failure", async () => {
+    const first = {
+      clerkOrgId: "clerk",
+      organisationId: "entity",
+      requestId: "first",
+    };
+    const second = { ...first, requestId: "second" };
+    mocks.resolved.mockResolvedValue([first, second]);
+    mocks.retire.mockRejectedValueOnce(new Error("interrupted retirement"));
+    const steps: string[] = [];
+    const step = {
+      run: async <T>(name: string, callback: () => Promise<T>): Promise<T> => {
+        steps.push(name);
+        return await callback();
+      },
+    };
+    expect(await registeredHandler({ step })).toEqual({
+      failed: 1,
+      processed: 1,
+    });
+    expect(steps).toEqual([
+      "list-due-xero-cleanup",
+      "list-resolved-xero-cleanup",
+      "retire-cleanup-first",
+      "retire-cleanup-second",
+      "record-unknown-cleanup-age",
+    ]);
+    expect(mocks.retire).toHaveBeenNthCalledWith(1, first);
+    expect(mocks.retire).toHaveBeenNthCalledWith(2, second);
+    expect(mocks.process).not.toHaveBeenCalled();
+  });
   it("records health once through its durable job step after all cleanup steps", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-09-26T12:00:00Z"));
     mocks.oldest.mockResolvedValue(new Date("2026-09-26T10:00:00Z"));
@@ -146,6 +203,7 @@ describe("cleanup sweep", () => {
       "list-due-xero-cleanup",
       "cleanup-a",
       "cleanup-b",
+      "list-resolved-xero-cleanup",
       "record-unknown-cleanup-age",
     ]);
     expect(mocks.metric).toHaveBeenCalledExactlyOnceWith(

@@ -28,7 +28,7 @@ const validAppVars = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_live_123456",
   XERO_CLIENT_ID: "xero_client_id_123",
   XERO_CLIENT_SECRET: "xero_client_secret_123",
-  XERO_TOKEN_ENCRYPTION_KEY: "dGhpcyBpcyBhIDMyIGJ5dGUgc2VjcmV0IGtleSE=",
+  XERO_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
 };
 
 const validApiVars = {
@@ -389,4 +389,203 @@ it("rejects a whitespace credential domain exactly as runtime keys do", () => {
       },
     })
   ).toThrow("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
+});
+
+describe("complete Xero configuration preflight", () => {
+  const nextKey = Buffer.alloc(32, 2).toString("base64");
+  it.each(["app", "api"] as const)(
+    "preserves legacy version one for %s",
+    (appName) => {
+      const result = runProductionPreflight({
+        appName,
+        envVars: appName === "app" ? validAppVars : validApiVars,
+      });
+      expect(result.ok).toBe(true);
+      expect(result.checkedVars).toContain(
+        "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION"
+      );
+      expect(result.checkedVars).toContain("XERO_TOKEN_ENCRYPTION_KEYS_JSON");
+    }
+  );
+  it("accepts a mixed keyring with active version two", () => {
+    expect(
+      runProductionPreflight({
+        appName: "api",
+        envVars: {
+          ...validApiVars,
+          XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: "2",
+          XERO_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
+            "1": validAppVars.XERO_TOKEN_ENCRYPTION_KEY,
+            "2": nextKey,
+          }),
+        },
+      }).ok
+    ).toBe(true);
+  });
+  it("uses the legacy key with a future optional keyring", () => {
+    expect(
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...validAppVars,
+          XERO_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({ "2": nextKey }),
+        },
+      }).ok
+    ).toBe(true);
+  });
+  it.each(["0", "-1", "1.5", "01", "9007199254740992", " 1 "])(
+    "rejects invalid active version %s",
+    (value) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "app",
+          envVars: {
+            ...validAppVars,
+            XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: value,
+          },
+        })
+      ).toThrow(
+        "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION must be a positive safe integer"
+      );
+    }
+  );
+  it.each([undefined, "{}", JSON.stringify({ "3": nextKey })])(
+    "rejects a missing active key",
+    (value) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "api",
+          envVars: {
+            ...validApiVars,
+            XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: "2",
+            XERO_TOKEN_ENCRYPTION_KEYS_JSON: value,
+          },
+        })
+      ).toThrow(
+        "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION must resolve in XERO_TOKEN_ENCRYPTION_KEYS_JSON"
+      );
+    }
+  );
+  it.each([
+    "{",
+    "[]",
+    "null",
+    JSON.stringify({ "0": nextKey }),
+    JSON.stringify({ "01": nextKey }),
+    JSON.stringify({ "9007199254740992": nextKey }),
+    JSON.stringify({ "2": "invalid-key" }),
+    JSON.stringify({ "2": Buffer.alloc(31).toString("base64") }),
+    JSON.stringify({ "2": 42 }),
+  ])("rejects malformed keyrings", (value) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, XERO_TOKEN_ENCRYPTION_KEYS_JSON: value },
+      })
+    ).toThrow(
+      "XERO_TOKEN_ENCRYPTION_KEYS_JSON must map positive safe integer versions to valid 32-byte base64 keys"
+    );
+  });
+  it("rejects conflicting version-one keys", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...validAppVars,
+          XERO_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({ "1": nextKey }),
+        },
+      })
+    ).toThrow(
+      "XERO_TOKEN_ENCRYPTION_KEYS_JSON conflicts with XERO_TOKEN_ENCRYPTION_KEY for version 1"
+    );
+  });
+  it.each(["invalid-key", Buffer.alloc(31).toString("base64"), ` ${nextKey} `])(
+    "rejects malformed legacy keys",
+    (value) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "api",
+          envVars: { ...validApiVars, XERO_TOKEN_ENCRYPTION_KEY: value },
+        })
+      ).toThrow(
+        "XERO_TOKEN_ENCRYPTION_KEY must be a valid 32-byte base64-encoded string"
+      );
+    }
+  );
+  it.each(["starter", "core", "plus", "advanced", "enterprise"])(
+    "accepts commercial tier %s",
+    (value) => {
+      expect(
+        runProductionPreflight({
+          appName: "app",
+          envVars: { ...validAppVars, XERO_APP_TIER: value },
+        }).ok
+      ).toBe(true);
+    }
+  );
+  it.each(["unknown", "Starter", " starter "])(
+    "rejects unsupported commercial tiers",
+    (value) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "app",
+          envVars: { ...validAppVars, XERO_APP_TIER: value },
+        })
+      ).toThrow("XERO_APP_TIER must be a supported commercial tier");
+    }
+  );
+  it.each(["Uppercase", "epoch space", "a".repeat(33), " epoch "])(
+    "rejects invalid namespace epochs",
+    (value) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "api",
+          envVars: { ...validApiVars, XERO_RATE_NAMESPACE_EPOCH: value },
+        })
+      ).toThrow(
+        "XERO_RATE_NAMESPACE_EPOCH must contain 1 to 32 lowercase letters, digits or hyphens"
+      );
+    }
+  );
+  it("reports variable names without supplied encryption or admission values", () => {
+    let failure: unknown;
+    try {
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...validAppVars,
+          XERO_APP_TIER: SECRET_CANARY_VALUE,
+          XERO_RATE_NAMESPACE_EPOCH: SECRET_CANARY_VALUE,
+          XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: SECRET_CANARY_VALUE,
+          XERO_TOKEN_ENCRYPTION_KEY: SECRET_CANARY_VALUE,
+          XERO_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
+            "2": SECRET_CANARY_VALUE,
+          }),
+        },
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(Error);
+    expect(String(failure)).not.toContain(SECRET_CANARY_VALUE);
+    for (const name of [
+      "XERO_APP_TIER",
+      "XERO_RATE_NAMESPACE_EPOCH",
+      "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION",
+      "XERO_TOKEN_ENCRYPTION_KEY",
+      "XERO_TOKEN_ENCRYPTION_KEYS_JSON",
+    ]) {
+      expect(String(failure)).toContain(name);
+    }
+  });
+  it("keeps Xero requirements out of marketing preflight", () => {
+    const result = runProductionPreflight({
+      appName: "web",
+      envVars: validWebVars,
+    });
+    expect(result.ok).toBe(true);
+    expect(
+      result.checkedVars.filter((name) => name.startsWith("XERO_"))
+    ).toEqual([]);
+  });
 });
