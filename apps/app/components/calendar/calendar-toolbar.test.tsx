@@ -69,7 +69,6 @@ function calendarRange() {
         publicHolidays: [],
       },
     ],
-    hasActiveXeroConnection: true,
     people: [],
     range: {
       end: new Date("2026-04-16T00:00:00.000Z"),
@@ -79,6 +78,7 @@ function calendarRange() {
     totalPeopleInScope: 0,
     truncated: false,
     view: "week",
+    xeroConnectionState: "connected",
     xeroSyncFailedCount: 0,
   } as const;
 }

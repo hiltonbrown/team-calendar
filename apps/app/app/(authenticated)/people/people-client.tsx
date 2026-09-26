@@ -6,6 +6,7 @@ import type {
   ClerkInvitationDispatchResult,
   PersonListItem,
 } from "@repo/availability";
+import { xeroRecoveryMessage } from "@repo/core";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -73,7 +74,6 @@ interface PeopleClientProps {
   canIncludeArchived: boolean;
   canManageClerkAccess?: boolean;
   filters: PeopleFilterInput;
-  hasActiveXeroConnection: boolean;
   locations: FilterOption[];
   nextCursor: string | null;
   organisationId: string;
@@ -81,6 +81,7 @@ interface PeopleClientProps {
   people: PersonListItem[];
   teams: FilterOption[];
   totalCount: number;
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   xeroTenantId: string | null;
 }
 
@@ -102,7 +103,7 @@ const statusLabels: Record<string, string> = {
 
 function renderEmptyState({
   canIncludeArchived,
-  hasActiveXeroConnection,
+  xeroConnectionState,
   onSync,
   orgQueryValue,
   syncPending,
@@ -110,16 +111,30 @@ function renderEmptyState({
   xeroTenantId,
 }: {
   canIncludeArchived: boolean;
-  hasActiveXeroConnection: boolean;
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   onSync: () => void;
   orgQueryValue: string | null;
   syncPending: boolean;
   totalCount: number;
   xeroTenantId: string | null;
 }) {
+  if (
+    totalCount === 0 &&
+    xeroConnectionState !== "connected" &&
+    xeroConnectionState !== "not_connected"
+  ) {
+    return (
+      <EmptyState
+        description={xeroRecoveryMessage(xeroConnectionState)}
+        title="Xero connection unavailable"
+      />
+    );
+  }
   if (totalCount === 0) {
     const canSync =
-      canIncludeArchived && hasActiveXeroConnection && Boolean(xeroTenantId);
+      canIncludeArchived &&
+      xeroConnectionState === "connected" &&
+      Boolean(xeroTenantId);
     return (
       <EmptyState
         actionSlot={
@@ -161,7 +176,7 @@ export function PeopleClient({
   canIncludeArchived,
   canManageClerkAccess = canIncludeArchived,
   filters,
-  hasActiveXeroConnection,
+  xeroConnectionState,
   locations,
   nextCursor,
   organisationId,
@@ -317,7 +332,9 @@ export function PeopleClient({
             <p className="text-body-sm text-muted-foreground">
               Profiles, balances and availability status for this organisation.
             </p>
-            {canIncludeArchived && hasActiveXeroConnection && xeroTenantId ? (
+            {canIncludeArchived &&
+            xeroConnectionState === "connected" &&
+            xeroTenantId ? (
               <Button
                 disabled={isSyncPending}
                 onClick={handleSyncFromXero}
@@ -492,11 +509,11 @@ export function PeopleClient({
       {people.length === 0 ? (
         renderEmptyState({
           canIncludeArchived,
-          hasActiveXeroConnection,
           onSync: handleSyncFromXero,
           orgQueryValue,
           syncPending: isSyncPending,
           totalCount,
+          xeroConnectionState,
           xeroTenantId,
         })
       ) : (

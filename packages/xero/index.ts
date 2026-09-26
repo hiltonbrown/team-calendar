@@ -1,5 +1,8 @@
 import "./keys";
 
+export { XERO_OPERATION_CAPABILITIES } from "./src/adapter/capabilities";
+export { classifyXeroFailure } from "./src/adapter/classify-xero-failure";
+export { toResolvedXeroTenant } from "./src/adapter/resolved-tenant";
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
 export {
@@ -86,6 +89,7 @@ export {
   submitLeaveApplicationForRegion,
   withdrawLeaveApplicationForRegion,
 } from "./src/write/dispatch";
+export type { XeroRecoveryReason, XeroTenantForWrite } from "./src/write/types";
 export {
   toPlainLanguageMessage,
   type XeroWriteError,

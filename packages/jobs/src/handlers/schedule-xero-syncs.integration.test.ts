@@ -77,6 +77,8 @@ async function setupTenant(tenant: typeof tenantA, timezone: string) {
 
   await database.xeroTenant.create({
     data: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.databaseTenantId,
       organisation_id: tenant.organisationId,

@@ -8,6 +8,7 @@ import type {
   ProviderWriteError,
   Result,
 } from "@repo/core";
+import { xeroRecoveryMessage } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
@@ -34,7 +35,7 @@ import { isXeroLeaveType } from "../records/record-type-categories";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { dispatchSyncEvent } from "../sync/sync-events";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import {
   acquireXeroWriteClaim,
   noUnresolvedSubmitOperationWhere,
@@ -806,15 +807,40 @@ async function dispatchXeroSyncInternal(
     return xeroNotConnected();
   }
 
-  const active = await hasActiveXeroConnection({
+  const xeroStateResult = await getXeroConnectionStateForScope({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   });
-  if (!active) {
+  if (!xeroStateResult.ok) {
+    return {
+      error: {
+        code: "unknown_error",
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
+      ok: false,
+    };
+  }
+  const xeroConnectionState = xeroStateResult.value.state;
+  if (
+    xeroConnectionState !== "connected" &&
+    xeroConnectionState !== "not_connected"
+  ) {
+    return {
+      error: {
+        code: "unknown_error",
+        message: xeroRecoveryMessage(xeroConnectionState),
+      },
+      ok: false,
+    };
+  }
+  const active = xeroConnectionState === "connected";
+  if (!active || xeroStateResult.value.bindingGeneration === null) {
     return xeroNotConnected();
   }
 
   const dispatched = await dispatchSyncEvent({
+    bindingGeneration: xeroStateResult.value.bindingGeneration,
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
     runType,
@@ -1149,7 +1175,31 @@ async function prepareApprovalWrite(
     };
   }
 
-  const hasXero = await hasActiveXeroConnection(input);
+  const xeroStateResult = await getXeroConnectionStateForScope(input);
+  if (!xeroStateResult.ok) {
+    return {
+      error: {
+        code: "unknown_error",
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
+      ok: false,
+    };
+  }
+  const xeroConnectionState = xeroStateResult.value.state;
+  if (
+    xeroConnectionState !== "connected" &&
+    xeroConnectionState !== "not_connected"
+  ) {
+    return {
+      error: {
+        code: "unknown_error",
+        message: xeroRecoveryMessage(xeroConnectionState),
+      },
+      ok: false,
+    };
+  }
+  const hasXero = xeroConnectionState === "connected";
   if (!hasXero) {
     return xeroNotConnected();
   }

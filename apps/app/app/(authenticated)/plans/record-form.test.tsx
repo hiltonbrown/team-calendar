@@ -38,7 +38,6 @@ const renderForm = () =>
       balanceAvailable={null}
       canSelectPerson
       closeHref="/plans"
-      hasActiveXeroConnection={false}
       mode="create"
       organisationId="00000000-0000-4000-8000-000000000001"
       people={[
@@ -48,6 +47,7 @@ const renderForm = () =>
           label: "Alex Morgan",
         },
       ]}
+      xeroConnectionState="not_connected"
     />
   );
 
@@ -55,6 +55,47 @@ describe("RecordForm", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+  });
+
+  it.each([
+    [
+      "unavailable",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+    ["reauthorisation_required", "Xero access needs to be renewed."],
+  ] as const)("blocks the payroll leave path while %s", (state, message) => {
+    const { container } = render(
+      <RecordForm
+        balanceAvailable={null}
+        canSelectPerson={false}
+        closeHref="/plans"
+        mode="create"
+        organisationId="00000000-0000-4000-8000-000000000001"
+        people={[
+          {
+            email: "alex@example.com",
+            id: "00000000-0000-4000-8000-000000000002",
+            label: "Alex Morgan",
+          },
+        ]}
+        xeroConnectionState={state}
+      />
+    );
+    expect(screen.getByText(message)).toBeDefined();
+    expect(
+      screen.queryByText("Saves as approved in Team Calendar only.", {
+        exact: false,
+      })
+    ).toBeNull();
+    const save = screen.getByRole("button", { name: "Save" });
+    expect(save.hasAttribute("disabled")).toBe(true);
+    const form = container.querySelector("form");
+    if (!form) {
+      throw new Error("Form missing");
+    }
+    fireEvent.submit(form);
+    expect(mocks.createRecordAction).not.toHaveBeenCalled();
   });
 
   it("associates visible labels with the core controls", () => {
@@ -93,7 +134,6 @@ describe("RecordForm", () => {
         balanceUnit="days"
         canSelectPerson
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={[
@@ -103,6 +143,7 @@ describe("RecordForm", () => {
             label: "Alex Morgan",
           },
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -116,7 +157,6 @@ describe("RecordForm", () => {
         balanceUnit="hours"
         canSelectPerson
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={[
@@ -126,6 +166,7 @@ describe("RecordForm", () => {
             label: "Alex Morgan",
           },
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -140,7 +181,6 @@ describe("RecordForm", () => {
         balanceUnit="currency"
         canSelectPerson
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={[
@@ -150,6 +190,7 @@ describe("RecordForm", () => {
             label: "Alex Morgan",
           },
         ]}
+        xeroConnectionState="connected"
       />
     );
 

@@ -15,7 +15,7 @@ import type {
 } from "@repo/database/generated/enums";
 import { z } from "zod";
 import { managerScopePersonIds } from "../settings/manager-scope";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import {
   type CurrentStatus,
   type CurrentStatusKey,
@@ -115,7 +115,7 @@ export interface PersonProfile {
   alternativeContacts: AlternativeContactSnapshot[];
   balances: {
     balancesLastFetchedAt: Date | null;
-    hasActiveXeroConnection: boolean;
+    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
     rows: BalanceRow[];
     xeroLinked: boolean;
   };
@@ -632,7 +632,7 @@ export async function getPersonProfile(input: {
       upcomingResult,
       balances,
       xeroSyncFailedCount,
-      hasXero,
+      xeroStateResult,
       alternativeContacts,
     ] = await Promise.all([
       computeCurrentStatus({
@@ -663,7 +663,7 @@ export async function getPersonProfile(input: {
           person_id: person.id,
         },
       }),
-      hasActiveXeroConnection({
+      getXeroConnectionStateForScope({
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
       }),
@@ -676,6 +676,10 @@ export async function getPersonProfile(input: {
         },
       }),
     ]);
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = xeroConnectionState !== "not_connected";
 
     const xeroLinked = Boolean(person.xero_employee_id);
     const visibleBalances = hasXero
@@ -698,8 +702,8 @@ export async function getPersonProfile(input: {
         ),
         balances: {
           balancesLastFetchedAt,
-          hasActiveXeroConnection: hasXero,
           rows: balanceRows,
+          xeroConnectionState,
           xeroLinked,
         },
         currentStatus,

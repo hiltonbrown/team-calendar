@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encryptXeroToken } from "../crypto/tokens";
 import {
   fetchEmployees,
   fetchLeaveApplicationStatus,
@@ -22,20 +21,15 @@ function restoreEncryptionKey() {
 }
 
 function buildXeroTenant() {
-  const accessToken = encryptXeroToken("access-token");
-
   return {
+    accessToken: "access-token",
+    bindingGeneration: 1,
     clerk_org_id: "org_uk_1",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_uk_1",
     organisation_id: "00000000-0000-4000-8000-000000000003",
     payroll_region: "UK" as const,
-    xero_connection: {
-      access_token_auth_tag: accessToken.authTag,
-      access_token_encrypted: accessToken.encrypted,
-      access_token_iv: accessToken.iv,
-      revoked_at: null,
-      token_key_version: 1,
-    },
+    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-uk-1",
   };
 }
@@ -244,15 +238,17 @@ describe("UK employee reads", () => {
     }
   });
 
-  it("returns auth_error Result without throwing when access_token_iv is null", async () => {
+  it("returns an incident without dispatch when resolved access is missing", async () => {
     const tenant = buildXeroTenant();
-    tenant.xero_connection.access_token_iv = null;
+    tenant.accessToken = "";
 
     await expect(fetchEmployees({ xeroTenant: tenant })).resolves.toMatchObject(
       {
         error: {
-          code: "auth_error",
-          message: "Xero credentials are missing or revoked.",
+          code: "unknown_error",
+          dispatchPhase: "before_dispatch",
+          message: "Xero access is unavailable.",
+          recoveryReason: "operational_incident",
         },
         ok: false,
       }

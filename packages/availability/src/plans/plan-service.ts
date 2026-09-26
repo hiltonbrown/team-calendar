@@ -29,7 +29,7 @@ import {
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { deriveAvailabilityUidKey } from "../sync/availability-uid";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import {
   noUnresolvedSubmitOperationWhere,
   unclaimedOrExpiredXeroWriteWhere,
@@ -405,7 +405,11 @@ export async function getRecord(input: {
       return notAuthorised();
     }
 
-    const hasXero = await hasActiveXeroConnection(input);
+    const xeroStateResult = await getXeroConnectionStateForScope(input);
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = connectionActionGate(xeroConnectionState);
     const listItem = await toRecordListItem(record, hasXero);
     return {
       ok: true,
@@ -428,7 +432,7 @@ export async function createRecord(
   }
 
   try {
-    const [targetPerson, actingPerson, hasXero, settingsResult] =
+    const [targetPerson, actingPerson, xeroStateResult, settingsResult] =
       await Promise.all([
         database.person.findFirst({
           select: personSelect,
@@ -446,12 +450,26 @@ export async function createRecord(
           parsed.data.organisationId,
           parsed.data.createdByUserId
         ),
-        hasActiveXeroConnection(parsed.data),
+        getXeroConnectionStateForScope(parsed.data),
         getSettings({
           clerkOrgId: parsed.data.clerkOrgId,
           organisationId: parsed.data.organisationId,
         }),
       ]);
+    if (!(xeroStateResult.ok || isLocalOnlyType(parsed.data.recordType))) {
+      return {
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+        },
+        ok: false,
+      };
+    }
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = xeroConnectionState !== "not_connected";
 
     if (!targetPerson) {
       return {
@@ -520,9 +538,9 @@ export async function createRecord(
           organisation_id: parsed.data.organisationId,
           payload: {
             approvalStatus: routing.approvalStatus,
-            hasActiveXeroConnection: hasXero,
             recordType: parsed.data.recordType,
             sourceType: routing.sourceType,
+            xeroConnectionState,
           },
           resource_id: id,
           resource_type: "availability_record",
@@ -556,7 +574,7 @@ export async function updateRecord(
   }
 
   try {
-    const [existing, actingPerson, hasXero] = await Promise.all([
+    const [existing, actingPerson, xeroStateResult] = await Promise.all([
       loadScopedRecord(
         parsed.data.clerkOrgId,
         parsed.data.organisationId,
@@ -567,8 +585,27 @@ export async function updateRecord(
         parsed.data.organisationId,
         parsed.data.actingUserId
       ),
-      hasActiveXeroConnection(parsed.data),
+      getXeroConnectionStateForScope(parsed.data),
     ]);
+    if (
+      !(
+        xeroStateResult.ok ||
+        isLocalOnlyEdit(existing, parsed.data.patch.recordType)
+      )
+    ) {
+      return {
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+        },
+        ok: false,
+      };
+    }
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
+    const hasXero = xeroConnectionState !== "not_connected";
 
     if (!existing) {
       return recordNotFound();
@@ -1053,7 +1090,7 @@ async function listRecordsPageForScope(input: {
   };
   const cursor = decodePlanCursor(input.cursor ?? null);
   const pageSize = Math.min(Math.max(input.pageSize ?? 50, 1), 200);
-  const [rows, totalCount, hasXero] = await Promise.all([
+  const [rows, totalCount, xeroStateResult] = await Promise.all([
     database.availabilityRecord.findMany({
       include: recordInclude,
       orderBy: [{ starts_at: "asc" }, { created_at: "asc" }, { id: "asc" }],
@@ -1081,11 +1118,15 @@ async function listRecordsPageForScope(input: {
         : where,
     }),
     database.availabilityRecord.count({ where }),
-    hasActiveXeroConnection({
+    getXeroConnectionStateForScope({
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
     }),
   ]);
+  const xeroConnectionState = xeroStateResult.ok
+    ? xeroStateResult.value.state
+    : "unavailable";
+  const hasXero = connectionActionGate(xeroConnectionState);
   const page = rows.slice(0, pageSize);
   const balances = page.length
     ? await database.leaveBalance.findMany({
@@ -1217,7 +1258,14 @@ async function listRecordsForScope({
     return { ok: true, value: [] };
   }
 
-  const hasXero = await hasActiveXeroConnection({ clerkOrgId, organisationId });
+  const xeroStateResult = await getXeroConnectionStateForScope({
+    clerkOrgId,
+    organisationId,
+  });
+  const xeroConnectionState = xeroStateResult.ok
+    ? xeroStateResult.value.state
+    : "unavailable";
+  const hasXero = connectionActionGate(xeroConnectionState);
   const records = await database.availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { created_at: "asc" }],
     select: { id: true },
@@ -1268,7 +1316,7 @@ async function listRecordsForScope({
 
 async function toRecordListItem(
   record: ScopedRecord,
-  hasXero: boolean
+  hasXero: boolean | null
 ): Promise<RecordListItem> {
   return {
     ...toPlanRecord(record, deriveActions(record, hasXero)),
@@ -1432,8 +1480,11 @@ function toPlanRecord(
 
 function deriveActions(
   record: ScopedRecord,
-  hasXero: boolean
+  hasXero: boolean | null
 ): EditableAction[] {
+  if (hasXero === null && record.source_type !== "manual") {
+    return ["view"];
+  }
   if (record.outbound_operations?.length > 0) {
     return ["view"];
   }
@@ -1693,3 +1744,22 @@ function emptyToNull(value: string | undefined): string | null {
 }
 
 class ActiveXeroWriteConflictError extends Error {}
+
+function connectionActionGate(
+  state: import("@repo/core").XeroConnectionDisplayState
+): boolean | null {
+  if (state === "connected") {
+    return true;
+  }
+  return state === "not_connected" ? false : null;
+}
+
+function isLocalOnlyEdit(
+  record: ScopedRecord | null,
+  recordType?: RecordType
+): boolean {
+  if (!record) {
+    return false;
+  }
+  return isLocalOnlyType(recordType ?? record.record_type);
+}

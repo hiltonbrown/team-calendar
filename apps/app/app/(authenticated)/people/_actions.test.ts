@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   deleteAlternativeContact: vi.fn(),
   dispatchBalanceRefresh: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   inviteClerkAccessCandidates: vi.fn(),
   loadClerkAccessReview: vi.fn(),
   reorderAlternativeContacts: vi.fn(),
@@ -35,6 +36,7 @@ vi.mock("@repo/availability", () => ({
   addAlternativeContact: mocks.addAlternativeContact,
   deleteAlternativeContact: mocks.deleteAlternativeContact,
   dispatchBalanceRefresh: mocks.dispatchBalanceRefresh,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
   inviteClerkAccessCandidates: mocks.inviteClerkAccessCandidates,
   loadClerkAccessReview: mocks.loadClerkAccessReview,
   reorderAlternativeContacts: mocks.reorderAlternativeContacts,
@@ -75,6 +77,10 @@ const userId = "user_456";
 describe("people server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
     mocks.currentUser.mockResolvedValue({ id: userId });
     mocks.getActiveOrgContext.mockResolvedValue({
@@ -241,6 +247,7 @@ describe("people server actions", () => {
       expect(resRefresh).toEqual({ ok: true, value: { queued: true } });
       expect(mocks.dispatchBalanceRefresh).toHaveBeenCalled();
       expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith({
+        bindingGeneration: 1,
         clerkOrgId,
         organisationId,
         personId,

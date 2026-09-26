@@ -27,20 +27,20 @@ function makeEmployeeView(
     },
     balances: {
       data: {
-        hasActiveXeroConnection: true,
         isXeroLinked: true,
         lastFetchedAt: null,
         rows: [],
+        xeroConnectionState: "connected",
       },
       status: "ready",
     },
     header: {
       firstName: "Ari",
-      hasActiveXeroConnection: true,
       lastName: "Chen",
       locationName: "Brisbane",
       roleLabel: "Employee",
       timezone: TIMEZONE,
+      xeroConnectionState: "connected",
     },
     publicHolidays: {
       data: { daysUntil: null, next: null },
@@ -87,12 +87,12 @@ function makeManagerView(
     header: {
       directReportCount: 5,
       firstName: "Ari",
-      hasActiveXeroConnection: true,
       lastName: "Chen",
       locationName: "Brisbane",
       roleLabel: "Manager",
       scopeLabel: "5 direct reports",
       timezone: TIMEZONE,
+      xeroConnectionState: "connected",
     },
     teamThisWeek: {
       data: {

@@ -71,10 +71,10 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={false}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[]}
+        xeroConnectionState="not_connected"
       />
     );
 
@@ -87,7 +87,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -108,6 +107,7 @@ describe("Plans page client surface", () => {
             workingDays: 1,
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -119,7 +119,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -130,6 +129,7 @@ describe("Plans page client surface", () => {
             sourceType: "manual",
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -149,7 +149,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -166,6 +165,7 @@ describe("Plans page client surface", () => {
             xeroWriteError: "Connection failed.",
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -192,10 +192,10 @@ describe("Plans page client surface", () => {
           sourceType: ["manual"],
           tab: "team",
         }}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue="org_123"
         records={[]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -210,7 +210,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={true}
         filters={{ ...baseFilters, tab: "team" }}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -231,6 +230,7 @@ describe("Plans page client surface", () => {
             id: "00000000-0000-4000-8000-000000000104",
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -251,7 +251,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -259,6 +258,7 @@ describe("Plans page client surface", () => {
             editableActions: ["view", "edit", "submit_for_approval", "archive"],
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -291,7 +291,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -302,6 +301,7 @@ describe("Plans page client surface", () => {
             recordType: "wfh",
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 
@@ -323,7 +323,6 @@ describe("Plans page client surface", () => {
       <PlansClient
         canViewTeam={false}
         filters={baseFilters}
-        hasActiveXeroConnection={true}
         organisationId="00000000-0000-4000-8000-000000000001"
         orgQueryValue={null}
         records={[
@@ -333,6 +332,7 @@ describe("Plans page client surface", () => {
             xeroWriteError: "Could not reach Xero.",
           }),
         ]}
+        xeroConnectionState="connected"
       />
     );
 

@@ -1,7 +1,7 @@
+import { database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  ensureFreshXeroConnection: vi.fn(),
   failedRecordCreate: vi.fn(),
   fetchLeaveBalancesForRegion: vi.fn(),
   isSupportedCurrencyCode: vi.fn((value: unknown) => value === "NZD"),
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   personFindFirst: vi.fn(),
   personFindMany: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
+  resolveXeroAccess: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -68,12 +69,43 @@ vi.mock("@repo/notifications", () => ({
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-vi.mock("@repo/xero", () => ({
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
+vi.mock("@repo/xero", async () => ({
+  classifyXeroFailure: (
+    await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
+  ).classifyXeroFailure,
   fetchLeaveBalancesForRegion: mocks.fetchLeaveBalancesForRegion,
   isSupportedCurrencyCode: mocks.isSupportedCurrencyCode,
   mapXeroLeaveType: mocks.mapXeroLeaveType,
+  resolveXeroAccess: async (scope) => {
+    const result = await mocks.resolveXeroAccess(scope);
+    if (!result?.ok) {
+      return result;
+    }
+    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    return {
+      ok: true,
+      value: {
+        ...result.value,
+        accessToken: "fake-access",
+        bindingGeneration: scope.expectedBindingGeneration,
+        capability: scope.capability,
+        deadline: scope.deadline,
+        payrollRegion: tenant.payroll_region,
+        tokenVersion: 1,
+        xeroTenantDatabaseId: tenant.id,
+        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+      },
+    };
+  },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
+  toResolvedXeroTenant: (scope, value) => ({
+    ...value,
+    clerk_org_id: scope.clerkOrgId,
+    id: value.xeroTenantDatabaseId,
+    organisation_id: scope.organisationId,
+    payroll_region: value.payrollRegion,
+    xero_tenant_id: value.xeroTenantId,
+  }),
   toValidatedLeaveBalanceRawPayload: mocks.toValidatedLeaveBalanceRawPayload,
 }));
 
@@ -86,6 +118,7 @@ const XERO_TENANT_ID = "20000000-0000-4000-8000-000000000001";
 
 function input() {
   return {
+    bindingGeneration: 1,
     clerkOrgId: CLERK_ORG_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -96,6 +129,11 @@ function input() {
 describe("leave balances sync run lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(database, {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+    });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
@@ -107,7 +145,7 @@ describe("leave balances sync run lifecycle", () => {
       xero_connection: {},
       xero_connection_id: "40000000-0000-4000-8000-000000000001",
     });
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
     });
@@ -455,6 +493,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -538,6 +577,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -599,6 +639,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -644,6 +685,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -689,6 +731,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -722,21 +765,67 @@ describe("leave balances sync run lifecycle", () => {
         code: "rate_limit_error",
         httpStatus: 429,
         message: "Rate limit exceeded",
+        recoveryReason: "retry_later",
       },
       ok: false,
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.status).toBe("failed");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
     }
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
+  });
+
+  it("fails and retries a per-employee operational incident without advancing canonical progress", async () => {
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [
+          {
+            employeeId: "emp_1",
+            error: {
+              code: "unknown_error",
+              message: "Admission unavailable",
+              recoveryReason: "operational_incident",
+            },
+          },
+        ],
+        leaveBalances: [],
+        rawResponses: [],
+      },
+    });
+    const result = await syncXeroLeaveBalances(input());
+    expect(result.ok).toBe(false);
+    const { rejectRetryableSyncResult } = await import("./xero-sync-access");
+    await expect(
+      rejectRetryableSyncResult(Promise.resolve(result))
+    ).rejects.toThrow();
+    expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_summary: "operational_incident",
+          status: "failed",
+        }),
+      })
+    );
+    expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
+    expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.xeroTenantUpdateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          last_leave_balances_sync_at: expect.any(Date),
+        }),
+      })
+    );
+    expect(mocks.leaveBalanceUpsert).not.toHaveBeenCalled();
   });
 
   it("advances cursor after recorded employee-specific failures", async () => {
@@ -762,6 +851,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -802,6 +892,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       personId,
       triggerType: "manual",
@@ -860,6 +951,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -932,6 +1024,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -975,11 +1068,13 @@ describe("leave balances sync run lifecycle", () => {
         code: "permission_error",
         httpStatus: 403,
         message: "Forbidden",
+        recoveryReason: "access_denied",
       },
       ok: false,
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
@@ -1007,18 +1102,20 @@ describe("leave balances sync run lifecycle", () => {
       error: {
         code: "network_error",
         message: "Network failure",
+        recoveryReason: "retry_later",
       },
       ok: false,
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.status).toBe("failed");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("unknown_error");
     }
     expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
     expect(mocks.xeroSyncCursorCreate).not.toHaveBeenCalled();
@@ -1070,6 +1167,7 @@ describe("leave balances sync run lifecycle", () => {
     });
 
     const result = await syncXeroLeaveBalances({
+      bindingGeneration: 1,
       ...input(),
       triggerType: "scheduled",
     });

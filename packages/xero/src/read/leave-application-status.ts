@@ -1,3 +1,4 @@
+import { classifyXeroHttpFailure } from "../adapter/classify-xero-failure";
 import type {
   XeroTenantForWrite,
   XeroWriteError,
@@ -87,6 +88,10 @@ export function mapXeroReadHttpError(
     rawPayload,
   };
 
+  const classified = classifyXeroHttpFailure(response, false);
+  if (classified.code) {
+    return { ...details, ...classified, code: classified.code };
+  }
   if (response.status === 400) {
     return { ...details, code: "validation_error" };
   }

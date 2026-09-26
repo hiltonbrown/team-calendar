@@ -24,7 +24,7 @@ interface AdminViewProps {
 }
 
 export function AdminView({ view, orgQueryValue, personId }: AdminViewProps) {
-  const xero = view.header.hasActiveXeroConnection;
+  const xero = view.header.xeroConnectionState === "connected";
   const timeline = buildPersonalCalendarTimeline(view, {
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
@@ -37,6 +37,7 @@ export function AdminView({ view, orgQueryValue, personId }: AdminViewProps) {
           <XeroDisconnectedBanner
             connectHref="/settings/integrations/xero"
             orgQueryValue={orgQueryValue}
+            xeroConnectionState={view.header.xeroConnectionState}
           />
         )
       }

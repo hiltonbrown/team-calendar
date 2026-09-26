@@ -129,7 +129,6 @@ function rangeWithEvents() {
         ],
       },
     ],
-    hasActiveXeroConnection: false,
     people: [],
     range: {
       end: new Date("2026-04-16T00:00:00.000Z"),
@@ -139,6 +138,7 @@ function rangeWithEvents() {
     totalPeopleInScope: 0,
     truncated: false,
     view: "day",
+    xeroConnectionState: "not_connected",
     xeroSyncFailedCount: 0,
   } as const;
 }

@@ -1,7 +1,7 @@
 import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
-import { tryDecryptXeroToken } from "../crypto/tokens";
+import { mapXeroTransportError } from "../adapter/classify-xero-failure";
 import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   XeroEmployee,
@@ -82,6 +82,7 @@ export async function fetchEmployees(input: {
 
     while (page <= XERO_MAX_PAGES) {
       const response = await xeroFetch({
+        deadline: input.xeroTenant.deadline,
         init: {
           headers: {
             Accept: "application/json",
@@ -175,11 +176,7 @@ export async function fetchEmployees(input: {
     };
   } catch (error) {
     return {
-      error: {
-        code: "network_error",
-        message:
-          error instanceof Error ? error.message : "Failed to reach Xero.",
-      },
+      error: mapXeroTransportError(error, false),
       ok: false,
     };
   }
@@ -215,6 +212,7 @@ export async function fetchLeaveRecords(input: {
 
     while (page <= XERO_MAX_PAGES) {
       const response = await xeroFetch({
+        deadline: input.xeroTenant.deadline,
         init: {
           headers: {
             Accept: "application/json",
@@ -278,11 +276,7 @@ export async function fetchLeaveRecords(input: {
     };
   } catch (error) {
     return {
-      error: {
-        code: "network_error",
-        message:
-          error instanceof Error ? error.message : "Failed to reach Xero.",
-      },
+      error: mapXeroTransportError(error, false),
       ok: false,
     };
   }
@@ -293,6 +287,7 @@ async function fetchAuLeaveTypeNames(input: {
   xeroTenant: XeroTenantForWrite;
 }): Promise<XeroWriteResult<ReadonlyMap<string, string>>> {
   const response = await xeroFetch({
+    deadline: input.xeroTenant.deadline,
     init: {
       headers: {
         Accept: "application/json",
@@ -375,6 +370,7 @@ export async function fetchLeaveBalances(input: {
     let response: Response;
     try {
       response = await xeroFetch({
+        deadline: input.xeroTenant.deadline,
         init: {
           headers: {
             Accept: "application/json",
@@ -397,11 +393,7 @@ export async function fetchLeaveBalances(input: {
       // A transport failure is environmental rather than employee-specific, so
       // abort and let the run retry instead of flagging every employee.
       return {
-        error: {
-          code: "network_error",
-          message:
-            error instanceof Error ? error.message : "Failed to reach Xero.",
-        },
+        error: mapXeroTransportError(error, false),
         ok: false,
       };
     }
@@ -417,7 +409,9 @@ export async function fetchLeaveBalances(input: {
       if (
         mappedError.code === "auth_error" ||
         mappedError.code === "permission_error" ||
-        mappedError.code === "rate_limit_error"
+        mappedError.code === "rate_limit_error" ||
+        mappedError.recoveryReason === "retry_later" ||
+        mappedError.recoveryReason === "operational_incident"
       ) {
         return { error: mappedError, ok: false };
       }
@@ -451,6 +445,7 @@ export async function fetchLeaveApplicationStatus(
 
   try {
     const response = await xeroFetch({
+      deadline: input.xeroTenant.deadline,
       init: {
         headers: {
           Accept: "application/json",
@@ -480,11 +475,7 @@ export async function fetchLeaveApplicationStatus(
     return { ok: true, value: mapLeaveApplicationStatus(rawPayload) };
   } catch (error) {
     return {
-      error: {
-        code: "network_error",
-        message:
-          error instanceof Error ? error.message : "Failed to reach Xero.",
-      },
+      error: mapXeroTransportError(error, false),
       ok: false,
     };
   }
@@ -501,33 +492,16 @@ function sleep(ms: number): Promise<void> {
 function resolveAccessToken(
   xeroTenant: XeroTenantForWrite
 ): { ok: true; token: string } | { ok: false; error: XeroWriteError } {
-  const accessToken = xeroTenant.xero_connection.access_token_encrypted;
-  const decrypted = tryDecryptXeroToken({
-    authTag: xeroTenant.xero_connection.access_token_auth_tag ?? null,
-    encrypted: accessToken,
-    iv: xeroTenant.xero_connection.access_token_iv ?? null,
-    keyVersion: xeroTenant.xero_connection.token_key_version,
-  });
-
-  if (!decrypted.ok) {
-    log.warn("Xero token decryption failed", {
-      clerkOrgId: xeroTenant.clerk_org_id,
-      organisationId: xeroTenant.organisation_id,
-      reason: decrypted.reason,
-    });
-  }
-
-  const decryptedAccessToken = decrypted.ok ? decrypted.token : "";
-
-  if (!decryptedAccessToken || xeroTenant.xero_connection.revoked_at) {
+  if (!xeroTenant.accessToken) {
     return {
       error: {
-        code: "auth_error",
-        message: "Xero credentials are missing or revoked.",
+        code: "unknown_error",
+        dispatchPhase: "before_dispatch",
+        message: "Xero access is unavailable.",
+        recoveryReason: "operational_incident",
       },
       ok: false,
     };
   }
-
-  return { ok: true, token: decryptedAccessToken };
+  return { ok: true, token: xeroTenant.accessToken };
 }

@@ -1,4 +1,5 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -349,23 +350,29 @@ describe("sync-xero-leave-records database flow", () => {
     let injected = false;
     const findManySpy = vi
       .spyOn(database.availabilityRecord, "findMany")
-      .mockImplementation(async (args) => {
-        const rows = await originalFindMany.call(
-          database.availabilityRecord,
-          args
-        );
-        if (args.select?.source_last_modified_at === true && !injected) {
-          injected = true;
-          await database.availabilityRecord.update({
-            data: {
-              approval_status: "declined",
-              derived_sequence: 7,
-              updated_at: new Date(),
-            },
-            where: { id: existing.id },
-          });
-        }
-        return rows;
+      .mockImplementation((args) => {
+        const result = (async () => {
+          const rows = await originalFindMany.call(
+            database.availabilityRecord,
+            args
+          );
+          if (args?.select?.source_last_modified_at === true && !injected) {
+            injected = true;
+            await database.availabilityRecord.update({
+              data: {
+                approval_status: "declined",
+                derived_sequence: 7,
+                updated_at: new Date(),
+              },
+              where: { id: existing.id },
+            });
+          }
+          return rows;
+        })();
+        // The spy adds an awaited concurrent write; retain Prisma's promise marker for its typed client contract.
+        return Object.assign(result, {
+          [Symbol.toStringTag]: "PrismaPromise" as const,
+        });
       });
 
     try {
@@ -934,19 +941,25 @@ async function setupTenant(
     },
   });
 
+  const access = encryptXeroToken("synthetic-access");
   await database.xeroConnection.create({
     data: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000),
       id: tenant.xeroConnectionId,
       organisation_id: tenant.organisationId,
       status: "active",
+      token_key_version: access.keyVersion,
     },
   });
 
   await database.xeroTenant.create({
     data: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
@@ -1074,6 +1087,7 @@ async function cleanTestData() {
 
 function syncInput(tenant: typeof tenantA) {
   return {
+    bindingGeneration: 1,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
     triggerType: "manual" as const,

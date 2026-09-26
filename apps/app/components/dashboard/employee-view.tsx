@@ -22,7 +22,7 @@ export function EmployeeView({
   orgQueryValue,
   personId,
 }: EmployeeViewProps) {
-  const xero = view.header.hasActiveXeroConnection;
+  const xero = view.header.xeroConnectionState === "connected";
   const timeline = buildPersonalCalendarTimeline(view, {
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
@@ -35,6 +35,7 @@ export function EmployeeView({
           <XeroDisconnectedBanner
             connectHref="/settings/integrations"
             orgQueryValue={orgQueryValue}
+            xeroConnectionState={view.header.xeroConnectionState}
           />
         )
       }

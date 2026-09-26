@@ -208,6 +208,6 @@ describe("mapXeroReadHttpError", () => {
     ).toBe("rate_limit_error");
     expect(
       mapXeroReadHttpError(new Response("", { status: 500 }), {}).code
-    ).toBe("unknown_error");
+    ).toBe("network_error");
   });
 });

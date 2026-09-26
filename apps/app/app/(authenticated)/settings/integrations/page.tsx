@@ -1,4 +1,5 @@
 import { auth } from "@repo/auth/server";
+import { getXeroConnectionStateForScope } from "@repo/availability";
 import { database } from "@repo/database";
 import type { Metadata } from "next";
 import { requirePageRole } from "@/lib/auth/require-page-role";
@@ -27,5 +28,17 @@ export default async function IntegrationsPage() {
     },
   });
 
-  return <IntegrationsClient organisations={organisations} />;
+  const withState = await Promise.all(
+    organisations.map(async (organisation) => {
+      const result = await getXeroConnectionStateForScope({
+        clerkOrgId: orgId,
+        organisationId: organisation.id,
+      });
+      const xeroConnectionState: import("@repo/core").XeroConnectionDisplayState =
+        result.ok ? result.value.state : "unavailable";
+      return { ...organisation, xeroConnectionState };
+    })
+  );
+
+  return <IntegrationsClient organisations={withState} />;
 }

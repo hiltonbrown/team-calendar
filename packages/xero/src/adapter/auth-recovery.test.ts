@@ -1,151 +1,161 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { XeroTenantForWrite, XeroWriteResult } from "../write/types";
+import type { XeroTenantForWrite, XeroWriteError } from "../write/types";
 
-vi.mock("server-only", () => ({}));
-
-const mocks = vi.hoisted(() => ({
-  ensureFreshXeroConnection: vi.fn(),
-  markXeroConnectionStale: vi.fn(),
-  tenantFindFirst: vi.fn(),
+const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
+vi.mock("../oauth/credential-owner", () => ({
+  resolveXeroAccess: mocks.resolve,
 }));
 
-vi.mock("@repo/database", () => ({
-  database: { xeroTenant: { findFirst: mocks.tenantFindFirst } },
-}));
+import { executeWithXeroAuthRecovery } from "./auth-recovery";
 
-vi.mock("../oauth/service", () => ({
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
-  markXeroConnectionStale: mocks.markXeroConnectionStale,
-}));
-
-const { executeWithXeroAuthRecovery } = await import("./auth-recovery");
-
-const tenant: XeroTenantForWrite = {
-  clerk_org_id: "org_1",
-  id: "tenant_1",
-  organisation_id: "00000000-0000-4000-8000-000000000001",
-  payroll_region: "AU",
-  xero_connection: {
-    access_token_auth_tag: "old-tag",
-    access_token_encrypted: "old-ciphertext",
-    access_token_iv: "old-iv",
-    revoked_at: null,
-  },
-  xero_tenant_id: "xero-tenant-1",
-};
-
-function authFailure(status: 401 | 403): XeroWriteResult<string> {
+function tenant(): XeroTenantForWrite {
   return {
-    error: {
-      code: status === 401 ? "auth_error" : "permission_error",
-      httpStatus: status,
-      message: "Xero rejected the request.",
-    },
-    ok: false,
+    accessToken: "old-token",
+    bindingGeneration: 2,
+    capability: "payroll.employees",
+    clerk_org_id: "clerk",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
+    id: "binding",
+    organisation_id: "organisation",
+    payroll_region: "AU",
+    tokenVersion: 1,
+    xero_tenant_id: "payroll-file",
   };
 }
-
-describe("executeWithXeroAuthRecovery", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
-      ok: true,
-      value: {
-        expiresAt: new Date("2026-08-29T01:00:00.000Z"),
-        refreshed: true,
-      },
-    });
-    mocks.markXeroConnectionStale.mockResolvedValue({
-      ok: true,
-      value: undefined,
-    });
-  });
-
-  it("returns non-authentication failures without touching token state", async () => {
-    const operation = vi.fn().mockResolvedValue({
-      error: { code: "network_error", message: "Offline" },
-      ok: false,
-    });
-
-    const result = await executeWithXeroAuthRecovery(tenant, operation);
-
-    expect(result).toEqual({
-      error: { code: "network_error", message: "Offline" },
-      ok: false,
-    });
-    expect(mocks.tenantFindFirst).not.toHaveBeenCalled();
-    expect(mocks.ensureFreshXeroConnection).not.toHaveBeenCalled();
-  });
-
-  it("forces one scoped refresh on 401, reloads credentials, and retries once", async () => {
-    const refreshedTenant = {
-      ...tenant,
-      xero_connection: {
-        ...tenant.xero_connection,
-        access_token_encrypted: "new-ciphertext",
-      },
-    };
-    mocks.tenantFindFirst
-      .mockResolvedValueOnce({ xero_connection_id: "connection_1" })
-      .mockResolvedValueOnce(refreshedTenant);
+function rejected(error: Partial<XeroWriteError> = {}) {
+  return {
+    error: {
+      code: "auth_error" as const,
+      httpStatus: 401,
+      message: "Rejected",
+      recoveryReason: "reauthorise" as const,
+      ...error,
+    },
+    ok: false as const,
+  };
+}
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocks.resolve.mockImplementation(async (input) => ({
+    ok: true,
+    value: {
+      accessToken: "new-token",
+      bindingGeneration: 2,
+      deadline: input.deadline,
+      payrollRegion: "AU",
+      tokenVersion: 2,
+      xeroTenantDatabaseId: "binding",
+      xeroTenantId: "payroll-file",
+    },
+  }));
+});
+describe("bounded Xero auth recovery", () => {
+  it("refreshes once on definite401 and retries with the same absolute deadline", async () => {
+    const current = tenant();
     const operation = vi
       .fn()
-      .mockResolvedValueOnce(authFailure(401))
+      .mockResolvedValueOnce(rejected())
       .mockResolvedValueOnce({ ok: true, value: "done" });
-
-    const result = await executeWithXeroAuthRecovery(tenant, operation);
-
-    expect(result).toEqual({ ok: true, value: "done" });
-    expect(mocks.ensureFreshXeroConnection).toHaveBeenCalledWith({
-      clerkOrgId: tenant.clerk_org_id,
-      connectionId: "connection_1",
-      forceRefresh: true,
-      organisationId: tenant.organisation_id,
-      previousAccessTokenEncrypted: "old-ciphertext",
-    });
-    expect(operation).toHaveBeenNthCalledWith(2, refreshedTenant);
-    expect(operation).toHaveBeenCalledTimes(2);
-  });
-
-  it("marks a 403 permission failure stale without rotating or retrying", async () => {
-    mocks.tenantFindFirst.mockResolvedValueOnce({
-      xero_connection_id: "connection_1",
-    });
-    const operation = vi.fn().mockResolvedValue(authFailure(403));
-
-    const result = await executeWithXeroAuthRecovery(tenant, operation);
-
-    expect(result).toEqual(authFailure(403));
-    expect(mocks.ensureFreshXeroConnection).not.toHaveBeenCalled();
-    expect(operation).toHaveBeenCalledOnce();
-    expect(mocks.markXeroConnectionStale).toHaveBeenCalledWith(
+    expect(await executeWithXeroAuthRecovery(current, operation, true)).toEqual(
+      { ok: true, value: "done" }
+    );
+    expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        connectionId: "connection_1",
-        errorCode: "xero_permission_denied",
+        clerkOrgId: "clerk",
+        deadline: current.deadline,
+        expectedBindingGeneration: 2,
+        forceRefresh: true,
+        organisationId: "organisation",
+        previousTokenVersion: 1,
       })
     );
-  });
-
-  it("marks the connection stale when the single retry is also rejected", async () => {
-    mocks.tenantFindFirst
-      .mockResolvedValueOnce({ xero_connection_id: "connection_1" })
-      .mockResolvedValueOnce({
-        ...tenant,
-        xero_connection: {
-          ...tenant.xero_connection,
-          access_token_encrypted: "new-ciphertext",
-        },
-      });
-    const operation = vi.fn().mockResolvedValue(authFailure(401));
-
-    const result = await executeWithXeroAuthRecovery(tenant, operation);
-
-    expect(result).toEqual(authFailure(401));
     expect(operation).toHaveBeenCalledTimes(2);
-    expect(mocks.markXeroConnectionStale).toHaveBeenCalledWith(
+    expect(operation.mock.calls[1]?.[0]).toMatchObject({
+      accessToken: "new-token",
+      deadline: current.deadline,
+    });
+  });
+  it.each([
+    ["scope401", { recoveryReason: "update_permissions" }],
+    [
+      "generic403",
+      {
+        code: "permission_error",
+        httpStatus: 403,
+        recoveryReason: "access_denied",
+      },
+    ],
+    ["uncertain401", { recoveryReason: "outcome_unknown" }],
+    ["pre-dispatch401", { dispatchPhase: "before_dispatch" }],
+    [
+      "ambiguous network",
+      {
+        code: "network_error",
+        httpStatus: undefined,
+        recoveryReason: "outcome_unknown",
+      },
+    ],
+  ] as const)("never refreshes or replays %s", async (_label, error) => {
+    const failure = rejected(error);
+    const operation = vi.fn().mockResolvedValue(failure);
+    expect(
+      await executeWithXeroAuthRecovery(tenant(), operation, true)
+    ).toEqual(failure);
+    expect(operation).toHaveBeenCalledOnce();
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
+  it("classifies a scope failure on the single retry without further refresh", async () => {
+    const second = rejected({
+      code: "permission_error",
+      recoveryReason: "update_permissions",
+    });
+    const operation = vi
+      .fn()
+      .mockResolvedValueOnce(rejected())
+      .mockResolvedValueOnce(second);
+    expect(
+      await executeWithXeroAuthRecovery(tenant(), operation, true)
+    ).toEqual(second);
+    expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+  it("returns reauthorise on the second401 without further refresh or state mutation", async () => {
+    const operation = vi.fn().mockResolvedValue(rejected());
+    expect(await executeWithXeroAuthRecovery(tenant(), operation)).toEqual(
+      rejected()
+    );
+    expect(mocks.resolve).toHaveBeenCalledOnce();
+    expect(operation).toHaveBeenCalledTimes(2);
+  });
+  it("retains an operational refresh failure as a definite non-attempt", async () => {
+    mocks.resolve.mockResolvedValue({
+      error: { code: "configuration_error", message: "Unavailable" },
+      ok: false,
+    });
+    const operation = vi.fn().mockResolvedValue(rejected());
+    expect(
+      await executeWithXeroAuthRecovery(tenant(), operation, true)
+    ).toMatchObject({
+      error: {
+        dispatchPhase: "before_dispatch",
+        recoveryReason: "operational_incident",
+      },
+      ok: false,
+    });
+    expect(operation).toHaveBeenCalledOnce();
+  });
+  it("uses rejected plaintext only for legacy concurrency comparison inside the resolver", async () => {
+    const current = { ...tenant(), tokenVersion: null };
+    const operation = vi
+      .fn()
+      .mockResolvedValueOnce(rejected())
+      .mockResolvedValueOnce({ ok: true, value: null });
+    await executeWithXeroAuthRecovery(current, operation);
+    expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        connectionId: "connection_1",
-        errorCode: "xero_auth_rejected_after_refresh",
+        previousAccessToken: "old-token",
+        previousTokenVersion: null,
       })
     );
   });

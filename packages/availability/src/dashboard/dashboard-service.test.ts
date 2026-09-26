@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   getFeedSummaryForDashboard: vi.fn(),
   getPersonProfile: vi.fn(),
   getSettings: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   listEvents: vi.fn(),
   listForApprover: vi.fn(),
   listForOrganisation: vi.fn(),
@@ -85,7 +85,7 @@ vi.mock("../sync/sync-monitor-service", () => ({
   listTenantSummaries: mocks.listTenantSummaries,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 
 const { getAdminView, getEmployeeView, getManagerView, resolveDashboardRole } =
@@ -159,7 +159,10 @@ describe("dashboard-service", () => {
         },
       },
     });
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.listMyRecords.mockImplementation(({ filters }) => {
       if (filters.approvalStatus?.includes("xero_sync_failed")) {
         return {
@@ -562,8 +565,29 @@ describe("dashboard-service", () => {
     }
   );
 
+  it("preserves unavailable in the employee DTO rather than reporting disconnected", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    const result = await getEmployeeView(baseInput);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.header.xeroConnectionState).toBe("unavailable");
+    if (result.value.balances.status === "ready") {
+      expect(result.value.balances.data.xeroConnectionState).toBe(
+        "unavailable"
+      );
+    }
+  });
+
   it("builds the employee view and degrades balances when Xero is disconnected", async () => {
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
 
     const result = await getEmployeeView(baseInput);
 
@@ -574,8 +598,8 @@ describe("dashboard-service", () => {
 
     expect(result.value.header).toMatchObject({
       firstName: "Ava",
-      hasActiveXeroConnection: false,
       roleLabel: "Employee",
+      xeroConnectionState: "not_connected",
     });
     expect(result.value.actionItems).toMatchObject({
       data: {

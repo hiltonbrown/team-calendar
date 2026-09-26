@@ -1,9 +1,10 @@
+import { toXeroConnectionDisplayState } from "@repo/core";
 import "server-only";
 
 import { auth, currentUser } from "@repo/auth/server";
 import {
   getRecord,
-  hasActiveXeroConnection,
+  getXeroConnectionStateForScope,
   isXeroLeaveType,
 } from "@repo/availability";
 import { database, scopedQuery } from "@repo/database";
@@ -85,7 +86,11 @@ export async function loadPlanFormData({
     people = [currentPerson];
   }
 
-  const hasXero = await hasActiveXeroConnection({ clerkOrgId, organisationId });
+  const xeroStateResult = await getXeroConnectionStateForScope({
+    clerkOrgId,
+    organisationId,
+  });
+  const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
   const recordResult = recordId
     ? await getRecord({
         actingOrgRole: orgRole,
@@ -149,7 +154,6 @@ export async function loadPlanFormData({
     balanceUnit: balance?.balance_unit ?? null,
     canSelectPerson,
     closeHref: withOrg("/plans", orgQueryValue),
-    hasActiveXeroConnection: hasXero,
     organisationId,
     people: people.map((person) => ({
       email: person.email,
@@ -157,6 +161,7 @@ export async function loadPlanFormData({
       label: `${person.first_name} ${person.last_name}`,
     })),
     record: prefillRecord,
+    xeroConnectionState,
   };
 }
 

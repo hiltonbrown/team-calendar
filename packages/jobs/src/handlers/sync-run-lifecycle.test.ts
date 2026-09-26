@@ -66,6 +66,7 @@ const XERO_TENANT_ID = "20000000-0000-4000-8000-000000000001";
 
 function input() {
   return {
+    bindingGeneration: 1,
     clerkOrgId: CLERK_ORG_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -96,7 +97,7 @@ describe("sync run lifecycle guards", () => {
     expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          error_summary: "database hiccup",
+          error_summary: "retry_later",
           status: "failed",
         }),
         where: expect.objectContaining({

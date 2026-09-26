@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
   dispatchSyncEvent: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   logError: vi.fn(),
   personFindFirst: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock("@repo/database", () => ({
   }),
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 vi.mock("../sync/sync-events", () => ({
   dispatchSyncEvent: mocks.dispatchSyncEvent,
@@ -55,7 +55,10 @@ describe("dispatchBalanceRefresh", () => {
     vi.clearAllMocks();
     setBalanceRefreshDispatcher(null);
     mocks.auditCreate.mockResolvedValue({});
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.xeroTenantFindFirst.mockResolvedValue({ id: "xero-tenant-1" });
   });
 
@@ -153,7 +156,10 @@ describe("dispatchBalanceRefresh", () => {
 
   it("records xero_not_connected when the organisation has no active Xero connection", async () => {
     mockLinkedPerson();
-    mocks.hasActiveXeroConnection.mockResolvedValueOnce(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValueOnce({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
 
     const result = await dispatchBalanceRefresh(input);
 
@@ -202,6 +208,7 @@ describe("dispatchBalanceRefresh", () => {
       value: { queued: false, reason: "dispatch_failed" },
     });
     expect(dispatcher).toHaveBeenCalledWith({
+      bindingGeneration: 1,
       clerkOrgId: input.clerkOrgId,
       dispatchedBy: input.actingUserId,
       organisationId: input.organisationId,
@@ -223,6 +230,7 @@ describe("dispatchBalanceRefresh", () => {
 
       expect(result).toEqual({ ok: true, value: { queued: true } });
       expect(dispatcher).toHaveBeenCalledWith({
+        bindingGeneration: 1,
         clerkOrgId: input.clerkOrgId,
         dispatchedBy: input.actingUserId,
         organisationId: input.organisationId,

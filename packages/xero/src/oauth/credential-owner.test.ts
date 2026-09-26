@@ -42,6 +42,13 @@ vi.mock("./identity", () => ({
 vi.mock("./service", () => ({
   ensureFreshXeroConnection: mocks.legacy,
   exchangeToken: mocks.exchange,
+  isRecordedXeroRefreshGrantInvalid: (code: string | null | undefined) =>
+    [
+      "invalid_grant",
+      "refresh_invalid_grant",
+      "refresh_token_invalid",
+      "reauthorisation_required",
+    ].includes(code ?? ""),
 }));
 vi.mock("../crypto/tokens", () => ({
   decryptXeroToken: mocks.decrypt,
@@ -468,4 +475,252 @@ describe("adoption and durable recovery", () => {
     });
     expect(mocks.exchange).not.toHaveBeenCalled();
   });
+});
+
+describe("161g resolver evidence and capabilities", () => {
+  it.each(["payroll.employees.read", "payroll.settings.read"])(
+    "accepts corresponding broad scope for %s",
+    async (capability) => {
+      db.xeroTenant.findFirst.mockResolvedValue({
+        ...binding(),
+        credential_owner: {
+          ...owner(),
+          granted_scopes: [capability.slice(0, -5)],
+        },
+      });
+      expect(
+        (await resolveXeroAccess({ ...accessInput(), capability })).ok
+      ).toBe(true);
+      expect(mocks.exchange).not.toHaveBeenCalled();
+    }
+  );
+  it("rejects write capability on read-only consent without refreshing even if expired", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...binding(),
+      credential_owner: {
+        ...owner(),
+        granted_scopes: ["payroll.employees.read"],
+        token_expires_at: new Date(0),
+      },
+    });
+    expect(
+      await resolveXeroAccess({
+        ...accessInput(),
+        capability: "payroll.employees",
+        forceRefresh: true,
+      })
+    ).toMatchObject({ error: { code: "capability_missing" }, ok: false });
+    expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.decrypt).not.toHaveBeenCalled();
+  });
+  it("requires all capabilities before refreshing", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...binding(),
+      credential_owner: { ...owner(), token_expires_at: new Date(0) },
+    });
+    expect(
+      await resolveXeroAccess({
+        ...accessInput(),
+        capability: ["payroll.employees.read", "payroll.settings.read"],
+      })
+    ).toMatchObject({ error: { code: "capability_missing" }, ok: false });
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["network_error", undefined, undefined, "network_error"],
+    [
+      "network_error",
+      "admission_unavailable",
+      undefined,
+      "admission_unavailable",
+    ],
+    ["network_error", undefined, 429, "rate_limit_error"],
+    ["client_credentials_invalid", undefined, undefined, "configuration_error"],
+    ["refresh_token_invalid", undefined, undefined, "reauthorisation_required"],
+  ])(
+    "preserves refresh reason %s / %s / %s",
+    async (code, transportCode, httpStatus, expected) => {
+      const current = { ...owner(), token_expires_at: new Date(0) };
+      db.xeroTenant.findFirst.mockResolvedValue({
+        ...binding(),
+        credential_owner: current,
+      });
+      db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue(current);
+      mocks.exchange.mockResolvedValue({
+        error: {
+          code,
+          httpStatus,
+          message: "safe",
+          retryAfterMs: 1234,
+          transportCode,
+        },
+        ok: false,
+      });
+      expect(await resolveXeroAccess(accessInput())).toMatchObject({
+        error: { code: expected, retryAfterMs: 1234 },
+        ok: false,
+      });
+      if (code !== "refresh_token_invalid") {
+        expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+        expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+      }
+    }
+  );
+  it("forces one owner refresh using the rejected token version and same deadline", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue(binding());
+    const input = {
+      ...accessInput(),
+      forceRefresh: true,
+      previousTokenVersion: 1,
+    };
+    const result = await resolveXeroAccess(input);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        deadline: input.deadline,
+        tokenVersion: 2,
+        xeroTenantDatabaseId: "binding",
+      },
+    });
+    expect(mocks.exchange).toHaveBeenCalledOnce();
+    expect(mocks.exchange).toHaveBeenCalledWith(
+      expect.objectContaining({ deadline: input.deadline })
+    );
+  });
+  it("reuses newer owner token instead of refreshing for an old401", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...binding(),
+      credential_owner: { ...owner(), token_version: 2 },
+    });
+    expect(
+      (
+        await resolveXeroAccess({
+          ...accessInput(),
+          forceRefresh: true,
+          previousTokenVersion: 1,
+        })
+      ).ok
+    ).toBe(true);
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+  it("retains unknown-key decryption as configuration rather than reauthorisation", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue(binding());
+    mocks.decrypt.mockImplementation(() => {
+      throw new Error("unknown key version");
+    });
+    expect(await resolveXeroAccess(accessInput())).toMatchObject({
+      error: { code: "configuration_error" },
+      ok: false,
+    });
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+    expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["network_error", "network_error"],
+    ["client_credentials_invalid", "configuration_error"],
+    ["refresh_token_invalid", "reauthorisation_required"],
+  ])("preserves legacy refresh failure %s", async (code, expected) => {
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...binding(),
+      credential_owner: null,
+    });
+    mocks.legacy.mockResolvedValue({
+      error: { code, message: "safe" },
+      ok: false,
+    });
+    expect(await resolveXeroAccess(accessInput())).toMatchObject({
+      error: { code: expected },
+      ok: false,
+    });
+  });
+  it("refreshes a newer but expiring owner using its current version", async () => {
+    const current = {
+      ...owner(),
+      token_expires_at: new Date(0),
+      token_version: 2,
+    };
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...binding(),
+      credential_owner: current,
+    });
+    db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue(current);
+    db.xeroRefreshAttempt.findUniqueOrThrow.mockResolvedValue({
+      ...attempt(),
+      expected_token_version: 2,
+    });
+    db.xeroCredentialOwner.update.mockResolvedValue({
+      ...current,
+      token_version: 3,
+    });
+    expect(
+      (
+        await resolveXeroAccess({
+          ...accessInput(),
+          forceRefresh: true,
+          previousTokenVersion: 1,
+        })
+      ).ok
+    ).toBe(true);
+    expect(mocks.exchange).toHaveBeenCalledOnce();
+    expect(db.xeroRefreshAttempt.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ expected_token_version: 2 }),
+      })
+    );
+  });
+});
+
+it.each([
+  "invalid_grant",
+  "refresh_invalid_grant",
+  "refresh_token_invalid",
+  "reauthorisation_required",
+])(
+  "rejects recorded legacy grant %s before refresh or decryption",
+  async (code) => {
+    const current = binding();
+    db.xeroTenant.findFirst.mockResolvedValue({
+      ...current,
+      credential_owner: null,
+      xero_connection: {
+        ...current.xero_connection,
+        last_error_code: code,
+        status: "stale",
+      },
+    });
+    expect(await resolveXeroAccess(accessInput())).toMatchObject({
+      error: { code: "reauthorisation_required" },
+      ok: false,
+    });
+    expect(mocks.legacy).not.toHaveBeenCalled();
+    expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.decrypt).not.toHaveBeenCalled();
+  }
+);
+it("opts a recoverable legacy stale binding into existing scoped refresh", async () => {
+  const current = binding();
+  db.xeroTenant.findFirst.mockResolvedValue({
+    ...current,
+    credential_owner: null,
+    xero_connection: {
+      ...current.xero_connection,
+      last_error_code: "client_credentials_invalid",
+      status: "stale",
+    },
+  });
+  mocks.legacy.mockResolvedValue({
+    error: { code: "network_error", message: "safe" },
+    ok: false,
+  });
+  expect(await resolveXeroAccess(accessInput())).toMatchObject({
+    error: { code: "network_error" },
+    ok: false,
+  });
+  expect(mocks.legacy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      allowStaleLegacyRefresh: true,
+      clerkOrgId: "clerk",
+      organisationId: "organisation",
+    })
+  );
 });

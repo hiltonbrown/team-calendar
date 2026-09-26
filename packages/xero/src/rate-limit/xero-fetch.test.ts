@@ -429,7 +429,7 @@ it("does not retry caller cancellation", async () => {
       },
       { fetchImpl, limiter: permissiveLimiter() }
     )
-  ).rejects.toMatchObject({ name: "AbortError" });
+  ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: true });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
 });
 
@@ -516,5 +516,89 @@ it("reports operation expiry before admission infrastructure failure", async () 
       { fetchImpl, limiter: new XeroRateLimiter({}, { store }) }
     )
   ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
+  expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+it.each([401, 403])(
+  "preserves %i authoritative headers when its body stalls within the absolute deadline",
+  async (status) => {
+    const limiter = permissiveLimiter();
+    const release = vi.fn();
+    const observe = vi.spyOn(limiter, "observe");
+    vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
+    const cancel = vi.fn();
+    const stream = new ReadableStream({
+      cancel,
+      pull() {
+        return new Promise(() => {
+          /* Stalled provider body. */
+        });
+      },
+    });
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        headers: { "WWW-Authenticate": 'Bearer error="insufficient_scope"' },
+        status,
+      })
+    );
+    const response = await xeroFetch(
+      {
+        deadline: { expiresAtMs: Date.now() + 25 },
+        rateClass,
+        url: "https://api.xero.com/x",
+      },
+      { fetchImpl, limiter }
+    );
+    expect(response.status).toBe(status);
+    expect(response.headers.get("WWW-Authenticate")).toBe(
+      'Bearer error="insufficient_scope"'
+    );
+    expect(await response.text()).toBe("");
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(release).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(observe).not.toHaveBeenCalled();
+  }
+);
+it.each([401, 403])(
+  "preserves %i normal raw audit body while retaining headers and release",
+  async (status) => {
+    const limiter = permissiveLimiter();
+    const release = vi.fn();
+    vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
+    const response = await xeroFetch(
+      { rateClass, url: "https://api.xero.com/x" },
+      {
+        fetchImpl: vi.fn().mockResolvedValue(
+          new Response('{"Message":"audit only"}', {
+            headers: { "WWW-Authenticate": "insufficent_scope" },
+            status,
+          })
+        ),
+        limiter,
+      }
+    );
+    expect(await response.json()).toEqual({ Message: "audit only" });
+    expect(response.headers.get("WWW-Authenticate")).toBe("insufficent_scope");
+    expect(release).toHaveBeenCalledOnce();
+  }
+);
+it("normalises pre-aborted signals as definite non-attempts", async () => {
+  const limiter = permissiveLimiter();
+  const acquire = vi.spyOn(limiter, "acquire");
+  const fetchImpl = vi.fn();
+  const controller = new AbortController();
+  controller.abort();
+  await expect(
+    xeroFetch(
+      {
+        init: { signal: controller.signal },
+        rateClass,
+        url: "https://api.xero.com/x",
+      },
+      { fetchImpl, limiter }
+    )
+  ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
+  expect(acquire).not.toHaveBeenCalled();
   expect(fetchImpl).not.toHaveBeenCalled();
 });

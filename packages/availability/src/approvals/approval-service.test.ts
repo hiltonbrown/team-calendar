@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   dispatchNotification: vi.fn(),
   dispatchSyncEvent: vi.fn(),
   getSettings: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   leaveBalanceFindFirst: vi.fn(),
   leaveBalanceFindMany: vi.fn(),
   listForOrganisation: vi.fn(),
@@ -74,7 +74,7 @@ vi.mock("../holidays/holiday-service", () => ({
   listForOrganisation: mocks.listForOrganisation,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 vi.mock("../sync/sync-events", () => ({
   dispatchSyncEvent: mocks.dispatchSyncEvent,
@@ -193,7 +193,10 @@ describe("approval-service", () => {
       ok: true,
       value: 2,
     });
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.leaveBalanceFindMany.mockResolvedValue([
       {
         balance: 10,
@@ -257,6 +260,58 @@ describe("approval-service", () => {
     });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
   });
+
+  it.each([
+    ["update_permissions", "Update Xero permissions to continue."],
+    [
+      "operational_incident",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+  ] as const)(
+    "preserves employee-visible %s from employee resolution",
+    async (recoveryReason, message) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.resolveXeroEmployeeId.mockResolvedValue({
+        error: { code: "unknown_error", message, recoveryReason },
+        ok: false,
+      });
+      const result = await approve(input, mockPort);
+      expect(result).toMatchObject({
+        error: {
+          message,
+          resolutionError: { code: "unknown_error", recoveryReason },
+        },
+        ok: false,
+      });
+      expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toContain("access_token");
+      expect(JSON.stringify(result)).not.toContain("WWW-Authenticate");
+    }
+  );
+
+  it.each([
+    [
+      "unavailable",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["reauthorisation_required", "Xero access needs to be renewed."],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+  ] as const)(
+    "blocks provider work with truthful recovery during %s",
+    async (state, message) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.getXeroConnectionStateForScope.mockResolvedValue(
+        state === "unavailable"
+          ? { error: { code: "state_unavailable" }, ok: false }
+          : { ok: true, value: { bindingGeneration: 7, state } }
+      );
+      const result = await approve(input, mockPort);
+      expect(result).toMatchObject({ error: { message }, ok: false });
+      expect(mocks.resolveXeroEmployeeId).not.toHaveBeenCalled();
+      expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+    }
+  );
 
   it("allows only the claim winner to call Xero for approve versus decline", async () => {
     const approval = deferred<{ ok: true; value: { rawResponse: object } }>();
@@ -354,6 +409,7 @@ describe("approval-service", () => {
 
     expect(result).toEqual({ ok: true, value: { queued: true } });
     expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith({
+      bindingGeneration: 1,
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
       runType: "leave_records",

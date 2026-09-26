@@ -917,7 +917,7 @@ describe("refreshXeroOAuthConnection", () => {
   });
 
   it.each(["unauthorized_client", "invalid_client"])(
-    "classifies %s and marks the connection stale",
+    "classifies %s without marking a customer connection stale",
     async (errorCode) => {
       mockStoredConnection();
       dbMock.xeroConnection.update.mockResolvedValueOnce({});
@@ -936,23 +936,7 @@ describe("refreshXeroOAuthConnection", () => {
       if (!result.ok) {
         expect(result.error.code).toBe("client_credentials_invalid");
       }
-      expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledWith({
-        data: {
-          last_error_code: "client_credentials_invalid",
-          last_error_message:
-            "The Xero client credentials are no longer valid. Contact support.",
-          stale_since: expect.any(Date),
-          status: "stale",
-        },
-        where: {
-          clerk_org_id: input.clerkOrgId,
-          disconnected_at: null,
-          id: input.connectionId,
-          organisation_id: input.organisationId,
-          revoked_at: null,
-          status: "active",
-        },
-      });
+      expect(dbMock.xeroConnection.updateMany).not.toHaveBeenCalled();
     }
   );
 
@@ -2176,5 +2160,130 @@ describe("markXeroConnectionStale", () => {
         status: "active",
       },
     });
+  });
+});
+
+describe("resolver-only stale legacy readiness", () => {
+  const input = {
+    clerkOrgId: "org_1",
+    connectionId: "conn_1",
+    organisationId: "11111111-1111-1111-1111-111111111111",
+  };
+  function staleConnection(code = "client_credentials_invalid") {
+    return {
+      ...buildStoredTokenFields(),
+      disconnected_at: null,
+      expires_at: new Date(0),
+      id: input.connectionId,
+      last_error_code: code,
+      revoked_at: null,
+      status: "stale",
+    };
+  }
+  function fakeToken() {
+    const fetch = vi.fn().mockResolvedValue(
+      Response.json({
+        access_token: "new-access",
+        expires_in: 3600,
+        refresh_token: "new-refresh",
+      })
+    );
+    vi.stubGlobal("fetch", fetch);
+    return fetch;
+  }
+  it("retains default stale rejection when scoped readiness was not requested", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValue(staleConnection());
+    const fetch = fakeToken();
+    expect(await ensureFreshXeroConnection(input)).toMatchObject({
+      error: { code: "connection_inactive" },
+      ok: false,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMock.xeroConnection.updateMany).not.toHaveBeenCalled();
+  });
+  it("refreshes opted-in expired stale credentials under the existing lock and ciphertext CAS", async () => {
+    const connection = staleConnection();
+    dbMock.xeroConnection.findFirst.mockResolvedValue(connection);
+    const fetch = fakeToken();
+    expect(
+      await ensureFreshXeroConnection({
+        ...input,
+        allowStaleLegacyRefresh: true,
+      })
+    ).toMatchObject({ ok: true, value: { refreshed: true } });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(dbMock.$queryRaw).toHaveBeenCalled();
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          last_error_code: null,
+          status: "active",
+        }),
+        where: expect.objectContaining({
+          clerk_org_id: input.clerkOrgId,
+          disconnected_at: null,
+          organisation_id: input.organisationId,
+          refresh_token_encrypted: connection.refresh_token_encrypted,
+          revoked_at: null,
+          status: "stale",
+        }),
+      })
+    );
+  });
+  it.each([
+    "invalid_grant",
+    "refresh_invalid_grant",
+    "refresh_token_invalid",
+    "reauthorisation_required",
+  ])(
+    "rejects opted-in recorded invalid grant %s with zero HTTP",
+    async (code) => {
+      dbMock.xeroConnection.findFirst.mockResolvedValue(staleConnection(code));
+      const fetch = fakeToken();
+      expect(
+        await ensureFreshXeroConnection({
+          ...input,
+          allowStaleLegacyRefresh: true,
+        })
+      ).toMatchObject({ error: { code: "refresh_token_invalid" }, ok: false });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(dbMock.xeroConnection.updateMany).not.toHaveBeenCalled();
+    }
+  );
+  it("rechecks the invalid grant inside the lock before any token HTTP", async () => {
+    dbMock.xeroConnection.findFirst
+      .mockResolvedValueOnce(staleConnection())
+      .mockResolvedValueOnce(staleConnection("refresh_token_invalid"));
+    const fetch = fakeToken();
+    expect(
+      await ensureFreshXeroConnection({
+        ...input,
+        allowStaleLegacyRefresh: true,
+      })
+    ).toMatchObject({ error: { code: "refresh_token_invalid" }, ok: false });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(dbMock.$queryRaw).toHaveBeenCalled();
+  });
+  it("recovers an accepted token response using the stale status and error-code CAS", async () => {
+    dbMock.xeroConnection.findFirst.mockResolvedValue(staleConnection());
+    const fetch = fakeToken();
+    dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+      new Error("Synthetic persistence failure")
+    );
+    expect(
+      await ensureFreshXeroConnection({
+        ...input,
+        allowStaleLegacyRefresh: true,
+      })
+    ).toMatchObject({ ok: true, value: { refreshed: true } });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(dbMock.xeroConnection.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          last_error_code: "client_credentials_invalid",
+          status: "stale",
+        }),
+      })
+    );
   });
 });

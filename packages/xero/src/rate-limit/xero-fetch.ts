@@ -152,7 +152,9 @@ async function performAttempt(
   if (remainingMs(deadline) === 0) {
     throw new XeroFetchError("deadline_exceeded", false);
   }
-  input.init?.signal?.throwIfAborted();
+  if (input.init?.signal?.aborted) {
+    throw new XeroFetchError("deadline_exceeded", false);
+  }
   const gate = await limiter.acquire(input.rateClass, {
     deadline,
     leaseMs: remainingMs(deadline) + 5000,
@@ -189,7 +191,7 @@ async function performAttempt(
       });
       throw new XeroFetchError("redirect_rejected", true);
     }
-    const buffered = await bufferResponse(
+    const buffered = await bufferWithRejectionEvidence(
       fetched,
       signal,
       input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
@@ -198,10 +200,12 @@ async function performAttempt(
     if (buffered.status !== 429) {
       headers.delete("Retry-After");
     }
-    await limiter.observe(input.rateClass, headers, deadline);
+    if (remainingMs(deadline) > 0) {
+      await limiter.observe(input.rateClass, headers, deadline);
+    }
     return buffered;
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (signal.aborted) {
       // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
       throw new XeroFetchError("deadline_exceeded", dispatched);
     }
@@ -209,6 +213,27 @@ async function performAttempt(
   } finally {
     await gate.release();
     clearTimeout(timeout);
+  }
+}
+
+async function bufferWithRejectionEvidence(
+  fetched: Response,
+  signal: AbortSignal,
+  maxBodyBytes: number
+): Promise<Response> {
+  try {
+    return await bufferResponse(fetched, signal, maxBodyBytes);
+  } catch (error) {
+    if (fetched.status !== 401 && fetched.status !== 403) {
+      throw error;
+    }
+    // An authoritative rejection survives an unreadable bounded body. The raw
+    // payload remains available for normal responses, with no unbounded fallback.
+    return new Response(null, {
+      headers: fetched.headers,
+      status: fetched.status,
+      statusText: fetched.statusText,
+    });
   }
 }
 

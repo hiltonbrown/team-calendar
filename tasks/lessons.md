@@ -213,3 +213,5 @@ actionable; keep one-off task evidence in the review for that task.
   that still prescribe localhost or Docker. Read this rule before provisioning
   any database; reconcile stale plan database instructions and refresh live
   ownership, restore, consumer-isolation and cleanup evidence instead.
+
+- Xero scope denial documentation includes an exact standalone WWW-Authenticate token as well as a valid Bearer error challenge. Accept only these documented forms, test both spellings, and keep actual provider wire validation separate from documentation evidence.

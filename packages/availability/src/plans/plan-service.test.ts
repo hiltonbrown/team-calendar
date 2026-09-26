@@ -32,7 +32,7 @@ const mocks = vi.hoisted(() => {
     availabilityFindFirst,
     availabilityFindMany: vi.fn(),
     availabilityUpdateMany: vi.fn(),
-    hasActiveXeroConnection: vi.fn(),
+    getXeroConnectionStateForScope: vi.fn(),
     hasUnresolvedSubmitOperation: vi.fn(),
     leaveBalanceFindFirst: vi.fn(),
     leaveBalanceFindMany: vi.fn(),
@@ -82,7 +82,7 @@ vi.mock("@repo/database", () => ({
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 vi.mock("../settings/manager-scope", () => ({
   managerScopePersonIds: mocks.managerScopePersonIds,
@@ -176,7 +176,10 @@ describe("plan-service", () => {
     mocks.leaveBalanceFindMany.mockResolvedValue([]);
     mocks.availabilityDeleteMany.mockResolvedValue({ count: 1 });
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
     mocks.managerScopePersonIds.mockResolvedValue([baseInput.personId]);
     mocks.personFindFirst.mockResolvedValue({
       email: "person@example.com",
@@ -271,7 +274,7 @@ describe("plan-service", () => {
 
     expect(result).toEqual({ ok: true, value: [] });
     expect(mocks.availabilityFindMany).not.toHaveBeenCalled();
-    expect(mocks.hasActiveXeroConnection).not.toHaveBeenCalled();
+    expect(mocks.getXeroConnectionStateForScope).not.toHaveBeenCalled();
   });
 
   it("returns no team records when requested people are outside manager scope", async () => {
@@ -354,6 +357,60 @@ describe("plan-service", () => {
     }
   );
 
+  it("keeps records visible but exposes only view during an unavailable Xero check", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...scopedRecordFixture({ managerPersonId: null }),
+      record_type: "annual_leave",
+      source_type: "team_calendar_leave",
+    });
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    const result = await getRecord({
+      actingOrgRole: "org:admin",
+      actingUserId: baseInput.createdByUserId,
+      clerkOrgId: baseInput.clerkOrgId,
+      organisationId: baseInput.organisationId,
+      recordId: "00000000-0000-4000-8000-000000000021",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.editableActions).toEqual(["view"]);
+  });
+  it("allows local-only availability when the Xero state cannot be checked", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    const result = await createRecord({ ...baseInput, recordType: "wfh" });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { approvalStatus: "approved", sourceType: "manual" },
+    });
+  });
+
+  it("blocks leave creation when the connection state cannot be checked", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    const result = await createRecord({
+      ...baseInput,
+      recordType: "annual_leave",
+    });
+    expect(result).toMatchObject({
+      error: {
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
+      ok: false,
+    });
+    expect(mocks.availabilityCreate).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["wfh", true, "manual", "approved"],
     ["wfh", false, "manual", "approved"],
@@ -364,7 +421,13 @@ describe("plan-service", () => {
   ] as const)(
     "routes %s with Xero %s to %s and %s",
     async (recordType, hasXero, sourceType, approvalStatus) => {
-      mocks.hasActiveXeroConnection.mockResolvedValue(hasXero);
+      mocks.getXeroConnectionStateForScope.mockResolvedValue({
+        ok: true,
+        value: {
+          bindingGeneration: hasXero ? 1 : null,
+          state: hasXero ? "connected" : "not_connected",
+        },
+      });
 
       const result = await createRecord({ ...baseInput, recordType });
 
@@ -509,7 +572,10 @@ describe("plan-service", () => {
   });
 
   it("projects unit, currencyCode, and balance amount on balanceChip", async () => {
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.hasUnresolvedSubmitOperation.mockResolvedValue(false);
     mocks.availabilityFindFirst.mockResolvedValue({
       ...scopedRecordFixture({ managerPersonId: null }),

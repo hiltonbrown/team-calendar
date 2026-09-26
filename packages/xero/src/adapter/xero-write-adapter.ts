@@ -8,9 +8,9 @@ import type {
   SubmitLeaveInput,
   WithdrawLeaveInput,
 } from "@repo/core";
-import { database } from "@repo/database";
 import { availability_record_type } from "@repo/database/generated/enums";
-import { ensureFreshXeroConnection } from "../oauth/service";
+import { resolveXeroAccess } from "../oauth/credential-owner";
+import { createXeroDeadline } from "../rate-limit/deadline";
 import {
   fetchLeaveForEmployeeForRegion,
   fetchLeaveRecordsForRegion,
@@ -23,7 +23,10 @@ import {
   submitLeaveApplicationForRegion,
   withdrawLeaveApplicationForRegion,
 } from "../write/dispatch";
-import { toPlainLanguageMessage } from "../write/types";
+import { toPlainLanguageMessage, type XeroWriteError } from "../write/types";
+import { XERO_OPERATION_CAPABILITIES } from "./capabilities";
+import { classifyXeroFailure } from "./classify-xero-failure";
+import { toResolvedXeroTenant } from "./resolved-tenant";
 
 function isAvailabilityRecordType(
   val: string
@@ -31,78 +34,79 @@ function isAvailabilityRecordType(
   return Object.values(availability_record_type).some((v) => v === val);
 }
 
-const writeErrorCertainty = (error: {
-  code: string;
-  httpStatus?: number;
-}): "definitive_failure" | "outcome_unknown" => {
-  if (
-    error.code === "network_error" ||
-    (error.httpStatus !== undefined && error.httpStatus >= 500) ||
-    (error.code === "unknown_error" && error.httpStatus === undefined)
-  ) {
+const writeErrorCertainty = (
+  error: XeroWriteError
+): "definitive_failure" | "outcome_unknown" => {
+  if (error.dispatchPhase === "before_dispatch") {
+    return "definitive_failure";
+  }
+  if (error.recoveryReason === "outcome_unknown") {
     return "outcome_unknown";
   }
-  return "definitive_failure";
+  if (error.recoveryReason) {
+    return "definitive_failure";
+  }
+  return error.code === "network_error" ||
+    (error.httpStatus !== undefined && error.httpStatus >= 500) ||
+    (error.code === "unknown_error" && error.httpStatus === undefined)
+    ? "outcome_unknown"
+    : "definitive_failure";
 };
 
-function loadTenant(clerkOrgId: string, organisationId: string) {
-  return database.xeroTenant.findFirst({
-    include: {
-      xero_connection: {
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          revoked_at: true,
-          token_key_version: true,
-        },
-      },
-    },
-    where: {
-      clerk_org_id: clerkOrgId,
-      organisation_id: organisationId,
-    },
+async function getTenant(
+  clerkOrgId: string,
+  organisationId: string,
+  operation: keyof typeof XERO_OPERATION_CAPABILITIES
+) {
+  const scope = {
+    capability: XERO_OPERATION_CAPABILITIES[operation],
+    clerkOrgId,
+    organisationId,
+  };
+  const resolved = await resolveXeroAccess({
+    ...scope,
+    deadline: createXeroDeadline(120_000),
   });
+  if (!resolved.ok) {
+    const error: XeroWriteError = {
+      ...classifyXeroFailure({
+        dispatched: false,
+        error: resolved.error,
+        isMutation: false,
+      }),
+      dispatchPhase: "before_dispatch",
+      message: resolved.error.message,
+      retryAfterMs: resolved.error.retryAfterMs,
+    };
+    return { error: toProviderError(error), ok: false as const };
+  }
+  return {
+    ok: true as const,
+    value: toResolvedXeroTenant(scope, resolved.value),
+  };
 }
 
-// Resolve the tenant for a synchronous, user-triggered write, refreshing the access token
-// proactively first so a write does not fail on a token that lapsed since the last sync.
-// Returns null when the tenant is missing or the connection cannot be made usable; callers
-// surface this as "Xero is not connected".
-async function getTenant(clerkOrgId: string, organisationId: string) {
-  const tenant = await loadTenant(clerkOrgId, organisationId);
-  if (!tenant) {
-    return null;
-  }
-  const freshness = await ensureFreshXeroConnection({
-    clerkOrgId,
-    connectionId: tenant.xero_connection_id,
-    organisationId,
-  });
-  if (!freshness.ok) {
-    return null;
-  }
-  if (!freshness.value.refreshed) {
-    return tenant;
-  }
-  return await loadTenant(clerkOrgId, organisationId);
+function toProviderError(error: XeroWriteError): ProviderWriteError {
+  return {
+    ...error,
+    certainty: writeErrorCertainty(error),
+    userMessage: toPlainLanguageMessage(error),
+  };
 }
 
 export const XeroWriteAdapter: ExternalWritePort = {
   async approveLeaveApplication(
     input: ApproveLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
-      return {
-        error: {
-          code: "auth_error",
-          message: "Xero is not connected.",
-          userMessage: "Xero is not connected.",
-        },
-        ok: false,
-      };
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "approveLeaveApplication"
+    );
+    if (!resolution.ok) {
+      return resolution;
     }
+    const tenant = resolution.value;
     const res = await approveLeaveApplicationForRegion(tenant.payroll_region, {
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
@@ -110,15 +114,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     });
     if (!res.ok) {
       return {
-        error: {
-          certainty: writeErrorCertainty(res.error),
-          code: res.error.code,
-          correlationId: res.error.correlationId,
-          httpStatus: res.error.httpStatus,
-          message: res.error.message,
-          rawPayload: res.error.rawPayload,
-          userMessage: toPlainLanguageMessage(res.error),
-        },
+        error: toProviderError(res.error),
         ok: false,
       };
     }
@@ -128,17 +124,15 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async declineLeaveApplication(
     input: DeclineLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
-      return {
-        error: {
-          code: "auth_error",
-          message: "Xero is not connected.",
-          userMessage: "Xero is not connected.",
-        },
-        ok: false,
-      };
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "declineLeaveApplication"
+    );
+    if (!resolution.ok) {
+      return resolution;
     }
+    const tenant = resolution.value;
     const res = await declineLeaveApplicationForRegion(tenant.payroll_region, {
       reason: input.reason,
       xeroEmployeeId: input.employeeId,
@@ -147,33 +141,22 @@ export const XeroWriteAdapter: ExternalWritePort = {
     });
     if (!res.ok) {
       return {
-        error: {
-          certainty: writeErrorCertainty(res.error),
-          code: res.error.code,
-          correlationId: res.error.correlationId,
-          httpStatus: res.error.httpStatus,
-          message: res.error.message,
-          rawPayload: res.error.rawPayload,
-          userMessage: toPlainLanguageMessage(res.error),
-        },
+        error: toProviderError(res.error),
         ok: false,
       };
     }
     return { ok: true, value: undefined };
   },
   async findLeaveApplicationCandidates(input) {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
-      return {
-        error: {
-          certainty: "definitive_failure",
-          code: "auth_error",
-          message: "Xero is not connected.",
-          userMessage: "Xero is not connected.",
-        },
-        ok: false,
-      };
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "findLeaveApplicationCandidates"
+    );
+    if (!resolution.ok) {
+      return resolution;
     }
+    const tenant = resolution.value;
     const result =
       tenant.payroll_region === "AU"
         ? await fetchLeaveRecordsForRegion(tenant.payroll_region, {
@@ -185,15 +168,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
           });
     if (!result.ok) {
       return {
-        error: {
-          certainty: writeErrorCertainty(result.error),
-          code: result.error.code,
-          correlationId: result.error.correlationId,
-          httpStatus: result.error.httpStatus,
-          message: result.error.message,
-          rawPayload: result.error.rawPayload,
-          userMessage: toPlainLanguageMessage(result.error),
-        },
+        error: toProviderError(result.error),
         ok: false,
       };
     }
@@ -222,13 +197,23 @@ export const XeroWriteAdapter: ExternalWritePort = {
     clerkOrgId: string;
     organisationId: string;
   }): Promise<Result<string, ProviderResolutionError>> {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "resolveEmployeeId"
+    );
+    if (!resolution.ok) {
       return {
-        error: { code: "unknown_error", message: "Xero tenant not found." },
+        error: {
+          code: "unknown_error",
+          message: resolution.error.userMessage,
+          recoveryReason: resolution.error.recoveryReason,
+          retryAfterMs: resolution.error.retryAfterMs,
+        },
         ok: false,
       };
     }
+    const tenant = resolution.value;
     const res = await resolveXeroEmployeeId({
       personId: input.personId,
       xeroTenant: tenant,
@@ -248,13 +233,23 @@ export const XeroWriteAdapter: ExternalWritePort = {
     clerkOrgId: string;
     organisationId: string;
   }): Promise<Result<string, ProviderResolutionError>> {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "resolveLeaveTypeId"
+    );
+    if (!resolution.ok) {
       return {
-        error: { code: "unknown_error", message: "Xero tenant not found." },
+        error: {
+          code: "unknown_error",
+          message: resolution.error.userMessage,
+          recoveryReason: resolution.error.recoveryReason,
+          retryAfterMs: resolution.error.retryAfterMs,
+        },
         ok: false,
       };
     }
+    const tenant = resolution.value;
     if (!isAvailabilityRecordType(input.recordType)) {
       return {
         error: {
@@ -283,17 +278,15 @@ export const XeroWriteAdapter: ExternalWritePort = {
   ): Promise<
     Result<{ remoteId: string; rawResponse: unknown }, ProviderWriteError>
   > {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
-      return {
-        error: {
-          code: "auth_error",
-          message: "Xero is not connected.",
-          userMessage: "Xero is not connected.",
-        },
-        ok: false,
-      };
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "submitLeaveApplication"
+    );
+    if (!resolution.ok) {
+      return resolution;
     }
+    const tenant = resolution.value;
     const res = await submitLeaveApplicationForRegion(tenant.payroll_region, {
       endsAt: input.endsAt,
       startsAt: input.startsAt,
@@ -305,15 +298,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     });
     if (!res.ok) {
       return {
-        error: {
-          certainty: writeErrorCertainty(res.error),
-          code: res.error.code,
-          correlationId: res.error.correlationId,
-          httpStatus: res.error.httpStatus,
-          message: res.error.message,
-          rawPayload: res.error.rawPayload,
-          userMessage: toPlainLanguageMessage(res.error),
-        },
+        error: toProviderError(res.error),
         ok: false,
       };
     }
@@ -329,17 +314,15 @@ export const XeroWriteAdapter: ExternalWritePort = {
   async withdrawLeaveApplication(
     input: WithdrawLeaveInput
   ): Promise<Result<void, ProviderWriteError>> {
-    const tenant = await getTenant(input.clerkOrgId, input.organisationId);
-    if (!tenant) {
-      return {
-        error: {
-          code: "auth_error",
-          message: "Xero is not connected.",
-          userMessage: "Xero is not connected.",
-        },
-        ok: false,
-      };
+    const resolution = await getTenant(
+      input.clerkOrgId,
+      input.organisationId,
+      "withdrawLeaveApplication"
+    );
+    if (!resolution.ok) {
+      return resolution;
     }
+    const tenant = resolution.value;
     const res = await withdrawLeaveApplicationForRegion(tenant.payroll_region, {
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
@@ -347,15 +330,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     });
     if (!res.ok) {
       return {
-        error: {
-          certainty: writeErrorCertainty(res.error),
-          code: res.error.code,
-          correlationId: res.error.correlationId,
-          httpStatus: res.error.httpStatus,
-          message: res.error.message,
-          rawPayload: res.error.rawPayload,
-          userMessage: toPlainLanguageMessage(res.error),
-        },
+        error: toProviderError(res.error),
         ok: false,
       };
     }

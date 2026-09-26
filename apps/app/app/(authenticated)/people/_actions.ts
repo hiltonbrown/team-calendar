@@ -10,6 +10,7 @@ import {
   type ClerkInvitationDispatchResult,
   deleteAlternativeContact,
   dispatchBalanceRefresh,
+  getXeroConnectionStateForScope,
   loadClerkAccessReview,
   type ManualBalanceServiceError,
   type PeopleRole,
@@ -211,9 +212,19 @@ export async function refreshBalancesAction(
         organisation_id: context.value.organisationId,
       },
     });
-    if (xeroTenant) {
+    const connectionState = await getXeroConnectionStateForScope({
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+    });
+    if (
+      xeroTenant &&
+      connectionState.ok &&
+      connectionState.value.state === "connected" &&
+      connectionState.value.bindingGeneration !== null
+    ) {
       try {
         await syncXeroLeaveBalances({
+          bindingGeneration: connectionState.value.bindingGeneration,
           clerkOrgId: context.value.clerkOrgId,
           organisationId: context.value.organisationId,
           personId: parsed.data.personId,

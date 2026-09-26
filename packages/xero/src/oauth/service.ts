@@ -20,7 +20,11 @@ import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import type { XeroDeadline } from "../rate-limit/deadline";
 import type { XeroRateClass } from "../rate-limit/shared-store";
-import { XeroFetchError, xeroFetch } from "../rate-limit/xero-fetch";
+import {
+  parseRetryAfter,
+  XeroFetchError,
+  xeroFetch,
+} from "../rate-limit/xero-fetch";
 import {
   aggregateXeroDisconnectReceipt,
   freezeCleanupTargets,
@@ -106,7 +110,12 @@ export interface PendingXeroSessionTenant {
   tenantName: string;
 }
 
-export type XeroOAuthError = { dispatched?: boolean } & (
+export type XeroOAuthError = {
+  dispatched?: boolean;
+  transportCode?: string;
+  httpStatus?: number;
+  retryAfterMs?: number;
+} & (
   | { code: "already_refreshed"; message: string }
   | { code: "connect_disabled"; message: string }
   | { code: "client_credentials_invalid"; message: string }
@@ -1050,6 +1059,7 @@ export async function refreshXeroOAuthConnection(input: {
 async function refreshXeroOAuthConnectionWithClient(
   client: Pick<Prisma.TransactionClient, "xeroConnection">,
   input: {
+    allowStaleLegacyRefresh?: boolean;
     clerkOrgId: string;
     connectionId: string;
     organisationId: string;
@@ -1061,6 +1071,7 @@ async function refreshXeroOAuthConnectionWithClient(
     select: {
       disconnected_at: true,
       id: true,
+      last_error_code: true,
       refresh_token_auth_tag: true,
       refresh_token_encrypted: true,
       refresh_token_iv: true,
@@ -1084,10 +1095,14 @@ async function refreshXeroOAuthConnectionWithClient(
     };
   }
 
+  if (recordedLegacyGrantFailure(connection, input.allowStaleLegacyRefresh)) {
+    return recordedGrantError();
+  }
   if (
     connection.disconnected_at !== null ||
     connection.revoked_at !== null ||
-    connection.status !== "active"
+    legacyStatusForRefresh(connection, input.allowStaleLegacyRefresh) !==
+      "active"
   ) {
     return {
       error: {
@@ -1113,10 +1128,7 @@ async function refreshXeroOAuthConnectionWithClient(
     }),
   });
   if (!token.ok) {
-    if (
-      token.error.code === "refresh_token_invalid" ||
-      token.error.code === "client_credentials_invalid"
-    ) {
+    if (token.error.code === "refresh_token_invalid") {
       await client.xeroConnection.updateMany({
         data: {
           last_error_code: token.error.code,
@@ -1130,7 +1142,7 @@ async function refreshXeroOAuthConnectionWithClient(
           id: input.connectionId,
           organisation_id: input.organisationId,
           revoked_at: null,
-          status: "active",
+          status: connection.status,
         },
       });
     } else if (token.error.code === "invalid_token_response") {
@@ -1149,7 +1161,7 @@ async function refreshXeroOAuthConnectionWithClient(
           organisation_id: input.organisationId,
           refresh_token_encrypted: connection.refresh_token_encrypted,
           revoked_at: null,
-          status: "active",
+          status: connection.status,
         },
       });
     }
@@ -1194,7 +1206,7 @@ async function refreshXeroOAuthConnectionWithClient(
       organisation_id: input.organisationId,
       refresh_token_encrypted: connection.refresh_token_encrypted,
       revoked_at: null,
-      status: "active",
+      status: connection.status,
     },
   });
 
@@ -1213,6 +1225,7 @@ async function refreshXeroOAuthConnectionWithClient(
 }
 
 async function reconcileRefreshPersistenceFailure(input: {
+  allowStaleLegacyRefresh?: boolean;
   clerkOrgId: string;
   connectionId: string;
   loadedRefreshTokenEncrypted: null | string;
@@ -1229,6 +1242,7 @@ async function reconcileRefreshPersistenceFailure(input: {
       select: {
         disconnected_at: true,
         expires_at: true,
+        last_error_code: true,
         refresh_token_encrypted: true,
         revoked_at: true,
         status: true,
@@ -1251,7 +1265,8 @@ async function reconcileRefreshPersistenceFailure(input: {
 
     if (
       input.successfulAttempt !== null &&
-      current.status === "active" &&
+      legacyStatusForRefresh(current, input.allowStaleLegacyRefresh) ===
+        "active" &&
       current.revoked_at === null &&
       current.disconnected_at === null
     ) {
@@ -1277,11 +1292,12 @@ async function reconcileRefreshPersistenceFailure(input: {
           clerk_org_id: input.clerkOrgId,
           disconnected_at: null,
           id: input.connectionId,
+          last_error_code: current.last_error_code,
           organisation_id: input.organisationId,
           refresh_token_encrypted:
             input.successfulAttempt.previousRefreshTokenEncrypted,
           revoked_at: null,
-          status: "active",
+          status: current.status,
         },
       });
       if (recovered.count === 1) {
@@ -1297,7 +1313,8 @@ async function reconcileRefreshPersistenceFailure(input: {
     }
 
     if (
-      current.status === "active" &&
+      legacyStatusForRefresh(current, input.allowStaleLegacyRefresh) ===
+        "active" &&
       current.revoked_at === null &&
       current.disconnected_at === null &&
       input.loadedRefreshTokenEncrypted !== null
@@ -1315,10 +1332,11 @@ async function reconcileRefreshPersistenceFailure(input: {
           clerk_org_id: input.clerkOrgId,
           disconnected_at: null,
           id: input.connectionId,
+          last_error_code: current.last_error_code,
           organisation_id: input.organisationId,
           refresh_token_encrypted: input.loadedRefreshTokenEncrypted,
           revoked_at: null,
-          status: "active",
+          status: current.status,
         },
       });
     }
@@ -1382,6 +1400,7 @@ export function xeroConnectionRefreshDecision(
 // refreshing proactively when it is at or near expiry. Returns the resulting expiry and
 // whether a refresh occurred so callers can reload the freshly persisted tokens.
 export async function ensureFreshXeroConnection(input: {
+  allowStaleLegacyRefresh?: boolean;
   clerkOrgId: string;
   connectionId: string;
   forceRefresh?: boolean;
@@ -1401,7 +1420,9 @@ export async function ensureFreshXeroConnection(input: {
   const connection = await database.xeroConnection.findFirst({
     select: {
       access_token_encrypted: true,
+      disconnected_at: true,
       expires_at: true,
+      last_error_code: true,
       refresh_token_encrypted: true,
       revoked_at: true,
       status: true,
@@ -1421,6 +1442,9 @@ export async function ensureFreshXeroConnection(input: {
       ok: false,
     };
   }
+  if (recordedLegacyGrantFailure(connection, input.allowStaleLegacyRefresh)) {
+    return recordedGrantError();
+  }
   if (
     input.previousAccessTokenEncrypted !== undefined &&
     connection.access_token_encrypted !== input.previousAccessTokenEncrypted
@@ -1437,7 +1461,7 @@ export async function ensureFreshXeroConnection(input: {
       hasAccessToken: connection.access_token_encrypted.length > 0,
       hasRefreshToken: connection.refresh_token_encrypted.length > 0,
       revokedAt: connection.revoked_at,
-      status: connection.status,
+      status: legacyStatusForRefresh(connection, input.allowStaleLegacyRefresh),
     },
     now
   );
@@ -1478,7 +1502,9 @@ export async function ensureFreshXeroConnection(input: {
         const current = await tx.xeroConnection.findFirst({
           select: {
             access_token_encrypted: true,
+            disconnected_at: true,
             expires_at: true,
+            last_error_code: true,
             refresh_token_auth_tag: true,
             refresh_token_encrypted: true,
             refresh_token_iv: true,
@@ -1502,6 +1528,11 @@ export async function ensureFreshXeroConnection(input: {
           };
         }
         if (
+          recordedLegacyGrantFailure(current, input.allowStaleLegacyRefresh)
+        ) {
+          return recordedGrantError();
+        }
+        if (
           input.previousAccessTokenEncrypted !== undefined &&
           current.access_token_encrypted !== input.previousAccessTokenEncrypted
         ) {
@@ -1517,7 +1548,10 @@ export async function ensureFreshXeroConnection(input: {
             hasAccessToken: current.access_token_encrypted.length > 0,
             hasRefreshToken: current.refresh_token_encrypted.length > 0,
             revokedAt: current.revoked_at,
-            status: current.status,
+            status: legacyStatusForRefresh(
+              current,
+              input.allowStaleLegacyRefresh
+            ),
           },
           now
         );
@@ -1543,6 +1577,7 @@ export async function ensureFreshXeroConnection(input: {
         const refreshed = await refreshXeroOAuthConnectionWithClient(
           tx,
           {
+            allowStaleLegacyRefresh: input.allowStaleLegacyRefresh,
             clerkOrgId: input.clerkOrgId,
             connectionId: input.connectionId,
             organisationId: input.organisationId,
@@ -2321,8 +2356,9 @@ export async function exchangeToken(input: {
     return {
       error: {
         code: "network_error",
-        dispatched: error instanceof XeroFetchError && error.dispatched,
+        dispatched: error instanceof XeroFetchError ? error.dispatched : true,
         message: "Xero token exchange could not reach Xero. Try again.",
+        transportCode: error instanceof XeroFetchError ? error.code : undefined,
       },
       ok: false,
     };
@@ -2366,6 +2402,16 @@ async function classifyTokenExchangeFailure(
   response: Response,
   grantType: "authorization_code" | "refresh_token"
 ): Promise<XeroOAuthError> {
+  if (response.status === 429) {
+    return {
+      code: "network_error",
+      dispatched: false,
+      httpStatus: 429,
+      message: "Xero token exchange is temporarily unavailable. Try again.",
+      retryAfterMs:
+        parseRetryAfter(response.headers.get("Retry-After")) ?? undefined,
+    };
+  }
   if (response.status >= 500 && response.status < 600) {
     return {
       code: "network_error",
@@ -2893,4 +2939,61 @@ function providerAssociationChanged(
     (connection.xero_credential_owner_id !== ownerId ||
       connection.xero_tenant_id !== tenantId)
   );
+}
+
+export function isRecordedXeroRefreshGrantInvalid(
+  code: string | null | undefined
+): boolean {
+  return [
+    "invalid_grant",
+    "refresh_invalid_grant",
+    "refresh_token_invalid",
+    "reauthorisation_required",
+  ].includes(code ?? "");
+}
+
+interface LegacyRefreshMetadata {
+  disconnected_at?: Date | null;
+  last_error_code?: string | null;
+  revoked_at: Date | null;
+  status: string | null;
+}
+
+function recordedLegacyGrantFailure(
+  connection: LegacyRefreshMetadata,
+  allowStale?: boolean
+): boolean {
+  return Boolean(
+    allowStale &&
+      connection.status === "stale" &&
+      !connection.revoked_at &&
+      !connection.disconnected_at &&
+      isRecordedXeroRefreshGrantInvalid(connection.last_error_code)
+  );
+}
+
+function legacyStatusForRefresh(
+  connection: LegacyRefreshMetadata,
+  allowStale?: boolean
+): string | null {
+  if (
+    allowStale &&
+    connection.status === "stale" &&
+    !connection.revoked_at &&
+    !connection.disconnected_at &&
+    !isRecordedXeroRefreshGrantInvalid(connection.last_error_code)
+  ) {
+    return "active";
+  }
+  return connection.status;
+}
+
+function recordedGrantError(): Result<never, XeroOAuthError> {
+  return {
+    error: {
+      code: "refresh_token_invalid",
+      message: "Xero access needs to be renewed.",
+    },
+    ok: false,
+  };
 }

@@ -1,8 +1,9 @@
-import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
-import { tryDecryptXeroToken } from "../crypto/tokens";
-import { createXeroDeadline } from "../rate-limit/deadline";
+import {
+  classifyXeroHttpFailure,
+  mapXeroTransportError,
+} from "../adapter/classify-xero-failure";
 import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   ApproveLeaveApplicationInput,
@@ -15,7 +16,6 @@ import type {
 } from "../write/types";
 
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
-const XERO_WRITE_TIMEOUT_MS = 120_000;
 
 const LeaveApplicationResponseSchema = z
   .object({
@@ -23,8 +23,8 @@ const LeaveApplicationResponseSchema = z
       .array(
         z
           .object({
-            LeaveApplicationID: z.string().optional(),
-            LeaveApplicationId: z.string().optional(),
+            LeaveApplicationID: z.string().trim().min(1).optional(),
+            LeaveApplicationId: z.string().trim().min(1).optional(),
           })
           .passthrough()
       )
@@ -67,8 +67,10 @@ export async function submitLeaveApplication(
     return {
       error: {
         code: "unknown_error",
+        dispatchPhase: "after_dispatch",
         message: "Xero did not return a leave application ID.",
         rawPayload: response.value,
+        recoveryReason: "outcome_unknown",
       },
       ok: false,
     };
@@ -142,47 +144,29 @@ async function xeroRequest(
     path: string;
   }
 ): Promise<XeroWriteResult<unknown>> {
-  const accessToken = xeroTenant.xero_connection.access_token_encrypted;
-  const decrypted = tryDecryptXeroToken({
-    authTag: xeroTenant.xero_connection.access_token_auth_tag ?? null,
-    encrypted: accessToken,
-    iv: xeroTenant.xero_connection.access_token_iv ?? null,
-    keyVersion: xeroTenant.xero_connection.token_key_version,
-  });
-
-  if (!decrypted.ok) {
-    log.warn("Xero token decryption failed", {
-      clerkOrgId: xeroTenant.clerk_org_id,
-      organisationId: xeroTenant.organisation_id,
-      reason: decrypted.reason,
-    });
-  }
-
-  const decryptedAccessToken = decrypted.ok ? decrypted.token : "";
-
-  if (!decryptedAccessToken || xeroTenant.xero_connection.revoked_at) {
+  if (!xeroTenant.accessToken) {
     return {
       error: {
-        code: "auth_error",
-        message: "Xero credentials are missing or revoked.",
+        code: "unknown_error",
+        dispatchPhase: "before_dispatch",
+        message: "Xero access is unavailable.",
+        recoveryReason: "operational_incident",
       },
       ok: false,
     };
   }
-
   try {
     const response = await xeroFetch({
-      deadline: createXeroDeadline(XERO_WRITE_TIMEOUT_MS),
+      deadline: xeroTenant.deadline,
       init: {
         body: request.body ? JSON.stringify(request.body) : undefined,
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${decryptedAccessToken}`,
+          Authorization: `Bearer ${xeroTenant.accessToken}`,
           "Content-Type": "application/json",
           "Xero-Tenant-Id": xeroTenant.xero_tenant_id,
         },
         method: request.method,
-        signal: AbortSignal.timeout(XERO_WRITE_TIMEOUT_MS),
       },
       maxAttempts: 1,
       rateClass: {
@@ -205,14 +189,26 @@ async function xeroRequest(
       };
     }
 
+    const parsed = LeaveApplicationResponseSchema.safeParse(rawPayload);
+    const application = parsed.success
+      ? parsed.data.LeaveApplications?.[0]
+      : undefined;
+    if (!(application?.LeaveApplicationID || application?.LeaveApplicationId)) {
+      return {
+        error: {
+          code: "unknown_error",
+          dispatchPhase: "after_dispatch",
+          message: "Xero response could not be confirmed.",
+          rawPayload,
+          recoveryReason: "outcome_unknown",
+        },
+        ok: false,
+      };
+    }
     return { ok: true, value: rawPayload };
   } catch (error) {
     return {
-      error: {
-        code: "network_error",
-        message:
-          error instanceof Error ? error.message : "Failed to reach Xero.",
-      },
+      error: mapXeroTransportError(error, true),
       ok: false,
     };
   }
@@ -239,6 +235,10 @@ function mapHttpError(response: Response, rawPayload: unknown): XeroWriteError {
     rawPayload,
   };
 
+  const classified = classifyXeroHttpFailure(response, true);
+  if (classified.code) {
+    return { ...details, ...classified, code: classified.code };
+  }
   if (response.status === 400) {
     return { ...details, code: "validation_error" };
   }

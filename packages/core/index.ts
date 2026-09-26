@@ -134,3 +134,13 @@ export {
   sanitizeTitleText,
   wrapUntrustedContent,
 } from "./src/support-submission";
+export type {
+  XeroConnectionDisplayState,
+  XeroConnectionState,
+  XeroRecoveryReason,
+} from "./src/xero-recovery";
+export {
+  toXeroConnectionDisplayState,
+  xeroRecoveryMessage,
+  xeroRecoveryMessageFromCode,
+} from "./src/xero-recovery";

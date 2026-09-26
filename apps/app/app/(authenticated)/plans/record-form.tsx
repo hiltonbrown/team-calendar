@@ -1,6 +1,6 @@
 "use client";
 
-import { getAvailabilityRecordLabel } from "@repo/core";
+import { getAvailabilityRecordLabel, xeroRecoveryMessage } from "@repo/core";
 
 import { Button } from "@repo/design-system/components/ui/button";
 import { Checkbox } from "@repo/design-system/components/ui/checkbox";
@@ -63,11 +63,11 @@ interface RecordFormProps {
   balanceUnit?: string | null;
   canSelectPerson: boolean;
   closeHref: string;
-  hasActiveXeroConnection: boolean;
   mode: "create" | "edit";
   organisationId: string;
   people: PlanPersonOption[];
   record?: EditablePlanRecord;
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
 
 type PlanIntent = "availability" | "leave";
@@ -98,7 +98,7 @@ export function RecordForm({
   balanceUnit,
   canSelectPerson,
   closeHref,
-  hasActiveXeroConnection,
+  xeroConnectionState,
   mode,
   organisationId,
   people,
@@ -134,14 +134,14 @@ export function RecordForm({
 
   const selectedPerson = people.find((person) => person.id === personId);
   const isXeroLeave = isXeroLeaveSelection(intent, recordType);
-  const showSubmitPath = isXeroLeave && hasActiveXeroConnection;
+  const showSubmitPath = isXeroLeave && xeroConnectionState === "connected";
   const primaryLabel = primarySubmitLabel(showSubmitPath, mode);
   const visibleRecordTypes = recordTypesForIntent(intent);
   const recordTypeLabels = recordTypeLabelsForIntent(intent);
 
   const dynamicPanel = useMemo(
-    () => dynamicPanelForIntent(intent, hasActiveXeroConnection),
-    [hasActiveXeroConnection, intent]
+    () => dynamicPanelForIntent(intent, xeroConnectionState),
+    [xeroConnectionState, intent]
   );
 
   useEffect(() => {
@@ -160,6 +160,14 @@ export function RecordForm({
   };
 
   const submit = (formData: FormData, submitAfterSave: boolean) => {
+    if (
+      isXeroLeave &&
+      xeroConnectionState !== "connected" &&
+      xeroConnectionState !== "not_connected"
+    ) {
+      setError(xeroRecoveryMessage(xeroConnectionState));
+      return;
+    }
     const input: PlanRecordFormInput = {
       allDay,
       contactabilityStatus,
@@ -235,7 +243,7 @@ export function RecordForm({
     >
       <div className="rounded-2xl bg-muted p-4 text-label-lg text-muted-foreground">
         <p>{dynamicPanel}</p>
-        {isXeroLeave && hasActiveXeroConnection ? (
+        {isXeroLeave && xeroConnectionState === "connected" ? (
           <p className="mt-2 font-medium text-foreground">
             {balanceAvailable === null
               ? "Balance has not synced yet. You can still save a draft before submitting."
@@ -451,12 +459,26 @@ export function RecordForm({
 
       <div className="flex flex-wrap justify-end gap-3">
         {showSubmitPath ? (
-          <Button disabled={isPending} type="submit" variant="secondary">
+          <Button
+            disabled={
+              isPending ||
+              (isXeroLeave &&
+                xeroConnectionState !== "connected" &&
+                xeroConnectionState !== "not_connected")
+            }
+            type="submit"
+            variant="secondary"
+          >
             {mode === "edit" ? "Save changes" : "Save draft"}
           </Button>
         ) : null}
         <Button
-          disabled={isPending}
+          disabled={
+            isPending ||
+            (isXeroLeave &&
+              xeroConnectionState !== "connected" &&
+              xeroConnectionState !== "not_connected")
+          }
           name="submissionMode"
           type="submit"
           value={showSubmitPath ? "submit" : "save"}
@@ -556,12 +578,18 @@ function recordTypeLabelsForIntent(intent: PlanIntent): {
 
 function dynamicPanelForIntent(
   intent: PlanIntent,
-  hasActiveXeroConnection: boolean
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState
 ): string {
   if (intent === "availability") {
     return "Saves immediately in Team Calendar. It appears on calendars and feeds without approval or Xero sync.";
   }
-  if (!hasActiveXeroConnection) {
+  if (
+    xeroConnectionState !== "connected" &&
+    xeroConnectionState !== "not_connected"
+  ) {
+    return xeroRecoveryMessage(xeroConnectionState);
+  }
+  if (xeroConnectionState === "not_connected") {
     return "Saves as approved in Team Calendar only. It appears on calendars, but it will not create payroll leave or go to Xero for approval.";
   }
   return "Saves as a draft first. Use Save and submit when you are ready to send it to Xero for manager approval.";

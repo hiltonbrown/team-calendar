@@ -85,6 +85,10 @@
     "./queries/xero-cleanup": {
       "types": "./queries/xero-cleanup.ts",
       "default": "./queries/xero-cleanup.ts"
+    },
+    "./queries/xero-connection-state": {
+      "types": "./queries/xero-connection-state.ts",
+      "default": "./queries/xero-connection-state.ts"
     }
   },
   "main": "./index.ts",

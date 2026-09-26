@@ -10,6 +10,7 @@ import {
   it,
   vi,
 } from "vitest";
+import { classifyXeroFailure } from "../adapter/classify-xero-failure";
 import { lockXeroOwner } from "./locks";
 
 const fixture = allocateLiveTestFixture(
@@ -131,6 +132,37 @@ async function seed(sameClerk = false) {
     });
   }
 }
+async function seedStaleLegacyBinding(lastErrorCode: string) {
+  const [slot] = slots;
+  await database.xeroTenant.updateMany({
+    data: { xero_credential_owner_id: null },
+    where: {
+      clerk_org_id: slot.clerkOrgId,
+      id: slot.tenantId,
+      organisation_id: slot.organisationId,
+    },
+  });
+  await database.xeroConnection.updateMany({
+    data: {
+      expires_at: new Date(Date.now() - 60_000),
+      last_error_code: lastErrorCode,
+      stale_since: new Date(),
+      status: "stale",
+    },
+    where: {
+      clerk_org_id: slot.clerkOrgId,
+      id: slot.connectionId,
+      organisation_id: slot.organisationId,
+    },
+  });
+  return database.xeroTenant.findFirstOrThrow({
+    where: {
+      clerk_org_id: slot.clerkOrgId,
+      id: slot.tenantId,
+      organisation_id: slot.organisationId,
+    },
+  });
+}
 function stubToken() {
   const fetch = vi.fn((url: string | URL | Request) => {
     expect(String(url)).toBe("https://identity.xero.com/connect/token");
@@ -218,6 +250,421 @@ describe("canonical credential owner integration", () => {
     vi.unstubAllEnvs();
     await cleanup();
     await database.$disconnect();
+  });
+  it("uses canonical owner usability instead of obsolete invalid-grant mirror state", async () => {
+    const [binding] = slots;
+    await database.xeroConnection.updateMany({
+      data: { last_error_code: "refresh_token_invalid", status: "stale" },
+      where: {
+        clerk_org_id: binding.clerkOrgId,
+        id: binding.connectionId,
+        organisation_id: binding.organisationId,
+      },
+    });
+    const { getXeroConnectionState } = await import(
+      "@repo/database/queries/xero-connection-state"
+    );
+    expect(
+      await getXeroConnectionState({
+        clerkOrgId: binding.clerkOrgId,
+        organisationId: binding.organisationId,
+      })
+    ).toEqual({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    expect(
+      await api.resolveXeroAccess({
+        capability: "payroll.employees.read",
+        clerkOrgId: binding.clerkOrgId,
+        deadline: deadline(),
+        expectedBindingGeneration: 1,
+        organisationId: binding.organisationId,
+      })
+    ).toMatchObject({ ok: true });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects a known missing write capability before refreshing an expired owner", async () => {
+    const [slot] = slots;
+    await database.xeroCredentialOwner.update({
+      data: {
+        granted_scopes: ["payroll.employees.read"],
+        token_expires_at: new Date(Date.now() - 60_000),
+      },
+      where: { id: ownerId },
+    });
+    const binding = await database.xeroTenant.findFirstOrThrow({
+      where: {
+        clerk_org_id: slot.clerkOrgId,
+        id: slot.tenantId,
+        organisation_id: slot.organisationId,
+      },
+    });
+    const fetch = stubToken();
+    const result = await api.resolveXeroAccess({
+      capability: "payroll.employees",
+      clerkOrgId: slot.clerkOrgId,
+      deadline: deadline(),
+      expectedBindingGeneration: binding.binding_generation,
+      forceRefresh: true,
+      organisationId: slot.organisationId,
+    });
+    expect(result).toMatchObject({
+      error: { code: "capability_missing" },
+      ok: false,
+    });
+    if (result.ok) {
+      throw new Error("Missing write capability unexpectedly resolved");
+    }
+    expect(
+      classifyXeroFailure({
+        dispatched: false,
+        error: result.error,
+        isMutation: true,
+      })
+    ).toEqual({
+      code: "permission_error",
+      recoveryReason: "update_permissions",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      await database.xeroRefreshAttempt.count({
+        where: { xero_credential_owner_id: ownerId },
+      })
+    ).toBe(0);
+    expect(
+      await database.xeroCredentialOwner.findUniqueOrThrow({
+        where: { id: ownerId },
+      })
+    ).toMatchObject({
+      token_version: 1,
+      usability: "usable",
+    });
+  });
+  it.each([
+    ["payroll.employees.read", "payroll.employees"],
+    ["payroll.settings.read", "payroll.settings"],
+  ])(
+    "resolves documented read capability %s from broad consent %s",
+    async (capability, grantedScope) => {
+      const [slot] = slots;
+      await database.xeroCredentialOwner.update({
+        data: { granted_scopes: [grantedScope] },
+        where: { id: ownerId },
+      });
+      const binding = await database.xeroTenant.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.tenantId,
+          organisation_id: slot.organisationId,
+        },
+      });
+      const operationDeadline = deadline();
+      const fetch = stubToken();
+      const result = await api.resolveXeroAccess({
+        capability,
+        clerkOrgId: slot.clerkOrgId,
+        deadline: operationDeadline,
+        expectedBindingGeneration: binding.binding_generation,
+        organisationId: slot.organisationId,
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          bindingGeneration: binding.binding_generation,
+          deadline: operationDeadline,
+          tokenVersion: 1,
+          xeroTenantDatabaseId: slot.tenantId,
+          xeroTenantId: slot.providerTenantId,
+        },
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(
+        await database.xeroRefreshAttempt.count({
+          where: { xero_credential_owner_id: ownerId },
+        })
+      ).toBe(0);
+    }
+  );
+  it("preserves a legacy invalid-client failure as configuration without marking the binding stale", async () => {
+    const [slot] = slots;
+    await database.xeroTenant.updateMany({
+      data: { xero_credential_owner_id: null },
+      where: {
+        clerk_org_id: slot.clerkOrgId,
+        id: slot.tenantId,
+        organisation_id: slot.organisationId,
+      },
+    });
+    await database.xeroConnection.updateMany({
+      data: { expires_at: new Date(Date.now() - 60_000) },
+      where: {
+        clerk_org_id: slot.clerkOrgId,
+        id: slot.connectionId,
+        organisation_id: slot.organisationId,
+      },
+    });
+    const binding = await database.xeroTenant.findFirstOrThrow({
+      where: {
+        clerk_org_id: slot.clerkOrgId,
+        id: slot.tenantId,
+        organisation_id: slot.organisationId,
+      },
+    });
+    const fetch = vi.fn((url: string | URL | Request) => {
+      expect(String(url)).toBe("https://identity.xero.com/connect/token");
+      return Promise.resolve(
+        Response.json({ error: "invalid_client" }, { status: 401 })
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    const result = await api.resolveXeroAccess({
+      capability: "payroll.employees.read",
+      clerkOrgId: slot.clerkOrgId,
+      deadline: deadline(),
+      expectedBindingGeneration: binding.binding_generation,
+      organisationId: slot.organisationId,
+    });
+    expect(result).toMatchObject({
+      error: { code: "configuration_error" },
+      ok: false,
+    });
+    if (result.ok) {
+      throw new Error("Invalid client unexpectedly resolved");
+    }
+    expect(
+      classifyXeroFailure({
+        dispatched: false,
+        error: result.error,
+        isMutation: false,
+      })
+    ).toEqual({
+      code: "unknown_error",
+      recoveryReason: "operational_incident",
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(
+      await database.xeroConnection.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.connectionId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({ last_error_code: null, status: "active" });
+    expect(
+      await database.xeroTenant.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.tenantId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({
+      binding_generation: binding.binding_generation,
+      xero_credential_owner_id: null,
+    });
+    expect(
+      await database.xeroCredentialOwner.findUniqueOrThrow({
+        where: { id: ownerId },
+      })
+    ).toMatchObject({ token_version: 1, usability: "usable" });
+    expect(
+      await database.xeroRefreshAttempt.count({
+        where: { xero_credential_owner_id: ownerId },
+      })
+    ).toBe(0);
+  });
+  it("rejects a stale expected generation before fake HTTP or refresh intent", async () => {
+    const [slot] = slots;
+    const binding = await database.xeroTenant.findFirstOrThrow({
+      where: {
+        clerk_org_id: slot.clerkOrgId,
+        id: slot.tenantId,
+        organisation_id: slot.organisationId,
+      },
+    });
+    const fetch = stubToken();
+    expect(
+      await api.resolveXeroAccess({
+        capability: "payroll.employees.read",
+        clerkOrgId: slot.clerkOrgId,
+        deadline: deadline(),
+        expectedBindingGeneration: binding.binding_generation + 1,
+        forceRefresh: true,
+        organisationId: slot.organisationId,
+      })
+    ).toMatchObject({ error: { code: "generation_changed" }, ok: false });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      await database.xeroRefreshAttempt.count({
+        where: { xero_credential_owner_id: ownerId },
+      })
+    ).toBe(0);
+  });
+  it.each([
+    "invalid_grant",
+    "refresh_invalid_grant",
+    "refresh_token_invalid",
+    "reauthorisation_required",
+  ])(
+    "rejects stale legacy recorded grant %s without fake HTTP or rotation",
+    async (code) => {
+      const [slot] = slots;
+      const binding = await seedStaleLegacyBinding(code);
+      const fetch = stubToken();
+      const result = await api.resolveXeroAccess({
+        capability: "payroll.employees.read",
+        clerkOrgId: slot.clerkOrgId,
+        deadline: deadline(),
+        expectedBindingGeneration: binding.binding_generation,
+        forceRefresh: true,
+        organisationId: slot.organisationId,
+      });
+      expect(result).toMatchObject({
+        error: { code: "reauthorisation_required" },
+        ok: false,
+      });
+      if (result.ok) {
+        throw new Error("Recorded invalid grant unexpectedly resolved");
+      }
+      expect(
+        classifyXeroFailure({
+          dispatched: false,
+          error: result.error,
+          isMutation: false,
+        })
+      ).toMatchObject({ recoveryReason: "reauthorise" });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(
+        await database.xeroConnection.findFirstOrThrow({
+          where: {
+            clerk_org_id: slot.clerkOrgId,
+            id: slot.connectionId,
+            organisation_id: slot.organisationId,
+          },
+        })
+      ).toMatchObject({ last_error_code: code, status: "stale" });
+      expect(
+        await database.xeroRefreshAttempt.count({
+          where: { xero_credential_owner_id: ownerId },
+        })
+      ).toBe(0);
+    }
+  );
+  it("refreshes an expired recoverable stale legacy binding without changing generation or its former owner", async () => {
+    const [slot] = slots;
+    const binding = await seedStaleLegacyBinding("client_credentials_invalid");
+    const fetch = stubToken();
+    const operationDeadline = deadline();
+    const result = await api.resolveXeroAccess({
+      capability: "payroll.employees.read",
+      clerkOrgId: slot.clerkOrgId,
+      deadline: operationDeadline,
+      expectedBindingGeneration: binding.binding_generation,
+      organisationId: slot.organisationId,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        bindingGeneration: binding.binding_generation,
+        deadline: operationDeadline,
+        tokenVersion: null,
+        xeroTenantDatabaseId: slot.tenantId,
+        xeroTenantId: slot.providerTenantId,
+      },
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(
+      await database.xeroConnection.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.connectionId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({
+      last_error_code: null,
+      stale_since: null,
+      status: "active",
+    });
+    expect(
+      await database.xeroTenant.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.tenantId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({
+      binding_generation: binding.binding_generation,
+      xero_credential_owner_id: null,
+    });
+    expect(
+      await database.xeroCredentialOwner.findUniqueOrThrow({
+        where: { id: ownerId },
+      })
+    ).toMatchObject({ token_version: 1, usability: "usable" });
+  });
+  it("preserves a stale legacy configuration incident when fake token exchange still rejects the app", async () => {
+    const [slot] = slots;
+    const binding = await seedStaleLegacyBinding("client_credentials_invalid");
+    const fetch = vi.fn((url: string | URL | Request) => {
+      expect(String(url)).toBe("https://identity.xero.com/connect/token");
+      return Promise.resolve(
+        Response.json({ error: "invalid_client" }, { status: 401 })
+      );
+    });
+    vi.stubGlobal("fetch", fetch);
+    const result = await api.resolveXeroAccess({
+      capability: "payroll.employees.read",
+      clerkOrgId: slot.clerkOrgId,
+      deadline: deadline(),
+      expectedBindingGeneration: binding.binding_generation,
+      organisationId: slot.organisationId,
+    });
+    expect(result).toMatchObject({
+      error: { code: "configuration_error" },
+      ok: false,
+    });
+    if (result.ok) {
+      throw new Error("Invalid client unexpectedly resolved");
+    }
+    expect(
+      classifyXeroFailure({
+        dispatched: false,
+        error: result.error,
+        isMutation: false,
+      })
+    ).toMatchObject({ recoveryReason: "operational_incident" });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(
+      await database.xeroConnection.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.connectionId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({
+      last_error_code: "client_credentials_invalid",
+      status: "stale",
+    });
+    expect(
+      await database.xeroTenant.findFirstOrThrow({
+        where: {
+          clerk_org_id: slot.clerkOrgId,
+          id: slot.tenantId,
+          organisation_id: slot.organisationId,
+        },
+      })
+    ).toMatchObject({
+      binding_generation: binding.binding_generation,
+      xero_credential_owner_id: null,
+    });
   });
   it("shares one owner between two payroll files within one Clerk account", async () => {
     await cleanup();

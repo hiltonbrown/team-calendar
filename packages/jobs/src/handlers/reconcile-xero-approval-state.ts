@@ -2,7 +2,7 @@ import "server-only";
 
 import { clerkClient } from "@repo/auth/server";
 import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
-import type { Result } from "@repo/core";
+import { type Result, xeroRecoveryMessage } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type { availability_approval_status } from "@repo/database/generated/enums";
@@ -13,15 +13,22 @@ import {
 } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
-  ensureFreshXeroConnection,
   fetchLeaveApplicationStatusForRegion,
-  toPlainLanguageMessage,
   type XeroLeaveApplicationStatus,
   type XeroWriteError,
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { inngest } from "../client";
+import {
+  rejectRetryableSyncResult,
+  resolveSyncTenant,
+  syncFailureReason,
+  throwRetryableXeroFailure,
+  withXeroBinding,
+  XeroBindingChangedError,
+  XeroSyncRetryError,
+} from "./xero-sync-access";
 
 const noUnresolvedSubmitOperationWhere =
   (): Prisma.AvailabilityRecordWhereInput => ({
@@ -36,6 +43,7 @@ const noUnresolvedSubmitOperationWhere =
   });
 
 const ReconcileInputSchema = z.object({
+  bindingGeneration: z.number().int().nonnegative(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
@@ -135,7 +143,7 @@ export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("reconcile-approval-state", async () =>
-        reconcileXeroApprovalState(event.data)
+        rejectRetryableSyncResult(reconcileXeroApprovalState(event.data))
       )
   );
 
@@ -214,44 +222,19 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
 
     await publishRunStatusChanged(context, run.id, "running");
 
-    const loadedTenant = await loadXeroTenant(context);
-    if (loadedTenant?.sync_paused_at) {
+    const readiness = await resolveSyncTenant(
+      context,
+      "payroll.employees.read"
+    );
+    if (!readiness.ok) {
       await completeRun(context, run.id, {
-        errorSummary: "Tenant sync is paused for this Xero connection",
-        status: "cancelled",
-      });
-      return { ok: true, value: emptyResult(run.id, "cancelled") };
-    }
-    if (!loadedTenant) {
-      await completeRun(context, run.id, {
-        errorSummary: "Xero connection not active",
+        errorSummary: syncFailureReason(readiness.error),
         status: "failed",
       });
+      throwRetryableXeroFailure(readiness.error);
       return { ok: true, value: emptyResult(run.id, "failed") };
     }
-    // Refresh the access token proactively before any Xero read.
-    const freshness = await ensureFreshXeroConnection({
-      clerkOrgId: context.clerkOrgId,
-      connectionId: loadedTenant.xero_connection_id,
-      organisationId: context.organisationId,
-    });
-    if (!freshness.ok) {
-      await completeRun(context, run.id, {
-        errorSummary: freshness.error.message,
-        status: "failed",
-      });
-      return { ok: true, value: emptyResult(run.id, "failed") };
-    }
-    const xeroTenant = freshness.value.refreshed
-      ? await loadXeroTenant(context)
-      : loadedTenant;
-    if (!xeroTenant) {
-      await completeRun(context, run.id, {
-        errorSummary: "Xero connection not active",
-        status: "failed",
-      });
-      return { ok: true, value: emptyResult(run.id, "failed") };
-    }
+    const xeroTenant = readiness.value;
 
     const windowStart = new Date(
       Date.now() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
@@ -325,10 +308,11 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
       if (blanket?.blanketError) {
         await completeRun(context, run.id, {
           counts,
-          errorSummary: toPlainLanguageMessage(blanket.blanketError),
+          errorSummary: syncFailureReason(blanket.blanketError),
           recordsFetched: records.length,
           status: "failed",
         });
+        throwRetryableXeroFailure(blanket.blanketError);
         return {
           ok: true,
           value: { ...counts, partial, runId: run.id, status: "failed" },
@@ -339,15 +323,17 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
       }
     }
 
-    await database.xeroTenant.updateMany({
-      data: {
-        approval_state_stale_since: null,
-        last_approval_state_reconciled_at: new Date(),
-        last_sync_error_code: null,
-        last_sync_error_message: null,
-      },
-      where: { ...scoped(context), id: context.xeroTenantId },
-    });
+    await withXeroBinding(context, async (tx) =>
+      tx.xeroTenant.updateMany({
+        data: {
+          approval_state_stale_since: null,
+          last_approval_state_reconciled_at: new Date(),
+          last_sync_error_code: null,
+          last_sync_error_message: null,
+        },
+        where: { ...scoped(context), id: context.xeroTenantId },
+      })
+    );
 
     const finalStatus: "partial_success" | "succeeded" =
       partial || counts.failed > 0 ? "partial_success" : "succeeded";
@@ -365,11 +351,20 @@ export async function reconcileXeroApprovalState(input: unknown): Promise<
       value: { ...counts, partial, runId: run.id, status: finalStatus },
     };
   } catch (error) {
+    if (error instanceof XeroBindingChangedError && runId) {
+      await completeRun(context, runId, {
+        errorSummary: "generation_changed",
+        status: "cancelled",
+      });
+      return { ok: true, value: emptyResult(runId, "cancelled") };
+    }
     log.error("Unhandled exception in reconcileXeroApprovalState:", { error });
     if (runId) {
       await completeRun(context, runId, {
         errorSummary:
-          error instanceof Error ? error.message : "Unhandled exception",
+          error instanceof XeroSyncRetryError
+            ? error.recoveryReason
+            : "retry_later",
         status: "failed",
       });
     }
@@ -519,7 +514,7 @@ async function transitionRecord(
     xeroLeaveApplicationId: string;
   }
 ) {
-  return await database.$transaction(async (tx) => {
+  return await withXeroBinding(context, async (tx) => {
     const updated = await tx.availabilityRecord.updateMany({
       data: options.data,
       where: {
@@ -562,7 +557,7 @@ async function archiveMissing(
   xeroLeaveApplicationId: string,
   checkedAt: Date
 ) {
-  await database.$transaction(async (tx) => {
+  await withXeroBinding(context, async (tx) => {
     const updated = await tx.availabilityRecord.updateMany({
       data: {
         archived_at: new Date(),
@@ -688,6 +683,12 @@ async function completionRecipients(
       .map((membership) => membership.publicUserData?.userId)
       .filter((userId): userId is string => Boolean(userId));
   } catch (error) {
+    if (
+      error instanceof XeroBindingChangedError ||
+      error instanceof XeroSyncRetryError
+    ) {
+      throw error;
+    }
     log.error("Failed to load reconciliation notification recipients:", {
       error,
     });
@@ -706,6 +707,15 @@ async function recordFailure(
     sourceRemoteId: string;
   }
 ) {
+  let errorMessage = input.error.recoveryReason
+    ? xeroRecoveryMessage(input.error.recoveryReason, {
+        retryAfterMs: input.error.retryAfterMs,
+      })
+    : input.error.message;
+  if (input.error.code === "not_found_error") {
+    errorMessage =
+      "The Xero leave application no longer exists. The Team Calendar record has been archived.";
+  }
   await database.failedRecord.create({
     data: {
       ...scoped(context),
@@ -714,10 +724,7 @@ async function recordFailure(
         input.error.code === "not_found_error"
           ? "xero_application_missing"
           : input.error.code,
-      error_message:
-        input.error.code === "not_found_error"
-          ? "The Xero leave application no longer exists. The Team Calendar record has been archived."
-          : toPlainLanguageMessage(input.error),
+      error_message: errorMessage,
       raw_payload: toPrismaJsonValue(input.rawPayload),
       record_type: failedRecordType(input.recordType),
       source_id: input.sourceRemoteId,
@@ -751,56 +758,48 @@ async function completeRun(
     status: "cancelled" | "failed" | "partial_success" | "succeeded";
   }
 ) {
-  await database.syncRun.updateMany({
-    data: {
-      completed_at: new Date(),
-      error_summary: input.errorSummary ?? null,
-      records_failed: input.counts?.failed ?? 0,
-      records_fetched: input.recordsFetched ?? 0,
-      records_skipped: input.counts?.matched ?? 0,
-      records_synced:
-        (input.counts?.approved ?? 0) +
-        (input.counts?.declined ?? 0) +
-        (input.counts?.withdrawn ?? 0) +
-        (input.counts?.archivedMissing ?? 0),
-      records_upserted:
-        (input.counts?.approved ?? 0) +
-        (input.counts?.declined ?? 0) +
-        (input.counts?.withdrawn ?? 0) +
-        (input.counts?.archivedMissing ?? 0),
-      status: input.status,
-    },
-    where: { ...scoped(context), id: runId },
-  });
-  await publishRunStatusChanged(context, runId, input.status);
-}
-
-function loadXeroTenant(context: ReconcileApprovalStateInput) {
-  return database.xeroTenant.findFirst({
-    include: {
-      xero_connection: {
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          expires_at: true,
-          last_refreshed_at: true,
-          revoked_at: true,
-          status: true,
-          token_key_version: true,
-        },
+  const persist = async (tx: Prisma.TransactionClient) => {
+    const updated = await tx.syncRun.updateMany({
+      data: {
+        completed_at: new Date(),
+        error_summary: input.errorSummary ?? null,
+        records_failed: input.counts?.failed ?? 0,
+        records_fetched: input.recordsFetched ?? 0,
+        records_skipped: input.counts?.matched ?? 0,
+        records_synced:
+          (input.counts?.approved ?? 0) +
+          (input.counts?.declined ?? 0) +
+          (input.counts?.withdrawn ?? 0) +
+          (input.counts?.archivedMissing ?? 0),
+        records_upserted:
+          (input.counts?.approved ?? 0) +
+          (input.counts?.declined ?? 0) +
+          (input.counts?.withdrawn ?? 0) +
+          (input.counts?.archivedMissing ?? 0),
+        status: input.status,
       },
-    },
-    where: {
-      ...scoped(context),
-      id: context.xeroTenantId,
-      organisation_id: context.organisationId,
-    },
-  });
+      where: { ...scoped(context), id: runId, status: "running" },
+    });
+    if (
+      updated.count === 0 &&
+      (input.status === "succeeded" || input.status === "partial_success")
+    ) {
+      throw new XeroBindingChangedError();
+    }
+  };
+  if (input.status === "succeeded" || input.status === "partial_success") {
+    await withXeroBinding(context, persist);
+  } else {
+    await persist(database);
+  }
+
+  await publishRunStatusChanged(context, runId, input.status);
 }
 
 function isBlanketFailure(error: XeroWriteError): boolean {
   return (
+    Boolean(error.recoveryReason) ||
+    error.code === "network_error" ||
     error.code === "auth_error" ||
     error.code === "permission_error" ||
     error.code === "rate_limit_error"
@@ -830,6 +829,12 @@ async function publishRunStatusChanged(
       }
     );
   } catch (error) {
+    if (
+      error instanceof XeroBindingChangedError ||
+      error instanceof XeroSyncRetryError
+    ) {
+      throw error;
+    }
     log.error("Failed to publish sync run status notification", {
       error,
       organisationId: context.organisationId,
@@ -900,7 +905,10 @@ function emptyResult(
 async function reconcileOne(
   context: ReconcileApprovalStateInput,
   runId: string,
-  xeroTenant: NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>,
+  xeroTenant: Extract<
+    Awaited<ReturnType<typeof resolveSyncTenant>>,
+    { ok: true }
+  >["value"],
   record: ReconciliationRecord,
   counts: {
     approved: number;
@@ -970,6 +978,12 @@ async function reconcileOne(
     counts[reconciled] += 1;
     return {};
   } catch (error) {
+    if (
+      error instanceof XeroBindingChangedError ||
+      error instanceof XeroSyncRetryError
+    ) {
+      throw error;
+    }
     log.error("Unhandled reconciliation error for record", {
       error,
       recordId: record.id,
@@ -985,15 +999,17 @@ async function stampCheckedAt(
   recordId: string,
   checkedAt: Date
 ) {
-  await database.availabilityRecord.updateMany({
-    data: { xero_approval_checked_at: checkedAt },
-    where: {
-      ...scoped(context),
-      id: recordId,
-      ...unclaimedOrExpiredXeroWriteWhere(),
-      ...noUnresolvedSubmitOperationWhere(),
-    },
-  });
+  await withXeroBinding(context, async (tx) =>
+    tx.availabilityRecord.updateMany({
+      data: { xero_approval_checked_at: checkedAt },
+      where: {
+        ...scoped(context),
+        id: recordId,
+        ...unclaimedOrExpiredXeroWriteWhere(),
+        ...noUnresolvedSubmitOperationWhere(),
+      },
+    })
+  );
 }
 
 function toPrismaJsonValue(

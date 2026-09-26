@@ -24,7 +24,7 @@ import {
   USER_CREATABLE_RECORD_TYPES,
 } from "../records/record-type-categories";
 import { getSettings } from "../settings/organisation-settings-service";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 
 export type CalendarRole = "admin" | "manager" | "owner" | "viewer";
 export type CalendarView = "day" | "month" | "week";
@@ -93,12 +93,12 @@ export interface CalendarDay {
 
 export interface CalendarRange {
   days: readonly CalendarDay[];
-  hasActiveXeroConnection: boolean;
   people: readonly CalendarPerson[];
   range: { end: Date; start: Date; timezone: string };
   totalPeopleInScope: number;
   truncated: boolean;
   view: CalendarView;
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   xeroSyncFailedCount: number;
 }
 
@@ -306,16 +306,18 @@ export async function getCalendarRange(
       isToday: dateOnly === dateOnlyInTimeZone(new Date(), timezone),
       publicHolidays: holidays.get(dateOnly) ?? [],
     }));
-    const hasXero = await hasActiveXeroConnection({
+    const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
 
     return {
       ok: true,
       value: {
         days,
-        hasActiveXeroConnection: hasXero,
         people: visiblePeople.map((person) =>
           toCalendarPerson(person, failedCounts.get(person.id) ?? 0)
         ),
@@ -323,6 +325,7 @@ export async function getCalendarRange(
         totalPeopleInScope,
         truncated: totalPeopleInScope > MAX_VISIBLE_PEOPLE,
         view: parsed.data.view,
+        xeroConnectionState,
         xeroSyncFailedCount: events.filter(
           (event) => event.approvalStatus === "xero_sync_failed"
         ).length,

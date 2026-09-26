@@ -1501,3 +1501,20 @@ Review: independent full lint, types (19 tasks), units (18 tasks), boundaries, r
 - [x] Verify ancestry, exact tested tree equality, whitespace and post-merge checks.
 
 Review: pending plan records committed at a131ec6; conflict-free merge bebd7e6 contains both completed branches. Merged tree exactly matched approved feature tip 0617120 before these documentation updates. Main lint, boundaries and 104 release-tool tests pass. Full source and protected live 26-suite/207-test verification remains valid for the identical runtime. No push or deployment; cleanup stays report-only.
+
+
+## Plan 161g execution
+
+- [x] Read full reconciled plan from verified shared absolute path before implementation; create isolated branch from dd458615.
+- [x] Read repository guidance and complete closing-the-loop reference; install locked dependencies.
+- [x] Prove failure collapse and generation regressions.
+- [x] Carry recovery reasons, strict challenge parsing, bounded scoped access and capabilities.
+- [x] Migrate state query, availability gates and all rendering callers.
+- [x] Migrate jobs to required event generations, scoped resolver, transactional persistence fences and Inngest rejection.
+- [x] Update fake fixtures and protected inventory only where necessary.
+- [x] Run lint, forced types, complete units concurrency two, boundaries, release tools and synthetic four-app build.
+- [x] Audit source-wide credentials/state/generation callers; commit clean candidate and freeze for reviewer online campaign.
+
+### Review
+
+PASS: final lint1098files, forcedtypes19tasks, fullunits18tasks(2655tests), boundaries1054files/21packages, release-tools104tests/types, changedintegrationfixturestatictypes and syntheticbuild4tasks. Clean committed candidate is frozen for reviewer-owned online Neon campaign. Actual Xero and browser checks remain NOT VERIFIED. Cleanup remains report_only. Plan packaging deviation: the complete plan was read from /home/hilton/Documents/teamcalendar/plans/161g-xero-permission-recovery.md, verified accessible, then copied into this isolated worktree rather than inlined in dispatch.

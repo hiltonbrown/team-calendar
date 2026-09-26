@@ -1,4 +1,5 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -746,20 +747,26 @@ async function setupTenant(
     },
   });
 
+  const access = encryptXeroToken("synthetic-access");
   await database.xeroConnection.create({
     data: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000),
       id: tenant.xeroConnectionId,
       organisation_id: tenant.organisationId,
       refresh_token_encrypted: "refresh-token",
       status: "active",
+      token_key_version: access.keyVersion,
     },
   });
 
   await database.xeroTenant.create({
     data: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
@@ -807,6 +814,7 @@ function syncInput(
   tenant: typeof tenantA | typeof tenantB | typeof tenantNz | typeof tenantUk
 ) {
   return {
+    bindingGeneration: 1,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
     triggerType: "manual" as const,

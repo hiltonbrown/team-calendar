@@ -18,6 +18,7 @@ import type { XeroDisconnectReceipt } from "@repo/xero";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { dispatchManualSyncAction } from "@/app/(authenticated)/sync/_actions";
+import { XeroRecoveryNotice } from "@/components/xero/xero-recovery-notice";
 import { ConfirmActionDialog } from "../../components/confirm-action-dialog";
 import { ProviderStatusBadge } from "../../components/provider-status-badge";
 import { SettingsSectionHeader } from "../../components/settings-section-header";
@@ -174,8 +175,10 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
       {organisations.map((organisation) => {
         const connection = organisation.xero_connection;
         const tenant = connection?.xero_tenant ?? null;
-        const status = statusForConnection(connection);
+        const state = organisation.xeroConnectionState;
+        const status = statusForState(state);
         const canRefresh =
+          state === "connected" &&
           connection?.status === "active" &&
           connection.disconnected_at === null &&
           connection.revoked_at === null;
@@ -184,7 +187,11 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
           : null;
 
         return (
-          <Card className="rounded-2xl" key={organisation.id}>
+          <Card
+            className="rounded-2xl"
+            data-xero-organisation-id={organisation.id}
+            key={organisation.id}
+          >
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -204,10 +211,8 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {connection?.last_error_message ? (
-                <div className="rounded-2xl bg-destructive/10 p-3 text-destructive text-label-lg">
-                  {connection.last_error_message}
-                </div>
+              {state !== "connected" && state !== "not_connected" ? (
+                <XeroRecoveryNotice reason={state} />
               ) : null}
 
               <div className="grid gap-3 md:grid-cols-4">
@@ -245,7 +250,11 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
               <div className="flex flex-wrap gap-3">
                 {status === "connected" && tenant && recommendedSync ? (
                   <Button
-                    disabled={isPending || Boolean(tenant.sync_paused_at)}
+                    disabled={
+                      isPending ||
+                      state !== "connected" ||
+                      Boolean(tenant.sync_paused_at)
+                    }
                     onClick={() =>
                       runSync(
                         organisation.id,
@@ -276,7 +285,11 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                       (option) => option.runType !== recommendedSync?.runType
                     ).map((option) => (
                       <Button
-                        disabled={isPending || Boolean(tenant.sync_paused_at)}
+                        disabled={
+                          isPending ||
+                          state !== "connected" ||
+                          Boolean(tenant.sync_paused_at)
+                        }
                         key={option.runType}
                         onClick={() =>
                           runSync(organisation.id, tenant.id, option.runType)
@@ -425,33 +438,6 @@ function timestampPriority(value: Date | null) {
   return value?.getTime() ?? Number.NEGATIVE_INFINITY;
 }
 
-function statusForConnection(
-  connection: OrganisationWithConnectionView["xero_connection"]
-): "connected" | "disconnected" | "error" | "expired" | "revoked" {
-  if (!connection) {
-    return "disconnected";
-  }
-  if (connection.revoked_at) {
-    return "revoked";
-  }
-  if (connection.status === "stale") {
-    return "expired";
-  }
-  if (
-    connection.status === "pending" ||
-    connection.status === "pending_tenant_selection"
-  ) {
-    return "error";
-  }
-  if (connection.status === "disconnected" || connection.disconnected_at) {
-    return "disconnected";
-  }
-  if (connection.status === "active") {
-    return "connected";
-  }
-  return "disconnected";
-}
-
 function formatTimestamp(value: Date | null): string {
   return value ? value.toLocaleString("en-AU") : "Not run yet";
 }
@@ -479,5 +465,20 @@ function disconnectReceiptMessage(
       return "Sync stopped. Xero disconnection is pending.";
     default:
       return "Sync stopped. We could not confirm the Xero disconnection. Contact support for help.";
+  }
+}
+
+function statusForState(
+  state: import("@repo/core").XeroConnectionDisplayState
+): "connected" | "disconnected" | "error" | "expired" {
+  switch (state) {
+    case "connected":
+      return "connected";
+    case "reauthorisation_required":
+      return "expired";
+    case "not_connected":
+      return "disconnected";
+    default:
+      return "error";
   }
 }

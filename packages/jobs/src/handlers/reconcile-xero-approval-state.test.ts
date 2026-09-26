@@ -1,16 +1,18 @@
+import { database } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { rejectRetryableSyncResult } from "./xero-sync-access";
 
 const mocks = vi.hoisted(() => ({
   auditEventCreate: vi.fn(),
   availabilityRecordFindMany: vi.fn(),
   availabilityRecordUpdateMany: vi.fn(),
   dispatchNotification: vi.fn(),
-  ensureFreshXeroConnection: vi.fn(),
   failedRecordCreate: vi.fn(),
   fetchLeaveApplicationStatusForRegion: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   publishOrganisationNotificationEvent: vi.fn(),
+  resolveXeroAccess: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -39,6 +41,7 @@ vi.mock("@repo/database", () => ({
         availabilityRecord: { updateMany: mocks.availabilityRecordUpdateMany },
       })
     ),
+    auditEvent: { create: mocks.auditEventCreate },
     availabilityRecord: {
       findMany: mocks.availabilityRecordFindMany,
       updateMany: mocks.availabilityRecordUpdateMany,
@@ -67,11 +70,42 @@ vi.mock("@repo/notifications", () => ({
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },
 }));
-vi.mock("@repo/xero", () => ({
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
+vi.mock("@repo/xero", async () => ({
+  classifyXeroFailure: (
+    await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
+  ).classifyXeroFailure,
   fetchLeaveApplicationStatusForRegion:
     mocks.fetchLeaveApplicationStatusForRegion,
+  resolveXeroAccess: async (scope) => {
+    const result = await mocks.resolveXeroAccess(scope);
+    if (!result?.ok) {
+      return result;
+    }
+    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    return {
+      ok: true,
+      value: {
+        ...result.value,
+        accessToken: "fake-access",
+        bindingGeneration: scope.expectedBindingGeneration,
+        capability: scope.capability,
+        deadline: scope.deadline,
+        payrollRegion: tenant.payroll_region,
+        tokenVersion: 1,
+        xeroTenantDatabaseId: tenant.id,
+        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+      },
+    };
+  },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
+  toResolvedXeroTenant: (scope, value) => ({
+    ...value,
+    clerk_org_id: scope.clerkOrgId,
+    id: value.xeroTenantDatabaseId,
+    organisation_id: scope.organisationId,
+    payroll_region: value.payrollRegion,
+    xero_tenant_id: value.xeroTenantId,
+  }),
 }));
 
 const { reconcileXeroApprovalState } = await import(
@@ -87,6 +121,7 @@ const RECORD_ID = "80000000-0000-4000-8000-000000000001";
 
 function input() {
   return {
+    bindingGeneration: 1,
     clerkOrgId: CLERK_ORG_ID,
     organisationId: ORGANISATION_ID,
     triggerType: "manual",
@@ -115,6 +150,11 @@ function record() {
 describe("reconcile Xero approval state optimistic concurrency", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(database, {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+    });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
@@ -124,7 +164,7 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
       sync_paused_at: null,
       xero_connection_id: XERO_CONNECTION_ID,
     });
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
     });
@@ -278,6 +318,11 @@ describe("reconcile Xero approval state optimistic concurrency", () => {
 describe("reconcile Xero approval state bounding", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(database, {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+    });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
@@ -287,7 +332,7 @@ describe("reconcile Xero approval state bounding", () => {
       sync_paused_at: null,
       xero_connection_id: XERO_CONNECTION_ID,
     });
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
     });
@@ -420,7 +465,7 @@ describe("reconcile Xero approval state bounding", () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([record(), second]);
     mocks.fetchLeaveApplicationStatusForRegion
       .mockResolvedValueOnce({
-        error: { code: "network_error", message: "fail", rawPayload: null },
+        error: { code: "validation_error", message: "fail", rawPayload: null },
         ok: false,
       } as unknown as Awaited<
         ReturnType<typeof mocks.fetchLeaveApplicationStatusForRegion>
@@ -758,7 +803,7 @@ describe("reconcile Xero approval state bounding", () => {
   it("increments failed, records failure, stamps checked marker, and forces partial_success on genuine upstream error", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValue([record()]);
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
-      error: { code: "network_error", message: "timeout", rawPayload: null },
+      error: { code: "validation_error", message: "timeout", rawPayload: null },
       ok: false,
     });
 
@@ -792,6 +837,11 @@ describe("reconcile Xero approval state bounding", () => {
 describe("regional approval state reconciliation (Plan 105)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(database, {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+    });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
@@ -801,7 +851,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
       sync_paused_at: null,
       xero_connection_id: XERO_CONNECTION_ID,
     });
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
     });
@@ -810,9 +860,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     mocks.auditEventCreate.mockResolvedValue({});
     mocks.dispatchNotification.mockResolvedValue({});
     mocks.failedRecordCreate.mockResolvedValue({});
-    mocks.toPlainLanguageMessage.mockReturnValue(
-      "Your Xero organisation does not have permission to access this payroll feature. Check your Xero subscription and permissions."
-    );
+    mocks.toPlainLanguageMessage.mockReturnValue("access_denied");
   });
 
   it("selects xero_employee_id on person and passes it to dispatch for NZ region", async () => {
@@ -960,6 +1008,31 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     );
   });
 
+  it("persists retry_later and rejects through the registered boundary without checked markers", async () => {
+    mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
+      error: {
+        code: "network_error",
+        message: "Network unavailable",
+        recoveryReason: "retry_later",
+      },
+      ok: false,
+    });
+    const result = await reconcileXeroApprovalState(input());
+    expect(result.ok).toBe(false);
+    await expect(
+      rejectRetryableSyncResult(Promise.resolve(result))
+    ).rejects.toThrow();
+    expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_summary: "retry_later",
+          status: "failed",
+        }),
+      })
+    );
+    expect(mocks.availabilityRecordUpdateMany).not.toHaveBeenCalled();
+  });
+
   it("treats a 403 permission_error as a blanket run failure rather than a business status or not found", async () => {
     mocks.fetchLeaveApplicationStatusForRegion.mockResolvedValue({
       error: {
@@ -967,6 +1040,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
         httpStatus: 403,
         message: "Forbidden",
         rawPayload: { Message: "Forbidden" },
+        recoveryReason: "access_denied",
       },
       ok: false,
     });
@@ -988,8 +1062,7 @@ describe("regional approval state reconciliation (Plan 105)", () => {
     expect(mocks.syncRunUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          error_summary:
-            "Your Xero organisation does not have permission to access this payroll feature. Check your Xero subscription and permissions.",
+          error_summary: "access_denied",
           records_failed: 0,
           records_synced: 0,
           status: "failed",

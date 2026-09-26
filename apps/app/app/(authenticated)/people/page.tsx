@@ -1,5 +1,5 @@
 import { auth } from "@repo/auth/server";
-import { listPeople } from "@repo/availability";
+import { getXeroConnectionStateForScope, listPeople } from "@repo/availability";
 import { database, scopedQuery } from "@repo/database";
 import type { Metadata } from "next";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -60,41 +60,43 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
       })
     : null;
 
-  const [peopleResult, teams, locations, xeroTenant] = await Promise.all([
-    listPeople({
-      actingPersonId: actingPerson?.id,
-      clerkOrgId,
-      filters,
-      organisationId,
-      pagination: {
-        cursor: filters.cursor,
-        pageSize: filters.pageSize,
-      },
-      role: peopleRole,
-    }),
-    database.team.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.xeroTenant.findFirst({
-      select: {
-        id: true,
-        xero_connection: { select: { status: true } },
-      },
-      where: {
-        clerk_org_id: clerkOrgId,
-        organisation_id: organisationId,
-      },
-    }),
-  ]);
-  const hasActiveXeroConnection =
-    xeroTenant?.xero_connection?.status === "active";
+  const [peopleResult, teams, locations, xeroTenant, xeroStateResult] =
+    await Promise.all([
+      listPeople({
+        actingPersonId: actingPerson?.id,
+        clerkOrgId,
+        filters,
+        organisationId,
+        pagination: {
+          cursor: filters.cursor,
+          pageSize: filters.pageSize,
+        },
+        role: peopleRole,
+      }),
+      database.team.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+        where: scopedQuery(clerkOrgId, organisationId),
+      }),
+      database.location.findMany({
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+        where: scopedQuery(clerkOrgId, organisationId),
+      }),
+      database.xeroTenant.findFirst({
+        select: {
+          id: true,
+        },
+        where: {
+          clerk_org_id: clerkOrgId,
+          organisation_id: organisationId,
+        },
+      }),
+      getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
+    ]);
+  const xeroConnectionState = xeroStateResult.ok
+    ? xeroStateResult.value.state
+    : "unavailable";
   const xeroTenantId = xeroTenant?.id ?? null;
 
   if (!peopleResult.ok) {
@@ -116,7 +118,6 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
           canIncludeArchived={canIncludeArchived}
           canManageClerkAccess={canIncludeArchived}
           filters={filters}
-          hasActiveXeroConnection={hasActiveXeroConnection}
           locations={locations}
           nextCursor={peopleResult.value.nextCursor}
           organisationId={organisationId}
@@ -124,6 +125,7 @@ const PeoplePage = async ({ searchParams }: PeoplePageProps) => {
           people={peopleResult.value.people}
           teams={teams}
           totalCount={peopleResult.value.totalCount}
+          xeroConnectionState={xeroConnectionState}
           xeroTenantId={xeroTenantId}
         />
       </div>

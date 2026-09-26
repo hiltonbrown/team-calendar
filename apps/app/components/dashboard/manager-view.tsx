@@ -26,7 +26,7 @@ export function ManagerView({
   orgQueryValue,
   personId,
 }: ManagerViewProps) {
-  const xero = view.header.hasActiveXeroConnection;
+  const xero = view.header.xeroConnectionState === "connected";
   const timeline = buildManagerCalendarTimeline(view, {
     now: new Date(),
     timezone: view.header.timezone ?? "Australia/Brisbane",
@@ -39,6 +39,7 @@ export function ManagerView({
           <XeroDisconnectedBanner
             connectHref="/settings/integrations"
             orgQueryValue={orgQueryValue}
+            xeroConnectionState={view.header.xeroConnectionState}
           />
         )
       }

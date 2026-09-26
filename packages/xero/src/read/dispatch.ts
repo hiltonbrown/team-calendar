@@ -220,6 +220,7 @@ async function fetchPerEmployeeLeaveBalances(
 
     if (!result.ok) {
       if (
+        result.error.recoveryReason ||
         result.error.code === "auth_error" ||
         result.error.code === "rate_limit_error" ||
         result.error.code === "permission_error" ||

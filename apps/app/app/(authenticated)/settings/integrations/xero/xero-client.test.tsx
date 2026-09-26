@@ -71,6 +71,7 @@ describe("XeroClient component", () => {
     id: "70000000-0000-4000-8000-000000000001",
     name: "Acme Corp",
     xero_connection: baseConnection,
+    xeroConnectionState: "connected",
   };
 
   it("renders Latest balance page stat label", () => {

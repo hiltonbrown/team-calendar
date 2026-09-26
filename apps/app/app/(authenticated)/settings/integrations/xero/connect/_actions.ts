@@ -6,6 +6,7 @@ import { auth, currentUser } from "@repo/auth/server";
 import { dispatchManualSync } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
+import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
 import {
   syncXeroLeaveBalances,
   syncXeroLeaveRecords,
@@ -127,15 +128,39 @@ export async function completeTenantSelectionAction(input: {
   // Perform immediate initial sync (people, leave-records, leave-balances).
   // Best effort: the connection is already persisted and scheduled syncs will catch up if
   // any step fails, so a sync error must not fail the connection itself.
-  const syncContext = {
-    clerkOrgId: orgId,
-    organisationId: result.value.organisationId,
-    triggeredByUserId: user.id,
-    triggerType: "manual" as const,
-    xeroTenantId: result.value.xeroTenantId,
-  };
-
   try {
+    const state = await getXeroConnectionState({
+      clerkOrgId: orgId,
+      organisationId: result.value.organisationId,
+    });
+    if (
+      !state.ok ||
+      state.value.state !== "connected" ||
+      state.value.bindingGeneration === null
+    ) {
+      throw new Error("Initial sync connection is unavailable.");
+    }
+    const tenant = await database.xeroTenant.findFirst({
+      select: { id: true },
+      where: {
+        active_slot: 1,
+        binding_generation: state.value.bindingGeneration,
+        clerk_org_id: orgId,
+        id: result.value.xeroTenantId,
+        organisation_id: result.value.organisationId,
+      },
+    });
+    if (!tenant) {
+      throw new Error("Initial sync binding changed.");
+    }
+    const syncContext = {
+      bindingGeneration: state.value.bindingGeneration,
+      clerkOrgId: orgId,
+      organisationId: result.value.organisationId,
+      triggeredByUserId: user.id,
+      triggerType: "manual" as const,
+      xeroTenantId: tenant.id,
+    };
     await syncXeroPeople(syncContext);
     await syncXeroLeaveRecords(syncContext);
     await syncXeroLeaveBalances(syncContext);

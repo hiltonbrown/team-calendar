@@ -1,4 +1,6 @@
-import type { Result } from "@repo/core";
+import { type Result, xeroRecoveryMessage } from "@repo/core";
+import { database } from "@repo/database";
+import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
 import {
   reconcileXeroApprovalState,
   syncXeroLeaveBalances,
@@ -46,15 +48,38 @@ const localEventNames: Record<LocalSyncRunType, string> = {
 export async function executeLocalSyncFallback(
   input: LocalSyncFallbackInput
 ): Promise<Result<LocalSyncFallbackValue, LocalSyncFallbackError>> {
-  const payload = {
-    clerkOrgId: input.clerkOrgId,
-    organisationId: input.organisationId,
-    triggeredByUserId: input.actingUserId,
-    triggerType: "manual" as const,
-    xeroTenantId: input.xeroTenantId,
-  };
-
   try {
+    const state = await getXeroConnectionState(input);
+    if (!state.ok) {
+      return syncFailed(xeroRecoveryMessage("unavailable"));
+    }
+    if (
+      state.value.state !== "connected" ||
+      state.value.bindingGeneration === null
+    ) {
+      return syncFailed(xeroRecoveryMessage(state.value.state));
+    }
+    const tenant = await database.xeroTenant.findFirst({
+      select: { id: true },
+      where: {
+        active_slot: 1,
+        binding_generation: state.value.bindingGeneration,
+        clerk_org_id: input.clerkOrgId,
+        id: input.xeroTenantId,
+        organisation_id: input.organisationId,
+      },
+    });
+    if (!tenant) {
+      return syncFailed("The Xero connection changed. Try again.");
+    }
+    const payload = {
+      bindingGeneration: state.value.bindingGeneration,
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+      triggeredByUserId: input.actingUserId,
+      triggerType: "manual" as const,
+      xeroTenantId: tenant.id,
+    };
     const syncResult = await executeLocalSync(input.runType, payload);
     if (!syncResult.ok) {
       return syncResult;
@@ -64,6 +89,17 @@ export async function executeLocalSyncFallback(
       syncResult.value.status === "failed" ||
       syncResult.value.status === "cancelled"
     ) {
+      if (syncResult.value.status === "failed") {
+        const run = await database.syncRun.findFirst({
+          select: { error_summary: true },
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            id: syncResult.value.runId,
+            organisation_id: input.organisationId,
+          },
+        });
+        return syncFailed(safeSyncFailureMessage(run?.error_summary));
+      }
       return syncFailed("Sync run failed or was cancelled.");
     }
 
@@ -83,18 +119,15 @@ export async function executeLocalSyncFallback(
         ...(hasCount(value, "upserted") ? { upserted: value.upserted } : {}),
       },
     };
-  } catch (error) {
-    return syncFailed(
-      error instanceof Error
-        ? error.message
-        : "Sync run threw an unexpected error."
-    );
+  } catch {
+    return syncFailed(xeroRecoveryMessage("operational_incident"));
   }
 }
 
 async function executeLocalSync(
   runType: LocalSyncRunType,
   payload: {
+    bindingGeneration: number;
     clerkOrgId: string;
     organisationId: string;
     triggeredByUserId: string;
@@ -126,4 +159,19 @@ function syncFailed(message: string): Result<never, LocalSyncFallbackError> {
     error: { code: "sync_failed", message },
     ok: false,
   };
+}
+
+function safeSyncFailureMessage(summary: string | null | undefined): string {
+  switch (summary) {
+    case "update_permissions":
+    case "reauthorise":
+    case "access_denied":
+    case "operational_incident":
+    case "retry_later":
+    case "outcome_unknown":
+    case "not_connected":
+      return xeroRecoveryMessage(summary);
+    default:
+      return "Sync run failed or was cancelled.";
+  }
 }

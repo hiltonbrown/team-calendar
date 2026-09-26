@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   availabilityFindFirst: vi.fn(),
   availabilityFindMany: vi.fn(),
   getSettings: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   listForOrganisation: vi.fn(),
   organisationFindFirst: vi.fn(),
   personFindMany: vi.fn(),
@@ -49,7 +49,7 @@ vi.mock("../settings/organisation-settings-service", () => ({
   getSettings: mocks.getSettings,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 
 const { getCalendarRange, getEventDetail } = await import("./calendar-service");
@@ -104,7 +104,10 @@ describe("calendar-service", () => {
         showPendingOnCalendar: true,
       },
     });
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
     mocks.listForOrganisation.mockResolvedValue({
       ok: true,
       value: [

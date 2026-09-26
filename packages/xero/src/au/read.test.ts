@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encryptXeroToken } from "../crypto/tokens";
 import { fetchEmployees, fetchLeaveBalances, fetchLeaveRecords } from "./read";
 
 const ORIGINAL_ENV = process.env.XERO_TOKEN_ENCRYPTION_KEY;
@@ -14,20 +13,15 @@ function restoreEncryptionKey() {
 }
 
 function buildXeroTenant() {
-  const accessToken = encryptXeroToken("access-token");
-
   return {
+    accessToken: "access-token",
+    bindingGeneration: 1,
     clerk_org_id: "org_1",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: "AU" as const,
-    xero_connection: {
-      access_token_auth_tag: accessToken.authTag,
-      access_token_encrypted: accessToken.encrypted,
-      access_token_iv: accessToken.iv,
-      revoked_at: null,
-      token_key_version: 1,
-    },
+    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-1",
   };
 }
@@ -211,15 +205,17 @@ describe("AU employee reads", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("returns auth_error Result without throwing when access_token_iv is null", async () => {
+  it("returns an incident without dispatch when resolved access is missing", async () => {
     const tenant = buildXeroTenant();
-    tenant.xero_connection.access_token_iv = null;
+    tenant.accessToken = "";
 
     await expect(fetchEmployees({ xeroTenant: tenant })).resolves.toMatchObject(
       {
         error: {
-          code: "auth_error",
-          message: "Xero credentials are missing or revoked.",
+          code: "unknown_error",
+          dispatchPhase: "before_dispatch",
+          message: "Xero access is unavailable.",
+          recoveryReason: "operational_incident",
         },
         ok: false,
       }
@@ -435,18 +431,68 @@ describe("AU leave balance reads", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("returns auth_error Result without throwing when access_token_iv is null", async () => {
+  it("returns an incident without dispatch when resolved access is missing", async () => {
     const tenant = buildXeroTenant();
-    tenant.xero_connection.access_token_iv = null;
+    tenant.accessToken = "";
 
     await expect(
       fetchLeaveRecords({ xeroTenant: tenant })
     ).resolves.toMatchObject({
       error: {
-        code: "auth_error",
-        message: "Xero credentials are missing or revoked.",
+        code: "unknown_error",
+        dispatchPhase: "before_dispatch",
+        message: "Xero access is unavailable.",
+        recoveryReason: "operational_incident",
       },
       ok: false,
+    });
+  });
+});
+
+describe("161g AU scoped read evidence", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("keeps read capability usable after write permission failure", async () => {
+    const module = await import("./write");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 403 }))
+      .mockResolvedValueOnce(new Response('{"Employees":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    const current = buildXeroTenant();
+    expect(
+      await module.approveLeaveApplication({
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+        xeroTenant: current,
+      })
+    ).toMatchObject({ error: { recoveryReason: "access_denied" }, ok: false });
+    expect((await fetchEmployees({ xeroTenant: current })).ok).toBe(true);
+  });
+  it("keeps a sibling tenant usable after a403 without mutating either binding", async () => {
+    const first = buildXeroTenant();
+    const sibling = {
+      ...buildXeroTenant(),
+      id: "sibling-binding",
+      xero_tenant_id: "sibling-payroll",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 403 }))
+      .mockResolvedValueOnce(new Response('{"Employees":[]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchEmployees({ xeroTenant: first })).toMatchObject({
+      error: { recoveryReason: "access_denied" },
+      ok: false,
+    });
+    expect((await fetchEmployees({ xeroTenant: sibling })).ok).toBe(true);
+    expect(first).toMatchObject({
+      accessToken: "access-token",
+      bindingGeneration: 1,
+      id: "tenant_1",
+      tokenVersion: 1,
+    });
+    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
+      "Xero-Tenant-Id": "sibling-payroll",
     });
   });
 });

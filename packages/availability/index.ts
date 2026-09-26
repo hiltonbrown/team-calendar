@@ -253,7 +253,7 @@ export {
   type TimelinePage,
 } from "./src/sync/sync-monitor-service";
 export * from "./src/xero-connection-state";
-export { hasActiveXeroConnection } from "./src/xero-connection-state";
+
 export {
   noUnresolvedSubmitOperationWhere,
   unclaimedOrExpiredXeroWriteWhere,
