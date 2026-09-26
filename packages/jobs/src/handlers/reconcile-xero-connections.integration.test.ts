@@ -185,7 +185,7 @@ describe("fenced Xero cleanup worker", () => {
   });
   it("recovers a persisted final confirmation after retirement failure without another provider call", async () => {
     const input = await seed();
-    await database.xeroCleanupAttempt.updateMany({
+    const confirmed = await database.xeroCleanupAttempt.updateMany({
       data: { outcome_reason: "absent", state: "confirmed_absent" },
       where: {
         clerk_org_id: scope.clerkOrgId,
@@ -193,20 +193,36 @@ describe("fenced Xero cleanup worker", () => {
         organisation_id: scope.organisationId,
       },
     });
+    expect(confirmed.count).toBe(1);
     const retirementScope = {
       ...scope,
       requestId: input.attempt.xero_cleanup_request_id,
     };
+    // The lazy proxy resolves property reads but has no method descriptors to spy on.
+    const resolvedDatabase = globalThis.__teamCalendarDatabase;
+    if (!resolvedDatabase) {
+      throw new Error("Expected the seeded database client to be initialised");
+    }
     const failed = vi
-      .spyOn(database, "$transaction")
+      .spyOn(resolvedDatabase, "$transaction")
       .mockRejectedValueOnce(new Error("retirement interrupted"));
     try {
       await expect(
         retireResolvedCleanupRequest(retirementScope)
       ).rejects.toThrow("retirement interrupted");
+      expect(failed).toHaveBeenCalledTimes(1);
     } finally {
       failed.mockRestore();
     }
+    expect(
+      await database.xeroCleanupAttempt.findFirstOrThrow({
+        where: {
+          clerk_org_id: scope.clerkOrgId,
+          id: input.attemptId,
+          organisation_id: scope.organisationId,
+        },
+      })
+    ).toMatchObject({ outcome_reason: "absent", state: "confirmed_absent" });
     expect(
       await database.xeroTenant.findFirstOrThrow({
         where: {
