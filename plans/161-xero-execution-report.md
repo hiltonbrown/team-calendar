@@ -313,3 +313,6 @@ The reviewer refreshed the protected manifest using timeline `73cb5a3404beeb6412
 Final candidate gates passed: lint 1047 files, typecheck 19 tasks, full unit 18 tasks, core 84 tests, Xero 364 tests and package boundaries. The reviewer also passed release-tool units (13 files, 65 tests). Production build passed with synthetic command-only format validation values as recorded above. Whitespace and commented-env-addition criteria passed; the stale `customFetch` through `response.json` text probe was reconciled to the equivalent fetch-to-body span because JSON is now parsed from a bounded reader, whose pre-body cleanup count is zero.
 
 The committed changes implement the capability and verify guarded online database behaviour using owned synthetic token rows. Live Xero provider operations, actual production token/key rotation, release preflight and browser rollout were not performed or claimed by this plan.
+
+
+Independent reviewer cleanup readback passed: all 32 fixture selectors returned zero owned rows; the outside fixture catalogue remained unchanged (`41e95ac` prefix); the protected active-run fence was released (`ACTIVE_RUN_RELEASED`). Final worktree contains no generated-file diff or temporary helper files. Plan 161c implementation and its reconciled verification criteria are complete; the reviewer maintains the plan index.
