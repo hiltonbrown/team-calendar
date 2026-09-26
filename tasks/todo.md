@@ -1544,3 +1544,13 @@ Protected online Neon campaign `f7578441-2838-4361-9ced-0f59a19d73c3` passed all
 Post-run cleanup PASS: all 39 owned selectors are empty, active fence released and outside-owned catalogue unchanged. All 204 pre-existing rows across 37 tables retain their exact per-table counts; the new classification table has zero rows. Restricted JSON/Markdown artefacts have mode 0600 and record inventory PASS, cleanup PASS, exit zero and released fence. Temporary private verification credentials were removed. All 40 charter cases remain NOT_VERIFIED without separate assertion provenance; deployed SHA remains null. Provider/browser behaviour and production rollout remain NOT VERIFIED or unexecuted; cleanup stays `report_only`.
 
 Documentation closure copies the reviewer plan, DONE index and execution report exactly, preserves all prior task history and keeps runtime/schema/generated files byte-identical to the approved candidate. Shared absolute-path handoff replaced inline dispatch packaging. No merge, push or deployment.
+
+## Plans 160 to 161h reconciliation: cleanup retirement recovery
+
+- [x] Independently read complete Plans 161d, 161e and 161f, source contracts and regression coverage.
+- [x] Prove a persisted final confirmation survives a failed retirement without replaying DELETE.
+- [x] Add bounded scoped reconciliation of nonempty terminal requests under current binding generation.
+- [x] Preserve report-only, unresolved, foreign-scope, reconnected and retired binding protections.
+- [x] Run focused unit and static integration type gates; freeze for root-owned full/live verification.
+
+Review: the new restart regression first failed against the original worker (1 failed, 7 passed). The scoped terminal-request sweep and retirement guards now pass 9 job and 19 cleanup unit tests, changed-file lint, whitespace and strict integration-fixture types. Six new protected integration scenarios cover a persisted final confirmation plus failed retirement, report-only recovery without provider dispatch, idempotence, generation change, reconnect, unknown, empty authority and foreign scopes. They are written but not executed by this executor; root owns full gates and the protected online campaign. No schema change, database operation or provider operation was performed by this executor.

@@ -2,9 +2,14 @@ import "server-only";
 import {
   getOldestUnknownXeroCleanupUpdatedAt,
   listDueXeroCleanupAttempts,
+  listResolvedXeroCleanupRequests,
 } from "@repo/database/queries/xero-cleanup";
 import { log } from "@repo/observability/log";
-import { emitXeroMetric, processXeroCleanupAttempt } from "@repo/xero";
+import {
+  emitXeroMetric,
+  processXeroCleanupAttempt,
+  retireResolvedCleanupRequest,
+} from "@repo/xero";
 import { inngest } from "../client";
 
 export async function reconcileXeroConnections(): Promise<{
@@ -28,6 +33,16 @@ export async function reconcileXeroConnections(): Promise<{
         clerkOrgId: attempt.clerkOrgId,
         organisationId: attempt.organisationId,
       });
+    }
+  }
+  const resolved = await listResolvedXeroCleanupRequests({ limit: 50 });
+  for (const request of resolved) {
+    try {
+      await retireResolvedCleanupRequest(request);
+      processed += 1;
+    } catch {
+      failed += 1;
+      log.error("Xero connection cleanup retirement failed.", request);
     }
   }
   await recordUnknownCleanupAge();
@@ -58,6 +73,20 @@ export const reconcileXeroConnectionsFunction = inngest.createFunction(
           clerkOrgId: attempt.clerkOrgId,
           organisationId: attempt.organisationId,
         });
+      }
+    }
+    const resolved = await step.run("list-resolved-xero-cleanup", () =>
+      listResolvedXeroCleanupRequests({ limit: 50 })
+    );
+    for (const request of resolved) {
+      try {
+        await step.run(`retire-cleanup-${request.requestId}`, () =>
+          retireResolvedCleanupRequest(request)
+        );
+        processed += 1;
+      } catch {
+        failed += 1;
+        log.error("Xero connection cleanup retirement failed.", request);
       }
     }
     await step.run("record-unknown-cleanup-age", recordUnknownCleanupAge);

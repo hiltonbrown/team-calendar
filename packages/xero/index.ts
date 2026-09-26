@@ -11,6 +11,7 @@ export {
   getXeroDisconnectReceipt,
   processXeroCleanupAttempt,
   reissueXeroCleanupAttempt,
+  retireResolvedCleanupRequest,
   type XeroDisconnectReceipt,
 } from "./src/oauth/connection-cleanup";
 export {

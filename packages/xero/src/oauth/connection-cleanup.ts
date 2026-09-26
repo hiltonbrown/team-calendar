@@ -344,11 +344,15 @@ export async function retireResolvedCleanupRequest(input: {
       }
       await lockXeroBinding(tx, request.xero_tenant_id);
       if (
+        request.attempts.length === 0 ||
         !request.attempts.every(
           (a) =>
-            a.state === "confirmed_deleted" ||
-            a.state === "confirmed_absent" ||
-            a.state === "cancelled"
+            a.clerk_org_id === input.clerkOrgId &&
+            a.organisation_id === input.organisationId &&
+            a.expected_binding_generation === request.binding_generation &&
+            (a.state === "confirmed_deleted" ||
+              a.state === "confirmed_absent" ||
+              a.state === "cancelled")
         )
       ) {
         return;
@@ -360,10 +364,13 @@ export async function retireResolvedCleanupRequest(input: {
           retirement_reason: "disconnected",
         },
         where: {
+          active_slot: 1,
           binding_generation: request.binding_generation,
           clerk_org_id: input.clerkOrgId,
           id: request.xero_tenant_id,
           organisation_id: input.organisationId,
+          retired_at: null,
+          xero_connection: { status: "disconnected" },
         },
       });
     },
