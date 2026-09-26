@@ -8,6 +8,8 @@ import {
   markXeroCleanupAttemptDispatching,
   recordXeroCleanupAttemptOutcome,
 } from "./src/queries/xero-cleanup";
+import { applyVerifiedXeroCredentialOwnerAttachment } from "./src/queries/xero-credential-owner";
+import { captureXeroCredentialIdentitySnapshot } from "./src/xero-credential-identity-artifact";
 import { planXeroCredentialOwnerBackfill } from "./src/xero-credential-owner-backfill";
 
 vi.mock("server-only", () => ({}));
@@ -437,4 +439,157 @@ describe("Xero cleanup lifecycle compare-and-set", () => {
       })
     ).rejects.toMatchObject({ code: "P2002" });
   });
+});
+
+describe("verified credential snapshot application", () => {
+  async function prepare() {
+    const binding = await createBinding(0, { activeSlot: 1 });
+    const connection = await database.xeroConnection.update({
+      data: {
+        access_token_auth_tag: "snapshot-access-tag",
+        access_token_encrypted: "snapshot-access-ciphertext",
+        access_token_iv: "snapshot-access-iv",
+        expires_at: new Date(Date.now() - 60_000),
+        refresh_token_auth_tag: "snapshot-refresh-tag",
+        refresh_token_encrypted: "snapshot-refresh-ciphertext",
+        refresh_token_iv: "snapshot-refresh-iv",
+        status: "active",
+        token_key_version: 1,
+      },
+      where: {
+        clerk_org_id: binding.clerk_org_id,
+        id: binding.xero_connection_id,
+        organisation_id: binding.organisation_id,
+      },
+    });
+    const identity = captureXeroCredentialIdentitySnapshot(
+      { ...binding, xero_connection: connection },
+      fixture.id("verified-authoriser")
+    );
+    return {
+      binding,
+      connection,
+      input: { identity, identityGroup: [identity], providerAppId },
+    };
+  }
+  it("applies the exact verified expired snapshot and keeps a rerun idempotent", async () => {
+    const { binding, connection, input } = await prepare();
+    const result = await applyVerifiedXeroCredentialOwnerAttachment(input, {
+      createOwnerId: () => fixture.globalKey("credential_owner"),
+    });
+    expect(result).toEqual({ ok: true, value: { attached: true } });
+    const attached = await database.xeroTenant.findFirstOrThrow({
+      where: {
+        clerk_org_id: binding.clerk_org_id,
+        id: binding.id,
+        organisation_id: binding.organisation_id,
+      },
+    });
+    expect(attached).toMatchObject({
+      binding_generation: binding.binding_generation,
+      xero_credential_owner_id: fixture.globalKey("credential_owner"),
+      xero_tenant_id: binding.xero_tenant_id,
+    });
+    const owner = await database.xeroCredentialOwner.findUniqueOrThrow({
+      where: { id: fixture.globalKey("credential_owner") },
+    });
+    expect(owner).toMatchObject({
+      access_token_encrypted: connection.access_token_encrypted,
+      refresh_token_encrypted: connection.refresh_token_encrypted,
+      token_expires_at: connection.expires_at,
+      usability: "usable",
+      xero_user_id: input.identity.xeroUserId,
+    });
+    expect(
+      planXeroCredentialOwnerBackfill(
+        [attached],
+        [input.identity],
+        providerAppId
+      ).attachments
+    ).toEqual([]);
+    expect(
+      await database.xeroCredentialOwner.count({
+        where: { provider_app_id: providerAppId },
+      })
+    ).toBe(1);
+  });
+  it.each([
+    "reauthorisation",
+    "key_version",
+    "generation",
+    "retired",
+    "disconnected",
+    "foreign_scope",
+  ] as const)(
+    "rejects a stale %s snapshot without creating or attaching an owner",
+    async (change) => {
+      const { binding, input } = await prepare();
+      const where = {
+        clerk_org_id: binding.clerk_org_id,
+        id: binding.xero_connection_id,
+        organisation_id: binding.organisation_id,
+      };
+      if (change === "reauthorisation") {
+        await database.xeroConnection.update({
+          data: {
+            access_token_encrypted: "different-authoriser-ciphertext",
+            refresh_token_encrypted: "different-authoriser-refresh",
+          },
+          where,
+        });
+      } else if (change === "key_version") {
+        await database.xeroConnection.update({
+          data: { token_key_version: 2 },
+          where,
+        });
+      } else if (change === "generation" || change === "retired") {
+        await database.xeroTenant.update({
+          data:
+            change === "generation"
+              ? { binding_generation: { increment: 1 } }
+              : { active_slot: null, retired_at: new Date() },
+          where: { ...where, id: binding.id },
+        });
+      } else if (change === "disconnected") {
+        await database.xeroConnection.update({
+          data: { disconnected_at: new Date(), status: "disconnected" },
+          where,
+        });
+      } else {
+        const [, foreign] = fixture.tenants;
+        if (!foreign) {
+          throw new Error("Missing foreign fixture scope");
+        }
+        input.identity = {
+          ...input.identity,
+          clerkOrgId: foreign.clerkOrgId,
+          organisationId: foreign.organisationId,
+        };
+        input.identityGroup = [input.identity];
+      }
+      const before = await database.xeroConnection.findFirstOrThrow({ where });
+      expect(
+        await applyVerifiedXeroCredentialOwnerAttachment(input, {
+          createOwnerId: () => fixture.globalKey("credential_owner"),
+        })
+      ).toMatchObject({ error: { code: "conflict" }, ok: false });
+      expect(
+        await database.xeroCredentialOwner.count({
+          where: { provider_app_id: providerAppId },
+        })
+      ).toBe(0);
+      expect(
+        await database.xeroTenant.findFirstOrThrow({
+          where: {
+            clerk_org_id: binding.clerk_org_id,
+            id: binding.id,
+            organisation_id: binding.organisation_id,
+          },
+        })
+      ).toMatchObject({ xero_credential_owner_id: null });
+      expect(await database.xeroConnection.findFirstOrThrow({ where })).toEqual(
+        before
+      );
+    }
+  );
 });

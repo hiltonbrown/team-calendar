@@ -1,6 +1,12 @@
 import { writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import { database } from "@repo/database";
+import {
+  captureXeroCredentialIdentitySnapshot,
+  type XeroCredentialIdentitySnapshot,
+  xeroCredentialIdentityArtifactSchema,
+} from "@repo/database/xero-credential-identity-artifact";
+import { keys } from "../keys";
 import { decryptXeroToken } from "../src/crypto/tokens";
 import { verifyLegacyXeroAccessTokenIdentity } from "../src/oauth/identity";
 
@@ -17,23 +23,40 @@ if (!(values.out && databaseUrl)) {
 }
 async function main(out: string) {
   try {
-    const identities: { tenantId: string; xeroUserId: string | null }[] = [];
+    const providerAppId = keys().XERO_CLIENT_ID;
+    if (!providerAppId) {
+      throw new Error("Xero provider app is required for identity planning.");
+    }
+    const identities: XeroCredentialIdentitySnapshot[] = [];
     let cursor: string | undefined;
     for (;;) {
       const page = await database.xeroTenant.findMany({
-        where: { active_slot: 1 },
+        where: {
+          active_slot: 1,
+          provider_app_id: providerAppId,
+          retired_at: null,
+        },
         ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
         orderBy: { id: "asc" },
         select: {
+          binding_generation: true,
+          clerk_org_id: true,
           id: true,
+          organisation_id: true,
+          provider_app_id: true,
           xero_connection: {
             select: {
               access_token_auth_tag: true,
               access_token_encrypted: true,
               access_token_iv: true,
+              expires_at: true,
+              refresh_token_auth_tag: true,
+              refresh_token_encrypted: true,
+              refresh_token_iv: true,
               token_key_version: true,
             },
           },
+          xero_connection_id: true,
         },
         take: 500,
       });
@@ -55,17 +78,21 @@ async function main(out: string) {
         } catch {
           // Unverifiable rows remain unowned. Never include token material in the report.
         }
-        identities.push({ tenantId: row.id, xeroUserId });
+        identities.push(captureXeroCredentialIdentitySnapshot(row, xeroUserId));
       }
       if (page.length < 500) {
         break;
       }
       cursor = page.at(-1)?.id;
     }
-    await writeFile(out, `${JSON.stringify(identities, null, 2)}\n`, {
-      flag: "wx",
-      mode: 0o600,
-    });
+    await writeFile(
+      out,
+      `${JSON.stringify(xeroCredentialIdentityArtifactSchema.parse({ entries: identities, providerAppId, version: 1 }), null, 2)}\n`,
+      {
+        flag: "wx",
+        mode: 0o600,
+      }
+    );
     process.stdout.write(
       `Identity plan written: ${identities.length} bindings, ${identities.filter((row) => row.xeroUserId === null).length} unverifiable.\n`
     );

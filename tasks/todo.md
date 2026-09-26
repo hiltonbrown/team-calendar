@@ -1554,3 +1554,13 @@ Documentation closure copies the reviewer plan, DONE index and execution report 
 - [x] Run focused unit and static integration type gates; freeze for root-owned full/live verification.
 
 Review: the new restart regression first failed against the original worker (1 failed, 7 passed). The scoped terminal-request sweep and retirement guards now pass 9 job and 19 cleanup unit tests, changed-file lint, whitespace and strict integration-fixture types. Six new protected integration scenarios cover a persisted final confirmation plus failed retirement, report-only recovery without provider dispatch, idempotence, generation change, reconnect, unknown, empty authority and foreign scopes. They are written but not executed by this executor; root owns full gates and the protected online campaign. No schema change, database operation or provider operation was performed by this executor.
+
+## Plans 160 to 161h reconciliation: verified backfill snapshot
+
+- [x] Identify stale identity artefact race between verified JWT planning and locked application.
+- [x] Bind each identity to its provider app, both scopes, generation, connection and encrypted credential fingerprint.
+- [x] Reject stale, foreign, disconnected or retired snapshots before owner creation or attachment.
+- [x] Exercise the actual guarded apply function with unit and existing protected integration fixtures.
+- [x] Run focused source gates; freeze for root-owned full and protected live verification.
+
+Review: 35 focused database tests (artefact, actual locked apply and unchanged pure planner) pass. Both operator scripts and the existing lifecycle fixture pass strict TypeScript; nine changed files pass lint and whitespace. Actual package CLI rejects missing intent and an old unversioned artefact with exit 1 before any SQL, using a synthetic invalid-domain database URL. Seven new registered lifecycle cases exercise the same actual guarded application function with owned synthetic envelopes: unchanged verified expired singleton, idempotent planner rerun, reauthorisation, key change, generation, retirement, disconnect and foreign scopes. These integration cases are written but await the root-owned protected online campaign. Identity still comes from verified JWT claims; fingerprints only bind that proof to the exact encrypted snapshot. No customer backfill, schema change or provider request was performed. An automatic permission-review timeout on one large edit command was reconciled by smaller approved edits; no unsafe action was inferred or bypassed.
