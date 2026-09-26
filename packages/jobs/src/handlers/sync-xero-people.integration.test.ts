@@ -3,6 +3,16 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+const mockInngestSend = vi.hoisted(() =>
+  vi.fn(async () => ({ ids: ["synthetic-people-event"] }))
+);
+vi.mock("../client", () => ({
+  inngest: {
+    createFunction: vi.fn(() => ({ id: "sync-xero-people" })),
+    send: mockInngestSend,
+  },
+}));
+
 import { database } from "@repo/database";
 import { getRegisteredSyncEventName } from "../events";
 import { syncXeroPeople } from "./sync-xero-people";

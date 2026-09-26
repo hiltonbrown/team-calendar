@@ -299,3 +299,6 @@ The leave-records CAS test assumed its dynamically allocated person UUID sorted 
 A comments-only env example amendment created `5b761dd` while the first runner was already executing `70faf06`; executed source and tests were identical. Subsequent candidates are frozen before manifest preparation. The first run's internal cleanup completed and released its fixture fence before any further source edits.
 
 Production build passed: `bun run build` with command-only synthetic validation configuration, 4 tasks successful (database, API, app, web), 40.223 seconds. No secrets or env files were committed. Full unit suite was repeated after all tests: 18 tasks passed. Final lint passed 1047 files. Generated Prisma formatting noise is restored after commands that regenerate it.
+
+
+Reviewer also approved a deterministic `../client` mock in the people integration suite, following the existing leave-records suite, to isolate outbound Inngest sends and avoid paired deployed-client initialisation when provider keys are supplied to the protected runner. The real database fixture operations and Xero employee mock coverage remain intact. The source candidate is frozen after this test-only reconciliation before the next protected run.
