@@ -72,7 +72,7 @@ for (const scenario of cases) {
       await organisation
         .getByText("Connection controls", { exact: true })
         .click();
-      await page
+      await organisation
         .getByRole("button", { exact: true, name: "Disconnect Xero" })
         .click();
       const dialog = page.getByRole("alertdialog", {
