@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const result = buildXeroOAuthStartUrl({
+  const result = await buildXeroOAuthStartUrl({
     clerkOrgId: authenticatedClerkOrgId,
     organisationId,
     returnTo,

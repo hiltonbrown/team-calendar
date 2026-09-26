@@ -7,6 +7,12 @@ import {
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
 import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
+import {
+  assertXeroFixtureInfrastructureOwned,
+  countXeroFixtureInfrastructure,
+  deleteXeroFixtureInfrastructure,
+  lockXeroFixtureInfrastructure,
+} from "./xero-fixture-cleanup.js";
 
 const flag = process.argv.indexOf("--manifest");
 const manifestPath = flag >= 0 ? process.argv[flag + 1] : undefined;
@@ -139,7 +145,11 @@ const outsideOwnedCatalogueDigest = async () => {
     .digest("hex");
 };
 const catalogueDigestBefore = await outsideOwnedCatalogueDigest();
-const counts: Record<string, number> = {};
+await assertXeroFixtureInfrastructureOwned(database, manifest.owned);
+const counts: Record<string, number> = await countXeroFixtureInfrastructure(
+  database,
+  manifest.owned
+);
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
 }
@@ -205,6 +215,8 @@ if (mode === "--apply") {
     );
   }
   await database.$transaction(async (transaction) => {
+    await lockXeroFixtureInfrastructure(transaction);
+    await assertXeroFixtureInfrastructureOwned(transaction, manifest.owned);
     for (const table of scopedTables) {
       await transaction.$executeRawUnsafe(
         `DELETE FROM "${table}" WHERE ${scopedSql}`,
@@ -217,6 +229,7 @@ if (mode === "--apply") {
         ...manifest.owned.clerkOrgIds
       );
     }
+    await deleteXeroFixtureInfrastructure(transaction, manifest.owned);
     if (stripeEventIds.length > 0) {
       await transaction.$executeRawUnsafe(
         `DELETE FROM "stripe_events" WHERE stripe_event_id IN (${placeholders(1, stripeEventIds.length)})`,
@@ -255,7 +268,10 @@ if (mode === "--apply") {
   });
 }
 
-const residue: Record<string, number> = {};
+const residue: Record<string, number> = await countXeroFixtureInfrastructure(
+  database,
+  manifest.owned
+);
 for (const table of scopedTables) {
   residue[table] = await countRows(table, scopedSql, scopedValues);
 }

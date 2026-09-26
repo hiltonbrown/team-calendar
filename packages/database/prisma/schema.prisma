@@ -492,10 +492,120 @@ model XeroConnection {
   @@map("xero_connections")
 }
 
+enum xero_credential_usability {
+  usable
+  reauthorisation_required
+}
+
+enum xero_refresh_attempt_outcome {
+  pending
+  superseded
+  committed
+  lost_response
+  failed
+}
+
+enum xero_provider_connection_status {
+  present
+  absent_confirmed
+  unknown
+}
+
+enum xero_oauth_intent_kind {
+  initial_binding
+  same_file_reauthorisation
+}
+
+enum xero_token_exchange_status {
+  not_started
+  dispatching
+  exchanged
+  unknown
+}
+
+model XeroCredentialOwner {
+  id                      String                    @id @default(uuid()) @db.Uuid
+  provider_app_id         String
+  xero_user_id            String
+  identity_evidence       String // "access_token_jwt" | "legacy_access_token_jwt"
+  access_token_encrypted  String
+  access_token_iv         String
+  access_token_auth_tag   String
+  refresh_token_encrypted String
+  refresh_token_iv        String
+  refresh_token_auth_tag  String
+  token_key_version       Int
+  token_version           Int                       @default(1)
+  last_refresh_attempt_id String?                   @db.Uuid
+  token_expires_at        DateTime
+  granted_scopes          String[]
+  granted_scopes_known    Boolean                   @default(false)
+  usability               xero_credential_usability @default(usable)
+  last_verified_at        DateTime?
+  last_adopted_at         DateTime?
+  last_rotated_at         DateTime?
+  created_at              DateTime                  @default(now())
+  updated_at              DateTime                  @updatedAt
+  refresh_attempts        XeroRefreshAttempt[]
+  provider_connections    XeroProviderConnection[]
+  tenants                 XeroTenant[]
+
+  @@unique([provider_app_id, xero_user_id])
+  @@map("xero_credential_owners")
+}
+
+model XeroRefreshAttempt {
+  id                       String                       @id @default(uuid()) @db.Uuid
+  xero_credential_owner_id String                       @db.Uuid
+  expected_token_version   Int
+  dispatched_at            DateTime?
+  uncertain_since          DateTime?
+  recovery_deadline        DateTime?
+  outcome                  xero_refresh_attempt_outcome @default(pending)
+  // Previous refresh token kept only for Xero's 30-minute retry grace window; scrubbed after.
+  recovery_token_encrypted String?
+  recovery_token_iv        String?
+  recovery_token_auth_tag  String?
+  recovery_key_version     Int?
+  created_at               DateTime                     @default(now())
+  updated_at               DateTime                     @updatedAt
+  owner                    XeroCredentialOwner          @relation(fields: [xero_credential_owner_id], references: [id])
+
+  @@index([outcome, recovery_deadline])
+  @@index([xero_credential_owner_id])
+  @@map("xero_refresh_attempts")
+}
+
+model XeroProviderConnection {
+  id                       String                          @id @default(uuid()) @db.Uuid
+  provider_app_id          String
+  remote_connection_id     String
+  xero_tenant_id           String
+  tenant_type              String?
+  xero_credential_owner_id String?                         @db.Uuid
+  auth_event_id            String?
+  provider_created_at      DateTime?
+  provider_updated_at      DateTime?
+  observed_at              DateTime
+  observed_via             String // "user_inventory" | "management_inventory"
+  remote_status            xero_provider_connection_status @default(present)
+  created_at               DateTime                        @default(now())
+  updated_at               DateTime                        @updatedAt
+  owner                    XeroCredentialOwner?            @relation(fields: [xero_credential_owner_id], references: [id])
+  tenants                  XeroTenant[]
+
+  @@unique([provider_app_id, remote_connection_id])
+  @@index([provider_app_id, xero_tenant_id])
+  @@index([xero_credential_owner_id])
+  @@map("xero_provider_connections")
+}
+
 model XeroTenant {
   id                                String         @id @default(uuid()) @db.Uuid
   clerk_org_id                      String
   organisation_id                   String         @db.Uuid
+  xero_credential_owner_id          String?        @db.Uuid
+  xero_provider_connection_id       String?        @db.Uuid
   xero_connection_id                String         @unique @db.Uuid
   xero_tenant_id                    String
   provider_app_id                   String
@@ -519,43 +629,51 @@ model XeroTenant {
   created_at                        DateTime       @default(now())
   updated_at                        DateTime       @updatedAt
 
-  organisation    Organisation     @relation(fields: [organisation_id], references: [id])
-  xero_connection XeroConnection   @relation(fields: [xero_connection_id], references: [id])
-  sync_cursors    XeroSyncCursor[]
-  leave_balances  LeaveBalance[]
-  sync_runs       SyncRun[]
+  organisation        Organisation            @relation(fields: [organisation_id], references: [id])
+  xero_connection     XeroConnection          @relation(fields: [xero_connection_id], references: [id])
+  credential_owner    XeroCredentialOwner?    @relation(fields: [xero_credential_owner_id], references: [id])
+  provider_connection XeroProviderConnection? @relation(fields: [xero_provider_connection_id], references: [id])
+  sync_cursors        XeroSyncCursor[]
+  leave_balances      LeaveBalance[]
+  sync_runs           SyncRun[]
 
+  @@unique([provider_app_id, xero_tenant_id, active_slot], map: "xero_tenants_reserved_binding_key")
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@index([xero_tenant_id])
-  @@unique([provider_app_id, xero_tenant_id, active_slot], map: "xero_tenants_reserved_binding_key")
+  @@index([xero_credential_owner_id])
+  @@index([xero_provider_connection_id])
   @@map("xero_tenants")
 }
 
 model XeroOAuthSession {
-  id                      String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id            String
-  organisation_id         String?                   @db.Uuid
-  created_by_user_id      String?
-  status                  xero_oauth_session_status @default(pending)
-  return_to               String
-  access_token_encrypted  String                    @default("")
-  access_token_iv         String?
-  access_token_auth_tag   String?
-  refresh_token_encrypted String                    @default("")
-  refresh_token_iv        String?
-  refresh_token_auth_tag  String?
-  token_key_version       Int                       @default(1)
-  token_encrypted_at      DateTime?
-  token_expires_at        DateTime
-  available_tenants_json  Json
-  selected_tenant_id      String?
-  selected_tenant_name    String?
-  selected_payroll_region payroll_region?
+  id                          String                      @id @default(uuid()) @db.Uuid
+  clerk_org_id                String
+  organisation_id             String?                     @db.Uuid
+  created_by_user_id          String?
+  status                      xero_oauth_session_status   @default(pending)
+  return_to                   String
+  access_token_encrypted      String                      @default("")
+  access_token_iv             String?
+  access_token_auth_tag       String?
+  refresh_token_encrypted     String                      @default("")
+  refresh_token_iv            String?
+  refresh_token_auth_tag      String?
+  token_key_version           Int                         @default(1)
+  token_encrypted_at          DateTime?
+  requested_scopes            String[]                    @default([])
+  intent_kind                 xero_oauth_intent_kind?
+  nonce_hash                  String?
+  token_exchange_status       xero_token_exchange_status?
+  token_expires_at            DateTime?
+  available_tenants_json      Json?
+  selected_tenant_id          String?
+  selected_tenant_name        String?
+  selected_payroll_region     payroll_region?
   expected_binding_generation Int?
-  expires_at              DateTime
-  created_at              DateTime                  @default(now())
-  updated_at              DateTime                  @updatedAt
+  expires_at                  DateTime
+  created_at                  DateTime                    @default(now())
+  updated_at                  DateTime                    @updatedAt
 
   organisation Organisation? @relation(fields: [organisation_id], references: [id])
 

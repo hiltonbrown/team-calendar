@@ -3,6 +3,7 @@ import { Pool, type PoolClient } from "pg";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { database, payroll_region } from "./index.js";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import { planXeroCredentialOwnerBackfill } from "./src/xero-credential-owner-backfill";
 
 vi.mock("server-only", () => ({}));
 
@@ -43,6 +44,15 @@ const captureError = async (operation: Promise<unknown>): Promise<unknown> => {
 async function cleanTestData() {
   const where = { clerk_org_id: { in: tenantScopes } };
   await database.xeroTenant.deleteMany({ where });
+  await database.xeroRefreshAttempt.deleteMany({
+    where: { owner: { provider_app_id: providerAppId } },
+  });
+  await database.xeroProviderConnection.deleteMany({
+    where: { provider_app_id: providerAppId },
+  });
+  await database.xeroCredentialOwner.deleteMany({
+    where: { provider_app_id: providerAppId },
+  });
   await database.xeroConnection.deleteMany({ where });
   await database.organisation.deleteMany({ where });
 }
@@ -245,5 +255,74 @@ describe("Xero tenant binding reservation constraints", () => {
     expect(constraintName(rejected[0]?.reason)).toBe(
       "xero_tenants_reserved_binding_key"
     );
+  });
+});
+
+describe("Xero credential owner migration", () => {
+  it("limits system-table scope exceptions to the explicit allowlist", async () => {
+    const result = await sqlPool.query<{ table_name: string }>(`
+      SELECT t.table_name FROM information_schema.tables t
+      WHERE t.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+      AND NOT EXISTS (
+        SELECT 1 FROM information_schema.columns c
+        WHERE c.table_schema = t.table_schema AND c.table_name = t.table_name
+        AND c.column_name = 'clerk_org_id'
+      ) ORDER BY t.table_name
+    `);
+    // Existing global catalogue tables and Prisma bookkeeping, plus only these three exceptions.
+    expect(result.rows.map((row) => row.table_name)).toEqual([
+      "_prisma_migrations",
+      "plan_limits",
+      "plans",
+      "xero_credential_owners",
+      "xero_provider_connections",
+      "xero_refresh_attempts",
+    ]);
+  });
+
+  it("attaches a verified expired singleton without changing payroll identity", async () => {
+    const binding = await createBinding(0, { activeSlot: 1 });
+    const plan = planXeroCredentialOwnerBackfill(
+      [binding],
+      [{ tenantId: binding.id, xeroUserId: fixture.id("authoriser") }],
+      providerAppId
+    );
+    expect(plan.attachments).toHaveLength(1);
+    const owner = await database.xeroCredentialOwner.create({
+      data: {
+        access_token_auth_tag: "synthetic-tag",
+        access_token_encrypted: "synthetic-ciphertext",
+        access_token_iv: "synthetic-iv",
+        granted_scopes: [],
+        id: fixture.globalKey("credential_owner"),
+        identity_evidence: "legacy_access_token_jwt",
+        provider_app_id: providerAppId,
+        refresh_token_auth_tag: "synthetic-tag",
+        refresh_token_encrypted: "synthetic-ciphertext",
+        refresh_token_iv: "synthetic-iv",
+        token_expires_at: new Date(Date.now() - 60_000),
+        token_key_version: 1,
+        usability: "usable",
+        xero_user_id: fixture.id("authoriser"),
+      },
+    });
+    const attached = await database.xeroTenant.update({
+      data: { xero_credential_owner_id: owner.id },
+      include: { credential_owner: true },
+      where: {
+        clerk_org_id: binding.clerk_org_id,
+        id: binding.id,
+        organisation_id: binding.organisation_id,
+      },
+    });
+    expect(attached.credential_owner?.usability).toBe("usable");
+    expect(attached.xero_tenant_id).toBe(binding.xero_tenant_id);
+    expect(
+      planXeroCredentialOwnerBackfill(
+        [attached],
+        [{ tenantId: binding.id, xeroUserId: owner.xero_user_id }],
+        providerAppId
+      ).attachments
+    ).toEqual([]);
   });
 });

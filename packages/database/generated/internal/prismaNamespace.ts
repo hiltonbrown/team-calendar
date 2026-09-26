@@ -404,6 +404,9 @@ export const ModelName = {
   Person: 'Person',
   AlternativeContact: 'AlternativeContact',
   XeroConnection: 'XeroConnection',
+  XeroCredentialOwner: 'XeroCredentialOwner',
+  XeroRefreshAttempt: 'XeroRefreshAttempt',
+  XeroProviderConnection: 'XeroProviderConnection',
   XeroTenant: 'XeroTenant',
   XeroOAuthSession: 'XeroOAuthSession',
   XeroSyncCursor: 'XeroSyncCursor',
@@ -444,7 +447,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -963,6 +966,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.XeroConnectionCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.XeroConnectionCountAggregateOutputType> | number
+        }
+      }
+    }
+    XeroCredentialOwner: {
+      payload: Prisma.$XeroCredentialOwnerPayload<ExtArgs>
+      fields: Prisma.XeroCredentialOwnerFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroCredentialOwnerFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroCredentialOwnerFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroCredentialOwnerFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroCredentialOwnerFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        findMany: {
+          args: Prisma.XeroCredentialOwnerFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>[]
+        }
+        create: {
+          args: Prisma.XeroCredentialOwnerCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        createMany: {
+          args: Prisma.XeroCredentialOwnerCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroCredentialOwnerCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroCredentialOwnerDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        update: {
+          args: Prisma.XeroCredentialOwnerUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroCredentialOwnerDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroCredentialOwnerUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroCredentialOwnerUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroCredentialOwnerUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCredentialOwnerPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroCredentialOwnerAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroCredentialOwner>
+        }
+        groupBy: {
+          args: Prisma.XeroCredentialOwnerGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCredentialOwnerGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroCredentialOwnerCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCredentialOwnerCountAggregateOutputType> | number
+        }
+      }
+    }
+    XeroRefreshAttempt: {
+      payload: Prisma.$XeroRefreshAttemptPayload<ExtArgs>
+      fields: Prisma.XeroRefreshAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroRefreshAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroRefreshAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroRefreshAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroRefreshAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.XeroRefreshAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.XeroRefreshAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.XeroRefreshAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroRefreshAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroRefreshAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        update: {
+          args: Prisma.XeroRefreshAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroRefreshAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroRefreshAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroRefreshAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroRefreshAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroRefreshAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroRefreshAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroRefreshAttempt>
+        }
+        groupBy: {
+          args: Prisma.XeroRefreshAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroRefreshAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroRefreshAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroRefreshAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
+    XeroProviderConnection: {
+      payload: Prisma.$XeroProviderConnectionPayload<ExtArgs>
+      fields: Prisma.XeroProviderConnectionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroProviderConnectionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroProviderConnectionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroProviderConnectionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroProviderConnectionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        findMany: {
+          args: Prisma.XeroProviderConnectionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>[]
+        }
+        create: {
+          args: Prisma.XeroProviderConnectionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        createMany: {
+          args: Prisma.XeroProviderConnectionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroProviderConnectionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroProviderConnectionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        update: {
+          args: Prisma.XeroProviderConnectionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroProviderConnectionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroProviderConnectionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroProviderConnectionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroProviderConnectionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroProviderConnectionPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroProviderConnectionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroProviderConnection>
+        }
+        groupBy: {
+          args: Prisma.XeroProviderConnectionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroProviderConnectionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroProviderConnectionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroProviderConnectionCountAggregateOutputType> | number
         }
       }
     }
@@ -3005,10 +3230,79 @@ export const XeroConnectionScalarFieldEnum = {
 export type XeroConnectionScalarFieldEnum = (typeof XeroConnectionScalarFieldEnum)[keyof typeof XeroConnectionScalarFieldEnum]
 
 
+export const XeroCredentialOwnerScalarFieldEnum = {
+  id: 'id',
+  provider_app_id: 'provider_app_id',
+  xero_user_id: 'xero_user_id',
+  identity_evidence: 'identity_evidence',
+  access_token_encrypted: 'access_token_encrypted',
+  access_token_iv: 'access_token_iv',
+  access_token_auth_tag: 'access_token_auth_tag',
+  refresh_token_encrypted: 'refresh_token_encrypted',
+  refresh_token_iv: 'refresh_token_iv',
+  refresh_token_auth_tag: 'refresh_token_auth_tag',
+  token_key_version: 'token_key_version',
+  token_version: 'token_version',
+  last_refresh_attempt_id: 'last_refresh_attempt_id',
+  token_expires_at: 'token_expires_at',
+  granted_scopes: 'granted_scopes',
+  granted_scopes_known: 'granted_scopes_known',
+  usability: 'usability',
+  last_verified_at: 'last_verified_at',
+  last_adopted_at: 'last_adopted_at',
+  last_rotated_at: 'last_rotated_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCredentialOwnerScalarFieldEnum = (typeof XeroCredentialOwnerScalarFieldEnum)[keyof typeof XeroCredentialOwnerScalarFieldEnum]
+
+
+export const XeroRefreshAttemptScalarFieldEnum = {
+  id: 'id',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  expected_token_version: 'expected_token_version',
+  dispatched_at: 'dispatched_at',
+  uncertain_since: 'uncertain_since',
+  recovery_deadline: 'recovery_deadline',
+  outcome: 'outcome',
+  recovery_token_encrypted: 'recovery_token_encrypted',
+  recovery_token_iv: 'recovery_token_iv',
+  recovery_token_auth_tag: 'recovery_token_auth_tag',
+  recovery_key_version: 'recovery_key_version',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroRefreshAttemptScalarFieldEnum = (typeof XeroRefreshAttemptScalarFieldEnum)[keyof typeof XeroRefreshAttemptScalarFieldEnum]
+
+
+export const XeroProviderConnectionScalarFieldEnum = {
+  id: 'id',
+  provider_app_id: 'provider_app_id',
+  remote_connection_id: 'remote_connection_id',
+  xero_tenant_id: 'xero_tenant_id',
+  tenant_type: 'tenant_type',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  auth_event_id: 'auth_event_id',
+  provider_created_at: 'provider_created_at',
+  provider_updated_at: 'provider_updated_at',
+  observed_at: 'observed_at',
+  observed_via: 'observed_via',
+  remote_status: 'remote_status',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroProviderConnectionScalarFieldEnum = (typeof XeroProviderConnectionScalarFieldEnum)[keyof typeof XeroProviderConnectionScalarFieldEnum]
+
+
 export const XeroTenantScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  xero_provider_connection_id: 'xero_provider_connection_id',
   xero_connection_id: 'xero_connection_id',
   xero_tenant_id: 'xero_tenant_id',
   provider_app_id: 'provider_app_id',
@@ -3051,6 +3345,10 @@ export const XeroOAuthSessionScalarFieldEnum = {
   refresh_token_auth_tag: 'refresh_token_auth_tag',
   token_key_version: 'token_key_version',
   token_encrypted_at: 'token_encrypted_at',
+  requested_scopes: 'requested_scopes',
+  intent_kind: 'intent_kind',
+  nonce_hash: 'nonce_hash',
+  token_exchange_status: 'token_exchange_status',
   token_expires_at: 'token_expires_at',
   available_tenants_json: 'available_tenants_json',
   selected_tenant_id: 'selected_tenant_id',
@@ -3556,13 +3854,6 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
-
-
 export const NullableJsonNullValueInput = {
   DbNull: DbNull,
   JsonNull: JsonNull
@@ -3750,6 +4041,48 @@ export type ListEnumxero_connection_statusFieldRefInput<$PrismaModel> = FieldRef
 
 
 /**
+ * Reference to a field of type 'xero_credential_usability'
+ */
+export type Enumxero_credential_usabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_credential_usability'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_credential_usability[]'
+ */
+export type ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_credential_usability[]'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_refresh_attempt_outcome'
+ */
+export type Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_refresh_attempt_outcome'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_refresh_attempt_outcome[]'
+ */
+export type ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_refresh_attempt_outcome[]'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_provider_connection_status'
+ */
+export type Enumxero_provider_connection_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_provider_connection_status'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_provider_connection_status[]'
+ */
+export type ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_provider_connection_status[]'>
+    
+
+
+/**
  * Reference to a field of type 'payroll_region'
  */
 export type Enumpayroll_regionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'payroll_region'>
@@ -3774,6 +4107,34 @@ export type Enumxero_oauth_session_statusFieldRefInput<$PrismaModel> = FieldRefI
  * Reference to a field of type 'xero_oauth_session_status[]'
  */
 export type ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_oauth_session_status[]'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_oauth_intent_kind'
+ */
+export type Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_oauth_intent_kind'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_oauth_intent_kind[]'
+ */
+export type ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_oauth_intent_kind[]'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_token_exchange_status'
+ */
+export type Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_token_exchange_status'>
+    
+
+
+/**
+ * Reference to a field of type 'xero_token_exchange_status[]'
+ */
+export type ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_token_exchange_status[]'>
     
 
 
@@ -4312,6 +4673,9 @@ export type GlobalOmitConfig = {
   person?: Prisma.PersonOmit
   alternativeContact?: Prisma.AlternativeContactOmit
   xeroConnection?: Prisma.XeroConnectionOmit
+  xeroCredentialOwner?: Prisma.XeroCredentialOwnerOmit
+  xeroRefreshAttempt?: Prisma.XeroRefreshAttemptOmit
+  xeroProviderConnection?: Prisma.XeroProviderConnectionOmit
   xeroTenant?: Prisma.XeroTenantOmit
   xeroOAuthSession?: Prisma.XeroOAuthSessionOmit
   xeroSyncCursor?: Prisma.XeroSyncCursorOmit

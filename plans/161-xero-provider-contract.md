@@ -31,3 +31,5 @@ NOT VERIFIED local configuration items before destructive cleanup is enabled.
 NZ and UK read endpoints are excluded because current OAuth rejects NZ and UK
 before persistence, and NZ and UK writes are stubs, so those endpoints are not
 reachable through the active production connection flow.
+
+| Access-token identity | DOCUMENTED | Verify issuer `https://identity.xero.com`, JWKS `https://identity.xero.com/.well-known/openid-configuration/jwks`, RS256, audience `https://identity.xero.com/resources`, configured `client_id`, expiry and optional not-before. `xero_userid` is the unique end-user identifier; `authentication_event_id` identifies the authorisation event. No OpenID scopes added. | [Token types](https://developer.xero.com/documentation/guides/oauth2/token-types), [PKCE](https://developer.xero.com/documentation/guides/oauth2/pkce-flow), [Discovery](https://identity.xero.com/.well-known/openid-configuration) |

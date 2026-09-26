@@ -40,6 +40,8 @@ export type XeroTenantMinAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
+  xero_credential_owner_id: string | null
+  xero_provider_connection_id: string | null
   xero_connection_id: string | null
   xero_tenant_id: string | null
   provider_app_id: string | null
@@ -68,6 +70,8 @@ export type XeroTenantMaxAggregateOutputType = {
   id: string | null
   clerk_org_id: string | null
   organisation_id: string | null
+  xero_credential_owner_id: string | null
+  xero_provider_connection_id: string | null
   xero_connection_id: string | null
   xero_tenant_id: string | null
   provider_app_id: string | null
@@ -96,6 +100,8 @@ export type XeroTenantCountAggregateOutputType = {
   id: number
   clerk_org_id: number
   organisation_id: number
+  xero_credential_owner_id: number
+  xero_provider_connection_id: number
   xero_connection_id: number
   xero_tenant_id: number
   provider_app_id: number
@@ -136,6 +142,8 @@ export type XeroTenantMinAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_credential_owner_id?: true
+  xero_provider_connection_id?: true
   xero_connection_id?: true
   xero_tenant_id?: true
   provider_app_id?: true
@@ -164,6 +172,8 @@ export type XeroTenantMaxAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_credential_owner_id?: true
+  xero_provider_connection_id?: true
   xero_connection_id?: true
   xero_tenant_id?: true
   provider_app_id?: true
@@ -192,6 +202,8 @@ export type XeroTenantCountAggregateInputType = {
   id?: true
   clerk_org_id?: true
   organisation_id?: true
+  xero_credential_owner_id?: true
+  xero_provider_connection_id?: true
   xero_connection_id?: true
   xero_tenant_id?: true
   provider_app_id?: true
@@ -254,13 +266,13 @@ export type XeroTenantAggregateArgs<ExtArgs extends runtime.Types.Extensions.Int
   _count?: true | XeroTenantCountAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to average
   **/
   _avg?: XeroTenantAvgAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to sum
   **/
   _sum?: XeroTenantSumAggregateInputType
@@ -307,6 +319,8 @@ export type XeroTenantGroupByOutputType = {
   id: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id: string | null
+  xero_provider_connection_id: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -358,6 +372,8 @@ export type XeroTenantWhereInput = {
   id?: Prisma.UuidFilter<"XeroTenant"> | string
   clerk_org_id?: Prisma.StringFilter<"XeroTenant"> | string
   organisation_id?: Prisma.UuidFilter<"XeroTenant"> | string
+  xero_credential_owner_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
+  xero_provider_connection_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
   xero_connection_id?: Prisma.UuidFilter<"XeroTenant"> | string
   xero_tenant_id?: Prisma.StringFilter<"XeroTenant"> | string
   provider_app_id?: Prisma.StringFilter<"XeroTenant"> | string
@@ -382,6 +398,8 @@ export type XeroTenantWhereInput = {
   updated_at?: Prisma.DateTimeFilter<"XeroTenant"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
+  credential_owner?: Prisma.XOR<Prisma.XeroCredentialOwnerNullableScalarRelationFilter, Prisma.XeroCredentialOwnerWhereInput> | null
+  provider_connection?: Prisma.XOR<Prisma.XeroProviderConnectionNullableScalarRelationFilter, Prisma.XeroProviderConnectionWhereInput> | null
   sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
   leave_balances?: Prisma.LeaveBalanceListRelationFilter
   sync_runs?: Prisma.SyncRunListRelationFilter
@@ -391,6 +409,8 @@ export type XeroTenantOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_credential_owner_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_provider_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   xero_tenant_id?: Prisma.SortOrder
   provider_app_id?: Prisma.SortOrder
@@ -415,6 +435,8 @@ export type XeroTenantOrderByWithRelationInput = {
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
   xero_connection?: Prisma.XeroConnectionOrderByWithRelationInput
+  credential_owner?: Prisma.XeroCredentialOwnerOrderByWithRelationInput
+  provider_connection?: Prisma.XeroProviderConnectionOrderByWithRelationInput
   sync_cursors?: Prisma.XeroSyncCursorOrderByRelationAggregateInput
   leave_balances?: Prisma.LeaveBalanceOrderByRelationAggregateInput
   sync_runs?: Prisma.SyncRunOrderByRelationAggregateInput
@@ -429,6 +451,8 @@ export type XeroTenantWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.XeroTenantWhereInput | Prisma.XeroTenantWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"XeroTenant"> | string
   organisation_id?: Prisma.UuidFilter<"XeroTenant"> | string
+  xero_credential_owner_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
+  xero_provider_connection_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
   xero_tenant_id?: Prisma.StringFilter<"XeroTenant"> | string
   provider_app_id?: Prisma.StringFilter<"XeroTenant"> | string
   active_slot?: Prisma.IntNullableFilter<"XeroTenant"> | number | null
@@ -452,6 +476,8 @@ export type XeroTenantWhereUniqueInput = Prisma.AtLeast<{
   updated_at?: Prisma.DateTimeFilter<"XeroTenant"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
+  credential_owner?: Prisma.XOR<Prisma.XeroCredentialOwnerNullableScalarRelationFilter, Prisma.XeroCredentialOwnerWhereInput> | null
+  provider_connection?: Prisma.XOR<Prisma.XeroProviderConnectionNullableScalarRelationFilter, Prisma.XeroProviderConnectionWhereInput> | null
   sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
   leave_balances?: Prisma.LeaveBalanceListRelationFilter
   sync_runs?: Prisma.SyncRunListRelationFilter
@@ -461,6 +487,8 @@ export type XeroTenantOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_credential_owner_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  xero_provider_connection_id?: Prisma.SortOrderInput | Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   xero_tenant_id?: Prisma.SortOrder
   provider_app_id?: Prisma.SortOrder
@@ -497,6 +525,8 @@ export type XeroTenantScalarWhereWithAggregatesInput = {
   id?: Prisma.UuidWithAggregatesFilter<"XeroTenant"> | string
   clerk_org_id?: Prisma.StringWithAggregatesFilter<"XeroTenant"> | string
   organisation_id?: Prisma.UuidWithAggregatesFilter<"XeroTenant"> | string
+  xero_credential_owner_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroTenant"> | string | null
+  xero_provider_connection_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroTenant"> | string | null
   xero_connection_id?: Prisma.UuidWithAggregatesFilter<"XeroTenant"> | string
   xero_tenant_id?: Prisma.StringWithAggregatesFilter<"XeroTenant"> | string
   provider_app_id?: Prisma.StringWithAggregatesFilter<"XeroTenant"> | string
@@ -547,6 +577,8 @@ export type XeroTenantCreateInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -556,6 +588,8 @@ export type XeroTenantUncheckedCreateInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -609,6 +643,8 @@ export type XeroTenantUpdateInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -618,6 +654,8 @@ export type XeroTenantUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -649,6 +687,8 @@ export type XeroTenantCreateManyInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -703,6 +743,8 @@ export type XeroTenantUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -752,6 +794,8 @@ export type XeroTenantCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_credential_owner_id?: Prisma.SortOrder
+  xero_provider_connection_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   xero_tenant_id?: Prisma.SortOrder
   provider_app_id?: Prisma.SortOrder
@@ -785,6 +829,8 @@ export type XeroTenantMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_credential_owner_id?: Prisma.SortOrder
+  xero_provider_connection_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   xero_tenant_id?: Prisma.SortOrder
   provider_app_id?: Prisma.SortOrder
@@ -813,6 +859,8 @@ export type XeroTenantMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   clerk_org_id?: Prisma.SortOrder
   organisation_id?: Prisma.SortOrder
+  xero_credential_owner_id?: Prisma.SortOrder
+  xero_provider_connection_id?: Prisma.SortOrder
   xero_connection_id?: Prisma.SortOrder
   xero_tenant_id?: Prisma.SortOrder
   provider_app_id?: Prisma.SortOrder
@@ -921,6 +969,90 @@ export type XeroTenantUncheckedUpdateOneWithoutXero_connectionNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.XeroTenantUpdateToOneWithWhereWithoutXero_connectionInput, Prisma.XeroTenantUpdateWithoutXero_connectionInput>, Prisma.XeroTenantUncheckedUpdateWithoutXero_connectionInput>
 }
 
+export type XeroTenantCreateNestedManyWithoutCredential_ownerInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput> | Prisma.XeroTenantCreateWithoutCredential_ownerInput[] | Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput | Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput[]
+  createMany?: Prisma.XeroTenantCreateManyCredential_ownerInputEnvelope
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+}
+
+export type XeroTenantUncheckedCreateNestedManyWithoutCredential_ownerInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput> | Prisma.XeroTenantCreateWithoutCredential_ownerInput[] | Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput | Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput[]
+  createMany?: Prisma.XeroTenantCreateManyCredential_ownerInputEnvelope
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+}
+
+export type XeroTenantUpdateManyWithoutCredential_ownerNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput> | Prisma.XeroTenantCreateWithoutCredential_ownerInput[] | Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput | Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput[]
+  upsert?: Prisma.XeroTenantUpsertWithWhereUniqueWithoutCredential_ownerInput | Prisma.XeroTenantUpsertWithWhereUniqueWithoutCredential_ownerInput[]
+  createMany?: Prisma.XeroTenantCreateManyCredential_ownerInputEnvelope
+  set?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  disconnect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  delete?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  update?: Prisma.XeroTenantUpdateWithWhereUniqueWithoutCredential_ownerInput | Prisma.XeroTenantUpdateWithWhereUniqueWithoutCredential_ownerInput[]
+  updateMany?: Prisma.XeroTenantUpdateManyWithWhereWithoutCredential_ownerInput | Prisma.XeroTenantUpdateManyWithWhereWithoutCredential_ownerInput[]
+  deleteMany?: Prisma.XeroTenantScalarWhereInput | Prisma.XeroTenantScalarWhereInput[]
+}
+
+export type XeroTenantUncheckedUpdateManyWithoutCredential_ownerNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput> | Prisma.XeroTenantCreateWithoutCredential_ownerInput[] | Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput | Prisma.XeroTenantCreateOrConnectWithoutCredential_ownerInput[]
+  upsert?: Prisma.XeroTenantUpsertWithWhereUniqueWithoutCredential_ownerInput | Prisma.XeroTenantUpsertWithWhereUniqueWithoutCredential_ownerInput[]
+  createMany?: Prisma.XeroTenantCreateManyCredential_ownerInputEnvelope
+  set?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  disconnect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  delete?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  update?: Prisma.XeroTenantUpdateWithWhereUniqueWithoutCredential_ownerInput | Prisma.XeroTenantUpdateWithWhereUniqueWithoutCredential_ownerInput[]
+  updateMany?: Prisma.XeroTenantUpdateManyWithWhereWithoutCredential_ownerInput | Prisma.XeroTenantUpdateManyWithWhereWithoutCredential_ownerInput[]
+  deleteMany?: Prisma.XeroTenantScalarWhereInput | Prisma.XeroTenantScalarWhereInput[]
+}
+
+export type XeroTenantCreateNestedManyWithoutProvider_connectionInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput> | Prisma.XeroTenantCreateWithoutProvider_connectionInput[] | Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput | Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput[]
+  createMany?: Prisma.XeroTenantCreateManyProvider_connectionInputEnvelope
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+}
+
+export type XeroTenantUncheckedCreateNestedManyWithoutProvider_connectionInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput> | Prisma.XeroTenantCreateWithoutProvider_connectionInput[] | Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput | Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput[]
+  createMany?: Prisma.XeroTenantCreateManyProvider_connectionInputEnvelope
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+}
+
+export type XeroTenantUpdateManyWithoutProvider_connectionNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput> | Prisma.XeroTenantCreateWithoutProvider_connectionInput[] | Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput | Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput[]
+  upsert?: Prisma.XeroTenantUpsertWithWhereUniqueWithoutProvider_connectionInput | Prisma.XeroTenantUpsertWithWhereUniqueWithoutProvider_connectionInput[]
+  createMany?: Prisma.XeroTenantCreateManyProvider_connectionInputEnvelope
+  set?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  disconnect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  delete?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  update?: Prisma.XeroTenantUpdateWithWhereUniqueWithoutProvider_connectionInput | Prisma.XeroTenantUpdateWithWhereUniqueWithoutProvider_connectionInput[]
+  updateMany?: Prisma.XeroTenantUpdateManyWithWhereWithoutProvider_connectionInput | Prisma.XeroTenantUpdateManyWithWhereWithoutProvider_connectionInput[]
+  deleteMany?: Prisma.XeroTenantScalarWhereInput | Prisma.XeroTenantScalarWhereInput[]
+}
+
+export type XeroTenantUncheckedUpdateManyWithoutProvider_connectionNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput> | Prisma.XeroTenantCreateWithoutProvider_connectionInput[] | Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput[]
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput | Prisma.XeroTenantCreateOrConnectWithoutProvider_connectionInput[]
+  upsert?: Prisma.XeroTenantUpsertWithWhereUniqueWithoutProvider_connectionInput | Prisma.XeroTenantUpsertWithWhereUniqueWithoutProvider_connectionInput[]
+  createMany?: Prisma.XeroTenantCreateManyProvider_connectionInputEnvelope
+  set?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  disconnect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  delete?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  connect?: Prisma.XeroTenantWhereUniqueInput | Prisma.XeroTenantWhereUniqueInput[]
+  update?: Prisma.XeroTenantUpdateWithWhereUniqueWithoutProvider_connectionInput | Prisma.XeroTenantUpdateWithWhereUniqueWithoutProvider_connectionInput[]
+  updateMany?: Prisma.XeroTenantUpdateManyWithWhereWithoutProvider_connectionInput | Prisma.XeroTenantUpdateManyWithWhereWithoutProvider_connectionInput[]
+  deleteMany?: Prisma.XeroTenantScalarWhereInput | Prisma.XeroTenantScalarWhereInput[]
+}
+
 export type Enumpayroll_regionFieldUpdateOperationsInput = {
   set?: $Enums.payroll_region
 }
@@ -996,6 +1128,8 @@ export type XeroTenantCreateWithoutOrganisationInput = {
   created_at?: Date | string
   updated_at?: Date | string
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -1004,6 +1138,8 @@ export type XeroTenantCreateWithoutOrganisationInput = {
 export type XeroTenantUncheckedCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -1064,6 +1200,8 @@ export type XeroTenantScalarWhereInput = {
   id?: Prisma.UuidFilter<"XeroTenant"> | string
   clerk_org_id?: Prisma.StringFilter<"XeroTenant"> | string
   organisation_id?: Prisma.UuidFilter<"XeroTenant"> | string
+  xero_credential_owner_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
+  xero_provider_connection_id?: Prisma.UuidNullableFilter<"XeroTenant"> | string | null
   xero_connection_id?: Prisma.UuidFilter<"XeroTenant"> | string
   xero_tenant_id?: Prisma.StringFilter<"XeroTenant"> | string
   provider_app_id?: Prisma.StringFilter<"XeroTenant"> | string
@@ -1113,6 +1251,8 @@ export type XeroTenantCreateWithoutXero_connectionInput = {
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -1122,6 +1262,8 @@ export type XeroTenantUncheckedCreateWithoutXero_connectionInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_tenant_id: string
   provider_app_id: string
   active_slot?: number | null
@@ -1189,6 +1331,8 @@ export type XeroTenantUpdateWithoutXero_connectionInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -1198,6 +1342,8 @@ export type XeroTenantUncheckedUpdateWithoutXero_connectionInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
   active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
@@ -1222,6 +1368,186 @@ export type XeroTenantUncheckedUpdateWithoutXero_connectionInput = {
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantCreateWithoutCredential_ownerInput = {
+  id?: string
+  clerk_org_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
+  xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantUncheckedCreateWithoutCredential_ownerInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_provider_connection_id?: string | null
+  xero_connection_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantCreateOrConnectWithoutCredential_ownerInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput>
+}
+
+export type XeroTenantCreateManyCredential_ownerInputEnvelope = {
+  data: Prisma.XeroTenantCreateManyCredential_ownerInput | Prisma.XeroTenantCreateManyCredential_ownerInput[]
+  skipDuplicates?: boolean
+}
+
+export type XeroTenantUpsertWithWhereUniqueWithoutCredential_ownerInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  update: Prisma.XOR<Prisma.XeroTenantUpdateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedUpdateWithoutCredential_ownerInput>
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedCreateWithoutCredential_ownerInput>
+}
+
+export type XeroTenantUpdateWithWhereUniqueWithoutCredential_ownerInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  data: Prisma.XOR<Prisma.XeroTenantUpdateWithoutCredential_ownerInput, Prisma.XeroTenantUncheckedUpdateWithoutCredential_ownerInput>
+}
+
+export type XeroTenantUpdateManyWithWhereWithoutCredential_ownerInput = {
+  where: Prisma.XeroTenantScalarWhereInput
+  data: Prisma.XOR<Prisma.XeroTenantUpdateManyMutationInput, Prisma.XeroTenantUncheckedUpdateManyWithoutCredential_ownerInput>
+}
+
+export type XeroTenantCreateWithoutProvider_connectionInput = {
+  id?: string
+  clerk_org_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
+  xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantUncheckedCreateWithoutProvider_connectionInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_connection_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantCreateOrConnectWithoutProvider_connectionInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput>
+}
+
+export type XeroTenantCreateManyProvider_connectionInputEnvelope = {
+  data: Prisma.XeroTenantCreateManyProvider_connectionInput | Prisma.XeroTenantCreateManyProvider_connectionInput[]
+  skipDuplicates?: boolean
+}
+
+export type XeroTenantUpsertWithWhereUniqueWithoutProvider_connectionInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  update: Prisma.XOR<Prisma.XeroTenantUpdateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedUpdateWithoutProvider_connectionInput>
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedCreateWithoutProvider_connectionInput>
+}
+
+export type XeroTenantUpdateWithWhereUniqueWithoutProvider_connectionInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  data: Prisma.XOR<Prisma.XeroTenantUpdateWithoutProvider_connectionInput, Prisma.XeroTenantUncheckedUpdateWithoutProvider_connectionInput>
+}
+
+export type XeroTenantUpdateManyWithWhereWithoutProvider_connectionInput = {
+  where: Prisma.XeroTenantScalarWhereInput
+  data: Prisma.XOR<Prisma.XeroTenantUpdateManyMutationInput, Prisma.XeroTenantUncheckedUpdateManyWithoutProvider_connectionInput>
 }
 
 export type XeroTenantCreateWithoutSync_cursorsInput = {
@@ -1250,6 +1576,8 @@ export type XeroTenantCreateWithoutSync_cursorsInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
 }
@@ -1258,6 +1586,8 @@ export type XeroTenantUncheckedCreateWithoutSync_cursorsInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -1326,6 +1656,8 @@ export type XeroTenantUpdateWithoutSync_cursorsInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
 }
@@ -1334,6 +1666,8 @@ export type XeroTenantUncheckedUpdateWithoutSync_cursorsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1386,6 +1720,8 @@ export type XeroTenantCreateWithoutLeave_balancesInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
 }
@@ -1394,6 +1730,8 @@ export type XeroTenantUncheckedCreateWithoutLeave_balancesInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -1462,6 +1800,8 @@ export type XeroTenantUpdateWithoutLeave_balancesInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
 }
@@ -1470,6 +1810,8 @@ export type XeroTenantUncheckedUpdateWithoutLeave_balancesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1522,6 +1864,8 @@ export type XeroTenantCreateWithoutSync_runsInput = {
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
 }
@@ -1530,6 +1874,8 @@ export type XeroTenantUncheckedCreateWithoutSync_runsInput = {
   id?: string
   clerk_org_id: string
   organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -1598,6 +1944,8 @@ export type XeroTenantUpdateWithoutSync_runsInput = {
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
 }
@@ -1606,6 +1954,8 @@ export type XeroTenantUncheckedUpdateWithoutSync_runsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
   organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1635,6 +1985,8 @@ export type XeroTenantUncheckedUpdateWithoutSync_runsInput = {
 export type XeroTenantCreateManyOrganisationInput = {
   id?: string
   clerk_org_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
   xero_connection_id: string
   xero_tenant_id: string
   provider_app_id: string
@@ -1684,6 +2036,8 @@ export type XeroTenantUpdateWithoutOrganisationInput = {
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -1692,6 +2046,8 @@ export type XeroTenantUpdateWithoutOrganisationInput = {
 export type XeroTenantUncheckedUpdateWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1722,6 +2078,252 @@ export type XeroTenantUncheckedUpdateWithoutOrganisationInput = {
 export type XeroTenantUncheckedUpdateManyWithoutOrganisationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type XeroTenantCreateManyCredential_ownerInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_provider_connection_id?: string | null
+  xero_connection_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+}
+
+export type XeroTenantUpdateWithoutCredential_ownerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantUncheckedUpdateWithoutCredential_ownerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantUncheckedUpdateManyWithoutCredential_ownerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type XeroTenantCreateManyProvider_connectionInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_connection_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+}
+
+export type XeroTenantUpdateWithoutProvider_connectionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantUncheckedUpdateWithoutProvider_connectionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantUncheckedUpdateManyWithoutProvider_connectionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
   xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
   provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1799,6 +2401,8 @@ export type XeroTenantSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_credential_owner_id?: boolean
+  xero_provider_connection_id?: boolean
   xero_connection_id?: boolean
   xero_tenant_id?: boolean
   provider_app_id?: boolean
@@ -1823,6 +2427,8 @@ export type XeroTenantSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
   sync_cursors?: boolean | Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>
   leave_balances?: boolean | Prisma.XeroTenant$leave_balancesArgs<ExtArgs>
   sync_runs?: boolean | Prisma.XeroTenant$sync_runsArgs<ExtArgs>
@@ -1833,6 +2439,8 @@ export type XeroTenantSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_credential_owner_id?: boolean
+  xero_provider_connection_id?: boolean
   xero_connection_id?: boolean
   xero_tenant_id?: boolean
   provider_app_id?: boolean
@@ -1857,12 +2465,16 @@ export type XeroTenantSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
 }, ExtArgs["result"]["xeroTenant"]>
 
 export type XeroTenantSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_credential_owner_id?: boolean
+  xero_provider_connection_id?: boolean
   xero_connection_id?: boolean
   xero_tenant_id?: boolean
   provider_app_id?: boolean
@@ -1887,12 +2499,16 @@ export type XeroTenantSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
 }, ExtArgs["result"]["xeroTenant"]>
 
 export type XeroTenantSelectScalar = {
   id?: boolean
   clerk_org_id?: boolean
   organisation_id?: boolean
+  xero_credential_owner_id?: boolean
+  xero_provider_connection_id?: boolean
   xero_connection_id?: boolean
   xero_tenant_id?: boolean
   provider_app_id?: boolean
@@ -1917,10 +2533,12 @@ export type XeroTenantSelectScalar = {
   updated_at?: boolean
 }
 
-export type XeroTenantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_connection_id" | "xero_tenant_id" | "provider_app_id" | "active_slot" | "binding_generation" | "retired_at" | "retirement_reason" | "tenant_name" | "payroll_region" | "sync_paused_at" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "created_at" | "updated_at", ExtArgs["result"]["xeroTenant"]>
+export type XeroTenantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_credential_owner_id" | "xero_provider_connection_id" | "xero_connection_id" | "xero_tenant_id" | "provider_app_id" | "active_slot" | "binding_generation" | "retired_at" | "retirement_reason" | "tenant_name" | "payroll_region" | "sync_paused_at" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "created_at" | "updated_at", ExtArgs["result"]["xeroTenant"]>
 export type XeroTenantInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
   sync_cursors?: boolean | Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>
   leave_balances?: boolean | Prisma.XeroTenant$leave_balancesArgs<ExtArgs>
   sync_runs?: boolean | Prisma.XeroTenant$sync_runsArgs<ExtArgs>
@@ -1929,10 +2547,14 @@ export type XeroTenantInclude<ExtArgs extends runtime.Types.Extensions.InternalA
 export type XeroTenantIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
 }
 export type XeroTenantIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
+  credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
+  provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
 }
 
 export type $XeroTenantPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1940,6 +2562,8 @@ export type $XeroTenantPayload<ExtArgs extends runtime.Types.Extensions.Internal
   objects: {
     organisation: Prisma.$OrganisationPayload<ExtArgs>
     xero_connection: Prisma.$XeroConnectionPayload<ExtArgs>
+    credential_owner: Prisma.$XeroCredentialOwnerPayload<ExtArgs> | null
+    provider_connection: Prisma.$XeroProviderConnectionPayload<ExtArgs> | null
     sync_cursors: Prisma.$XeroSyncCursorPayload<ExtArgs>[]
     leave_balances: Prisma.$LeaveBalancePayload<ExtArgs>[]
     sync_runs: Prisma.$SyncRunPayload<ExtArgs>[]
@@ -1948,6 +2572,8 @@ export type $XeroTenantPayload<ExtArgs extends runtime.Types.Extensions.Internal
     id: string
     clerk_org_id: string
     organisation_id: string
+    xero_credential_owner_id: string | null
+    xero_provider_connection_id: string | null
     xero_connection_id: string
     xero_tenant_id: string
     provider_app_id: string
@@ -2366,6 +2992,8 @@ export interface Prisma__XeroTenantClient<T, Null = never, ExtArgs extends runti
   readonly [Symbol.toStringTag]: "PrismaPromise"
   organisation<T extends Prisma.OrganisationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganisationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganisationClient<runtime.Types.Result.GetResult<Prisma.$OrganisationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   xero_connection<T extends Prisma.XeroConnectionDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnectionDefaultArgs<ExtArgs>>): Prisma.Prisma__XeroConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  credential_owner<T extends Prisma.XeroTenant$credential_ownerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$credential_ownerArgs<ExtArgs>>): Prisma.Prisma__XeroCredentialOwnerClient<runtime.Types.Result.GetResult<Prisma.$XeroCredentialOwnerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  provider_connection<T extends Prisma.XeroTenant$provider_connectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$provider_connectionArgs<ExtArgs>>): Prisma.Prisma__XeroProviderConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroProviderConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   sync_cursors<T extends Prisma.XeroTenant$sync_cursorsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroSyncCursorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   leave_balances<T extends Prisma.XeroTenant$leave_balancesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$leave_balancesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LeaveBalancePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sync_runs<T extends Prisma.XeroTenant$sync_runsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$sync_runsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SyncRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2401,6 +3029,8 @@ export interface XeroTenantFieldRefs {
   readonly id: Prisma.FieldRef<"XeroTenant", 'String'>
   readonly clerk_org_id: Prisma.FieldRef<"XeroTenant", 'String'>
   readonly organisation_id: Prisma.FieldRef<"XeroTenant", 'String'>
+  readonly xero_credential_owner_id: Prisma.FieldRef<"XeroTenant", 'String'>
+  readonly xero_provider_connection_id: Prisma.FieldRef<"XeroTenant", 'String'>
   readonly xero_connection_id: Prisma.FieldRef<"XeroTenant", 'String'>
   readonly xero_tenant_id: Prisma.FieldRef<"XeroTenant", 'String'>
   readonly provider_app_id: Prisma.FieldRef<"XeroTenant", 'String'>
@@ -2821,6 +3451,44 @@ export type XeroTenantDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Limit how many XeroTenants to delete.
    */
   limit?: number
+}
+
+/**
+ * XeroTenant.credential_owner
+ */
+export type XeroTenant$credential_ownerArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroCredentialOwner
+   */
+  select?: Prisma.XeroCredentialOwnerSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroCredentialOwner
+   */
+  omit?: Prisma.XeroCredentialOwnerOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroCredentialOwnerInclude<ExtArgs> | null
+  where?: Prisma.XeroCredentialOwnerWhereInput
+}
+
+/**
+ * XeroTenant.provider_connection
+ */
+export type XeroTenant$provider_connectionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroProviderConnection
+   */
+  select?: Prisma.XeroProviderConnectionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroProviderConnection
+   */
+  omit?: Prisma.XeroProviderConnectionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroProviderConnectionInclude<ExtArgs> | null
+  where?: Prisma.XeroProviderConnectionWhereInput
 }
 
 /**

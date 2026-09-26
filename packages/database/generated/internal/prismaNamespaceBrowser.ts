@@ -58,6 +58,9 @@ export const ModelName = {
   Person: 'Person',
   AlternativeContact: 'AlternativeContact',
   XeroConnection: 'XeroConnection',
+  XeroCredentialOwner: 'XeroCredentialOwner',
+  XeroRefreshAttempt: 'XeroRefreshAttempt',
+  XeroProviderConnection: 'XeroProviderConnection',
   XeroTenant: 'XeroTenant',
   XeroOAuthSession: 'XeroOAuthSession',
   XeroSyncCursor: 'XeroSyncCursor',
@@ -251,10 +254,79 @@ export const XeroConnectionScalarFieldEnum = {
 export type XeroConnectionScalarFieldEnum = (typeof XeroConnectionScalarFieldEnum)[keyof typeof XeroConnectionScalarFieldEnum]
 
 
+export const XeroCredentialOwnerScalarFieldEnum = {
+  id: 'id',
+  provider_app_id: 'provider_app_id',
+  xero_user_id: 'xero_user_id',
+  identity_evidence: 'identity_evidence',
+  access_token_encrypted: 'access_token_encrypted',
+  access_token_iv: 'access_token_iv',
+  access_token_auth_tag: 'access_token_auth_tag',
+  refresh_token_encrypted: 'refresh_token_encrypted',
+  refresh_token_iv: 'refresh_token_iv',
+  refresh_token_auth_tag: 'refresh_token_auth_tag',
+  token_key_version: 'token_key_version',
+  token_version: 'token_version',
+  last_refresh_attempt_id: 'last_refresh_attempt_id',
+  token_expires_at: 'token_expires_at',
+  granted_scopes: 'granted_scopes',
+  granted_scopes_known: 'granted_scopes_known',
+  usability: 'usability',
+  last_verified_at: 'last_verified_at',
+  last_adopted_at: 'last_adopted_at',
+  last_rotated_at: 'last_rotated_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCredentialOwnerScalarFieldEnum = (typeof XeroCredentialOwnerScalarFieldEnum)[keyof typeof XeroCredentialOwnerScalarFieldEnum]
+
+
+export const XeroRefreshAttemptScalarFieldEnum = {
+  id: 'id',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  expected_token_version: 'expected_token_version',
+  dispatched_at: 'dispatched_at',
+  uncertain_since: 'uncertain_since',
+  recovery_deadline: 'recovery_deadline',
+  outcome: 'outcome',
+  recovery_token_encrypted: 'recovery_token_encrypted',
+  recovery_token_iv: 'recovery_token_iv',
+  recovery_token_auth_tag: 'recovery_token_auth_tag',
+  recovery_key_version: 'recovery_key_version',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroRefreshAttemptScalarFieldEnum = (typeof XeroRefreshAttemptScalarFieldEnum)[keyof typeof XeroRefreshAttemptScalarFieldEnum]
+
+
+export const XeroProviderConnectionScalarFieldEnum = {
+  id: 'id',
+  provider_app_id: 'provider_app_id',
+  remote_connection_id: 'remote_connection_id',
+  xero_tenant_id: 'xero_tenant_id',
+  tenant_type: 'tenant_type',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  auth_event_id: 'auth_event_id',
+  provider_created_at: 'provider_created_at',
+  provider_updated_at: 'provider_updated_at',
+  observed_at: 'observed_at',
+  observed_via: 'observed_via',
+  remote_status: 'remote_status',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroProviderConnectionScalarFieldEnum = (typeof XeroProviderConnectionScalarFieldEnum)[keyof typeof XeroProviderConnectionScalarFieldEnum]
+
+
 export const XeroTenantScalarFieldEnum = {
   id: 'id',
   clerk_org_id: 'clerk_org_id',
   organisation_id: 'organisation_id',
+  xero_credential_owner_id: 'xero_credential_owner_id',
+  xero_provider_connection_id: 'xero_provider_connection_id',
   xero_connection_id: 'xero_connection_id',
   xero_tenant_id: 'xero_tenant_id',
   provider_app_id: 'provider_app_id',
@@ -297,6 +369,10 @@ export const XeroOAuthSessionScalarFieldEnum = {
   refresh_token_auth_tag: 'refresh_token_auth_tag',
   token_key_version: 'token_key_version',
   token_encrypted_at: 'token_encrypted_at',
+  requested_scopes: 'requested_scopes',
+  intent_kind: 'intent_kind',
+  nonce_hash: 'nonce_hash',
+  token_exchange_status: 'token_exchange_status',
   token_expires_at: 'token_expires_at',
   available_tenants_json: 'available_tenants_json',
   selected_tenant_id: 'selected_tenant_id',
@@ -800,13 +876,6 @@ export const SortOrder = {
 } as const
 
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
-
-
-export const JsonNullValueInput = {
-  JsonNull: JsonNull
-} as const
-
-export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
 
 
 export const NullableJsonNullValueInput = {

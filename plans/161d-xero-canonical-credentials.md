@@ -176,23 +176,31 @@ because of the mirror-write. 161g migrates them.
 additionally needs a syntactically valid `DATABASE_URL` and a 32-byte base64
 `XERO_TOKEN_ENCRYPTION_KEY` (e.g. `openssl rand -base64 32`) for that command only.
 
-**Local integration database (every `test:integration` and `migrate:deploy`).**
+**Authorised online integration database.** The session-wide decision in
+`tasks/lessons.md` supersedes localhost and Docker instructions. Use only the
+configured online Neon database through `tooling/release/run-live-integration.ts`.
+Refresh SQL identity and restore evidence, Inngest consumer isolation, durable
+candidate-bound manifest ownership, active-run ownership and cleanup checks.
+No local database may be provisioned. Do not use a local flag to bypass the
+remote guard, and never fabricate provider evidence.
+
+The single additive schema migration is necessary for this slice. Generate and
+review its SQL before applying it: only the three new infrastructure tables,
+the specified nullable references and session nullability relaxations are
+allowed. Confirm existing migration checksums, the exact pending migration,
+fresh live target/restore/consumer evidence and active-run ownership before
+deploying it. Do not apply the credential backfill to customer rows or refresh
+real customer credentials during verification. Fixture tests use only the
+protected manifest's owned records and global keys.
 
 ```bash
-docker run -d --name tc-161-pg -p 5432:5432 \
-  -e POSTGRES_USER=team-calendar -e POSTGRES_PASSWORD=team-calendar \
-  -e POSTGRES_DB=team-calendar_test postgres:16
-export DATABASE_URL=postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
-echo "$DATABASE_URL" | grep -q '@localhost:5432/' && echo LOCAL_OK   # must print LOCAL_OK
-bun run migrate:deploy
+bun tooling/release/run-live-integration.ts --manifest <private-manifest-path>
 ```
 
-Never run `migrate:deploy` against a non-localhost database. If no local database is available,
-record integration gates `NOT_VERIFIED: no local database` in the execution report and set the
-README status `BLOCKED (integration gates not run)`. A run that collects zero tests from a file
-this plan names is a failure.
+Record actual guarded online suite collection and post-cleanup read-back.
+Reconcile provider or tooling obstacles while continuing independent work.
 
-**Not local gates:** `bun run preflight` and `bun run test:release`.
+**Separate rollout gates:** `bun run preflight` and `bun run test:release`.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
@@ -202,7 +210,7 @@ this plan names is a failure.
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
 | Database units | `bun run --cwd packages/database test` | exit 0 |
 | Prisma validate | `(cd packages/database && bunx prisma validate)` | exit 0 |
-| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
+| Apply reviewed additive migration | `bun run migrate:deploy` in the protected live window | exit 0; only the reviewed migration applied |
 | Xero integration | `bun run --cwd packages/xero test:integration` | exit 0, `credential-owner.integration.test.ts` collected |
 | Database integration | `bun run --cwd packages/database test:integration` | exit 0 |
 | Release tooling | `bun run test:release-tools` | exit 0 |
@@ -239,7 +247,7 @@ this plan names is a failure.
   nothing else) and its unit test
 - `tooling/release/integration-inventory.ts` and `.test.ts` (add
   `credential-owner.integration.test.ts`; bump the suite count in the message)
-- `CLAUDE.md` and `PRODUCT.md` (the `clerk_org_id` exception paragraph only)
+- `AGENTS.md` and `PRODUCT.md` (the `clerk_org_id` exception paragraph only)
 - `plans/161-xero-provider-contract.md` (one row: access-token identity claims)
 - `plans/161-xero-execution-report.md` (append a 161d section), `plans/README.md` (status row)
 
@@ -406,7 +414,7 @@ nullable (a session now exists before the exchange).
 
 **The deliberate convention exception.** `XeroCredentialOwner`, `XeroRefreshAttempt` and
 `XeroProviderConnection` are **system infrastructure**, not customer-owned payroll rows. They get
-**no `clerk_org_id`**. Add one paragraph to the Database conventions section of `CLAUDE.md` and to
+**no `clerk_org_id`**. Add one paragraph to the Database conventions section of `AGENTS.md` and to
 the data-model section of `PRODUCT.md` naming these three tables and the reason. Add a test to
 `packages/database/xero-lifecycle-migration.integration.test.ts` that queries
 `information_schema.columns` and asserts every table **except** those three and a fixed,
@@ -420,7 +428,7 @@ Generate SQL as in 161b (`migrate diff --from-config-datasource --to-schema --sc
 
 **Verify**: `(cd packages/database && bunx prisma validate)` → exit 0.
 `grep "DROP" <new migration.sql> | grep -v "DROP NOT NULL"` prints nothing.
-`bun run migrate:deploy` (after `LOCAL_OK`) → exit 0.
+`bun run migrate:deploy` in the verified protected live window → exit 0.
 
 ### Step 3: Verify authoriser identity
 
@@ -651,7 +659,7 @@ exported function (assert call order on the `$queryRaw` mock); invalid client re
 nothing; `resolveXeroAccess` rejects a stale generation, a retired binding, an unusable owner, and
 unknown scope data.
 
-`credential-owner.integration.test.ts` (new, local database):
+`credential-owner.integration.test.ts` (new, guarded online database):
 1. **Same authoriser, two payroll files** (tenant slots 1 and 2 in one Clerk org): one owner,
    both bindings mirror the same envelope, and `resolveXeroAccess` for org A never returns org B's
    tenant ID. Assert both directions.
@@ -683,15 +691,15 @@ All must hold:
 - [ ] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
 - [ ] `bun run --cwd packages/xero test` exits 0, including the Step 1 regressions
 - [ ] `bun run --cwd packages/database test` and `bun run --cwd packages/jobs test` exit 0
-- [ ] `bun run --cwd packages/xero test:integration` exits 0 locally and lists `credential-owner.integration.test.ts`
-- [ ] `bun run --cwd packages/database test:integration` exits 0 locally
+- [ ] `bun run --cwd packages/xero test:integration` passes through the protected online runner and lists `credential-owner.integration.test.ts`
+- [ ] `bun run --cwd packages/database test:integration` passes through the protected online runner
 - [ ] `bun run test:release-tools` exits 0
 - [ ] `git diff --check` exits 0
 - [ ] `grep -n "model XeroTenantBinding" packages/database/prisma/schema.prisma` returns no matches
 - [ ] `grep -n "tokenChanged" packages/xero/src/oauth/service.ts` returns no matches
 - [ ] `grep -rn "resolveXeroAccess\|refreshXeroCredentialOwner" apps/ --include=*.ts --include=*.tsx` returns no matches
 - [ ] `grep -n "access_token_encrypted" packages/database/prisma/schema.prisma` still shows the `XeroConnection` column
-- [ ] `grep -n "xero_credential_owners" CLAUDE.md PRODUCT.md` returns a match in each
+- [ ] `grep -n "xero_credential_owners" AGENTS.md PRODUCT.md` returns a match in each
 - [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
 - [ ] `plans/README.md` status row for 161d updated
 
@@ -727,3 +735,29 @@ Stop and report; do not improvise:
   a clean stop after Step 4.
 - In review, scrutinise: the JWKS failure path, candidate adoption ordering, the mirror-write set
   (reserved bindings of **this** owner only), and every lock acquisition's order.
+
+## Execution reconciliation, 26 September 2026
+
+Baseline `8812ecf` includes merged 161b and 161c. Their schema, keyring,
+required key-version arguments and deadline changes are expected prerequisite
+drift, not a stop condition. The ciphertext-inequality recovery defect remains.
+
+The executor works in `/tmp/tc-161d` on `codex/xero-canonical-credentials`.
+It reads the complete committed plan plus these explicit reconciliation rules;
+the reviewer owns the index and live-run orchestration. Generated Prisma
+client changes are required for the new schema and are in scope. The owned
+cleanup implementation and its tests are in scope for the three infrastructure
+tables and recovery envelopes. Any further required scope is reviewed explicitly.
+
+Resolver scope behaviour follows Step 4: unknown granted scope data may proceed
+without asserting the capability is granted. The contradictory test-plan phrase
+about rejecting unknown scopes is superseded. Obsolete refresh attempts must
+not mark an owner with a newer token version unusable.
+
+Official Xero token documentation identifies `xero_userid` as the unique end-user
+claim. The access-token examples in token-types and the PKCE flow agree on
+`https://identity.xero.com/resources` as the resource audience (the token-types
+table's client-ID audience description differs). The official discovery response
+confirms the issuer, fixed JWKS URL and RS256 signing algorithm. Record this
+evidence boundary in the provider contract ledger; actual customer tokens are
+not decoded or refreshed as verification evidence.

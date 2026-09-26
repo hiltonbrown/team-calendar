@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   ensureFreshXeroConnection: vi.fn(),
   findConnectionsNeedingTokenRotation: vi.fn(),
   listSchedulableXeroTenants: vi.fn(),
+  recoverXeroRefreshAttempts: vi.fn(),
   scrubInactiveXeroOAuthSessionCredentials: vi.fn(),
 }));
 
@@ -18,6 +19,7 @@ vi.mock("@repo/database", () => ({
 
 vi.mock("@repo/xero", () => ({
   ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
+  recoverXeroRefreshAttempts: mocks.recoverXeroRefreshAttempts,
   scrubInactiveXeroOAuthSessionCredentials:
     mocks.scrubInactiveXeroOAuthSessionCredentials,
 }));
@@ -352,6 +354,36 @@ describe("scheduleXeroSyncs Coordinator", () => {
   });
 
   describe("scheduleXeroSyncsFunction registration", () => {
+    it("runs durable refresh recovery once before scheduled tenant dispatch", async () => {
+      mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
+        ok: true,
+        value: [],
+      });
+      mocks.listSchedulableXeroTenants.mockResolvedValue({
+        ok: true,
+        value: { tenants: [] },
+      });
+      const handler: unknown = Reflect.get(scheduleXeroSyncsFunction, "fn");
+      if (typeof handler !== "function") {
+        throw new Error("Expected registered Inngest handler");
+      }
+      const steps: string[] = [];
+      await handler({
+        step: {
+          run: (id: string, operation: () => Promise<unknown>) => {
+            steps.push(id);
+            return operation();
+          },
+        },
+      });
+      expect(mocks.recoverXeroRefreshAttempts).toHaveBeenCalledExactlyOnceWith({
+        now: expect.any(Date),
+      });
+      expect(steps.indexOf("recover-xero-refresh-attempts")).toBeLessThan(
+        steps.indexOf("rotate-dormant-connections")
+      );
+    });
+
     it("registers scheduleXeroSyncsFunction with id schedule-xero-syncs and 15-min cron", () => {
       expect(functions).toContain(scheduleXeroSyncsFunction);
 

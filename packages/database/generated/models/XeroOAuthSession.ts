@@ -51,6 +51,9 @@ export type XeroOAuthSessionMinAggregateOutputType = {
   refresh_token_auth_tag: string | null
   token_key_version: number | null
   token_encrypted_at: Date | null
+  intent_kind: $Enums.xero_oauth_intent_kind | null
+  nonce_hash: string | null
+  token_exchange_status: $Enums.xero_token_exchange_status | null
   token_expires_at: Date | null
   selected_tenant_id: string | null
   selected_tenant_name: string | null
@@ -76,6 +79,9 @@ export type XeroOAuthSessionMaxAggregateOutputType = {
   refresh_token_auth_tag: string | null
   token_key_version: number | null
   token_encrypted_at: Date | null
+  intent_kind: $Enums.xero_oauth_intent_kind | null
+  nonce_hash: string | null
+  token_exchange_status: $Enums.xero_token_exchange_status | null
   token_expires_at: Date | null
   selected_tenant_id: string | null
   selected_tenant_name: string | null
@@ -101,6 +107,10 @@ export type XeroOAuthSessionCountAggregateOutputType = {
   refresh_token_auth_tag: number
   token_key_version: number
   token_encrypted_at: number
+  requested_scopes: number
+  intent_kind: number
+  nonce_hash: number
+  token_exchange_status: number
   token_expires_at: number
   available_tenants_json: number
   selected_tenant_id: number
@@ -139,6 +149,9 @@ export type XeroOAuthSessionMinAggregateInputType = {
   refresh_token_auth_tag?: true
   token_key_version?: true
   token_encrypted_at?: true
+  intent_kind?: true
+  nonce_hash?: true
+  token_exchange_status?: true
   token_expires_at?: true
   selected_tenant_id?: true
   selected_tenant_name?: true
@@ -164,6 +177,9 @@ export type XeroOAuthSessionMaxAggregateInputType = {
   refresh_token_auth_tag?: true
   token_key_version?: true
   token_encrypted_at?: true
+  intent_kind?: true
+  nonce_hash?: true
+  token_exchange_status?: true
   token_expires_at?: true
   selected_tenant_id?: true
   selected_tenant_name?: true
@@ -189,6 +205,10 @@ export type XeroOAuthSessionCountAggregateInputType = {
   refresh_token_auth_tag?: true
   token_key_version?: true
   token_encrypted_at?: true
+  requested_scopes?: true
+  intent_kind?: true
+  nonce_hash?: true
+  token_exchange_status?: true
   token_expires_at?: true
   available_tenants_json?: true
   selected_tenant_id?: true
@@ -302,8 +322,12 @@ export type XeroOAuthSessionGroupByOutputType = {
   refresh_token_auth_tag: string | null
   token_key_version: number
   token_encrypted_at: Date | null
-  token_expires_at: Date
-  available_tenants_json: runtime.JsonValue
+  requested_scopes: string[]
+  intent_kind: $Enums.xero_oauth_intent_kind | null
+  nonce_hash: string | null
+  token_exchange_status: $Enums.xero_token_exchange_status | null
+  token_expires_at: Date | null
+  available_tenants_json: runtime.JsonValue | null
   selected_tenant_id: string | null
   selected_tenant_name: string | null
   selected_payroll_region: $Enums.payroll_region | null
@@ -351,8 +375,12 @@ export type XeroOAuthSessionWhereInput = {
   refresh_token_auth_tag?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   token_key_version?: Prisma.IntFilter<"XeroOAuthSession"> | number
   token_encrypted_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
-  token_expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
-  available_tenants_json?: Prisma.JsonFilter<"XeroOAuthSession">
+  requested_scopes?: Prisma.StringNullableListFilter<"XeroOAuthSession">
+  intent_kind?: Prisma.Enumxero_oauth_intent_kindNullableFilter<"XeroOAuthSession"> | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
+  token_exchange_status?: Prisma.Enumxero_token_exchange_statusNullableFilter<"XeroOAuthSession"> | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
+  available_tenants_json?: Prisma.JsonNullableFilter<"XeroOAuthSession">
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
@@ -378,8 +406,12 @@ export type XeroOAuthSessionOrderByWithRelationInput = {
   refresh_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
   token_key_version?: Prisma.SortOrder
   token_encrypted_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  token_expires_at?: Prisma.SortOrder
-  available_tenants_json?: Prisma.SortOrder
+  requested_scopes?: Prisma.SortOrder
+  intent_kind?: Prisma.SortOrderInput | Prisma.SortOrder
+  nonce_hash?: Prisma.SortOrderInput | Prisma.SortOrder
+  token_exchange_status?: Prisma.SortOrderInput | Prisma.SortOrder
+  token_expires_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  available_tenants_json?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -408,8 +440,12 @@ export type XeroOAuthSessionWhereUniqueInput = Prisma.AtLeast<{
   refresh_token_auth_tag?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   token_key_version?: Prisma.IntFilter<"XeroOAuthSession"> | number
   token_encrypted_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
-  token_expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
-  available_tenants_json?: Prisma.JsonFilter<"XeroOAuthSession">
+  requested_scopes?: Prisma.StringNullableListFilter<"XeroOAuthSession">
+  intent_kind?: Prisma.Enumxero_oauth_intent_kindNullableFilter<"XeroOAuthSession"> | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
+  token_exchange_status?: Prisma.Enumxero_token_exchange_statusNullableFilter<"XeroOAuthSession"> | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
+  available_tenants_json?: Prisma.JsonNullableFilter<"XeroOAuthSession">
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
@@ -435,8 +471,12 @@ export type XeroOAuthSessionOrderByWithAggregationInput = {
   refresh_token_auth_tag?: Prisma.SortOrderInput | Prisma.SortOrder
   token_key_version?: Prisma.SortOrder
   token_encrypted_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  token_expires_at?: Prisma.SortOrder
-  available_tenants_json?: Prisma.SortOrder
+  requested_scopes?: Prisma.SortOrder
+  intent_kind?: Prisma.SortOrderInput | Prisma.SortOrder
+  nonce_hash?: Prisma.SortOrderInput | Prisma.SortOrder
+  token_exchange_status?: Prisma.SortOrderInput | Prisma.SortOrder
+  token_expires_at?: Prisma.SortOrderInput | Prisma.SortOrder
+  available_tenants_json?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_id?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrderInput | Prisma.SortOrder
   selected_payroll_region?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -469,8 +509,12 @@ export type XeroOAuthSessionScalarWhereWithAggregatesInput = {
   refresh_token_auth_tag?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   token_key_version?: Prisma.IntWithAggregatesFilter<"XeroOAuthSession"> | number
   token_encrypted_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroOAuthSession"> | Date | string | null
-  token_expires_at?: Prisma.DateTimeWithAggregatesFilter<"XeroOAuthSession"> | Date | string
-  available_tenants_json?: Prisma.JsonWithAggregatesFilter<"XeroOAuthSession">
+  requested_scopes?: Prisma.StringNullableListFilter<"XeroOAuthSession">
+  intent_kind?: Prisma.Enumxero_oauth_intent_kindNullableWithAggregatesFilter<"XeroOAuthSession"> | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
+  token_exchange_status?: Prisma.Enumxero_token_exchange_statusNullableWithAggregatesFilter<"XeroOAuthSession"> | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroOAuthSession"> | Date | string | null
+  available_tenants_json?: Prisma.JsonNullableWithAggregatesFilter<"XeroOAuthSession">
   selected_tenant_id?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableWithAggregatesFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableWithAggregatesFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
@@ -494,8 +538,12 @@ export type XeroOAuthSessionCreateInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -521,8 +569,12 @@ export type XeroOAuthSessionUncheckedCreateInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -546,8 +598,12 @@ export type XeroOAuthSessionUpdateInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -573,8 +629,12 @@ export type XeroOAuthSessionUncheckedUpdateInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -599,8 +659,12 @@ export type XeroOAuthSessionCreateManyInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -624,8 +688,12 @@ export type XeroOAuthSessionUpdateManyMutationInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -650,8 +718,12 @@ export type XeroOAuthSessionUncheckedUpdateManyInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -686,6 +758,10 @@ export type XeroOAuthSessionCountOrderByAggregateInput = {
   refresh_token_auth_tag?: Prisma.SortOrder
   token_key_version?: Prisma.SortOrder
   token_encrypted_at?: Prisma.SortOrder
+  requested_scopes?: Prisma.SortOrder
+  intent_kind?: Prisma.SortOrder
+  nonce_hash?: Prisma.SortOrder
+  token_exchange_status?: Prisma.SortOrder
   token_expires_at?: Prisma.SortOrder
   available_tenants_json?: Prisma.SortOrder
   selected_tenant_id?: Prisma.SortOrder
@@ -717,6 +793,9 @@ export type XeroOAuthSessionMaxOrderByAggregateInput = {
   refresh_token_auth_tag?: Prisma.SortOrder
   token_key_version?: Prisma.SortOrder
   token_encrypted_at?: Prisma.SortOrder
+  intent_kind?: Prisma.SortOrder
+  nonce_hash?: Prisma.SortOrder
+  token_exchange_status?: Prisma.SortOrder
   token_expires_at?: Prisma.SortOrder
   selected_tenant_id?: Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrder
@@ -742,6 +821,9 @@ export type XeroOAuthSessionMinOrderByAggregateInput = {
   refresh_token_auth_tag?: Prisma.SortOrder
   token_key_version?: Prisma.SortOrder
   token_encrypted_at?: Prisma.SortOrder
+  intent_kind?: Prisma.SortOrder
+  nonce_hash?: Prisma.SortOrder
+  token_exchange_status?: Prisma.SortOrder
   token_expires_at?: Prisma.SortOrder
   selected_tenant_id?: Prisma.SortOrder
   selected_tenant_name?: Prisma.SortOrder
@@ -799,8 +881,25 @@ export type XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationNestedInput = 
   deleteMany?: Prisma.XeroOAuthSessionScalarWhereInput | Prisma.XeroOAuthSessionScalarWhereInput[]
 }
 
+export type XeroOAuthSessionCreaterequested_scopesInput = {
+  set: string[]
+}
+
 export type Enumxero_oauth_session_statusFieldUpdateOperationsInput = {
   set?: $Enums.xero_oauth_session_status
+}
+
+export type XeroOAuthSessionUpdaterequested_scopesInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
+export type NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput = {
+  set?: $Enums.xero_oauth_intent_kind | null
+}
+
+export type NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput = {
+  set?: $Enums.xero_token_exchange_status | null
 }
 
 export type NullableEnumpayroll_regionFieldUpdateOperationsInput = {
@@ -821,8 +920,12 @@ export type XeroOAuthSessionCreateWithoutOrganisationInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -846,8 +949,12 @@ export type XeroOAuthSessionUncheckedCreateWithoutOrganisationInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -901,8 +1008,12 @@ export type XeroOAuthSessionScalarWhereInput = {
   refresh_token_auth_tag?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   token_key_version?: Prisma.IntFilter<"XeroOAuthSession"> | number
   token_encrypted_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
-  token_expires_at?: Prisma.DateTimeFilter<"XeroOAuthSession"> | Date | string
-  available_tenants_json?: Prisma.JsonFilter<"XeroOAuthSession">
+  requested_scopes?: Prisma.StringNullableListFilter<"XeroOAuthSession">
+  intent_kind?: Prisma.Enumxero_oauth_intent_kindNullableFilter<"XeroOAuthSession"> | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
+  token_exchange_status?: Prisma.Enumxero_token_exchange_statusNullableFilter<"XeroOAuthSession"> | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.DateTimeNullableFilter<"XeroOAuthSession"> | Date | string | null
+  available_tenants_json?: Prisma.JsonNullableFilter<"XeroOAuthSession">
   selected_tenant_id?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_tenant_name?: Prisma.StringNullableFilter<"XeroOAuthSession"> | string | null
   selected_payroll_region?: Prisma.Enumpayroll_regionNullableFilter<"XeroOAuthSession"> | $Enums.payroll_region | null
@@ -926,8 +1037,12 @@ export type XeroOAuthSessionCreateManyOrganisationInput = {
   refresh_token_auth_tag?: string | null
   token_key_version?: number
   token_encrypted_at?: Date | string | null
-  token_expires_at: Date | string
-  available_tenants_json: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionCreaterequested_scopesInput | string[]
+  intent_kind?: $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: string | null
+  token_exchange_status?: $Enums.xero_token_exchange_status | null
+  token_expires_at?: Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: string | null
   selected_tenant_name?: string | null
   selected_payroll_region?: $Enums.payroll_region | null
@@ -951,8 +1066,12 @@ export type XeroOAuthSessionUpdateWithoutOrganisationInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -976,8 +1095,12 @@ export type XeroOAuthSessionUncheckedUpdateWithoutOrganisationInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -1001,8 +1124,12 @@ export type XeroOAuthSessionUncheckedUpdateManyWithoutOrganisationInput = {
   refresh_token_auth_tag?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   token_key_version?: Prisma.IntFieldUpdateOperationsInput | number
   token_encrypted_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  token_expires_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  available_tenants_json?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  requested_scopes?: Prisma.XeroOAuthSessionUpdaterequested_scopesInput | string[]
+  intent_kind?: Prisma.NullableEnumxero_oauth_intent_kindFieldUpdateOperationsInput | $Enums.xero_oauth_intent_kind | null
+  nonce_hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  token_exchange_status?: Prisma.NullableEnumxero_token_exchange_statusFieldUpdateOperationsInput | $Enums.xero_token_exchange_status | null
+  token_expires_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  available_tenants_json?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   selected_tenant_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   selected_payroll_region?: Prisma.NullableEnumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region | null
@@ -1029,6 +1156,10 @@ export type XeroOAuthSessionSelect<ExtArgs extends runtime.Types.Extensions.Inte
   refresh_token_auth_tag?: boolean
   token_key_version?: boolean
   token_encrypted_at?: boolean
+  requested_scopes?: boolean
+  intent_kind?: boolean
+  nonce_hash?: boolean
+  token_exchange_status?: boolean
   token_expires_at?: boolean
   available_tenants_json?: boolean
   selected_tenant_id?: boolean
@@ -1056,6 +1187,10 @@ export type XeroOAuthSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   refresh_token_auth_tag?: boolean
   token_key_version?: boolean
   token_encrypted_at?: boolean
+  requested_scopes?: boolean
+  intent_kind?: boolean
+  nonce_hash?: boolean
+  token_exchange_status?: boolean
   token_expires_at?: boolean
   available_tenants_json?: boolean
   selected_tenant_id?: boolean
@@ -1083,6 +1218,10 @@ export type XeroOAuthSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   refresh_token_auth_tag?: boolean
   token_key_version?: boolean
   token_encrypted_at?: boolean
+  requested_scopes?: boolean
+  intent_kind?: boolean
+  nonce_hash?: boolean
+  token_exchange_status?: boolean
   token_expires_at?: boolean
   available_tenants_json?: boolean
   selected_tenant_id?: boolean
@@ -1110,6 +1249,10 @@ export type XeroOAuthSessionSelectScalar = {
   refresh_token_auth_tag?: boolean
   token_key_version?: boolean
   token_encrypted_at?: boolean
+  requested_scopes?: boolean
+  intent_kind?: boolean
+  nonce_hash?: boolean
+  token_exchange_status?: boolean
   token_expires_at?: boolean
   available_tenants_json?: boolean
   selected_tenant_id?: boolean
@@ -1121,7 +1264,7 @@ export type XeroOAuthSessionSelectScalar = {
   updated_at?: boolean
 }
 
-export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "access_token_encrypted" | "access_token_iv" | "access_token_auth_tag" | "refresh_token_encrypted" | "refresh_token_iv" | "refresh_token_auth_tag" | "token_key_version" | "token_encrypted_at" | "token_expires_at" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expected_binding_generation" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
+export type XeroOAuthSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "created_by_user_id" | "status" | "return_to" | "access_token_encrypted" | "access_token_iv" | "access_token_auth_tag" | "refresh_token_encrypted" | "refresh_token_iv" | "refresh_token_auth_tag" | "token_key_version" | "token_encrypted_at" | "requested_scopes" | "intent_kind" | "nonce_hash" | "token_exchange_status" | "token_expires_at" | "available_tenants_json" | "selected_tenant_id" | "selected_tenant_name" | "selected_payroll_region" | "expected_binding_generation" | "expires_at" | "created_at" | "updated_at", ExtArgs["result"]["xeroOAuthSession"]>
 export type XeroOAuthSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.XeroOAuthSession$organisationArgs<ExtArgs>
 }
@@ -1152,8 +1295,12 @@ export type $XeroOAuthSessionPayload<ExtArgs extends runtime.Types.Extensions.In
     refresh_token_auth_tag: string | null
     token_key_version: number
     token_encrypted_at: Date | null
-    token_expires_at: Date
-    available_tenants_json: runtime.JsonValue
+    requested_scopes: string[]
+    intent_kind: $Enums.xero_oauth_intent_kind | null
+    nonce_hash: string | null
+    token_exchange_status: $Enums.xero_token_exchange_status | null
+    token_expires_at: Date | null
+    available_tenants_json: runtime.JsonValue | null
     selected_tenant_id: string | null
     selected_tenant_name: string | null
     selected_payroll_region: $Enums.payroll_region | null
@@ -1599,6 +1746,10 @@ export interface XeroOAuthSessionFieldRefs {
   readonly refresh_token_auth_tag: Prisma.FieldRef<"XeroOAuthSession", 'String'>
   readonly token_key_version: Prisma.FieldRef<"XeroOAuthSession", 'Int'>
   readonly token_encrypted_at: Prisma.FieldRef<"XeroOAuthSession", 'DateTime'>
+  readonly requested_scopes: Prisma.FieldRef<"XeroOAuthSession", 'String[]'>
+  readonly intent_kind: Prisma.FieldRef<"XeroOAuthSession", 'xero_oauth_intent_kind'>
+  readonly nonce_hash: Prisma.FieldRef<"XeroOAuthSession", 'String'>
+  readonly token_exchange_status: Prisma.FieldRef<"XeroOAuthSession", 'xero_token_exchange_status'>
   readonly token_expires_at: Prisma.FieldRef<"XeroOAuthSession", 'DateTime'>
   readonly available_tenants_json: Prisma.FieldRef<"XeroOAuthSession", 'Json'>
   readonly selected_tenant_id: Prisma.FieldRef<"XeroOAuthSession", 'String'>
