@@ -137,6 +137,7 @@ export function readXeroExecutionManifest(path: string) {
 const contextSchema = z.strictObject({
   appUrl: z.string().url(),
   candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
+  createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
   manifestHash: z.string().regex(/^[a-f0-9]{64}$/),
   nonce: z.uuid(),
@@ -149,10 +150,14 @@ const contextSchema = z.strictObject({
 export type XeroRunnerContext = z.infer<typeof contextSchema>;
 export function writeXeroRunnerContext(
   path: string,
-  value: Omit<XeroRunnerContext, "nonce" | "version" | "runnerPid">
+  value: Omit<
+    XeroRunnerContext,
+    "nonce" | "version" | "runnerPid" | "createdAt"
+  >
 ) {
   const context = contextSchema.parse({
     ...value,
+    createdAt: new Date().toISOString(),
     nonce: randomUUID(),
     runnerPid: process.pid,
     version: 1,
@@ -176,6 +181,8 @@ export function requireXeroRunnerContext(environment = process.env) {
   const context = contextSchema.parse(JSON.parse(readFileSync(path, "utf8")));
   if (
     context.nonce !== environment.TC_XERO_RUNNER_NONCE ||
+    Date.parse(context.createdAt) > Date.now() + 30_000 ||
+    Date.parse(context.expiresAt) <= Date.parse(context.createdAt) ||
     Date.parse(context.expiresAt) <= Date.now() ||
     Date.parse(context.expiresAt) - Date.now() > 60 * 60 * 1000 ||
     context.candidateSha !==

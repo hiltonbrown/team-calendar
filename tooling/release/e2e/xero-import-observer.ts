@@ -95,10 +95,23 @@ export function assertIndependentInitialImport(
     organisationId: string;
     bindingGeneration: number;
     xeroTenantId: string;
+    campaignStartedAt: string;
+    expectedRunIds: readonly string[];
   }
 ) {
   const raw = rawAuEnumerationSchema.parse(rawValue);
   const canonical = canonicalImportSchema.parse(canonicalValue);
+  const campaignStartedAt = Date.parse(
+    z.iso.datetime().parse(scope.campaignStartedAt)
+  );
+  const expectedRunIds = z
+    .array(z.uuid())
+    .length(3)
+    .parse(scope.expectedRunIds);
+  exactIds(
+    canonical.runs.map((run) => run.id),
+    expectedRunIds
+  );
   if (
     canonical.clerkOrgId !== scope.clerkOrgId ||
     canonical.organisationId !== scope.organisationId ||
@@ -187,6 +200,7 @@ export function assertIndependentInitialImport(
       runs.length !== 1 ||
       !run ||
       run.fetched !== expectedCounts[entity] ||
+      Date.parse(run.startedAt) < campaignStartedAt ||
       Date.parse(run.startedAt) > Date.parse(run.completedAt) ||
       Date.parse(run.completedAt) > observedUntil
     ) {

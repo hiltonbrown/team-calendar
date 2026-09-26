@@ -111,7 +111,9 @@ try {
   };
   const comparison = assertIndependentInitialImport(raw, canonical, {
     bindingGeneration: owned.bindingGeneration,
+    campaignStartedAt: context.createdAt,
     clerkOrgId: owned.clerkOrgId,
+    expectedRunIds: runIds,
     organisationId: owned.organisationId,
     xeroTenantId: owned.xeroTenantId,
   });

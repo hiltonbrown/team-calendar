@@ -13,6 +13,15 @@ const scope = {
   organisationId,
   xeroTenantId: "tenant-owned",
 };
+const importScope = {
+  ...scope,
+  campaignStartedAt: now,
+  expectedRunIds: [
+    "00000000-0000-4000-8000-000000000003",
+    "00000000-0000-4000-8000-000000000004",
+    "00000000-0000-4000-8000-000000000005",
+  ],
+};
 function raw() {
   return {
     balances: [
@@ -80,7 +89,7 @@ function canonical() {
 describe("actual independent import and scheduler assertions", () => {
   it("compares exact raw source IDs, counts, leave dates/type/units and balance units", () => {
     expect(
-      assertIndependentInitialImport(raw(), canonical(), scope)
+      assertIndependentInitialImport(raw(), canonical(), importScope)
     ).toMatchObject({
       balanceCount: 1,
       employeeCount: 1,
@@ -119,7 +128,9 @@ describe("actual independent import and scheduler assertions", () => {
     if (fault === "scope") {
       value.clerkOrgId = "org_foreign";
     }
-    expect(() => assertIndependentInitialImport(raw(), value, scope)).toThrow();
+    expect(() =>
+      assertIndependentInitialImport(raw(), value, importScope)
+    ).toThrow();
   });
   it("requires a real scheduled dispatch and separately correlated terminal worker", () => {
     const value = {
@@ -179,7 +190,26 @@ describe("actual independent import and scheduler assertions", () => {
         run.completedAt = "2026-09-27T00:01:00.000Z";
       }
       expect(() =>
-        assertIndependentInitialImport(raw(), value, scope)
+        assertIndependentInitialImport(raw(), value, importScope)
+      ).toThrow();
+    }
+  );
+  it.each(["stale", "replaced"])(
+    "rejects %s import stage provenance despite matching scope, counts and terminal status",
+    (fault) => {
+      const value = canonical();
+      const [run] = value.runs;
+      if (!run) {
+        throw new Error("Missing run");
+      }
+      if (fault === "stale") {
+        run.startedAt = "2026-09-26T23:59:00.000Z";
+        run.completedAt = "2026-09-26T23:59:30.000Z";
+      } else {
+        run.id = "00000000-0000-4000-8000-000000000099";
+      }
+      expect(() =>
+        assertIndependentInitialImport(raw(), value, importScope)
       ).toThrow();
     }
   );

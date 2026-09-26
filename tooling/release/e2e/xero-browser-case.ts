@@ -29,12 +29,12 @@ import {
 } from "./xero-browser-mutation-scope.js";
 
 import { assertIndependentInitialImport } from "./xero-import-observer.js";
-
 import {
-  fetchAndAssertXeroFeedPublication,
+  createVerifiedXeroPublicationProbe,
+  xeroPublicationAssertionSchema,
+} from "./xero-publication-probe.js";
+import {
   verifyXeroReadonlyLayout,
-  xeroFeedPublicationExpectationSchema,
-  xeroFeedPublicationObservationSchema,
   xeroReadonlyLayoutOptionsSchema,
 } from "./xero-readonly-assertions.js";
 
@@ -56,14 +56,7 @@ const fixtureSchema = z.strictObject({
   clerkRole: z.enum(["org:owner", "org:admin", "org:manager", "org:viewer"]),
   clerkUserId: z.string().min(1),
   employeeId: z.uuid().nullable(),
-  feedAssertion: z
-    .strictObject({
-      expected: xeroFeedPublicationExpectationSchema,
-      feedId: z.uuid(),
-      previous: xeroFeedPublicationObservationSchema.optional(),
-      privateUrl: z.string().url(),
-    })
-    .nullable(),
+  feedAssertion: xeroPublicationAssertionSchema.nullable(),
   fixtureAlias: z.string().regex(/^fixture-[a-z0-9-]+$/),
   id: z.string().refine((id) => XERO_SUBCASE_IDS.includes(id)),
   importRunIds: z.array(z.uuid()).length(3).nullable(),
@@ -212,6 +205,9 @@ export async function executeXeroBrowserSubcase(
   if (!owned) {
     throw new Error("Browser scenario fixture is outside protected scope");
   }
+  if (fixture.id.startsWith("X24.") && !fixture.feedAssertion) {
+    throw new Error("Exact feed publication assertion is unavailable");
+  }
   if (fixture.id.startsWith("X08.")) {
     throw new Error(
       "Fresh fenced scheduled observer is unavailable on the current platform"
@@ -235,6 +231,42 @@ export async function executeXeroBrowserSubcase(
       );
     }
     await page.goto(fixture.path);
+    const publication =
+      fixture.id.startsWith("X24.") && fixture.feedAssertion
+        ? createVerifiedXeroPublicationProbe({
+            approvedApiOrigin: manifest.deployments.api,
+            assertion: fixture.feedAssertion,
+            assertOwned: (_scope, privateUrl) => {
+              execFileSync(
+                "bun",
+                [
+                  "--no-env-file",
+                  "--conditions=react-server",
+                  "tooling/release/e2e/xero-browser-scope-cli.ts",
+                  owned.alias,
+                  "--feed",
+                  fixture.feedAssertion?.feedId ?? "",
+                ],
+                {
+                  env: process.env,
+                  input: JSON.stringify({ privateUrl }),
+                  stdio: ["pipe", "ignore", "ignore"],
+                }
+              );
+              return Promise.resolve();
+            },
+            fixture: {
+              alias: owned.alias,
+              clerkOrgId: owned.clerkOrgId,
+              feedId: fixture.feedAssertion.feedId,
+              organisationId: owned.organisationId,
+            },
+            observationId: fixture.id,
+            privateUrl: fixture.feedAssertion.privateUrl,
+            request: browserContext.request,
+          })
+        : null;
+    await publication?.observeBefore();
     if (fixture.mutation) {
       const { mutation } = fixture;
       const mutationScope = {
@@ -367,7 +399,9 @@ export async function executeXeroBrowserSubcase(
         .parse(JSON.parse(bytes));
       assertIndependentInitialImport(observed.raw, observed.canonical, {
         bindingGeneration: owned.bindingGeneration,
+        campaignStartedAt: context.createdAt,
         clerkOrgId: owned.clerkOrgId,
+        expectedRunIds: fixture.importRunIds,
         organisationId: owned.organisationId,
         xeroTenantId: owned.xeroTenantId,
       });
@@ -383,68 +417,10 @@ export async function executeXeroBrowserSubcase(
       }))
     );
     if (fixture.id.startsWith("X24.")) {
-      if (!fixture.feedAssertion) {
+      if (!publication) {
         throw new Error("Exact feed publication assertion is unavailable");
       }
-      const transitionKinds = {
-        "X24.sequence": "material-change",
-        "X24.uid-stability": "unchanged",
-        "X24.withdrawal": "withdrawal",
-      } as const; // Exact registered transition cases.
-      const requiredKind = Object.entries(transitionKinds).find(
-        ([id]) => id === fixture.id
-      )?.[1];
-      if (
-        requiredKind &&
-        (!(
-          fixture.feedAssertion.previous &&
-          fixture.feedAssertion.expected.transitions.some(
-            (transition) => transition.kind === requiredKind
-          )
-        ) ||
-          (requiredKind === "withdrawal" &&
-            !fixture.feedAssertion.expected.transitions.some(
-              (transition) =>
-                transition.kind === "withdrawal" &&
-                fixture.feedAssertion?.expected.absentUids.includes(
-                  transition.uid
-                )
-            )))
-      ) {
-        throw new Error(
-          "Named publication transition has no exact prior proof"
-        );
-      }
-      actualUi = await fetchAndAssertXeroFeedPublication({
-        ...fixture.feedAssertion,
-        approvedApiOrigin: manifest.deployments.api,
-        assertOwned: (_scope, privateUrl) => {
-          execFileSync(
-            "bun",
-            [
-              "--no-env-file",
-              "--conditions=react-server",
-              "tooling/release/e2e/xero-browser-scope-cli.ts",
-              owned.alias,
-              "--feed",
-              fixture.feedAssertion?.feedId ?? "",
-            ],
-            {
-              env: process.env,
-              input: JSON.stringify({ privateUrl }),
-              stdio: ["pipe", "ignore", "ignore"],
-            }
-          );
-          return Promise.resolve();
-        },
-        fixture: {
-          alias: owned.alias,
-          clerkOrgId: owned.clerkOrgId,
-          feedId: fixture.feedAssertion.feedId,
-          organisationId: owned.organisationId,
-        },
-        request: browserContext.request,
-      });
+      actualUi = await publication.observeAfter();
     }
     if (fixture.id.startsWith("X25.")) {
       if (!fixture.layoutAssertion) {
