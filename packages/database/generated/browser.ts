@@ -54,17 +54,17 @@ export type AlternativeContact = Prisma.AlternativeContactModel
 export type XeroConnection = Prisma.XeroConnectionModel
 /**
  * Model XeroCredentialOwner
- * 
+ *
  */
 export type XeroCredentialOwner = Prisma.XeroCredentialOwnerModel
 /**
  * Model XeroRefreshAttempt
- * 
+ *
  */
 export type XeroRefreshAttempt = Prisma.XeroRefreshAttemptModel
 /**
  * Model XeroProviderConnection
- * 
+ *
  */
 export type XeroProviderConnection = Prisma.XeroProviderConnectionModel
 /**

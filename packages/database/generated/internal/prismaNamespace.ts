@@ -4044,42 +4044,42 @@ export type ListEnumxero_connection_statusFieldRefInput<$PrismaModel> = FieldRef
  * Reference to a field of type 'xero_credential_usability'
  */
 export type Enumxero_credential_usabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_credential_usability'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_credential_usability[]'
  */
 export type ListEnumxero_credential_usabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_credential_usability[]'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_refresh_attempt_outcome'
  */
 export type Enumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_refresh_attempt_outcome'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_refresh_attempt_outcome[]'
  */
 export type ListEnumxero_refresh_attempt_outcomeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_refresh_attempt_outcome[]'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_provider_connection_status'
  */
 export type Enumxero_provider_connection_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_provider_connection_status'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_provider_connection_status[]'
  */
 export type ListEnumxero_provider_connection_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_provider_connection_status[]'>
-    
+
 
 
 /**
@@ -4114,28 +4114,28 @@ export type ListEnumxero_oauth_session_statusFieldRefInput<$PrismaModel> = Field
  * Reference to a field of type 'xero_oauth_intent_kind'
  */
 export type Enumxero_oauth_intent_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_oauth_intent_kind'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_oauth_intent_kind[]'
  */
 export type ListEnumxero_oauth_intent_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_oauth_intent_kind[]'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_token_exchange_status'
  */
 export type Enumxero_token_exchange_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_token_exchange_status'>
-    
+
 
 
 /**
  * Reference to a field of type 'xero_token_exchange_status[]'
  */
 export type ListEnumxero_token_exchange_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_token_exchange_status[]'>
-    
+
 
 
 /**

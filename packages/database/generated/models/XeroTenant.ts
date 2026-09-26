@@ -266,13 +266,13 @@ export type XeroTenantAggregateArgs<ExtArgs extends runtime.Types.Extensions.Int
   _count?: true | XeroTenantCountAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
+   *
    * Select which fields to average
   **/
   _avg?: XeroTenantAvgAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   * 
+   *
    * Select which fields to sum
   **/
   _sum?: XeroTenantSumAggregateInputType
