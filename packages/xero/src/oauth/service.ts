@@ -1669,7 +1669,9 @@ async function disconnectXeroOAuthConnectionWithClient(
             cleanupRequestId: null,
             dataActionStatus: "not_requested",
             localDisabled: true,
-            remoteStatus: "not_applicable",
+            remoteStatus: legacyDisconnectRemoteStatus(
+              connection.xero_authorisation_connection_id
+            ),
           },
     };
   }
@@ -1686,9 +1688,9 @@ async function disconnectXeroOAuthConnectionWithClient(
         cleanupRequestId: null,
         dataActionStatus: input.destructive ? "completed" : "not_requested",
         localDisabled: true,
-        remoteStatus: connection.xero_authorisation_connection_id
-          ? "left_in_place"
-          : "not_applicable",
+        remoteStatus: legacyDisconnectRemoteStatus(
+          connection.xero_authorisation_connection_id
+        ),
       },
     };
   }
@@ -1698,6 +1700,12 @@ async function disconnectXeroOAuthConnectionWithClient(
     { ...connection, xero_tenant: tenant },
     now
   );
+}
+
+function legacyDisconnectRemoteStatus(
+  remoteConnectionId: string | null
+): "left_in_place" | "not_applicable" {
+  return remoteConnectionId ? "left_in_place" : "not_applicable";
 }
 
 async function lockDisconnectIdentity(

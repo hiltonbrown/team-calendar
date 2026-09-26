@@ -162,6 +162,15 @@ describe("local cleanup transaction", () => {
       ok: true,
       value: { localDisabled: true, remoteStatus: "pending" },
     });
+    expect(await disconnect()).toEqual(result);
+    expect(
+      await database.xeroCleanupRequest.count({
+        where: {
+          clerk_org_id: scope().clerkOrgId,
+          organisation_id: scope().organisationId,
+        },
+      })
+    ).toBe(1);
     expect(fetchSpy).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
     expect(

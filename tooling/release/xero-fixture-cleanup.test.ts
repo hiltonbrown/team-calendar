@@ -182,6 +182,21 @@ describe("cleanup request fixture ownership", () => {
     ).rejects.toThrow("unowned data");
     expect(database.$executeRawUnsafe).not.toHaveBeenCalled();
   });
+  it("binds exactly the numbered placeholders required by each cleanup DELETE", async () => {
+    const database = cleanupClient();
+    await deleteXeroCleanupFixtures(database, cleanupOwned);
+    for (const [sql, ...values] of database.$executeRawUnsafe.mock.calls) {
+      const placeholders = [...sql.matchAll(/\$(\d+)/g)].map((match) =>
+        Number(match[1])
+      );
+      expect(values).toHaveLength(Math.max(...placeholders));
+    }
+    expect(database.$executeRawUnsafe.mock.calls[1]?.slice(1)).toEqual([
+      ["clerk-owned"],
+      ["org-owned"],
+      ["request"],
+    ]);
+  });
   it("counts both selectors and deletes attempts before their requests", async () => {
     const database = cleanupClient();
     expect(await countXeroCleanupFixtures(database, cleanupOwned)).toEqual({

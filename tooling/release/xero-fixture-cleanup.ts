@@ -290,6 +290,6 @@ export async function deleteXeroCleanupFixtures(
   );
   await database.$executeRawUnsafe(
     `DELETE FROM xero_cleanup_requests WHERE ${cleanupRequestSelector}`,
-    ...cleanupValues(owned)
+    ...cleanupValues(owned).slice(0, 3)
   );
 }

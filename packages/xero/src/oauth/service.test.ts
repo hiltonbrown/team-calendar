@@ -1691,6 +1691,24 @@ describe("disconnectXeroOAuthConnection", () => {
       ok: true,
       value: { remoteStatus: "left_in_place" },
     });
+    dbMock.xeroConnection.findFirst.mockResolvedValue({
+      ...connection(),
+      status: "disconnected",
+      xero_tenant: null,
+    });
+    expect(await disconnectXeroOAuthConnection(input)).toMatchObject({
+      ok: true,
+      value: { remoteStatus: "left_in_place" },
+    });
+    dbMock.xeroConnection.findFirst.mockResolvedValue({
+      ...connection(null),
+      status: "disconnected",
+      xero_tenant: null,
+    });
+    expect(await disconnectXeroOAuthConnection(input)).toMatchObject({
+      ok: true,
+      value: { remoteStatus: "not_applicable" },
+    });
   });
   it("records pending exact targets in enabled mode without HTTP", async () => {
     process.env.XERO_REMOTE_CLEANUP_MODE = "enabled";
