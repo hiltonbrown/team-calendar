@@ -1481,3 +1481,14 @@ Review: unit, build and type gates executed in the isolated worktree. An unrelat
 - [x] Run full source gates, independent review and protected live campaign.
 
 Review: source lint (1070 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Independent reviewer approved runtime f2aeff73. Protected live campaign ccc3ba37-89b3-4636-83ab-58b1b6351d4e passed 24 suites / 187 tests; all 36 cleanup selectors zero, catalogue unchanged, active fence released and read-only schema diff equal. CI Actions execution remains NOT VERIFIED; production namespace activation belongs to Plan 161h.
+
+## Plan 161f execution
+
+- [x] Read complete reconciled plan, lessons and scoped domain contracts; isolate from approved 161e baseline.
+- [x] Prove local disconnect defect with two failing regressions.
+- [x] Add additive cleanup schema, scoped lease queries and protected fixture cleanup.
+- [x] Add app-scoped management client and local-only disconnect with generation fencing.
+- [x] Add truthful receipts, cron worker, operator reissue and required tests.
+- [ ] Run source gates and freeze candidate for independent protected live review.
+
+Review: source gates pass; independent protected live review pending. Full plan delivered by shared absolute path rather than inline duplication; complete text and reconciliation read before implementation.

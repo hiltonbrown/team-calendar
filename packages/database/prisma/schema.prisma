@@ -304,6 +304,7 @@ model Organisation {
   public_holidays              PublicHoliday[]
   public_holiday_assignments   PublicHolidayAssignment[]
   xero_connection              XeroConnection?
+  xero_cleanup_requests        XeroCleanupRequest[]
   xero_tenants                 XeroTenant[]
   xero_oauth_sessions          XeroOAuthSession[]
   xero_person_matches          XeroPersonMatch[]
@@ -633,6 +634,7 @@ model XeroTenant {
   xero_connection     XeroConnection          @relation(fields: [xero_connection_id], references: [id])
   credential_owner    XeroCredentialOwner?    @relation(fields: [xero_credential_owner_id], references: [id])
   provider_connection XeroProviderConnection? @relation(fields: [xero_provider_connection_id], references: [id])
+  cleanup_requests    XeroCleanupRequest[]
   sync_cursors        XeroSyncCursor[]
   leave_balances      LeaveBalance[]
   sync_runs           SyncRun[]
@@ -1341,4 +1343,70 @@ model StripeEvent {
   @@index([clerk_org_id, delivery_state, event_created_at])
   @@index([delivery_state, updated_at])
   @@map("stripe_events")
+}
+
+model XeroCleanupRequest {
+  id                   String                          @id @default(uuid()) @db.Uuid
+  clerk_org_id         String
+  organisation_id      String                          @db.Uuid
+  xero_tenant_id       String                          @db.Uuid // internal XeroTenant.id (FK below)
+  binding_generation   Int // XeroTenant.binding_generation after the disconnect increment
+  requested_by_user_id String
+  destructive          Boolean
+  data_action_status   xero_cleanup_data_action_status
+  created_at           DateTime                        @default(now())
+  updated_at           DateTime                        @updatedAt
+  attempts             XeroCleanupAttempt[]
+  organisation         Organisation                    @relation(fields: [organisation_id], references: [id])
+  xero_tenant          XeroTenant                      @relation(fields: [xero_tenant_id], references: [id])
+
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@map("xero_cleanup_requests")
+}
+
+model XeroCleanupAttempt {
+  id                          String                     @id @default(uuid()) @db.Uuid
+  clerk_org_id                String
+  organisation_id             String                     @db.Uuid
+  xero_cleanup_request_id     String                     @db.Uuid
+  provider_app_id             String
+  remote_connection_id        String
+  expected_binding_generation Int
+  state                       xero_cleanup_attempt_state @default(pending)
+  lease_owner                 String?
+  lease_expires_at            DateTime?
+  dispatched_at               DateTime?
+  deadline_at                 DateTime?
+  next_attempt_at             DateTime?
+  retry_count                 Int                        @default(0)
+  outcome_reason              String? // safe, allowlisted code; never a raw payload
+  correlation_id              String?
+  created_at                  DateTime                   @default(now())
+  updated_at                  DateTime                   @updatedAt
+  request                     XeroCleanupRequest         @relation(fields: [xero_cleanup_request_id], references: [id])
+
+  @@unique([xero_cleanup_request_id, remote_connection_id])
+  @@index([state, next_attempt_at])
+  @@index([organisation_id])
+  @@index([clerk_org_id])
+  @@map("xero_cleanup_attempts")
+}
+
+enum xero_cleanup_data_action_status {
+  not_requested
+  pending
+  completed
+  failed
+}
+
+enum xero_cleanup_attempt_state {
+  pending
+  claimed
+  dispatching
+  confirmed_deleted
+  confirmed_absent
+  unknown
+  blocked_authorisation
+  cancelled
 }

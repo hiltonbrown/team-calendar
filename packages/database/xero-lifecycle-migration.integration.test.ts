@@ -3,6 +3,11 @@ import { Pool, type PoolClient } from "pg";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { database, payroll_region } from "./index.js";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
+import {
+  claimXeroCleanupAttempt,
+  markXeroCleanupAttemptDispatching,
+  recordXeroCleanupAttemptOutcome,
+} from "./src/queries/xero-cleanup";
 import { planXeroCredentialOwnerBackfill } from "./src/xero-credential-owner-backfill";
 
 vi.mock("server-only", () => ({}));
@@ -43,6 +48,8 @@ const captureError = async (operation: Promise<unknown>): Promise<unknown> => {
 
 async function cleanTestData() {
   const where = { clerk_org_id: { in: tenantScopes } };
+  await database.xeroCleanupAttempt.deleteMany({ where });
+  await database.xeroCleanupRequest.deleteMany({ where });
   await database.xeroTenant.deleteMany({ where });
   await database.xeroRefreshAttempt.deleteMany({
     where: { owner: { provider_app_id: providerAppId } },
@@ -324,5 +331,110 @@ describe("Xero credential owner migration", () => {
         providerAppId
       ).attachments
     ).toEqual([]);
+  });
+});
+
+describe("Xero cleanup lifecycle compare-and-set", () => {
+  async function createCleanup() {
+    const binding = await createBinding(0, { activeSlot: 1 });
+    const scope = {
+      clerkOrgId: binding.clerk_org_id,
+      organisationId: binding.organisation_id,
+    };
+    const request = await database.xeroCleanupRequest.create({
+      data: {
+        binding_generation: binding.binding_generation,
+        clerk_org_id: scope.clerkOrgId,
+        data_action_status: "not_requested",
+        destructive: false,
+        id: fixture.globalKey("cleanup_request"),
+        organisation_id: scope.organisationId,
+        requested_by_user_id: "fixture-user",
+        xero_tenant_id: binding.id,
+      },
+    });
+    const attempt = await database.xeroCleanupAttempt.create({
+      data: {
+        clerk_org_id: scope.clerkOrgId,
+        expected_binding_generation: binding.binding_generation,
+        id: fixture.globalKey("cleanup_attempt"),
+        organisation_id: scope.organisationId,
+        provider_app_id: providerAppId,
+        remote_connection_id: fixture.id("remote-cleanup"),
+        xero_cleanup_request_id: request.id,
+      },
+    });
+    return { ...scope, attempt, attemptId: attempt.id, request };
+  }
+  it("allows exactly one live lease and rejects stale outcomes and cross-scope claims", async () => {
+    const input = await createCleanup();
+    const now = new Date();
+    const leaseExpiresAt = new Date(now.getTime() + 120_000);
+    const claims = await Promise.all(
+      ["worker-a", "worker-b"].map((leaseOwner) =>
+        claimXeroCleanupAttempt({ ...input, leaseExpiresAt, leaseOwner, now })
+      )
+    );
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    const owner = claims[0] ? "worker-a" : "worker-b";
+    expect(
+      await claimXeroCleanupAttempt({
+        ...input,
+        clerkOrgId: "unowned",
+        leaseExpiresAt,
+        leaseOwner: owner,
+        now,
+      })
+    ).toBe(false);
+    expect(
+      await markXeroCleanupAttemptDispatching({
+        ...input,
+        deadlineAt: new Date(now.getTime() + 60_000),
+        leaseOwner: owner,
+        now,
+      })
+    ).toBe(true);
+    expect(
+      await recordXeroCleanupAttemptOutcome({
+        ...input,
+        leaseOwner: "stale-worker",
+        now,
+        state: "confirmed_absent",
+      })
+    ).toBe(false);
+    expect(
+      await recordXeroCleanupAttemptOutcome({
+        ...input,
+        leaseOwner: owner,
+        now: new Date(leaseExpiresAt.getTime() + 1),
+        state: "confirmed_absent",
+      })
+    ).toBe(false);
+    expect(
+      await recordXeroCleanupAttemptOutcome({
+        ...input,
+        leaseOwner: owner,
+        now,
+        outcomeReason: "absent",
+        state: "confirmed_absent",
+      })
+    ).toBe(true);
+  });
+  it("enforces one attempt per frozen request and remote connection", async () => {
+    const input = await createCleanup();
+    await expect(
+      database.xeroCleanupAttempt.create({
+        data: {
+          clerk_org_id: input.clerkOrgId,
+          expected_binding_generation:
+            input.attempt.expected_binding_generation,
+          id: fixture.globalKey("cleanup_attempt", 1),
+          organisation_id: input.organisationId,
+          provider_app_id: providerAppId,
+          remote_connection_id: input.attempt.remote_connection_id,
+          xero_cleanup_request_id: input.request.id,
+        },
+      })
+    ).rejects.toMatchObject({ code: "P2002" });
   });
 });

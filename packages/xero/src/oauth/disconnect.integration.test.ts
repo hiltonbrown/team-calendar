@@ -62,6 +62,24 @@ describe("disconnectXeroOAuthConnection integration", () => {
     ]);
     ({ database } = databaseModule);
     ({ disconnectXeroOAuthConnection } = serviceModule);
+    const create = database.xeroCleanupRequest.create.bind(
+      database.xeroCleanupRequest
+    );
+    let requestSlot = 0;
+    const nextSlot = () => {
+      const slot = requestSlot;
+      requestSlot += 1;
+      return slot;
+    };
+    vi.spyOn(database.xeroCleanupRequest, "create").mockImplementation((args) =>
+      create({
+        ...args,
+        data: {
+          ...args.data,
+          id: fixture.globalKey("cleanup_request", nextSlot()),
+        },
+      })
+    );
   });
 
   beforeEach(async () => {
@@ -86,7 +104,12 @@ describe("disconnectXeroOAuthConnection integration", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { disconnected: true, remoteRevoked: false },
+      value: {
+        cleanupRequestId: expect.any(String),
+        dataActionStatus: "not_requested",
+        localDisabled: true,
+        remoteStatus: "not_applicable",
+      },
     });
 
     await expectConnectionDisconnected(tenantA, "admin_1");
@@ -106,7 +129,12 @@ describe("disconnectXeroOAuthConnection integration", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { disconnected: true, remoteRevoked: false },
+      value: {
+        cleanupRequestId: expect.any(String),
+        dataActionStatus: "completed",
+        localDisabled: true,
+        remoteStatus: "not_applicable",
+      },
     });
 
     await expectConnectionDisconnected(tenantA, "admin_1");
@@ -120,6 +148,12 @@ async function cleanTestData() {
   if (!database) {
     return;
   }
+  await database.xeroCleanupAttempt.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
+  await database.xeroCleanupRequest.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
   await database.xeroSyncCursor.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });

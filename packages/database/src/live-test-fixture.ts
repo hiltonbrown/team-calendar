@@ -34,8 +34,8 @@ export const LIVE_FIXTURE_SUITES = {
   },
   "packages/database/xero-lifecycle-migration.integration.test.ts": {
     globalKeys: {
-      cleanup_attempt: 1,
-      cleanup_request: 1,
+      cleanup_attempt: 12,
+      cleanup_request: 12,
       credential_owner: 1,
       oauth_attempt: 1,
       provider_app: 2,
@@ -51,9 +51,11 @@ export const LIVE_FIXTURE_SUITES = {
     { tenants: 2 },
   "packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts": {
     globalKeys: {
-      cleanup_attempt: 1,
-      cleanup_request: 1,
-      provider_connection: 1,
+      cleanup_attempt: 12,
+      cleanup_request: 12,
+      credential_owner: 2,
+      provider_app: 2,
+      provider_connection: 12,
       tenant_binding: 1,
     },
     tenants: 2,
@@ -72,9 +74,11 @@ export const LIVE_FIXTURE_SUITES = {
   },
   "packages/xero/src/oauth/connection-cleanup.integration.test.ts": {
     globalKeys: {
-      cleanup_attempt: 1,
-      cleanup_request: 1,
-      provider_connection: 1,
+      cleanup_attempt: 12,
+      cleanup_request: 12,
+      credential_owner: 2,
+      provider_app: 2,
+      provider_connection: 12,
       tenant_binding: 1,
     },
     tenants: 2,
@@ -83,7 +87,10 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { credential_owner: 1, oauth_attempt: 1, provider_app: 1 },
     tenants: 2,
   },
-  "packages/xero/src/oauth/disconnect.integration.test.ts": { tenants: 2 },
+  "packages/xero/src/oauth/disconnect.integration.test.ts": {
+    globalKeys: { cleanup_attempt: 4, cleanup_request: 4 },
+    tenants: 2,
+  },
   "packages/xero/src/oauth/service.integration.test.ts": {
     globalKeys: { provider_app: 1 },
     tenants: 2,

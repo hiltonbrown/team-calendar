@@ -159,3 +159,17 @@ it("warns only once for an unset non-production tier", async () => {
   warn.mockRestore();
   vi.unstubAllEnvs();
 });
+
+describe("Xero remote cleanup mode", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it("defaults to report_only when absent", () => {
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", undefined);
+    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("report_only");
+  });
+  it("requires an explicit recognised rollout mode", () => {
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "enabled");
+    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("enabled");
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", "automatic");
+    expect(() => keys()).toThrow();
+  });
+});

@@ -431,7 +431,9 @@ export const ModelName = {
   PlanLimit: 'PlanLimit',
   ClerkOrgSubscription: 'ClerkOrgSubscription',
   UsageCounter: 'UsageCounter',
-  StripeEvent: 'StripeEvent'
+  StripeEvent: 'StripeEvent',
+  XeroCleanupRequest: 'XeroCleanupRequest',
+  XeroCleanupAttempt: 'XeroCleanupAttempt'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -447,7 +449,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent" | "xeroCleanupRequest" | "xeroCleanupAttempt"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3041,6 +3043,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    XeroCleanupRequest: {
+      payload: Prisma.$XeroCleanupRequestPayload<ExtArgs>
+      fields: Prisma.XeroCleanupRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroCleanupRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroCleanupRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroCleanupRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroCleanupRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        findMany: {
+          args: Prisma.XeroCleanupRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>[]
+        }
+        create: {
+          args: Prisma.XeroCleanupRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        createMany: {
+          args: Prisma.XeroCleanupRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroCleanupRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroCleanupRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        update: {
+          args: Prisma.XeroCleanupRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroCleanupRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroCleanupRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroCleanupRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroCleanupRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroCleanupRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroCleanupRequest>
+        }
+        groupBy: {
+          args: Prisma.XeroCleanupRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCleanupRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroCleanupRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCleanupRequestCountAggregateOutputType> | number
+        }
+      }
+    }
+    XeroCleanupAttempt: {
+      payload: Prisma.$XeroCleanupAttemptPayload<ExtArgs>
+      fields: Prisma.XeroCleanupAttemptFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroCleanupAttemptFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroCleanupAttemptFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroCleanupAttemptFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroCleanupAttemptFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        findMany: {
+          args: Prisma.XeroCleanupAttemptFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>[]
+        }
+        create: {
+          args: Prisma.XeroCleanupAttemptCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        createMany: {
+          args: Prisma.XeroCleanupAttemptCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroCleanupAttemptCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroCleanupAttemptDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        update: {
+          args: Prisma.XeroCleanupAttemptUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroCleanupAttemptDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroCleanupAttemptUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroCleanupAttemptUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroCleanupAttemptUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroCleanupAttemptPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroCleanupAttemptAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroCleanupAttempt>
+        }
+        groupBy: {
+          args: Prisma.XeroCleanupAttemptGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCleanupAttemptGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroCleanupAttemptCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroCleanupAttemptCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -3846,6 +3996,46 @@ export const StripeEventScalarFieldEnum = {
 export type StripeEventScalarFieldEnum = (typeof StripeEventScalarFieldEnum)[keyof typeof StripeEventScalarFieldEnum]
 
 
+export const XeroCleanupRequestScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_tenant_id: 'xero_tenant_id',
+  binding_generation: 'binding_generation',
+  requested_by_user_id: 'requested_by_user_id',
+  destructive: 'destructive',
+  data_action_status: 'data_action_status',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCleanupRequestScalarFieldEnum = (typeof XeroCleanupRequestScalarFieldEnum)[keyof typeof XeroCleanupRequestScalarFieldEnum]
+
+
+export const XeroCleanupAttemptScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_cleanup_request_id: 'xero_cleanup_request_id',
+  provider_app_id: 'provider_app_id',
+  remote_connection_id: 'remote_connection_id',
+  expected_binding_generation: 'expected_binding_generation',
+  state: 'state',
+  lease_owner: 'lease_owner',
+  lease_expires_at: 'lease_expires_at',
+  dispatched_at: 'dispatched_at',
+  deadline_at: 'deadline_at',
+  next_attempt_at: 'next_attempt_at',
+  retry_count: 'retry_count',
+  outcome_reason: 'outcome_reason',
+  correlation_id: 'correlation_id',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroCleanupAttemptScalarFieldEnum = (typeof XeroCleanupAttemptScalarFieldEnum)[keyof typeof XeroCleanupAttemptScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -4503,6 +4693,34 @@ export type ListEnumstripe_event_delivery_stateFieldRefInput<$PrismaModel> = Fie
 
 
 /**
+ * Reference to a field of type 'xero_cleanup_data_action_status'
+ */
+export type Enumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_cleanup_data_action_status'>
+
+
+
+/**
+ * Reference to a field of type 'xero_cleanup_data_action_status[]'
+ */
+export type ListEnumxero_cleanup_data_action_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_cleanup_data_action_status[]'>
+
+
+
+/**
+ * Reference to a field of type 'xero_cleanup_attempt_state'
+ */
+export type Enumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_cleanup_attempt_state'>
+
+
+
+/**
+ * Reference to a field of type 'xero_cleanup_attempt_state[]'
+ */
+export type ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_cleanup_attempt_state[]'>
+
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -4701,6 +4919,8 @@ export type GlobalOmitConfig = {
   clerkOrgSubscription?: Prisma.ClerkOrgSubscriptionOmit
   usageCounter?: Prisma.UsageCounterOmit
   stripeEvent?: Prisma.StripeEventOmit
+  xeroCleanupRequest?: Prisma.XeroCleanupRequestOmit
+  xeroCleanupAttempt?: Prisma.XeroCleanupAttemptOmit
 }
 
 /* Types for Logging */

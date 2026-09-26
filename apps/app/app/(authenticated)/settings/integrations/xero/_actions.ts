@@ -7,6 +7,7 @@ import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
   refreshXeroOAuthConnection,
+  type XeroDisconnectReceipt,
 } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
@@ -106,7 +107,9 @@ export async function disconnectXeroAction(input: {
   connectionId: string;
   mode: "destructive" | "soft";
   organisationId: string;
-}): Promise<ActionResult<{ disconnected: true }>> {
+}): Promise<
+  ActionResult<{ disconnected: true; receipt: XeroDisconnectReceipt }>
+> {
   const parsed = DisconnectSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -149,7 +152,7 @@ export async function disconnectXeroAction(input: {
       entity_type: "xero_connection",
       metadata: {
         mode: parsed.data.mode,
-        remoteRevoked: result.value.remoteRevoked,
+        remoteStatus: result.value.remoteStatus,
       },
       resource_id: parsed.data.connectionId,
       resource_type: "xero_connection",
@@ -157,7 +160,18 @@ export async function disconnectXeroAction(input: {
   });
 
   revalidate();
-  return { ok: true, value: { disconnected: true } };
+  return {
+    ok: true,
+    value: {
+      disconnected: true,
+      receipt: {
+        cleanupRequestId: result.value.cleanupRequestId,
+        dataActionStatus: result.value.dataActionStatus,
+        localDisabled: true,
+        remoteStatus: result.value.remoteStatus,
+      },
+    },
+  };
 }
 
 export async function pauseTenantSyncAction(input: {

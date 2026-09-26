@@ -420,3 +420,27 @@ export const xero_token_exchange_status = {
 } as const
 
 export type xero_token_exchange_status = (typeof xero_token_exchange_status)[keyof typeof xero_token_exchange_status]
+
+
+export const xero_cleanup_data_action_status = {
+  not_requested: 'not_requested',
+  pending: 'pending',
+  completed: 'completed',
+  failed: 'failed'
+} as const
+
+export type xero_cleanup_data_action_status = (typeof xero_cleanup_data_action_status)[keyof typeof xero_cleanup_data_action_status]
+
+
+export const xero_cleanup_attempt_state = {
+  pending: 'pending',
+  claimed: 'claimed',
+  dispatching: 'dispatching',
+  confirmed_deleted: 'confirmed_deleted',
+  confirmed_absent: 'confirmed_absent',
+  unknown: 'unknown',
+  blocked_authorisation: 'blocked_authorisation',
+  cancelled: 'cancelled'
+} as const
+
+export type xero_cleanup_attempt_state = (typeof xero_cleanup_attempt_state)[keyof typeof xero_cleanup_attempt_state]

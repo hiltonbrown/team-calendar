@@ -22,6 +22,12 @@ import type { XeroDeadline } from "../rate-limit/deadline";
 import type { XeroRateClass } from "../rate-limit/shared-store";
 import { XeroFetchError, xeroFetch } from "../rate-limit/xero-fetch";
 import {
+  aggregateXeroDisconnectReceipt,
+  freezeCleanupTargets,
+  getXeroDisconnectReceipt,
+  type XeroDisconnectReceipt,
+} from "./connection-cleanup";
+import {
   adoptXeroCredential,
   boundXeroLocks,
   lockXeroBinding,
@@ -114,6 +120,7 @@ export type XeroOAuthError = { dispatched?: boolean } & (
   | { code: "refresh_token_invalid"; message: string }
   | { code: "session_not_found"; message: string }
   | { code: "tenant_binding_conflict"; message: string }
+  | { code: "cleanup_unresolved"; message: string }
   | { code: "tenant_not_found"; message: string }
   | { code: "tenant_replacement_required"; message: string }
   | { code: "unknown_error"; message: string }
@@ -133,16 +140,13 @@ interface RefreshAttemptCallbacks {
   onTokenLoaded?: (refreshTokenEncrypted: string) => void;
 }
 
-type RevokeConnectionResult =
-  | { ok: true; value: { remoteRevoked: boolean } }
-  | { error: XeroOAuthError; httpStatus: null | number; ok: false };
-
 class OrganisationSelectionRaceError extends Error {}
 
 class TenantSelectionRejectedError extends Error {
   readonly code:
     | "connection_changed"
     | "tenant_binding_conflict"
+    | "cleanup_unresolved"
     | "tenant_replacement_required";
 
   constructor(
@@ -876,6 +880,8 @@ export async function completeXeroTenantSelection(input: {
   } catch (error) {
     if (error instanceof TenantSelectionRejectedError) {
       const messages = {
+        cleanup_unresolved:
+          "A previous Xero disconnection is still being confirmed. Try again later or contact support.",
         connection_changed:
           "This Xero connection changed while you were connecting. Start the connection again.",
         tenant_binding_conflict:
@@ -1600,9 +1606,7 @@ interface DisconnectXeroInput {
 
 export async function disconnectXeroOAuthConnection(
   input: DisconnectXeroInput
-): Promise<
-  Result<{ disconnected: true; remoteRevoked: boolean }, XeroOAuthError>
-> {
+): Promise<Result<XeroDisconnectReceipt, XeroOAuthError>> {
   try {
     return await database.$transaction(
       (tx) => disconnectXeroOAuthConnectionWithClient(tx, input),
@@ -1619,221 +1623,185 @@ export async function disconnectXeroOAuthConnection(
   }
 }
 
-type DisconnectConnection = NonNullable<
-  Awaited<ReturnType<typeof loadConnectionForDisconnect>>
->;
-
 async function disconnectXeroOAuthConnectionWithClient(
   tx: Prisma.TransactionClient,
   input: DisconnectXeroInput
-): Promise<
-  Result<{ disconnected: true; remoteRevoked: boolean }, XeroOAuthError>
-> {
-  await tx.$queryRaw`
-    SELECT pg_advisory_xact_lock(hashtextextended(${input.connectionId}, 0))::text AS acquired
-  `;
+): Promise<Result<XeroDisconnectReceipt, XeroOAuthError>> {
+  await boundXeroLocks(tx, createXeroDeadline(10_000));
+  const initial = await loadConnectionForDisconnect(tx, input);
+  if (!initial) {
+    return connectionNotFoundError();
+  }
+  await lockDisconnectIdentity(tx, initial, input.connectionId);
   const connection = await loadConnectionForDisconnect(tx, input);
   if (!connection) {
     return connectionNotFoundError();
   }
+  const tenant = connection.xero_tenant;
+  if (
+    (tenant?.xero_credential_owner_id ?? null) !==
+      (initial.xero_tenant?.xero_credential_owner_id ?? null) ||
+    (tenant?.id ?? null) !== (initial.xero_tenant?.id ?? null)
+  ) {
+    throw new Error("Binding changed before disconnect lock.");
+  }
   if (connection.status === "disconnected") {
+    const request = tenant
+      ? await tx.xeroCleanupRequest.findFirst({
+          orderBy: { created_at: "desc" },
+          select: { id: true },
+          where: {
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: input.organisationId,
+            xero_tenant_id: tenant.id,
+          },
+        })
+      : null;
     return {
       ok: true,
-      value: { disconnected: true, remoteRevoked: false },
+      value: request
+        ? await getXeroDisconnectReceipt({
+            ...input,
+            cleanupRequestId: request.id,
+            client: tx,
+          })
+        : {
+            cleanupRequestId: null,
+            dataActionStatus: "not_requested",
+            localDisabled: true,
+            remoteStatus: "not_applicable",
+          },
     };
   }
-
   const now = new Date();
-  const prepared = await prepareConnectionForDisconnect(
-    tx,
-    input,
-    connection,
-    now
-  );
-  if (!prepared.ok) {
-    return prepared;
-  }
-  const revoked = await revokePreparedXeroConnection(
-    tx,
-    input,
-    prepared.value.connection,
-    prepared.value.terminalAuthorisation,
-    now
-  );
-  if (!revoked.ok) {
-    return revoked;
-  }
-
   await finaliseLocalXeroDisconnect(tx, {
     ...input,
     now,
-    xeroTenantId: revoked.value.connection.xero_tenant?.id ?? null,
+    xeroTenantId: tenant?.id ?? null,
+  });
+  if (!tenant) {
+    return {
+      ok: true,
+      value: {
+        cleanupRequestId: null,
+        dataActionStatus: input.destructive ? "completed" : "not_requested",
+        localDisabled: true,
+        remoteStatus: connection.xero_authorisation_connection_id
+          ? "left_in_place"
+          : "not_applicable",
+      },
+    };
+  }
+  return createFrozenDisconnectRequest(
+    tx,
+    input,
+    { ...connection, xero_tenant: tenant },
+    now
+  );
+}
+
+async function lockDisconnectIdentity(
+  tx: Prisma.TransactionClient,
+  connection: NonNullable<
+    Awaited<ReturnType<typeof loadConnectionForDisconnect>>
+  >,
+  connectionId: string
+): Promise<void> {
+  if (connection.xero_tenant?.xero_credential_owner_id) {
+    await lockXeroOwner(tx, connection.xero_tenant.xero_credential_owner_id);
+  }
+  if (connection.xero_tenant) {
+    await lockXeroBinding(tx, connection.xero_tenant.id);
+  }
+  await lockXeroConnection(tx, connectionId);
+}
+
+async function createFrozenDisconnectRequest(
+  tx: Prisma.TransactionClient,
+  input: DisconnectXeroInput,
+  connection: NonNullable<
+    Awaited<ReturnType<typeof loadConnectionForDisconnect>>
+  > & {
+    xero_tenant: NonNullable<
+      NonNullable<
+        Awaited<ReturnType<typeof loadConnectionForDisconnect>>
+      >["xero_tenant"]
+    >;
+  },
+  now: Date
+): Promise<Result<XeroDisconnectReceipt, XeroOAuthError>> {
+  const tenant = connection.xero_tenant;
+  const providerConnections = tenant.xero_credential_owner_id
+    ? await tx.xeroProviderConnection.findMany({
+        where: {
+          provider_app_id: tenant.provider_app_id,
+          xero_credential_owner_id: tenant.xero_credential_owner_id,
+          xero_tenant_id: tenant.xero_tenant_id,
+        },
+      })
+    : [];
+  const targets = freezeCleanupTargets({
+    externalTenantId: tenant.xero_tenant_id,
+    legacyRemoteConnectionId: connection.xero_authorisation_connection_id,
+    ownerId: tenant.xero_credential_owner_id,
+    providerAppId: tenant.provider_app_id,
+    providerConnections,
+  });
+  const reportOnly = keys().XERO_REMOTE_CLEANUP_MODE !== "enabled";
+  const generation = tenant.binding_generation + 1;
+  const changedBinding = await tx.xeroTenant.updateMany({
+    data: {
+      binding_generation: { increment: 1 },
+      ...(reportOnly || !targets.length
+        ? {
+            active_slot: null,
+            retired_at: now,
+            retirement_reason: "disconnected",
+          }
+        : {}),
+    },
+    where: {
+      binding_generation: tenant.binding_generation,
+      clerk_org_id: input.clerkOrgId,
+      id: tenant.id,
+      organisation_id: input.organisationId,
+    },
+  });
+  if (changedBinding.count !== 1) {
+    throw new Error("Binding generation changed during disconnect.");
+  }
+  const request = await tx.xeroCleanupRequest.create({
+    data: {
+      attempts: {
+        create: targets.map((remoteId) => ({
+          clerk_org_id: input.clerkOrgId,
+          expected_binding_generation: generation,
+          organisation_id: input.organisationId,
+          outcome_reason: reportOnly ? "report_only" : null,
+          provider_app_id: tenant.provider_app_id,
+          remote_connection_id: remoteId,
+          state: reportOnly ? "cancelled" : "pending",
+        })),
+      },
+      binding_generation: generation,
+      clerk_org_id: input.clerkOrgId,
+      data_action_status: input.destructive ? "completed" : "not_requested",
+      destructive: input.destructive,
+      organisation_id: input.organisationId,
+      requested_by_user_id: input.performedByUserId ?? "system",
+      xero_tenant_id: tenant.id,
+    },
+    include: { attempts: true },
   });
   return {
     ok: true,
     value: {
-      disconnected: true,
-      remoteRevoked: revoked.value.remoteRevoked,
+      cleanupRequestId: request.id,
+      dataActionStatus: request.data_action_status,
+      localDisabled: true,
+      remoteStatus: aggregateXeroDisconnectReceipt(request.attempts),
     },
   };
-}
-
-async function prepareConnectionForDisconnect(
-  tx: Prisma.TransactionClient,
-  input: DisconnectXeroInput,
-  connection: DisconnectConnection,
-  now: Date
-): Promise<
-  Result<
-    { connection: DisconnectConnection; terminalAuthorisation: boolean },
-    XeroOAuthError
-  >
-> {
-  const terminalAuthorisation =
-    connection.revoked_at !== null ||
-    (connection.status === "stale" &&
-      connection.last_error_code === "refresh_token_invalid");
-  if (
-    !connection.xero_authorisation_connection_id ||
-    terminalAuthorisation ||
-    xeroConnectionRefreshDecision(
-      {
-        expiresAt: connection.expires_at,
-        hasAccessToken: connection.access_token_encrypted.length > 0,
-        hasRefreshToken: connection.refresh_token_encrypted.length > 0,
-        revokedAt: connection.revoked_at,
-        status: connection.status,
-      },
-      now
-    ) !== "refresh"
-  ) {
-    return { ok: true, value: { connection, terminalAuthorisation } };
-  }
-  return await refreshConnectionForDisconnect(tx, input, connection);
-}
-
-async function refreshConnectionForDisconnect(
-  tx: Prisma.TransactionClient,
-  input: DisconnectXeroInput,
-  connection: DisconnectConnection
-): Promise<
-  Result<
-    { connection: DisconnectConnection; terminalAuthorisation: boolean },
-    XeroOAuthError
-  >
-> {
-  const refreshed = await refreshXeroOAuthConnectionWithClient(tx, input);
-  if (!refreshed.ok) {
-    if (refreshed.error.code === "refresh_token_invalid") {
-      return {
-        ok: true,
-        value: { connection, terminalAuthorisation: true },
-      };
-    }
-    return refreshed;
-  }
-  const reloaded = await loadConnectionForDisconnect(tx, input);
-  return reloaded
-    ? {
-        ok: true,
-        value: { connection: reloaded, terminalAuthorisation: false },
-      }
-    : connectionNotFoundError();
-}
-
-async function revokePreparedXeroConnection(
-  tx: Prisma.TransactionClient,
-  input: DisconnectXeroInput,
-  connection: DisconnectConnection,
-  terminalAuthorisation: boolean,
-  now: Date
-): Promise<
-  Result<
-    { connection: DisconnectConnection; remoteRevoked: boolean },
-    XeroOAuthError
-  >
-> {
-  if (!connection.xero_authorisation_connection_id || terminalAuthorisation) {
-    return { ok: true, value: { connection, remoteRevoked: false } };
-  }
-  if (!hasUsableAccessTokenForDisconnect(connection, now)) {
-    return {
-      error: {
-        code: "connection_inactive",
-        message:
-          "Team Calendar could not confirm the Xero connection revocation. Reconnect Xero, then try disconnecting again.",
-      },
-      ok: false,
-    };
-  }
-
-  const first = await revokeStoredXeroConnection(input, connection);
-  if (first.ok) {
-    return {
-      ok: true,
-      value: { connection, remoteRevoked: first.value.remoteRevoked },
-    };
-  }
-  if (first.httpStatus !== 401) {
-    return { error: first.error, ok: false };
-  }
-
-  const recovered = await refreshConnectionForDisconnect(tx, input, connection);
-  if (!recovered.ok) {
-    return recovered;
-  }
-  if (recovered.value.terminalAuthorisation) {
-    return {
-      ok: true,
-      value: { connection: recovered.value.connection, remoteRevoked: false },
-    };
-  }
-  const second = await revokeStoredXeroConnection(
-    input,
-    recovered.value.connection
-  );
-  return second.ok
-    ? {
-        ok: true,
-        value: {
-          connection: recovered.value.connection,
-          remoteRevoked: second.value.remoteRevoked,
-        },
-      }
-    : { error: second.error, ok: false };
-}
-
-function hasUsableAccessTokenForDisconnect(
-  connection: DisconnectConnection,
-  now: Date
-): boolean {
-  return (
-    connection.revoked_at === null &&
-    connection.access_token_encrypted.length > 0 &&
-    connection.access_token_auth_tag !== null &&
-    connection.access_token_iv !== null &&
-    connection.expires_at.getTime() > now.getTime()
-  );
-}
-
-function revokeStoredXeroConnection(
-  _input: DisconnectXeroInput,
-  connection: DisconnectConnection
-): Promise<RevokeConnectionResult> {
-  return revokeXeroConnectionAtSource({
-    accessToken: decryptXeroToken({
-      authTag: connection.access_token_auth_tag,
-      encrypted: connection.access_token_encrypted,
-      iv: connection.access_token_iv,
-      keyVersion: connection.token_key_version,
-    }),
-    rateClass: {
-      kind: "app_management",
-      providerAppId: keys().XERO_CLIENT_ID ?? "",
-    },
-    xeroAuthorisationConnectionId:
-      connection.xero_authorisation_connection_id ?? "",
-  });
 }
 
 function connectionNotFoundError(): Result<never, XeroOAuthError> {
@@ -1867,7 +1835,15 @@ function loadConnectionForDisconnect(
       status: true,
       token_key_version: true,
       xero_authorisation_connection_id: true,
-      xero_tenant: { select: { id: true } },
+      xero_tenant: {
+        select: {
+          binding_generation: true,
+          id: true,
+          provider_app_id: true,
+          xero_credential_owner_id: true,
+          xero_tenant_id: true,
+        },
+      },
     },
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -1965,53 +1941,6 @@ async function finaliseLocalXeroDisconnect(
       xero_tenant_id: input.xeroTenantId,
     },
   });
-}
-
-async function revokeXeroConnectionAtSource(input: {
-  accessToken: string;
-  rateClass: XeroRateClass;
-  xeroAuthorisationConnectionId: string;
-}): Promise<RevokeConnectionResult> {
-  try {
-    const response = await xeroFetch({
-      init: {
-        headers: { Authorization: `Bearer ${input.accessToken}` },
-        method: "DELETE",
-      },
-      maxAttempts: 1,
-      rateClass: input.rateClass,
-      url: `${XERO_CONNECTIONS_URL}/${input.xeroAuthorisationConnectionId}`,
-    });
-    if (response.ok) {
-      return { ok: true, value: { remoteRevoked: true } };
-    }
-    if (response.status === 404) {
-      return { ok: true, value: { remoteRevoked: false } };
-    }
-    return {
-      error: {
-        code:
-          response.status === 401 || response.status === 403
-            ? "connection_inactive"
-            : "network_error",
-        message:
-          response.status === 401 || response.status === 403
-            ? "Xero rejected the connection revocation. Reconnect Xero, then try disconnecting again."
-            : "Xero could not confirm the connection revocation. Try again.",
-      },
-      httpStatus: response.status,
-      ok: false,
-    };
-  } catch {
-    return {
-      error: {
-        code: "network_error",
-        message: "Xero could not confirm the connection revocation. Try again.",
-      },
-      httpStatus: null,
-      ok: false,
-    };
-  }
 }
 
 export async function markXeroConnectionStale(input: {
@@ -2821,10 +2750,11 @@ async function validateTenantSelectionBinding(
     expectedBindingGeneration: number | null;
   }
 ) {
-  const existing = await tx.xeroTenant.findFirst({
+  let existing = await tx.xeroTenant.findFirst({
     select: {
       active_slot: true,
       binding_generation: true,
+      id: true,
       xero_tenant_id: true,
     },
     where: {
@@ -2832,6 +2762,77 @@ async function validateTenantSelectionBinding(
       organisation_id: input.organisationId,
     },
   });
+  if (existing) {
+    await lockXeroBinding(tx, existing.id);
+    existing = await tx.xeroTenant.findFirst({
+      select: {
+        active_slot: true,
+        binding_generation: true,
+        id: true,
+        xero_tenant_id: true,
+      },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        id: existing.id,
+        organisation_id: input.organisationId,
+      },
+    });
+    if (!existing) {
+      throw new TenantSelectionRejectedError("connection_changed");
+    }
+    const now = new Date();
+    await tx.xeroCleanupAttempt.updateMany({
+      data: { lease_expires_at: null, lease_owner: null, state: "pending" },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        lease_expires_at: { lte: now },
+        organisation_id: input.organisationId,
+        request: { xero_tenant_id: existing.id },
+        state: "claimed",
+      },
+    });
+    await tx.xeroCleanupAttempt.updateMany({
+      data: {
+        lease_expires_at: null,
+        lease_owner: null,
+        outcome_reason: "lease_expired",
+        state: "unknown",
+      },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        lease_expires_at: { lte: now },
+        organisation_id: input.organisationId,
+        request: { xero_tenant_id: existing.id },
+        state: "dispatching",
+      },
+    });
+    const unresolved = await tx.xeroCleanupAttempt.findFirst({
+      select: { id: true },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+        request: { xero_tenant_id: existing.id },
+        state: { in: ["claimed", "dispatching", "unknown"] },
+      },
+    });
+    if (unresolved) {
+      throw new TenantSelectionRejectedError("cleanup_unresolved");
+    }
+    await tx.xeroCleanupAttempt.updateMany({
+      data: {
+        lease_expires_at: null,
+        lease_owner: null,
+        outcome_reason: "superseded",
+        state: "cancelled",
+      },
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        organisation_id: input.organisationId,
+        request: { xero_tenant_id: existing.id },
+        state: "pending",
+      },
+    });
+  }
   if (existing && existing.xero_tenant_id !== input.tenantId) {
     throw new TenantSelectionRejectedError("tenant_replacement_required");
   }

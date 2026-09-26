@@ -216,3 +216,13 @@ export type UsageCounter = Prisma.UsageCounterModel
  * 
  */
 export type StripeEvent = Prisma.StripeEventModel
+/**
+ * Model XeroCleanupRequest
+ *
+ */
+export type XeroCleanupRequest = Prisma.XeroCleanupRequestModel
+/**
+ * Model XeroCleanupAttempt
+ *
+ */
+export type XeroCleanupAttempt = Prisma.XeroCleanupAttemptModel
