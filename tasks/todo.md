@@ -1489,6 +1489,6 @@ Review: source lint (1070 files), types (19 tasks), full units (18 tasks, includ
 - [x] Add additive cleanup schema, scoped lease queries and protected fixture cleanup.
 - [x] Add app-scoped management client and local-only disconnect with generation fencing.
 - [x] Add truthful receipts, cron worker, operator reissue and required tests.
-- [ ] Run source gates and freeze candidate for independent protected live review.
+- [x] Run source gates and freeze candidate for independent protected live review.
 
-Review: source gates pass; independent protected live review pending. Full plan delivered by shared absolute path rather than inline duplication; complete text and reconciliation read before implementation.
+Review: independent full lint, types (19 tasks), units (18 tasks), boundaries, release tools (104 cases/types) and synthetic builds (four tasks) pass on runtime c0ce9a13. Protected online Neon campaign aa4e28f1-b3f7-45c1-92ce-db5290c8b91a passed 26 files / 207 tests across six uncached tasks. All 38 cleanup selectors are zero, outside-owned catalogue unchanged, fence released, all 20 migration checksums match and read-only schema comparison reports no difference. The first failed run and guarded recovery are preserved in the execution report. CLI safe rejection/import checks passed; real Xero management authorisation and Plan 160 browser execution remain NOT VERIFIED. Full plan delivered by shared absolute path rather than inline duplication; complete text and reconciliation read before implementation. No merge or push.

@@ -36,7 +36,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | DONE: approved source `caa98406`; guarded live Neon inventory passed (22 files, 162 tests); cleanup and released fence verified |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | DONE: merged into main at `128cc66`; protected online Neon 23 files/177 tests passed; clean fixtures |
 | [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | DONE: approved runtime `f2aeff73`; protected live Neon and Redis passed (24 files, 187 tests); zero residue and released fence verified |
-| [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | TODO |
+| [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | DONE: approved runtime `c0ce9a13`; protected live Neon passed (26 files, 207 tests); 38 zero-residue selectors, released fence and no schema drift verified; provider/browser NOT VERIFIED |
 | [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | TODO |
 | [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | TODO |
 
@@ -109,8 +109,10 @@ against the code and rewritten where they had drifted or conflicted. Programme-w
 recorded in the plans: the binding lives on the existing `XeroTenant` row (no
 `XeroTenantBinding` table); provider app ID is `XERO_CLIENT_ID`; every plan that adds an
 integration suite also adds it to `tooling/release/integration-inventory.ts`; integration and
-migration gates run only against a local Postgres (and, from 161e, a local Redis REST store), and
-are recorded `NOT_VERIFIED` with status `BLOCKED`, never `DONE`, when those are unavailable;
+migration gates now use the already-authorised online Neon protected runner, with refreshed
+ownership, restore, consumer-isolation and cleanup evidence; this session-wide decision overrides
+the historical localhost/Docker instructions. Redis verification uses isolated owned keys.
+Unexecuted gates remain `NOT_VERIFIED`; reconcile environment obstacles and continue;
 161d keeps legacy readers working by mirror-writing owner tokens until 161g; `@repo/availability`
 never imports `@repo/xero`; remote cleanup defaults to `report_only` via
 `XERO_REMOTE_CLEANUP_MODE`, which **stops today's inline remote revoke until an operator enables

@@ -554,19 +554,19 @@ no remote connection ID and no provider error code.
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck` exit 0
-- [ ] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
-- [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
-- [ ] `TURBO_CONCURRENCY=2 bun tooling/release/run-live-integration.ts --manifest <protected-manifest>` exits 0 against the authorised online Neon target, listing all 26 suites including both new suites
-- [ ] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
-- [ ] `grep -n "reconcileXeroConnectionsFunction" packages/jobs/src/functions.ts` returns a match
-- [ ] `grep -n "report_only" packages/xero/keys.ts` returns a match and `keys.test.ts` asserts the absent default is `report_only`
-- [ ] `grep -c "revokeXeroConnectionAtSource\|revokePreparedXeroConnection" packages/xero/src/oauth/service.ts` prints `0` (the inline revoke is gone)
-- [ ] A spec under `tooling/release/e2e/` references the three receipt messages; the execution report records it `NOT_VERIFIED`
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161f updated
+- [x] `bun run check`, `bun run typecheck` exit 0
+- [x] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
+- [x] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
+- [x] `TURBO_CONCURRENCY=2 bun tooling/release/run-live-integration.ts --manifest <protected-manifest>` exits 0 against the authorised online Neon target, listing all 26 suites including both new suites
+- [x] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
+- [x] `git diff --check` exits 0
+- [x] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
+- [x] `grep -n "reconcileXeroConnectionsFunction" packages/jobs/src/functions.ts` returns a match
+- [x] `grep -n "report_only" packages/xero/keys.ts` returns a match and `keys.test.ts` asserts the absent default is `report_only`
+- [x] `grep -c "revokeXeroConnectionAtSource\|revokePreparedXeroConnection" packages/xero/src/oauth/service.ts` prints `0` (the inline revoke is gone)
+- [x] A spec under `tooling/release/e2e/` references the three receipt messages; the execution report records it `NOT_VERIFIED`
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161f updated
 
 ## STOP conditions
 
@@ -601,3 +601,16 @@ Stop and report; do not improvise:
   provider-outcome mapping.
 - Deferred: inactivity-driven deletion (161h, report-only), customer notices, bulk management,
   cleanup credential escrow.
+
+
+## Execution review, 26 September 2026
+
+**APPROVE.** Runtime candidate `c0ce9a13b7b188d4805bf74d0d85d9cbeac68d69` on `codex/xero-management-cleanup`, worktree `/tmp/tc-161f`, based on approved 161e dependency `af649c24dcca6ed44aca02952e802915a4c288be`. The reviewer read the complete implementation and correction diffs, verified scope and meaningful regression assertions, and independently reran all done criteria. No merge or push was performed.
+
+Independent local gates PASS: lint (1083 files), package boundaries, forced unit campaign (18 tasks), forced typecheck (19 tasks), release tools (16 files, 104 tests), release-tool types and forced four-app build using synthetic command-only settings. Actual CLI missing-intent and fully specified default report-only invocations exit 1 before database service imports; direct cleanup module import succeeds under `react-server` without SQL/provider calls. The extracted lock-helper block is byte-equivalent to its predecessor. The destructive local finalisation function remains byte-equivalent to the approved dependency.
+
+Protected online Neon run `aa4e28f1-b3f7-45c1-92ce-db5290c8b91a` PASS: 26 files, 207 tests, six package tasks, no cached integration results. Package counts: app 2, feeds 15, Xero 50, availability 21, database 45 and jobs 74. The run refreshed durable ownership (53 tenant slots, 145 kind-qualified global keys), exact identity, restore timeline/LSN `73cb5a3404beeb6412275bed23ffa160` / `0/4A536A40`, and strict empty-consumer evidence. All 20 applied migration checksums matched; no pending migration. The additive cleanup migration, applied under protected authority during the initial interrupted campaign, has checksum `d038fcd0041cb6b0cebcffca869c9c01053895eb597e053da19a2d4d68dc1d96`.
+
+Independent post-run read-back PASS: all 38 fixture selectors zero, including cleanup requests/attempts and owned Redis keys; outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`; active-run KV fence absent; durable manifest and consumer isolation reverified. Live Prisma schema comparison exits 0 with `No difference detected`. The initial failed campaign and guarded recovery are retained in the programme execution report and are not counted as a pass. The earlier metadata-only manifest for `6efa83e` was not activated or used for a test campaign.
+
+Default mode stays `report_only`. Actual Xero management provisioning/token acquisition/targeted deletion and browser E2E are **NOT VERIFIED**. Provider responses were fake. The three-receipt browser spec is written for later Plan 160 execution; receipt UI unit-render tests pass. No customer cleanup activation or actual provider operation was performed.
