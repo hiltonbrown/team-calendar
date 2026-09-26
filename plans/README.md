@@ -22,6 +22,9 @@ bodies; the implementable work is in the table below.
 
 ### Plan 161 sub-plans
 
+Execution policy for Plan 161: use the already authorised online Neon database through the protected live runner, with refreshed ownership, restore, consumer-isolation and cleanup evidence. This session-wide decision supersedes historical localhost or Docker instructions in these plans. Shared-store verification uses only manifest-owned Redis fixture namespaces.
+
+
 Execute in order. Each is self-contained and written for an executor with no other
 context: read the plan fully, honour its STOP conditions, update your row when done.
 
@@ -32,7 +35,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | DONE: guarded online Neon inventory passed at `bade686`; migrations A-C and immutable binding verified; fixtures cleaned and lock released |
 | [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | DONE: approved source `caa98406`; guarded live Neon inventory passed (22 files, 162 tests); cleanup and released fence verified |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | DONE: merged into main at `128cc66`; protected online Neon 23 files/177 tests passed; clean fixtures |
-| [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | TODO |
+| [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | DONE: approved runtime `f2aeff73`; protected live Neon and Redis passed (24 files, 187 tests); zero residue and released fence verified |
 | [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | TODO |
 | [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | TODO |
 | [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | TODO |

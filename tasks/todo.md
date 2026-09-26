@@ -1478,6 +1478,6 @@ Review: unit, build and type gates executed in the isolated worktree. An unrelat
 - [x] Thread endpoint classes and absolute deadlines through callers.
 - [x] Add tier, namespace, preflight and operator cutover contracts.
 - [x] Add owned shared-store integration, CI and guarded cleanup.
-- [ ] Run full source gates, independent review and protected live campaign.
+- [x] Run full source gates, independent review and protected live campaign.
 
-Review: source lint (1070 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Protected live campaign and independent review remain pending.
+Review: source lint (1070 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Independent reviewer approved runtime f2aeff73. Protected live campaign ccc3ba37-89b3-4636-83ab-58b1b6351d4e passed 24 suites / 187 tests; all 36 cleanup selectors zero, catalogue unchanged, active fence released and read-only schema diff equal. CI Actions execution remains NOT VERIFIED; production namespace activation belongs to Plan 161h.

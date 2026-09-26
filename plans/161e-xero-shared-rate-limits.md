@@ -453,18 +453,18 @@ caps as such.
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck` exit 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including tests 1-7 and 13-15
-- [ ] `bun run --cwd packages/xero test:integration` exits 0 locally and lists `shared-store.integration.test.ts` (tests 8-12)
-- [ ] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` prints `0`
-- [ ] `grep -rn "orgRateLimitKey" packages/ apps/ --include=*.ts --include=*.tsx` returns no matches
-- [ ] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src --include=*.ts | grep -v "limits.ts\|\.test\.ts"` returns no matches
-- [ ] `grep -n "serverless-redis-http" .github/workflows/ci.yml` returns a match
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161e updated
+- [x] `bun run check`, `bun run typecheck` exit 0
+- [x] `bun run --cwd packages/xero test` exits 0, including tests 1-7 and 13-15
+- [x] The protected live runner exits 0 for the complete 24-suite, 187-test inventory, including all ten `shared-store.integration.test.ts` cases
+- [x] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
+- [x] `bun run test:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` prints `0`
+- [x] `grep -rn "orgRateLimitKey" packages/ apps/ --include=*.ts --include=*.tsx` returns no matches
+- [x] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src --include=*.ts | grep -v "limits.ts\|\.test\.ts"` returns no matches
+- [x] `grep -n "serverless-redis-http" .github/workflows/ci.yml` returns a match
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161e updated
 
 ## STOP conditions
 
@@ -499,3 +499,11 @@ Stop and report; do not improvise:
   `admission_unavailable` code.
 - In review, scrutinise: the Lua script's all-or-none path, lease expiry, the release path on every
   exit, and any code that turns a store failure into a user-facing "not connected".
+
+## Reviewer verdict, 26 September 2026
+
+**APPROVE.** Runtime candidate `f2aeff73b050c30ef1dbacfa5997338d57d53268`, worktree `/tmp/tc-161e`, branch `codex/xero-shared-rate-limits`. Independent uncached full units (18 tasks, including 430 Xero tests), types (19 tasks), four-app build, lint (1,070 files), package boundaries, 97 release-tool tests, release-tool types, whitespace and source probes all passed.
+
+Protected online Neon run `ccc3ba37-89b3-4636-83ab-58b1b6351d4e` passed 24 suites and 187 tests across six workspaces, including ten actual Redis tests. Fresh identity, all 19 migration checksums, restore reference, 53 owned tenant slots, 41 global keys, durable manifest and consumer isolation were verified. Independent post-run read-back confirmed all 36 owned database/Redis selectors empty, the outside-owned catalogue unchanged, no schema difference and the active-run fence released.
+
+The boundary gate initially rejected direct test imports from tooling and database internals; helper placement was reconciled behind database package exports, then all gates and the live campaign ran against the corrected frozen candidate. No real Xero requests or production rate-namespace activation occurred. Actual GitHub Actions execution remains NOT VERIFIED; its service configuration matches upstream documentation. Production cutover remains an explicit operator action sequenced by Plan 161h.
