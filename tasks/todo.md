@@ -1467,6 +1467,6 @@ fix later; not changed here to keep the production push to reviewed scope.
 - [x] Persist OAuth intent before redirect, retain candidates before inventory and adopt by verified expiry.
 - [x] Prepare singleton-only dry-run backfill and key maintenance with complete compare-and-set fences.
 - [x] Add owned integration fixtures, protected infrastructure cleanup and migration scope tests.
-- [ ] Reviewer protected live integration run, ownership/restore/isolation evidence and zero residue.
+- [x] Reviewer protected live integration run, ownership/restore/isolation evidence and zero residue.
 
-Review: unit, build and type gates executed in the isolated worktree. An unrelated marketing contact test timed out under unrestricted parallel unit execution; the complete unit gate passed with concurrency two and no marketing source change. Live migration and integration remain reviewer-controlled, with no customer backfill or provider consent operation performed.
+Review: unit, build and type gates executed in the isolated worktree. An unrelated marketing contact test timed out under unrestricted parallel unit execution; the complete unit gate passed with concurrency two and no marketing source change. Protected online Neon verification passed all 23 suites and 177 tests, verified 19 applied migration checksums and no schema drift, and confirmed all 35 cleanup selectors empty with the active-run fence released. No customer backfill or provider consent operation performed.

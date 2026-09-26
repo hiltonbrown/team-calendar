@@ -265,6 +265,8 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Column names: `snake_case`.
 - Every table: `id` (UUID, PK), `created_at`, `updated_at`.
 - `clerk_org_id` (text, not null, indexed) on every tenant-scoped table.
+
+The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempts` and `xero_provider_connections` deliberately have no `clerk_org_id`. They coordinate one verified Xero authoriser across payroll bindings and customer accounts. Customer visibility and access remain scoped through `XeroTenant` by Clerk organisation and payroll organisation.
 - Soft deletes where specified: `archived_at` (nullable timestamp).
 - Foreign keys explicit. Enums at database level.
 - JSON columns typed with Zod schemas; schema reference in a column comment.

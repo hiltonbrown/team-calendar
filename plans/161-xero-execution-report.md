@@ -356,4 +356,17 @@ Migration output was regenerated through a terminal-blank normaliser, preserving
 
 The first protected live run against source `23dde13` applied the additive migration and passed 43 database tests and 29 Xero tests, but the two new OAuth callback cases failed during OAuth start. The fixture omitted a synthetic callback URI, so `callbackUrl()` had no configured URI in the protected runner environment. The fixture now sets a synthetic callback URI and isolates the preview flag; diagnostics include only the typed error code.
 
-The reviewer terminated workers, refreshed consumer checks, recovered three owned interrupted sync-run fixtures through protected recovery (exit zero), independently confirmed all 35 cleanup selectors empty and released the active-run fence before source edits resumed. Schema catalogue unchanged. No executor database operation occurred. Corrected candidate remains subject to protected live rerun.
+After confirming that the interrupted test workers had terminated, the reviewer refreshed consumer checks, recovered three owned interrupted sync-run fixtures through protected recovery (exit zero), independently confirmed all 35 cleanup selectors empty and released the active-run fence before source edits resumed. Outside-owned catalogue digest unchanged. No executor database operation occurred. Corrected candidate remains subject to protected live rerun.
+
+
+### Final reviewer verdict and protected online verification
+
+**PASS**, tested runtime candidate `1b16680ad34642ba356f4623b144c6160f64c285`, protected run `9050c019-ec1e-4515-a5cc-69e92679b539`. The authorised online Neon runner executed six integration workspace tasks, **23 suites and 177 tests**: app 2, feeds 15, availability 21, database 43, Xero 31 (including all 13 credential-owner cases) and jobs 65. The protected migration gate verified all 19 applied migration checksums with none pending. The read-only live Prisma schema diff reported no difference.
+
+Fresh durable ownership evidence covered 53 tenant slots and 41 global keys; consumer-isolation and restore evidence were refreshed before the run (restore timeline prefix `73cb5a`, LSN `0/490E57C0`). Independent post-run verification confirmed all 35 owned cleanup selectors empty, the outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`, and `ACTIVE_RUN_RELEASED`.
+
+The second protected attempt timed out during all three Xero import hooks before any of their 31 tests executed. Cleanup and fence release were independently verified. Pure Bun and real Vitest probes imported the database, service and coordinator without constructing a database client, and reproduced no import-cycle failure. The reviewer verified installed Turborepo support for the documented `TURBO_CONCURRENCY` variable and reran the **unchanged runtime candidate** with concurrency two; the complete integration gate then passed. No hook timeout increase or runtime workaround was introduced.
+
+Reviewer independent lint, forced four-application build, 19-workspace typecheck, full units at concurrency two, boundaries, 72 release-tool tests, release-tool types and source done-criteria probes passed. Generated formatting was restored byte-identically after generation. The final documentation reconciliation adds the same three-table infrastructure exception to the separate tracked `AGENTS.md`; runtime and test source remain exactly the live-tested candidate. Plans and task review now record the completed verification.
+
+No real customer backfill, Xero consent modification, customer credential rotation, deployment, merge or push was performed. Legacy identity grouping that requires a provider refresh remains explicitly unowned, as required by the rollout plan.

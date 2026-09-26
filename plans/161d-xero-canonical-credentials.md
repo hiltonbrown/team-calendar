@@ -247,7 +247,7 @@ Reconcile provider or tooling obstacles while continuing independent work.
   nothing else) and its unit test
 - `tooling/release/integration-inventory.ts` and `.test.ts` (add
   `credential-owner.integration.test.ts`; bump the suite count in the message)
-- `AGENTS.md` and `PRODUCT.md` (the `clerk_org_id` exception paragraph only)
+- `AGENTS.md`, `CLAUDE.md` and `PRODUCT.md` (the `clerk_org_id` exception paragraph only)
 - `plans/161-xero-provider-contract.md` (one row: access-token identity claims)
 - `plans/161-xero-execution-report.md` (append a 161d section), `plans/README.md` (status row)
 
@@ -688,20 +688,20 @@ log call (spy on the logger) or returned error.
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including the Step 1 regressions
-- [ ] `bun run --cwd packages/database test` and `bun run --cwd packages/jobs test` exit 0
-- [ ] `bun run --cwd packages/xero test:integration` passes through the protected online runner and lists `credential-owner.integration.test.ts`
-- [ ] `bun run --cwd packages/database test:integration` passes through the protected online runner
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -n "model XeroTenantBinding" packages/database/prisma/schema.prisma` returns no matches
-- [ ] `grep -n "tokenChanged" packages/xero/src/oauth/service.ts` returns no matches
-- [ ] `grep -rn "resolveXeroAccess\|refreshXeroCredentialOwner" apps/ --include=*.ts --include=*.tsx` returns no matches
-- [ ] `grep -n "access_token_encrypted" packages/database/prisma/schema.prisma` still shows the `XeroConnection` column
-- [ ] `grep -n "xero_credential_owners" AGENTS.md PRODUCT.md` returns a match in each
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161d updated
+- [x] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
+- [x] `bun run --cwd packages/xero test` exits 0, including the Step 1 regressions
+- [x] `bun run --cwd packages/database test` and `bun run --cwd packages/jobs test` exit 0
+- [x] `bun run --cwd packages/xero test:integration` passes through the protected online runner and lists `credential-owner.integration.test.ts`
+- [x] `bun run --cwd packages/database test:integration` passes through the protected online runner
+- [x] `bun run test:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `grep -n "model XeroTenantBinding" packages/database/prisma/schema.prisma` returns no matches
+- [x] `grep -n "tokenChanged" packages/xero/src/oauth/service.ts` returns no matches
+- [x] `grep -rn "resolveXeroAccess\|refreshXeroCredentialOwner" apps/ --include=*.ts --include=*.tsx` returns no matches
+- [x] `grep -n "access_token_encrypted" packages/database/prisma/schema.prisma` still shows the `XeroConnection` column
+- [x] `grep -n "xero_credential_owners" AGENTS.md PRODUCT.md` returns a match in each
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161d updated
 
 ## STOP conditions
 
@@ -761,3 +761,28 @@ table's client-ID audience description differs). The official discovery response
 confirms the issuer, fixed JWKS URL and RS256 signing algorithm. Record this
 evidence boundary in the provider contract ledger; actual customer tokens are
 not decoded or refreshed as verification evidence.
+
+
+Final documentation reconciliation: `AGENTS.md` and `CLAUDE.md` are separate tracked
+instruction files. Both receive the same single infrastructure-table exception
+paragraph already required in `PRODUCT.md`; no other instruction content changes.
+The reviewer approved the bounded `CLAUDE.md` documentation addition.
+
+
+## Final execution review (26 September 2026)
+
+PASS in isolated branch `codex/xero-canonical-credentials`, worktree `/tmp/tc-161d`.
+Live-tested runtime candidate `1b16680ad34642ba356f4623b144c6160f64c285`; protected
+Neon run `9050c019-ec1e-4515-a5cc-69e92679b539` passed all six integration tasks,
+23 files and 177 tests with documented Turbo concurrency two. All 19 applied
+migration checksums matched and the live schema drift check found no difference.
+Independent cleanup returned zero for all 35 owned selectors, an unchanged
+outside-owned catalogue digest and a released active-run fence. Build, lint,
+types, full unit tests, boundaries and release-tool checks passed. The execution
+report records initial fixture and parallel import failures and their recovery.
+
+Reviewed additional scope includes durable `requested_scopes`, generated Prisma
+models, coordinator and re-encryption tests, scheduled recovery unit coverage,
+protected infrastructure cleanup helpers and tests, the manifest allocation type
+annotation and `tasks/todo.md`. No real customer backfill, provider consent change,
+customer token rotation, deployment, merge or push was performed.
