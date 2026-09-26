@@ -316,3 +316,57 @@ The committed changes implement the capability and verify guarded online databas
 
 
 Independent reviewer cleanup readback passed: all 32 fixture selectors returned zero owned rows; the outside fixture catalogue remained unchanged (`41e95ac` prefix); the protected active-run fence was released (`ACTIVE_RUN_RELEASED`). Final worktree contains no generated-file diff or temporary helper files. Plan 161c implementation and its reconciled verification criteria are complete; the reviewer maintains the plan index.
+
+## 161d: Canonical credential owner, executor candidate (26 September 2026)
+
+Implementation candidate prepared in `/tmp/tc-161d` on `codex/xero-canonical-credentials`, based on `8812ecf7`. No merge or push performed. The session-authorised online Neon database is the sole integration target, through the protected live runner. No localhost or Docker database was provisioned. Reviewer owns refresh of live identity, restore evidence, consumer isolation, manifest ownership, additive migration and cleanup verification.
+
+### Implementation
+
+1. Added two regression cases for re-encrypted or scrubbed ciphertext. With the original ciphertext-inequality inference temporarily restored in the disposable worktree, the targeted run produced exactly **2 failed, 398 skipped**; fixed source restored and both pass.
+2. Added credential owner, refresh attempt and provider inventory models plus nullable OAuth intent fields and durable requested scopes. The generated additive migration `20260926040000_add_xero_credential_owner` has SHA-256 `fdfa83377c57d4a68d0e9372a188c9a568fb58b8e97e160828895fbf81ee0544`. Generated using Prisma 7 workspace CLI `migrate diff --from-schema /tmp/tc-161d-before-owner.prisma --to-schema prisma/schema.prisma --script`. Only two planned `DROP NOT NULL` operations, no dropped tables or token columns.
+3. JWT identity validates fixed issuer, resource audience, configured client, RS256 signature and expiry. The migration-only verifier relaxes expiry alone after authenticated decoding. Fourteen generated-key JWT tests pass; direct `jose` dependency pinned to existing 6.2.12 resolution.
+4. Owner refresh commits durable attempt before HTTP, uses SQL-bounded owner/binding/connection lock order, mirrors only reserved active/stale non-disconnected links and proves lost commits by exact attempt ID plus token version. Recovery supersedes obsolete attempts and retains the original grace window. Resolver rechecks binding generation and lifecycle after refresh. Owner/recovery re-encryption uses full envelope/version/outcome CAS.
+5. Async OAuth start persists intent and nonce hash before redirect. Callback claims exchange once, persists encrypted candidate before verification/inventory, adopts only a newer verified expiry or unusable owner and returns generic errors. Selection uses current owner credentials and requires verified owner/provider associations for newly exchanged sessions. No OpenID scopes added.
+6. Prepared read-only identity planning CLI and default dry-run singleton-only backfill. Shared-authoriser groups and unverifiable identities remain unowned. No real customer backfill, token refresh, consent change or key rotation performed.
+7. Added 13 owned PostgreSQL integration cases and registered the 23-suite inventory. Cases include real OAuth start/callback abandonment and inventory persistence failure, queued owner-lock concurrency, cross-account isolation, grace recovery, exact proof, disconnected mirrors, unowned legacy refresh and maintenance CAS. Database migration scope and fixture cleanup checks expanded for system infrastructure ownership.
+
+### Verification before reviewer live run
+
+- `bun run check`: PASS.
+- `bun run build`: PASS, four applications, command-only synthetic configuration; no database provisioned or contacted.
+- `bun run typecheck`: PASS, 19 workspaces; changed Xero/jobs types rechecked after final edits.
+- `bun run test --concurrency=2`: PASS, 18 workspace tasks. Initial unrestricted run timed out in the unrelated marketing contact test; bounded concurrency passed without any marketing source edit.
+- Xero unit suite: PASS, 26 files, 402 tests, including JWT identity, coordinator, key maintenance, ciphertext regressions and error/log redaction assertions.
+- Database unit suite: PASS, 18 files, 78 tests.
+- Jobs unit suite: PASS, 13 files, 136 tests, including scheduled recovery invocation.
+- `bun run boundaries`: PASS.
+- `bun run test:release-tools`: PASS, 14 files, 72 tests.
+- `bun run typecheck:release-tools`: PASS after minimal literal-union typing reconciliation.
+- Protected online integration, migration apply, schema drift and zero residue: **PENDING REVIEWER RUN**.
+
+### Reviewed scope reconciliations
+
+Added `XeroOAuthSession.requested_scopes` because Step 5 requires durable requested-scope evidence but omitted a schema field. Generated Prisma model updates are required by the additive schema. Protected cleanup required `tooling/release/cleanup.ts`, new `tooling/release/xero-fixture-cleanup.ts` and its seven tests. The release fixture manifest needed a `Partial<Record<GlobalKeyKind, number>>` annotation to compile the existing heterogeneous allocation registry. Added coordinator/key-maintenance tests and the job handler test as required by plan behaviour. `tasks/todo.md` records this scoped execution and reviewer-controlled live gate. Reviewer explicitly approved these reconciliations. The worktree plan was refreshed from the reviewer's online-only reconciliation; README remains reviewer-owned.
+
+Migration output was regenerated through a terminal-blank normaliser, preserving one final newline and all SQL statements. Generated Prisma whitespace was normalised only for added/changed lines. `git diff --check 8812ecf` passes.
+
+
+### First protected live run and fixture reconciliation
+
+The first protected live run against source `23dde13` applied the additive migration and passed 43 database tests and 29 Xero tests, but the two new OAuth callback cases failed during OAuth start. The fixture omitted a synthetic callback URI, so `callbackUrl()` had no configured URI in the protected runner environment. The fixture now sets a synthetic callback URI and isolates the preview flag; diagnostics include only the typed error code.
+
+After confirming that the interrupted test workers had terminated, the reviewer refreshed consumer checks, recovered three owned interrupted sync-run fixtures through protected recovery (exit zero), independently confirmed all 35 cleanup selectors empty and released the active-run fence before source edits resumed. Outside-owned catalogue digest unchanged. No executor database operation occurred. Corrected candidate remains subject to protected live rerun.
+
+
+### Final reviewer verdict and protected online verification
+
+**PASS**, tested runtime candidate `1b16680ad34642ba356f4623b144c6160f64c285`, protected run `9050c019-ec1e-4515-a5cc-69e92679b539`. The authorised online Neon runner executed six integration workspace tasks, **23 suites and 177 tests**: app 2, feeds 15, availability 21, database 43, Xero 31 (including all 13 credential-owner cases) and jobs 65. The protected migration gate verified all 19 applied migration checksums with none pending. The read-only live Prisma schema diff reported no difference.
+
+Fresh durable ownership evidence covered 53 tenant slots and 41 global keys; consumer-isolation and restore evidence were refreshed before the run (restore timeline prefix `73cb5a`, LSN `0/490E57C0`). Independent post-run verification confirmed all 35 owned cleanup selectors empty, the outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`, and `ACTIVE_RUN_RELEASED`.
+
+The second protected attempt timed out during all three Xero import hooks before any of their 31 tests executed. Cleanup and fence release were independently verified. Pure Bun and real Vitest probes imported the database, service and coordinator without constructing a database client, and reproduced no import-cycle failure. The reviewer verified installed Turborepo support for the documented `TURBO_CONCURRENCY` variable and reran the **unchanged runtime candidate** with concurrency two; the complete integration gate then passed. No hook timeout increase or runtime workaround was introduced.
+
+Reviewer independent lint, forced four-application build, 19-workspace typecheck, full units at concurrency two, boundaries, 72 release-tool tests, release-tool types and source done-criteria probes passed. Generated formatting was restored byte-identically after generation. The final documentation reconciliation adds the same three-table infrastructure exception to the separate tracked `AGENTS.md`; runtime and test source remain exactly the live-tested candidate. Plans and task review now record the completed verification.
+
+No real customer backfill, Xero consent modification, customer credential rotation, deployment, merge or push was performed. Legacy identity grouping that requires a provider refresh remains explicitly unowned, as required by the rollout plan.
