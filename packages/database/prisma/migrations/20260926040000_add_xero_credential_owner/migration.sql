@@ -127,4 +127,3 @@ ALTER TABLE "xero_tenants" ADD CONSTRAINT "xero_tenants_xero_credential_owner_id
 
 -- AddForeignKey
 ALTER TABLE "xero_tenants" ADD CONSTRAINT "xero_tenants_xero_provider_connection_id_fkey" FOREIGN KEY ("xero_provider_connection_id") REFERENCES "xero_provider_connections"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
