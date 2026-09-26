@@ -215,9 +215,18 @@ describe("XeroClient component", () => {
       xeroTenantId: baseTenant.id,
     });
     fireEvent.click(screen.getByText("Connection controls"));
-    fireEvent.click(screen.getByRole("button", { name: "Refresh tokens" }));
+    const refreshButton = screen.getByRole("button", {
+      name: "Refresh tokens",
+    });
+    await waitFor(() =>
+      expect(refreshButton.hasAttribute("disabled")).toBe(false)
+    );
+    fireEvent.click(refreshButton);
     await waitFor(() =>
       expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledTimes(1)
+    );
+    await waitFor(() =>
+      expect(refreshButton.hasAttribute("disabled")).toBe(false)
     );
     expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledWith({
       connectionId: baseConnection.id,
