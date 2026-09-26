@@ -11,7 +11,7 @@ import {
 } from "vitest";
 import type { TenantContext } from "./index";
 
-vi.mock("server-only", () => ({}), { virtual: true });
+vi.mock("server-only", () => ({}));
 vi.setConfig({ hookTimeout: 30_000, testTimeout: 30_000 });
 vi.mock("./src/holidays/nager-client", () => ({
   getPublicHolidays: vi.fn().mockImplementation((_countryCode, year) =>
@@ -750,25 +750,27 @@ describe("release list-query evidence", () => {
           starts_at: new Date("2026-10-03T00:00:00.000Z"),
         })),
         {
-          approval_status: "approved",
+          approval_status: "approved" as const,
           clerk_org_id: tenantA.clerkOrgId,
-          contactability: "limited",
+          contactability: "limited" as const,
           derived_uid_key: fixture.key("people-status-record", 25),
           ends_at: new Date("2026-10-05T00:00:00.000Z"),
           id: fixture.id("people-status-record", 25),
           organisation_id: tenantA.organisationId,
           person_id: archivedPersonId,
-          privacy_mode: "named",
-          record_type: "wfh",
+          privacy_mode: "named" as const,
+          record_type: "wfh" as const,
           source_remote_id: fixture.key("people-status-remote", 25),
-          source_type: "team_calendar_leave",
+          source_type: "team_calendar_leave" as const,
           starts_at: new Date("2026-10-03T00:00:00.000Z"),
         },
-        ...[
-          [statusPeople[5]?.id, "travelling"],
-          [statusPeople[9]?.id, "wfh"],
-          [holidayPersonId, "wfh"],
-        ].map(([personId, recordType], index) => ({
+        ...(
+          [
+            [statusPeople[5]?.id, "travelling"],
+            [statusPeople[9]?.id, "wfh"],
+            [holidayPersonId, "wfh"],
+          ] as const
+        ).map(([personId, recordType], index) => ({
           approval_status: "approved" as const,
           clerk_org_id: tenantA.clerkOrgId,
           contactability: "limited" as const,
@@ -904,7 +906,7 @@ describe("release list-query evidence", () => {
     const findMany = vi.spyOn(database.availabilityRecord, "findMany");
     const count = vi.spyOn(database.availabilityRecord, "count");
     const balanceFindMany = vi.spyOn(database.leaveBalance, "findMany");
-    const connectionFindFirst = vi.spyOn(database.xeroConnection, "findFirst");
+    const tenantFindFirst = vi.spyOn(database.xeroTenant, "findFirst");
     const measurements: Array<{
       durationMs: number;
       payloadBytes: number;
@@ -943,7 +945,7 @@ describe("release list-query evidence", () => {
         findMany.mock.calls.length +
         count.mock.calls.length +
         balanceFindMany.mock.calls.length +
-        connectionFindFirst.mock.calls.length;
+        tenantFindFirst.mock.calls.length;
       const startedAt = process.hrtime.bigint();
       const result = await listTeamRecordsPage({
         actingOrgRole: "org:admin",
@@ -961,7 +963,7 @@ describe("release list-query evidence", () => {
         findMany.mock.calls.length +
         count.mock.calls.length +
         balanceFindMany.mock.calls.length +
-        connectionFindFirst.mock.calls.length;
+        tenantFindFirst.mock.calls.length;
       const expectedIds = Array.from({ length: rowCount }, (_, index) =>
         fixture.id(`plan-${rowCount}-record`, index)
       ).sort();

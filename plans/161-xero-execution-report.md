@@ -497,3 +497,18 @@ DATABASE_URL='postgresql://synthetic:synthetic@invalid.example/teamcalendar?sslm
 ```
 
 The typecheck used the same synthetic variables with `bun --no-env-file run typecheck -- --force`. Changed live fixture static compilation used `bunx tsc --ignoreConfig --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --strict --jsx react-jsx --types node,vitest/globals` followed by the five changed jobs suites and the existing owner and connection-cleanup suites. This is type verification only, not database execution. Full protected online integration and actual provider/browser evidence remain pending or NOT VERIFIED as stated above. All requested source steps are implemented; the reviewer owns independent campaign and final plan-index closure.
+
+
+### 161g first protected campaign and benchmark instrumentation correction
+
+The independent reviewer passed all source gates on `26f5ce38e412604fc4dff7c161c27a392f1c81aa`: lint, forced types (19 tasks), boundaries, complete units (18 tasks), release tools (104 tests) and types, static integration fixture types and four-app build. The reviewer then ran protected online campaign `60d45251-4d1e-4745-9c01-a1b5bfd78210`. It stopped early on the existing availability list-query benchmark and is **not a complete inventory pass**.
+
+The benchmark still counted `xeroConnection.findFirst`, while the new credential-free state boundary calls `xeroTenant.findFirst`. The narrow correction replaces that spy and its variable references only, retaining the expected `[4, 4, 4]` count and every row/payload assertion. Runtime, schema, fixture allocation and protected inventory are unchanged. The latest reviewer reconciliation is copied into this candidate.
+
+Per the reviewer's verified cleanup evidence, all 38 ownership selectors are empty, the active fence is released, durable ownership and strict consumer isolation remain valid, and the outside-owned catalogue is unchanged. No executor database access occurred. A fresh complete protected campaign remains required on the corrected clean candidate; provider/browser checks remain NOT VERIFIED and cleanup remains report_only.
+
+
+Adding the existing availability file to strict static fixture compilation exposed two pre-existing test typing issues: the unsupported third Vitest mock argument and widened fixture enum literals. The reviewer authorised removing only that argument and preserving literal types with const assertions in the same fixture. Fixture values, benchmark counts and runtime code remain unchanged. Initial static errors are recorded rather than claimed as a passing gate; the corrected candidate is verified below.
+
+
+Corrected candidate validation PASS: full lint (1098 files), strict standalone static compilation of all eight changed integration fixtures including `packages/availability/index.integration.test.ts`, and whitespace checks. Diff audit confirms that the availability integration fixture is the only changed apps/packages file relative to `26f5ce3`; all production runtime remains byte-identical. No unit, build or database suite was executed for this narrow correction, and no live DB was accessed by the executor. The reviewer will independently rerun source gates and the whole protected campaign after the clean commit. The benchmark continues to assert `[4, 4, 4]` exactly.
