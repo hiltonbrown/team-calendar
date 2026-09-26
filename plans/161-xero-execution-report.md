@@ -370,3 +370,12 @@ The second protected attempt timed out during all three Xero import hooks before
 Reviewer independent lint, forced four-application build, 19-workspace typecheck, full units at concurrency two, boundaries, 72 release-tool tests, release-tool types and source done-criteria probes passed. Generated formatting was restored byte-identically after generation. The final documentation reconciliation adds the same three-table infrastructure exception to the separate tracked `AGENTS.md`; runtime and test source remain exactly the live-tested candidate. Plans and task review now record the completed verification.
 
 No real customer backfill, Xero consent modification, customer credential rotation, deployment, merge or push was performed. Legacy identity grouping that requires a provider refresh remains explicitly unowned, as required by the rollout plan.
+
+
+### Main merge (26 September 2026)
+
+User-authorised merge into main completed at `128cc66`. The committed runtime,
+tests, lockfile and migration match protected live-tested candidate `1b16680`
+byte for byte. Existing unrelated local edits were preserved outside the commit;
+the instruction import stub was retained when restoring those edits. No push
+or additional live database mutation was performed for the merge.

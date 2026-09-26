@@ -786,3 +786,8 @@ models, coordinator and re-encryption tests, scheduled recovery unit coverage,
 protected infrastructure cleanup helpers and tests, the manifest allocation type
 annotation and `tasks/todo.md`. No real customer backfill, provider consent change,
 customer token rotation, deployment, merge or push was performed.
+
+
+Subsequent user-authorised main merge completed at `128cc66`. The merged runtime
+and tests remain identical to the protected live-tested candidate; unrelated
+local edits were restored and excluded from the Plan 161d commits.
