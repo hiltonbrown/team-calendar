@@ -16,7 +16,7 @@
 | Date | 21 September 2026 |
 | Source baseline | `8652c31`, re-stamped from `585f6cb4d2532bfa23eb8fb455ad0d360d7e16fe`. The only changes between those commits are under `plans/`, so every source excerpt below is valid at both. All sub-plans use `8652c31` |
 | Review scope | Attached Plan 161, this conversation, relevant repository source and existing plans, Xero references and the upstream `improve` execution contract |
-| Implementation status | TODO. No source implementation, database migration or live provider test was performed to produce this document |
+| Implementation status | Source sub-plans 161-pre through 161h implemented and integrated at `1d50742`; reconciliation and regression fixes underway. All 21 migrations applied. Real browser/provider campaign and Section 9.3 production sign-off remain NOT VERIFIED. See `160-161-reconciliation.md`. |
 | Priority | P1 production-hardening programme; binding and credential correctness are release-blocking |
 | Effort | XL. Eight dependent units; each of B–H is an L on its own. Do not attempt in one sitting |
 | Change risk | HIGH: credential adoption, cross-account infrastructure, migrations and external deletion |
@@ -271,16 +271,16 @@ Fences protect local decisions. They cannot recall a provider request already se
 
 ## 6. Execution order and `improve` workflow
 
-| Unit | Result | Dependency for integration | Initial status |
+| Unit | Result | Dependency for integration | Current reconciled status |
 | --- | --- | --- | --- |
-| A | Source drift, provider contracts, protected fixtures and baseline | None | TODO |
-| B | Immutable binding and additive schema/migration framework | A | TODO |
-| C | Bounded transport and version-aware encryption | A; coordinate schema with B | TODO |
-| D | Canonical credential lifecycle and safe OAuth adoption | B, C | TODO |
-| E | Distributed quota/concurrency enforcement | A, C; consume D's access context | TODO |
-| F | Management client, durable disconnect and reconciliation | B, C, D, E | TODO |
-| G | Permission-aware recovery and all caller integrations | D, E; integrate F's receipt | TODO |
-| H | Inactivity reporting, operator recovery and rollout evidence | B–G | TODO |
+| A | Source drift, provider contracts, protected fixtures and baseline | None | DONE (source); provider/rollout evidence NOT VERIFIED |
+| B | Immutable binding and additive schema/migration framework | A | DONE (source); provider/rollout evidence NOT VERIFIED |
+| C | Bounded transport and version-aware encryption | A; coordinate schema with B | DONE (source); provider/rollout evidence NOT VERIFIED |
+| D | Canonical credential lifecycle and safe OAuth adoption | B, C | DONE (source); provider/rollout evidence NOT VERIFIED |
+| E | Distributed quota/concurrency enforcement | A, C; consume D's access context | DONE (source); provider/rollout evidence NOT VERIFIED |
+| F | Management client, durable disconnect and reconciliation | B, C, D, E | DONE (source); provider/rollout evidence NOT VERIFIED |
+| G | Permission-aware recovery and all caller integrations | D, E; integrate F's receipt | DONE (source); provider/rollout evidence NOT VERIFIED |
+| H | Inactivity reporting, operator recovery and rollout evidence | B–G | DONE (source); provider/rollout evidence NOT VERIFIED |
 
 Binding regression tests and transport work can start independently after A. Assign one schema/credential-contract owner. Do not allow concurrent agents to implement incompatible ownership models in the same service. Remote cleanup remains off until its dependencies pass.
 
@@ -359,13 +359,11 @@ Commands below are defined by the inspected repository manifests unless explicit
 | Jobs units | `bun run --cwd packages/jobs test` | Retry, maintenance and registration contracts pass |
 | Core units | `bun run --cwd packages/core test` | Transport/error contract tests execute |
 | App Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | Correct status, ownership and actions |
-| Configured-database integration | `bun run test:integration` | Run only through the validated guarded target/manifest context |
-| Focused database integration | `bun run --cwd packages/database test:integration` | Owned migration/lifecycle fixtures and cleanup pass |
-| Focused provider integration | `bun run --cwd packages/xero test:integration` | Owned database/shared-store scenarios execute, as selected by existing configuration |
+| Complete online integration inventory | `TURBO_CONCURRENCY=1 bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | Every registered suite collected and passing on the authorised Neon/KV targets; owned cleanup, catalogue and fence read-back pass |
 | Release tooling | `bun run test:release-tools` | Exit zero |
 | Release-tool types | `bun run typecheck:release-tools` | Exit zero |
 | Browser release suite, **deployed candidate only** | `bun run test:release` | Guarded owned browser fixtures, changed Xero flows and cleanup pass. Requires six `TC_*` variables and Firefox/WebKit; runs in the Plan 160 campaign, never as a sub-plan Done criterion |
-| Authorised additive migration | `bun run migrate:deploy` | Reviewed migration applies to the existing selected target |
+| Migration read-back | Protected read-only checksum and Prisma schema comparison | All 21 migrations applied, none pending; no schema difference. Do not reapply existing migrations |
 | Whitespace | `git diff --check` | Exit zero |
 
 Integration scripts currently set `ALLOW_LOCAL_DATABASE_TESTS` and match `.integration.test.ts`; positional filtering may still run more tests than requested. Confirm the actual selected suites. Do not treat zero collected tests, omitted required scenarios or broader unowned fixture mutations as success. Do not run integration against an unguarded remote URL.

@@ -240,12 +240,13 @@ Run:
 
 ```bash
 bun run --cwd packages/next-config test
-DATABASE_URL='postgresql://postgres:postgres@localhost:5432/teamcalendar' \
-  XERO_TOKEN_ENCRYPTION_KEY='<synthetic-32-byte-base64-placeholder>' bun run build
+DATABASE_URL='postgresql://synthetic:synthetic@invalid.example:5432/synthetic' \
+  XERO_TOKEN_ENCRYPTION_KEY='<synthetic-32-byte-base64-placeholder>' \
+  XERO_CLIENT_ID=synthetic-client XERO_CLIENT_SECRET=synthetic-secret bun --no-env-file run build -- --force
 ```
 
-Use a syntactically valid synthetic value for the encryption key, never a real value. Expected:
-the package suite exits 0 with 37 tests and the exact repository build exits 0 using Turbopack.
+These are source-only build placeholders, never a database verification target. Use a syntactically valid synthetic value for the encryption key, never a real value. Current package validation expects 87 tests; the original 37-test count below is historical. Expected:
+the package suite exits 0 with 87 tests (37 at the original baseline) and the exact repository build exits 0 using Turbopack.
 Record in the execution report that worker threads replaced only the plugin transport, not the
 bundler. If the build still fails with the same socket-binding error, inspect whether each app
 actually composes `@repo/next-config`; do not add Webpack fallback flags.
@@ -363,22 +364,22 @@ harness for the `.env.example` comment changes.
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run build` exits 0 with Turbopack after selecting the worker-thread plugin runtime
-- [ ] `bun run test` exits 0
-- [ ] `bun run boundaries` exits 0
-- [ ] `bun run --cwd packages/next-config test` exits 0 with **37 tests**, and that count is recorded in the execution report
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `bun run typecheck:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `plans/161-xero-execution-report.md` records all seven baseline gates with observed exit codes, plus the preflight-gate test count
-- [ ] `grep -nE "bun run test:release([^-]|$)" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
-- [ ] `grep -n "bun run preflight" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
-- [ ] `git status --short` shows no modified file under `packages/` or `apps/` other than the two
+- [x] `bun run check` exits 0
+- [x] `bun run typecheck` exits 0
+- [x] `bun run build` exits 0 with Turbopack after selecting the worker-thread plugin runtime
+- [x] `bun run test` exits 0
+- [x] `bun run boundaries` exits 0
+- [x] `bun run --cwd packages/next-config test` exits 0 with **87 tests** after the 161c preflight reconciliation (37 at the original baseline), and that count is recorded in the execution report
+- [x] `bun run test:release-tools` exits 0
+- [x] `bun run typecheck:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `plans/161-xero-execution-report.md` records all seven baseline gates with observed exit codes, plus the preflight-gate test count
+- [x] `grep -nE "bun run test:release([^-]|$)" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
+- [x] `grep -n "bun run preflight" plans/161[a-h]-*.md` shows no match inside a Commands table or a Done criteria checklist
+- [x] `git status --short` shows no modified file under `packages/` or `apps/` other than the two
   `.env.example` files and the two scoped `packages/next-config` files
-- [ ] No plan file under `plans/161[a-h]-*.md` or the charter is modified by this plan
-- [ ] `plans/README.md` status row for 161-pre updated
+- [x] No plan file under `plans/161[a-h]-*.md` or the charter is modified by this plan
+- [x] `plans/README.md` status row for 161-pre updated
 
 ## STOP conditions
 
@@ -392,7 +393,7 @@ Stop and report; do not improvise:
   get a local fallback, or that `DATABASE_URL` or `XERO_TOKEN_ENCRYPTION_KEY` should become
   `.optional()`. **All three weaken a real production guard for local convenience.** Report the
   friction instead.
-- `bun run --cwd packages/next-config test` does not report 37 tests, or
+- `bun run --cwd packages/next-config test` drops an expected regression (current suite 87 tests; original baseline 37), or
   `packages/next-config/preflight.test.ts` is missing. The gate 161e and 161h depend on has
   changed; report the actual count and file list before 161a starts.
 - You are about to copy a real value out of any `.env.local`, `packages/database/.env` or the
@@ -418,3 +419,7 @@ Stop and report; do not improvise:
 - If the turbo cache seems not to help in a worktree, that is `turbo.json:3`
   `globalDependencies: ["**/.env.*local", ...]` doing its job: absent env files hash differently.
   Do not "fix" it by committing an env file.
+
+### Current reconciliation, 27 September 2026
+
+The Done checklist above is reconciled against the approved execution record and current source. Original 37-test assertions in historical steps record the 22 September baseline, not a ceiling on future coverage. Commit `5194124` adds the promised key-version/keyring production-preflight validation; all 87 next-config tests independently pass. Invalid active key versions, malformed legacy/ring keys, conflicting version-1 material, absent active keys, invalid commercial tier and malformed namespace epoch reject with names-only errors. Valid legacy fallback remains supported. Full combined gates and protected online campaign are tracked in `160-161-reconciliation.md`.

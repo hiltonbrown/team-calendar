@@ -210,11 +210,11 @@ Reconcile provider or tooling obstacles while continuing independent work.
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
 | Database units | `bun run --cwd packages/database test` | exit 0 |
 | Prisma validate | `(cd packages/database && bunx prisma validate)` | exit 0 |
-| Apply reviewed additive migration | `bun run migrate:deploy` in the protected live window | exit 0; only the reviewed migration applied |
-| Xero integration | `bun run --cwd packages/xero test:integration` | exit 0, `credential-owner.integration.test.ts` collected |
-| Database integration | `bun run --cwd packages/database test:integration` | exit 0 |
+| Migration read-back | Protected checksum and Prisma schema comparison | All 21 migrations applied with matching checksums, none pending; no schema difference. Do not reapply existing migrations |
+| Full protected integration inventory | `bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | every registered suite collected, exit 0, zero owned residue and released fence |
 | Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
+
 
 ## Scope
 
@@ -428,7 +428,7 @@ Generate SQL as in 161b (`migrate diff --from-config-datasource --to-schema --sc
 
 **Verify**: `(cd packages/database && bunx prisma validate)` → exit 0.
 `grep "DROP" <new migration.sql> | grep -v "DROP NOT NULL"` prints nothing.
-`bun run migrate:deploy` in the verified protected live window → exit 0.
+Historical additive migration deployment completed in the protected live window. Current reconciliation verifies all 21 applied checksums, zero pending migrations and no schema difference; do not regenerate or reapply this migration.
 
 ### Step 3: Verify authoriser identity
 
@@ -603,7 +603,7 @@ field when present; otherwise leave `granted_scopes_known` unchanged). Missing s
 refresh never erases known scopes.
 
 **Verify**: `bun run --cwd packages/xero test` → exit 0.
-`bun run --cwd packages/xero test:integration` → exit 0.
+protected online runner child inventory for `packages/xero` → exit 0.
 
 ### Step 6: Backfill legacy credentials
 
@@ -612,13 +612,12 @@ Two phases, because verification needs `@repo/xero` and `packages/database` must
 **Phase 1** - `packages/xero/scripts/plan-legacy-credential-owners.ts`, run as
 `bun run --cwd packages/xero plan:legacy-credential-owners --out <path>`: for each reserved
 binding, decrypt the connection's access token, call `verifyLegacyXeroAccessTokenIdentity`, and
-write a JSON array of `{ tenantId, xeroUserId: string | null }` to `<path>`. No tokens, no names.
-Follow the style of `packages/database/seed.ts` for constructing clients in a script.
+write a strict version-1 artefact `{ version: 1, providerAppId, entries }` to `<path>` with mode 0600 and exclusive creation. Each entry contains verified `xeroUserId` (or null), tenant/connection identity, both scope IDs, provider app, binding generation and a SHA-256 fingerprint of the exact full encrypted credential envelope, key version and expiry. No token plaintext, names or encrypted token values are written. The digest binds previously verified JWT evidence to that snapshot; it never proves identity by itself. Use the standard guarded lazy database client. Old identity-only arrays are rejected; regenerate them.
 
 **Phase 2** - `packages/database/scripts/backfill-xero-credential-owner.ts`
 (`bun run --cwd packages/database backfill:xero-credential-owner --identities <path> --provider-app-id <id>`,
 default `--dry-run`, `--apply` to write), calling the pure planner in
-`packages/database/src/xero-credential-owner-backfill.ts`.
+`packages/database/src/xero-credential-owner-backfill.ts`. Actual attachment uses `applyVerifiedXeroCredentialOwnerAttachment` in `packages/database/src/queries/xero-credential-owner.ts`. Under natural-owner, owner-UUID, binding and connection locks, it rechecks both scope IDs, provider app, binding generation, connection identity, eligibility and the complete fingerprint before any owner upsert or attachment. Reauthorisation, key rotation, generation change, retirement, disconnect or foreign scope invalidates the plan. Regenerate stale evidence; never attach current credentials using an old verified identity.
 
 Planner rules:
 - **An expired access token is normal and says nothing about the refresh token** (Xero access
@@ -646,7 +645,7 @@ allocation (2 tenant slots, `credential_owner`/`oauth_attempt`/`provider_app` ke
 owned keys in `afterAll`. Add it to `tooling/release/integration-inventory.ts` in sorted order and
 bump the `N-suite` count in both the message and its test.
 
-**Verify**: `bun run --cwd packages/xero test:integration` → exit 0 listing the new file.
+**Verify**: protected online runner child inventory for `packages/xero` → exit 0 listing the new file.
 `bun run test:release-tools` → exit 0.
 
 ## Test plan
@@ -691,8 +690,8 @@ All must hold:
 - [x] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
 - [x] `bun run --cwd packages/xero test` exits 0, including the Step 1 regressions
 - [x] `bun run --cwd packages/database test` and `bun run --cwd packages/jobs test` exit 0
-- [x] `bun run --cwd packages/xero test:integration` passes through the protected online runner and lists `credential-owner.integration.test.ts`
-- [x] `bun run --cwd packages/database test:integration` passes through the protected online runner
+- [x] protected online runner child inventory for `packages/xero` passes through the protected online runner and lists `credential-owner.integration.test.ts`
+- [x] protected online runner child inventory for `packages/database` passes through the protected online runner
 - [x] `bun run test:release-tools` exits 0
 - [x] `git diff --check` exits 0
 - [x] `grep -n "model XeroTenantBinding" packages/database/prisma/schema.prisma` returns no matches
@@ -791,3 +790,11 @@ customer token rotation, deployment, merge or push was performed.
 Subsequent user-authorised main merge completed at `128cc66`. The merged runtime
 and tests remain identical to the protected live-tested candidate; unrelated
 local edits were restored and excluded from the Plan 161d commits.
+
+### Reconciliation correction, 27 September 2026
+
+Commit `634d179` closes the stale identity-plan race without schema changes. The actual locked attachment helper is exercised by seven additional manifest-owned database lifecycle integration cases, including stale envelope, key version, generation, retirement, disconnect and foreign-scope rejection before writes. Focused 35 database unit tests, operator/fixture strict types and CLI rejection of old unversioned evidence pass. Final protected campaign evidence is tracked in `160-161-reconciliation.md`. No customer backfill was applied.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.

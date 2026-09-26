@@ -40,7 +40,7 @@ Protected runner credentials must remain available to its authority, fence and c
 
 All Redis operations, admission, provider observations and release must respect 161c's absolute operation budget. Lease margin is added exactly once. Namespace initialisation is an explicit operator action, conservative for newly seen tenants as well as known tenants when `assumeSpentDaily` is true. Tests may shrink caps to exercise exhaustion inside owned namespaces; they must not consume real Xero quota. Verify the Lua all-or-none behaviour against the actual authorised REST store. An unavailable store must fail closed.
 
-Replace the historical local integration done criterion with the complete protected live inventory including the new shared-store suite. Run full lint, types, unit tests, release tooling and build with synthetic command-only build variables. Keep the tier unset during ordinary checks. Use `TURBO_CONCURRENCY=2` for the protected integration campaign, as verified during 161d. Reconcile environment obstacles and review necessary adaptations instead of stopping at stale Docker prerequisites or a fixed retry count. Never bypass live guards.
+Replace the historical local integration done criterion with the complete protected live inventory including the new shared-store suite. Run full lint, types, unit tests, release tooling and build with synthetic command-only build variables. Keep the tier unset during ordinary checks. Use `TURBO_CONCURRENCY=1` for the protected integration campaign, matching the reconciled serial jobs/Xero workers. Reconcile environment obstacles and review necessary adaptations instead of stopping at stale Docker prerequisites or a fixed retry count. Never bypass live guards.
 
 Provider limits and header names were refreshed from https://developer.xero.com/documentation/best-practices/api-call-efficiencies/rate-limits/ and https://developer.xero.com/pricing on 26 September 2026. They confirm the plan's five-concurrent, 60-minute, 1,000 Starter / 5,000 higher-tier daily, 10,000 app-minute limits and three remaining-limit header names.
 
@@ -153,27 +153,7 @@ commented out.
 syntactically valid `DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that
 command only.
 
-**Local shared store (Step 6 onwards).** Upstash's REST protocol is served locally by the
-`serverless-redis-http` container in front of Redis:
-
-```bash
-docker network create tc-161-net 2>/dev/null || true
-docker run -d --name tc-161-redis --network tc-161-net redis:7
-docker run -d --name tc-161-srh --network tc-161-net -p 8079:80 \
-  -e SRH_MODE=env -e SRH_TOKEN=local-test-token \
-  -e SRH_CONNECTION_STRING=redis://tc-161-redis:6379 hiett/serverless-redis-http:latest
-export TC_TEST_KV_REST_API_URL=http://localhost:8079
-export TC_TEST_KV_REST_API_TOKEN=local-test-token
-```
-
-`local-test-token` is a throwaway value for a local container, not a secret. The shared-store
-integration suite must refuse any `TC_TEST_KV_REST_API_URL` whose host is not `localhost`/`127.0.0.1`
-unless the protected live-manifest mode from `packages/database/src/live-test-guard.ts` is active.
-The suite also needs the local Postgres used by every other integration suite (see 161b's
-"Local integration database" block; same `docker run` and `DATABASE_URL`).
-
-If Docker is unavailable, record the integration gate `NOT_VERIFIED: no local store` in the
-execution report and set the README status `BLOCKED (integration gates not run)`.
+**Protected shared store and database.** Use only the authorised Neon database and KV endpoint through the protected live runner, with fresh manifest-owned database fixtures and Redis namespaces. Refresh exact identity, ownership, restore, consumers, active fence and cleanup. Direct live package integration invocation is forbidden. No local store or Docker provisioning is needed or authorised for this execution. A suite collecting zero named tests fails verification.
 
 **Not local gates:** `bun run preflight` and `bun run test:release`.
 
@@ -182,10 +162,11 @@ execution report and set the README status `BLOCKED (integration gates not run)`
 | Lint | `bun run check` | exit 0 |
 | Types | `bun run typecheck` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
-| Xero integration (local DB + store) | `bun run --cwd packages/xero test:integration` | exit 0, `shared-store.integration.test.ts` collected |
+| Full protected integration inventory | `bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | every registered suite collected, exit 0, zero owned residue and released fence |
 | next-config units | `bun run --cwd packages/next-config test` | exit 0 |
 | Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
+
 
 ## Scope
 
@@ -392,8 +373,7 @@ out the daily window or initialise with `assumeSpentDaily: true`; set the sentin
 
 ### Step 6: Integration evidence, CI and inventory
 
-Create `shared-store.integration.test.ts` against the local SRH store (and local Postgres for the
-fixture allocation). It constructs its Redis REST store directly from **its own** variables,
+The delivered `shared-store.integration.test.ts` supports the committed CI SRH/Postgres services and the protected live runner. For this execution, use only the authorised online Neon and manifest-owned KV namespaces, with no local provisioning. The suite constructs its Redis REST store directly from **its own** variables,
 `TC_TEST_KV_REST_API_URL` and `TC_TEST_KV_REST_API_TOKEN`, and fails (not skips) if they are unset.
 The global `KV_REST_API_*` variables stay unset in test runs, so every other integration suite
 keeps using the memory store. Use only keys under the fixture's `shared_store_namespace` epoch, and delete
@@ -410,8 +390,7 @@ sorted order and bump the `N-suite` count in both the message and its test.
 
 Replace the `BLOCKED.md item D` comment in `limiter.ts` with a one-line pointer to this plan.
 
-**Verify**: with the local containers running, `bun run --cwd packages/xero test:integration` →
-exit 0 listing `shared-store.integration.test.ts`. `bun run test:release-tools` → exit 0.
+**Current verification**: run the full inventory through `tooling/release/run-live-integration.ts` using the fresh private online manifest/environment. Require exit 0, collection of `shared-store.integration.test.ts`, owned cleanup and released fence. `bun run test:release-tools` → exit 0. The CI service configuration above is a delivered source requirement, not an instruction to provision local services in this session.
 
 ### Step 7: Update the provider ledger
 
@@ -507,3 +486,7 @@ Stop and report; do not improvise:
 Protected online Neon run `ccc3ba37-89b3-4636-83ab-58b1b6351d4e` passed 24 suites and 187 tests across six workspaces, including ten actual Redis tests. Fresh identity, all 19 migration checksums, restore reference, 53 owned tenant slots, 41 global keys, durable manifest and consumer isolation were verified. Independent post-run read-back confirmed all 36 owned database/Redis selectors empty, the outside-owned catalogue unchanged, no schema difference and the active-run fence released.
 
 The boundary gate initially rejected direct test imports from tooling and database internals; helper placement was reconciled behind database package exports, then all gates and the live campaign ran against the corrected frozen candidate. No real Xero requests or production rate-namespace activation occurred. Actual GitHub Actions execution remains NOT VERIFIED; its service configuration matches upstream documentation. Production cutover remains an explicit operator action sequenced by Plan 161h.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.

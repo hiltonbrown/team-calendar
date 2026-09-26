@@ -604,3 +604,7 @@ an unchanged outside-owned catalogue and the released active-run fence.
 Lint, types, units, boundaries, production build and release guard units passed.
 Implementation was reviewed on `codex/xero-deadlines-key-versioning` in
 `/tmp/tc-161c`. The user authorised committing the records and merging into `main`.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.

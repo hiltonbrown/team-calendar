@@ -26,9 +26,23 @@
 > concrete external actions. This planning request does not itself authorise real
 > employee payroll changes, customer disconnection or production deployment.
 
+## Execution reconciliation, 27 September 2026
+
+This section takes precedence over historical baselines, localhost instructions and stale excerpts below. The user requests reconciliation and completion of Plans 160 through 161h. Baseline is integrated main `1d507421ca7519ea3b2aa5d4fe04d9ed56e67ac1`; isolated execution uses `/tmp/tc-xero-reconcile`, branch `codex/xero-reconciliation`, alongside disjoint reviewed 161 bug fixes. Read the complete plan before editing. Root owns plans/status and online verification; executor owns only the Plan 160 harness scope. Shared absolute-path handoff is documented and verified instead of inline packaging.
+
+- Implement every independent harness/report requirement, rather than stopping at an audit. Extend current protection modules only additively and preserve ordinary database-fixture mode unchanged. Existing manifest remains version 1 and all-consumers-paused/strict-empty. A separate E2E contract must not be silently accepted by the ordinary runner or fixtures. No label or file assertion is worker isolation: actual registered revision and tenant/generation fencing must be verified before any worker/browser/provider action. Where current application cannot enforce this mode, record it as unavailable and refuse those actions. Do not provision another database/environment or enable workers as a shortcut.
+- Session authority is online Neon through the protected runner only. Root refreshes ownership, restore, strict consumers, active fence, inventory and cleanup on the final frozen candidate. Do not use localhost/Docker or execute customer backfills. Existing safe source-only synthetic build variables also require synthetic Xero client ID/secret. Source gates use `bun --no-env-file` and forced uncached tasks.
+- Read-only current Vercel audit observes app/API/web production at `11ce7e7fc6a90576321277ca631958c42feffb79`, not the integrated implementation. Production app/API metadata lacks XERO_APP_TIER, XERO_RATE_NAMESPACE_EPOCH and XERO_CREDENTIAL_DOMAIN_ID. Inngest remains unregistered in earlier evidence and must be freshly checked. No configured TC_E2E_* fixture/session/deployed-candidate inputs exist locally. Obtain real fixture identifiers from the user or verified existing protected records; never borrow customer identities. Production deployment, customer payroll changes and provider deletion are not authorised by this plan. Missing external inputs affect those actions only; finish the independent harness and reports.
+- Plan 159 remains TODO with unresolved/non-executed import, identity and AU contract requirements. Never select AU write policy in this verification harness or report those behaviours complete by implication. Xero-scenarios must contain all 26 exact scenarios and registered suffixes, with explicit LIVE versus CONTROLLED modes and all four evidence layers where required. Account for all 40 charter cases via the existing strict xero-evidence builder or an explicit linked coverage table. No aggregate unit/integration exit may create scenario/subcase PASS.
+- Implement actual CLI bootstrap/preflight/recovery/report handling with honest exit 0 only overall PASS, 1 FAIL, 2 incomplete/NOT VERIFIED. Every early failure emits both sanitised reports; missing/unreadable/invalid manifests, CLI errors, unavailable config/deployment/worker/fixtures must not throw before reporting. No raw stderr/error messages or provider data in public outputs. Report schema/allowlists must reject malformed, secret-bearing, stale, mismatched or partial evidence while still accounting for every case. Unknown identities remain null, unexecuted scenario timings null. Private browser artefacts/ledgers are ignored and mode-restricted; safe report files only in reports/xero-e2e.
+- Pure renderer/report CLI must work without credentials. Implement bounded durable intent/outcome/recovery ledger interfaces and actual guarded execution wiring; SIGINT/failure invokes safe independent reconciliation, unresolved remote effects block local evidence deletion and fence release, recovery never replays creates. Never assert everything reconciled before attempting safe independent cleanup. Preserve ordinary release suite behaviour except justified safe cleanup/report corrections with meaningful tests.
+- Independent provider observation must use raw provider shapes and exact IDs/date/type/units, never the production mapper as the oracle. Reuse safe credential access and xeroFetch quota/deadline/origin enforcement for an authorised live observer, with no direct fetch bypass. LIVE rejects local/mock origins and intercepted responses. Replace existing submit-only SQL assumptions with scoped action-aware/imported record observation; keep approved local intent separate from raw remote status. No provider access occurs while prerequisites are absent.
+- Dedicated Playwright config is guarded by actual runner context, one mutation worker, zero retries and inventory discovery without secrets. OAuth recordings disabled, non-OAuth retained-on-failure private artefacts; no direct config invocation bypass. Implement meaningful harness fault tests including queued-only, missing layer, mapper disagreement, stale deployment, wrong ID/scope, uncertain duplicate create, state mapping, report-on-early-failure, partial cleanup and process recovery. Add no dependencies or application/service/schema behaviour in this slice.
+- Stage only your Plan 160 files; other executor agents own next-config preflight, DB/Xero cleanup/backfill and xero-evidence source/tests. Do not modify their files or discard their edits. Root owns primary plan copies, final review, gates and online campaign. Finish with a scoped conventional commit and exact implemented/unexecuted requirement evidence, not a claim of live PASS.
+
 ## Status
 
-- Status: TODO. No live Xero tests run for this plan.
+- Status: IN PROGRESS. Harness implementation and source verification complete at `5d2e57b`; real application/browser/provider campaign NOT VERIFIED. Sanitised diagnostic reports are produced on actual early preflight failure.
 - Priority: P1, required before declaring Xero end-to-end verified.
 - Effort: L, harness completion plus provider/browser execution and reporting.
 - Risk: HIGH for live payroll/credential changes; LOW for offline harness tests.
@@ -190,7 +204,7 @@ Permitted edits during later execution:
   either optional** to make a worktree build. See "Fresh worktree setup" below.
 - The existing all-consumers-paused database-fixture mode in
   `tooling/release/database-guard.ts`. You add a **separate** Xero E2E mode beside it; the
-  existing mode's behaviour stays byte-for-byte unchanged and its tests must still pass.
+  existing default/absent-mode authority remains compatible and its tests must pass. Explicit foreign-mode rejection is required in both release and database-fixture guards.
 - `tooling/release/consumer-isolation.ts` beyond additive extension. Do not fork it.
 - Any real `.env*` file, `tooling/release/.auth/`, or stored refresh tokens.
 - The NZ and UK adapters. They are outside this Australian certification.
@@ -230,13 +244,14 @@ bun install --frozen-lockfile
 ```
 
 `bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with
-no further setup. **`bun run build` additionally requires two variables**, because
+no further setup. **`bun run build` additionally requires four synthetic variables**, because
 `packages/xero/keys.ts:74` validates at module load whenever `NODE_ENV` is not `test`, and
 `packages/database/keys.ts:10` has no fallback:
 
 - `DATABASE_URL` - any syntactically valid Postgres URL suffices for a build; the client is
   lazy and nothing connects. Do **not** point it at the real database.
 - `XERO_TOKEN_ENCRYPTION_KEY` - any 32-byte base64 value suffices for a build.
+- `XERO_CLIENT_ID` and `XERO_CLIENT_SECRET` - synthetic nonempty build values.
 
 Supply them for the build command only. Do not create a committed `.env`, do not copy the
 developer's real values, and do not make either variable optional to avoid setting them.
@@ -631,15 +646,15 @@ Use Bun 1.4.0 and the repository-supported Node version for candidate evidence.
 | Repository lint | `bun run check` | Exit 0 |
 | Candidate build/types | `bun run build`, then `bun run typecheck` | Both exit 0 |
 | Candidate tests/boundaries | `bun run test` and `bun run boundaries` | Both exit 0 |
-| CI integration | `bun run test:integration` | Exit 0 in CI's supported local guarded environment |
-| Authorised live database integration | `bun run tooling/release/run-live-integration.ts --manifest <protected-db-fixture-manifest>` | Existing ownership/cleanup gates pass; not a substitute for Xero E2E |
-| Xero preflight, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --preflight` | Validate-only report; no fixture/payroll mutation; records missing prerequisites |
-| Xero full run, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --output tooling/release/test-results/<run-id>` | Every scenario accounted for; provider/UI evidence and cleanup; reports emitted |
-| Interrupted-run recovery, new | `bun run tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --recover --output tooling/release/test-results/<same-run-id>` | Reconcile/cleanup/report only; no replay of uncertain mutations |
-| Re-render, new | `bun run tooling/release/xero-report.ts --input <sanitised-run-json> --output reports/xero-e2e` | Offline validation and Markdown/JSON output; original evidence retained |
+| Complete integration inventory for this execution | `TURBO_CONCURRENCY=1 bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | All registered suites pass on authorised online Neon; cleanup and fence read-back pass |
+| Authorised live database integration | `bun --no-env-file ./tooling/release/run-live-integration.ts --manifest <protected-db-fixture-manifest>` | Existing ownership/cleanup gates pass; not a substitute for Xero E2E |
+| Xero preflight, new | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --preflight` | Validate-only report; no fixture/payroll mutation; records missing prerequisites |
+| Xero full run, new | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --output tooling/release/test-results/<run-id>` | Every scenario accounted for; provider/UI evidence and cleanup; reports emitted |
+| Interrupted-run recovery, new | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <protected-xero-manifest> --recover --output tooling/release/test-results/<same-run-id>` | Reconcile/cleanup/report only; no replay of uncertain mutations |
+| Re-render, new | `bun --no-env-file ./tooling/release/xero-report.ts --input <sanitised-run-json> --output reports/xero-e2e` | Offline validation and Markdown/JSON output; original evidence retained |
 | Whitespace | `git diff --check` | Exit 0 |
 
-The new runner internally invokes
+The dedicated runner internally invokes
 `bunx playwright test --config tooling/release/xero-e2e.config.ts` only after
 mode/target/ownership validation, then invokes reporting regardless of test exit.
 Do not run that Playwright config directly to bypass the guard. Enforce its runner
@@ -662,46 +677,46 @@ restriction separately and use the authorised OAuth-capable target for X01.
 
 Harness gates, all machine-checkable and all required:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run test` exits 0
-- [ ] `bun run boundaries` exits 0
-- [ ] `bun run build` exits 0 (see "Fresh worktree setup" for the two required variables)
-- [ ] `bun run test:release-tools` exits 0, with no required test skipped
-- [ ] `bun run typecheck:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `git check-ignore -q tooling/release/test-results` exits 0
-- [ ] `git status --short` lists no file under `packages/` or `apps/`
-- [ ] The preflight runner emits both reports with **26** scenarios accounted for:
-      `bun run tooling/release/run-xero-e2e.ts --manifest <m> --preflight` then
+- [x] `bun run check` exits 0
+- [x] `bun run typecheck` exits 0
+- [x] `bun run test` exits 0
+- [x] `bun run boundaries` exits 0
+- [x] `bun run build` exits 0 (see "Fresh worktree setup" for synthetic database, encryption and Xero client variables)
+- [x] `bun run test:release-tools` exits 0, with no required test skipped
+- [x] `bun run typecheck:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `git check-ignore -q tooling/release/test-results` exits 0
+- [x] `git status --short` lists no file under `packages/` or `apps/`
+- [x] The preflight runner emits both reports with **26** scenarios accounted for:
+      `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <m> --preflight` then
       `jq '.scenarios | length' <run-json>` returns `26`
-- [ ] Every scenario status is one of `PASS`, `FAIL`, `NOT VERIFIED`:
+- [x] Every scenario status is one of `PASS`, `FAIL`, `NOT VERIFIED`:
       `jq -r '.scenarios[].status' <run-json> | sort -u` returns only those values
-- [ ] No scenario carries a fabricated timestamp on a non-executed case:
+- [x] No scenario carries a fabricated timestamp on a non-executed case:
       `jq '[.scenarios[] | select(.status=="NOT VERIFIED" and .startedAt!=null)] | length'
       returns `0`
-- [ ] The runner exits 2 (not 0) on a deliberately incomplete preflight run
-- [ ] A renderer unit test exists for each of: all-pass, failed, blocked setup, missing
+- [x] The runner exits 2 (not 0) on a deliberately incomplete preflight run
+- [x] A renderer unit test exists for each of: all-pass, failed, blocked setup, missing
       evidence, missing scenario, duplicate ID, wrong evidence mode, retained unsafe
       provider record, cleanup failure
-- [ ] `grep -rn "retain-on-failure" tooling/release/xero-e2e.config.ts` shows trace and
-      video disabled for the OAuth project specifically
-- [ ] No secret in any committed report:
-      `grep -rniE "(bearer |refresh_token|authorization:|sk_|whsec_|storageState)" reports/xero-e2e/`
+- [x] `rg -n "retain-on-failure" tooling/release/xero-e2e.config.ts` shows trace and
+      video retention outside OAuth and both trace/video disabled for OAuth projects specifically
+- [x] No secret in any committed report:
+      `rg -niE "(bearer |refresh_token|authorization:|sk_|whsec_|storageState)" reports/xero-e2e/`
       returns no matches
 
 Campaign criteria, satisfied by evidence rather than by a command:
 
 - [ ] Plan 159 contract, sub-plans 161a-161h status, and the exact deployed candidate identified.
-- [ ] Harness rejects false queued success and independently verifies all four evidence layers.
+- [x] Harness rejects false queued success and requires independent evidence for all four layers. Actual application observations remain NOT VERIFIED.
 - [ ] Protected mode permits only owned jobs; cleanup restores the verified prior state.
-- [ ] All 26 scenario IDs and every registered subcase have an honest result.
-- [ ] LIVE versus CONTROLLED evidence, and multi-page and expiry limitations, are explicit.
+- [x] All 26 scenario IDs and every registered subcase have an honest diagnostic result: NOT VERIFIED.
+- [x] LIVE versus CONTROLLED evidence and unavailable multi-page/expiry observations are explicit; neither mode was executed against an application/provider.
 - [ ] Unknown external outcomes are reconciled without duplicate writes.
 - [ ] Provider and local cleanup and outside-owned invariants are verified or reported failed.
-- [ ] Both reports were generated even on setup, test or cleanup failure.
-- [ ] Final response links the report and states verdict, counts and material limits.
-- [ ] `plans/README.md` records execution complete separately from integration PASS.
+- [x] Both reports were generated on actual setup failure; meaningful tests verify test/cleanup/report-write failures preserve their verdict.
+- [x] Published reconciliation links diagnostic reports and states verdict, counts and material limits.
+- [x] `plans/README.md` records harness completion separately from the unavailable integration campaign.
 
 The test campaign can finish with FAIL or NOT VERIFIED: reporting that result is
 a completed test/report task, not a passed integration. Plan 159 fixes remain
@@ -713,9 +728,9 @@ product production readiness.
 | Planning | COMPLETE | Source/harness inspected at `246ba27`; plan only |
 | Independent plan review | COMPLETE | Incorporated independent provider oracle, early-failure reports, explicit subcases and protected connection/recovery cohorts |
 | Second plan review | COMPLETE | Re-baselined `246ba27` to `8652c31`; corrected six wrong file:line anchors; named the protected output directory; recorded the new `consumer-isolation.ts` overlap; added worktree env setup, an out-of-scope list and machine-checkable gates |
-| Harness implementation | TODO | New interfaces not yet implemented |
-| Live Xero campaign | NOT VERIFIED | Not run in this planning task |
-| Final execution report | PENDING | Generated by Steps 3 through 5, including failures |
+| Harness implementation | COMPLETE | Reviewed `b211d87` plus final provenance fix `5d2e57b`; 30 release-tool files / 395 tests, strict types and lint PASS; discovery accounts for 92 suffixes and five guards |
+| Live Xero campaign | NOT VERIFIED | Missing sanctioned fixtures, role sessions, approved AU contract, deployed candidate and enforceable tenant/generation worker fence; current runner refuses provider execution |
+| Diagnostic execution report | COMPLETE | Actual missing-manifest CLI exits 2 and emits both reports with 26 scenarios / 92 subcases / 40 charter cases explicitly NOT VERIFIED and null unexecuted timings; see [current reconciliation](160-161-reconciliation.md) |
 
 ## Stop conditions and maintenance
 

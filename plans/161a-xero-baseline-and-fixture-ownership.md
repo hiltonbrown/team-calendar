@@ -283,16 +283,16 @@ map; the guarded integration behaviour is exercised by 161b onward.
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run --cwd packages/database test` exits 0
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `bun run typecheck:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `plans/161-xero-provider-contract.md` exists, and every row has a verification status of `DOCUMENTED`, `OBSERVED`, `INFERRED` or `NOT VERIFIED`
-- [ ] Both `toHaveLength(...)` assertions in `packages/database/src/live-test-fixture.test.ts` equal the output of `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`, and `bun run --cwd packages/database test` exits 0
-- [ ] `git status --short` shows no modified file outside the In scope list
-- [ ] `plans/README.md` status row for 161a updated
+- [x] `bun run check` exits 0
+- [x] `bun run typecheck` exits 0
+- [x] `bun run --cwd packages/database test` exits 0
+- [x] `bun run test:release-tools` exits 0
+- [x] `bun run typecheck:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `plans/161-xero-provider-contract.md` exists, and every row has a verification status of `DOCUMENTED`, `OBSERVED`, `INFERRED` or `NOT VERIFIED`
+- [x] Both `toHaveLength(...)` assertions in `packages/database/src/live-test-fixture.test.ts` equal the output of `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`, and `bun run --cwd packages/database test` exits 0
+- [x] `git status --short` shows no modified file outside the In scope list
+- [x] `plans/README.md` status row for 161a updated
 
 ## STOP conditions
 
@@ -334,3 +334,7 @@ The strict integration inventory remains at the 21 suites that currently exist. 
 must add its newly created test file to that inventory in the same commit; pre-listing absent files
 here would make the release-tool gate fail and would weaken rather than improve the reviewed
 inventory contract.
+
+### Current reconciliation, 27 September 2026
+
+The Done checklist is reconciled against the approved execution record and current registry. The original registry count of 26 was the 22 September baseline; 161h adds its real suite, bringing the registered inventory and length assertions to **27**. The protected online campaign includes every registered file and kind-qualified owned key, including the original five baseline files. Aggregate suite success does not certify any unobserved browser/provider charter assertion. See `160-161-reconciliation.md` for fresh cleanup and catalogue preservation evidence.

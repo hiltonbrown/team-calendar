@@ -3,10 +3,7 @@
 **Status: IN PROGRESS. Production readiness is not verified by any plan in this directory.**
 Writing a plan proves nothing; only its recorded evidence does.
 
-Index last reviewed at `8652c31`, 22 September 2026. All eleven Xero plans were checked
-together for consistency on that date: every gate command was verified to exist and to be
-runnable where a plan claims it, every cross-plan link resolves, and all drift-check baselines
-were normalised to `8652c31`.
+Index reconciled, 27 September 2026, against integrated main `1d50742` and isolated `codex/xero-reconciliation`. The original 22 September drift-check stamps are historical anchors. Current fixes, verification and production boundaries are recorded in [160–161h reconciliation](160-161-reconciliation.md). No source-only completion certifies production readiness. Final reviewed source `5d2e57b` passes 2,810 repository tests, 395 tooling tests and protected online Neon/Redis 27 files / 246 tests; all 21 migrations verified applied, zero residue and unchanged customer content. [Published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) keeps the real Xero/browser campaign and charter sign-off NOT VERIFIED.
 
 ## Active plans
 
@@ -14,7 +11,7 @@ were normalised to `8652c31`.
 | --- | --- | --- | --- |
 | [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | TODO |
-| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | TODO |
+| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: harness and diagnostic report COMPLETE at `5d2e57b`; 395 tooling tests PASS; real campaign NOT VERIFIED |
 | [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, references | P1 | IN PROGRESS |
 
 Plan 161 is a charter plus nine executable sub-plans. It deliberately contains no unit
@@ -31,7 +28,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | Plan | Title | Priority | Effort | Risk | Depends on | Status |
 | --- | --- | --- | --- | --- | --- | --- |
 | [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
-| [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; all local gates passed, 26 protected fixture suites registered |
+| [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; source gates passed; current protected registry contains 27 suites |
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | DONE: guarded online Neon inventory passed at `bade686`; migrations A-C and immutable binding verified; fixtures cleaned and lock released |
 | [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | DONE: approved source `caa98406`; guarded live Neon inventory passed (22 files, 162 tests); cleanup and released fence verified |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | DONE: merged into main at `128cc66`; protected online Neon 23 files/177 tests passed; clean fixtures |
@@ -92,7 +89,7 @@ With 161-pre done:
 - **161a** is complete. It registered the protected fixtures every later integration suite
   allocates from; 161b and 161c may now proceed against those reserved ownership slots.
 - **161b then 161c, sequentially.** Both edit `completeXeroTenantSelection`,
-  `loadPendingSession` and `service.integration.test.ts`, and share the local test database.
+  `loadPendingSession` and `service.integration.test.ts`, and share the protected online Neon target with isolated manifest-owned fixtures.
 - **161e** needs only 161a and 161c (its rate keys use `XERO_CLIENT_ID` directly); it may run
   before or after 161d.
 - **161g** reads 161f's cleanup records for the `disconnect_pending` state, so it follows 161f.

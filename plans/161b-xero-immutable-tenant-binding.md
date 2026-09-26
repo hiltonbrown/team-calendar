@@ -27,7 +27,7 @@
 
 ### Execution reconciliation, 23 September 2026
 
-The user explicitly authorised using the database configured in the local environment files as a **development** database for this execution, including data-changing validation. This supersedes this plan's `LOCAL_OK` prerequisite for that target only. Do not print or copy credentials. Before applying a migration or backfill, identify the target without exposing its URL, inspect applied migrations and existing tenant bindings, and preserve the migration and backfill ordering. The production rollout ordering below still applies to production.
+The user authorised the already configured online Neon database through the protected live runner. This session-wide decision supersedes stale local database instructions. Refresh ownership, restore, exact target, migration, consumer-isolation, fence and cleanup evidence before any mutation. Never disclose credentials or apply customer backfills as fixture verification. The production rollout ordering below still applies.
 
 The repository's integration-test guard does not accept a remote URL with `ALLOW_LOCAL_DATABASE_TESTS=1`. Do not disable or spoof that guard. Remote integration tests must use the existing protected live-run machinery in `tooling/release/`, with its manifest, fixture ownership, durable read-back and consumer-isolation checks. If that machinery cannot be satisfied, complete all independent implementation and checks, record the database suites as `NOT VERIFIED`, and continue reconciliation of the verification path without claiming `DONE`.
 
@@ -218,63 +218,25 @@ requires it. Plans 161d and 161e reuse this exact definition. Do not invent a se
 
 ## Commands you will need
 
-**Fresh worktree setup.** `.env*` files are gitignored (`.gitignore:35`), so a new worktree has
-none. From the worktree root:
+**Current execution authority, reconciled 27 September 2026:** use only the already authorised online Neon target through `tooling/release/run-live-integration.ts`. Refresh exact target identity, migration checksums, restore evidence, durable fixture ownership, strict consumer isolation, active fence and final cleanup before a campaign. Never provision localhost, Docker or a new database. This supersedes the original local database instructions.
 
-```bash
-bun install --frozen-lockfile
-```
-
-`bun run test`, `bun run check`, `bun run typecheck` and `bun run boundaries` then work with no
-further setup. `bun run build` additionally needs `DATABASE_URL` (any syntactically valid Postgres
-URL) and `XERO_TOKEN_ENCRYPTION_KEY` (any 32-byte base64 value, e.g. from
-`openssl rand -base64 32`). Supply them for that command only. **Do not create a committed `.env`
-file, do not copy the developer's real values, and do not make either variable optional.**
-
-**Local integration database (required for every `test:integration` and `migrate:deploy` below).**
-The integration guard (`packages/database/src/live-test-guard.ts:69-79`) only permits a
-**localhost** `DATABASE_URL`; anything else throws. Use the same throwaway setup as CI
-(`.github/workflows/ci.yml:17-33`):
-
-```bash
-docker run -d --name tc-161-pg -p 5432:5432 \
-  -e POSTGRES_USER=team-calendar -e POSTGRES_PASSWORD=team-calendar \
-  -e POSTGRES_DB=team-calendar_test postgres:16
-export DATABASE_URL=postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
-echo "$DATABASE_URL" | grep -q '@localhost:5432/' && echo LOCAL_OK   # must print LOCAL_OK
-bun run migrate:deploy                                               # applies all migrations locally
-```
-
-`packages/database/prisma.config.ts` loads `packages/database/.env` if present, but an exported
-`DATABASE_URL` takes precedence. **Always export it and check `LOCAL_OK` in the same shell before
-`migrate:deploy`.** Never run `migrate:deploy` against any non-localhost database in this plan.
-
-If Docker or a local Postgres is unavailable, do every non-integration step, record each
-integration gate as `NOT_VERIFIED: no local database` in `plans/161-xero-execution-report.md`,
-and set this plan's README status to `BLOCKED (integration gates not run)`, never `DONE`.
-
-A `test:integration` run that **collects zero tests from a file this plan names** is a failure,
-not a pass. Check the Vitest file list in the output.
-
-**Not local gates.** `bun run preflight <app|api|web>` (production variables) and
-`bun run test:release` (deployed candidate) run during the Plan 161h rollout and the Plan 160
-campaign. Never stub either to make it run locally.
+Fresh isolated worktree: `bun install --frozen-lockfile`. Run ordinary source gates with `bun --no-env-file`; use uncached Turbo tasks. The synthetic build requires a syntactically valid non-routable Postgres URL, a 32-byte base64 encryption key and synthetic Xero client ID/secret supplied only to that command.
 
 | Purpose | Command | Expected on success |
 |---|---|---|
-| Lint | `bun run check` | exit 0 |
-| Types | `bun run typecheck` | exit 0 |
-| Xero units | `bun run --cwd packages/xero test` | exit 0 |
-| Database units | `bun run --cwd packages/database test` | exit 0 |
-| Prisma validate | `(cd packages/database && bunx prisma validate)` | exit 0 |
-| Apply migrations (local only) | `bun run migrate:deploy` | exit 0, after `LOCAL_OK` |
-| Database integration | `bun run --cwd packages/database test:integration` | exit 0, named files collected |
-| Xero integration | `bun run --cwd packages/xero test:integration` | exit 0, named files collected |
-| Release tooling | `bun run test:release-tools` | exit 0 (may need to run outside a restricted sandbox: one IPC test binds a local socket) |
+| Lint | `bun --no-env-file run check` | exit 0 |
+| Types | `bun --no-env-file run typecheck -- --force` | exit 0 |
+| Units | `bun --no-env-file run test -- --force --concurrency=2` | exit 0 |
+| Boundaries | `bun --no-env-file run boundaries` | exit 0 |
+| Release tooling | `bun --no-env-file run test:release-tools` | exit 0 |
+| Release types | `bun --no-env-file run typecheck:release-tools` | exit 0 |
+| Full protected integration inventory | `bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | exit 0; every registered file collected; clean fixtures; fence released |
+| Migration and schema verification | Protected read-back of `_prisma_migrations`, checksums and schema diff in `packages/database` | all migrations applied, zero pending, no schema difference |
 | Whitespace | `git diff --check` | exit 0 |
 
-Run Prisma CLI commands from `packages/database` (as `migrate:deploy` does); the Prisma 7 config
-file `packages/database/prisma.config.ts` is resolved relative to the working directory.
+The private manifest and environment are created by the reviewer after read-back. Do not fabricate them or run a package integration script directly against the live target. Apply only a reviewed pending migration under the same protected authority; never run unguarded migrate, push, reset, rebaseline or customer backfill. The current migration catalogue has 21 applied migrations and none pending.
+
+Production preflight and real browser/provider checks remain separate Plan 160 and charter sign-off requirements. Source tests never substitute for them.
 
 ## Scope
 
@@ -425,7 +387,7 @@ Read the file end to end. It must contain only `ALTER TABLE` statements adding t
 **Verify**:
 - `(cd packages/database && bunx prisma validate)` → exit 0
 - `grep -c "DROP " packages/database/prisma/migrations/<timestamp>_add_xero_tenant_binding_reservation/migration.sql` → `0`
-- `bun run migrate:deploy` (after `LOCAL_OK`) → exit 0
+- Reviewed pending migrations applied only through protected live authority, followed by exact checksum and schema read-back → no pending migration or schema difference
 
 ### Step 4: Guard the selection transaction
 
@@ -570,7 +532,7 @@ the collision report is empty, then deploy B and C together. Do not deploy B alo
 immutable binding. Plan 161h's rollout procedure must be updated to reference both B and C.
 
 **Verify**:
-- Against the local database (after `LOCAL_OK`):
+- In manifest-owned integration fixtures through the protected live runner, exercise the pure planner; customer backfill application remains a separate rollout action. The historical CLI example below is a dry-run example, not authorisation to apply it to customer rows:
   `bun run --cwd packages/database backfill:xero-tenant-binding --provider-app-id local-check`
   → exit 0 and prints a dry-run report (the table is empty or holds only fixture rows).
 - `bun run --cwd packages/database test` → exit 0, including new
@@ -578,7 +540,7 @@ immutable binding. Plan 161h's rollout procedure must be updated to reference bo
   `disconnected` rows are retired; two reservable rows for one tenant produce one collision and
   zero updates for those rows.
 - `grep -c "DROP " packages/database/prisma/migrations/<timestamp>_enforce_xero_tenant_binding_reservation/migration.sql` → `0`
-- `bun run migrate:deploy` (after `LOCAL_OK`) → exit 0
+- Reviewed pending migrations applied only through protected live authority, followed by exact checksum and schema read-back → no pending migration or schema difference
 
 ### Step 5a: Enforce row-level immutability (review reconciliation)
 
@@ -633,8 +595,8 @@ protected database integration suite must collect and pass test 12 before 161b i
    `integration-inventory.test.ts`. Nothing else in `tooling/release/` changes.
 
 **Verify**: `bun run test:release-tools` → exit 0.
-`bun run --cwd packages/database test:integration` and
-`bun run --cwd packages/xero test:integration` → both exit 0, and the output lists
+protected online runner child inventory for `packages/database` and
+protected online runner child inventory for `packages/xero` → both exit 0, and the output lists
 `xero-lifecycle-migration.integration.test.ts` and `service.integration.test.ts` with non-zero
 test counts.
 
@@ -690,8 +652,8 @@ All must hold:
 - [x] `bun run typecheck` exits 0
 - [x] `bun run --cwd packages/xero test` exits 0, including U1-U5
 - [x] `bun run --cwd packages/database test` exits 0, including the backfill unit tests
-- [x] `bun run --cwd packages/database test:integration` exits 0 and lists `xero-lifecycle-migration.integration.test.ts` with 5+ tests
-- [x] `bun run --cwd packages/xero test:integration` exits 0 and lists `service.integration.test.ts`
+- [x] protected online runner child inventory for `packages/database` exits 0 and lists `xero-lifecycle-migration.integration.test.ts` with 5+ tests
+- [x] protected online runner child inventory for `packages/xero` exits 0 and lists `service.integration.test.ts`
 - [x] `bun run test:release-tools` exits 0 (the inventory allowlist includes the new suite)
 - [x] `git diff --check` exits 0
 - [x] `grep -c "DROP " <each of the three new migration.sql files>` prints `0` for all three
@@ -714,7 +676,7 @@ Stop and report; do not improvise:
 - A generated migration contains any `DROP`, rename, or change to a table other than
   `xero_tenants` and `xero_oauth_sessions`. Report the SQL.
 - Applying a migration would require `migrate dev`, `db push`, reset, rebaseline or seeding, or
-  `LOCAL_OK` does not print.
+  protected live identity, ownership, restore, consumer isolation or active fence cannot be verified. Reconcile the evidence before dependent mutations; continue independent source work.
 - A database test would need to touch a record the fixture manifest does not own.
 - **The assumption that one external Xero payroll tenant maps to at most one reserved internal
   binding per app turns out to be false for this product** (for example, the backfill shows
@@ -748,3 +710,7 @@ Stop and report; do not improvise:
   `catch` mapping, and the conflict message (an information leak discloses another customer).
 - Deferred: cross-account transfer and replacement-file workflows are explicitly out of the
   programme.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.

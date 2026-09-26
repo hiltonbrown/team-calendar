@@ -155,11 +155,7 @@ and `provider_connection`, `tenant_binding`, `cleanup_request`, `cleanup_attempt
 **Fresh worktree setup**: `bun install --frozen-lockfile`. Build needs a valid-looking
 `DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that command only.
 
-**Local integration database and store**: use exactly the Postgres block from 161b ("Local
-integration database") and the SRH block from 161e ("Local shared store"), including the
-`LOCAL_OK` check before `bun run migrate:deploy`. If either is unavailable, record integration
-gates `NOT_VERIFIED` in the execution report and set README status `BLOCKED (integration gates not run)`.
-A run that collects zero tests from a file this plan names is a failure.
+**Protected integration database and store:** use only the authorised online Neon and KV targets through the protected live runner, with fresh identity, ownership, restore, strict consumer isolation, active fence and cleanup. Never provision Docker or localhost. A run collecting zero named tests fails. Apply only reviewed pending additive migrations under protected authority. Current read-back shows all 21 migrations applied, none pending; do not reapply them.
 
 **Not local gates:** `bun run preflight`, `bun run test:release`.
 
@@ -170,13 +166,11 @@ A run that collects zero tests from a file this plan names is a failure.
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
 | Jobs units | `bun run --cwd packages/jobs test` | exit 0 |
 | Database units | `bun run --cwd packages/database test` | exit 0 |
-| App Xero tests | `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` | exit 0 |
-| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
-| Xero integration | `bun run --cwd packages/xero test:integration` | exit 0 |
-| Jobs integration | `bun run --cwd packages/jobs test:integration` | exit 0 |
-| Database integration | `bun run --cwd packages/database test:integration` | exit 0 |
+| Full protected integration inventory | `bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-manifest> --evidence-dir <private-evidence-dir>` | every registered suite collected, exit 0, zero owned residue and released fence |
+| Migration verification | Protected checksum and schema read-back | no pending migration or schema difference |
 | Release tooling | `bun run test:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
+
 
 ## Scope
 
@@ -327,7 +321,7 @@ Add `packages/database/src/queries/xero-cleanup.ts`, its wrapper
 ID and lease owner), `listDueXeroCleanupAttempts` (system sweep; returns attempt IDs and scope IDs
 only).
 
-**Verify**: `bun run migrate:deploy` (after `LOCAL_OK`) → exit 0. `bun run --cwd packages/database test:integration`
+**Verify**: Reviewed additive migration applied under protected authority, followed by checksum and schema read-back → no pending migration or schema difference. protected online runner child inventory for `packages/database`
 → exit 0 with new tests in `xero-lifecycle-migration.integration.test.ts`: a claim by a second
 lease owner fails while the first lease is live; an outcome write with a stale lease owner is
 rejected; attempts are unique per request and remote connection.
@@ -495,7 +489,7 @@ attempt while reconnect remains fenced: a 2xx gives `confirmed_deleted`, a targe
 
 Job payloads carry IDs and generations only.
 
-**Verify**: `bun run --cwd packages/jobs test && bun run --cwd packages/jobs test:integration` →
+**Verify**: `bun run --cwd packages/jobs test`, then the jobs child inventory through the protected online runner →
 exit 0 listing `reconcile-xero-connections.integration.test.ts`.
 
 ### Step 7: Operator procedure, inventory and browser spec
@@ -614,3 +608,7 @@ Protected online Neon run `aa4e28f1-b3f7-45c1-92ce-db5290c8b91a` PASS: 26 files,
 Independent post-run read-back PASS: all 38 fixture selectors zero, including cleanup requests/attempts and owned Redis keys; outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`; active-run KV fence absent; durable manifest and consumer isolation reverified. Live Prisma schema comparison exits 0 with `No difference detected`. The initial failed campaign and guarded recovery are retained in the programme execution report and are not counted as a pass. The earlier metadata-only manifest for `6efa83e` was not activated or used for a test campaign.
 
 Default mode stays `report_only`. Actual Xero management provisioning/token acquisition/targeted deletion and browser E2E are **NOT VERIFIED**. Provider responses were fake. The three-receipt browser spec is written for later Plan 160 execution; receipt UI unit-render tests pass. No customer cleanup activation or actual provider operation was performed.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.

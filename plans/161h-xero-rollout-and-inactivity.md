@@ -24,7 +24,7 @@
 - **Risk**: MED for code, HIGH for the rollout sequence it describes
 - **Depends on**: 161b, 161c, 161d, 161e, 161f and 161g. All six DONE.
 - **Category**: dx, docs, direction
-- **Planned at**: approved dependency commit `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`, 26 September 2026; implementation base is `/tmp/tc-161g`, branch `codex/xero-permission-recovery`, not yet merged into main. Historical excerpts below are anchors, not current line counts.
+- **Planned at**: approved dependency commit `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`, 26 September 2026; implementation base is `/tmp/tc-161g`, branch `codex/xero-permission-recovery`, subsequently merged into main at `2a24395` and recorded at `1d50742`. Historical excerpts below are anchors, not current line counts.
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
 ## Execution reconciliation, 26 September 2026
@@ -485,7 +485,7 @@ Write into `plans/161-xero-execution-report.md`, under "Rollout procedure (not e
    `bun run --cwd packages/xero rate:initialise-namespace --epoch <e> --assume-spent-daily --credential-domain-id <id>`
    before any deployment running 161e code serves traffic; an empty store is not a fresh daily
    allowance. Drain every deployment still running the process-local limiter first.
-4. Run the 161d two-phase credential-owner backfill (identity plan, then `--dry-run`, then
+4. Generate the current strict version-1 scoped credential identity artefact from 161d. Legacy identity-only arrays are rejected. The locked apply rejects any changed credential envelope, key version, expiry, binding generation, scope, connection identity or eligibility; regenerate stale plans. Run the 161d two-phase credential-owner backfill (identity plan, then `--dry-run`, then
    `--apply`). Bindings it cannot verify stay on the legacy path and are listed for controlled
    reauthorisation. **Never choose account owners automatically.**
 5. Deploy 161g. Unowned (legacy) bindings keep working through 161d's legacy fallback inside
@@ -612,3 +612,7 @@ Documentation closure copies this completed reviewer plan and DONE index exactly
 ## Merge to main, 26 September 2026
 
 The user authorised committing all remaining work and merging to main. Remaining reviewer documentation was committed as `24ffcf2`; merge `2a2439561b06c0a9e61e091c151b4539ff8b7533` brings approved Plan 161g `fca052bf78d39d03da4ad0cbc62ef29566b6cee0` and Plan 161h `a206458365a0697c7deead43b123ecf9b81f9c7a` into main. The merge completed without conflicts and its complete tree is byte-identical to approved `a206458`. Runtime, schema, generated files and SQL remain identical to the independently verified `8325a35` candidate. Both feature commits are ancestors of main. Existing source gates and protected online Neon evidence therefore remain applicable; no repeated database campaign is claimed. This follow-up records merged status only. Rollout, provider/browser verification, namespace activation, deployment and push remain unexecuted; cleanup remains `report_only`.
+
+### Cross-plan reconciliation, 27 September 2026
+
+Current audit, scoped bug corrections, uncached source gates, complete protected online Neon/Redis inventory, all 21 migration checksums, schema and integrity read-back, fixture cleanup and catalogue preservation are consolidated in `plans/160-161-reconciliation.md`. Historical source candidates and counts above remain execution records. Source-slice DONE does not certify the Plan 160 real browser/provider campaign, customer backfills, namespace activation or the charter production sign-off. The already authorised online Neon protected-runner policy remains mandatory.
