@@ -11,9 +11,9 @@ web
 | Document | Purpose |
 |---|---|
 | `PRODUCT.md` | This file. Authoritative product truth, architecture, schema, and non-negotiables. |
-| `CLAUDE.md` | Coding agent instructions, repo conventions, package boundaries, and environment variables. |
-| `AGENTS.md` | Equivalent agent instructions for coding agents other than Claude Code; mirrors `CLAUDE.md`. |
-| `GEMINI.md` | Equivalent agent instructions for Gemini CLI; mirrors `CLAUDE.md`. |
+| `AGENTS.md` | Single source of coding agent instructions: repo conventions, package boundaries, and environment variables. |
+| `CLAUDE.md` | Imports `AGENTS.md` for Claude Code. Do not duplicate content here. |
+| `GEMINI.md` | Imports `AGENTS.md` for Gemini CLI. Do not duplicate content here. |
 | `DESIGN.md` | Colour tokens, typography, spacing, elevation, and component specifications. |
 | `.impeccable.md` | Brand personality, user context, and design principles. |
 | `SECURITY.md` | Vulnerability reporting policy, response targets, and disclosure process. |

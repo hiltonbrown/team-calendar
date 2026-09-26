@@ -7,7 +7,7 @@ Definitive reference for every screen in `apps/app`, reconciled against the impl
 When this catalogue and a project file disagree, resolve in this order:
 
 1. `PRODUCT.md` (product truth, schema, sync behaviour, tenancy)
-2. `CLAUDE.md` (repo conventions, package boundaries, environment)
+2. `AGENTS.md` (repo conventions, package boundaries, environment)
 3. `DESIGN.md` (colour tokens, typography, elevation, components)
 4. Prior versions of this catalogue (superseded, retained only in git history)
 

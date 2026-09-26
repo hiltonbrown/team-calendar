@@ -73,7 +73,7 @@ const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const RECONCILE_LOOKBACK_DAYS = 90;
 
 // Ceiling on Xero requests per run. The per-organisation budget is 5,000 a day
-// (see the rate limiting section in CLAUDE.md); this leaves ample headroom for
+// (see the Xero adapter rules in AGENTS.md); this leaves ample headroom for
 // the scheduled people, leave-record and balance syncs that share it. A run
 // that hits the cap finishes cleanly and reports itself as partial rather than
 // truncating silently.
