@@ -675,6 +675,16 @@ function programmeStatus(
   if (command.outcome === "FAIL" || commandFailed) {
     return "FAIL";
   }
+  if (
+    command.outcome !== "PASS" ||
+    command.phase !== "complete" ||
+    command.inventoryStatus !== "PASS" ||
+    command.cleanupStatus !== "PASS" ||
+    command.fenceState !== "released" ||
+    command.failurePhase !== undefined
+  ) {
+    return "NOT_VERIFIED";
+  }
   return command.outcome;
 }
 
@@ -694,6 +704,11 @@ export function buildXeroEvidence(value: unknown): {
         .filter((id) => !knownCases.has(id))
         .map(() => "Unrecognised evidence case")
     : ["Malformed evidence input"];
+  if (input?.deployedSha === null) {
+    validationErrors.push("Deployed candidate evidence is missing");
+  } else if (input && input.deployedSha !== input.candidateSha) {
+    validationErrors.push("Deployed candidate does not match assessed source");
+  }
   const requiredPrerequisites = new Set(
     XERO_EVIDENCE_CASES.flatMap((entry) =>
       entry.requiredEvidenceLevels.map((level) => prerequisiteByLevel[level])
