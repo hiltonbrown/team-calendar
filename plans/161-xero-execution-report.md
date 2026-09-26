@@ -302,3 +302,14 @@ Production build passed: `bun run build` with command-only synthetic validation 
 
 
 Reviewer also approved a deterministic `../client` mock in the people integration suite, following the existing leave-records suite, to isolate outbound Inngest sends and avoid paired deployed-client initialisation when provider keys are supplied to the protected runner. The real database fixture operations and Xero employee mock coverage remain intact. The source candidate is frozen after this test-only reconciliation before the next protected run.
+
+
+### Final verification on the frozen source candidate
+
+Protected online Neon verification passed on source candidate `caa98406b635bb0f5930c22c7ca8285be7d75e1f`, run `75e1b64e-6147-4b9e-aa9b-8c93249166fc`. The runner exited 0: 6 integration tasks, 22 files and 162 tests passed (app 2, availability 21, database 41, feeds 15, jobs 65, Xero 18). The Xero service integration file was collected and all four new re-encryption cases passed. The jobs CAS test now proves the fetch and concurrent cursor update executed, and the people suite collects with isolated event transport.
+
+The reviewer refreshed the protected manifest using timeline `73cb5a3404beeb6412275bed23ffa160`, restore LSN `0/4863BDA8`, all 18 applied migration checksums, 53 owned tenants and 41 global keys. Consumer isolation and durable-fixture checks were refreshed before execution. The run's guarded cleanup completed; independent final cleanup and KV-fence readback evidence is retained by the reviewer and recorded below after confirmation.
+
+Final candidate gates passed: lint 1047 files, typecheck 19 tasks, full unit 18 tasks, core 84 tests, Xero 364 tests and package boundaries. The reviewer also passed release-tool units (13 files, 65 tests). Production build passed with synthetic command-only format validation values as recorded above. Whitespace and commented-env-addition criteria passed; the stale `customFetch` through `response.json` text probe was reconciled to the equivalent fetch-to-body span because JSON is now parsed from a bounded reader, whose pre-body cleanup count is zero.
+
+The committed changes implement the capability and verify guarded online database behaviour using owned synthetic token rows. Live Xero provider operations, actual production token/key rotation, release preflight and browser rollout were not performed or claimed by this plan.
