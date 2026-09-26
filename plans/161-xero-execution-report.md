@@ -350,3 +350,10 @@ Implementation candidate prepared in `/tmp/tc-161d` on `codex/xero-canonical-cre
 Added `XeroOAuthSession.requested_scopes` because Step 5 requires durable requested-scope evidence but omitted a schema field. Generated Prisma model updates are required by the additive schema. Protected cleanup required `tooling/release/cleanup.ts`, new `tooling/release/xero-fixture-cleanup.ts` and its seven tests. The release fixture manifest needed a `Partial<Record<GlobalKeyKind, number>>` annotation to compile the existing heterogeneous allocation registry. Added coordinator/key-maintenance tests and the job handler test as required by plan behaviour. `tasks/todo.md` records this scoped execution and reviewer-controlled live gate. Reviewer explicitly approved these reconciliations. The worktree plan was refreshed from the reviewer's online-only reconciliation; README remains reviewer-owned.
 
 Migration output was regenerated through a terminal-blank normaliser, preserving one final newline and all SQL statements. Generated Prisma whitespace was normalised only for added/changed lines. `git diff --check 8812ecf` passes.
+
+
+### First protected live run and fixture reconciliation
+
+The first protected live run against source `23dde13` applied the additive migration and passed 43 database tests and 29 Xero tests, but the two new OAuth callback cases failed during OAuth start. The fixture omitted a synthetic callback URI, so `callbackUrl()` had no configured URI in the protected runner environment. The fixture now sets a synthetic callback URI and isolates the preview flag; diagnostics include only the typed error code.
+
+The reviewer terminated workers, refreshed consumer checks, recovered three owned interrupted sync-run fixtures through protected recovery (exit zero), independently confirmed all 35 cleanup selectors empty and released the active-run fence before source edits resumed. Schema catalogue unchanged. No executor database operation occurred. Corrected candidate remains subject to protected live rerun.

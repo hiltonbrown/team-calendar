@@ -203,6 +203,11 @@ describe("canonical credential owner integration", () => {
   });
   beforeEach(async () => {
     vi.unstubAllGlobals();
+    vi.stubEnv(
+      "XERO_REDIRECT_URI",
+      "https://api.example.com/api/xero/oauth/callback"
+    );
+    vi.stubEnv("VERCEL_ENV", "test");
     await cleanup();
     await seed();
   });
@@ -475,7 +480,7 @@ describe("canonical credential owner integration", () => {
       userId: "abandoned-fixture-user",
     });
     if (!start.ok) {
-      throw new Error("OAuth start failed");
+      throw new Error(`OAuth start failed: ${start.error.code}`);
     }
     const state = new URL(start.value.redirectUrl).searchParams.get("state");
     if (!state) {
@@ -550,7 +555,7 @@ describe("canonical credential owner integration", () => {
     });
     expect(start.ok).toBe(true);
     if (!start.ok) {
-      throw new Error("OAuth start failed");
+      throw new Error(`OAuth start failed: ${start.error.code}`);
     }
     const state = new URL(start.value.redirectUrl).searchParams.get("state");
     if (!state) {
