@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   countSharedStoreFixtureKeys,
   deleteSharedStoreFixtureKeys,
-} from "./shared-store-cleanup.js";
-import { sharedStoreFixtureEpoch } from "./shared-store-namespace.js";
+  sharedStoreFixtureEpoch,
+} from "../../packages/database/src/live-shared-store-fixture.js";
 
 const SAFE_EPOCH = /^[a-f0-9]{32}$/;
 const namespace = "release_shared_store_a_run_marker_01";

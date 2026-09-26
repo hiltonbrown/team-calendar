@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  countSharedStoreFixtureKeys,
+  deleteSharedStoreFixtureKeys,
+} from "../../packages/database/src/live-shared-store-fixture.js";
 import { createStandaloneDatabaseClient } from "../../packages/database/src/standalone-client.js";
 import { assertActiveRunOwner } from "./active-run-registry.js";
 import { assertConsumerIsolationReadBack } from "./consumer-isolation.js";
@@ -7,10 +11,6 @@ import {
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
 import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
-import {
-  countSharedStoreFixtureKeys,
-  deleteSharedStoreFixtureKeys,
-} from "./shared-store-cleanup.js";
 import {
   assertXeroFixtureInfrastructureOwned,
   countXeroFixtureInfrastructure,

@@ -1,11 +1,12 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
 import { randomUUID } from "node:crypto";
-
+import {
+  deleteSharedStoreFixtureKeys,
+  sharedStoreFixtureEpoch,
+} from "@repo/database/live-shared-store-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { assertTestDatabaseConnectionAllowed } from "@repo/database/live-test-guard";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { deleteSharedStoreFixtureKeys } from "../../../../tooling/release/shared-store-cleanup";
-import { sharedStoreFixtureEpoch } from "../../../../tooling/release/shared-store-namespace";
-import { assertTestDatabaseConnectionAllowed } from "../../../database/src/live-test-guard";
 import {
   RedisSharedXeroRateStore,
   type SharedRateLimits,

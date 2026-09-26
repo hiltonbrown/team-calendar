@@ -1480,4 +1480,4 @@ Review: unit, build and type gates executed in the isolated worktree. An unrelat
 - [x] Add owned shared-store integration, CI and guarded cleanup.
 - [ ] Run full source gates, independent review and protected live campaign.
 
-Review: source lint (1071 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Protected live campaign and independent review remain pending.
+Review: source lint (1070 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Protected live campaign and independent review remain pending.

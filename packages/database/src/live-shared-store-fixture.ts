@@ -1,6 +1,6 @@
+import { createHash } from "node:crypto";
+import { executeRedisRestCommand } from "@repo/core";
 import { z } from "zod";
-import { executeRedisRestCommand } from "../../packages/core/src/redis-rest-transport.js";
-import { sharedStoreFixtureEpoch } from "./shared-store-namespace.js";
 
 const NAMESPACE_PREFIX = "shared_store_namespace:";
 const CURSOR = /^(0|[1-9][0-9]{0,19})$/;
@@ -152,4 +152,12 @@ function assertOwnedKey(key: string, epoch: string) {
       "Shared-store cleanup returned a key outside manifest ownership"
     );
   }
+}
+
+// Hash the exact allocated fixture value, including underscores and its run marker.
+export function sharedStoreFixtureEpoch(namespace: string): string {
+  if (!namespace) {
+    throw new Error("A manifest-owned shared-store namespace is required");
+  }
+  return createHash("sha256").update(namespace).digest("hex").slice(0, 32);
 }
