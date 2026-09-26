@@ -548,17 +548,17 @@ Instrumentation and configuration:
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck`, `bun run build` (with the two variables), `bun run test` exit 0
-- [ ] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
-- [ ] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -nE "\.delete(Many)?\(|method: \"DELETE\"|connection-cleanup|management-client" packages/xero/src/oauth/inactivity-policy.ts packages/xero/src/oauth/inactivity-report.ts` returns no matches
-- [ ] `grep -c "reconcile-xero-connections" CLAUDE.md AGENTS.md` shows at least 1 in each
-- [ ] `grep -n "XERO_REMOTE_CLEANUP_MODE" CLAUDE.md AGENTS.md` matches in each
-- [ ] `grep -c "Rollout procedure (not executed)" plans/161-xero-execution-report.md` prints `1`
-- [ ] `xero-evidence.test.ts` includes a case where a prerequisite is `false`: `buildXeroEvidence` returns `exitCode: 1`, both `json` and `markdown` are non-empty and name the prerequisite, and `writeXeroEvidence` writes both files to a temporary directory
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status rows for 161b-161h reflect actual state
+- [x] `bun run check`, `bun run typecheck`, `bun run build` (with the two variables), `bun run test` exit 0
+- [x] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
+- [x] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
+- [x] `git diff --check` exits 0
+- [x] `grep -nE "\.delete(Many)?\(|method: \"DELETE\"|connection-cleanup|management-client" packages/xero/src/oauth/inactivity-policy.ts packages/xero/src/oauth/inactivity-report.ts` returns no matches
+- [x] `grep -c "reconcile-xero-connections" CLAUDE.md AGENTS.md` shows at least 1 in each
+- [x] `grep -n "XERO_REMOTE_CLEANUP_MODE" CLAUDE.md AGENTS.md` matches in each
+- [x] `grep -c "Rollout procedure (not executed)" plans/161-xero-execution-report.md` prints `1`
+- [x] `xero-evidence.test.ts` includes a case where a prerequisite is `false`: `buildXeroEvidence` returns `exitCode: 1`, both `json` and `markdown` are non-empty and name the prerequisite, and `writeXeroEvidence` writes both files to a temporary directory
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status rows for 161b-161h reflect actual state
 
 ## STOP conditions
 
@@ -590,3 +590,20 @@ Stop and report; do not improvise:
 - **Deferred, each needing its own plan and authority:** executing the rollout; inactivity cleanup
   with notice and retention policy; retiring `XERO_TOKEN_ENCRYPTION_KEY`; dropping the mirrored
   credential columns; removing 161d's mirror-write; NZ or UK activation.
+
+
+## Independent execution approval, 26 September 2026
+
+**APPROVE** isolated runtime candidate `8325a35b328b4786181c421ce8a89e946f119a84`, branch `codex/xero-rollout-inactivity`, worktree `/tmp/tc-161h`. Independent full source/test/schema review found no remaining actionable issue. Dependencies remain DONE; 161g and 161h are approved isolated branches, not merged.
+
+Independent source gates PASS: lint 1114 files; forced types 19 uncached tasks; full units 2723 tests across 18 uncached tasks; boundaries 1068 files across 21 packages; release tooling 175 tests across 18 files and tooling types; strict metric and both changed integration-fixture types; four uncached synthetic builds; separate next-config 47 tests; all documentation, report-only prohibited-operation, scope and base-to-candidate whitespace criteria. Eleven regenerated files differed only in whitespace and were restored byte-for-byte to the reviewed candidate. The two inherited deadline timing scenarios use controlled clocks with all original assertions retained.
+
+Protected online Neon campaign `f7578441-2838-4361-9ced-0f59a19d73c3` passed all **27 files, 233 tests and six uncached tasks**, in 9m6.962s. Package totals: database 45, jobs 78, Xero 72, availability 21, feeds 15 and app 2. Jobs retained the complete 505-record fixture and both passes, completing in 456.90 seconds. Actual owned Redis domain immutability, matching reinitialisation, legacy/malformed/foreign denial and unchanged allowance assertions passed. Durable ownership covers 55 tenant slots and 146 kind-qualified global keys. Fresh strict consumer isolation and exact target identity were verified before writes; restore evidence records timeline `73cb5a3404beeb6412275bed23ffa160`, LSN `0/4BB179F8`.
+
+The independently reviewed additive migration `20260926130000_add_xero_inactivity_classifications` was applied under protected authority and the active-run fence. Final SQL SHA-256: `0606302b88c98b28aadc4dd42ab4c1ce674e3f08a6d0b577f169559d062b2d93`. All 21 applied checksums match; zero pending migrations. Read-only schema comparison reports `No difference detected`. Its first invocation did not propagate the private environment into the Prisma subprocess; an explicit environment-preserving subprocess rerun passed, with no guard or source change.
+
+Independent post-run cleanup PASS: zero owned rows across all 39 selectors, active fence released, durable manifest and strict empty-consumer isolation verified. Outside-owned catalogue digest remains `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`. All 204 pre-existing rows across 37 tables retain their exact per-table counts; the new classification table has zero rows. No registered or archived Inngest app and no nonterminal run. Source remained frozen and clean throughout the campaign. Temporary private verification credentials were removed after final read-back.
+
+Both restricted evidence artefacts are present at `/tmp/tc161h-evidence/xero-evidence.json` and `/tmp/tc161h-evidence/xero-evidence.md`, mode 0600. They record actual inventory PASS, cleanup PASS, command exit zero and released fence. All 40 charter cases and their required levels remain NOT_VERIFIED without separately supplied assertion provenance; the builder does not infer case PASS from infrastructure success. Deployed SHA is null. Production rollout, customer backfills, commercial namespace activation, destructive provider operations, browser and real Xero provider behaviour remain NOT VERIFIED or unexecuted. Cleanup remains `report_only`. No deployment, merge or push occurred.
+
+Documentation closure copies this completed reviewer plan and DONE index exactly, updates only the scoped 161h task review and appends the same evidence to the execution report. Runtime, generated output, schema and SQL remain byte-identical to the verified candidate; no repeat database campaign is required for documentation-only closure.
