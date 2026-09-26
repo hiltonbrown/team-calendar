@@ -1,6 +1,7 @@
 import type { Result } from "../index";
 
 export type RedisRestTransportErrorCode =
+  | "aborted"
   | "http_error"
   | "invalid_response"
   | "network_error"
@@ -189,19 +190,21 @@ function setupTimeoutSignal(
     );
   }, timeoutMs);
 
+  const onAbort = () => controller.abort(inputSignal?.reason);
   if (inputSignal) {
     if (inputSignal.aborted) {
       clearTimeout(timeoutId);
       controller.abort(inputSignal.reason);
     } else {
-      inputSignal.addEventListener("abort", () => {
-        controller.abort(inputSignal.reason);
-      });
+      inputSignal.addEventListener("abort", onAbort);
     }
   }
 
   return {
-    cleanup: () => clearTimeout(timeoutId),
+    cleanup: () => {
+      clearTimeout(timeoutId);
+      inputSignal?.removeEventListener("abort", onAbort);
+    },
     signal: controller.signal,
   };
 }
@@ -215,7 +218,7 @@ export async function executeRedisRestCommand<T = unknown>(
   if (input.signal?.aborted) {
     return {
       error: {
-        code: "timeout",
+        code: "aborted",
         message: redactCredentials(
           input.signal.reason instanceof Error
             ? input.signal.reason.message
@@ -240,12 +243,13 @@ export async function executeRedisRestCommand<T = unknown>(
       signal,
     });
 
-    cleanup();
-
     let payload: unknown;
     try {
-      payload = await response.json();
+      payload = JSON.parse(await readResponseText(response, signal));
     } catch (parseError) {
+      if (signal?.aborted) {
+        return cancellationResult(input.signal);
+      }
       const parseMessage =
         parseError instanceof Error
           ? parseError.message
@@ -282,7 +286,71 @@ export async function executeRedisRestCommand<T = unknown>(
 
     return parseEnvelope<T>(payload, response.status, token);
   } catch (error) {
-    cleanup();
+    if (signal?.aborted) {
+      return cancellationResult(input.signal);
+    }
     return mapFetchError(error, signal, token);
+  } finally {
+    cleanup();
+  }
+}
+
+function cancellationResult(
+  callerSignal?: AbortSignal
+): Result<never, RedisRestTransportError> {
+  return {
+    error: {
+      code: callerSignal?.aborted ? "aborted" : "timeout",
+      message: callerSignal?.aborted
+        ? "Redis REST request was aborted"
+        : "Redis REST request timed out",
+    },
+    ok: false,
+  };
+}
+
+async function readResponseText(
+  response: Response,
+  signal?: AbortSignal
+): Promise<string> {
+  if (!signal) {
+    return response.text();
+  }
+  const reader = response.body?.getReader();
+  if (!reader) {
+    return "";
+  }
+  let onAbort: () => void = () => {
+    /* Assigned synchronously below. */
+  };
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => {
+      reader.cancel().catch(() => {
+        /* Body cancellation may race closure. */
+      });
+      reject(new DOMException("Request cancelled", "AbortError"));
+    };
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort);
+    }
+  });
+  try {
+    const decoder = new TextDecoder();
+    let text = "";
+    let complete = false;
+    while (!complete) {
+      const chunk = await Promise.race([reader.read(), aborted]);
+      if (chunk.done) {
+        complete = true;
+      } else {
+        text += decoder.decode(chunk.value, { stream: true });
+      }
+    }
+    return text + decoder.decode();
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    reader.releaseLock();
   }
 }

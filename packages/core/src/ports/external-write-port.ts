@@ -9,6 +9,10 @@ export interface ProviderWriteError {
   certainty?: ProviderWriteCertainty;
   code: string;
   correlationId?: string | null;
+  // Before dispatch is a definite non-attempt (admission, configuration, decryption,
+  // expired deadline or origin). After dispatch is an unknown outcome (lost response,
+  // 5xx, timeout or body failure).
+  dispatchPhase?: "before_dispatch" | "after_dispatch";
   httpStatus?: number | null;
   message: string;
   rawPayload?: unknown;

@@ -34,6 +34,7 @@ function buildXeroTenant() {
       access_token_encrypted: accessToken.encrypted,
       access_token_iv: accessToken.iv,
       revoked_at: null,
+      token_key_version: 1,
     },
     xero_tenant_id: "xero-tenant-uk-1",
   };

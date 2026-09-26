@@ -5,6 +5,31 @@ describe("executeRedisRestCommand", () => {
   const defaultUrl = "https://example.kv.vercel-storage.com";
   const defaultToken = "secret-redis-token-xyz";
 
+  it("bounds a stalled body after headers", async () => {
+    const result = await Promise.race([
+      executeRedisRestCommand({
+        command: ["get", "key"],
+        fetch: vi.fn().mockResolvedValue(
+          new Response(
+            new ReadableStream({
+              start() {
+                /* Deliberately never produce body data. */
+              },
+            })
+          )
+        ),
+        timeoutMs: 50,
+        token: defaultToken,
+        url: defaultUrl,
+      }),
+      new Promise<"unsettled">((resolve) =>
+        setTimeout(() => resolve("unsettled"), 500)
+      ),
+    ]);
+    expect(result).toMatchObject({ error: { code: "timeout" }, ok: false });
+    expect(JSON.stringify(result)).not.toContain(defaultToken);
+  });
+
   it("sends proper POST headers and JSON body, returning parsed result", async () => {
     const mockFetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ result: "OK" }), {
@@ -210,7 +235,7 @@ describe("executeRedisRestCommand", () => {
 
     expect(result).toEqual({
       error: {
-        code: "timeout",
+        code: "aborted",
         message: "Operation cancelled",
       },
       ok: false,
@@ -322,3 +347,45 @@ describe("executeRedisRestCommand", () => {
     }
   });
 });
+
+it("distinguishes caller cancellation during a stalled body", async () => {
+  const caller = new AbortController();
+  const result = executeRedisRestCommand({
+    command: ["get", "key"],
+    fetch: vi.fn().mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          start() {
+            /* Deliberately never produce body data. */
+          },
+        })
+      )
+    ),
+    signal: caller.signal,
+    timeoutMs: 1000,
+    token: "synthetic-bearer",
+    url: "https://example.com",
+  });
+  setTimeout(() => caller.abort(), 10);
+  expect(await result).toMatchObject({ error: { code: "aborted" }, ok: false });
+  expect(JSON.stringify(await result)).not.toContain("synthetic-bearer");
+});
+for (const failure of [false, true]) {
+  it(`removes caller listener after ${failure ? "failure" : "success"}`, async () => {
+    const caller = new AbortController();
+    const remove = vi.spyOn(caller.signal, "removeEventListener");
+    const result = await executeRedisRestCommand({
+      command: ["get", "key"],
+      fetch: failure
+        ? vi.fn().mockRejectedValue(new Error("synthetic-bearer"))
+        : vi.fn().mockResolvedValue(new Response('{"result":1}')),
+      signal: caller.signal,
+      timeoutMs: 1000,
+      token: "synthetic-bearer",
+      url: "https://example.com",
+    });
+    expect(remove).toHaveBeenCalledWith("abort", expect.any(Function));
+    expect(result.ok).toBe(!failure);
+    expect(JSON.stringify(result)).not.toContain("synthetic-bearer");
+  });
+}

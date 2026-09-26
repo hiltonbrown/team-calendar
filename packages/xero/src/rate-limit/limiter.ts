@@ -97,8 +97,11 @@ export class XeroRateLimiter {
   // Reserve one unit of budget for orgKey. Resolves with a release() to call once
   // the request finishes (it frees the concurrency slot), or with a denial reason
   // when the budget is genuinely exhausted.
-  async acquire(orgKey: string): Promise<RateLimitAcquireResult> {
-    const deadline = this.now() + this.config.maxWaitMs;
+  async acquire(
+    orgKey: string,
+    options?: { maxWaitMs?: number }
+  ): Promise<RateLimitAcquireResult> {
+    const deadline = this.now() + (options?.maxWaitMs ?? this.config.maxWaitMs);
     const org = this.orgStateFor(orgKey);
 
     // Fail fast when the daily budget is already spent: it is not worth taking a

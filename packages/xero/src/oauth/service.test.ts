@@ -108,6 +108,7 @@ function buildStoredTokenFields() {
     refresh_token_auth_tag: refreshToken.authTag,
     refresh_token_encrypted: refreshToken.encrypted,
     refresh_token_iv: refreshToken.iv,
+    token_key_version: accessToken.keyVersion,
   };
 }
 
@@ -739,7 +740,7 @@ describe("refreshXeroOAuthConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: revokedAt,
         status,
-        token_key_version: 1,
+        token_key_version: storedTokens.token_key_version,
       });
       const fetchSpy = vi.fn();
       vi.stubGlobal("fetch", fetchSpy);
@@ -759,11 +760,11 @@ describe("refreshXeroOAuthConnection", () => {
     dbMock.xeroConnection.update.mockResolvedValueOnce({});
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({ error: "invalid_grant" }),
-        ok: false,
-        status: 400,
-      })
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "invalid_grant" }, { status: 400 })
+        )
     );
 
     const result = await refreshXeroOAuthConnection(input);
@@ -796,11 +797,11 @@ describe("refreshXeroOAuthConnection", () => {
     dbMock.xeroConnection.update.mockResolvedValueOnce({});
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({ error: "refresh_token_invalid" }),
-        ok: false,
-        status: 400,
-      })
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "refresh_token_invalid" }, { status: 400 })
+        )
     );
 
     const result = await refreshXeroOAuthConnection(input);
@@ -826,11 +827,11 @@ describe("refreshXeroOAuthConnection", () => {
       dbMock.xeroConnection.update.mockResolvedValueOnce({});
       vi.stubGlobal(
         "fetch",
-        vi.fn().mockResolvedValue({
-          json: async () => ({ error: errorCode }),
-          ok: false,
-          status: 401,
-        })
+        vi
+          .fn()
+          .mockResolvedValue(
+            Response.json({ error: errorCode }, { status: 401 })
+          )
       );
 
       const result = await refreshXeroOAuthConnection(input);
@@ -863,11 +864,11 @@ describe("refreshXeroOAuthConnection", () => {
     mockStoredConnection();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({ error: "invalid_client" }),
-        ok: false,
-        status: 503,
-      })
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "invalid_client" }, { status: 503 })
+        )
     );
 
     const result = await refreshXeroOAuthConnection(input);
@@ -907,15 +908,16 @@ describe("refreshXeroOAuthConnection", () => {
     mockStoredConnection();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({
-          access_token: "new-access-token",
-          expires_in: 1800,
-          refresh_token: "new-refresh-token",
-        }),
-        ok: true,
-        status: 200,
-      })
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            access_token: "new-access-token",
+            expires_in: 1800,
+            refresh_token: "new-refresh-token",
+          },
+          { status: 200 }
+        )
+      )
     );
 
     const result = await refreshXeroOAuthConnection(input);
@@ -946,15 +948,16 @@ describe("refreshXeroOAuthConnection", () => {
     dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 0 });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({
-          access_token: "new-access-token",
-          expires_in: 1800,
-          refresh_token: "new-refresh-token",
-        }),
-        ok: true,
-        status: 200,
-      })
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            access_token: "new-access-token",
+            expires_in: 1800,
+            refresh_token: "new-refresh-token",
+          },
+          { status: 200 }
+        )
+      )
     );
 
     const result = await refreshXeroOAuthConnection(input);
@@ -977,7 +980,7 @@ describe("refreshXeroOAuthConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
-        token_key_version: 1,
+        token_key_version: storedTokens.token_key_version,
       })
       .mockResolvedValueOnce({
         disconnected_at: null,
@@ -988,15 +991,16 @@ describe("refreshXeroOAuthConnection", () => {
       });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({
-          access_token: "new-access-token",
-          expires_in: 1800,
-          refresh_token: "new-refresh-token",
-        }),
-        ok: true,
-        status: 200,
-      })
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            access_token: "new-access-token",
+            expires_in: 1800,
+            refresh_token: "new-refresh-token",
+          },
+          { status: 200 }
+        )
+      )
     );
     dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
       new Error("Database transaction aborted.")
@@ -1103,18 +1107,20 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
+        token_key_version: storedTokens.token_key_version,
       });
     dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
 
-    const fetchSpy = vi.fn().mockResolvedValue({
-      json: async () => ({
-        access_token: "new-access-token",
-        expires_in: 1800,
-        refresh_token: "new-refresh-token",
-      }),
-      ok: true,
-      status: 200,
-    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        },
+        { status: 200 }
+      )
+    );
     vi.stubGlobal("fetch", fetchSpy);
 
     const result = await ensureFreshXeroConnection(input);
@@ -1192,14 +1198,15 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
+        token_key_version: storedTokens.token_key_version,
       });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({ error: "invalid_grant" }),
-        ok: false,
-        status: 400,
-      })
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "invalid_grant" }, { status: 400 })
+        )
     );
 
     const result = await ensureFreshXeroConnection(input);
@@ -1270,6 +1277,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
+        token_key_version: storedTokens.token_key_version,
       })
       .mockResolvedValueOnce({
         disconnected_at: null,
@@ -1281,15 +1289,16 @@ describe("ensureFreshXeroConnection", () => {
 
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        json: async () => ({
-          access_token: "new-access-token",
-          expires_in: 1800,
-          refresh_token: "new-refresh-token",
-        }),
-        ok: true,
-        status: 200,
-      })
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            access_token: "new-access-token",
+            expires_in: 1800,
+            refresh_token: "new-refresh-token",
+          },
+          { status: 200 }
+        )
+      )
     );
     dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
       new Error("Database connection timed out.")
@@ -1335,17 +1344,19 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
+        token_key_version: storedTokens.token_key_version,
       });
     dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
-    const fetchSpy = vi.fn().mockResolvedValue({
-      json: async () => ({
-        access_token: "new-access-token",
-        expires_in: 1800,
-        refresh_token: "new-refresh-token",
-      }),
-      ok: true,
-      status: 200,
-    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        },
+        { status: 200 }
+      )
+    );
     vi.stubGlobal("fetch", fetchSpy);
 
     const result = await ensureFreshXeroConnection(input);
@@ -1393,6 +1404,7 @@ describe("ensureFreshXeroConnection", () => {
         refresh_token_iv: storedTokens.refresh_token_iv,
         revoked_at: null,
         status: "active",
+        token_key_version: storedTokens.token_key_version,
       })
       .mockResolvedValueOnce(freshConnection);
     dbMock.xeroConnection.updateMany.mockResolvedValueOnce({ count: 1 });
@@ -1418,15 +1430,16 @@ describe("ensureFreshXeroConnection", () => {
       return result;
     });
 
-    const fetchSpy = vi.fn().mockResolvedValue({
-      json: async () => ({
-        access_token: "new-access-token",
-        expires_in: 1800,
-        refresh_token: "new-refresh-token",
-      }),
-      ok: true,
-      status: 200,
-    });
+    const fetchSpy = vi.fn().mockResolvedValue(
+      Response.json(
+        {
+          access_token: "new-access-token",
+          expires_in: 1800,
+          refresh_token: "new-refresh-token",
+        },
+        { status: 200 }
+      )
+    );
     vi.stubGlobal("fetch", fetchSpy);
 
     const [first, second] = await Promise.all([
@@ -2020,6 +2033,7 @@ describe("completeXeroTenantSelection", () => {
       refresh_token_iv: refreshToken.iv,
       return_to: "/settings/integrations/xero",
       token_expires_at: new Date("2026-07-07T00:30:00.000Z"),
+      token_key_version: accessToken.keyVersion,
     };
   }
 

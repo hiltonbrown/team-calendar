@@ -248,3 +248,43 @@ Outcome: Plan 161b is DONE. The production ordering remains unchanged: deploy
 migration A, dry-run and apply the backfill only with zero collisions, then deploy
 migrations B and C together. This verification does not claim that a separate rollout
 was performed during this run.
+
+
+## 161c: Deadlines and encryption key versions (26 September 2026)
+
+Implementation worktree: `/tmp/tc-161c`, branch `codex/xero-deadlines-key-versioning`, baseline `11ce7e7`.
+
+- Redis timeout remains active through body consumption, cancellation is distinct from timeout, caller listeners are removed. Reader cancellation replaces the proposed text race so the actual locked body stream can be cancelled.
+- Xero calls share an absolute deadline across admission, headers, body and retries; concurrency stays held until the body is buffered. Foreign origins and redirects are rejected, responses have a five MiB application cap, token operations use ten seconds, background admission keeps 65 seconds.
+- Version-one compatibility is preserved; optional active-version/keyring configuration is validated, all decrypt calls use stored versions, and unknown version/authentication failures remain distinct and safe.
+- Maintenance re-encryption preflights versions, pages both ciphertext tables and uses version-plus-ciphertext compare-and-set updates. Four integration cases cover both tables, idempotency, conflicts, corrupt ciphertext and unknown versions. No real key rotation or schema change.
+
+### Regression evidence before implementation
+
+`bun run --cwd packages/core test` exited 1 before the fix. Exactly the new stalled-body case failed:
+
+```text
+FAIL src/redis-rest-transport.test.ts > executeRedisRestCommand > bounds a stalled body after headers
+AssertionError: expected 'unsettled' to match object { ok: false, error: { code: "timeout" } }
+Test Files 1 failed | 5 passed (6)
+Tests 1 failed | 80 passed (81)
+```
+
+### Reconciliation and scope
+
+The plan omitted the required version field from `XeroTenantForWrite` and row selects that construct it. Reviewer approved mechanical additions in `packages/xero/src/write/types.ts`, `packages/xero/src/adapter/{auth-recovery,xero-write-adapter}.ts`, the four Xero jobs handlers and typed fixtures. OAuth unit mocks now use real Responses because buffered-body consumption requires an actual body. No adapter classification, lock/persistence, limiter storage or schema logic changed. Prisma generated-file formatting noise is restored before commit.
+
+The initial Xero run occurred during incomplete mechanical crypto updates and failed due to missing fixture versions and Response-shaped test doubles. These were reconciled, not treated as product transport failures.
+
+User confirmed online Neon verification only. A disposable local migration had started before that correction, but no local integration tests ran. The disposable instance was stopped by the reviewer. All subsequent database verification must use the existing protected live runner, with fresh manifest, ownership, consumer isolation and restoration evidence; no remote migrations are needed.
+
+### Verification evidence
+
+- Core units: 6 files, 84 tests passed, including the failing regression and cancellation/listener cleanup cases.
+- Xero crypto/config units: 39 tests passed; OAuth service units: 74 tests passed.
+- `bun run check`: exit 0 (1047 files).
+- `bun run typecheck`: exit 0 (19 tasks).
+- `bun run boundaries`: exit 0, 1001 files in 21 packages.
+- `bun run test`: exit 0, 18 tasks passed.
+- Final Xero units: 23 files, 364 tests passed, including expired budgets, stalled headers and caller cancellation.
+- Build and protected live integration: final evidence appended after completion.

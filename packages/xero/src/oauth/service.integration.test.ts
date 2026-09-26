@@ -17,6 +17,7 @@ type CryptoModule = typeof import("../crypto/tokens");
 type DatabaseModule = typeof import("@repo/database");
 type ServiceModule = typeof import("./service");
 
+let reencryptXeroTokens: typeof import("./reencrypt-tokens")["reencryptXeroTokens"];
 let database: DatabaseModule["database"];
 let decryptXeroToken: CryptoModule["decryptXeroToken"];
 let encryptXeroToken: CryptoModule["encryptXeroToken"];
@@ -61,6 +62,7 @@ describe("ensureFreshXeroConnection integration", () => {
       import("@repo/database"),
       import("./service"),
     ]);
+    ({ reencryptXeroTokens } = await import("./reencrypt-tokens"));
     ({ database } = databaseModule);
     ({ decryptXeroToken, encryptXeroToken } = cryptoModule);
     ({
@@ -73,6 +75,7 @@ describe("ensureFreshXeroConnection integration", () => {
 
   afterAll(async () => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     await cleanTestData();
     await database.$disconnect();
   });
@@ -148,6 +151,7 @@ describe("ensureFreshXeroConnection integration", () => {
         refresh_token_encrypted: true,
         refresh_token_iv: true,
         status: true,
+        token_key_version: true,
       },
       where: {
         clerk_org_id: fixture.clerkOrgId,
@@ -168,6 +172,7 @@ describe("ensureFreshXeroConnection integration", () => {
         authTag: persisted?.access_token_auth_tag ?? null,
         encrypted: persisted?.access_token_encrypted ?? "",
         iv: persisted?.access_token_iv ?? null,
+        keyVersion: persisted?.token_key_version ?? 1,
       })
     ).toBe("new-access-token");
     expect(
@@ -175,6 +180,7 @@ describe("ensureFreshXeroConnection integration", () => {
         authTag: persisted?.refresh_token_auth_tag ?? null,
         encrypted: persisted?.refresh_token_encrypted ?? "",
         iv: persisted?.refresh_token_iv ?? null,
+        keyVersion: persisted?.token_key_version ?? 1,
       })
     ).toBe("new-refresh-token");
   });
@@ -236,6 +242,7 @@ describe("ensureFreshXeroConnection integration", () => {
         refresh_token_auth_tag: true,
         refresh_token_encrypted: true,
         refresh_token_iv: true,
+        token_key_version: true,
       },
       where: { id: fixture.connectionId },
     });
@@ -244,6 +251,7 @@ describe("ensureFreshXeroConnection integration", () => {
         authTag: persisted.access_token_auth_tag,
         encrypted: persisted.access_token_encrypted,
         iv: persisted.access_token_iv,
+        keyVersion: persisted?.token_key_version ?? 1,
       })
     ).toBe("concurrent-new-access-token");
     expect(
@@ -251,6 +259,7 @@ describe("ensureFreshXeroConnection integration", () => {
         authTag: persisted.refresh_token_auth_tag,
         encrypted: persisted.refresh_token_encrypted,
         iv: persisted.refresh_token_iv,
+        keyVersion: persisted?.token_key_version ?? 1,
       })
     ).toBe("concurrent-new-refresh-token");
   });
@@ -599,6 +608,149 @@ describe("ensureFreshXeroConnection integration", () => {
       retired_at: null,
     });
   });
+  it("re-encrypts connection and session tokens in pages and is idempotent", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    await createSelectionSession();
+    configureVersionTwo();
+    try {
+      const only = {
+        connectionIds: [fixture.connectionId],
+        sessionIds: [fixture.sessionId],
+      };
+      expect(await reencryptXeroTokens({ batchSize: 1, only })).toEqual({
+        ok: true,
+        value: { failed: 0, rewritten: 2, skipped: 0 },
+      });
+      const connection = await database.xeroConnection.findUniqueOrThrow({
+        where: { id: fixture.connectionId },
+      });
+      const session = await database.xeroOAuthSession.findUniqueOrThrow({
+        where: { id: fixture.sessionId },
+      });
+      expect(connection.token_key_version).toBe(2);
+      expect(session.token_key_version).toBe(2);
+      expect(
+        decryptXeroToken({
+          authTag: connection.access_token_auth_tag,
+          encrypted: connection.access_token_encrypted,
+          iv: connection.access_token_iv,
+          keyVersion: connection.token_key_version,
+        })
+      ).toBe("original-access-token");
+      expect(
+        decryptXeroToken({
+          authTag: session.refresh_token_auth_tag,
+          encrypted: session.refresh_token_encrypted,
+          iv: session.refresh_token_iv,
+          keyVersion: session.token_key_version,
+        })
+      ).toBe("selection-refresh-token");
+      expect(await reencryptXeroTokens({ batchSize: 1, only })).toEqual({
+        ok: true,
+        value: { failed: 0, rewritten: 0, skipped: 0 },
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("skips compare-and-set conflicts rather than overwriting newer credentials", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    configureVersionTwo();
+    try {
+      const replacement = encryptXeroToken("concurrent-access-token");
+      const result = await reencryptXeroTokens(
+        { batchSize: 1, only: { connectionIds: [fixture.connectionId] } },
+        {
+          beforeWrite: async () => {
+            await database.xeroConnection.update({
+              data: {
+                access_token_auth_tag: replacement.authTag,
+                access_token_encrypted: replacement.encrypted,
+                access_token_iv: replacement.iv,
+              },
+              where: { id: fixture.connectionId },
+            });
+          },
+        }
+      );
+      expect(result).toEqual({
+        ok: true,
+        value: { failed: 0, rewritten: 0, skipped: 1 },
+      });
+      const connection = await database.xeroConnection.findUniqueOrThrow({
+        where: { id: fixture.connectionId },
+      });
+      expect(connection.access_token_encrypted).toBe(replacement.encrypted);
+      expect(connection.token_key_version).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("preflights unknown session key versions before writing a connection", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    await createSelectionSession();
+    await database.xeroOAuthSession.update({
+      data: { token_key_version: 99 },
+      where: { id: fixture.sessionId },
+    });
+    configureVersionTwo();
+    try {
+      expect(
+        await reencryptXeroTokens({
+          batchSize: 1,
+          only: {
+            connectionIds: [fixture.connectionId],
+            sessionIds: [fixture.sessionId],
+          },
+        })
+      ).toEqual({ error: { code: "unknown_key_version_present" }, ok: false });
+      expect(
+        (
+          await database.xeroConnection.findUniqueOrThrow({
+            where: { id: fixture.connectionId },
+          })
+        ).token_key_version
+      ).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("counts corrupt ciphertext and continues to a valid session", async () => {
+    await cleanTestData();
+    await seedBoundTenant(fixture.providerTenantId);
+    await createSelectionSession();
+    await database.xeroConnection.update({
+      data: { access_token_auth_tag: Buffer.alloc(16).toString("base64") },
+      where: { id: fixture.connectionId },
+    });
+    configureVersionTwo();
+    try {
+      expect(
+        await reencryptXeroTokens({
+          batchSize: 1,
+          only: {
+            connectionIds: [fixture.connectionId],
+            sessionIds: [fixture.sessionId],
+          },
+        })
+      ).toEqual({ ok: true, value: { failed: 1, rewritten: 1, skipped: 0 } });
+      expect(
+        (
+          await database.xeroConnection.findUniqueOrThrow({
+            where: { id: fixture.connectionId },
+          })
+        ).token_key_version
+      ).toBe(1);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 async function createOrganisation() {
@@ -730,4 +882,12 @@ function selectTenant(tenantId: string) {
     tenantId,
     userId: "user_integration_1",
   });
+}
+
+function configureVersionTwo() {
+  vi.stubEnv("XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION", "2");
+  vi.stubEnv(
+    "XERO_TOKEN_ENCRYPTION_KEYS_JSON",
+    JSON.stringify({ "2": Buffer.alloc(32, 8).toString("base64") })
+  );
 }

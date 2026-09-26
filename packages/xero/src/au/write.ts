@@ -2,6 +2,7 @@ import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
 import { tryDecryptXeroToken } from "../crypto/tokens";
+import { createXeroDeadline } from "../rate-limit/deadline";
 import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   ApproveLeaveApplicationInput,
@@ -146,6 +147,7 @@ async function xeroRequest(
     authTag: xeroTenant.xero_connection.access_token_auth_tag ?? null,
     encrypted: accessToken,
     iv: xeroTenant.xero_connection.access_token_iv ?? null,
+    keyVersion: xeroTenant.xero_connection.token_key_version,
   });
 
   if (!decrypted.ok) {
@@ -170,6 +172,7 @@ async function xeroRequest(
 
   try {
     const response = await xeroFetch({
+      deadline: createXeroDeadline(XERO_WRITE_TIMEOUT_MS),
       init: {
         body: request.body ? JSON.stringify(request.body) : undefined,
         headers: {

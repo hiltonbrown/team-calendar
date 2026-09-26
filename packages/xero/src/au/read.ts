@@ -501,6 +501,7 @@ function resolveAccessToken(
     authTag: xeroTenant.xero_connection.access_token_auth_tag ?? null,
     encrypted: accessToken,
     iv: xeroTenant.xero_connection.access_token_iv ?? null,
+    keyVersion: xeroTenant.xero_connection.token_key_version,
   });
 
   if (!decrypted.ok) {

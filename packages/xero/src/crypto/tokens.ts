@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { keys, validateEncryptionKey } from "../../keys";
+import { activeXeroKeyVersion, resolveXeroEncryptionKey } from "./keyring";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
@@ -17,6 +17,7 @@ export function tryDecryptXeroToken(input: {
   authTag: null | string;
   encrypted: string;
   iv: null | string;
+  keyVersion: number;
 }): DecryptXeroTokenResult {
   try {
     return { ok: true, token: decryptXeroToken(input) };
@@ -38,7 +39,8 @@ export interface EncryptedToken {
 }
 
 export function encryptXeroToken(value: string): EncryptedToken {
-  const key = readKey();
+  const keyVersion = activeXeroKeyVersion();
+  const key = readKey(keyVersion);
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([
@@ -51,7 +53,7 @@ export function encryptXeroToken(value: string): EncryptedToken {
     encrypted: encrypted.toString("base64"),
     encryptedAt: new Date(),
     iv: iv.toString("base64"),
-    keyVersion: 1,
+    keyVersion,
   };
 }
 
@@ -59,7 +61,9 @@ export function decryptXeroToken(input: {
   authTag: null | string;
   encrypted: string;
   iv: null | string;
+  keyVersion: number;
 }): string {
+  const key = readKey(input.keyVersion);
   if (!input.encrypted) {
     return "";
   }
@@ -69,25 +73,28 @@ export function decryptXeroToken(input: {
     );
   }
 
-  const key = readKey();
-  const decipher = createDecipheriv(
-    ALGORITHM,
-    key,
-    Buffer.from(input.iv, "base64")
-  );
-  decipher.setAuthTag(Buffer.from(input.authTag, "base64"));
+  try {
+    const decipher = createDecipheriv(
+      ALGORITHM,
+      key,
+      Buffer.from(input.iv, "base64")
+    );
+    decipher.setAuthTag(Buffer.from(input.authTag, "base64"));
 
-  return Buffer.concat([
-    decipher.update(Buffer.from(input.encrypted, "base64")),
-    decipher.final(),
-  ]).toString("utf8");
+    return Buffer.concat([
+      decipher.update(Buffer.from(input.encrypted, "base64")),
+      decipher.final(),
+    ]).toString("utf8");
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Crypto error causes must not expose sensitive internals.
+    throw new Error("Encrypted Xero token authentication failed.");
+  }
 }
 
-function readKey(): Buffer {
-  const raw = keys().XERO_TOKEN_ENCRYPTION_KEY;
-  validateEncryptionKey(raw);
-  if (!raw) {
-    throw new Error("XERO_TOKEN_ENCRYPTION_KEY is required.");
+function readKey(version: number): Buffer {
+  const result = resolveXeroEncryptionKey(version);
+  if (!result.ok) {
+    throw new Error("Encrypted Xero token has an unknown key version.");
   }
-  return Buffer.from(raw, "base64");
+  return result.value;
 }

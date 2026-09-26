@@ -92,6 +92,7 @@ describe("encryptXeroToken and decryptXeroToken", () => {
         authTag: "abc",
         encrypted: "abc",
         iv: "abc",
+        keyVersion: 1,
       })
     ).toThrowError("Invalid environment variables");
   });
@@ -102,6 +103,7 @@ describe("encryptXeroToken and decryptXeroToken", () => {
         authTag: null,
         encrypted: "",
         iv: null,
+        keyVersion: 1,
       })
     ).toBe("");
   });
@@ -112,6 +114,7 @@ describe("encryptXeroToken and decryptXeroToken", () => {
         authTag: "auth-tag",
         encrypted: "encrypted-token",
         iv: null,
+        keyVersion: 1,
       })
     ).toThrowError(MISSING_TOKEN_COMPONENTS_ERROR);
   });
@@ -122,6 +125,7 @@ describe("encryptXeroToken and decryptXeroToken", () => {
         authTag: null,
         encrypted: "encrypted-token",
         iv: "iv",
+        keyVersion: 1,
       })
     ).toThrowError(MISSING_TOKEN_COMPONENTS_ERROR);
   });
@@ -190,6 +194,7 @@ describe("tryDecryptXeroToken", () => {
       authTag: "auth-tag",
       encrypted: "encrypted-token",
       iv: null,
+      keyVersion: 1,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -202,6 +207,7 @@ describe("tryDecryptXeroToken", () => {
       authTag: null,
       encrypted: "encrypted-token",
       iv: "iv",
+      keyVersion: 1,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -214,6 +220,7 @@ describe("tryDecryptXeroToken", () => {
       authTag: null,
       encrypted: "",
       iv: null,
+      keyVersion: 1,
     });
     expect(result).toEqual({ ok: true, token: "" });
   });
@@ -224,6 +231,7 @@ describe("tryDecryptXeroToken", () => {
         authTag: "auth-tag",
         encrypted: "encrypted-token",
         iv: null,
+        keyVersion: 1,
       })
     ).toThrowError(MISSING_TOKEN_COMPONENTS_ERROR);
 
@@ -232,6 +240,7 @@ describe("tryDecryptXeroToken", () => {
         authTag: "auth-tag",
         encrypted: "encrypted-token",
         iv: null,
+        keyVersion: 1,
       }).ok
     ).toBe(false);
   });

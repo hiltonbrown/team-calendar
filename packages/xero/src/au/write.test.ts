@@ -31,6 +31,7 @@ function buildXeroTenant() {
       access_token_encrypted: accessToken.encrypted,
       access_token_iv: accessToken.iv,
       revoked_at: null,
+      token_key_version: 1,
     },
     xero_tenant_id: "xero-tenant-1",
   };
@@ -174,7 +175,10 @@ describe("AU payroll write path", () => {
 
     expect(timeout).toHaveBeenCalledWith(120_000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
+    const dispatchedSignal = fetchMock.mock.calls[0]?.[1]?.signal;
+    expect(dispatchedSignal).toBeInstanceOf(AbortSignal);
+    controller.abort();
+    expect(dispatchedSignal?.aborted).toBe(true);
   });
 
   it("approves leave through Xero", async () => {
