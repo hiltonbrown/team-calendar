@@ -1,3 +1,5 @@
+import { createXeroDeadline } from "../rate-limit/deadline";
+import { XERO_TOKEN_OPERATION_BUDGET_MS } from "../rate-limit/limits";
 import "server-only";
 
 import {
@@ -451,11 +453,13 @@ export async function completeXeroTenantSelection(input: {
     authTag: session.access_token_auth_tag,
     encrypted: session.access_token_encrypted,
     iv: session.access_token_iv,
+    keyVersion: session.token_key_version,
   });
   const refreshToken = decryptXeroToken({
     authTag: session.refresh_token_auth_tag,
     encrypted: session.refresh_token_encrypted,
     iv: session.refresh_token_iv,
+    keyVersion: session.token_key_version,
   });
 
   const payrollRegionResult = await inferPayrollRegionForTenant({
@@ -885,6 +889,7 @@ async function refreshXeroOAuthConnectionWithClient(
       authTag: connection.refresh_token_auth_tag,
       encrypted: connection.refresh_token_encrypted,
       iv: connection.refresh_token_iv,
+      keyVersion: connection.token_key_version,
     }),
   });
   if (!token.ok) {
@@ -1612,6 +1617,7 @@ function revokeStoredXeroConnection(
       authTag: connection.access_token_auth_tag,
       encrypted: connection.access_token_encrypted,
       iv: connection.access_token_iv,
+      keyVersion: connection.token_key_version,
     }),
     orgKey: orgRateLimitKey({
       clerkOrgId: input.clerkOrgId,
@@ -1651,6 +1657,7 @@ function loadConnectionForDisconnect(
       refresh_token_encrypted: true,
       revoked_at: true,
       status: true,
+      token_key_version: true,
       xero_authorisation_connection_id: true,
       xero_tenant: { select: { id: true } },
     },
@@ -2033,6 +2040,7 @@ async function loadPendingSession(input: {
       refresh_token_iv: null | string;
       return_to: string;
       token_expires_at: Date;
+      token_key_version: number;
     },
     XeroOAuthError
   >
@@ -2052,6 +2060,7 @@ async function loadPendingSession(input: {
       refresh_token_iv: true,
       return_to: true,
       token_expires_at: true,
+      token_key_version: true,
     },
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -2133,6 +2142,7 @@ async function exchangeToken(input: {
   let response: Response;
   try {
     response = await xeroFetch({
+      deadline: createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
       init: {
         body,
         headers: {

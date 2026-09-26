@@ -1448,6 +1448,7 @@ function loadXeroTenant(context: SyncXeroLeaveRecordsInput) {
           last_refreshed_at: true,
           revoked_at: true,
           status: true,
+          token_key_version: true,
         },
       },
     },

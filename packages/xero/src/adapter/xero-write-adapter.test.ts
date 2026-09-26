@@ -63,6 +63,7 @@ function buildTenant(id: string): XeroTenantForWrite & {
       access_token_encrypted: "encrypted-token",
       access_token_iv: "iv",
       revoked_at: null,
+      token_key_version: 1,
     },
     xero_connection_id: "connection-1",
     xero_tenant_id: "xero-tenant-1",

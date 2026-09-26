@@ -1,4 +1,11 @@
+import { keys } from "../../keys";
+import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
 import { XeroRateLimiter } from "./limiter";
+import {
+  DEFAULT_MAX_WAIT_MS,
+  XERO_DEFAULT_OPERATION_BUDGET_MS,
+  XERO_MAX_RESPONSE_BYTES,
+} from "./limits";
 
 // Default reactive-retry budget for transient failures (429 and 5xx). The first
 // attempt is the real call; the rest are backed-off retries.
@@ -13,11 +20,13 @@ export interface XeroFetchDeps {
 }
 
 export interface XeroFetchInput {
+  deadline?: XeroDeadline;
   init?: RequestInit;
   // Reactive-retry attempts including the first call. Defaults to
   // DEFAULT_MAX_ATTEMPTS. Pass 1 to disable inline retry (used where the caller
   // owns retry semantics, e.g. the per-employee balance loop).
   maxAttempts?: number;
+  maxBodyBytes?: number;
   // Identity the limiter buckets are keyed by. Built from the connected
   // organisation so one org cannot starve another.
   orgKey: string;
@@ -79,56 +88,232 @@ export async function xeroFetch(
   const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const retryOnAmbiguousFailure = input.retryOnAmbiguousFailure ?? true;
 
+  const deadline =
+    input.deadline ?? createXeroDeadline(XERO_DEFAULT_OPERATION_BUDGET_MS);
+  assertOrigin(input.url);
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const gate = await limiter.acquire(input.orgKey);
-    if (!gate.ok) {
-      return rateLimitedResponse(gate.reason);
-    }
-
     let response: Response;
     try {
-      response = await fetchImpl(input.url, input.init);
+      response = await performAttempt(input, deadline, limiter, fetchImpl);
     } catch (error) {
-      gate.release();
       if (
-        shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
+        !canRetryError(
+          error,
+          input,
+          attempt,
+          maxAttempts,
+          retryOnAmbiguousFailure
+        )
       ) {
-        await sleep(backoffMs(attempt));
-        continue;
+        throw error;
       }
-      throw error;
-    }
-    gate.release();
-
-    if (
-      attempt < maxAttempts &&
-      isRetryableStatus(response.status, retryOnAmbiguousFailure)
-    ) {
-      const retryAfterMs =
-        response.status === 429
-          ? parseRetryAfter(response.headers.get("Retry-After"))
-          : null;
-      // Drain the discarded response so the underlying connection can be reused
-      // rather than leaked while we back off.
-      await cancelBody(response);
-      await sleep(retryAfterMs ?? backoffMs(attempt));
+      const waitMs = backoffMs(attempt);
+      if (remainingMs(deadline) < waitMs) {
+        // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
+        throw new XeroFetchError("deadline_exceeded", true);
+      }
+      await sleep(waitMs);
       continue;
     }
-
-    return response;
+    if (
+      attempt >= maxAttempts ||
+      !isRetryableStatus(response.status, retryOnAmbiguousFailure)
+    ) {
+      return response;
+    }
+    const waitMs = retryDelayMs(response, attempt);
+    if (remainingMs(deadline) < waitMs) {
+      return response;
+    }
+    await sleep(waitMs);
   }
-
-  // Unreachable: the loop returns on the final attempt. Present for exhaustive
-  // typing only.
   return rateLimitedResponse("minute");
 }
 
-async function cancelBody(response: Response): Promise<void> {
-  try {
-    await response.body?.cancel();
-  } catch {
-    // The body may already be consumed or unsupported; nothing to clean up.
+function retryDelayMs(response: Response, attempt: number): number {
+  return (
+    (response.status === 429
+      ? parseRetryAfter(response.headers.get("Retry-After"))
+      : null) ?? backoffMs(attempt)
+  );
+}
+
+function canRetryError(
+  error: unknown,
+  input: XeroFetchInput,
+  attempt: number,
+  maxAttempts: number,
+  retryOnAmbiguousFailure: boolean
+): boolean {
+  return (
+    !(error instanceof XeroFetchError || input.init?.signal?.aborted) &&
+    shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
+  );
+}
+
+async function performAttempt(
+  input: XeroFetchInput,
+  deadline: XeroDeadline,
+  limiter: XeroRateLimiter,
+  fetchImpl: typeof fetch
+): Promise<Response> {
+  if (remainingMs(deadline) === 0) {
+    throw new XeroFetchError("deadline_exceeded", false);
   }
+  input.init?.signal?.throwIfAborted();
+  const gate = await limiter.acquire(input.orgKey, {
+    maxWaitMs: Math.min(DEFAULT_MAX_WAIT_MS, remainingMs(deadline)),
+  });
+  if (!gate.ok) {
+    if (remainingMs(deadline) === 0) {
+      throw new XeroFetchError("deadline_exceeded", false);
+    }
+    return rateLimitedResponse(gate.reason);
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), remainingMs(deadline));
+  const signal = input.init?.signal
+    ? AbortSignal.any([controller.signal, input.init.signal])
+    : controller.signal;
+  let dispatched = false;
+  try {
+    if (remainingMs(deadline) === 0) {
+      throw new XeroFetchError("deadline_exceeded", false);
+    }
+    signal.throwIfAborted();
+    dispatched = true;
+    const fetched = await raceAbort(
+      fetchImpl(input.url, { ...input.init, redirect: "manual", signal }),
+      signal
+    );
+    if (fetched.status >= 300 && fetched.status < 400) {
+      fetched.body?.cancel().catch(() => {
+        /* The body may already be closed. */
+      });
+      throw new XeroFetchError("redirect_rejected", true);
+    }
+    return await bufferResponse(
+      fetched,
+      signal,
+      input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
+    );
+  } catch (error) {
+    if (controller.signal.aborted) {
+      // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
+      throw new XeroFetchError("deadline_exceeded", dispatched);
+    }
+    throw error;
+  } finally {
+    gate.release();
+    clearTimeout(timeout);
+  }
+}
+
+export class XeroFetchError extends Error {
+  readonly code:
+    | "body_too_large"
+    | "deadline_exceeded"
+    | "origin_rejected"
+    | "redirect_rejected";
+  readonly dispatched: boolean;
+  constructor(code: XeroFetchError["code"], dispatched: boolean) {
+    super(`Xero transport failed: ${code}`);
+    this.name = "XeroFetchError";
+    this.code = code;
+    this.dispatched = dispatched;
+  }
+}
+
+function assertOrigin(url: string): void {
+  let origin: string;
+  try {
+    ({ origin } = new URL(url));
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Rejected URL values must not enter error causes.
+    throw new XeroFetchError("origin_rejected", false);
+  }
+  if (
+    origin === "https://api.xero.com" ||
+    origin === "https://identity.xero.com"
+  ) {
+    return;
+  }
+  const override =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : keys().XERO_API_BASE_URL;
+  if (override && origin === new URL(override).origin) {
+    return;
+  }
+  throw new XeroFetchError("origin_rejected", false);
+}
+
+async function raceAbort<T>(
+  operation: Promise<T>,
+  signal: AbortSignal
+): Promise<T> {
+  let onAbort: () => void = () => {
+    /* Assigned inside the promise executor. */
+  };
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason);
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort);
+    }
+  });
+  try {
+    return await Promise.race([operation, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
+async function bufferResponse(
+  response: Response,
+  signal: AbortSignal,
+  maxBytes: number
+): Promise<Response> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const reader = response.body?.getReader();
+  try {
+    if (reader) {
+      let complete = false;
+      while (!complete) {
+        const chunk = await raceAbort(reader.read(), signal);
+        if (chunk.done) {
+          complete = true;
+          continue;
+        }
+        total += chunk.value.byteLength;
+        if (total > maxBytes) {
+          throw new XeroFetchError("body_too_large", true);
+        }
+        chunks.push(chunk.value);
+      }
+    }
+  } catch (error) {
+    reader?.cancel().catch(() => {
+      /* Cancellation can race stream closure. */
+    });
+    throw error;
+  } finally {
+    reader?.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const nullBody = [101, 103, 204, 205, 304].includes(response.status);
+  return new Response(nullBody ? null : bytes, {
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText,
+  });
 }
 
 function isTransientStatus(status: number): boolean {

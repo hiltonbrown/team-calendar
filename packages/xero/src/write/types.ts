@@ -37,6 +37,7 @@ export interface XeroTenantForWrite {
     access_token_encrypted: string;
     access_token_iv?: null | string;
     revoked_at: Date | null;
+    token_key_version: number;
   };
   xero_tenant_id: string;
 }

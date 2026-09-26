@@ -104,6 +104,7 @@ async function loadXeroTenantForRetry(
           access_token_encrypted: true,
           access_token_iv: true,
           revoked_at: true,
+          token_key_version: true,
         },
       },
       xero_tenant_id: true,

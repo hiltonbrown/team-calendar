@@ -1,4 +1,4 @@
-// Xero's published rate limits, per PRODUCT.md:240-247. These are the ceilings
+// Xero's published ceilings for the four per-org/app limits, per PRODUCT.md:240-247. These are the ceilings
 // the limiter enforces per connected organisation, plus the app-wide cap.
 
 export const XERO_CALLS_PER_MINUTE_PER_ORG = 60;
@@ -14,3 +14,10 @@ export const DAY_MS = 86_400_000;
 // one token roughly every second, so a short ceiling is enough to ride out a
 // transient burst without holding a synchronous write open indefinitely.
 export const DEFAULT_MAX_WAIT_MS = 65_000;
+
+// Our engineering budgets, not Xero limits. Token operations must fit inside 15-second transactions.
+export const XERO_TOKEN_OPERATION_BUDGET_MS = 10_000;
+// Preserve up to 65 seconds of admission waiting for background syncs.
+export const XERO_DEFAULT_OPERATION_BUDGET_MS = 90_000;
+// Application policy for fully buffered responses.
+export const XERO_MAX_RESPONSE_BYTES = 5 * 1024 * 1024;

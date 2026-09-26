@@ -54,6 +54,7 @@ function loadTenant(clerkOrgId: string, organisationId: string) {
           access_token_encrypted: true,
           access_token_iv: true,
           revoked_at: true,
+          token_key_version: true,
         },
       },
     },

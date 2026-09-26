@@ -787,6 +787,7 @@ function loadXeroTenant(context: ReconcileApprovalStateInput) {
           last_refreshed_at: true,
           revoked_at: true,
           status: true,
+          token_key_version: true,
         },
       },
     },
