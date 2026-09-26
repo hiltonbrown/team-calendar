@@ -17,6 +17,7 @@
 
 ## Status
 
+- **Execution**: DONE, independently approved on isolated `codex/xero-permission-recovery`; verified candidate `68a2aaa00a36cfcad00daa212dabb1c6fc0261b1`. Not merged or pushed.
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: MED (wide caller surface; the risk is silently changing what a user is told)
@@ -31,7 +32,7 @@
 
 This section overrides conflicting historical instructions below. Execute from merged baseline `dd458615590658b9574b73df24abbebba5ac5a8d`, where 161b-161f are DONE. Use isolated `/tmp/tc-161g` on `codex/xero-permission-recovery`. The reviewer maintains `plans/README.md`; do not merge or push. The full plan and this reconciliation must be read before implementation. Refresh drift by function and contract rather than rejecting expected dependency changes. Reconcile obstacles and continue; no fixed revision count replaces verification.
 
-Use only the already-authorised online Neon database through the protected live runner, never localhost, Docker or a new database. The reviewer refreshes exact target identity, all migration checksums, durable ownership, restore evidence, strict consumer isolation, complete integration inventory, catalogue preservation and final cleanup. No schema change is expected. All Xero/provider responses are fake; no actual provider request, customer credential mutation, cleanup activation, backfill or commercial-tier change is authorised. Cleanup stays report-only. Browser E2E is written for Plan 160 and remains NOT VERIFIED. Full lint, types, units, package boundaries, release-tool tests/types and synthetic four-app build are required; use concurrency two for full units and protected integrations. Preserve protected credentials in the runner and 161e's isolated child KV environment. Restore only generated formatting noise after verification, preserving any necessary generated changes.
+Use only the already-authorised online Neon database through the protected live runner, never localhost, Docker or a new database. The reviewer refreshes exact target identity, all migration checksums, durable ownership, restore evidence, strict consumer isolation, complete integration inventory, catalogue preservation and final cleanup. No schema change is expected. All Xero/provider responses are fake; no actual provider request, customer credential mutation, cleanup activation, backfill or commercial-tier change is authorised. Cleanup stays report-only. Browser E2E is written for Plan 160 and remains NOT VERIFIED. Full lint, types, units, package boundaries, release-tool tests/types and synthetic four-app build are required; use concurrency two for full units; final protected integration execution uses one package at a time and the reconciled serial jobs/Xero workers. Preserve protected credentials in the runner and 161e's isolated child KV environment. Restore only generated formatting noise after verification, preserving any necessary generated changes.
 
 The current resolver still collapses every legacy refresh failure into reauthorisation, and owner refresh collapses transient errors into configuration. Authorise narrow edits to `oauth/credential-owner.ts` and its tests for reason-preserving resolver errors, bounded explicit refresh after a definite 401, token-version comparison and read-scope alternatives. Preserve owner identity verification, recovery attempts, lock protocol, generation fences and mirror writes. Check known granted capabilities before any refresh: a scope failure refreshes zero times. A broad read-write scope satisfies its corresponding documented read capability; a write never succeeds on a read-only scope. Legacy bindings remain supported exclusively inside the resolver. Callers must receive a resolved token, tenant/region/generation and the same absolute operation deadline, never ciphertext. Additional scope includes the existing OAuth error translation in `oauth/service.ts` if it discards admission/configuration error distinctions, and removing `client_credentials_invalid` from the legacy refresh branch that marks a customer connection stale. App credential failure is an incident, not a customer grant event. Keep actual `refresh_token_invalid` handling and all owner recovery, lock, identity and rotation semantics intact; do not rewrite OAuth or requested scopes.
 
@@ -452,18 +453,18 @@ containing "insufficient_scope" without a header is **not** `update_permissions`
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
-- [ ] `bun run --cwd packages/core test`, `packages/database test`, `packages/xero test`, `packages/availability test`, `packages/jobs test`, `apps/app test` all exit 0
-- [ ] The complete protected online Neon integration inventory exits 0, including jobs, availability, Xero, database, feeds, app and owned Redis verification
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -c "return null" packages/xero/src/adapter/xero-write-adapter.ts` prints `0`
-- [ ] `grep -rn "hasActiveXeroConnection" apps packages --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
-- [ ] `grep -rln "refresh_token_encrypted\|access_token_encrypted\|decryptXeroToken" packages/availability/src packages/jobs/src packages/xero/src/au packages/xero/src/nz packages/xero/src/uk packages/xero/src/adapter apps/app/app apps/app/lib --include=*.ts --include=*.tsx | grep -v "\.test\.ts\|\.integration\.test\.ts"` returns no files
-- [ ] `grep -n "@repo/xero" packages/availability/package.json` returns no matches
-- [ ] A spec under `tooling/release/e2e/` references each recovery string; the execution report records it `NOT_VERIFIED`
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161g updated
+- [x] `bun run check`, `bun run typecheck`, `bun run boundaries` exit 0
+- [x] `bun run --cwd packages/core test`, `packages/database test`, `packages/xero test`, `packages/availability test`, `packages/jobs test`, `apps/app test` all exit 0
+- [x] The complete protected online Neon integration inventory exits 0, including jobs, availability, Xero, database, feeds, app and owned Redis verification
+- [x] `bun run test:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `grep -c "return null" packages/xero/src/adapter/xero-write-adapter.ts` prints `0`
+- [x] `grep -rn "hasActiveXeroConnection" apps packages --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
+- [x] `grep -rln "refresh_token_encrypted\|access_token_encrypted\|decryptXeroToken" packages/availability/src packages/jobs/src packages/xero/src/au packages/xero/src/nz packages/xero/src/uk packages/xero/src/adapter apps/app/app apps/app/lib --include=*.ts --include=*.tsx | grep -v "\.test\.ts\|\.integration\.test\.ts"` returns no files
+- [x] `grep -n "@repo/xero" packages/availability/package.json` returns no matches
+- [x] A spec under `tooling/release/e2e/` references each recovery string; the execution report records it `NOT_VERIFIED`
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161g updated
 
 ## STOP conditions
 
@@ -494,3 +495,16 @@ Stop and report; do not improvise:
   may scrub them; 161d's mirror-write can then be removed in a follow-up.
 - Changing a reason's meaning without changing its copy misinforms customers. Change them together.
 - Deferred: scope changes, NZ/UK activation, AU submission or approval semantics.
+
+
+## Independent execution verdict, 26 September 2026
+
+APPROVE. Implemented in `/tmp/tc-161g` on `codex/xero-permission-recovery`, from merged baseline `dd458615590658b9574b73df24abbebba5ac5a8d`. Verified candidate `68a2aaa00a36cfcad00daa212dabb1c6fc0261b1`. The complete diff and meaningful regression assertions were independently reviewed; all reconciled scope exceptions above were assessed and approved. No merge, push or deployment.
+
+Independent source gates PASS: lint 1098 files; forced typecheck 19 uncached tasks; full units 18 uncached tasks, 2655 tests; boundaries 1054 files and 21 packages; release tools 16 files and 104 tests plus tooling types; strict compilation of all eight changed integration fixtures; four uncached synthetic app builds; whitespace and all credential/state/adapter/dependency audits. Generated formatting was restored exactly, leaving schema/generated content unchanged.
+
+Protected online Neon campaign `2262abb9-6b8c-4eda-83e7-176a4d437350` PASS with exit 0: complete 26-file inventory, 224 tests, six uncached package tasks. Counts: jobs 78, feeds 15, Xero 63, availability 21, database 45, app 2. Serial jobs completed in 434.43 seconds, including all 505 records and both reconciliation passes; no semantic assertion or runtime deadline was weakened. Fresh durable ownership covered 53 tenant slots and 145 kind-qualified global keys. Exact target, restore timeline `73cb5a3404beeb6412275bed23ffa160` and LSN `0/4B330298`, and actual strict empty-consumer evidence were refreshed before execution.
+
+Independent final cleanup PASS: all 38 selectors zero, durable manifest and consumer isolation valid, active fence released, outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`. Post-run read-only audit verifies all 20 applied migration checksums, no pending migration, zero active/archived Inngest apps or nonterminal runs, and Prisma reports `No difference detected.` Earlier failed campaigns and guarded recovery are retained in the execution report.
+
+Actual Xero provider/header/authorisation behaviour and Plan 160 browser execution remain NOT VERIFIED; the browser spec is written. Cleanup remains report_only. No real customer credential mutation, backfill, destructive provider cleanup, commercial namespace activation or OAuth scope/semantics change. The full plan was delivered through a verified shared absolute path rather than duplicated inline; this packaging deviation was explicitly reviewed. A later documentation-only completion commit does not change the verified runtime.
