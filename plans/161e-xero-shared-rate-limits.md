@@ -28,6 +28,22 @@
 - **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b and 161c)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
+## Execution reconciliation, 26 September 2026
+
+This section overrides conflicting historical instructions below. Baseline is `6c7874038ee908287ceaf9b1b536967999e126e6`; 161a, 161b, 161c and 161d have landed. Drift is the expected 161c transport and deadline change, reviewed by function. Use an isolated `/tmp/tc-161e` worktree on `codex/xero-shared-rate-limits`. The reviewer maintains this index; do not merge or push.
+
+The user's session-wide decision and `tasks/lessons.md` require the already authorised online Neon database through `tooling/release/run-live-integration.ts`. Do not provision Docker, localhost Postgres or a local Redis service for this execution. Refresh durable ownership, exact target and migration identity, restore evidence, consumer isolation and final cleanup. Use the authorised KV endpoint only for manifest-owned shared-store fixture namespaces. No live Xero requests, customer tokens, production namespace initialisation or commercial-tier configuration changes are authorised.
+
+Extend scope where necessary to `tooling/release/cleanup.ts`, a co-located shared-store cleanup helper and tests, `live-run-environment.ts` and tests, `manifest-fixtures.ts` and tests, `tasks/todo.md`, existing caller tests that must adopt the new rate-class shape, and the existing rate-limit paragraph in `PRODUCT.md` and `AGENTS.md` only, to reconcile their obsolete universal 5,000/day wording. Recovery must enumerate and delete only manifest-owned shared-store namespaces, never flush or affect other keys. Fixture names currently contain underscores and exceed 32 characters: use a deterministic safe epoch derived from the exact allocated fixture namespace, with the same derivation in suite and guarded cleanup, and tests proving ownership and collision resistance. Production epoch validation stays unchanged. The package-boundary gate additionally requires shared fixture namespace/cleanup helpers to live behind an explicit `@repo/database` subpath export, with the live-test guard accessed through a package export. Extend scope to that narrowly scoped helper and `packages/database/package.json`; retain tooling wrappers/tests as appropriate. Do not suppress package-boundary checks.
+
+Protected runner credentials must remain available to its authority, fence and cleanup operations. Give the integration-test child a separate environment with global `KV_REST_API_*` absent, and its dedicated `TC_TEST_KV_REST_API_*` pair supplied privately. This preserves the planned default memory store for existing fake-provider tests without changing production store selection. Keep guard verification evidence intact and add tests for the environment boundary. CI retains its specified Redis/SRH services; these are not provisioned in this session.
+
+All Redis operations, admission, provider observations and release must respect 161c's absolute operation budget. Lease margin is added exactly once. Namespace initialisation is an explicit operator action, conservative for newly seen tenants as well as known tenants when `assumeSpentDaily` is true. Tests may shrink caps to exercise exhaustion inside owned namespaces; they must not consume real Xero quota. Verify the Lua all-or-none behaviour against the actual authorised REST store. An unavailable store must fail closed.
+
+Replace the historical local integration done criterion with the complete protected live inventory including the new shared-store suite. Run full lint, types, unit tests, release tooling and build with synthetic command-only build variables. Keep the tier unset during ordinary checks. Use `TURBO_CONCURRENCY=2` for the protected integration campaign, as verified during 161d. Reconcile environment obstacles and review necessary adaptations instead of stopping at stale Docker prerequisites or a fixed retry count. Never bypass live guards.
+
+Provider limits and header names were refreshed from https://developer.xero.com/documentation/best-practices/api-call-efficiencies/rate-limits/ and https://developer.xero.com/pricing on 26 September 2026. They confirm the plan's five-concurrent, 60-minute, 1,000 Starter / 5,000 higher-tier daily, 10,000 app-minute limits and three remaining-limit header names.
+
 ## Why this matters
 
 Xero's rate limits are enforced per **Xero tenant** across every caller using the same app. Team
@@ -437,18 +453,18 @@ caps as such.
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck` exit 0
-- [ ] `bun run --cwd packages/xero test` exits 0, including tests 1-7 and 13-15
-- [ ] `bun run --cwd packages/xero test:integration` exits 0 locally and lists `shared-store.integration.test.ts` (tests 8-12)
-- [ ] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
-- [ ] `bun run test:release-tools` exits 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` prints `0`
-- [ ] `grep -rn "orgRateLimitKey" packages/ apps/ --include=*.ts --include=*.tsx` returns no matches
-- [ ] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src --include=*.ts | grep -v "limits.ts\|\.test\.ts"` returns no matches
-- [ ] `grep -n "serverless-redis-http" .github/workflows/ci.yml` returns a match
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161e updated
+- [x] `bun run check`, `bun run typecheck` exit 0
+- [x] `bun run --cwd packages/xero test` exits 0, including tests 1-7 and 13-15
+- [x] The protected live runner exits 0 for the complete 24-suite, 187-test inventory, including all ten `shared-store.integration.test.ts` cases
+- [x] `bun run --cwd packages/next-config test` exits 0 with the new preflight cases
+- [x] `bun run test:release-tools` exits 0
+- [x] `git diff --check` exits 0
+- [x] `grep -c "new Map" packages/xero/src/rate-limit/limiter.ts` prints `0`
+- [x] `grep -rn "orgRateLimitKey" packages/ apps/ --include=*.ts --include=*.tsx` returns no matches
+- [x] `grep -rn "XERO_CALLS_PER_DAY_PER_ORG" packages/xero/src --include=*.ts | grep -v "limits.ts\|\.test\.ts"` returns no matches
+- [x] `grep -n "serverless-redis-http" .github/workflows/ci.yml` returns a match
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161e updated
 
 ## STOP conditions
 
@@ -483,3 +499,11 @@ Stop and report; do not improvise:
   `admission_unavailable` code.
 - In review, scrutinise: the Lua script's all-or-none path, lease expiry, the release path on every
   exit, and any code that turns a store failure into a user-facing "not connected".
+
+## Reviewer verdict, 26 September 2026
+
+**APPROVE.** Runtime candidate `f2aeff73b050c30ef1dbacfa5997338d57d53268`, worktree `/tmp/tc-161e`, branch `codex/xero-shared-rate-limits`. Independent uncached full units (18 tasks, including 430 Xero tests), types (19 tasks), four-app build, lint (1,070 files), package boundaries, 97 release-tool tests, release-tool types, whitespace and source probes all passed.
+
+Protected online Neon run `ccc3ba37-89b3-4636-83ab-58b1b6351d4e` passed 24 suites and 187 tests across six workspaces, including ten actual Redis tests. Fresh identity, all 19 migration checksums, restore reference, 53 owned tenant slots, 41 global keys, durable manifest and consumer isolation were verified. Independent post-run read-back confirmed all 36 owned database/Redis selectors empty, the outside-owned catalogue unchanged, no schema difference and the active-run fence released.
+
+The boundary gate initially rejected direct test imports from tooling and database internals; helper placement was reconciled behind database package exports, then all gates and the live campaign ran against the corrected frozen candidate. No real Xero requests or production rate-namespace activation occurred. Actual GitHub Actions execution remains NOT VERIFIED; its service configuration matches upstream documentation. Production cutover remains an explicit operator action sequenced by Plan 161h.

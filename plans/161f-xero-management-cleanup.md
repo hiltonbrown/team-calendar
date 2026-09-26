@@ -26,6 +26,24 @@
 - **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b-161e)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
+## Execution reconciliation, 26 September 2026
+
+This section overrides conflicting historical instructions below. Execute from approved dependency commit `af649c24dcca6ed44aca02952e802915a4c288be` on the isolated `codex/xero-shared-rate-limits` branch. Plan 161e is DONE and need not be merged into main to serve as this worktree baseline. Create `/tmp/tc-161f` on `codex/xero-management-cleanup`; never merge or push. Expected drift consists of 161b binding, 161c deadlines, 161d canonical credentials and 161e endpoint-class threading, plus the reviewed documentation import-stub change. `xeroRateKeys` now lives in `rate-limit/shared-store.ts`, not `xero-fetch.ts`.
+
+Use only the already authorised online Neon database through `tooling/release/run-live-integration.ts`. Do not provision localhost, Docker or a new database. Refresh exact target identity, durable ownership, migration checksums, restore, consumer isolation and cleanup evidence. Generate the additive migration by schema-to-schema diff without any database connection. The reviewer applies the reviewed additive migration under protected manifest authority and active ownership before the complete live campaign. All provider responses in tests are fake; no actual Xero token request, inventory request, DELETE, customer credential change or production cleanup activation is authorised. Management-tier provisioning therefore remains NOT VERIFIED. Default mode remains `report_only`.
+
+Expand scope as necessary to `tooling/release/cleanup.ts`, `xero-fixture-cleanup.ts` and tests, the fixture allocation registry and manifest tests, and `tasks/todo.md`. Add cleanup requests and attempts to protected count/ownership/deletion logic before any live migration or tests. Validate their tenant and global-key references against manifest ownership, delete in foreign-key order and preserve unrelated data. Register both actual new suites in the 26-suite inventory in the same candidate. Allocate enough owned tenant and kind-qualified global fixtures for the actual concurrency tests; never invent fixture IDs outside the manifest. Retain 161e's credential-separated test environment and owned Redis cleanup.
+
+The operator command must start without loading application or React modules. Authorise extracting the existing unchanged bounded advisory-lock helpers to `packages/xero/src/oauth/locks.ts`, with direct imports from cleanup, credential-owner, service and the existing credential-owner unit/integration tests. Validate explicit CLI intent and reject disabled cleanup before dynamically importing services. Verify missing-intent and report-only invocations reject safely, and a direct cleanup-module import succeeds with synthetic settings without database or provider calls. Consume existing lock helpers and bound lock waits. Disconnect locks owner (when present), binding and connection in that order, re-reads scoped identities under locks, and performs no HTTP. Worker claim, dispatch marker, result persistence and retirement must use state/lease-owner compare-and-set with fresh lease evidence. Dispatch check and marker share the binding lock taken by reconnect; a lost lease or changed generation means no provider request. Reconnect must fence the old binding even if another Organisation attempts to claim the same external file. The owner credential set is never revoked or scrubbed to remove one tenant. Preserve existing destructive data changes exactly.
+
+Before any targeted DELETE, verify the frozen attempt's `provider_app_id` equals the app whose management token is acquired. Add that expected app identity to the management-client input or an equivalently strict check. A 404 from credentials for a different app cannot establish absence. Validate the exact frozen remote UUID, never substitute a tenant ID, never widen targets to the whole authoriser, and never rebuild deletion authority from a later inventory. Client-credentials token caching and in-flight sharing must be scoped to the provider app and credential configuration and bounded for every waiter's deadline. Token failures are definitely-unsent DELETE outcomes; an uncertain dispatched DELETE remains `unknown` and is never retried automatically. Management token requests use the plan's `app_management` application-policy class; reconcile that provider-ledger Rate bucket cell, its management-only Deadline cell and the directly contradicted paragraph claiming no management-token implementation. Keep unrelated ledger fields unchanged and actual app provisioning NOT VERIFIED. The official Xero client-credentials and managing-connections guides were read on 26 September 2026; they confirm the grant, `app.connections`, token response fields and targeted DELETE path, but do not independently prove this app's capability or actual 404 behaviour.
+
+The interrupted first live run exposed a stale existing `service.integration.test.ts` expectation. Include that suite in scope and reconcile it to local-first disconnect. An already-disconnected row without a durable request still returns `left_in_place` when its legacy remote connection ID remains recorded; use `not_applicable` only when no recorded target exists. Prove repeat calls return the same latest receipt without new requests or generation increments. Receipt aggregation must not treat cancellation as evidence of remote deletion or absence. All report-only cancellations mean `left_in_place`; otherwise confirmed status requires authoritative targeted confirmations, and cancelled unconfirmed targets remain truthfully represented. UI copy for unresolved receipts is: "Sync stopped. We could not confirm the Xero disconnection. Contact support for help." This replaces the unsupported claim "Our team has been notified" because the plan does not implement team notification. Keep the required browser spec written and honestly NOT VERIFIED until Plan 160; unit-render each receipt message now.
+
+The production Inngest sweep lists routing IDs in one durable step and executes each attempt in its own named durable step, rather than placing fifty potentially 90-second operations in one step. Authorise the one-line `maxDuration = 300` export in `apps/api/app/api/inngest/route.ts`; official Inngest v4 Vercel and loop guidance was checked through Context7 on 26 September 2026. System sweeps are narrowly authorised across scopes but return IDs/scopes only; each actual mutation applies both Clerk Org and Organisation filters. Reissue must revalidate explicit operator intent, correct scope/app, original frozen target/generation and unresolved state; it cannot reissue report-only or superseded cancellations. Expired dispatch markers become `unknown`, and neither stale worker outcomes nor cancelled targets can reopen the old reservation. Persist only allowlisted outcome reasons, never raw provider payloads or tokens. Failed management authorisation stays blocked and cannot silently create an automatic retry storm.
+
+Run full lint, types, units, package boundaries, release-tool tests/types and a four-app build using synthetic command-only build variables. Restore generated baseline formatting without reverting required model changes. Use `TURBO_CONCURRENCY=2` for the complete protected integration inventory, including 161e's ten Redis cases and both new suites. Preserve all guard gates and reconcile environment obstacles rather than stopping at stale local provisioning instructions or a fixed revision count. The reviewer alone maintains `plans/README.md`.
+
 ## Why this matters
 
 `disconnectXeroOAuthConnection` runs the remote DELETE **inside** a 20-second database
@@ -47,7 +65,7 @@ app-management client, and replaces the boolean with a receipt that can say `unk
 **Behaviour change to be aware of.** Remote deletion is gated by `XERO_REMOTE_CLEANUP_MODE`,
 default `report_only`. Until an operator sets `enabled` (a 161h rollout step), disconnect no longer
 removes the remote Xero link at all, where today it tries once inline with the customer's token.
-The receipt says so truthfully (`remoteStatus: "pending"`). This is intentional: the charter keeps
+The receipt says so truthfully (`remoteStatus: "left_in_place"`). This is intentional: the charter keeps
 destructive cleanup off until its evidence gates pass.
 
 ## Current state
@@ -508,7 +526,7 @@ aggregate for each combination (all deleted → `confirmed_deleted`; one deleted
 `unknown` → `unknown`; one deleted plus one `pending` → `partially_confirmed`); target
 freezing excludes a same-authoriser connection for a different tenant.
 
-`connection-cleanup.integration.test.ts` (local DB):
+`connection-cleanup.integration.test.ts` (protected live Neon):
 1. With `XERO_REMOTE_CLEANUP_MODE=enabled`, local disable commits with zero provider calls and the
    receipt is `pending`.
 2. No remote link → binding retired immediately, receipt `not_applicable`.
@@ -536,19 +554,19 @@ no remote connection ID and no provider error code.
 
 All must hold:
 
-- [ ] `bun run check`, `bun run typecheck` exit 0
-- [ ] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
-- [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
-- [ ] `bun run --cwd packages/xero test:integration`, `bun run --cwd packages/jobs test:integration`, `bun run --cwd packages/database test:integration` exit 0 locally, listing the new suites
-- [ ] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
-- [ ] `git diff --check` exits 0
-- [ ] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
-- [ ] `grep -n "reconcileXeroConnectionsFunction" packages/jobs/src/functions.ts` returns a match
-- [ ] `grep -n "report_only" packages/xero/keys.ts` returns a match and `keys.test.ts` asserts the absent default is `report_only`
-- [ ] `grep -c "revokeXeroConnectionAtSource\|revokePreparedXeroConnection" packages/xero/src/oauth/service.ts` prints `0` (the inline revoke is gone)
-- [ ] A spec under `tooling/release/e2e/` references the three receipt messages; the execution report records it `NOT_VERIFIED`
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
-- [ ] `plans/README.md` status row for 161f updated
+- [x] `bun run check`, `bun run typecheck` exit 0
+- [x] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
+- [x] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
+- [x] `TURBO_CONCURRENCY=2 bun tooling/release/run-live-integration.ts --manifest <protected-manifest>` exits 0 against the authorised online Neon target, listing all 26 suites including both new suites
+- [x] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
+- [x] `git diff --check` exits 0
+- [x] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
+- [x] `grep -n "reconcileXeroConnectionsFunction" packages/jobs/src/functions.ts` returns a match
+- [x] `grep -n "report_only" packages/xero/keys.ts` returns a match and `keys.test.ts` asserts the absent default is `report_only`
+- [x] `grep -c "revokeXeroConnectionAtSource\|revokePreparedXeroConnection" packages/xero/src/oauth/service.ts` prints `0` (the inline revoke is gone)
+- [x] A spec under `tooling/release/e2e/` references the three receipt messages; the execution report records it `NOT_VERIFIED`
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list, and `plans/` changes are limited to the files this plan names
+- [x] `plans/README.md` status row for 161f updated
 
 ## STOP conditions
 
@@ -583,3 +601,16 @@ Stop and report; do not improvise:
   provider-outcome mapping.
 - Deferred: inactivity-driven deletion (161h, report-only), customer notices, bulk management,
   cleanup credential escrow.
+
+
+## Execution review, 26 September 2026
+
+**APPROVE.** Runtime candidate `c0ce9a13b7b188d4805bf74d0d85d9cbeac68d69` on `codex/xero-management-cleanup`, worktree `/tmp/tc-161f`, based on approved 161e dependency `af649c24dcca6ed44aca02952e802915a4c288be`. The reviewer read the complete implementation and correction diffs, verified scope and meaningful regression assertions, and independently reran all done criteria. No merge or push was performed.
+
+Independent local gates PASS: lint (1083 files), package boundaries, forced unit campaign (18 tasks), forced typecheck (19 tasks), release tools (16 files, 104 tests), release-tool types and forced four-app build using synthetic command-only settings. Actual CLI missing-intent and fully specified default report-only invocations exit 1 before database service imports; direct cleanup module import succeeds under `react-server` without SQL/provider calls. The extracted lock-helper block is byte-equivalent to its predecessor. The destructive local finalisation function remains byte-equivalent to the approved dependency.
+
+Protected online Neon run `aa4e28f1-b3f7-45c1-92ce-db5290c8b91a` PASS: 26 files, 207 tests, six package tasks, no cached integration results. Package counts: app 2, feeds 15, Xero 50, availability 21, database 45 and jobs 74. The run refreshed durable ownership (53 tenant slots, 145 kind-qualified global keys), exact identity, restore timeline/LSN `73cb5a3404beeb6412275bed23ffa160` / `0/4A536A40`, and strict empty-consumer evidence. All 20 applied migration checksums matched; no pending migration. The additive cleanup migration, applied under protected authority during the initial interrupted campaign, has checksum `d038fcd0041cb6b0cebcffca869c9c01053895eb597e053da19a2d4d68dc1d96`.
+
+Independent post-run read-back PASS: all 38 fixture selectors zero, including cleanup requests/attempts and owned Redis keys; outside-owned catalogue digest unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`; active-run KV fence absent; durable manifest and consumer isolation reverified. Live Prisma schema comparison exits 0 with `No difference detected`. The initial failed campaign and guarded recovery are retained in the programme execution report and are not counted as a pass. The earlier metadata-only manifest for `6efa83e` was not activated or used for a test campaign.
+
+Default mode stays `report_only`. Actual Xero management provisioning/token acquisition/targeted deletion and browser E2E are **NOT VERIFIED**. Provider responses were fake. The three-receipt browser spec is written for later Plan 160 execution; receipt UI unit-render tests pass. No customer cleanup activation or actual provider operation was performed.
