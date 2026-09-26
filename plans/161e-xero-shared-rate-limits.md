@@ -28,6 +28,22 @@
 - **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b and 161c)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
+## Execution reconciliation, 26 September 2026
+
+This section overrides conflicting historical instructions below. Baseline is `6c7874038ee908287ceaf9b1b536967999e126e6`; 161a, 161b, 161c and 161d have landed. Drift is the expected 161c transport and deadline change, reviewed by function. Use an isolated `/tmp/tc-161e` worktree on `codex/xero-shared-rate-limits`. The reviewer maintains this index; do not merge or push.
+
+The user's session-wide decision and `tasks/lessons.md` require the already authorised online Neon database through `tooling/release/run-live-integration.ts`. Do not provision Docker, localhost Postgres or a local Redis service for this execution. Refresh durable ownership, exact target and migration identity, restore evidence, consumer isolation and final cleanup. Use the authorised KV endpoint only for manifest-owned shared-store fixture namespaces. No live Xero requests, customer tokens, production namespace initialisation or commercial-tier configuration changes are authorised.
+
+Extend scope where necessary to `tooling/release/cleanup.ts`, a co-located shared-store cleanup helper and tests, `live-run-environment.ts` and tests, `manifest-fixtures.ts` and tests, `tasks/todo.md`, existing caller tests that must adopt the new rate-class shape, and the existing rate-limit paragraph in `PRODUCT.md` and `AGENTS.md` only, to reconcile their obsolete universal 5,000/day wording. Recovery must enumerate and delete only manifest-owned shared-store namespaces, never flush or affect other keys. Fixture names currently contain underscores and exceed 32 characters: use a deterministic safe epoch derived from the exact allocated fixture namespace, with the same derivation in suite and guarded cleanup, and tests proving ownership and collision resistance. Production epoch validation stays unchanged.
+
+Protected runner credentials must remain available to its authority, fence and cleanup operations. Give the integration-test child a separate environment with global `KV_REST_API_*` absent, and its dedicated `TC_TEST_KV_REST_API_*` pair supplied privately. This preserves the planned default memory store for existing fake-provider tests without changing production store selection. Keep guard verification evidence intact and add tests for the environment boundary. CI retains its specified Redis/SRH services; these are not provisioned in this session.
+
+All Redis operations, admission, provider observations and release must respect 161c's absolute operation budget. Lease margin is added exactly once. Namespace initialisation is an explicit operator action, conservative for newly seen tenants as well as known tenants when `assumeSpentDaily` is true. Tests may shrink caps to exercise exhaustion inside owned namespaces; they must not consume real Xero quota. Verify the Lua all-or-none behaviour against the actual authorised REST store. An unavailable store must fail closed.
+
+Replace the historical local integration done criterion with the complete protected live inventory including the new shared-store suite. Run full lint, types, unit tests, release tooling and build with synthetic command-only build variables. Keep the tier unset during ordinary checks. Use `TURBO_CONCURRENCY=2` for the protected integration campaign, as verified during 161d. Reconcile environment obstacles and review necessary adaptations instead of stopping at stale Docker prerequisites or a fixed retry count. Never bypass live guards.
+
+Provider limits and header names were refreshed from https://developer.xero.com/documentation/best-practices/api-call-efficiencies/rate-limits/ and https://developer.xero.com/pricing on 26 September 2026. They confirm the plan's five-concurrent, 60-minute, 1,000 Starter / 5,000 higher-tier daily, 10,000 app-minute limits and three remaining-limit header names.
+
 ## Why this matters
 
 Xero's rate limits are enforced per **Xero tenant** across every caller using the same app. Team

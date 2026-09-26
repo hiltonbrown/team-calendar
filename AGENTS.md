@@ -382,7 +382,7 @@ The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempt
 - Raw Xero responses stored in `source_payload_json` on `availability_records` for audit.
 - Raw Xero write error payloads stored in `xero_write_error_raw` for admin audit only. A plain-language version is stored in `xero_write_error` for display. Never expose raw Xero error codes or payloads to employees.
 - Xero-specific types never leak into `packages/availability` or `packages/feeds`.
-- Rate limiting (60/min per org, 5,000/day per org, five concurrent per org) handled inside `packages/xero`.
+- Rate limiting uses a shared, atomic store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. Admission fails closed when the store or its explicitly initialised namespace is unavailable.
 - Token refresh handled proactively before sync runs.
 - All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
 - Resolve XeroTenant via `organisation_id` FK, not bare `clerk_org_id`.

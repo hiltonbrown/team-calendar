@@ -1,6 +1,8 @@
+import { log } from "@repo/observability/log";
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
+const NAMESPACE_EPOCH_REGEX = /^[a-z0-9-]{1,32}$/;
 const POSITIVE_VERSION_REGEX = /^[1-9]\d*$/;
 const BASE64_REGEX = /^[a-zA-Z0-9+/]*={0,2}$/;
 
@@ -33,10 +35,22 @@ if (process.env.NODE_ENV === "test" && !process.env.XERO_CLIENT_SECRET) {
   process.env.XERO_CLIENT_SECRET = "test-xero-client-secret";
 }
 
+if (process.env.NODE_ENV === "test" && !process.env.XERO_CLIENT_ID) {
+  process.env.XERO_CLIENT_ID = "test-xero-client-id";
+}
+
 export const keys = () =>
   createEnv({
     createFinalSchema: (shape) =>
       z.object(shape).superRefine((env, ctx) => {
+        if (Boolean(env.KV_REST_API_URL) !== Boolean(env.KV_REST_API_TOKEN)) {
+          ctx.addIssue({
+            code: "custom",
+            message:
+              "KV_REST_API_URL and KV_REST_API_TOKEN must be configured together",
+            path: ["KV_REST_API_URL"],
+          });
+        }
         const ring = env.XERO_TOKEN_ENCRYPTION_KEYS_JSON ?? {};
         if (ring["1"] && ring["1"] !== env.XERO_TOKEN_ENCRYPTION_KEY) {
           ctx.addIssue({
@@ -60,9 +74,13 @@ export const keys = () =>
     // format-constrained optional keys do not fail validation.
     emptyStringAsUndefined: true,
     runtimeEnv: {
+      KV_REST_API_TOKEN: process.env.KV_REST_API_TOKEN,
+      KV_REST_API_URL: process.env.KV_REST_API_URL,
       XERO_API_BASE_URL: process.env.XERO_API_BASE_URL,
+      XERO_APP_TIER: process.env.XERO_APP_TIER,
       XERO_CLIENT_ID: process.env.XERO_CLIENT_ID,
       XERO_CLIENT_SECRET: process.env.XERO_CLIENT_SECRET,
+      XERO_RATE_NAMESPACE_EPOCH: process.env.XERO_RATE_NAMESPACE_EPOCH,
       XERO_REDIRECT_URI: process.env.XERO_REDIRECT_URI,
       XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION:
         process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION,
@@ -71,9 +89,18 @@ export const keys = () =>
         process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON,
     },
     server: {
+      KV_REST_API_TOKEN: z.string().min(1).optional(),
+      KV_REST_API_URL: z.string().url().optional(),
       XERO_API_BASE_URL: z.string().url().optional(),
+      XERO_APP_TIER: z
+        .enum(["starter", "core", "plus", "advanced", "enterprise"])
+        .optional(),
       XERO_CLIENT_ID: z.string().optional(),
       XERO_CLIENT_SECRET: z.string().optional(),
+      XERO_RATE_NAMESPACE_EPOCH: z
+        .string()
+        .regex(NAMESPACE_EPOCH_REGEX)
+        .optional(),
       // The OAuth redirect URI Xero returns the authorisation code to. It must
       // exactly match a URI pre-registered on the Xero app. When set it pins
       // the callback to the registered production URL regardless of the
@@ -145,4 +172,20 @@ export const keys = () =>
 // Validate immediately on module load to prevent boot if invalid or missing
 if (process.env.NODE_ENV !== "test") {
   keys();
+}
+
+let warnedMissingTier = false;
+export function resolveXeroDailyAllowance(): number {
+  const tier = keys().XERO_APP_TIER;
+  if (!tier) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("XERO_APP_TIER is required");
+    }
+    if (!warnedMissingTier) {
+      log.warn("XERO_APP_TIER is unset; using Starter allowance");
+      warnedMissingTier = true;
+    }
+    return 1000;
+  }
+  return tier === "starter" ? 1000 : 5000;
 }

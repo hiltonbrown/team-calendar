@@ -2,7 +2,7 @@ import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
 import { tryDecryptXeroToken } from "../crypto/tokens";
-import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
+import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   XeroEmployee,
   XeroEmployeeMapFailure,
@@ -90,10 +90,11 @@ export async function fetchEmployees(input: {
           },
           method: "GET",
         },
-        orgKey: orgRateLimitKey({
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
-        }),
+        rateClass: {
+          kind: "tenant",
+          providerAppId: keys().XERO_CLIENT_ID ?? "",
+          xeroTenantId: input.xeroTenant.xero_tenant_id,
+        },
         url: `${baseUrl()}/payroll.xro/1.0/Employees?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
@@ -222,10 +223,11 @@ export async function fetchLeaveRecords(input: {
           },
           method: "GET",
         },
-        orgKey: orgRateLimitKey({
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
-        }),
+        rateClass: {
+          kind: "tenant",
+          providerAppId: keys().XERO_CLIENT_ID ?? "",
+          xeroTenantId: input.xeroTenant.xero_tenant_id,
+        },
         url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/v2?page=${page}`,
       });
       const rawPayload = await readXeroPayload(response);
@@ -299,10 +301,11 @@ async function fetchAuLeaveTypeNames(input: {
       },
       method: "GET",
     },
-    orgKey: orgRateLimitKey({
-      clerkOrgId: input.xeroTenant.clerk_org_id,
-      organisationId: input.xeroTenant.organisation_id,
-    }),
+    rateClass: {
+      kind: "tenant",
+      providerAppId: keys().XERO_CLIENT_ID ?? "",
+      xeroTenantId: input.xeroTenant.xero_tenant_id,
+    },
     url: `${baseUrl()}/payroll.xro/1.0/PayItems`,
   });
   const rawPayload = await readXeroPayload(response);
@@ -383,10 +386,11 @@ export async function fetchLeaveBalances(input: {
         // The loop aborts the whole run on a rate-limit so the Inngest job can
         // retry later; no inline retry here.
         maxAttempts: 1,
-        orgKey: orgRateLimitKey({
-          clerkOrgId: input.xeroTenant.clerk_org_id,
-          organisationId: input.xeroTenant.organisation_id,
-        }),
+        rateClass: {
+          kind: "tenant",
+          providerAppId: keys().XERO_CLIENT_ID ?? "",
+          xeroTenantId: input.xeroTenant.xero_tenant_id,
+        },
         url: `${baseUrl()}/payroll.xro/1.0/Employees/${encodeURIComponent(employeeId)}`,
       });
     } catch (error) {
@@ -455,10 +459,11 @@ export async function fetchLeaveApplicationStatus(
         },
         method: "GET",
       },
-      orgKey: orgRateLimitKey({
-        clerkOrgId: input.xeroTenant.clerk_org_id,
-        organisationId: input.xeroTenant.organisation_id,
-      }),
+      rateClass: {
+        kind: "tenant",
+        providerAppId: keys().XERO_CLIENT_ID ?? "",
+        xeroTenantId: input.xeroTenant.xero_tenant_id,
+      },
       url: `${baseUrl()}/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
         input.xeroLeaveApplicationId
       )}`,

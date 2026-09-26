@@ -3,7 +3,7 @@ import { z } from "zod";
 import { keys } from "../../keys";
 import { tryDecryptXeroToken } from "../crypto/tokens";
 import { createXeroDeadline } from "../rate-limit/deadline";
-import { orgRateLimitKey, xeroFetch } from "../rate-limit/xero-fetch";
+import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   ApproveLeaveApplicationInput,
   DeclineLeaveApplicationInput,
@@ -185,10 +185,11 @@ async function xeroRequest(
         signal: AbortSignal.timeout(XERO_WRITE_TIMEOUT_MS),
       },
       maxAttempts: 1,
-      orgKey: orgRateLimitKey({
-        clerkOrgId: xeroTenant.clerk_org_id,
-        organisationId: xeroTenant.organisation_id,
-      }),
+      rateClass: {
+        kind: "tenant",
+        providerAppId: keys().XERO_CLIENT_ID ?? "",
+        xeroTenantId: xeroTenant.xero_tenant_id,
+      },
       // Every request through this helper mutates payroll state. See the field
       // comment in xero-fetch.ts: an ambiguous failure must surface to the user
       // rather than be retried into a duplicate.

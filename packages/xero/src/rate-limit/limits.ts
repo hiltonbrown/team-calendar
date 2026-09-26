@@ -1,5 +1,5 @@
-// Xero's published ceilings for the four per-org/app limits, per PRODUCT.md:240-247. These are the ceilings
-// the limiter enforces per connected organisation, plus the app-wide cap.
+// Xero published limits apply per external tenant and provider app.
+// Starter daily allowance is 1,000; other commercial tiers allow 5,000.
 
 export const XERO_CALLS_PER_MINUTE_PER_ORG = 60;
 export const XERO_CALLS_PER_DAY_PER_ORG = 5000;
@@ -21,3 +21,6 @@ export const XERO_TOKEN_OPERATION_BUDGET_MS = 10_000;
 export const XERO_DEFAULT_OPERATION_BUDGET_MS = 90_000;
 // Application policy for fully buffered responses.
 export const XERO_MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+
+// Application policy for each non-tenant endpoint class, per provider app.
+export const XERO_CLASS_CALLS_PER_MINUTE = 60;

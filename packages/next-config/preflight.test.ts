@@ -15,6 +15,8 @@ const validCommonVars = {
 };
 
 const validAppVars = {
+  XERO_APP_TIER: "starter",
+  XERO_RATE_NAMESPACE_EPOCH: "test",
   ...validCommonVars,
   CLERK_SECRET_KEY: "clerk_sec_123456",
   DATABASE_URL:
@@ -138,9 +140,7 @@ describe("production preflight validation", () => {
         appName: "app",
         envVars: halfKv,
       })
-    ).toThrow(
-      "KV_REST_API_URL and KV_REST_API_TOKEN must be configured together"
-    );
+    ).toThrow("KV_REST_API_TOKEN is missing or empty");
   });
 
   it("fails atomically when Inngest credentials pair is half-configured on api", () => {
@@ -303,4 +303,41 @@ describe("production preflight validation", () => {
       );
     });
   }
+});
+
+describe("shared Xero admission preflight", () => {
+  for (const variable of [
+    "XERO_APP_TIER",
+    "XERO_RATE_NAMESPACE_EPOCH",
+    "KV_REST_API_URL",
+    "KV_REST_API_TOKEN",
+  ]) {
+    it(`requires ${variable}`, () => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "app",
+          envVars: { ...validAppVars, [variable]: undefined },
+        })
+      ).toThrow(`${variable} is missing or empty`);
+    });
+  }
+  it("never prints configured store credentials in failures", () => {
+    const secret = "do-not-print-this-store-token";
+    let failure: unknown;
+    try {
+      runProductionPreflight({
+        appName: "app",
+        envVars: {
+          ...validAppVars,
+          KV_REST_API_TOKEN: secret,
+          XERO_APP_TIER: undefined,
+        },
+      });
+    } catch (error) {
+      failure = error;
+      expect(String(error)).not.toContain(secret);
+      expect(String(error)).toContain("XERO_APP_TIER");
+    }
+    expect(failure).toBeInstanceOf(Error);
+  });
 });

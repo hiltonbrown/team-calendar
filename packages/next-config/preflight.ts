@@ -191,7 +191,10 @@ export const runProductionPreflight = (
     checkPresent("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
     checkPresent("CLERK_SECRET_KEY");
 
-    checkPair("KV_REST_API_URL", "KV_REST_API_TOKEN", true);
+    checkPresent("XERO_APP_TIER");
+    checkPresent("XERO_RATE_NAMESPACE_EPOCH");
+    checkPresent("KV_REST_API_URL");
+    checkPresent("KV_REST_API_TOKEN");
   }
 
   if (appName === "api") {

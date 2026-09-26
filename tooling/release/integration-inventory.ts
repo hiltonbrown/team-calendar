@@ -34,6 +34,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/xero/src/oauth/credential-owner.integration.test.ts",
   "packages/xero/src/oauth/disconnect.integration.test.ts",
   "packages/xero/src/oauth/service.integration.test.ts",
+  "packages/xero/src/rate-limit/shared-store.integration.test.ts",
 ] as const;
 
 export const assertExpectedIntegrationInventory = (
@@ -43,7 +44,7 @@ export const assertExpectedIntegrationInventory = (
     JSON.stringify(inventory) !== JSON.stringify(EXPECTED_INTEGRATION_TESTS)
   ) {
     throw new Error(
-      "Live integration inventory differs from the reviewed 23-suite allowlist"
+      "Live integration inventory differs from the reviewed 24-suite allowlist"
     );
   }
 };

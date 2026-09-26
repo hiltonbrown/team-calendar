@@ -8,6 +8,10 @@ import {
 } from "./database-guard.js";
 import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
 import {
+  countSharedStoreFixtureKeys,
+  deleteSharedStoreFixtureKeys,
+} from "./shared-store-cleanup.js";
+import {
   assertXeroFixtureInfrastructureOwned,
   countXeroFixtureInfrastructure,
   deleteXeroFixtureInfrastructure,
@@ -144,12 +148,18 @@ const outsideOwnedCatalogueDigest = async () => {
     .update(JSON.stringify({ limits, plans }))
     .digest("hex");
 };
+const sharedStoreInput = {
+  globalKeys: manifest.owned.globalKeys,
+  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
+};
 const catalogueDigestBefore = await outsideOwnedCatalogueDigest();
 await assertXeroFixtureInfrastructureOwned(database, manifest.owned);
 const counts: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+counts.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
 }
@@ -266,12 +276,14 @@ if (mode === "--apply") {
       ...scopedValues
     );
   });
+  await deleteSharedStoreFixtureKeys(sharedStoreInput);
 }
 
 const residue: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+residue.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   residue[table] = await countRows(table, scopedSql, scopedValues);
 }

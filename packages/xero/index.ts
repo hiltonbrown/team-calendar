@@ -26,6 +26,11 @@ export {
   xeroConnectionRefreshDecision,
 } from "./src/oauth/service";
 export {
+  initialiseXeroRateNamespace,
+  type XeroRateClass,
+  xeroRateKeys,
+} from "./src/rate-limit/shared-store";
+export {
   fetchEmployeesForRegion,
   fetchLeaveApplicationStatusForRegion,
   fetchLeaveBalancesForRegion,

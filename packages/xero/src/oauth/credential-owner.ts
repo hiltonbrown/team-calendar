@@ -173,7 +173,10 @@ export async function refreshXeroCredentialOwner(input: {
         const exchanged = await exchangeToken({
           deadline: input.deadline,
           grantType: "refresh_token",
-          orgKey: `xero-owner:${owner.id}`,
+          rateClass: {
+            kind: "token",
+            providerAppId: keys().XERO_CLIENT_ID ?? "",
+          },
           refreshToken: token,
         });
         if (!exchanged.ok) {

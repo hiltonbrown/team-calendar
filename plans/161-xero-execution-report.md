@@ -379,3 +379,13 @@ tests, lockfile and migration match protected live-tested candidate `1b16680`
 byte for byte. Existing unrelated local edits were preserved outside the commit;
 the instruction import stub was retained when restoring those edits. No push
 or additional live database mutation was performed for the merge.
+
+## 161e: shared Xero rate budgets
+
+Step 1 defect reproduced before source implementation: `bun run --cwd packages/xero test` exited 1, 2 failed and 402 passed, 1 failed and 25 passed files. Same external tenant through different internal bindings produced `one:one` and `two:two`; different external tenants through one internal binding both produced `one:one`. Log: `/tmp/tc161e-regression.log`.
+
+Cutover: production admission remains closed until explicit tier, KV pair, namespace epoch and namespace initialisation are configured. Quiesce callers, then either wait out the daily window or initialise conservatively with `assumeSpentDaily: true`; set the sentinel and resume. Conservative recovery also closes newly seen tenant daily windows. Never flush live state or rotate epochs to bypass quota. Plan 161h sequences activation. No production namespace was activated in this execution.
+
+Verification: source lint PASS (1071 files), full types PASS (19 tasks), full units PASS (18 tasks; Xero 430 cases, next-config 42), release tools PASS (16 files, 97 cases, including cluster-safe cleanup), release-tool types PASS and synthetic build PASS (4 tasks). Whitespace and identity-removal criteria PASS. Protected live inventory including the ten-case shared-store suite remains pending reviewer execution. CI Redis/SRH containers were configured but not provisioned in this session.
+
+Deviation: conservative namespace initialisation uses one namespace-wide expiring daily marker rather than enumerating tenant windows. It blocks tenant daily admission for the complete recovery period, including previously unseen tenants, while allowing separate token/inventory/management classes. Runtime never creates the sentinel. Integration child credentials are isolated from protected runner credentials, and cleanup derives exact owned epochs from manifest namespace keys.

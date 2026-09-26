@@ -1470,3 +1470,14 @@ fix later; not changed here to keep the production push to reviewed scope.
 - [x] Reviewer protected live integration run, ownership/restore/isolation evidence and zero residue.
 
 Review: unit, build and type gates executed in the isolated worktree. An unrelated marketing contact test timed out under unrestricted parallel unit execution; the complete unit gate passed with concurrency two and no marketing source change. Protected online Neon verification passed all 23 suites and 177 tests, verified 19 applied migration checksums and no schema drift, and confirmed all 35 cleanup selectors empty with the active-run fence released. No customer backfill or provider consent operation performed.
+
+## Plan 161e: shared Xero admission
+
+- [x] Prove external tenant key regressions.
+- [x] Implement atomic Redis and equivalent memory stores.
+- [x] Thread endpoint classes and absolute deadlines through callers.
+- [x] Add tier, namespace, preflight and operator cutover contracts.
+- [x] Add owned shared-store integration, CI and guarded cleanup.
+- [ ] Run full source gates, independent review and protected live campaign.
+
+Review: source lint (1071 files), types (19 tasks), full units (18 tasks, including 430 Xero and 42 next-config cases), release tooling and synthetic build pass. Protected live campaign and independent review remain pending.

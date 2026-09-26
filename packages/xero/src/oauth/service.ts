@@ -19,11 +19,8 @@ import { z } from "zod";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import type { XeroDeadline } from "../rate-limit/deadline";
-import {
-  orgRateLimitKey,
-  XeroFetchError,
-  xeroFetch,
-} from "../rate-limit/xero-fetch";
+import type { XeroRateClass } from "../rate-limit/shared-store";
+import { XeroFetchError, xeroFetch } from "../rate-limit/xero-fetch";
 import {
   adoptXeroCredential,
   boundXeroLocks,
@@ -291,16 +288,16 @@ export async function completeXeroOAuth(input: {
     if (claimed.count !== 1) {
       return invalidState();
     }
-    const orgKey = orgRateLimitKey({
-      clerkOrgId: state.value.clerkOrgId,
-      organisationId: state.value.organisationId,
-    });
+    const rateClass: XeroRateClass = {
+      kind: "token",
+      providerAppId: keys().XERO_CLIENT_ID ?? "",
+    };
     const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
     const token = await exchangeToken({
       code: input.code,
       deadline,
       grantType: "authorization_code",
-      orgKey,
+      rateClass,
     });
     if (!token.ok) {
       await database.xeroOAuthSession.updateMany({
@@ -342,10 +339,10 @@ export async function completeXeroOAuth(input: {
     const identity = await verifyXeroAccessTokenIdentity(
       token.value.access_token
     );
-    const connections = await fetchConnections(
-      token.value.access_token,
-      orgKey
-    );
+    const connections = await fetchConnections(token.value.access_token, {
+      kind: "user_inventory",
+      providerAppId: keys().XERO_CLIENT_ID ?? "",
+    });
     if (!connections.ok) {
       return connections;
     }
@@ -655,10 +652,11 @@ export async function completeXeroTenantSelection(input: {
     : accessToken;
   const payrollRegionResult = await inferPayrollRegionForTenant({
     accessToken: currentAccessToken,
-    orgKey: orgRateLimitKey({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId ?? session.organisation_id,
-    }),
+    rateClass: {
+      kind: "tenant",
+      providerAppId: keys().XERO_CLIENT_ID ?? "",
+      xeroTenantId: selectedTenant.tenantId,
+    },
     tenantId: selectedTenant.tenantId,
   });
   if (!payrollRegionResult.ok) {
@@ -1098,10 +1096,7 @@ async function refreshXeroOAuthConnectionWithClient(
     deadline,
     grantType: "refresh_token",
     onResponseAccepted: callbacks.onResponseAccepted,
-    orgKey: orgRateLimitKey({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
+    rateClass: { kind: "token", providerAppId: keys().XERO_CLIENT_ID ?? "" },
     refreshToken: decryptXeroToken({
       authTag: connection.refresh_token_auth_tag,
       encrypted: connection.refresh_token_encrypted,
@@ -1822,7 +1817,7 @@ function hasUsableAccessTokenForDisconnect(
 }
 
 function revokeStoredXeroConnection(
-  input: DisconnectXeroInput,
+  _input: DisconnectXeroInput,
   connection: DisconnectConnection
 ): Promise<RevokeConnectionResult> {
   return revokeXeroConnectionAtSource({
@@ -1832,10 +1827,10 @@ function revokeStoredXeroConnection(
       iv: connection.access_token_iv,
       keyVersion: connection.token_key_version,
     }),
-    orgKey: orgRateLimitKey({
-      clerkOrgId: input.clerkOrgId,
-      organisationId: input.organisationId,
-    }),
+    rateClass: {
+      kind: "app_management",
+      providerAppId: keys().XERO_CLIENT_ID ?? "",
+    },
     xeroAuthorisationConnectionId:
       connection.xero_authorisation_connection_id ?? "",
   });
@@ -1974,7 +1969,7 @@ async function finaliseLocalXeroDisconnect(
 
 async function revokeXeroConnectionAtSource(input: {
   accessToken: string;
-  orgKey: string;
+  rateClass: XeroRateClass;
   xeroAuthorisationConnectionId: string;
 }): Promise<RevokeConnectionResult> {
   try {
@@ -1984,7 +1979,7 @@ async function revokeXeroConnectionAtSource(input: {
         method: "DELETE",
       },
       maxAttempts: 1,
-      orgKey: input.orgKey,
+      rateClass: input.rateClass,
       url: `${XERO_CONNECTIONS_URL}/${input.xeroAuthorisationConnectionId}`,
     });
     if (response.ok) {
@@ -2174,7 +2169,7 @@ async function provisionNewOrganisationDefaults(input: {
 
 async function inferPayrollRegionForTenant(input: {
   accessToken: string;
-  orgKey: string;
+  rateClass: XeroRateClass;
   tenantId: string;
 }): Promise<
   Result<
@@ -2194,7 +2189,7 @@ async function inferPayrollRegionForTenant(input: {
       },
       method: "GET",
     },
-    orgKey: input.orgKey,
+    rateClass: input.rateClass,
     url: XERO_ORGANISATION_URL,
   });
 
@@ -2349,7 +2344,7 @@ export async function exchangeToken(input: {
   grantType: "authorization_code" | "refresh_token";
   deadline?: XeroDeadline;
   onResponseAccepted?: () => void;
-  orgKey: string;
+  rateClass: XeroRateClass;
   refreshToken?: string;
 }): Promise<Result<TokenResponse, XeroOAuthError>> {
   const clientId = keys().XERO_CLIENT_ID;
@@ -2380,7 +2375,7 @@ export async function exchangeToken(input: {
         },
         method: "POST",
       },
-      orgKey: input.orgKey,
+      rateClass: input.rateClass,
       url: XERO_TOKEN_URL,
     });
   } catch (error) {
@@ -2477,7 +2472,7 @@ async function readOAuthErrorCode(response: Response): Promise<null | string> {
 
 async function fetchConnections(
   accessToken: string,
-  orgKey: string
+  rateClass: XeroRateClass
 ): Promise<Result<ConnectionResponse[], XeroOAuthError>> {
   const response = await xeroFetch({
     init: {
@@ -2486,7 +2481,7 @@ async function fetchConnections(
       },
       method: "GET",
     },
-    orgKey,
+    rateClass,
     url: XERO_CONNECTIONS_URL,
   });
   if (!response.ok) {
