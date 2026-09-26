@@ -1492,3 +1492,12 @@ Review: source lint (1070 files), types (19 tasks), full units (18 tasks, includ
 - [x] Run source gates and freeze candidate for independent protected live review.
 
 Review: independent full lint, types (19 tasks), units (18 tasks), boundaries, release tools (104 cases/types) and synthetic builds (four tasks) pass on runtime c0ce9a13. Protected online Neon campaign aa4e28f1-b3f7-45c1-92ce-db5290c8b91a passed 26 files / 207 tests across six uncached tasks. All 38 cleanup selectors are zero, outside-owned catalogue unchanged, fence released, all 20 migration checksums match and read-only schema comparison reports no difference. The first failed run and guarded recovery are preserved in the execution report. CLI safe rejection/import checks passed; real Xero management authorisation and Plan 160 browser execution remain NOT VERIFIED. Full plan delivered by shared absolute path rather than inline duplication; complete text and reconciliation read before implementation. No merge or push.
+
+
+## Plans 161e and 161f merge to main
+
+- [x] Review and commit all outstanding changes.
+- [x] Merge both completed feature slices into main.
+- [x] Verify ancestry, exact tested tree equality, whitespace and post-merge checks.
+
+Review: pending plan records committed at a131ec6; conflict-free merge bebd7e6 contains both completed branches. Merged tree exactly matched approved feature tip 0617120 before these documentation updates. Main lint, boundaries and 104 release-tool tests pass. Full source and protected live 26-suite/207-test verification remains valid for the identical runtime. No push or deployment; cleanup stays report-only.

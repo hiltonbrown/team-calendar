@@ -444,3 +444,10 @@ Protected online Neon campaign `aa4e28f1-b3f7-45c1-92ce-db5290c8b91a` exited zer
 Independent post-run dry-run verification confirmed all 38 cleanup selectors zero, including Redis namespaces. The outside-owned catalogue digest remained `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`; the active-run Redis fence was null. Read-only schema comparison exited zero with `No difference detected`. The initial failed campaign and guarded recovery remain recorded above; the unused metadata-only manifest is not represented as an executed campaign.
 
 Final documentation copies the reviewer's completed plan and index exactly and closes the task review. Runtime and tests remain byte-identical to the approved live-tested candidate. No real Xero management token acquisition, targeted provider DELETE, customer credential mutation, production namespace activation, deployment, merge or push was performed. Actual app management authorisation and Plan 160 browser scenarios remain **NOT VERIFIED**; remote cleanup continues to default to `report_only`.
+
+
+### Plans 161e and 161f merge to main, 26 September 2026
+
+The user's subsequent instruction, "commit all and merge to main", authorised committing all pending plan records and merging both completed slices. Pending records were committed at `a131ec6`; merge `bebd7e6` includes `codex/xero-management-cleanup` and its `codex/xero-shared-rate-limits` dependency with no conflicts. Both feature tips are ancestors of main. Before this documentation update, the complete merged tree was byte-identical to feature tip `0617120`, preserving the runtime verified in the protected 26-suite, 207-test campaign.
+
+Post-merge checks on main PASS: lint (1083 files), package boundaries (1040 files, 21 packages), release tools (16 files, 104 tests), whitespace and clean working tree. No new runtime changes, database campaign or provider operation was needed for this identical tree. The full type/unit/build and protected live evidence above remains applicable. Cleanup remains report-only; actual provider operations and browser E2E remain NOT VERIFIED. No push or deployment was performed.
