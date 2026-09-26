@@ -30,7 +30,7 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
 | [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; all local gates passed, 26 protected fixture suites registered |
 | [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | DONE: guarded online Neon inventory passed at `bade686`; migrations A-C and immutable binding verified; fixtures cleaned and lock released |
-| [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | TODO |
+| [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | DONE: approved source `caa98406`; guarded live Neon inventory passed (22 files, 162 tests); cleanup and released fence verified |
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | TODO |
 | [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | TODO |
 | [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | TODO |

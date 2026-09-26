@@ -248,3 +248,71 @@ Outcome: Plan 161b is DONE. The production ordering remains unchanged: deploy
 migration A, dry-run and apply the backfill only with zero collisions, then deploy
 migrations B and C together. This verification does not claim that a separate rollout
 was performed during this run.
+
+
+## 161c: Deadlines and encryption key versions (26 September 2026)
+
+Implementation worktree: `/tmp/tc-161c`, branch `codex/xero-deadlines-key-versioning`, baseline `11ce7e7`.
+
+- Redis timeout remains active through body consumption, cancellation is distinct from timeout, caller listeners are removed. Reader cancellation replaces the proposed text race so the actual locked body stream can be cancelled.
+- Xero calls share an absolute deadline across admission, headers, body and retries; concurrency stays held until the body is buffered. Foreign origins and redirects are rejected, responses have a five MiB application cap, token operations use ten seconds, background admission keeps 65 seconds.
+- Version-one compatibility is preserved; optional active-version/keyring configuration is validated, all decrypt calls use stored versions, and unknown version/authentication failures remain distinct and safe.
+- Maintenance re-encryption preflights versions, pages both ciphertext tables and uses version-plus-ciphertext compare-and-set updates. Four integration cases cover both tables, idempotency, conflicts, corrupt ciphertext and unknown versions. No real key rotation or schema change.
+
+### Regression evidence before implementation
+
+`bun run --cwd packages/core test` exited 1 before the fix. Exactly the new stalled-body case failed:
+
+```text
+FAIL src/redis-rest-transport.test.ts > executeRedisRestCommand > bounds a stalled body after headers
+AssertionError: expected 'unsettled' to match object { ok: false, error: { code: "timeout" } }
+Test Files 1 failed | 5 passed (6)
+Tests 1 failed | 80 passed (81)
+```
+
+### Reconciliation and scope
+
+The plan omitted the required version field from `XeroTenantForWrite` and row selects that construct it. Reviewer approved mechanical additions in `packages/xero/src/write/types.ts`, `packages/xero/src/adapter/{auth-recovery,xero-write-adapter}.ts`, the four Xero jobs handlers and typed fixtures. OAuth unit mocks now use real Responses because buffered-body consumption requires an actual body. No adapter classification, lock/persistence, limiter storage or schema logic changed. Prisma generated-file formatting noise is restored before commit.
+
+The initial Xero run occurred during incomplete mechanical crypto updates and failed due to missing fixture versions and Response-shaped test doubles. These were reconciled, not treated as product transport failures.
+
+User confirmed online Neon verification only. A disposable local migration had started before that correction, but no local integration tests ran. The disposable instance was stopped by the reviewer. All subsequent database verification must use the existing protected live runner, with fresh manifest, ownership, consumer isolation and restoration evidence; no remote migrations are needed.
+
+### Verification evidence
+
+- Core units: 6 files, 84 tests passed, including the failing regression and cancellation/listener cleanup cases.
+- Xero crypto/config units: 39 tests passed; OAuth service units: 74 tests passed.
+- `bun run check`: exit 0 (1047 files).
+- `bun run typecheck`: exit 0 (19 tasks).
+- `bun run boundaries`: exit 0, 1001 files in 21 packages.
+- `bun run test`: exit 0, 18 tasks passed.
+- Final Xero units: 23 files, 364 tests passed, including expired budgets, stalled headers and caller cancellation.
+- Build and protected live integration: final evidence appended after completion.
+
+
+### First guarded online integration run and reconciliation
+
+The protected online runner against source candidate `70faf06` collected all new Xero cases: Xero 2 files and 18 tests passed, database 41, app 2, feeds 15 and availability 21 passed. The full command exited 1 due to two existing jobs-suite prerequisites, not a Xero deadline or keyring failure. The people suite failed collection because the runner supplied Inngest signing configuration without its paired event key. The reviewer will supply the existing paired provider configuration, keeping all actual sends mocked in integration tests.
+
+The leave-records CAS test assumed its dynamically allocated person UUID sorted after a hardcoded cursor, so the mocked concurrent update never ran and the result was `succeeded` instead of `cancelled`. With reviewer approval, its initial cursor is now null (first page) and the test explicitly asserts one fetch, ensuring the database race is exercised for every allocated ID. This is a necessary test-only scope reconciliation in `packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts`.
+
+A comments-only env example amendment created `5b761dd` while the first runner was already executing `70faf06`; executed source and tests were identical. Subsequent candidates are frozen before manifest preparation. The first run's internal cleanup completed and released its fixture fence before any further source edits.
+
+Production build passed: `bun run build` with command-only synthetic validation configuration, 4 tasks successful (database, API, app, web), 40.223 seconds. No secrets or env files were committed. Full unit suite was repeated after all tests: 18 tasks passed. Final lint passed 1047 files. Generated Prisma formatting noise is restored after commands that regenerate it.
+
+
+Reviewer also approved a deterministic `../client` mock in the people integration suite, following the existing leave-records suite, to isolate outbound Inngest sends and avoid paired deployed-client initialisation when provider keys are supplied to the protected runner. The real database fixture operations and Xero employee mock coverage remain intact. The source candidate is frozen after this test-only reconciliation before the next protected run.
+
+
+### Final verification on the frozen source candidate
+
+Protected online Neon verification passed on source candidate `caa98406b635bb0f5930c22c7ca8285be7d75e1f`, run `75e1b64e-6147-4b9e-aa9b-8c93249166fc`. The runner exited 0: 6 integration tasks, 22 files and 162 tests passed (app 2, availability 21, database 41, feeds 15, jobs 65, Xero 18). The Xero service integration file was collected and all four new re-encryption cases passed. The jobs CAS test now proves the fetch and concurrent cursor update executed, and the people suite collects with isolated event transport.
+
+The reviewer refreshed the protected manifest using timeline `73cb5a3404beeb6412275bed23ffa160`, restore LSN `0/4863BDA8`, all 18 applied migration checksums, 53 owned tenants and 41 global keys. Consumer isolation and durable-fixture checks were refreshed before execution. The run's guarded cleanup completed; independent final cleanup and KV-fence readback evidence is retained by the reviewer and recorded below after confirmation.
+
+Final candidate gates passed: lint 1047 files, typecheck 19 tasks, full unit 18 tasks, core 84 tests, Xero 364 tests and package boundaries. The reviewer also passed release-tool units (13 files, 65 tests). Production build passed with synthetic command-only format validation values as recorded above. Whitespace and commented-env-addition criteria passed; the stale `customFetch` through `response.json` text probe was reconciled to the equivalent fetch-to-body span because JSON is now parsed from a bounded reader, whose pre-body cleanup count is zero.
+
+The committed changes implement the capability and verify guarded online database behaviour using owned synthetic token rows. Live Xero provider operations, actual production token/key rotation, release preflight and browser rollout were not performed or claimed by this plan.
+
+
+Independent reviewer cleanup readback passed: all 32 fixture selectors returned zero owned rows; the outside fixture catalogue remained unchanged (`41e95ac` prefix); the protected active-run fence was released (`ACTIVE_RUN_RELEASED`). Final worktree contains no generated-file diff or temporary helper files. Plan 161c implementation and its reconciled verification criteria are complete; the reviewer maintains the plan index.

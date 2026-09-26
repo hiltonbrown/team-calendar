@@ -180,25 +180,27 @@ additionally needs `DATABASE_URL` (any syntactically valid Postgres URL) and
 `XERO_TOKEN_ENCRYPTION_KEY` (any 32-byte base64 value, e.g. `openssl rand -base64 32`) for that
 command only. Never commit an env file, never copy real values.
 
-**Local integration database (Step 5 only).** The guard in
-`packages/database/src/live-test-guard.ts:69-79` accepts only a localhost `DATABASE_URL`. Use the
-same throwaway setup as CI (`.github/workflows/ci.yml:17-33`):
+**Authorised online integration database.** The existing online Neon authorisation
+persists for this execution. Use `tooling/release/run-live-integration.ts` with a
+fresh candidate-bound protected manifest, SQL target and restore read-back,
+verified Inngest consumer isolation, durable KV ownership and fixture cleanup.
+Obtain existing provider configuration without printing credentials. Do not
+provision localhost or Docker. Do not run migrations for this schema-free slice.
+Never use a local database flag to bypass the remote guard. The protected runner
+invokes the complete integration inventory, including the Xero service suite;
+zero collected service tests is a failure.
 
 ```bash
-docker run -d --name tc-161-pg -p 5432:5432 \
-  -e POSTGRES_USER=team-calendar -e POSTGRES_PASSWORD=team-calendar \
-  -e POSTGRES_DB=team-calendar_test postgres:16
-export DATABASE_URL=postgresql://team-calendar:team-calendar@localhost:5432/team-calendar_test
-echo "$DATABASE_URL" | grep -q '@localhost:5432/' && echo LOCAL_OK   # must print LOCAL_OK
-bun run migrate:deploy
+bun tooling/release/run-live-integration.ts --manifest <private-manifest-path>
 ```
 
-Never run `migrate:deploy` against a non-localhost database. If no local database is available,
-record the integration gate `NOT_VERIFIED: no local database` in the execution report and set the
-README status `BLOCKED (integration gate not run)`, never `DONE`. A run that collects zero tests
-from `service.integration.test.ts` is a failure.
+Supply the runner's acknowledged live authority, expected run ID, database and
+KV configuration and paired Inngest configuration through a private command
+environment. Never commit that environment or fabricate manifest facts. If
+provider/tooling prerequisites drift, reconcile them and continue independent
+work while retaining truthful verification status.
 
-**Not local gates:** `bun run preflight <app|api|web>` and `bun run test:release` (Plan 161h
+**Separate rollout gates:** `bun run preflight <app|api|web>` and `bun run test:release` (Plan 161h
 rollout and Plan 160 campaign). Never stub either.
 
 | Purpose | Command | Expected on success |
@@ -207,7 +209,7 @@ rollout and Plan 160 campaign). Never stub either.
 | Types | `bun run typecheck` | exit 0 |
 | Core units | `bun run --cwd packages/core test` | exit 0 |
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
-| Xero integration (local DB) | `bun run --cwd packages/xero test:integration` | exit 0, `service.integration.test.ts` collected |
+| Guarded online integration | `bun tooling/release/run-live-integration.ts --manifest <private-manifest-path>` | exit 0, `service.integration.test.ts` collected; owned fixtures cleaned |
 | Whitespace | `git diff --check` | exit 0 |
 
 ## Scope
@@ -462,7 +464,7 @@ It covers the two tables that hold ciphertext today, `xero_connections` and `xer
 This is a system maintenance operation over all rows, so it does not filter by `clerk_org_id`.
 Say so in a comment. It is not exported to `apps/`.
 
-**Verify**: `bun run --cwd packages/xero test:integration` → exit 0 with the two re-encryption
+**Verify**: the protected online runner above → exit 0 with the re-encryption
 tests (Test plan 17, 18) in `service.integration.test.ts`.
 
 ## Test plan
@@ -496,7 +498,7 @@ tests (Test plan 17, 18) in `service.integration.test.ts`.
 16. Unknown version and corrupted auth tag return two different safe errors; no plaintext.
 16a. `keys.test.ts`: conflicting version-1 definitions are rejected; errors contain no key value.
 
-`packages/xero/src/oauth/service.integration.test.ts` (local database):
+`packages/xero/src/oauth/service.integration.test.ts` (guarded online database):
 17. Re-encryption rewrites a version-1 connection row to version 2 and a second run rewrites
     nothing.
 18. Compare-and-set: pass `deps.beforeWrite` that rewrites the row's ciphertext, and assert the
@@ -507,19 +509,19 @@ Both tests pass `only: { connectionIds: [<the suite's own connection>] }`.
 
 All must hold:
 
-- [ ] `bun run check` exits 0
-- [ ] `bun run typecheck` exits 0
-- [ ] `bun run --cwd packages/core test` exits 0, including the four new transport tests
-- [ ] `bun run --cwd packages/xero test` exits 0, including tests 5-16a and 13a and 13a
-- [ ] `bun run --cwd packages/xero test:integration` exits 0 against the local database, including tests 17-18
-- [ ] `git diff --check` exits 0
-- [ ] `sed -n '/customFetch(url/,/response.json()/p' packages/core/src/redis-rest-transport.ts | grep -c "cleanup()"` prints `0`
-- [ ] `grep -n "XERO_TOKEN_OPERATION_BUDGET_MS" packages/xero/src/oauth/service.ts` returns at least one match
-- [ ] `grep -n "keyVersion: 1," packages/xero/src/crypto/tokens.ts` returns no matches
-- [ ] `git diff 6b934be -- apps/api/.env.example apps/app/.env.example | grep '^+' | grep -v '^+++' | grep -v '^+#'` prints nothing (only commented lines were added)
-- [ ] `git status --short -- . ':!plans'` shows no modified file outside the In scope list
-- [ ] `plans/161-xero-execution-report.md` has a 161c section with the Step 1 failure output
-- [ ] `plans/README.md` status row for 161c updated
+- [x] `bun run check` exits 0
+- [x] `bun run typecheck` exits 0
+- [x] `bun run --cwd packages/core test` exits 0, including the four new transport tests
+- [x] `bun run --cwd packages/xero test` exits 0, including tests 5-16a and 13a and 13a
+- [x] The protected online runner exits 0 against the authorised Neon target, including tests 17-18 and cleanup read-back
+- [x] `git diff --check` exits 0
+- [x] `sed -n '/customFetch(url/,/let payload/p' packages/core/src/redis-rest-transport.ts | grep -c "cleanup()"` prints `0`
+- [x] `grep -n "XERO_TOKEN_OPERATION_BUDGET_MS" packages/xero/src/oauth/service.ts` returns at least one match
+- [x] `grep -n "keyVersion: 1," packages/xero/src/crypto/tokens.ts` returns no matches
+- [x] `git diff 6b934be -- apps/api/.env.example apps/app/.env.example | grep '^+' | grep -v '^+++' | grep -v '^+#'` prints nothing (only commented lines were added)
+- [x] `git status --short -- . ':!plans'` shows no modified file outside the In scope list
+- [x] `plans/161-xero-execution-report.md` has a 161c section with the Step 1 failure output
+- [x] `plans/README.md` status row for 161c updated
 
 ## STOP conditions
 
@@ -556,3 +558,49 @@ Stop and report; do not improvise:
   extend `reencryptXeroTokens` to cover them before any key rotation is attempted.
 - In review, scrutinise: every exit path in both transports (timer, listener, permit), and every
   decrypt branch (can any return plaintext or try a second key?).
+
+## Execution reconciliation, 26 September 2026
+
+Execution starts from `11ce7e7`. Dependencies 161a and 161b are DONE. The stated
+transport, crypto, limiter and regional drift check is empty. Changes to
+`completeXeroTenantSelection` and `loadPendingSession` are the expected 161b
+immutable-binding implementation; preserve them and apply only the mechanical
+161c arguments and selections. These expected changes do not stop execution.
+
+The user reaffirmed the existing online database authorisation and instructed
+the executor to refer to lessons. The plan's localhost and Docker instructions
+are superseded for this execution: use only the configured online Neon target
+through `tooling/release/run-live-integration.ts`, with fresh provider identity,
+restore, consumer isolation, durable manifest ownership and cleanup evidence.
+Never apply `ALLOW_LOCAL_DATABASE_TESTS` to the remote target. The mistakenly
+provisioned disposable local database was stopped before verification and is
+not execution evidence. No remote migration or actual key rotation is required.
+
+Scope is additionally reconciled to allow strictly mechanical `token_key_version`
+fields, database selections and typed fixtures required by the mandatory decrypt
+argument, including `packages/xero/src/write/types.ts`. No default-version
+fallback may replace the stored row version.
+
+The executor reads the complete committed plan from the current checkout; its
+content is identical to the reviewed plan. Implementation and commits remain
+in `/tmp/tc-161c` on `codex/xero-deadlines-key-versioning` for review.
+
+Full live-inventory verification also exposed a pre-existing cursor-test
+ordering assumption and an unmocked Inngest client in the people integration
+suite. Scope includes the minimal fixes in
+`packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts`
+(first-page null cursor and proof that the race callback executed) and
+`packages/jobs/src/handlers/sync-xero-people.integration.test.ts`
+(mock the queue client, preserving real database coverage). The private
+runner environment supplies the paired existing Inngest credentials for
+configuration validation; integration tests must not send production events.
+
+## Review verdict, 26 September 2026
+
+APPROVE. Source candidate `caa98406b635bb0f5930c22c7ca8285be7d75e1f` passed
+the complete guarded live Neon inventory: 22 files, 162 tests, six tasks.
+Independent read-back confirmed zero rows for all 32 owned fixture selectors,
+an unchanged outside-owned catalogue and the released active-run fence.
+Lint, types, units, boundaries, production build and release guard units passed.
+Implementation was reviewed on `codex/xero-deadlines-key-versioning` in
+`/tmp/tc-161c`. The user authorised committing the records and merging into `main`.

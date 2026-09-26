@@ -207,3 +207,9 @@ actionable; keep one-off task evidence in the review for that task.
 - When the user explicitly rules out a local database, do not offer localhost,
   Docker or a local fallback again. Use only the authorised online database
   through the protected live runner, and keep blocked live gates explicit.
+
+- For Plan 161 execution, use the already authorised online Neon database through
+  the protected live runner. This session-wide decision overrides later plans
+  that still prescribe localhost or Docker. Read this rule before provisioning
+  any database; reconcile stale plan database instructions and refresh live
+  ownership, restore, consumer-isolation and cleanup evidence instead.
