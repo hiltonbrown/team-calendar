@@ -3,6 +3,8 @@ import type { Result } from "../../index";
 export interface ProviderResolutionError {
   code: "missing_mapping" | "person_not_in_tenant" | "unknown_error";
   message: string;
+  recoveryReason?: ProviderWriteError["recoveryReason"];
+  retryAfterMs?: number;
 }
 
 export interface ProviderWriteError {
@@ -16,6 +18,15 @@ export interface ProviderWriteError {
   httpStatus?: number | null;
   message: string;
   rawPayload?: unknown;
+  recoveryReason?:
+    | "update_permissions"
+    | "reauthorise"
+    | "access_denied"
+    | "operational_incident"
+    | "retry_later"
+    | "outcome_unknown"
+    | "not_connected";
+  retryAfterMs?: number;
   userMessage: string;
 }
 

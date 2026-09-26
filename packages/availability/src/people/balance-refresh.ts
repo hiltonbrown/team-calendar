@@ -2,10 +2,11 @@ import { log } from "@repo/observability/log";
 import "server-only";
 
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import { xeroRecoveryMessage } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { z } from "zod";
 import { dispatchSyncEvent } from "../sync/sync-events";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import type { PeopleRole } from "./people-service";
 
 export type BalanceRefreshError =
@@ -21,6 +22,7 @@ export type BalanceRefreshReason =
   | "xero_not_connected";
 
 export type BalanceRefreshDispatcher = (payload: {
+  bindingGeneration: number;
   clerkOrgId: string;
   dispatchedBy: string;
   organisationId: string;
@@ -91,11 +93,35 @@ export async function dispatchBalanceRefresh(input: {
       return { ok: true, value };
     }
 
-    const hasXero = await hasActiveXeroConnection({
+    const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
-    if (!hasXero) {
+    if (!xeroStateResult.ok) {
+      return {
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+        },
+        ok: false,
+      };
+    }
+    const xeroConnectionState = xeroStateResult.value.state;
+    if (
+      xeroConnectionState !== "connected" &&
+      xeroConnectionState !== "not_connected"
+    ) {
+      return {
+        error: {
+          code: "unknown_error",
+          message: xeroRecoveryMessage(xeroConnectionState),
+        },
+        ok: false,
+      };
+    }
+    const hasXero = xeroConnectionState === "connected";
+    if (!hasXero || xeroStateResult.value.bindingGeneration === null) {
       const value = { queued: false, reason: "xero_not_connected" as const };
       await auditDispatch(parsed.data, value);
       return { ok: true, value };
@@ -105,13 +131,10 @@ export async function dispatchBalanceRefresh(input: {
       select: { id: true },
       where: {
         ...scoped,
+        active_slot: 1,
+        binding_generation: xeroStateResult.value.bindingGeneration,
         organisation_id: parsed.data.organisationId,
-        xero_connection: {
-          disconnected_at: null,
-          refresh_token_encrypted: { not: "" },
-          revoked_at: null,
-          status: "active",
-        },
+        retired_at: null,
       },
     });
     if (!xeroTenant) {
@@ -127,6 +150,7 @@ export async function dispatchBalanceRefresh(input: {
     }
 
     const dispatched = await balanceRefreshDispatcher({
+      bindingGeneration: xeroStateResult.value.bindingGeneration,
       clerkOrgId: parsed.data.clerkOrgId,
       dispatchedBy: parsed.data.actingUserId,
       organisationId: parsed.data.organisationId,
@@ -226,6 +250,7 @@ function notAuthorised(): Result<never, BalanceRefreshError> {
 
 setBalanceRefreshDispatcher(async (payload) => {
   const result = await dispatchSyncEvent({
+    bindingGeneration: payload.bindingGeneration,
     clerkOrgId: payload.clerkOrgId,
     organisationId: payload.organisationId,
     personId: payload.personId,

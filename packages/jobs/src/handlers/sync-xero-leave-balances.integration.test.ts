@@ -1,4 +1,5 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -422,10 +423,25 @@ describe("sync-xero-leave-balances database flow", () => {
       ...syncInput(tenantA),
       triggerType: "scheduled",
     });
-    expect(failedRun.ok).toBe(true);
-    if (failedRun.ok) {
-      expect(failedRun.value.status).toBe("failed");
-    }
+    expect(failedRun).toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    const { rejectRetryableSyncResult } = await import("./xero-sync-access");
+    await expect(
+      rejectRetryableSyncResult(Promise.resolve(failedRun))
+    ).rejects.toThrow("retry_later");
+    expect(
+      await database.syncRun.findFirst({
+        orderBy: { created_at: "desc" },
+        select: { error_summary: true, status: true },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+          run_type: "leave_balances",
+        },
+      })
+    ).toEqual({ error_summary: "retry_later", status: "failed" });
 
     const cursorAfterFailure = await database.xeroSyncCursor.findFirst({
       where: {
@@ -746,20 +762,26 @@ async function setupTenant(
     },
   });
 
+  const access = encryptXeroToken("synthetic-access");
   await database.xeroConnection.create({
     data: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000),
       id: tenant.xeroConnectionId,
       organisation_id: tenant.organisationId,
       refresh_token_encrypted: "refresh-token",
       status: "active",
+      token_key_version: access.keyVersion,
     },
   });
 
   await database.xeroTenant.create({
     data: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
@@ -807,6 +829,7 @@ function syncInput(
   tenant: typeof tenantA | typeof tenantB | typeof tenantNz | typeof tenantUk
 ) {
   return {
+    bindingGeneration: 1,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
     triggerType: "manual" as const,

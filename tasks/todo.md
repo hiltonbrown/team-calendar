@@ -1501,3 +1501,46 @@ Review: independent full lint, types (19 tasks), units (18 tasks), boundaries, r
 - [x] Verify ancestry, exact tested tree equality, whitespace and post-merge checks.
 
 Review: pending plan records committed at a131ec6; conflict-free merge bebd7e6 contains both completed branches. Merged tree exactly matched approved feature tip 0617120 before these documentation updates. Main lint, boundaries and 104 release-tool tests pass. Full source and protected live 26-suite/207-test verification remains valid for the identical runtime. No push or deployment; cleanup stays report-only.
+
+
+## Plan 161g execution
+
+- [x] Read full reconciled plan from verified shared absolute path before implementation; create isolated branch from dd458615.
+- [x] Read repository guidance and complete closing-the-loop reference; install locked dependencies.
+- [x] Prove failure collapse and generation regressions.
+- [x] Carry recovery reasons, strict challenge parsing, bounded scoped access and capabilities.
+- [x] Migrate state query, availability gates and all rendering callers.
+- [x] Migrate jobs to required event generations, scoped resolver, transactional persistence fences and Inngest rejection.
+- [x] Update fake fixtures and protected inventory only where necessary.
+- [x] Run lint, forced types, complete units concurrency two, boundaries, release tools and synthetic four-app build.
+- [x] Audit source-wide credentials/state/generation callers; commit clean candidate and freeze for reviewer online campaign.
+- [x] Complete independent reviewer gates and protected online campaign; verify ownership, restore evidence, cleanup and unchanged runtime.
+
+### Review
+
+Independent APPROVE on runtime `68a2aaa00a36cfcad00daa212dabb1c6fc0261b1`. PASS: lint (1098 files), forced types (19 tasks), full units (18 tasks, 2655 tests), boundaries (1054 files, 21 packages), release tools (104 tests and types), eight integration fixture static types and four synthetic app builds. Protected online Neon campaign `2262abb9-6b8c-4eda-83e7-176a4d437350` passed all 26 files and 224 tests. All 38 cleanup selectors are empty, catalogue unchanged, fence released, durable ownership and strict consumers verified, all 20 applied migration checksums match and read-only schema comparison reports no difference. Earlier failed campaigns and guarded recovery remain in the execution report. Documentation closure preserves the verified runtime exactly. Actual provider and browser execution remain NOT VERIFIED; cleanup stays report_only. Full plan delivered through a verified shared absolute path, read before implementation and copied with all reviewer reconciliation. No merge, push or deployment.
+
+
+## Plan 161h execution, 26 September 2026
+
+- Handoff: read the complete reconciled plan at `/home/hilton/Documents/teamcalendar/plans/161h-xero-rollout-and-inactivity.md` and copy it exactly into this isolated worktree. This shared readable path replaces inline handoff packaging. Base: `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`; branch: `codex/xero-rollout-inactivity`. Reviewer owns the status index and live gates.
+- [x] 1. Implement pure conservative inactivity evaluator and tests.
+- [x] 2. Implement scoped signals, report, owned integration fixture and additive migration.
+- [x] 3. Add safe lifecycle metrics and callsite tests.
+- [x] 4. Add credential-domain checks, preflight and immutable namespace verification.
+- [x] 5. Document existing enablement controls.
+- [x] 6. Implement strict forty-case evidence and runner output on all outcomes.
+- [x] 7. Document unexecuted rollout and rollback.
+- [x] 8. Reconcile lifecycle/environment docs and execute source verification.
+
+- [x] Independent source review and protected live inventory, migration, owned Redis and cleanup read-back (reviewer-owned).
+
+### Plan 161h final verification review
+
+Independent APPROVE on runtime `8325a35b328b4786181c421ce8a89e946f119a84`. PASS: lint (1114 files), forced types (19 uncached tasks), full units (2723 tests, 18 uncached tasks), boundaries (1068 files, 21 packages), release tooling (175 tests and types), strict metric and both changed integration-fixture types, next-config (47 tests), four uncached synthetic builds, scope, documentation and base-to-candidate whitespace checks. The two inherited deadline scenarios use controlled clocks with every original assertion retained. Regenerated whitespace was restored exactly to the verified runtime.
+
+Protected online Neon campaign `f7578441-2838-4361-9ced-0f59a19d73c3` passed all 27 files, 233 tests and six uncached tasks. Owned Redis domain immutability, idempotence, legacy/malformed/foreign denial and unchanged allowance assertions passed. Fresh target identity, restore evidence, durable ownership and strict consumer isolation were verified. Reviewed additive migration `20260926130000_add_xero_inactivity_classifications`, SQL SHA-256 `0606302b88c98b28aadc4dd42ab4c1ce674e3f08a6d0b577f169559d062b2d93`, was applied under the protected fence. All 21 migration checksums match, zero migrations are pending and schema comparison reports no difference.
+
+Post-run cleanup PASS: all 39 owned selectors are empty, active fence released and outside-owned catalogue unchanged. All 204 pre-existing rows across 37 tables retain their exact per-table counts; the new classification table has zero rows. Restricted JSON/Markdown artefacts have mode 0600 and record inventory PASS, cleanup PASS, exit zero and released fence. Temporary private verification credentials were removed. All 40 charter cases remain NOT_VERIFIED without separate assertion provenance; deployed SHA remains null. Provider/browser behaviour and production rollout remain NOT VERIFIED or unexecuted; cleanup stays `report_only`.
+
+Documentation closure copies the reviewer plan, DONE index and execution report exactly, preserves all prior task history and keeps runtime/schema/generated files byte-identical to the approved candidate. Shared absolute-path handoff replaced inline dispatch packaging. No merge, push or deployment.

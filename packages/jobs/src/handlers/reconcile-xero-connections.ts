@@ -1,7 +1,10 @@
 import "server-only";
-import { listDueXeroCleanupAttempts } from "@repo/database/queries/xero-cleanup";
+import {
+  getOldestUnknownXeroCleanupUpdatedAt,
+  listDueXeroCleanupAttempts,
+} from "@repo/database/queries/xero-cleanup";
 import { log } from "@repo/observability/log";
-import { processXeroCleanupAttempt } from "@repo/xero";
+import { emitXeroMetric, processXeroCleanupAttempt } from "@repo/xero";
 import { inngest } from "../client";
 
 export async function reconcileXeroConnections(): Promise<{
@@ -27,6 +30,7 @@ export async function reconcileXeroConnections(): Promise<{
       });
     }
   }
+  await recordUnknownCleanupAge();
   return { failed, processed };
 }
 export const reconcileXeroConnectionsFunction = inngest.createFunction(
@@ -56,6 +60,19 @@ export const reconcileXeroConnectionsFunction = inngest.createFunction(
         });
       }
     }
+    await step.run("record-unknown-cleanup-age", recordUnknownCleanupAge);
     return { failed, processed };
   }
 );
+
+async function recordUnknownCleanupAge(): Promise<void> {
+  try {
+    const oldest = await getOldestUnknownXeroCleanupUpdatedAt();
+    emitXeroMetric(
+      "xero.cleanup.unknown_oldest_age_hours",
+      oldest ? Math.max(0, (Date.now() - oldest.getTime()) / 3_600_000) : 0
+    );
+  } catch {
+    /* Health instrumentation must not alter cleanup processing. */
+  }
+}

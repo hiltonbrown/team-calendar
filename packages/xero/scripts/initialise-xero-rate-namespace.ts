@@ -7,15 +7,22 @@ async function main(): Promise<void> {
     args: process.argv.slice(2),
     options: {
       "assume-spent-daily": { type: "boolean" },
+      "credential-domain-id": { type: "string" },
       epoch: { type: "string" },
     },
     strict: true,
   });
-  if (!values.epoch || values["assume-spent-daily"] !== true) {
-    throw new Error("Explicit --epoch and --assume-spent-daily are required");
+  if (
+    !(values.epoch && values["credential-domain-id"]) ||
+    values["assume-spent-daily"] !== true
+  ) {
+    throw new Error(
+      "Explicit --epoch, --credential-domain-id and --assume-spent-daily are required"
+    );
   }
   const counts = await initialiseXeroRateNamespace({
     assumeSpentDaily: true,
+    credentialDomainId: values["credential-domain-id"],
     epoch: values.epoch,
   });
   log.info("Xero rate namespace initialisation", counts);

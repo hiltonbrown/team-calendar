@@ -33,6 +33,11 @@ describe("findConnectionsNeedingTokenRotation", () => {
         id: "connection-uuid-1",
         last_refreshed_at: lastRefreshedAt,
         organisation_id: "organisation-uuid-1",
+        xero_tenant: {
+          binding_generation: 3,
+          id: "tenant-uuid-1",
+          xero_credential_owner_id: "owner-uuid-1",
+        },
       },
     ]);
 
@@ -42,10 +47,13 @@ describe("findConnectionsNeedingTokenRotation", () => {
       ok: true,
       value: [
         {
+          bindingGeneration: 3,
           clerkOrgId: "org_clerk_1",
           connectionId: "connection-uuid-1",
+          databaseTenantId: "tenant-uuid-1",
           lastRefreshedAt,
           organisationId: "organisation-uuid-1",
+          ownerId: "owner-uuid-1",
         },
       ],
     });
@@ -56,6 +64,14 @@ describe("findConnectionsNeedingTokenRotation", () => {
         id: true,
         last_refreshed_at: true,
         organisation_id: true,
+        xero_tenant: {
+          select: {
+            binding_generation: true,
+            id: true,
+            xero_credential_owner_id: true,
+          },
+          where: { active_slot: 1 },
+        },
       },
       where: {
         disconnected_at: null,
@@ -69,6 +85,7 @@ describe("findConnectionsNeedingTokenRotation", () => {
         },
         revoked_at: null,
         status: "active",
+        xero_tenant: { active_slot: 1 },
       },
     });
   });
@@ -99,6 +116,7 @@ describe("listSchedulableXeroTenants", () => {
 
     mocks.tenantFindMany.mockResolvedValue([
       {
+        binding_generation: 3,
         clerk_org_id: "org_clerk_1",
         id: databaseTenantIdA,
         last_approval_state_reconciled_at: fixtureDate,
@@ -119,6 +137,7 @@ describe("listSchedulableXeroTenants", () => {
         xero_tenant_id: providerTenantIdA,
       },
       {
+        binding_generation: 4,
         clerk_org_id: "org_clerk_2",
         id: databaseTenantIdB,
         last_approval_state_reconciled_at: null,
@@ -158,6 +177,7 @@ describe("listSchedulableXeroTenants", () => {
 
     // Verify filter boundaries
     expect(callArgs.where).toEqual({
+      active_slot: 1,
       organisation: {
         archived_at: null,
         is_active: true,
@@ -191,6 +211,7 @@ describe("listSchedulableXeroTenants", () => {
 
     mocks.tenantFindMany.mockResolvedValue([
       {
+        binding_generation: 3,
         clerk_org_id: "org_clerk_1",
         id: databaseTenantIdA,
         last_approval_state_reconciled_at: null,

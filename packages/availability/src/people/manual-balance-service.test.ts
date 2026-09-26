@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auditCreate: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   leaveBalanceCreate: vi.fn(),
   leaveBalanceFindFirst: vi.fn(),
   leaveBalanceUpdateMany: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock("@repo/database", () => ({
   scopedQuery: mocks.scopedQuery,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 
 const { setManualLeaveBalance } = await import("./manual-balance-service");
@@ -53,15 +53,38 @@ describe("manual balance service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auditCreate.mockResolvedValue({});
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
     mocks.leaveBalanceCreate.mockResolvedValue({ id: "balance_1" });
     mocks.leaveBalanceFindFirst.mockResolvedValue(null);
     mocks.leaveBalanceUpdateMany.mockResolvedValue({ count: 1 });
     mocks.personFindFirst.mockResolvedValue({ id: input.personId });
   });
 
+  it("cannot fall back to manual balances when the state lookup is unavailable", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    const result = await setManualLeaveBalance(input);
+    expect(result).toMatchObject({
+      error: {
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
+      ok: false,
+    });
+    expect(mocks.leaveBalanceCreate).not.toHaveBeenCalled();
+    expect(mocks.leaveBalanceUpdateMany).not.toHaveBeenCalled();
+  });
+
   it("blocks manual edits while Xero is connected", async () => {
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
 
     const result = await setManualLeaveBalance(input);
 

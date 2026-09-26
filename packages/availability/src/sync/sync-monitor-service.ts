@@ -3,9 +3,11 @@ import { sanitizeObject } from "@repo/observability/scrubber";
 import "server-only";
 
 import type { Result } from "@repo/core";
+import { xeroRecoveryMessage, xeroRecoveryMessageFromCode } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { z } from "zod";
 import { scrubXeroWriteErrorRaw } from "../settings/shared";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import {
   dispatchCancelSyncRun,
   dispatchSyncEvent,
@@ -44,7 +46,13 @@ export type SyncMonitorRole =
   | "viewer";
 
 export interface TenantSummary {
-  connectionStatus: "active" | "expired" | "not_configured" | "revoked";
+  connectionStatus:
+    | "active"
+    | "expired"
+    | "not_configured"
+    | "revoked"
+    | "disconnect_pending"
+    | "unavailable";
   currentFailedRuns: number;
   currentPartialSuccessRuns: number;
   currentRun: {
@@ -241,10 +249,23 @@ export async function listTenantSummaries(
 
   try {
     const tenants = await database.xeroTenant.findMany({
-      include: { xero_connection: true },
+      include: {
+        xero_connection: {
+          select: {
+            disconnected_at: true,
+            last_refreshed_at: true,
+            revoked_at: true,
+            status: true,
+          },
+        },
+      },
       orderBy: { tenant_name: "asc" },
       where: scoped(parsed.data),
     });
+    const stateResult = await getXeroConnectionStateForScope(parsed.data);
+    const displayState = stateResult.ok
+      ? stateResult.value.state
+      : "unavailable";
     const tenantIds = tenants.map((tenant) => tenant.id);
     if (tenantIds.length === 0) {
       return { ok: true, value: [] };
@@ -371,7 +392,10 @@ export async function listTenantSummaries(
           .reduce((total, entry) => total + entry.count, 0);
 
         return {
-          connectionStatus: connectionStatus(tenant.xero_connection),
+          connectionStatus: connectionStatus(
+            tenant.xero_connection,
+            displayState
+          ),
           currentFailedRuns: completedRuns.filter(
             (run) => run.status === "failed"
           ).length,
@@ -542,7 +566,7 @@ export async function getRunDetail(
         failedRecords: failurePage.map((record) => ({
           createdAt: record.created_at,
           errorCode: record.error_code,
-          errorMessage: record.error_message,
+          errorMessage: xeroRecoveryMessageFromCode(record.error_message),
           id: record.id,
           recordType: record.record_type,
           sourceRemoteId: record.source_remote_id,
@@ -609,7 +633,7 @@ export async function listRunFailedRecords(
         records: rows.slice(0, parsed.data.pageSize).map((row) => ({
           createdAt: row.created_at,
           errorCode: row.error_code,
-          errorMessage: row.error_message,
+          errorMessage: xeroRecoveryMessageFromCode(row.error_message),
           id: row.id,
           recordType: row.record_type,
           sourceRemoteId: row.source_remote_id,
@@ -739,7 +763,16 @@ export async function dispatchManualSync(
 
   try {
     const tenant = await database.xeroTenant.findFirst({
-      include: { xero_connection: true },
+      include: {
+        xero_connection: {
+          select: {
+            disconnected_at: true,
+            last_refreshed_at: true,
+            revoked_at: true,
+            status: true,
+          },
+        },
+      },
       where: {
         ...scoped(parsed.data),
         id: parsed.data.xeroTenantId,
@@ -771,7 +804,33 @@ export async function dispatchManualSync(
       };
     }
 
-    if (connectionStatus(tenant.xero_connection) !== "active") {
+    const stateResult = await getXeroConnectionStateForScope(parsed.data);
+    if (!stateResult.ok) {
+      return {
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+        },
+        ok: false,
+      };
+    }
+    if (
+      stateResult.value.state === "disconnect_pending" ||
+      stateResult.value.state === "reauthorisation_required"
+    ) {
+      return {
+        error: {
+          code: "connection_not_active",
+          message: xeroRecoveryMessage(stateResult.value.state),
+        },
+        ok: false,
+      };
+    }
+    if (
+      stateResult.value.state !== "connected" ||
+      stateResult.value.bindingGeneration === null
+    ) {
       return {
         ok: true,
         value: {
@@ -783,6 +842,7 @@ export async function dispatchManualSync(
     }
 
     const dispatched = await dispatchSyncEvent({
+      bindingGeneration: stateResult.value.bindingGeneration,
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
       runType: parsed.data.runType,
@@ -872,7 +932,7 @@ export async function exportFailedRecordsCsv(
         record.record_type,
         record.source_remote_id ?? "",
         record.error_code,
-        record.error_message,
+        xeroRecoveryMessageFromCode(record.error_message),
         record.created_at.toISOString(),
       ]);
     if (truncated) {
@@ -994,34 +1054,25 @@ function auditBase(input: BaseInput, actingUserId: string) {
   };
 }
 
-function connectionStatus(connection: {
-  access_token_encrypted: string;
-  disconnected_at?: Date | null;
-  expires_at: Date;
-  last_refreshed_at: Date | null;
-  status?: string;
-  refresh_token_encrypted: string;
-  revoked_at: Date | null;
-}): TenantSummary["connectionStatus"] {
-  if (connection.status === "disconnected" || connection.disconnected_at) {
-    return "not_configured";
-  }
-  if (connection.status === "stale") {
-    return "expired";
+function connectionStatus(
+  connection: {
+    disconnected_at: Date | null;
+    last_refreshed_at: Date | null;
+    status?: string;
+    revoked_at: Date | null;
+  },
+  state: import("@repo/core").XeroConnectionDisplayState
+): TenantSummary["connectionStatus"] {
+  if (state === "unavailable" || state === "disconnect_pending") {
+    return state;
   }
   if (connection.revoked_at) {
     return "revoked";
   }
-  if (
-    connection.access_token_encrypted.trim().length === 0 ||
-    connection.refresh_token_encrypted.trim().length === 0
-  ) {
-    return "not_configured";
+  if (state === "reauthorisation_required" || connection.status === "stale") {
+    return "expired";
   }
-  if (connection.status === "active") {
-    return "active";
-  }
-  return "not_configured";
+  return state === "connected" ? "active" : "not_configured";
 }
 
 function latestCompletedRunAt(
@@ -1261,7 +1312,7 @@ function toRunListItem(
           )
         )
       : null,
-    errorSummary: run.error_summary,
+    errorSummary: xeroRecoveryMessageFromCode(run.error_summary),
     hasFailedRecords: run.records_failed > 0 || run._count.failed_records > 0,
     id: run.id,
     recordsFailed: run.records_failed,

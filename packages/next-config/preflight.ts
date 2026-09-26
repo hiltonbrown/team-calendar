@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { type LaunchMode, launchModeSchema } from "./launch-mode";
 
 export type AppName = "app" | "api" | "web";
@@ -188,6 +189,18 @@ export const runProductionPreflight = (
     checkPresent("XERO_TOKEN_ENCRYPTION_KEY");
     checkPresent("XERO_CLIENT_ID");
     checkPresent("XERO_CLIENT_SECRET");
+    if (
+      checkPresent("XERO_CREDENTIAL_DOMAIN_ID") &&
+      !z.string().uuid().safeParse(envVars.XERO_CREDENTIAL_DOMAIN_ID).success
+    ) {
+      errors.push("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
+    }
+    if (
+      checkUrl("XERO_REDIRECT_URI") &&
+      !envVars.XERO_REDIRECT_URI?.trim().startsWith("https://")
+    ) {
+      errors.push("XERO_REDIRECT_URI must be a valid HTTPS URL");
+    }
     checkPresent("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
     checkPresent("CLERK_SECRET_KEY");
 

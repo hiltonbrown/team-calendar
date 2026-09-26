@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getXeroConnectionStateForScope } from "@repo/availability";
+import { toXeroConnectionDisplayState, xeroRecoveryMessage } from "@repo/core";
 import { database } from "@repo/database";
 
 export type OnboardingStepStatus = "complete" | "next" | "optional" | "pending";
@@ -17,12 +19,12 @@ export interface OnboardingState {
   activeFeedCount: number;
   completedRequiredCount: number;
   currentUserPersonLinked: boolean | null;
-  hasActiveXeroConnection: boolean;
   isComplete: boolean;
   peopleCount: number;
   publicHolidayJurisdictionCount: number;
   requiredCount: number;
   steps: OnboardingStep[];
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
 
 interface LoadOnboardingStateInput {
@@ -64,16 +66,7 @@ export async function loadOnboardingState({
         },
       },
     }),
-    database.xeroConnection.findFirst({
-      select: { id: true },
-      where: {
-        clerk_org_id: clerkOrgId,
-        disconnected_at: null,
-        organisation_id: organisationId,
-        revoked_at: null,
-        status: "active",
-      },
-    }),
+    getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
     database.person.count({
       where: {
         archived_at: null,
@@ -111,8 +104,12 @@ export async function loadOnboardingState({
   ]);
 
   const hasProfile = Boolean(organisation);
-  const hasActiveXeroConnection = Boolean(activeXeroConnection);
-  const showXeroSetupTask = clerkOrgConnectionCount === 0;
+  const xeroConnectionState =
+    toXeroConnectionDisplayState(activeXeroConnection);
+  const showXeroSetupTask =
+    clerkOrgConnectionCount === 0 ||
+    (xeroConnectionState !== "connected" &&
+      xeroConnectionState !== "not_connected");
   const hasPeople = peopleCount > 0;
   const currentUserPersonLinked = userId ? Boolean(currentUserPerson) : null;
   const hasPeopleForCurrentUser =
@@ -128,19 +125,10 @@ export async function loadOnboardingState({
       { complete: hasFeeds, id: "feed" },
     ];
   const nextRequiredId = requiredSteps.find((step) => !step.complete)?.id;
-  const xeroSetupSteps: OnboardingStep[] = showXeroSetupTask
-    ? [
-        {
-          ctaHref: "/settings/integrations/xero",
-          ctaLabel: hasActiveXeroConnection ? "Manage Xero" : "Connect Xero",
-          description:
-            "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place.",
-          id: "xero",
-          status: hasActiveXeroConnection ? "complete" : "optional",
-          title: "Connect Xero",
-        },
-      ]
-    : [];
+  const xeroSetupSteps = xeroSetupStepsForState(
+    xeroConnectionState,
+    showXeroSetupTask
+  );
 
   const steps: OnboardingStep[] = [
     {
@@ -202,12 +190,12 @@ export async function loadOnboardingState({
     activeFeedCount,
     completedRequiredCount,
     currentUserPersonLinked,
-    hasActiveXeroConnection,
     isComplete: completedRequiredCount === requiredSteps.length,
     peopleCount,
     publicHolidayJurisdictionCount,
     requiredCount: requiredSteps.length,
     steps,
+    xeroConnectionState,
   };
 }
 
@@ -220,4 +208,31 @@ function statusForRequiredStep(
     return "complete";
   }
   return id === nextRequiredId ? "next" : "pending";
+}
+
+function xeroSetupStepsForState(
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState,
+  showXeroSetupTask: boolean
+): OnboardingStep[] {
+  return showXeroSetupTask
+    ? [
+        {
+          ctaHref: "/settings/integrations/xero",
+          ctaLabel:
+            xeroConnectionState === "not_connected"
+              ? "Connect Xero"
+              : "Review Xero",
+          description:
+            xeroConnectionState === "not_connected"
+              ? "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place."
+              : xeroRecoveryMessage(xeroConnectionState),
+          id: "xero",
+          status: xeroConnectionState === "connected" ? "complete" : "optional",
+          title:
+            xeroConnectionState === "not_connected"
+              ? "Connect Xero"
+              : "Xero connection",
+        },
+      ]
+    : [];
 }

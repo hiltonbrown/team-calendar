@@ -17,13 +17,13 @@ import {
 } from "./dispatch";
 
 const baseTenant = {
+  accessToken: "access-token",
+  bindingGeneration: 1,
   clerk_org_id: "org_1",
+  deadline: { expiresAtMs: Date.now() + 120_000 },
   id: "tenant_1",
   organisation_id: "00000000-0000-4000-8000-000000000001",
-  xero_connection: {
-    access_token_encrypted: "token",
-    revoked_at: null,
-  },
+  tokenVersion: 1,
   xero_tenant_id: "xero-tenant-1",
 };
 

@@ -55,17 +55,14 @@ import {
 
 function buildTenant(region: "AU" | "NZ" | "UK") {
   return {
+    accessToken: "access-token",
+    bindingGeneration: 1,
     clerk_org_id: "org_1",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: region,
-    xero_connection: {
-      access_token_auth_tag: "tag",
-      access_token_encrypted: "encrypted",
-      access_token_iv: "iv",
-      revoked_at: null,
-      token_key_version: 1,
-    },
+    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-1",
   };
 }
@@ -558,6 +555,30 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("permission_error");
     }
+    expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops balance collection on an operational incident before the next employee", async () => {
+    mocks.fetchUkLeaveBalancesForEmployee.mockResolvedValue({
+      ok: true,
+      value: { leaveBalances: [], rawResponse: {} },
+    });
+    mocks.fetchUkLeaveBalancesForEmployee.mockResolvedValueOnce({
+      error: {
+        code: "unknown_error",
+        message: "Admission unavailable",
+        recoveryReason: "operational_incident",
+      },
+      ok: false,
+    });
+    const result = await fetchLeaveBalancesForRegion("UK", {
+      employeeIds: ["emp-uk-1", "emp-uk-2"],
+      xeroTenant: buildTenant("UK"),
+    });
+    expect(result).toMatchObject({
+      error: { recoveryReason: "operational_incident" },
+      ok: false,
+    });
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
 

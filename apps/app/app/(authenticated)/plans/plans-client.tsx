@@ -1,6 +1,6 @@
 "use client";
 
-import { getAvailabilityRecordLabel } from "@repo/core";
+import { getAvailabilityRecordLabel, xeroRecoveryMessage } from "@repo/core";
 
 import {
   AlertDialog,
@@ -121,13 +121,13 @@ interface PlansClientProps {
   canRecoverSubmit?: boolean;
   canViewTeam: boolean;
   filters: PlansFilterInput;
-  hasActiveXeroConnection: boolean;
   nextCursor?: string | null;
   organisationId: string;
   orgQueryValue: string | null;
   records: PlansClientRecord[];
   totalCount?: number;
   window?: { from: string | null; to: string | null };
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
 
 const recordTypeLabels: Record<string, string> = {
@@ -173,7 +173,7 @@ export function PlansClient({
   canRecoverSubmit = false,
   canViewTeam,
   filters,
-  hasActiveXeroConnection,
+  xeroConnectionState,
   organisationId,
   orgQueryValue,
   records,
@@ -600,11 +600,11 @@ export function PlansClient({
         ) : null}
       </div>
 
-      {!hasActiveXeroConnection && (
+      {xeroConnectionState !== "connected" && (
         <p className="text-body-sm text-muted-foreground">
-          Xero is disconnected, so new leave records save locally as approved
-          calendar entries. They will not be submitted to payroll until Xero is
-          connected.
+          {xeroConnectionState === "not_connected"
+            ? "Xero is disconnected, so new leave records save locally as approved calendar entries. They will not be submitted to payroll until Xero is connected."
+            : xeroRecoveryMessage(xeroConnectionState)}
         </p>
       )}
 

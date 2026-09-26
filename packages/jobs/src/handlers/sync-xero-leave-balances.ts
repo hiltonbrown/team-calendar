@@ -6,11 +6,9 @@ import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
-  ensureFreshXeroConnection,
   fetchLeaveBalancesForRegion,
   isSupportedCurrencyCode,
   mapXeroLeaveType,
-  toPlainLanguageMessage,
   toValidatedLeaveBalanceRawPayload,
   type XeroLeaveBalance,
   type XeroLeaveBalanceFetchFailure,
@@ -21,8 +19,18 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
+import {
+  rejectRetryableSyncResult,
+  resolveSyncTenant,
+  syncFailureReason,
+  throwRetryableXeroFailure,
+  withXeroBinding,
+  XeroBindingChangedError,
+  XeroSyncRetryError,
+} from "./xero-sync-access";
 
 const SyncXeroLeaveBalancesInputSchema = z.object({
+  bindingGeneration: z.number().int().nonnegative(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -62,7 +70,10 @@ type SyncXeroLeaveBalancesResult = Result<
   },
   SyncXeroLeaveBalancesError
 >;
-type XeroTenant = NonNullable<Awaited<ReturnType<typeof loadXeroTenant>>>;
+type XeroTenant = Extract<
+  Awaited<ReturnType<typeof resolveSyncTenant>>,
+  { ok: true }
+>["value"];
 
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const BALANCE_PAGE_SIZE = 40;
@@ -94,7 +105,7 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
     },
     async ({ event, step }) =>
       await step.run("sync-leave-balances", async () =>
-        syncXeroLeaveBalances(event.data)
+        rejectRetryableSyncResult(syncXeroLeaveBalances(event.data))
       )
   );
 
@@ -194,17 +205,31 @@ export async function syncXeroLeaveBalances(
     if (!balancesResult.ok) {
       await completeRun(context, run.id, {
         counts,
-        errorSummary: isBlanketFailure(balancesResult.error)
-          ? toPlainLanguageMessage(balancesResult.error)
-          : balancesResult.error.message,
+        errorSummary: syncFailureReason(balancesResult.error),
         status: "failed",
       });
+      throwRetryableXeroFailure(balancesResult.error);
       return {
         ok: true,
         value: { ...counts, runId: run.id, status: "failed" },
       };
     }
 
+    const blanketFailure = balancesResult.value.failures.find((failure) =>
+      isBlanketFailure(failure.error)
+    );
+    if (blanketFailure) {
+      await completeRun(context, run.id, {
+        counts,
+        errorSummary: syncFailureReason(blanketFailure.error),
+        status: "failed",
+      });
+      throwRetryableXeroFailure(blanketFailure.error);
+      return {
+        ok: true,
+        value: { ...counts, runId: run.id, status: "failed" },
+      };
+    }
     counts.fetched = balancesResult.value.leaveBalances.length;
     await recordFetchFailures(
       context,
@@ -257,15 +282,17 @@ export async function syncXeroLeaveBalances(
         staleSinceData = { leave_balances_stale_since: startedAt };
       }
 
-      await database.xeroTenant.updateMany({
-        data: {
-          last_leave_balances_sync_at: new Date(),
-          last_sync_error_code: null,
-          last_sync_error_message: null,
-          ...staleSinceData,
-        },
-        where: { ...scoped(context), id: context.xeroTenantId },
-      });
+      await withXeroBinding(context, async (tx) =>
+        tx.xeroTenant.updateMany({
+          data: {
+            last_leave_balances_sync_at: new Date(),
+            last_sync_error_code: null,
+            last_sync_error_message: null,
+            ...staleSinceData,
+          },
+          where: { ...scoped(context), id: context.xeroTenantId },
+        })
+      );
     }
 
     const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
@@ -282,12 +309,22 @@ export async function syncXeroLeaveBalances(
       value: { ...counts, runId: run.id, status: finalStatus },
     };
   } catch (error) {
+    if (error instanceof XeroBindingChangedError && runId) {
+      await completeRun(context, runId, {
+        counts: emptyCounts(),
+        errorSummary: "generation_changed",
+        status: "cancelled",
+      });
+      return { ok: true, value: emptyResult(runId, "cancelled") };
+    }
     log.error("Unhandled exception in syncXeroLeaveBalances:", { error });
     if (runId) {
       await completeRun(context, runId, {
         counts: emptyCounts(),
         errorSummary:
-          error instanceof Error ? error.message : "Unhandled exception",
+          error instanceof XeroSyncRetryError
+            ? error.recoveryReason
+            : "retry_later",
         status: "failed",
       });
     }
@@ -342,42 +379,51 @@ async function processBalance(
     const sourcePayloadJson =
       toValidatedLeaveBalanceRawPayload(balance.rawPayload) ?? Prisma.DbNull;
 
-    await database.leaveBalance.upsert({
-      create: {
-        ...scoped(context),
-        as_at: new Date(),
-        balance: balance.balance.toFixed(4),
-        balance_unit: balance.unitType,
-        currency_code: balance.currencyCode,
-        last_fetched_at: new Date(),
-        leave_type_name: balance.leaveTypeName,
-        leave_type_xero_id: balance.leaveTypeId,
-        person_id: personId,
-        record_type: recordType,
-        source_payload_json: sourcePayloadJson,
-        xero_tenant_id: xeroTenantId,
-      },
-      update: {
-        as_at: new Date(),
-        balance: balance.balance.toFixed(4),
-        balance_unit: balance.unitType,
-        currency_code: balance.currencyCode,
-        last_fetched_at: new Date(),
-        leave_type_name: balance.leaveTypeName,
-        record_type: recordType,
-        source_payload_json: sourcePayloadJson,
-        updated_at: new Date(),
-      },
-      where: {
-        person_id_xero_tenant_id_leave_type_xero_id: {
+    await withXeroBinding(context, async (tx) =>
+      tx.leaveBalance.upsert({
+        create: {
+          ...scoped(context),
+          as_at: new Date(),
+          balance: balance.balance.toFixed(4),
+          balance_unit: balance.unitType,
+          currency_code: balance.currencyCode,
+          last_fetched_at: new Date(),
+          leave_type_name: balance.leaveTypeName,
           leave_type_xero_id: balance.leaveTypeId,
           person_id: personId,
+          record_type: recordType,
+          source_payload_json: sourcePayloadJson,
           xero_tenant_id: xeroTenantId,
         },
-      },
-    });
+        update: {
+          as_at: new Date(),
+          balance: balance.balance.toFixed(4),
+          balance_unit: balance.unitType,
+          currency_code: balance.currencyCode,
+          last_fetched_at: new Date(),
+          leave_type_name: balance.leaveTypeName,
+          record_type: recordType,
+          source_payload_json: sourcePayloadJson,
+          updated_at: new Date(),
+        },
+        where: {
+          ...scoped(context),
+          person_id_xero_tenant_id_leave_type_xero_id: {
+            leave_type_xero_id: balance.leaveTypeId,
+            person_id: personId,
+            xero_tenant_id: xeroTenantId,
+          },
+        },
+      })
+    );
     return true;
   } catch (error) {
+    if (
+      error instanceof XeroBindingChangedError ||
+      error instanceof XeroSyncRetryError
+    ) {
+      throw error;
+    }
     await recordFailure(context, {
       errorCode: "db_error",
       errorMessage:
@@ -534,61 +580,20 @@ async function ensureTenantReady(
   | { ready: true; xeroTenant: XeroTenant }
   | { ready: false; result: SyncXeroLeaveBalancesResult }
 > {
-  const loadedTenant = await loadXeroTenant(context);
-  if (loadedTenant?.sync_paused_at) {
+  const readiness = await resolveSyncTenant(context, "payroll.employees.read");
+  if (!readiness.ok) {
     await completeRun(context, runId, {
       counts: emptyCounts(),
-      errorSummary: "Tenant sync is paused for this Xero connection",
-      status: "cancelled",
-    });
-    return {
-      ready: false,
-      result: { ok: true, value: emptyResult(runId, "cancelled") },
-    };
-  }
-  if (!loadedTenant) {
-    await completeRun(context, runId, {
-      counts: emptyCounts(),
-      errorSummary: "Xero connection not active",
+      errorSummary: syncFailureReason(readiness.error),
       status: "failed",
     });
+    throwRetryableXeroFailure(readiness.error);
     return {
       ready: false,
       result: { ok: true, value: emptyResult(runId, "failed") },
     };
   }
-  const freshness = await ensureFreshXeroConnection({
-    clerkOrgId: context.clerkOrgId,
-    connectionId: loadedTenant.xero_connection_id,
-    organisationId: context.organisationId,
-  });
-  if (!freshness.ok) {
-    await completeRun(context, runId, {
-      counts: emptyCounts(),
-      errorSummary: freshness.error.message,
-      status: "failed",
-    });
-    return {
-      ready: false,
-      result: { ok: true, value: emptyResult(runId, "failed") },
-    };
-  }
-  // Reload so the run uses the freshly persisted access token, not the stale one.
-  const xeroTenant = freshness.value.refreshed
-    ? await loadXeroTenant(context)
-    : loadedTenant;
-  if (!xeroTenant) {
-    await completeRun(context, runId, {
-      counts: emptyCounts(),
-      errorSummary: "Xero connection not active",
-      status: "failed",
-    });
-    return {
-      ready: false,
-      result: { ok: true, value: emptyResult(runId, "failed") },
-    };
-  }
-  return { ready: true, xeroTenant };
+  return { ready: true, xeroTenant: readiness.value };
 }
 
 function validateBalance(
@@ -658,98 +663,34 @@ async function completeRun(
     status: "cancelled" | "failed" | "partial_success" | "succeeded";
   }
 ) {
-  await database.syncRun.updateMany({
-    data: {
-      completed_at: new Date(),
-      error_summary: input.errorSummary ?? null,
-      records_failed: input.counts.failed,
-      records_fetched: input.counts.fetched,
-      records_skipped: input.counts.skipped,
-      records_synced: input.counts.upserted,
-      records_upserted: input.counts.upserted,
-      status: input.status,
-    },
-    where: { ...scoped(context), id: runId },
-  });
+  const persist = async (tx: Prisma.TransactionClient) => {
+    const updated = await tx.syncRun.updateMany({
+      data: {
+        completed_at: new Date(),
+        error_summary: input.errorSummary ?? null,
+        records_failed: input.counts.failed,
+        records_fetched: input.counts.fetched,
+        records_skipped: input.counts.skipped,
+        records_synced: input.counts.upserted,
+        records_upserted: input.counts.upserted,
+        status: input.status,
+      },
+      where: { ...scoped(context), id: runId, status: "running" },
+    });
+    if (
+      updated.count === 0 &&
+      (input.status === "succeeded" || input.status === "partial_success")
+    ) {
+      throw new XeroBindingChangedError();
+    }
+  };
+  if (input.status === "succeeded" || input.status === "partial_success") {
+    await withXeroBinding(context, persist);
+  } else {
+    await persist(database);
+  }
+
   await publishRunStatusChanged(context, runId, input.status);
-}
-
-function loadXeroTenant(context: SyncXeroLeaveBalancesInput) {
-  return database.xeroTenant.findFirst({
-    include: {
-      xero_connection: {
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          expires_at: true,
-          last_refreshed_at: true,
-          revoked_at: true,
-          status: true,
-          token_key_version: true,
-        },
-      },
-    },
-    where: {
-      ...scoped(context),
-      id: context.xeroTenantId,
-      organisation_id: context.organisationId,
-    },
-  });
-}
-
-async function advanceCursor(params: {
-  context: SyncXeroLeaveBalancesInput;
-  cursorRecord: { cursor_value: string | null; id: string } | null;
-  initialCursorValue: string | null;
-  nextCursorValue: string | null;
-}): Promise<boolean> {
-  const { context, cursorRecord, initialCursorValue, nextCursorValue } = params;
-
-  if (cursorRecord) {
-    const updated = await database.xeroSyncCursor.updateMany({
-      data: {
-        cursor_value: nextCursorValue,
-        updated_at: new Date(),
-      },
-      where: {
-        ...scoped(context),
-        cursor_value: initialCursorValue,
-        entity_type: "leave_balances",
-        id: cursorRecord.id,
-        xero_tenant_id: context.xeroTenantId,
-      },
-    });
-    return updated.count > 0;
-  }
-
-  try {
-    await database.xeroSyncCursor.create({
-      data: {
-        ...scoped(context),
-        cursor_value: nextCursorValue,
-        entity_type: "leave_balances",
-        xero_tenant_id: context.xeroTenantId,
-      },
-    });
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return false;
-    }
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2002"
-    ) {
-      return false;
-    }
-    throw error;
-  }
 }
 
 function emptyCounts(): Counts {
@@ -781,8 +722,67 @@ function validationError(
   };
 }
 
+async function advanceCursor(params: {
+  context: SyncXeroLeaveBalancesInput;
+  cursorRecord: { cursor_value: string | null; id: string } | null;
+  initialCursorValue: string | null;
+  nextCursorValue: string | null;
+}): Promise<boolean> {
+  const { context, cursorRecord, initialCursorValue, nextCursorValue } = params;
+
+  if (cursorRecord) {
+    const updated = await withXeroBinding(context, async (tx) =>
+      tx.xeroSyncCursor.updateMany({
+        data: {
+          cursor_value: nextCursorValue,
+          updated_at: new Date(),
+        },
+        where: {
+          ...scoped(context),
+          cursor_value: initialCursorValue,
+          entity_type: "leave_balances",
+          id: cursorRecord.id,
+          xero_tenant_id: context.xeroTenantId,
+        },
+      })
+    );
+    return updated.count > 0;
+  }
+
+  try {
+    await withXeroBinding(context, async (tx) =>
+      tx.xeroSyncCursor.create({
+        data: {
+          ...scoped(context),
+          cursor_value: nextCursorValue,
+          entity_type: "leave_balances",
+          xero_tenant_id: context.xeroTenantId,
+        },
+      })
+    );
+    return true;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return false;
+    }
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 function isBlanketFailure(error: XeroWriteError): boolean {
   return (
+    Boolean(error.recoveryReason) ||
     error.code === "auth_error" ||
     error.code === "rate_limit_error" ||
     error.code === "permission_error" ||
@@ -814,6 +814,12 @@ async function publishRunStatusChanged(
       }
     );
   } catch (error) {
+    if (
+      error instanceof XeroBindingChangedError ||
+      error instanceof XeroSyncRetryError
+    ) {
+      throw error;
+    }
     log.error("Failed to publish sync run status notification", {
       error,
       organisationId: context.organisationId,

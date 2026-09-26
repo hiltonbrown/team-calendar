@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   completeSideEffects: vi.fn(),
   computeWorkingDays: vi.fn(),
   dispatchNotification: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   markSubmitCompleted: vi.fn(),
   markSubmitDefinitiveFailure: vi.fn(),
   markSubmitDispatchStarted: vi.fn(),
@@ -65,7 +65,7 @@ vi.mock("../duration/working-days", () => ({
   computeWorkingDays: mocks.computeWorkingDays,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
@@ -152,7 +152,10 @@ describe("submit-service", () => {
     mocks.acquireSideEffects.mockResolvedValue(new Date());
     mocks.completeSideEffects.mockResolvedValue({ ok: true, value: undefined });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.markSubmitCompleted.mockResolvedValue(true);
     mocks.markSubmitDefinitiveFailure.mockResolvedValue(true);
     mocks.markSubmitDispatchStarted.mockResolvedValue(true);
@@ -177,6 +180,58 @@ describe("submit-service", () => {
     });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
   });
+
+  it.each([
+    ["update_permissions", "Update Xero permissions to continue."],
+    [
+      "operational_incident",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+  ] as const)(
+    "preserves employee-visible %s from employee resolution",
+    async (recoveryReason, message) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.resolveXeroEmployeeId.mockResolvedValue({
+        error: { code: "unknown_error", message, recoveryReason },
+        ok: false,
+      });
+      const result = await submitDraftRecord(input, mockPort);
+      expect(result).toMatchObject({
+        error: {
+          message,
+          resolutionError: { code: "unknown_error", recoveryReason },
+        },
+        ok: false,
+      });
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(JSON.stringify(result)).not.toContain("access_token");
+      expect(JSON.stringify(result)).not.toContain("WWW-Authenticate");
+    }
+  );
+
+  it.each([
+    [
+      "unavailable",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["reauthorisation_required", "Xero access needs to be renewed."],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+  ] as const)(
+    "blocks provider work with truthful recovery during %s",
+    async (state, message) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.getXeroConnectionStateForScope.mockResolvedValue(
+        state === "unavailable"
+          ? { error: { code: "state_unavailable" }, ok: false }
+          : { ok: true, value: { bindingGeneration: 7, state } }
+      );
+      const result = await submitDraftRecord(input, mockPort);
+      expect(result).toMatchObject({ error: { message }, ok: false });
+      expect(mocks.resolveXeroEmployeeId).not.toHaveBeenCalled();
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.withdrawLeaveApplicationForRegion).not.toHaveBeenCalled();
+    }
+  );
 
   it("submits a draft record and writes notification plus audit rows", async () => {
     mocks.availabilityFindFirst
@@ -391,7 +446,10 @@ describe("submit-service", () => {
 
   it("blocks submission when Xero is not connected", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce(record);
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
 
     const result = await submitDraftRecord(input, mockPort);
 
@@ -648,7 +706,10 @@ describe("submit-service", () => {
       });
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
-    mocks.hasActiveXeroConnection.mockResolvedValue(true);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.dispatchNotification.mockResolvedValue({
       ok: true,
       value: { emailQueued: false, inAppDelivered: true },

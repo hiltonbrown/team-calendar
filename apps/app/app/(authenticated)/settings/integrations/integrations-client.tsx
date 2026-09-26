@@ -1,5 +1,6 @@
 "use client";
 
+import { xeroRecoveryMessage } from "@repo/core";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
   Card,
@@ -22,7 +23,7 @@ export const IntegrationsClient = ({
 }: IntegrationsClientProps) => {
   const totals = organisations.reduce(
     (accumulator, organisation) => {
-      const status = statusForConnection(organisation.xero_connection);
+      const status = statusForConnection(organisation.xeroConnectionState);
       accumulator.total += 1;
       if (status === "connected") {
         accumulator.connected += 1;
@@ -76,7 +77,9 @@ export const IntegrationsClient = ({
           </div>
           <div className="space-y-2 rounded-2xl bg-muted/30 p-4 text-label-lg">
             {organisations.map((organisation) => {
-              const status = statusForConnection(organisation.xero_connection);
+              const status = statusForConnection(
+                organisation.xeroConnectionState
+              );
               const tenantName =
                 organisation.xero_connection?.xero_tenant?.tenant_name ??
                 "Not connected";
@@ -95,7 +98,15 @@ export const IntegrationsClient = ({
                         : ""}
                     </p>
                   </div>
-                  <ProviderStatusBadge status={status} />
+                  <div className="space-y-2">
+                    <ProviderStatusBadge status={status} />
+                    {organisation.xeroConnectionState !== "connected" &&
+                    organisation.xeroConnectionState !== "not_connected" ? (
+                      <p className="text-body-sm text-muted-foreground">
+                        {xeroRecoveryMessage(organisation.xeroConnectionState)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               );
             })}
@@ -110,30 +121,15 @@ export const IntegrationsClient = ({
 };
 
 function statusForConnection(
-  connection: OrganisationWithConnectionView["xero_connection"]
+  state: import("@repo/core").XeroConnectionDisplayState
 ): "connected" | "disconnected" | "error" | "expired" | "revoked" {
-  if (!connection) {
-    return "disconnected";
+  if (state === "connected") {
+    return "connected";
   }
-  if (connection.revoked_at) {
-    return "revoked";
-  }
-  if (connection.status === "stale") {
+  if (state === "reauthorisation_required") {
     return "expired";
   }
-  if (connection.status === "disconnected" || connection.disconnected_at) {
-    return "disconnected";
-  }
-  if (
-    connection.status === "pending" ||
-    connection.status === "pending_tenant_selection"
-  ) {
-    return "error";
-  }
-  if (connection.expires_at.getTime() <= Date.now()) {
-    return "expired";
-  }
-  return "connected";
+  return state === "not_connected" ? "disconnected" : "error";
 }
 
 function Stat({ label, value }: { label: string; value: string }) {

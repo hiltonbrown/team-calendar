@@ -194,6 +194,48 @@ describe("local cleanup transaction", () => {
       })
     ).toMatchObject({ status: "active" });
   });
+  it("reports current cleanup pending but ignores a superseded generation", async () => {
+    const { getXeroConnectionState } = await import(
+      "@repo/database/queries/xero-connection-state"
+    );
+    expect(await disconnect()).toMatchObject({ ok: true });
+    expect(await getXeroConnectionState(scope())).toEqual({
+      ok: true,
+      value: { bindingGeneration: 2, state: "disconnect_pending" },
+    });
+    await database.$transaction(async (tx) => {
+      await tx.xeroConnection.updateMany({
+        data: { disconnected_at: null, revoked_at: null, status: "active" },
+        where: {
+          clerk_org_id: scope().clerkOrgId,
+          id: slot(0).connectionId,
+          organisation_id: scope().organisationId,
+        },
+      });
+      await tx.xeroTenant.updateMany({
+        data: { active_slot: 1, binding_generation: 3, retired_at: null },
+        where: {
+          clerk_org_id: scope().clerkOrgId,
+          id: slot(0).tenantId,
+          organisation_id: scope().organisationId,
+        },
+      });
+    });
+    expect(await getXeroConnectionState(scope())).toEqual({
+      ok: true,
+      value: { bindingGeneration: 3, state: "connected" },
+    });
+    expect(
+      await database.xeroCleanupAttempt.findFirst({
+        where: {
+          clerk_org_id: scope().clerkOrgId,
+          expected_binding_generation: 2,
+          organisation_id: scope().organisationId,
+        },
+      })
+    ).toMatchObject({ state: "pending" });
+  });
+
   it("retires a binding immediately when no remote target was recorded", async () => {
     await database.xeroConnection.updateMany({
       data: { xero_authorisation_connection_id: null },

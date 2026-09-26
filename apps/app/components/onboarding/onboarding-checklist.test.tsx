@@ -78,7 +78,6 @@ const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,
   currentUserPersonLinked: false,
-  hasActiveXeroConnection: false,
   isComplete: false,
   peopleCount: 0,
   publicHolidayJurisdictionCount: 0,
@@ -125,6 +124,7 @@ const incompleteState: OnboardingState = {
       title: "Review calendar feed",
     },
   ],
+  xeroConnectionState: "not_connected",
 };
 
 const completeState: OnboardingState = {

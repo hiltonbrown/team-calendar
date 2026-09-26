@@ -1,4 +1,5 @@
 import type { EmployeeDashboardView } from "@repo/availability";
+import { xeroRecoveryMessage } from "@repo/core";
 import type { ReactNode } from "react";
 import { EmptyState } from "@/components/states/empty-state";
 import { formatLeaveBalance } from "@/lib/format-leave-balance";
@@ -32,10 +33,14 @@ export function BalancesCard({
 
   let content: ReactNode;
 
-  if (!state.data.hasActiveXeroConnection) {
+  if (state.data.xeroConnectionState !== "connected") {
     content = (
       <EmptyState
-        description="Balance syncing becomes available after Xero is connected."
+        description={
+          state.data.xeroConnectionState === "not_connected"
+            ? "Balance syncing becomes available after Xero is connected."
+            : xeroRecoveryMessage(state.data.xeroConnectionState)
+        }
         title="Balance unavailable"
       />
     );

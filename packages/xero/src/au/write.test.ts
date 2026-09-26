@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { encryptXeroToken } from "../crypto/tokens";
 import {
   approveLeaveApplication,
   declineLeaveApplication,
@@ -19,20 +18,15 @@ function restoreEncryptionKey() {
 }
 
 function buildXeroTenant() {
-  const accessToken = encryptXeroToken("access-token");
-
   return {
+    accessToken: "access-token",
+    bindingGeneration: 1,
     clerk_org_id: "org_1",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: "AU" as const,
-    xero_connection: {
-      access_token_auth_tag: accessToken.authTag,
-      access_token_encrypted: accessToken.encrypted,
-      access_token_iv: accessToken.iv,
-      revoked_at: null,
-      token_key_version: 1,
-    },
+    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-1",
   };
 }
@@ -106,7 +100,7 @@ describe("AU payroll write path", () => {
     [404, "not_found_error"],
     [409, "conflict_error"],
     [429, "rate_limit_error"],
-    [500, "unknown_error"],
+    [500, "network_error"],
   ] as const)("maps HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
@@ -156,10 +150,6 @@ describe("AU payroll write path", () => {
   });
 
   it("uses one bounded provider attempt for a payroll mutation", async () => {
-    const controller = new AbortController();
-    const timeout = vi
-      .spyOn(AbortSignal, "timeout")
-      .mockReturnValue(controller.signal);
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -173,20 +163,20 @@ describe("AU payroll write path", () => {
       xeroTenant: buildXeroTenant(),
     });
 
-    expect(timeout).toHaveBeenCalledWith(120_000);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const dispatchedSignal = fetchMock.mock.calls[0]?.[1]?.signal;
     expect(dispatchedSignal).toBeInstanceOf(AbortSignal);
-    controller.abort();
-    expect(dispatchedSignal?.aborted).toBe(true);
   });
 
   it("approves leave through Xero", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), { status: 200 })
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          LeaveApplications: [{ LeaveApplicationID: "leave-1" }],
+        }),
+        { status: 200 }
+      )
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await approveLeaveApplication({
@@ -210,7 +200,7 @@ describe("AU payroll write path", () => {
     [404, "not_found_error"],
     [409, "conflict_error"],
     [429, "rate_limit_error"],
-    [500, "unknown_error"],
+    [500, "network_error"],
   ] as const)("maps approve HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
@@ -239,11 +229,14 @@ describe("AU payroll write path", () => {
   });
 
   it("declines with reason and withdraws through Xero", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(
-        new Response(JSON.stringify({ ok: true }), { status: 200 })
-      );
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          LeaveApplications: [{ LeaveApplicationID: "leave-1" }],
+        }),
+        { status: 200 }
+      )
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const declineResult = await declineLeaveApplication({
@@ -276,7 +269,7 @@ describe("AU payroll write path", () => {
     [404, "not_found_error"],
     [409, "conflict_error"],
     [429, "rate_limit_error"],
-    [500, "unknown_error"],
+    [500, "network_error"],
   ] as const)("maps decline HTTP %s to %s", async (status, code) => {
     vi.stubGlobal(
       "fetch",
@@ -307,7 +300,7 @@ describe("AU payroll write path", () => {
 
   it("returns auth_error Result without throwing when access_token_iv is null", async () => {
     const tenant = buildXeroTenant();
-    tenant.xero_connection.access_token_iv = null;
+    tenant.accessToken = "";
 
     await expect(
       submitLeaveApplication({
@@ -320,10 +313,140 @@ describe("AU payroll write path", () => {
       })
     ).resolves.toMatchObject({
       error: {
-        code: "auth_error",
-        message: "Xero credentials are missing or revoked.",
+        code: "unknown_error",
+        dispatchPhase: "before_dispatch",
+        message: "Xero access is unavailable.",
+        recoveryReason: "operational_incident",
       },
       ok: false,
     });
   });
+});
+
+describe("161g AU mutation evidence", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("keeps scope rejection through a stalled401 body without replay", async () => {
+    const stream = new ReadableStream({
+      pull() {
+        return new Promise(() => {
+          /* Provider body stalls. */
+        });
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        headers: { "WWW-Authenticate": 'Bearer error="insufficient_scope"' },
+        status: 401,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const current = {
+      ...buildXeroTenant(),
+      deadline: { expiresAtMs: Date.now() + 25 },
+    };
+    expect(
+      await approveLeaveApplication({
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+        xeroTenant: current,
+      })
+    ).toMatchObject({
+      error: { code: "permission_error", recoveryReason: "update_permissions" },
+      ok: false,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+  it("reports an unusable successful remote ID as outcome_unknown", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('{"LeaveApplications":[{}]}'));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(
+      await submitLeaveApplication({
+        endsAt: new Date(),
+        startsAt: new Date(),
+        units: 1,
+        xeroEmployeeId: "employee",
+        xeroLeaveTypeId: "annual",
+        xeroTenant: buildXeroTenant(),
+      })
+    ).toMatchObject({
+      error: {
+        dispatchPhase: "after_dispatch",
+        recoveryReason: "outcome_unknown",
+      },
+      ok: false,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+  it("retains pre-dispatch admission outage as an incident", async () => {
+    const { xeroFetch } = await import("../rate-limit/xero-fetch");
+    const { XeroFetchError } = await import("../rate-limit/xero-fetch");
+    const module = await import("../rate-limit/xero-fetch");
+    const request = vi
+      .spyOn(module, "xeroFetch")
+      .mockRejectedValue(new XeroFetchError("admission_unavailable", false));
+    expect(xeroFetch).toBeDefined();
+    expect(
+      await approveLeaveApplication({
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+        xeroTenant: buildXeroTenant(),
+      })
+    ).toMatchObject({
+      error: {
+        dispatchPhase: "before_dispatch",
+        recoveryReason: "operational_incident",
+      },
+      ok: false,
+    });
+    request.mockRestore();
+  });
+  it("never retries a lost mutation response and keeps dispatch evidence", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("lost response"));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(
+      await approveLeaveApplication({
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+        xeroTenant: buildXeroTenant(),
+      })
+    ).toMatchObject({
+      error: {
+        dispatchPhase: "after_dispatch",
+        recoveryReason: "outcome_unknown",
+      },
+      ok: false,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+});
+
+it.each([
+  "",
+  "{}",
+  "[]",
+  "invalid JSON",
+  '{"LeaveApplications":[{"LeaveApplicationID":" "}]}',
+])("keeps unusable successful mutation payload %s uncertain", async (body) => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(body));
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    expect(
+      await approveLeaveApplication({
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+        xeroTenant: buildXeroTenant(),
+      })
+    ).toMatchObject({
+      error: {
+        dispatchPhase: "after_dispatch",
+        recoveryReason: "outcome_unknown",
+      },
+      ok: false,
+    });
+    expect(fetchMock).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
   })),
+  state: vi.fn(),
   syncRunFindFirst: vi.fn(),
   syncRunFindMany: vi.fn(),
   syncRunGroupBy: vi.fn(),
@@ -21,6 +22,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("../xero-connection-state", () => ({
+  getXeroConnectionStateForScope: mocks.state,
+}));
 vi.mock("@repo/database", () => ({
   database: {
     $transaction: vi.fn((callback) =>
@@ -148,6 +152,10 @@ describe("sync-monitor-service", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.state.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.xeroTenantFindMany.mockResolvedValue([
       {
         id: "tenant_1",
@@ -186,6 +194,58 @@ describe("sync-monitor-service", () => {
       value: undefined,
     });
   });
+
+  it.each([
+    ["update_permissions", "Update Xero permissions to continue."],
+    ["retry_later", "Xero is temporarily unavailable. Try again later."],
+    [
+      "operational_incident",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+    ["Payroll NZ is not enabled.", "Payroll NZ is not enabled."],
+  ])(
+    "projects stored recovery summary %s into neutral DTO copy",
+    async (code, message) => {
+      const runId = "00000000-0000-4000-8000-000000000021";
+      mocks.syncRunFindFirst.mockResolvedValue({
+        _count: { failed_records: 1 },
+        completed_at: new Date("2026-04-19T12:05:00.000Z"),
+        error_summary: code,
+        id: runId,
+        records_failed: 1,
+        records_fetched: 1,
+        records_skipped: 0,
+        records_upserted: 0,
+        run_type: "people",
+        started_at: new Date("2026-04-19T12:00:00.000Z"),
+        status: "failed",
+        trigger_type: "scheduled",
+        triggered_by_user_id: null,
+        xero_tenant: { id: "tenant_1", tenant_name: "Acme Payroll" },
+        xero_tenant_id: "tenant_1",
+      });
+      mocks.failedRecordFindMany.mockResolvedValue([
+        {
+          created_at: new Date("2026-04-19T12:00:00.000Z"),
+          error_code: code,
+          error_message: code,
+          id: "failed_1",
+          record_type: "people",
+          source_remote_id: null,
+        },
+      ]);
+      const result = await getRunDetail({ ...baseInput, runId });
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          failedRecords: [{ errorCode: code, errorMessage: message }],
+          run: { errorSummary: message },
+        },
+      });
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+    }
+  );
 
   it("bounds initial detail and excludes raw or arbitrary audit payloads", async () => {
     mocks.syncRunFindFirst.mockResolvedValue({
@@ -476,6 +536,43 @@ describe("sync-monitor-service", () => {
       ],
     });
   });
+
+  it.each([
+    [
+      "unavailable",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+    ["reauthorisation_required", "Xero access needs to be renewed."],
+  ] as const)(
+    "never dispatches or reports disconnection during %s",
+    async (state, message) => {
+      const tenantId = "00000000-0000-4000-8000-000000000010";
+      mocks.xeroTenantFindFirst.mockResolvedValue({
+        id: tenantId,
+        organisation_id: baseInput.organisationId,
+        sync_paused_at: null,
+        xero_connection: {
+          disconnected_at: null,
+          last_refreshed_at: null,
+          revoked_at: null,
+          status: "active",
+        },
+      });
+      mocks.state.mockResolvedValue(
+        state === "unavailable"
+          ? { error: { code: "state_unavailable" }, ok: false }
+          : { ok: true, value: { bindingGeneration: 7, state } }
+      );
+      const result = await dispatchManualSync({
+        ...baseInput,
+        runType: "people",
+        xeroTenantId: tenantId,
+      });
+      expect(result).toMatchObject({ error: { message }, ok: false });
+      expect(mocks.dispatchSyncEvent).not.toHaveBeenCalled();
+    }
+  );
 
   it("dispatches manual sync for active connection even if access token expires_at is past", async () => {
     const validTenantId = "00000000-0000-4000-8000-000000000010";

@@ -4,13 +4,13 @@ import { DashboardLayout } from "./dashboard-layout";
 import { XeroDisconnectedBanner } from "./xero-disconnected-banner";
 
 interface AdminEmptyViewProps {
-  hasActiveXeroConnection: boolean;
   orgQueryValue: string | null;
   roleLabel: "Admin" | "Owner";
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
 
 export function AdminEmptyView({
-  hasActiveXeroConnection,
+  xeroConnectionState,
   orgQueryValue,
   roleLabel,
 }: AdminEmptyViewProps) {
@@ -22,10 +22,11 @@ export function AdminEmptyView({
         subtitle="Your dashboard is ready. Add people manually, connect Xero, or create calendar feeds when you need them."
       />
 
-      {hasActiveXeroConnection ? null : (
+      {xeroConnectionState === "connected" ? null : (
         <XeroDisconnectedBanner
           connectHref="/settings/integrations/xero"
           orgQueryValue={orgQueryValue}
+          xeroConnectionState={xeroConnectionState}
         />
       )}
 

@@ -3,6 +3,7 @@ import { appError } from "@repo/core";
 import { database } from "../client";
 
 export interface SchedulableXeroTenant {
+  bindingGeneration: number;
   clerkOrgId: string;
   connectionStatus: string;
   databaseTenantId: string;
@@ -29,10 +30,13 @@ export interface ListSchedulableXeroTenantsResult {
 }
 
 export interface XeroConnectionNeedingTokenRotation {
+  bindingGeneration: number;
   clerkOrgId: string;
   connectionId: string;
+  databaseTenantId: string;
   lastRefreshedAt: Date;
   organisationId: string;
+  ownerId: string | null;
 }
 
 export interface FindConnectionsNeedingTokenRotationOptions {
@@ -63,6 +67,14 @@ export async function findConnectionsNeedingTokenRotation(
         id: true,
         last_refreshed_at: true,
         organisation_id: true,
+        xero_tenant: {
+          select: {
+            binding_generation: true,
+            id: true,
+            xero_credential_owner_id: true,
+          },
+          where: { active_slot: 1 },
+        },
       },
       where: {
         disconnected_at: null,
@@ -76,19 +88,23 @@ export async function findConnectionsNeedingTokenRotation(
         },
         revoked_at: null,
         status: "active",
+        xero_tenant: { active_slot: 1 },
       },
     });
 
     return {
       ok: true,
       value: connections.flatMap((connection) =>
-        connection.last_refreshed_at
+        connection.last_refreshed_at && connection.xero_tenant
           ? [
               {
+                bindingGeneration: connection.xero_tenant.binding_generation,
                 clerkOrgId: connection.clerk_org_id,
                 connectionId: connection.id,
+                databaseTenantId: connection.xero_tenant.id,
                 lastRefreshedAt: connection.last_refreshed_at,
                 organisationId: connection.organisation_id,
+                ownerId: connection.xero_tenant.xero_credential_owner_id,
               },
             ]
           : []
@@ -137,6 +153,7 @@ export async function listSchedulableXeroTenants(
         : {}),
       orderBy: { id: "asc" },
       select: {
+        binding_generation: true,
         clerk_org_id: true,
         id: true,
         last_approval_state_reconciled_at: true,
@@ -160,6 +177,7 @@ export async function listSchedulableXeroTenants(
         },
       },
       where: {
+        active_slot: 1,
         organisation: {
           archived_at: null,
           is_active: true,
@@ -192,6 +210,7 @@ export async function listSchedulableXeroTenants(
     );
 
     const tenants: SchedulableXeroTenant[] = validItems.map((item) => ({
+      bindingGeneration: item.binding_generation,
       clerkOrgId: item.clerk_org_id,
       connectionStatus: item.xero_connection.status,
       databaseTenantId: item.id,

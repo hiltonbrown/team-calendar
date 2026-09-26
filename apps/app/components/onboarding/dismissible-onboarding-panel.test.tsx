@@ -61,7 +61,6 @@ const incompleteState: OnboardingState = {
   activeFeedCount: 0,
   completedRequiredCount: 1,
   currentUserPersonLinked: false,
-  hasActiveXeroConnection: false,
   isComplete: false,
   peopleCount: 0,
   publicHolidayJurisdictionCount: 0,
@@ -84,4 +83,5 @@ const incompleteState: OnboardingState = {
       title: "Add or sync people",
     },
   ],
+  xeroConnectionState: "not_connected",
 };

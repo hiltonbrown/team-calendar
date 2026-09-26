@@ -16,11 +16,13 @@ const mocks = vi.hoisted(() => ({
   })),
   currentUser: vi.fn(),
   dispatchManualSync: vi.fn(),
+  getXeroConnectionState: vi.fn(),
   revalidatePath: vi.fn(),
   syncXeroLeaveBalances: vi.fn(),
   syncXeroLeaveRecords: vi.fn(),
   syncXeroPeople: vi.fn(),
   xeroConnectionFindFirst: vi.fn(),
+  xeroTenantFindFirst: vi.fn(),
 }));
 
 vi.mock("@repo/analytics/activation-events", () => ({
@@ -48,10 +50,14 @@ vi.mock("@repo/jobs", () => ({
 vi.mock("@repo/xero", () => ({
   completeXeroTenantSelection: mocks.completeXeroTenantSelection,
 }));
+vi.mock("@repo/database/queries/xero-connection-state", () => ({
+  getXeroConnectionState: mocks.getXeroConnectionState,
+}));
 vi.mock("@repo/database", () => ({
   database: {
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
+    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
 }));
 vi.mock("next/cache", () => ({
@@ -68,6 +74,13 @@ const validInput = {
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getXeroConnectionState.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 7, state: "connected" },
+    });
+    mocks.xeroTenantFindFirst.mockResolvedValue({
+      id: "44444444-4444-4444-8444-444444444444",
+    });
     mocks.analyticsShutdown.mockResolvedValue(undefined);
     mocks.analyticsFlush.mockResolvedValue(undefined);
     mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:admin" });
@@ -102,6 +115,7 @@ describe("completeTenantSelectionAction", () => {
     expect(result.ok).toBe(true);
     expect(mocks.syncXeroPeople).toHaveBeenCalledWith(
       expect.objectContaining({
+        bindingGeneration: 7,
         clerkOrgId: "org_1",
         organisationId: "33333333-3333-4333-8333-333333333333",
         triggeredByUserId: "user_1",
@@ -111,6 +125,7 @@ describe("completeTenantSelectionAction", () => {
     );
     expect(mocks.syncXeroLeaveRecords).toHaveBeenCalledWith(
       expect.objectContaining({
+        bindingGeneration: 7,
         clerkOrgId: "org_1",
         organisationId: "33333333-3333-4333-8333-333333333333",
         xeroTenantId: "44444444-4444-4444-8444-444444444444",
@@ -118,6 +133,7 @@ describe("completeTenantSelectionAction", () => {
     );
     expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith(
       expect.objectContaining({
+        bindingGeneration: 7,
         clerkOrgId: "org_1",
         organisationId: "33333333-3333-4333-8333-333333333333",
         xeroTenantId: "44444444-4444-4444-8444-444444444444",
@@ -139,6 +155,17 @@ describe("completeTenantSelectionAction", () => {
         })
       );
     }
+  });
+
+  it("keeps durable connection success but skips immediate workers for unavailable state", async () => {
+    mocks.getXeroConnectionState.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    expect((await completeTenantSelectionAction(validInput)).ok).toBe(true);
+    expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
+    expect(mocks.syncXeroLeaveRecords).not.toHaveBeenCalled();
+    expect(mocks.syncXeroLeaveBalances).not.toHaveBeenCalled();
   });
 
   it("maps the owner role when dispatching the initial sync", async () => {

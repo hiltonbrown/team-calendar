@@ -1,4 +1,5 @@
 import type { AdminDashboardView } from "@repo/availability";
+import { xeroRecoveryMessage } from "@repo/core";
 import { EmptyState } from "@/components/states/empty-state";
 import { DashboardCardError, DashboardCardShell } from "./dashboard-card-shell";
 import { formatDateTime } from "./dashboard-format";
@@ -32,7 +33,7 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
       orgQueryValue={orgQueryValue}
       title="Sync health"
     >
-      {state.data.hasActiveXeroConnection ? (
+      {state.data.xeroConnectionState === "connected" ? (
         <div className="grid grid-cols-2 gap-x-4 gap-y-3">
           <MetricTile label="Tenants" value={state.data.tenantCount} />
           <MetricTile
@@ -62,8 +63,16 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
         </div>
       ) : (
         <EmptyState
-          description="No active Xero connection is configured."
-          title="Xero not connected"
+          description={
+            state.data.xeroConnectionState === "not_connected"
+              ? "No active Xero connection is configured."
+              : xeroRecoveryMessage(state.data.xeroConnectionState)
+          }
+          title={
+            state.data.xeroConnectionState === "not_connected"
+              ? "Xero not connected"
+              : "Xero sync unavailable"
+          }
         />
       )}
     </DashboardCardShell>

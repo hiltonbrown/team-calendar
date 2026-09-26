@@ -7,6 +7,7 @@ import type {
   SyncTriggerType,
   TenantSummary,
 } from "@repo/availability";
+import { xeroRecoveryMessageFromCode } from "@repo/core";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -124,7 +125,10 @@ export function SyncClient({
           xeroTenantId,
         });
         if (!result.ok) {
-          setMessage({ text: result.error.message, tone: "error" });
+          setMessage({
+            text: xeroRecoveryMessageFromCode(result.error.message),
+            tone: "error",
+          });
           return;
         }
         if (!result.value.queued) {
@@ -144,7 +148,10 @@ export function SyncClient({
         };
         // Surface NZ/UK guard and other succeeded-with-notice cases
         if (v.errorSummary) {
-          setMessage({ text: v.errorSummary, tone: "status" });
+          setMessage({
+            text: xeroRecoveryMessageFromCode(v.errorSummary),
+            tone: "status",
+          });
         } else if (
           typeof v.fetched === "number" ||
           typeof v.upserted === "number"
@@ -159,7 +166,7 @@ export function SyncClient({
           if (typeof v.failed === "number" && v.failed > 0) {
             parts.push(`${v.failed} failed`);
           }
-          const detail = parts.length ? ` — ${parts.join(", ")}` : "";
+          const detail = parts.length ? `: ${parts.join(", ")}` : "";
           setMessage({
             text: `Sync ${v.status ?? "completed"}${detail}.`,
             tone: v.failed && v.failed > 0 ? "error" : "status",
@@ -765,9 +772,11 @@ function ConnectionDot({
 }) {
   const colour = {
     active: statusToneClasses.leave,
+    disconnect_pending: statusToneClasses.holiday,
     expired: statusToneClasses.holiday,
     not_configured: statusToneClasses.private,
     revoked: statusToneClasses.failed,
+    unavailable: statusToneClasses.failed,
   }[status];
   return (
     <span

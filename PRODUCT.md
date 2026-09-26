@@ -144,8 +144,8 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 |---|---|
 | Clerk Organisation | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `clerk_org_id`). One Clerk Organisation = one country code. |
 | Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns one XeroConnection, one XeroTenant, its own People and Feeds. |
-| XeroConnection | One per Organisation. Holds the OAuth credential set for that Organisation's Xero file. Current-state only; lifecycle history in `audit_events`. |
-| XeroTenant | One per XeroConnection. Carries Xero's `xero_tenant_id` and the payroll region (AU, NZ, UK). |
+| XeroConnection | One per Organisation. Holds local connection state and transitional credential mirrors; lifecycle history in `audit_events`. |
+| XeroTenant | One per XeroConnection. Owns the immutable external payroll binding, reserved slot and generation, and links its verified credential owner and provider connection. |
 | User | Authenticated identity via Clerk. Managed entirely by Clerk; no local users table. |
 | Membership | User-to-Clerk-Organisation relationship. Managed entirely by Clerk; no custom membership table. |
 | Team | Grouping of people within an Organisation. |
@@ -562,6 +562,7 @@ Outbound: synchronous API write triggered by user action. No background queue fo
 | `reconcile-feed-publications` | Internal | Ensure `availability_publications` match current records |
 | `rebuild-feed-cache` | Internal | Regenerate cached ICS feed bodies in Vercel KV |
 | `reconcile-xero-approval-state` | Bidirectional | Detect and resolve approval state drift |
+| `reconcile-xero-connections` | Internal | Sweep frozen, scoped remote-cleanup attempts; report-only unless explicitly enabled |
 
 All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Never rely on session context inside a job handler.
 
@@ -707,3 +708,11 @@ Each step produces a deployable, testable vertical slice.
 - The `AvailabilityRecord` unique constraint `(organisation_id, source_type, source_remote_id)` is NULL-distinct in PostgreSQL. Application-layer guards in `packages/availability` must prevent duplicate manual records (`source_remote_id IS NULL`). Tests must assert this guard is enforced.
 
 The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempts` and `xero_provider_connections` deliberately have no `clerk_org_id`. They coordinate one verified Xero authoriser across payroll bindings and customer accounts. Customer visibility and access remain scoped through `XeroTenant` by Clerk organisation and payroll organisation.
+
+## Xero lifecycle ownership and operational reporting
+
+`XeroCredentialOwner` coordinates one verified Xero authoriser per provider app. It owns the encrypted versioned credential set and refresh-attempt history across payroll bindings, without granting payroll access across Clerk accounts. `XeroProviderConnection` records the exact remote connection provenance. The reserved binding stays on the existing `XeroTenant` row, with `active_slot = 1`, `retired_at = null` and a generation fence. Reconnect cannot silently replace its external payroll file. Customer visibility remains scoped by both Clerk organisation and payroll organisation.
+
+Unbackfilled bindings retain the existing legacy access fallback. Transitional `XeroConnection` credential mirrors remain until every reserved binding has a verified owner and no reader remains. A shared immutable credential-domain UUID in the rate namespace prevents deployments using different credential databases from competing over one refresh token. Missing, legacy or foreign sentinel values deny admission.
+
+`xero_inactivity_classifications` is a child of Organisation and XeroTenant containing versioned report classifications and bounded review status. The manually invoked report requires both scope IDs, selects timestamps/status only and never sends notices, disables service or deletes provider connections. Active feed use, recent human activity, paused sync and active subscriptions prove activity. Missing subscription, feed or human evidence remains unknown. Historical recent token use survives rotation for active feeds. Onboarding remains informational and unknown. Archive cannot replace unknown evidence. Scheduled sync is never evidence of human use or abandonment.

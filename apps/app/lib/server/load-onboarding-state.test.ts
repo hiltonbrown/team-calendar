@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  activeXeroConnectionFindFirst: vi.fn(),
   clerkOrgConnectionCount: vi.fn(),
   currentUserPersonFindFirst: vi.fn(),
   feedCount: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   organisationFindFirst: vi.fn(),
   peopleCount: vi.fn(),
   publicHolidayJurisdictionCount: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
+vi.mock("@repo/availability", () => ({
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
+}));
 vi.mock("@repo/database", () => ({
   database: {
     feed: {
@@ -28,7 +31,7 @@ vi.mock("@repo/database", () => ({
     },
     xeroConnection: {
       count: mocks.clerkOrgConnectionCount,
-      findFirst: mocks.activeXeroConnectionFindFirst,
+      findFirst: mocks.getXeroConnectionStateForScope,
     },
   },
 }));
@@ -43,12 +46,43 @@ describe("loadOnboardingState", () => {
       name: "Acme",
     });
     mocks.clerkOrgConnectionCount.mockResolvedValue(1);
-    mocks.activeXeroConnectionFindFirst.mockResolvedValue({ id: "conn_1" });
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
     mocks.peopleCount.mockResolvedValue(2);
     mocks.currentUserPersonFindFirst.mockResolvedValue({ id: "person_1" });
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
     mocks.feedCount.mockResolvedValue(1);
   });
+
+  it.each([
+    [
+      "unavailable",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+    ["reauthorisation_required", "Xero access needs to be renewed."],
+  ] as const)(
+    "does not instruct reconnecting during %s",
+    async (xeroState, message) => {
+      mocks.getXeroConnectionStateForScope.mockResolvedValue(
+        xeroState === "unavailable"
+          ? { error: { code: "state_unavailable" }, ok: false }
+          : { ok: true, value: { bindingGeneration: 7, state: xeroState } }
+      );
+      const result = await loadOnboardingState({
+        clerkOrgId: "org_1",
+        organisationId: "00000000-0000-4000-8000-000000000001",
+      });
+      expect(result.xeroConnectionState).toBe(xeroState);
+      expect(result.steps.find((step) => step.id === "xero")).toMatchObject({
+        ctaLabel: "Review Xero",
+        description: message,
+        title: "Xero connection",
+      });
+    }
+  );
 
   it("uses default-feed copy when a feed already exists", async () => {
     const state = await loadOnboardingState({
@@ -125,7 +159,10 @@ describe("loadOnboardingState", () => {
 
   it("keeps a disconnected Xero task optional so one required step leads", async () => {
     mocks.clerkOrgConnectionCount.mockResolvedValue(0);
-    mocks.activeXeroConnectionFindFirst.mockResolvedValue(null);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
     mocks.peopleCount.mockResolvedValue(0);
     mocks.currentUserPersonFindFirst.mockResolvedValue(null);
 

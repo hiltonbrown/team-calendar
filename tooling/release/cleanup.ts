@@ -84,6 +84,7 @@ const scopedTables = [
   "alternative_contacts",
   "availability_records",
   "xero_sync_cursors",
+  "xero_inactivity_classifications",
   "xero_tenants",
   "xero_connections",
   "people",

@@ -2,18 +2,20 @@ import { auth, currentUser } from "@repo/auth/server";
 import {
   computeWorkingDaysFromReferenceData,
   ensureCurrentUserPerson,
-  hasActiveXeroConnection,
+  getXeroConnectionStateForScope,
   listMyRecordsPage,
   listTeamRecordsPage,
   loadWorkingDaysReferenceData,
   type RecordListItem,
 } from "@repo/availability";
+import { toXeroConnectionDisplayState } from "@repo/core";
 import { Button } from "@repo/design-system/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { EmptyState } from "@/components/states/empty-state";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
+import { XeroRecoveryNotice } from "@/components/xero/xero-recovery-notice";
 import { requirePageRole } from "@/lib/auth/require-page-role";
 import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
@@ -113,7 +115,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     sourceType: filters.sourceType,
   };
 
-  const [recordsResult, hasXero] = await Promise.all([
+  const [recordsResult, xeroStateResult] = await Promise.all([
     filters.tab === "team"
       ? listTeamRecordsPage({
           actingOrgRole: orgRole,
@@ -134,8 +136,10 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           pageSize: filters.pageSize ?? 50,
           userId: user.id,
         }),
-    hasActiveXeroConnection({ clerkOrgId, organisationId }),
+    getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
   ]);
+
+  const xeroConnectionState = toXeroConnectionDisplayState(xeroStateResult);
 
   if (!recordsResult.ok) {
     return (
@@ -181,7 +185,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
     <>
       <Header page="Plans" />
       <div className="flex flex-1 flex-col gap-6 p-6 pt-0">
-        {!hasXero && (
+        {xeroConnectionState === "not_connected" && (
           <div className="rounded-2xl bg-muted p-5 text-label-lg text-muted-foreground">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <p>
@@ -201,11 +205,15 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
           </div>
         )}
 
+        {xeroConnectionState !== "connected" &&
+        xeroConnectionState !== "not_connected" ? (
+          <XeroRecoveryNotice reason={xeroConnectionState} />
+        ) : null}
+
         <PlansClient
           canRecoverSubmit={isAdminOrOwner(orgRole)}
           canViewTeam={canViewTeam}
           filters={filters}
-          hasActiveXeroConnection={hasXero}
           nextCursor={recordsResult.value.nextCursor}
           organisationId={organisationId}
           orgQueryValue={orgQueryValue}
@@ -215,6 +223,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
             from: recordsResult.value.window.from?.toISOString() ?? null,
             to: recordsResult.value.window.to?.toISOString() ?? null,
           }}
+          xeroConnectionState={xeroConnectionState}
         />
 
         {records.length === 0 && (

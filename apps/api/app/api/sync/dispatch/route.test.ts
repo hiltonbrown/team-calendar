@@ -3,12 +3,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   dispatchManualSync: vi.fn(),
+  getXeroConnectionState: vi.fn(),
   reconcileXeroApprovalState: vi.fn(),
   requireOrg: vi.fn(),
   requireRole: vi.fn(),
+  syncRunFindFirst: vi.fn(),
   syncXeroLeaveBalances: vi.fn(),
   syncXeroLeaveRecords: vi.fn(),
   syncXeroPeople: vi.fn(),
+  xeroTenantFindFirst: vi.fn(),
 }));
 
 vi.mock("@repo/auth/helpers", () => ({
@@ -18,6 +21,15 @@ vi.mock("@repo/auth/helpers", () => ({
 }));
 vi.mock("@repo/availability", () => ({
   dispatchManualSync: mocks.dispatchManualSync,
+}));
+vi.mock("@repo/database/queries/xero-connection-state", () => ({
+  getXeroConnectionState: mocks.getXeroConnectionState,
+}));
+vi.mock("@repo/database", () => ({
+  database: {
+    syncRun: { findFirst: mocks.syncRunFindFirst },
+    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
+  },
 }));
 vi.mock("@repo/jobs", () => ({
   reconcileXeroApprovalState: mocks.reconcileXeroApprovalState,
@@ -59,6 +71,12 @@ function successfulInlineResult() {
 describe("manual sync dispatch route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getXeroConnectionState.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 8, state: "connected" },
+    });
+    mocks.xeroTenantFindFirst.mockResolvedValue({ id: input.xeroTenantId });
+    mocks.syncRunFindFirst.mockResolvedValue(null);
     vi.stubEnv("NODE_ENV", "test");
     mocks.requireOrg.mockResolvedValue("org_123");
     mocks.currentUser.mockResolvedValue({ id: "user_123" });
@@ -170,6 +188,7 @@ describe("manual sync dispatch route", () => {
       expect(response.status).toBe(200);
       expect(handler).toHaveBeenCalledTimes(1);
       expect(handler).toHaveBeenCalledWith({
+        bindingGeneration: 8,
         clerkOrgId: "org_123",
         organisationId: input.organisationId,
         triggeredByUserId: "user_123",
@@ -189,6 +208,43 @@ describe("manual sync dispatch route", () => {
       });
     }
   );
+
+  it.each(["disconnect_pending", "reauthorisation_required"] as const)(
+    "does not run local fallback for %s",
+    async (state) => {
+      mocks.dispatchManualSync.mockResolvedValue({
+        error: { code: "dispatch_failed", message: "Queue unavailable" },
+        ok: false,
+      });
+      mocks.getXeroConnectionState.mockResolvedValue({
+        ok: true,
+        value: { bindingGeneration: 8, state },
+      });
+      expect((await POST(request(input))).status).toBe(500);
+      expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
+    }
+  );
+
+  it("does not run local fallback for a different scoped database tenant", async () => {
+    mocks.dispatchManualSync.mockResolvedValue({
+      error: { code: "dispatch_failed", message: "Queue unavailable" },
+      ok: false,
+    });
+    mocks.xeroTenantFindFirst.mockResolvedValue(null);
+    expect((await POST(request(input))).status).toBe(500);
+    expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
+    expect(mocks.xeroTenantFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          active_slot: 1,
+          binding_generation: 8,
+          clerk_org_id: "org_123",
+          id: input.xeroTenantId,
+          organisation_id: input.organisationId,
+        },
+      })
+    );
+  });
 
   it("keeps production dispatch failures as 503 responses", async () => {
     vi.stubEnv("NODE_ENV", "production");
@@ -241,6 +297,43 @@ describe("manual sync dispatch route", () => {
     }
   );
 
+  it.each([
+    ["update_permissions", "Update Xero permissions to continue."],
+    ["reauthorise", "Xero access needs to be renewed."],
+    [
+      "access_denied",
+      "Xero declined this request. Check that the person who connected Xero still has payroll access.",
+    ],
+    ["raw provider detail", "Sync run failed or was cancelled."],
+  ])(
+    "translates only allowlisted terminal run reason %s",
+    async (summary, message) => {
+      mocks.dispatchManualSync.mockResolvedValue({
+        error: { code: "dispatch_failed", message: "Queue unavailable" },
+        ok: false,
+      });
+      mocks.syncXeroPeople.mockResolvedValue({
+        ok: true,
+        value: { ...successfulInlineResult().value, status: "failed" },
+      });
+      mocks.syncRunFindFirst.mockResolvedValue({ error_summary: summary });
+      const response = await POST(request(input));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({
+        error: { code: "sync_failed", message },
+        ok: false,
+      });
+      expect(mocks.syncRunFindFirst).toHaveBeenCalledWith({
+        select: { error_summary: true },
+        where: {
+          clerk_org_id: "org_123",
+          id: "run_1",
+          organisation_id: input.organisationId,
+        },
+      });
+    }
+  );
+
   it("preserves a local handler error", async () => {
     mocks.dispatchManualSync.mockResolvedValueOnce({
       error: {
@@ -279,7 +372,11 @@ describe("manual sync dispatch route", () => {
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({
-      error: { code: "sync_failed", message: "Database connection lost." },
+      error: {
+        code: "sync_failed",
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
       ok: false,
     });
   });

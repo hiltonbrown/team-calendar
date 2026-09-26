@@ -82,6 +82,39 @@ describe("SyncClient", () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ["update_permissions", "Update Xero permissions to continue."],
+    ["retry_later", "Xero is temporarily unavailable. Try again later."],
+    [
+      "operational_incident",
+      "We cannot reach Xero right now. Try again later or contact support.",
+    ],
+    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
+    ["Payroll NZ is not enabled.", "Payroll NZ is not enabled."],
+  ])(
+    "renders live dispatch summary %s as recovery copy",
+    async (code, message) => {
+      mocks.dispatchManualSyncAction.mockResolvedValueOnce({
+        ok: true,
+        value: { errorSummary: code, queued: true },
+      });
+      render(
+        <SyncClient
+          filters={{}}
+          nextCursor={null}
+          organisationId={organisationId}
+          orgQueryValue={organisationId}
+          runs={[run]}
+          summaries={[summary]}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Run sync" }));
+      expect((await screen.findByRole("status")).textContent).toContain(
+        message
+      );
+    }
+  );
+
   it("offers every registered run type through one recommended action", async () => {
     mocks.dispatchManualSyncAction.mockResolvedValueOnce({
       ok: true,

@@ -173,3 +173,20 @@ describe("Xero remote cleanup mode", () => {
     expect(() => keys()).toThrow();
   });
 });
+
+describe("credential domain configuration", () => {
+  it("accepts only a UUID and retains report-only cleanup default", () => {
+    vi.stubEnv(
+      "XERO_CREDENTIAL_DOMAIN_ID",
+      "11111111-1111-4111-8111-111111111111"
+    );
+    vi.stubEnv("XERO_REMOTE_CLEANUP_MODE", undefined);
+    expect(keys().XERO_CREDENTIAL_DOMAIN_ID).toBe(
+      "11111111-1111-4111-8111-111111111111"
+    );
+    expect(keys().XERO_REMOTE_CLEANUP_MODE).toBe("report_only");
+    vi.stubEnv("XERO_CREDENTIAL_DOMAIN_ID", "malformed");
+    expect(() => keys()).toThrow();
+    vi.unstubAllEnvs();
+  });
+});

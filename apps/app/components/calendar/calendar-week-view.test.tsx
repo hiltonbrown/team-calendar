@@ -93,7 +93,6 @@ function weekRange() {
             ]
           : [],
     })),
-    hasActiveXeroConnection: false,
     people: [],
     range: {
       end: new Date("2026-04-20T00:00:00.000Z"),
@@ -103,6 +102,7 @@ function weekRange() {
     totalPeopleInScope: 0,
     truncated: false,
     view: "week",
+    xeroConnectionState: "not_connected",
     xeroSyncFailedCount: 0,
   } as const;
 }

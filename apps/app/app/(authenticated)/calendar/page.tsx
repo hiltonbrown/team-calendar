@@ -5,6 +5,7 @@ import {
   type CalendarScope,
   getCalendarRange,
 } from "@repo/availability";
+import { xeroRecoveryMessage } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
@@ -148,10 +149,11 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     <>
       <Header page="Calendar" />
       <div className="flex flex-1 flex-col gap-8 p-6 pt-0">
-        {!dataResult.value.hasActiveXeroConnection && (
+        {dataResult.value.xeroConnectionState !== "connected" && (
           <DisconnectedXeroBanner
             canConnect={role === "admin" || role === "owner"}
             orgQueryValue={orgQueryValue}
+            xeroConnectionState={dataResult.value.xeroConnectionState}
           />
         )}
 
@@ -219,7 +221,9 @@ function resolveScope(
 function DisconnectedXeroBanner({
   canConnect,
   orgQueryValue,
+  xeroConnectionState,
 }: {
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   canConnect: boolean;
   orgQueryValue: string | null;
 }) {
@@ -227,10 +231,11 @@ function DisconnectedXeroBanner({
     <div className="rounded-2xl bg-muted p-5 text-label-lg text-muted-foreground">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p>
-          Xero is not connected. Connect Xero in Integration Settings to enable
-          leave submission for manager approval.
+          {xeroConnectionState === "not_connected"
+            ? "Xero is not connected. Connect Xero in Integration Settings to enable leave submission for manager approval."
+            : xeroRecoveryMessage(xeroConnectionState)}
         </p>
-        {canConnect ? (
+        {canConnect && xeroConnectionState === "not_connected" ? (
           <a
             className="font-medium text-primary"
             href={withOrg("/settings/integrations/xero", orgQueryValue)}

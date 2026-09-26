@@ -114,7 +114,6 @@ function calendarRange({ eventCount }: { eventCount: number }) {
         ],
       },
     ],
-    hasActiveXeroConnection: false,
     people: [
       {
         avatarUrl: null,
@@ -137,6 +136,7 @@ function calendarRange({ eventCount }: { eventCount: number }) {
     totalPeopleInScope: 1,
     truncated: false,
     view: "month",
+    xeroConnectionState: "not_connected",
     xeroSyncFailedCount: 0,
   } as const;
 }

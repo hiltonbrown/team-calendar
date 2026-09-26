@@ -225,3 +225,14 @@ export async function listDueXeroCleanupAttempts(input: {
     organisationId: attempt.organisation_id,
   }));
 }
+
+/** Aggregate-only system health query, with no customer payload or identifiers returned. */
+export async function getOldestUnknownXeroCleanupUpdatedAt(
+  input: { client?: Client } = {}
+): Promise<Date | null> {
+  const result = await (input.client ?? database).xeroCleanupAttempt.aggregate({
+    _min: { updated_at: true },
+    where: { state: "unknown" },
+  });
+  return result._min.updated_at;
+}

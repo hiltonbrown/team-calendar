@@ -108,7 +108,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -116,6 +115,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -142,7 +142,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -150,6 +149,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -174,7 +174,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -182,6 +181,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -220,7 +220,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -228,6 +227,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -267,7 +267,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -275,6 +274,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -304,7 +304,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -312,6 +311,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -338,7 +338,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -346,6 +345,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -371,7 +371,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -379,6 +378,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -405,7 +405,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -413,6 +412,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -435,7 +435,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -443,6 +442,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -471,7 +471,6 @@ describe("PeopleClient", () => {
         <PeopleClient
           canIncludeArchived={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -479,6 +478,7 @@ describe("PeopleClient", () => {
           people={[]}
           teams={[]}
           totalCount={0}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -571,7 +571,6 @@ describe("PeopleClient", () => {
           canIncludeArchived={true}
           canManageClerkAccess={true}
           filters={defaultFilters}
-          hasActiveXeroConnection={true}
           locations={[]}
           nextCursor={null}
           organisationId={organisationId}
@@ -579,6 +578,7 @@ describe("PeopleClient", () => {
           people={[samplePerson]}
           teams={[]}
           totalCount={1}
+          xeroConnectionState="connected"
           xeroTenantId={xeroTenantId}
         />
       );
@@ -632,7 +632,6 @@ describe("PeopleClient", () => {
       <PeopleClient
         canIncludeArchived
         filters={filters}
-        hasActiveXeroConnection
         locations={[]}
         nextCursor={null}
         organisationId={organisationId}
@@ -640,6 +639,7 @@ describe("PeopleClient", () => {
         people={[samplePerson]}
         teams={[{ id: teamId, name: "Engineering" }]}
         totalCount={1}
+        xeroConnectionState="connected"
         xeroTenantId={xeroTenantId}
       />
     );

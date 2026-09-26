@@ -4,6 +4,7 @@ import type {
   AvailabilityRecordSummary,
   PersonProfile,
 } from "@repo/availability";
+import { xeroRecoveryMessage } from "@repo/core";
 import { Badge } from "@repo/design-system/components/ui/badge";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -78,7 +79,7 @@ export function PersonProfileContent({
   const refreshDisabledReason = balanceRefreshDisabledReason({
     balanceRefreshEnabled,
     canRefreshBalances,
-    hasActiveXeroConnection: profile.balances.hasActiveXeroConnection,
+    xeroConnectionState: profile.balances.xeroConnectionState,
     xeroLinked: profile.balances.xeroLinked,
   });
 
@@ -459,8 +460,10 @@ function BalancesPanel({
   const [leaveTypeName, setLeaveTypeName] = useState("");
   const [leaveTypeXeroId, setLeaveTypeXeroId] = useState("");
   const showXeroBalances =
-    profile.balances.xeroLinked && profile.balances.hasActiveXeroConnection;
-  const showManualEditor = !profile.balances.hasActiveXeroConnection;
+    profile.balances.xeroLinked &&
+    profile.balances.xeroConnectionState === "connected";
+  const showManualEditor =
+    profile.balances.xeroConnectionState === "not_connected";
 
   const saveManualBalance = () => {
     if (!(canEditManual && showManualEditor)) {
@@ -516,6 +519,12 @@ function BalancesPanel({
   }
   return (
     <div className="flex flex-col gap-3">
+      {profile.balances.xeroConnectionState !== "connected" &&
+      profile.balances.xeroConnectionState !== "not_connected" ? (
+        <p role="status">
+          {xeroRecoveryMessage(profile.balances.xeroConnectionState)}
+        </p>
+      ) : null}
       <Table>
         <TableHeader>
           <TableRow>
@@ -662,7 +671,7 @@ function hasValidBalanceInput(value: string): boolean {
 function balanceRefreshDisabledReason(input: {
   balanceRefreshEnabled: boolean;
   canRefreshBalances: boolean;
-  hasActiveXeroConnection: boolean;
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   xeroLinked: boolean;
 }): string | null {
   if (!input.canRefreshBalances) {
@@ -671,8 +680,10 @@ function balanceRefreshDisabledReason(input: {
   if (!input.xeroLinked) {
     return "Balances can refresh only for Xero-linked people.";
   }
-  if (!input.hasActiveXeroConnection) {
-    return "Balances can refresh only when Xero is connected.";
+  if (input.xeroConnectionState !== "connected") {
+    return input.xeroConnectionState === "not_connected"
+      ? "Balances can refresh only when Xero is connected."
+      : xeroRecoveryMessage(input.xeroConnectionState);
   }
   if (!input.balanceRefreshEnabled) {
     return "Balance refresh is not yet enabled";

@@ -1,13 +1,13 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-
 import type {
   ExternalWritePort,
   ProviderResolutionError,
   ProviderWriteError,
   Result,
 } from "@repo/core";
+import { xeroRecoveryMessage } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
   database,
@@ -35,7 +35,7 @@ import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { computeWorkingDays } from "../duration/working-days";
 import { isXeroLeaveType } from "../records/record-type-categories";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import {
   acquireXeroWriteClaim,
   releaseXeroWriteClaim,
@@ -610,7 +610,31 @@ async function prepareXeroWrite(
     SubmitServiceError
   >
 > {
-  const hasXero = await hasActiveXeroConnection(input);
+  const xeroStateResult = await getXeroConnectionStateForScope(input);
+  if (!xeroStateResult.ok) {
+    return {
+      error: {
+        code: "unknown_error",
+        message:
+          "We cannot reach Xero right now. Try again later or contact support.",
+      },
+      ok: false,
+    };
+  }
+  const xeroConnectionState = xeroStateResult.value.state;
+  if (
+    xeroConnectionState !== "connected" &&
+    xeroConnectionState !== "not_connected"
+  ) {
+    return {
+      error: {
+        code: "unknown_error",
+        message: xeroRecoveryMessage(xeroConnectionState),
+      },
+      ok: false,
+    };
+  }
+  const hasXero = xeroConnectionState === "connected";
   if (!hasXero) {
     return {
       error: {

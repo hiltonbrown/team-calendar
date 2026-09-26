@@ -3,11 +3,13 @@ import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type {
   Prisma,
+  XeroConnection,
   XeroCredentialOwner,
   XeroRefreshAttempt,
 } from "@repo/database/generated/client";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
+import { emitXeroMetric } from "../metrics";
 import {
   createXeroDeadline,
   remainingMs,
@@ -24,6 +26,7 @@ import {
 import {
   ensureFreshXeroConnection,
   exchangeToken,
+  isRecordedXeroRefreshGrantInvalid,
   type XeroOAuthError,
 } from "./service";
 
@@ -177,6 +180,9 @@ export async function refreshXeroCredentialOwner(input: {
             },
             where: { id: attemptId },
           });
+          emitXeroMetric("xero.refresh.failed", 1, {
+            outcome: "lost_response",
+          });
           return failure("invalid_token_response");
         }
         const access = encryptXeroToken(exchanged.value.access_token);
@@ -247,6 +253,9 @@ export async function refreshXeroCredentialOwner(input: {
                 outcome: { in: ["pending", "lost_response"] },
               },
             });
+            emitXeroMetric("xero.refresh.conflict", 1, {
+              outcome: "superseded",
+            });
             return null;
           }
           const uncertain = attempt.uncertain_since ?? new Date();
@@ -259,6 +268,9 @@ export async function refreshXeroCredentialOwner(input: {
               uncertain_since: uncertain,
             },
             where: { id: attemptId, outcome: "pending" },
+          });
+          emitXeroMetric("xero.refresh.failed", 1, {
+            outcome: "lost_response",
           });
           return null;
         },
@@ -367,14 +379,21 @@ export interface XeroAccessError {
     | "generation_changed"
     | "reauthorisation_required"
     | "capability_missing"
-    | "configuration_error";
+    | "configuration_error"
+    | "admission_unavailable"
+    | "rate_limit_error"
+    | "network_error";
   message: string;
+  retryAfterMs?: number;
 }
 export async function resolveXeroAccess(input: {
   clerkOrgId: string;
   organisationId: string;
   expectedBindingGeneration?: number;
-  capability?: string;
+  capability?: string | readonly string[];
+  forceRefresh?: boolean;
+  previousTokenVersion?: number | null;
+  previousAccessToken?: string;
   deadline: XeroDeadline;
 }): Promise<
   Result<
@@ -384,6 +403,8 @@ export async function resolveXeroAccess(input: {
       payrollRegion: "AU" | "NZ" | "UK";
       bindingGeneration: number;
       tokenVersion: number | null;
+      xeroTenantDatabaseId: string;
+      deadline: XeroDeadline;
     },
     XeroAccessError
   >
@@ -433,17 +454,33 @@ export async function resolveXeroAccess(input: {
       }
       ({ owner, accessToken } = resolved.value);
     } else {
+      if (
+        connection.status === "stale" &&
+        isRecordedXeroRefreshGrantInvalid(connection.last_error_code)
+      ) {
+        return error("reauthorisation_required");
+      }
+      // Compare the rejected token inside the resolver; no credential column escapes it.
       const fresh = await ensureFreshXeroConnection({
+        allowStaleLegacyRefresh: true,
         clerkOrgId: input.clerkOrgId,
         connectionId: connection.id,
         deadline: input.deadline,
+        forceRefresh: shouldForceLegacyRefresh(connection, input),
         organisationId: input.organisationId,
+        previousAccessTokenEncrypted: input.forceRefresh
+          ? connection.access_token_encrypted
+          : undefined,
       });
       if (!fresh.ok) {
-        return error("reauthorisation_required");
+        return accessRefreshFailure(fresh.error);
       }
       const current = await database.xeroConnection.findUniqueOrThrow({
-        where: { id: connection.id },
+        where: {
+          clerk_org_id: input.clerkOrgId,
+          id: connection.id,
+          organisation_id: input.organisationId,
+        },
       });
       accessToken = decryptXeroToken({
         authTag: current.access_token_auth_tag,
@@ -476,8 +513,10 @@ export async function resolveXeroAccess(input: {
       value: {
         accessToken,
         bindingGeneration: tenant.binding_generation,
+        deadline: input.deadline,
         payrollRegion: tenant.payroll_region,
         tokenVersion: owner?.token_version ?? null,
+        xeroTenantDatabaseId: tenant.id,
         xeroTenantId: tenant.xero_tenant_id,
       },
     };
@@ -503,6 +542,7 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
   for (const attempt of attempts) {
     const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
     const retry = await database.$transaction(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve coordinated recovery and metric observations within the owner fence.
       async (tx) => {
         await boundXeroLocks(tx, deadline);
         await lockXeroOwner(tx, attempt.xero_credential_owner_id);
@@ -527,6 +567,14 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
             },
             where: { id: attempt.id },
           });
+          if (
+            owner.last_refresh_attempt_id !== attempt.id ||
+            owner.token_version !== attempt.expected_token_version + 1
+          ) {
+            emitXeroMetric("xero.refresh.conflict", 1, {
+              outcome: "superseded",
+            });
+          }
           return false;
         }
         const since =
@@ -540,6 +588,7 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
             data: { ...scrub, outcome: "failed" },
             where: { id: attempt.id },
           });
+          emitXeroMetric("xero.refresh.failed", 1, { outcome: "failed" });
           await tx.xeroCredentialOwner.updateMany({
             data: { usability: "reauthorisation_required" },
             where: {
@@ -599,11 +648,19 @@ async function recordExchangeFailure(
       : { ...scrub, outcome: "failed" },
     where: { id: attempt.id },
   });
+  emitXeroMetric("xero.refresh.failed", 1, {
+    outcome: ambiguous ? "lost_response" : "failed",
+  });
 }
 
 async function resolveOwnerToken(
   initialOwner: XeroCredentialOwner,
-  input: { capability?: string; deadline: XeroDeadline }
+  input: {
+    capability?: string | readonly string[];
+    deadline: XeroDeadline;
+    forceRefresh?: boolean;
+    previousTokenVersion?: number | null;
+  }
 ): Promise<
   Result<{ owner: XeroCredentialOwner; accessToken: string }, XeroAccessError>
 > {
@@ -621,26 +678,29 @@ async function resolveOwnerToken(
   if (owner.usability !== "usable") {
     return error("reauthorisation_required");
   }
-  if (owner.token_expires_at.getTime() <= Date.now() + 5 * 60_000) {
+  // Known missing permissions are independent of token expiry and never trigger refresh.
+  if (!hasXeroCapabilities(owner, input.capability)) {
+    return error("capability_missing");
+  }
+  const forceRefresh =
+    input.forceRefresh &&
+    (input.previousTokenVersion === undefined ||
+      input.previousTokenVersion === owner.token_version);
+  if (
+    forceRefresh ||
+    owner.token_expires_at.getTime() <= Date.now() + 5 * 60_000
+  ) {
     const refreshed = await refreshXeroCredentialOwner({
       deadline: input.deadline,
       expectedTokenVersion: owner.token_version,
       ownerId: owner.id,
     });
     if (!refreshed.ok) {
-      return error(
-        refreshed.error.code === "refresh_token_invalid"
-          ? "reauthorisation_required"
-          : "configuration_error"
-      );
+      return accessRefreshFailure(refreshed.error);
     }
     owner = refreshed.value;
   }
-  if (
-    input.capability &&
-    owner.granted_scopes_known &&
-    !owner.granted_scopes.includes(input.capability)
-  ) {
+  if (!hasXeroCapabilities(owner, input.capability)) {
     return error("capability_missing");
   }
   const accessToken = decryptXeroToken({
@@ -676,6 +736,12 @@ async function validateRefreshAttempt(
       },
       where: { id: attempt.id },
     });
+    if (
+      owner.last_refresh_attempt_id !== attempt.id ||
+      owner.token_version !== input.expectedTokenVersion + 1
+    ) {
+      emitXeroMetric("xero.refresh.conflict", 1, { outcome: "superseded" });
+    }
     return { ok: true, value: owner };
   }
   if (
@@ -694,4 +760,70 @@ async function validateRefreshAttempt(
   }
 
   return null;
+}
+
+function hasXeroCapabilities(
+  owner: XeroCredentialOwner,
+  capability?: string | readonly string[]
+): boolean {
+  if (!(owner.granted_scopes_known && capability)) {
+    return true;
+  }
+  const capabilities =
+    typeof capability === "string" ? [capability] : capability;
+  return capabilities.every(
+    (required) =>
+      owner.granted_scopes.includes(required) ||
+      (required.endsWith(".read") &&
+        owner.granted_scopes.includes(required.slice(0, -5)))
+  );
+}
+
+function accessRefreshFailure(
+  error: XeroOAuthError
+): Result<never, XeroAccessError> {
+  let code: XeroAccessError["code"] = "configuration_error";
+  if (error.code === "refresh_token_invalid") {
+    code = "reauthorisation_required";
+  } else if (error.transportCode === "admission_unavailable") {
+    code = "admission_unavailable";
+  } else if (error.httpStatus === 429) {
+    code = "rate_limit_error";
+  } else if (
+    error.code === "network_error" ||
+    error.code === "invalid_token_response"
+  ) {
+    code = "network_error";
+  } else if (error.code === "connection_changed") {
+    code = "generation_changed";
+  } else if (error.code === "connection_inactive") {
+    code = "disconnected";
+  }
+  return {
+    error: {
+      code,
+      message: "Xero access is unavailable for this payroll entity.",
+      retryAfterMs: error.retryAfterMs,
+    },
+    ok: false,
+  };
+}
+
+function shouldForceLegacyRefresh(
+  connection: XeroConnection,
+  input: { forceRefresh?: boolean; previousAccessToken?: string }
+): boolean {
+  if (!input.forceRefresh) {
+    return false;
+  }
+  if (input.previousAccessToken === undefined) {
+    return true;
+  }
+  const currentAccessToken = decryptXeroToken({
+    authTag: connection.access_token_auth_tag,
+    encrypted: connection.access_token_encrypted,
+    iv: connection.access_token_iv,
+    keyVersion: connection.token_key_version,
+  });
+  return currentAccessToken === input.previousAccessToken;
 }

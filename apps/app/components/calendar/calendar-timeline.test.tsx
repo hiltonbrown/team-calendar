@@ -165,7 +165,6 @@ function calendarRange(
 
   return {
     days,
-    hasActiveXeroConnection: true,
     people,
     range: {
       end: new Date("2026-04-20T00:00:00.000Z"),
@@ -175,6 +174,7 @@ function calendarRange(
     totalPeopleInScope: people.length,
     truncated: false,
     view: "week",
+    xeroConnectionState: "connected",
     xeroSyncFailedCount: 0,
   } as const;
 }

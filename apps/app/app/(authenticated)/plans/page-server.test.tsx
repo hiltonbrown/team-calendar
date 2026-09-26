@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   computeWorkingDays: vi.fn(),
   currentUser: vi.fn(),
   ensureCurrentUserPerson: vi.fn(),
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
   listMyRecords: vi.fn(),
   listTeamRecords: vi.fn(),
   redirect: vi.fn(),
@@ -22,7 +22,7 @@ vi.mock("@repo/auth/server", () => ({
 vi.mock("@repo/availability", () => ({
   computeWorkingDaysFromReferenceData: mocks.computeWorkingDays,
   ensureCurrentUserPerson: mocks.ensureCurrentUserPerson,
-  hasActiveXeroConnection: mocks.hasActiveXeroConnection,
+  getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
   listMyRecordsPage: async (...args: unknown[]) => {
     const result = await mocks.listMyRecords(...args);
     return result.ok
@@ -120,10 +120,40 @@ describe("Plans page server data", () => {
     });
     mocks.listMyRecords.mockResolvedValue({ ok: true, value: [] });
     mocks.listTeamRecords.mockResolvedValue({ ok: true, value: [] });
-    mocks.hasActiveXeroConnection.mockResolvedValue(false);
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
   });
 
   afterEach(() => cleanup());
+
+  it("offers Connect Xero only for a verified disconnected admin", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    render(await PlansPage({ searchParams: Promise.resolve({}) }));
+    expect(
+      screen.getByRole("link", { name: "Connect Xero to submit leave" })
+    ).toBeDefined();
+    expect(
+      screen.getByText("Xero is not connected.", { exact: false })
+    ).toBeDefined();
+  });
+  it("shows cannot-check recovery without a reconnect prompt for an unavailable admin", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      error: { code: "state_unavailable" },
+      ok: false,
+    });
+    render(await PlansPage({ searchParams: Promise.resolve({}) }));
+    expect(
+      screen.queryByRole("link", { name: "Connect Xero to submit leave" })
+    ).toBeNull();
+    expect(
+      screen.getByText(
+        "We cannot reach Xero right now. Try again later or contact support."
+      )
+    ).toBeDefined();
+  });
 
   it("repairs the current user person before listing my records", async () => {
     render(await PlansPage({ searchParams: Promise.resolve({}) }));

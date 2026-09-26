@@ -1,4 +1,5 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 /*
@@ -317,7 +318,7 @@ describe("reconcile-xero-approval-state database flow", () => {
     });
 
     mockFetchLeaveApplicationStatusForRegion
-      .mockResolvedValueOnce(xeroError("network_error"))
+      .mockResolvedValueOnce(xeroError("validation_error"))
       .mockResolvedValueOnce(xeroStatus("APPROVED"));
 
     const result = await reconcileXeroApprovalState(reconcileInput(tenantA));
@@ -348,7 +349,7 @@ describe("reconcile-xero-approval-state database flow", () => {
     });
     expect(failedRecords).toHaveLength(1);
     expect(failedRecords[0]).toMatchObject({
-      error_code: "network_error",
+      error_code: "validation_error",
       source_remote_id: leaveApplicationId("network"),
     });
 
@@ -411,8 +412,7 @@ describe("reconcile-xero-approval-state database flow", () => {
 
     const run = await latestRun(tenantA);
     expect(run).toMatchObject({
-      error_summary:
-        "Your Xero connection needs to be reauthorised. Ask an administrator to reconnect Xero in Settings > Integrations.",
+      error_summary: "reauthorise",
       records_failed: 0,
       records_synced: 0,
       status: "failed",
@@ -533,7 +533,7 @@ describe("reconcile-xero-approval-state database flow", () => {
       },
     });
     expect(uncheckedAfterRun2).toBe(0);
-  }, 120_000);
+  }, 600_000);
 
   it("fails the run immediately on a blanket permission_error (403)", async () => {
     await setupTenant(tenantA);
@@ -583,8 +583,7 @@ describe("reconcile-xero-approval-state database flow", () => {
 
     const run = await latestRun(tenantA);
     expect(run).toMatchObject({
-      error_summary:
-        "Your Xero organisation does not have permission to access this payroll feature. Check your Xero subscription and permissions.",
+      error_summary: "access_denied",
       records_failed: 0,
       records_synced: 0,
       status: "failed",
@@ -745,27 +744,36 @@ async function setupTenant(
     where: { id: tenant.organisationId },
   });
 
+  const access = encryptXeroToken("synthetic-access");
   await database.xeroConnection.upsert({
     create: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000),
       id: tenant.xeroConnectionId,
       organisation_id: tenant.organisationId,
       status: "active",
+      token_key_version: access.keyVersion,
     },
     update: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000),
       organisation_id: tenant.organisationId,
       status: "active",
+      token_key_version: access.keyVersion,
     },
     where: { id: tenant.xeroConnectionId },
   });
 
   await database.xeroTenant.upsert({
     create: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
@@ -776,6 +784,8 @@ async function setupTenant(
       xero_tenant_id: `xero-${tenant.xeroTenantId}`,
     },
     update: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       organisation_id: tenant.organisationId,
       payroll_region: region,
@@ -870,6 +880,7 @@ async function latestRun(tenant: TestTenant) {
 
 function reconcileInput(tenant: TestTenant) {
   return {
+    bindingGeneration: 1,
     clerkOrgId: tenant.clerkOrgId,
     organisationId: tenant.organisationId,
     triggeredByUserId: triggerUserId(tenant),

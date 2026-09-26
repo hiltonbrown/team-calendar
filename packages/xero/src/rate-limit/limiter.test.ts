@@ -1,4 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const metricLog = vi.hoisted(() => vi.fn());
+vi.mock("@repo/observability/log", () => ({
+  log: { error: vi.fn(), info: metricLog, warn: vi.fn() },
+}));
+beforeEach(() => {
+  metricLog.mockReset();
+});
+
 import { MemorySharedXeroRateStore } from "./memory-store";
 import type { XeroRateClass } from "./shared-store";
 
@@ -343,4 +352,66 @@ it("preserves the last denial when the wait expires before another reserve", asy
   } finally {
     vi.useRealTimers();
   }
+});
+
+describe("admission lifecycle metrics", () => {
+  it.each([
+    "daily",
+    "minute",
+    "concurrency",
+    "cooldown",
+    "infrastructure",
+    "credential_domain_mismatch",
+  ] as const)(
+    "records %s without treating ordinary denial or domain mismatch as store outage",
+    async (reason) => {
+      const reserve = vi
+        .fn()
+        .mockResolvedValue({ error: { reason }, ok: false });
+      const store = { observe: vi.fn(), release: vi.fn(), reserve };
+      const limiter = new XeroRateLimiter({ maxWaitMs: 0 }, { store });
+      expect(await limiter.acquire(tenant("private-external-tenant"))).toEqual({
+        ok: false,
+        reason,
+      });
+      expect(reserve).toHaveBeenCalledOnce();
+      const expected = [
+        { class: "tenant", metric: "xero.admission.denied", reason, value: 1 },
+      ];
+      if (reason === "infrastructure") {
+        expected.push({
+          class: "tenant",
+          metric: "xero.store.unavailable",
+          reason,
+          value: 1,
+        });
+        expect(metricLog.mock.calls.map((call) => call[1])).toEqual([
+          expected[0],
+          { class: "tenant", metric: "xero.store.unavailable", value: 1 },
+        ]);
+      } else {
+        expect(metricLog.mock.calls.map((call) => call[1])).toEqual(expected);
+      }
+      expect(JSON.stringify(metricLog.mock.calls)).not.toContain(
+        "private-external-tenant"
+      );
+    }
+  );
+  it("preserves a denial when the metric logger fails", async () => {
+    metricLog.mockImplementation(() => {
+      throw new Error("telemetry unavailable");
+    });
+    const reserve = vi
+      .fn()
+      .mockResolvedValue({ error: { reason: "infrastructure" }, ok: false });
+    const limiter = new XeroRateLimiter(
+      { maxWaitMs: 0 },
+      { store: { observe: vi.fn(), release: vi.fn(), reserve } }
+    );
+    expect(await limiter.acquire(tenant("tenant"))).toEqual({
+      ok: false,
+      reason: "infrastructure",
+    });
+    expect(metricLog).toHaveBeenCalledTimes(2);
+  });
 });

@@ -54,7 +54,7 @@ vi.mock("./current-status", () => ({
   computePublicHolidayApplicability: mocks.computePublicHolidayApplicability,
 }));
 vi.mock("../xero-connection-state", () => ({
-  hasActiveXeroConnection: vi.fn(),
+  getXeroConnectionStateForScope: vi.fn(),
 }));
 
 const { canAccessPerson, listPeople, toBalanceRow } = await import(

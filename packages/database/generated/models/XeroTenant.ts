@@ -400,6 +400,7 @@ export type XeroTenantWhereInput = {
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
   credential_owner?: Prisma.XOR<Prisma.XeroCredentialOwnerNullableScalarRelationFilter, Prisma.XeroCredentialOwnerWhereInput> | null
   provider_connection?: Prisma.XOR<Prisma.XeroProviderConnectionNullableScalarRelationFilter, Prisma.XeroProviderConnectionWhereInput> | null
+  inactivity_classifications?: Prisma.XeroInactivityClassificationListRelationFilter
   cleanup_requests?: Prisma.XeroCleanupRequestListRelationFilter
   sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
   leave_balances?: Prisma.LeaveBalanceListRelationFilter
@@ -438,6 +439,7 @@ export type XeroTenantOrderByWithRelationInput = {
   xero_connection?: Prisma.XeroConnectionOrderByWithRelationInput
   credential_owner?: Prisma.XeroCredentialOwnerOrderByWithRelationInput
   provider_connection?: Prisma.XeroProviderConnectionOrderByWithRelationInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationOrderByRelationAggregateInput
   cleanup_requests?: Prisma.XeroCleanupRequestOrderByRelationAggregateInput
   sync_cursors?: Prisma.XeroSyncCursorOrderByRelationAggregateInput
   leave_balances?: Prisma.LeaveBalanceOrderByRelationAggregateInput
@@ -480,6 +482,7 @@ export type XeroTenantWhereUniqueInput = Prisma.AtLeast<{
   xero_connection?: Prisma.XOR<Prisma.XeroConnectionScalarRelationFilter, Prisma.XeroConnectionWhereInput>
   credential_owner?: Prisma.XOR<Prisma.XeroCredentialOwnerNullableScalarRelationFilter, Prisma.XeroCredentialOwnerWhereInput> | null
   provider_connection?: Prisma.XOR<Prisma.XeroProviderConnectionNullableScalarRelationFilter, Prisma.XeroProviderConnectionWhereInput> | null
+  inactivity_classifications?: Prisma.XeroInactivityClassificationListRelationFilter
   cleanup_requests?: Prisma.XeroCleanupRequestListRelationFilter
   sync_cursors?: Prisma.XeroSyncCursorListRelationFilter
   leave_balances?: Prisma.LeaveBalanceListRelationFilter
@@ -582,6 +585,7 @@ export type XeroTenantCreateInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -616,6 +620,7 @@ export type XeroTenantUncheckedCreateInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -650,6 +655,7 @@ export type XeroTenantUpdateInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -684,6 +690,7 @@ export type XeroTenantUncheckedUpdateInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -1124,6 +1131,20 @@ export type XeroTenantUpdateOneRequiredWithoutCleanup_requestsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.XeroTenantUpdateToOneWithWhereWithoutCleanup_requestsInput, Prisma.XeroTenantUpdateWithoutCleanup_requestsInput>, Prisma.XeroTenantUncheckedUpdateWithoutCleanup_requestsInput>
 }
 
+export type XeroTenantCreateNestedOneWithoutInactivity_classificationsInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedCreateWithoutInactivity_classificationsInput>
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutInactivity_classificationsInput
+  connect?: Prisma.XeroTenantWhereUniqueInput
+}
+
+export type XeroTenantUpdateOneRequiredWithoutInactivity_classificationsNestedInput = {
+  create?: Prisma.XOR<Prisma.XeroTenantCreateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedCreateWithoutInactivity_classificationsInput>
+  connectOrCreate?: Prisma.XeroTenantCreateOrConnectWithoutInactivity_classificationsInput
+  upsert?: Prisma.XeroTenantUpsertWithoutInactivity_classificationsInput
+  connect?: Prisma.XeroTenantWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.XeroTenantUpdateToOneWithWhereWithoutInactivity_classificationsInput, Prisma.XeroTenantUpdateWithoutInactivity_classificationsInput>, Prisma.XeroTenantUncheckedUpdateWithoutInactivity_classificationsInput>
+}
+
 export type XeroTenantCreateWithoutOrganisationInput = {
   id?: string
   clerk_org_id: string
@@ -1151,6 +1172,7 @@ export type XeroTenantCreateWithoutOrganisationInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -1184,6 +1206,7 @@ export type XeroTenantUncheckedCreateWithoutOrganisationInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1276,6 +1299,7 @@ export type XeroTenantCreateWithoutXero_connectionInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -1309,6 +1333,7 @@ export type XeroTenantUncheckedCreateWithoutXero_connectionInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1358,6 +1383,7 @@ export type XeroTenantUpdateWithoutXero_connectionInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -1391,6 +1417,7 @@ export type XeroTenantUncheckedUpdateWithoutXero_connectionInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -1424,6 +1451,7 @@ export type XeroTenantCreateWithoutCredential_ownerInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -1457,6 +1485,7 @@ export type XeroTenantUncheckedCreateWithoutCredential_ownerInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1516,6 +1545,7 @@ export type XeroTenantCreateWithoutProvider_connectionInput = {
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -1549,6 +1579,7 @@ export type XeroTenantUncheckedCreateWithoutProvider_connectionInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1609,6 +1640,7 @@ export type XeroTenantCreateWithoutSync_cursorsInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -1642,6 +1674,7 @@ export type XeroTenantUncheckedCreateWithoutSync_cursorsInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1691,6 +1724,7 @@ export type XeroTenantUpdateWithoutSync_cursorsInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -1724,6 +1758,7 @@ export type XeroTenantUncheckedUpdateWithoutSync_cursorsInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -1757,6 +1792,7 @@ export type XeroTenantCreateWithoutLeave_balancesInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -1790,6 +1826,7 @@ export type XeroTenantUncheckedCreateWithoutLeave_balancesInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1839,6 +1876,7 @@ export type XeroTenantUpdateWithoutLeave_balancesInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -1872,6 +1910,7 @@ export type XeroTenantUncheckedUpdateWithoutLeave_balancesInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -1905,6 +1944,7 @@ export type XeroTenantCreateWithoutSync_runsInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
@@ -1938,6 +1978,7 @@ export type XeroTenantUncheckedCreateWithoutSync_runsInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -1987,6 +2028,7 @@ export type XeroTenantUpdateWithoutSync_runsInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -2020,6 +2062,7 @@ export type XeroTenantUncheckedUpdateWithoutSync_runsInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -2053,6 +2096,7 @@ export type XeroTenantCreateWithoutCleanup_requestsInput = {
   xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
   credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
   provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
@@ -2086,6 +2130,7 @@ export type XeroTenantUncheckedCreateWithoutCleanup_requestsInput = {
   last_sync_error_message?: string | null
   created_at?: Date | string
   updated_at?: Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
   sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
@@ -2135,6 +2180,7 @@ export type XeroTenantUpdateWithoutCleanup_requestsInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
@@ -2168,6 +2214,159 @@ export type XeroTenantUncheckedUpdateWithoutCleanup_requestsInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantCreateWithoutInactivity_classificationsInput = {
+  id?: string
+  clerk_org_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  organisation: Prisma.OrganisationCreateNestedOneWithoutXero_tenantsInput
+  xero_connection: Prisma.XeroConnectionCreateNestedOneWithoutXero_tenantInput
+  credential_owner?: Prisma.XeroCredentialOwnerCreateNestedOneWithoutTenantsInput
+  provider_connection?: Prisma.XeroProviderConnectionCreateNestedOneWithoutTenantsInput
+  cleanup_requests?: Prisma.XeroCleanupRequestCreateNestedManyWithoutXero_tenantInput
+  sync_cursors?: Prisma.XeroSyncCursorCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantUncheckedCreateWithoutInactivity_classificationsInput = {
+  id?: string
+  clerk_org_id: string
+  organisation_id: string
+  xero_credential_owner_id?: string | null
+  xero_provider_connection_id?: string | null
+  xero_connection_id: string
+  xero_tenant_id: string
+  provider_app_id: string
+  active_slot?: number | null
+  binding_generation?: number
+  retired_at?: Date | string | null
+  retirement_reason?: string | null
+  tenant_name?: string | null
+  payroll_region: $Enums.payroll_region
+  sync_paused_at?: Date | string | null
+  last_people_sync_at?: Date | string | null
+  last_leave_records_sync_at?: Date | string | null
+  last_leave_balances_sync_at?: Date | string | null
+  last_approval_state_reconciled_at?: Date | string | null
+  people_stale_since?: Date | string | null
+  leave_records_stale_since?: Date | string | null
+  leave_balances_stale_since?: Date | string | null
+  approval_state_stale_since?: Date | string | null
+  last_sync_error_code?: string | null
+  last_sync_error_message?: string | null
+  created_at?: Date | string
+  updated_at?: Date | string
+  cleanup_requests?: Prisma.XeroCleanupRequestUncheckedCreateNestedManyWithoutXero_tenantInput
+  sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_tenantInput
+  leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_tenantInput
+  sync_runs?: Prisma.SyncRunUncheckedCreateNestedManyWithoutXero_tenantInput
+}
+
+export type XeroTenantCreateOrConnectWithoutInactivity_classificationsInput = {
+  where: Prisma.XeroTenantWhereUniqueInput
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedCreateWithoutInactivity_classificationsInput>
+}
+
+export type XeroTenantUpsertWithoutInactivity_classificationsInput = {
+  update: Prisma.XOR<Prisma.XeroTenantUpdateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedUpdateWithoutInactivity_classificationsInput>
+  create: Prisma.XOR<Prisma.XeroTenantCreateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedCreateWithoutInactivity_classificationsInput>
+  where?: Prisma.XeroTenantWhereInput
+}
+
+export type XeroTenantUpdateToOneWithWhereWithoutInactivity_classificationsInput = {
+  where?: Prisma.XeroTenantWhereInput
+  data: Prisma.XOR<Prisma.XeroTenantUpdateWithoutInactivity_classificationsInput, Prisma.XeroTenantUncheckedUpdateWithoutInactivity_classificationsInput>
+}
+
+export type XeroTenantUpdateWithoutInactivity_classificationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
+  xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
+  credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
+  sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
+  leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
+  sync_runs?: Prisma.SyncRunUpdateManyWithoutXero_tenantNestedInput
+}
+
+export type XeroTenantUncheckedUpdateWithoutInactivity_classificationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clerk_org_id?: Prisma.StringFieldUpdateOperationsInput | string
+  organisation_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_credential_owner_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_provider_connection_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  xero_connection_id?: Prisma.StringFieldUpdateOperationsInput | string
+  xero_tenant_id?: Prisma.StringFieldUpdateOperationsInput | string
+  provider_app_id?: Prisma.StringFieldUpdateOperationsInput | string
+  active_slot?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  binding_generation?: Prisma.IntFieldUpdateOperationsInput | number
+  retired_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  retirement_reason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tenant_name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payroll_region?: Prisma.Enumpayroll_regionFieldUpdateOperationsInput | $Enums.payroll_region
+  sync_paused_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_leave_balances_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_approval_state_reconciled_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  people_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_records_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  leave_balances_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  approval_state_stale_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  last_sync_error_code?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_runs?: Prisma.SyncRunUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -2229,6 +2428,7 @@ export type XeroTenantUpdateWithoutOrganisationInput = {
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -2262,6 +2462,7 @@ export type XeroTenantUncheckedUpdateWithoutOrganisationInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -2353,6 +2554,7 @@ export type XeroTenantUpdateWithoutCredential_ownerInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   provider_connection?: Prisma.XeroProviderConnectionUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -2386,6 +2588,7 @@ export type XeroTenantUncheckedUpdateWithoutCredential_ownerInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -2477,6 +2680,7 @@ export type XeroTenantUpdateWithoutProvider_connectionInput = {
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_tenantsNestedInput
   xero_connection?: Prisma.XeroConnectionUpdateOneRequiredWithoutXero_tenantNestedInput
   credential_owner?: Prisma.XeroCredentialOwnerUpdateOneWithoutTenantsNestedInput
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUpdateManyWithoutXero_tenantNestedInput
@@ -2510,6 +2714,7 @@ export type XeroTenantUncheckedUpdateWithoutProvider_connectionInput = {
   last_sync_error_message?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  inactivity_classifications?: Prisma.XeroInactivityClassificationUncheckedUpdateManyWithoutXero_tenantNestedInput
   cleanup_requests?: Prisma.XeroCleanupRequestUncheckedUpdateManyWithoutXero_tenantNestedInput
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_tenantNestedInput
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_tenantNestedInput
@@ -2551,6 +2756,7 @@ export type XeroTenantUncheckedUpdateManyWithoutProvider_connectionInput = {
  */
 
 export type XeroTenantCountOutputType = {
+  inactivity_classifications: number
   cleanup_requests: number
   sync_cursors: number
   leave_balances: number
@@ -2558,6 +2764,7 @@ export type XeroTenantCountOutputType = {
 }
 
 export type XeroTenantCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  inactivity_classifications?: boolean | XeroTenantCountOutputTypeCountInactivity_classificationsArgs
   cleanup_requests?: boolean | XeroTenantCountOutputTypeCountCleanup_requestsArgs
   sync_cursors?: boolean | XeroTenantCountOutputTypeCountSync_cursorsArgs
   leave_balances?: boolean | XeroTenantCountOutputTypeCountLeave_balancesArgs
@@ -2572,6 +2779,13 @@ export type XeroTenantCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.E
    * Select specific fields to fetch from the XeroTenantCountOutputType
    */
   select?: Prisma.XeroTenantCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * XeroTenantCountOutputType without action
+ */
+export type XeroTenantCountOutputTypeCountInactivity_classificationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.XeroInactivityClassificationWhereInput
 }
 
 /**
@@ -2635,6 +2849,7 @@ export type XeroTenantSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
   credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
   provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
+  inactivity_classifications?: boolean | Prisma.XeroTenant$inactivity_classificationsArgs<ExtArgs>
   cleanup_requests?: boolean | Prisma.XeroTenant$cleanup_requestsArgs<ExtArgs>
   sync_cursors?: boolean | Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>
   leave_balances?: boolean | Prisma.XeroTenant$leave_balancesArgs<ExtArgs>
@@ -2746,6 +2961,7 @@ export type XeroTenantInclude<ExtArgs extends runtime.Types.Extensions.InternalA
   xero_connection?: boolean | Prisma.XeroConnectionDefaultArgs<ExtArgs>
   credential_owner?: boolean | Prisma.XeroTenant$credential_ownerArgs<ExtArgs>
   provider_connection?: boolean | Prisma.XeroTenant$provider_connectionArgs<ExtArgs>
+  inactivity_classifications?: boolean | Prisma.XeroTenant$inactivity_classificationsArgs<ExtArgs>
   cleanup_requests?: boolean | Prisma.XeroTenant$cleanup_requestsArgs<ExtArgs>
   sync_cursors?: boolean | Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>
   leave_balances?: boolean | Prisma.XeroTenant$leave_balancesArgs<ExtArgs>
@@ -2772,6 +2988,7 @@ export type $XeroTenantPayload<ExtArgs extends runtime.Types.Extensions.Internal
     xero_connection: Prisma.$XeroConnectionPayload<ExtArgs>
     credential_owner: Prisma.$XeroCredentialOwnerPayload<ExtArgs> | null
     provider_connection: Prisma.$XeroProviderConnectionPayload<ExtArgs> | null
+    inactivity_classifications: Prisma.$XeroInactivityClassificationPayload<ExtArgs>[]
     cleanup_requests: Prisma.$XeroCleanupRequestPayload<ExtArgs>[]
     sync_cursors: Prisma.$XeroSyncCursorPayload<ExtArgs>[]
     leave_balances: Prisma.$LeaveBalancePayload<ExtArgs>[]
@@ -3203,6 +3420,7 @@ export interface Prisma__XeroTenantClient<T, Null = never, ExtArgs extends runti
   xero_connection<T extends Prisma.XeroConnectionDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroConnectionDefaultArgs<ExtArgs>>): Prisma.Prisma__XeroConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   credential_owner<T extends Prisma.XeroTenant$credential_ownerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$credential_ownerArgs<ExtArgs>>): Prisma.Prisma__XeroCredentialOwnerClient<runtime.Types.Result.GetResult<Prisma.$XeroCredentialOwnerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   provider_connection<T extends Prisma.XeroTenant$provider_connectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$provider_connectionArgs<ExtArgs>>): Prisma.Prisma__XeroProviderConnectionClient<runtime.Types.Result.GetResult<Prisma.$XeroProviderConnectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  inactivity_classifications<T extends Prisma.XeroTenant$inactivity_classificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$inactivity_classificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroInactivityClassificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   cleanup_requests<T extends Prisma.XeroTenant$cleanup_requestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$cleanup_requestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroCleanupRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sync_cursors<T extends Prisma.XeroTenant$sync_cursorsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$sync_cursorsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$XeroSyncCursorPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   leave_balances<T extends Prisma.XeroTenant$leave_balancesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.XeroTenant$leave_balancesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LeaveBalancePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3699,6 +3917,30 @@ export type XeroTenant$provider_connectionArgs<ExtArgs extends runtime.Types.Ext
    */
   include?: Prisma.XeroProviderConnectionInclude<ExtArgs> | null
   where?: Prisma.XeroProviderConnectionWhereInput
+}
+
+/**
+ * XeroTenant.inactivity_classifications
+ */
+export type XeroTenant$inactivity_classificationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the XeroInactivityClassification
+   */
+  select?: Prisma.XeroInactivityClassificationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the XeroInactivityClassification
+   */
+  omit?: Prisma.XeroInactivityClassificationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.XeroInactivityClassificationInclude<ExtArgs> | null
+  where?: Prisma.XeroInactivityClassificationWhereInput
+  orderBy?: Prisma.XeroInactivityClassificationOrderByWithRelationInput | Prisma.XeroInactivityClassificationOrderByWithRelationInput[]
+  cursor?: Prisma.XeroInactivityClassificationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.XeroInactivityClassificationScalarFieldEnum | Prisma.XeroInactivityClassificationScalarFieldEnum[]
 }
 
 /**

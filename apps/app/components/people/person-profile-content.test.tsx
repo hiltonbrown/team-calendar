@@ -17,7 +17,6 @@ const profile: PersonProfile = {
   alternativeContacts: [],
   balances: {
     balancesLastFetchedAt: null,
-    hasActiveXeroConnection: false,
     rows: [
       {
         balanceUnits: 12,
@@ -30,6 +29,7 @@ const profile: PersonProfile = {
         xeroTenantId: null,
       },
     ],
+    xeroConnectionState: "not_connected",
     xeroLinked: false,
   },
   currentStatus: {
@@ -80,6 +80,20 @@ describe("PersonProfileContent", () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    "unavailable",
+    "disconnect_pending",
+    "reauthorisation_required",
+  ] as const)("never offers manual balance editing during %s", (state) => {
+    renderProfile(true, {
+      ...profile,
+      balances: { ...profile.balances, xeroConnectionState: state },
+    });
+    expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save balance" })).toBeNull();
+    expect(mocks.setManualBalanceAction).not.toHaveBeenCalled();
+  });
+
   it("shows profile provenance and hides manual balance editing from viewers", () => {
     renderProfile(false);
 
@@ -95,8 +109,8 @@ describe("PersonProfileContent", () => {
       ...profile,
       balances: {
         ...profile.balances,
-        hasActiveXeroConnection: true,
         rows: [],
+        xeroConnectionState: "connected",
       },
     });
 

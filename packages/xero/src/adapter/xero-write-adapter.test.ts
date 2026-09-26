@@ -5,10 +5,17 @@ const mocks = vi.hoisted(() => ({
   approveLeaveApplicationForRegion: vi.fn(),
   declineLeaveApplicationForRegion: vi.fn(),
   ensureFreshXeroConnection: vi.fn(),
+  metricLog: vi.fn(),
+  resolveXeroAccess: vi.fn(),
   submitLeaveApplicationForRegion: vi.fn(),
   tenantFindFirst: vi.fn(),
   withdrawLeaveApplicationForRegion: vi.fn(),
 }));
+
+vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
+beforeEach(() => {
+  mocks.metricLog.mockReset();
+});
 
 vi.mock("@repo/database", () => ({
   database: {
@@ -20,6 +27,10 @@ vi.mock("@repo/database", () => ({
 
 vi.mock("../oauth/service", () => ({
   ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
+}));
+
+vi.mock("../oauth/credential-owner", () => ({
+  resolveXeroAccess: mocks.resolveXeroAccess,
 }));
 
 vi.mock("../write/dispatch", () => ({
@@ -54,17 +65,14 @@ function buildTenant(id: string): XeroTenantForWrite & {
   xero_connection_id: string;
 } {
   return {
+    accessToken: "access-token",
+    bindingGeneration: 1,
     clerk_org_id: "org_1",
+    deadline: { expiresAtMs: Date.now() + 120_000 },
     id,
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: "AU",
-    xero_connection: {
-      access_token_auth_tag: "auth-tag",
-      access_token_encrypted: "encrypted-token",
-      access_token_iv: "iv",
-      revoked_at: null,
-      token_key_version: 1,
-    },
+    tokenVersion: 1,
     xero_connection_id: "connection-1",
     xero_tenant_id: "xero-tenant-1",
   };
@@ -73,21 +81,36 @@ function buildTenant(id: string): XeroTenantForWrite & {
 describe("XeroWriteAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
-      value: { refreshed: false },
+      value: {
+        accessToken: "access-token",
+        bindingGeneration: 1,
+        deadline: { expiresAtMs: Date.now() + 120_000 },
+        payrollRegion: "AU",
+        tokenVersion: 1,
+        xeroTenantDatabaseId: "tenant-1",
+        xeroTenantId: "xero-tenant-1",
+      },
     });
   });
 
   it("returns auth_error when submit cannot find a connected Xero tenant", async () => {
-    mocks.tenantFindFirst.mockResolvedValueOnce(null);
+    mocks.resolveXeroAccess.mockResolvedValueOnce({
+      error: { code: "not_connected", message: "Xero is not connected." },
+      ok: false,
+    });
 
     const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
 
     expect(result).toEqual({
       error: {
+        certainty: "definitive_failure",
         code: "auth_error",
+        dispatchPhase: "before_dispatch",
         message: "Xero is not connected.",
+        recoveryReason: "not_connected",
+        retryAfterMs: undefined,
         userMessage: "Xero is not connected.",
       },
       ok: false,
@@ -96,14 +119,21 @@ describe("XeroWriteAdapter", () => {
   });
 
   it("returns auth_error when approve cannot find a connected Xero tenant", async () => {
-    mocks.tenantFindFirst.mockResolvedValueOnce(null);
+    mocks.resolveXeroAccess.mockResolvedValueOnce({
+      error: { code: "not_connected", message: "Xero is not connected." },
+      ok: false,
+    });
 
     const result = await XeroWriteAdapter.approveLeaveApplication(approveInput);
 
     expect(result).toEqual({
       error: {
+        certainty: "definitive_failure",
         code: "auth_error",
+        dispatchPhase: "before_dispatch",
         message: "Xero is not connected.",
+        recoveryReason: "not_connected",
+        retryAfterMs: undefined,
         userMessage: "Xero is not connected.",
       },
       ok: false,
@@ -111,43 +141,30 @@ describe("XeroWriteAdapter", () => {
     expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
 
-  it("reloads the tenant after a proactive refresh before submitting leave", async () => {
-    const staleTenant = buildTenant("tenant-stale");
-    const freshTenant = buildTenant("tenant-fresh");
-    mocks.tenantFindFirst
-      .mockResolvedValueOnce(staleTenant)
-      .mockResolvedValueOnce(freshTenant);
-    mocks.ensureFreshXeroConnection.mockResolvedValueOnce({
-      ok: true,
-      value: { refreshed: true },
-    });
+  it("uses resolved access and the operation capability without selecting credentials", async () => {
     mocks.submitLeaveApplicationForRegion.mockResolvedValueOnce({
       ok: true,
-      value: {
-        rawResponse: { LeaveApplications: [] },
-        xeroLeaveApplicationId: "leave-application-1",
-      },
+      value: { rawResponse: {}, xeroLeaveApplicationId: "remote" },
     });
-
-    const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
-
-    expect(result).toEqual({
-      ok: true,
-      value: {
-        rawResponse: { LeaveApplications: [] },
-        remoteId: "leave-application-1",
-      },
-    });
-    expect(mocks.tenantFindFirst).toHaveBeenCalledTimes(2);
-    expect(mocks.ensureFreshXeroConnection).toHaveBeenCalledWith({
-      clerkOrgId: "org_1",
-      connectionId: "connection-1",
-      organisationId: "00000000-0000-4000-8000-000000000001",
-    });
+    expect(
+      (await XeroWriteAdapter.submitLeaveApplication(submitInput)).ok
+    ).toBe(true);
+    expect(mocks.resolveXeroAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        capability: "payroll.employees",
+        clerkOrgId: submitInput.clerkOrgId,
+        deadline: expect.objectContaining({ expiresAtMs: expect.any(Number) }),
+        organisationId: submitInput.organisationId,
+      })
+    );
+    expect(mocks.tenantFindFirst).not.toHaveBeenCalled();
     expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledWith(
       "AU",
       expect.objectContaining({
-        xeroTenant: freshTenant,
+        xeroTenant: expect.objectContaining({
+          accessToken: "access-token",
+          bindingGeneration: 1,
+        }),
       })
     );
   });
@@ -211,5 +228,157 @@ describe("XeroWriteAdapter", () => {
       expect(result.error.correlationId).toBe("xero-correlation-2");
       expect(result.error.rawPayload).toEqual(xeroError.rawPayload);
     }
+  });
+});
+
+describe("161g recovery regression", () => {
+  it.each([
+    ["admission_unavailable", "operational_incident"],
+    ["configuration_error", "operational_incident"],
+    ["capability_missing", "update_permissions"],
+  ])(
+    "preserves %s rather than reporting not connected",
+    async (code, recoveryReason) => {
+      mocks.tenantFindFirst.mockResolvedValue(buildTenant("tenant-1"));
+      mocks.ensureFreshXeroConnection.mockResolvedValue({
+        error: { code, message: "safe failure" },
+        ok: false,
+      });
+      mocks.resolveXeroAccess.mockResolvedValue({
+        error: { code, message: "safe failure" },
+        ok: false,
+      });
+      const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
+      expect(result).toMatchObject({ error: { recoveryReason }, ok: false });
+      if (recoveryReason === "update_permissions") {
+        expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+          "Xero lifecycle metric",
+          {
+            metric: "xero.binding.permission_required",
+            reason: "update_permissions",
+            value: 1,
+          }
+        );
+      } else {
+        expect(mocks.metricLog).not.toHaveBeenCalled();
+      }
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe("safe neutral resolution failures", () => {
+  it.each(["resolveEmployeeId", "resolveLeaveTypeId"] as const)(
+    "returns safe recovery copy from %s without diagnostics",
+    async (method) => {
+      mocks.resolveXeroAccess.mockResolvedValue({
+        error: {
+          code: "configuration_error",
+          message: "Sensitive transport diagnostic",
+          retryAfterMs: 5000,
+        },
+        ok: false,
+      });
+      const input = {
+        clerkOrgId: submitInput.clerkOrgId,
+        organisationId: submitInput.organisationId,
+        personId: "person-1",
+        recordType: "annual_leave",
+      };
+      const result = await XeroWriteAdapter[method](input);
+      expect(result).toEqual({
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+          recoveryReason: "operational_incident",
+          retryAfterMs: 5000,
+        },
+        ok: false,
+      });
+      if (result.ok) {
+        throw new Error("Resolution unexpectedly succeeded");
+      }
+      expect(result.error.message).not.toContain("Sensitive");
+      expect(result.error).not.toHaveProperty("rawPayload");
+      expect(result.error).not.toHaveProperty("dispatchPhase");
+      expect(result.error).not.toHaveProperty("certainty");
+      expect(result.error).not.toHaveProperty("correlationId");
+    }
+  );
+});
+
+describe("permission metric outcome safety", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  it("retains a definite pre-dispatch permissions failure when metric logging throws", async () => {
+    mocks.metricLog.mockImplementation(() => {
+      throw new Error("telemetry unavailable");
+    });
+    mocks.resolveXeroAccess.mockResolvedValue({
+      error: { code: "capability_missing", message: "missing permission" },
+      ok: false,
+    });
+    const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
+    expect(result).toMatchObject({
+      error: {
+        certainty: "definitive_failure",
+        dispatchPhase: "before_dispatch",
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.binding.permission_required",
+        reason: "update_permissions",
+        value: 1,
+      }
+    );
+  });
+  it("records returned permission errors without copying provider diagnostics into metric labels", async () => {
+    mocks.resolveXeroAccess.mockResolvedValue({
+      ok: true,
+      value: {
+        accessToken: "synthetic-access",
+        bindingGeneration: 1,
+        deadline: { expiresAtMs: Date.now() + 120_000 },
+        payrollRegion: "AU",
+        tokenVersion: 1,
+        xeroTenantDatabaseId: "tenant",
+        xeroTenantId: "external-tenant",
+      },
+    });
+    mocks.approveLeaveApplicationForRegion.mockResolvedValue({
+      error: {
+        code: "permission_error",
+        dispatchPhase: "provider_response_received",
+        httpStatus: 403,
+        message: "private provider diagnostic",
+        rawPayload: { secret: "private payload" },
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(
+      await XeroWriteAdapter.approveLeaveApplication(approveInput)
+    ).toMatchObject({
+      error: {
+        certainty: "definitive_failure",
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.binding.permission_required",
+        reason: "update_permissions",
+        value: 1,
+      }
+    );
   });
 });

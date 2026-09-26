@@ -9,7 +9,7 @@ import type {
   leave_balance_unit,
 } from "@repo/database/generated/enums";
 import { z } from "zod";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import type { PeopleRole } from "./people-service";
 
 export type ManualBalanceServiceError =
@@ -84,10 +84,22 @@ export async function setManualLeaveBalance(input: {
       parsed.data.organisationId as OrganisationId
     );
 
-    const hasXero = await hasActiveXeroConnection({
+    const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     });
+    if (!xeroStateResult.ok) {
+      return {
+        error: {
+          code: "unknown_error",
+          message:
+            "We cannot reach Xero right now. Try again later or contact support.",
+        },
+        ok: false,
+      };
+    }
+    const xeroConnectionState = xeroStateResult.value.state;
+    const hasXero = xeroConnectionState !== "not_connected";
     if (hasXero) {
       return {
         error: {

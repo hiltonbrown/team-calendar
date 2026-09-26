@@ -113,9 +113,9 @@ async function renderDashboard({
     if (role === "owner" || role === "admin") {
       return (
         <AdminEmptyView
-          hasActiveXeroConnection={onboarding.hasActiveXeroConnection}
           orgQueryValue={orgQueryValue}
           roleLabel={role === "owner" ? "Owner" : "Admin"}
+          xeroConnectionState={onboarding.xeroConnectionState}
         />
       );
     }

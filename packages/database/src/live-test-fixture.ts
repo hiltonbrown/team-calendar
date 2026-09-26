@@ -91,6 +91,10 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { cleanup_attempt: 4, cleanup_request: 4 },
     tenants: 2,
   },
+  "packages/xero/src/oauth/inactivity-report.integration.test.ts": {
+    globalKeys: { provider_app: 1 },
+    tenants: 2,
+  },
   "packages/xero/src/oauth/service.integration.test.ts": {
     globalKeys: { provider_app: 1 },
     tenants: 2,

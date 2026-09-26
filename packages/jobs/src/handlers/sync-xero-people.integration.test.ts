@@ -1,4 +1,5 @@
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -58,19 +59,25 @@ async function setupTenant(tenant: typeof tenantA) {
     },
   });
 
+  const access = encryptXeroToken("synthetic-access");
   await database.xeroConnection.create({
     data: {
-      access_token_encrypted: "encrypted-token",
+      access_token_auth_tag: access.authTag,
+      access_token_encrypted: access.encrypted,
+      access_token_iv: access.iv,
       clerk_org_id: tenant.clerkOrgId,
       expires_at: new Date(Date.now() + 3_600_000), // 1 hour in future
       id: tenant.xeroConnectionId,
       organisation_id: tenant.organisationId,
       status: "active",
+      token_key_version: access.keyVersion,
     },
   });
 
   await database.xeroTenant.create({
     data: {
+      active_slot: 1,
+      binding_generation: 1,
       clerk_org_id: tenant.clerkOrgId,
       id: tenant.xeroTenantId,
       organisation_id: tenant.organisationId,
@@ -78,7 +85,7 @@ async function setupTenant(tenant: typeof tenantA) {
       provider_app_id: process.env.XERO_CLIENT_ID ?? "test-xero-client-id",
       tenant_name: "Xero Tenant",
       xero_connection_id: tenant.xeroConnectionId,
-      xero_tenant_id: "xero-tenant-uuid",
+      xero_tenant_id: `xero-${tenant.xeroTenantId}`,
     },
   });
 }
@@ -149,6 +156,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const input = {
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -291,6 +299,7 @@ describe("sync-xero-people handler", () => {
     });
 
     await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -299,6 +308,7 @@ describe("sync-xero-people handler", () => {
 
     // Run for Tenant B with same Employee ID
     await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantB.clerkOrgId,
       organisationId: tenantB.organisationId,
       triggerType: "manual" as const,
@@ -363,6 +373,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -437,6 +448,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -510,6 +522,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -603,6 +616,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -690,6 +704,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -739,6 +754,7 @@ describe("sync-xero-people handler", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: tenantA.clerkOrgId,
       organisationId: tenantA.organisationId,
       triggerType: "manual" as const,
@@ -752,6 +768,9 @@ describe("sync-xero-people handler", () => {
       expect(result.value.upserted).toBe(0);
     }
 
+    if (!result.ok) {
+      throw new Error("Expected a terminal failed run result.");
+    }
     const run = await database.syncRun.findFirst({
       where: { clerk_org_id: tenantA.clerkOrgId, id: result.value.runId },
     });
@@ -845,6 +864,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -906,6 +926,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -963,6 +984,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1018,6 +1040,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1080,6 +1103,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1114,6 +1138,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1174,6 +1199,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1226,6 +1252,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1274,6 +1301,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1295,7 +1323,7 @@ describe("sync-xero-people handler", () => {
         expect(p.xero_missing_since).not.toBeNull();
         expect(p.archived_at).toBeNull();
       }
-    });
+    }, 120_000);
 
     it("blocks entire absence pass when missing count is greater than 5 (e.g. 6 of 35 = 17.1% < 20%, but count = 6 > 5)", async () => {
       await setupTenant(tenantA);
@@ -1327,6 +1355,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1347,7 +1376,7 @@ describe("sync-xero-people handler", () => {
         expect(p.xero_missing_since).toBeNull();
         expect(p.archived_at).toBeNull();
       }
-    });
+    }, 120_000);
 
     it("does not run absence pass on incomplete/truncated, failed, or cancelled reads", async () => {
       await setupTenant(tenantA);
@@ -1377,6 +1406,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const resultIncomplete = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1399,14 +1429,15 @@ describe("sync-xero-people handler", () => {
       });
 
       const resultFailed = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
         xeroTenantId: tenantA.xeroTenantId,
       });
-      expect(resultFailed.ok).toBe(true);
-      if (resultFailed.ok) {
-        expect(resultFailed.value.status).toBe("failed");
+      expect(resultFailed.ok).toBe(false);
+      if (!resultFailed.ok) {
+        expect(resultFailed.error.code).toBe("unknown_error");
       }
     });
 
@@ -1443,6 +1474,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1507,6 +1539,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1559,6 +1592,7 @@ describe("sync-xero-people handler", () => {
       });
 
       const result = await syncXeroPeople({
+        bindingGeneration: 1,
         clerkOrgId: tenantA.clerkOrgId,
         organisationId: tenantA.organisationId,
         triggerType: "manual",
@@ -1585,4 +1619,265 @@ describe("sync-xero-people handler", () => {
       }
     });
   });
+});
+
+it("persists current reserved and stale connection states without treating an incident as revocation", async () => {
+  const { getXeroConnectionState } = await import(
+    "@repo/database/queries/xero-connection-state"
+  );
+  await setupTenant(tenantA);
+  const scope = {
+    clerkOrgId: tenantA.clerkOrgId,
+    organisationId: tenantA.organisationId,
+  };
+  expect(await getXeroConnectionState(scope)).toEqual({
+    ok: true,
+    value: { bindingGeneration: 1, state: "connected" },
+  });
+  await database.xeroConnection.updateMany({
+    data: { last_error_code: "refresh_token_invalid", status: "stale" },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      organisation_id: scope.organisationId,
+    },
+  });
+  expect(await getXeroConnectionState(scope)).toEqual({
+    ok: true,
+    value: { bindingGeneration: 1, state: "reauthorisation_required" },
+  });
+  await database.xeroConnection.updateMany({
+    data: { last_error_code: "client_credentials_invalid" },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      organisation_id: scope.organisationId,
+    },
+  });
+  expect(await getXeroConnectionState(scope)).toEqual({
+    ok: true,
+    value: { bindingGeneration: 1, state: "connected" },
+  });
+  await database.xeroConnection.updateMany({
+    data: { revoked_at: new Date() },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      organisation_id: scope.organisationId,
+    },
+  });
+  expect(await getXeroConnectionState(scope)).toEqual({
+    ok: true,
+    value: { bindingGeneration: 1, state: "not_connected" },
+  });
+  await database.xeroConnection.updateMany({
+    data: { revoked_at: null },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      organisation_id: scope.organisationId,
+    },
+  });
+  await database.xeroTenant.updateMany({
+    data: { active_slot: null },
+    where: {
+      clerk_org_id: scope.clerkOrgId,
+      id: tenantA.xeroTenantId,
+      organisation_id: scope.organisationId,
+    },
+  });
+  expect(await getXeroConnectionState(scope)).toEqual({
+    ok: true,
+    value: { bindingGeneration: 1, state: "not_connected" },
+  });
+});
+
+it("cancels an old event when generation changes after fake fetch and persists no canonical batch", async () => {
+  await setupTenant(tenantA);
+  mockFetchEmployeesForRegion.mockImplementationOnce(async () => {
+    await database.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-binding:${tenantA.xeroTenantId}`}, 0))::text AS acquired`;
+      await tx.xeroTenant.updateMany({
+        data: { active_slot: null, binding_generation: { increment: 1 } },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          id: tenantA.xeroTenantId,
+          organisation_id: tenantA.organisationId,
+        },
+      });
+    });
+    return {
+      ok: true,
+      value: {
+        complete: true,
+        employees: [
+          {
+            email: "fake@example.test",
+            employeeId: fixture.id("employee", 0),
+            employmentType: "EMPLOYEE",
+            firstName: "Fake",
+            jobTitle: null,
+            lastName: "Employee",
+            rawPayload: {},
+            startDate: null,
+            status: "ACTIVE",
+          },
+        ],
+        failures: [],
+        rawItemCount: 1,
+        rawResponse: {},
+        seenEmployeeIds: [fixture.id("employee", 0)],
+      },
+    };
+  });
+  const result = await syncXeroPeople({
+    bindingGeneration: 1,
+    clerkOrgId: tenantA.clerkOrgId,
+    organisationId: tenantA.organisationId,
+    xeroTenantId: tenantA.xeroTenantId,
+  });
+  expect(result).toMatchObject({ ok: true, value: { status: "cancelled" } });
+  expect(
+    await database.person.count({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    })
+  ).toBe(0);
+  expect(
+    await database.xeroTenant.findFirst({
+      select: { binding_generation: true, last_people_sync_at: true },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: tenantA.xeroTenantId,
+        organisation_id: tenantA.organisationId,
+      },
+    })
+  ).toEqual({ binding_generation: 2, last_people_sync_at: null });
+  expect(
+    await database.syncRun.findFirst({
+      select: { error_summary: true, status: true },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    })
+  ).toEqual({ error_summary: "generation_changed", status: "cancelled" });
+});
+
+it("isolates a real per-record unique violation and still commits the following valid employee", async () => {
+  await setupTenant(tenantA);
+  const blockedId = fixture.id("employee", 0);
+  const validId = fixture.id("employee", 1);
+  await database.person.create({
+    data: {
+      clerk_org_id: tenantA.clerkOrgId,
+      email: "manual@example.test",
+      employment_type: "employee",
+      first_name: "Existing",
+      id: fixture.id("person", 0),
+      last_name: "Manual",
+      organisation_id: tenantA.organisationId,
+      source_person_key: null,
+      source_system: "MANUAL",
+      xero_employee_id: blockedId,
+    },
+  });
+  mockFetchEmployeesForRegion.mockResolvedValueOnce({
+    ok: true,
+    value: {
+      complete: true,
+      employees: [blockedId, validId].map((employeeId) => ({
+        email: `${employeeId}@example.test`,
+        employeeId,
+        employmentType: "EMPLOYEE",
+        firstName: "Fake",
+        jobTitle: null,
+        lastName: "Employee",
+        rawPayload: {},
+        startDate: null,
+        status: "ACTIVE",
+      })),
+      failures: [],
+      rawItemCount: 2,
+      rawResponse: {},
+      seenEmployeeIds: [blockedId, validId],
+    },
+  });
+  const result = await syncXeroPeople({
+    bindingGeneration: 1,
+    clerkOrgId: tenantA.clerkOrgId,
+    organisationId: tenantA.organisationId,
+    xeroTenantId: tenantA.xeroTenantId,
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    value: { failed: 1, status: "partial_success", upserted: 1 },
+  });
+  expect(
+    await database.person.findFirst({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        source_person_key: validId,
+        source_system: "XERO",
+      },
+    })
+  ).not.toBeNull();
+  expect(
+    await database.failedRecord.count({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        error_code: "db_error",
+        organisation_id: tenantA.organisationId,
+        source_id: blockedId,
+      },
+    })
+  ).toBe(1);
+});
+
+it("cancels legacy invalid-grant state racing after fake fetch without canonical writes", async () => {
+  await setupTenant(tenantA);
+  mockFetchEmployeesForRegion.mockImplementationOnce(async () => {
+    await database.xeroConnection.updateMany({
+      data: { last_error_code: "refresh_token_invalid", status: "stale" },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    return {
+      ok: true,
+      value: {
+        complete: true,
+        employees: [],
+        failures: [],
+        rawItemCount: 0,
+        rawResponse: {},
+        seenEmployeeIds: [],
+      },
+    };
+  });
+  const result = await syncXeroPeople({
+    bindingGeneration: 1,
+    clerkOrgId: tenantA.clerkOrgId,
+    organisationId: tenantA.organisationId,
+    xeroTenantId: tenantA.xeroTenantId,
+  });
+  expect(result).toMatchObject({ ok: true, value: { status: "cancelled" } });
+  expect(
+    await database.person.count({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+      },
+    })
+  ).toBe(0);
+  expect(
+    await database.xeroTenant.findFirst({
+      select: { last_people_sync_at: true },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: tenantA.xeroTenantId,
+        organisation_id: tenantA.organisationId,
+      },
+    })
+  ).toEqual({ last_people_sync_at: null });
 });

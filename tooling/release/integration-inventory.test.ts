@@ -15,6 +15,6 @@ describe("live integration inventory", () => {
     expect(() => assertExpectedIntegrationInventory(inventory)).not.toThrow();
     expect(() =>
       assertExpectedIntegrationInventory(inventory.slice(1))
-    ).toThrow("26-suite allowlist");
+    ).toThrow("27-suite allowlist");
   });
 });

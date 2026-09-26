@@ -105,11 +105,11 @@ describe("new record modal form", () => {
         balanceAvailable={10}
         canSelectPerson={false}
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={people}
         record={initialRecord}
+        xeroConnectionState="connected"
       />
     );
 
@@ -131,11 +131,11 @@ describe("new record modal form", () => {
         balanceAvailable={null}
         canSelectPerson={false}
         closeHref="/plans"
-        hasActiveXeroConnection={false}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={people}
         record={initialRecord}
+        xeroConnectionState="not_connected"
       />
     );
 
@@ -150,11 +150,11 @@ describe("new record modal form", () => {
         balanceAvailable={10}
         canSelectPerson={false}
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={people}
         record={initialRecord}
+        xeroConnectionState="connected"
       />
     );
 
@@ -182,11 +182,11 @@ describe("new record modal form", () => {
         balanceAvailable={10}
         canSelectPerson={false}
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={people}
         record={{ ...initialRecord, recordType: "wfh" }}
+        xeroConnectionState="connected"
       />
     );
 
@@ -207,11 +207,11 @@ describe("new record modal form", () => {
         balanceAvailable={10}
         canSelectPerson={false}
         closeHref="/plans"
-        hasActiveXeroConnection={true}
         mode="create"
         organisationId="00000000-0000-4000-8000-000000000001"
         people={people}
         record={initialRecord}
+        xeroConnectionState="connected"
       />
     );
 

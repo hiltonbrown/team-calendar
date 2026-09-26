@@ -40,6 +40,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
 ]);
 
 const SyncEventSchema = z.object({
+  bindingGeneration: z.number().int().nonnegative(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -101,6 +102,7 @@ export async function dispatchSyncEvent(
   try {
     const sent = await inngest.send({
       data: {
+        bindingGeneration: parsed.data.bindingGeneration,
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,

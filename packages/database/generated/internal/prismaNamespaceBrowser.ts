@@ -87,7 +87,8 @@ export const ModelName = {
   UsageCounter: 'UsageCounter',
   StripeEvent: 'StripeEvent',
   XeroCleanupRequest: 'XeroCleanupRequest',
-  XeroCleanupAttempt: 'XeroCleanupAttempt'
+  XeroCleanupAttempt: 'XeroCleanupAttempt',
+  XeroInactivityClassification: 'XeroInactivityClassification'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -910,6 +911,23 @@ export const XeroCleanupAttemptScalarFieldEnum = {
 } as const
 
 export type XeroCleanupAttemptScalarFieldEnum = (typeof XeroCleanupAttemptScalarFieldEnum)[keyof typeof XeroCleanupAttemptScalarFieldEnum]
+
+
+export const XeroInactivityClassificationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_tenant_id: 'xero_tenant_id',
+  policy_version: 'policy_version',
+  kind: 'kind',
+  reason: 'reason',
+  review_status: 'review_status',
+  classified_at: 'classified_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroInactivityClassificationScalarFieldEnum = (typeof XeroInactivityClassificationScalarFieldEnum)[keyof typeof XeroInactivityClassificationScalarFieldEnum]
 
 
 export const SortOrder = {

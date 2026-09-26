@@ -1,4 +1,5 @@
-import type { Result } from "@repo/core";
+import { type Result, xeroRecoveryMessage } from "@repo/core";
+import type { XeroDeadline } from "../rate-limit/deadline";
 
 export type XeroWriteError =
   | XeroWriteErrorVariant<"auth_error">
@@ -11,11 +12,23 @@ export type XeroWriteError =
   | XeroWriteErrorVariant<"unknown_error">
   | XeroWriteErrorVariant<"validation_error">;
 
+export type XeroRecoveryReason =
+  | "update_permissions"
+  | "reauthorise"
+  | "access_denied"
+  | "operational_incident"
+  | "retry_later"
+  | "outcome_unknown"
+  | "not_connected";
+
 export interface XeroWriteErrorDetails {
   correlationId?: string;
+  dispatchPhase?: "before_dispatch" | "after_dispatch";
   httpStatus?: number;
   message: string;
   rawPayload?: unknown;
+  recoveryReason?: XeroRecoveryReason;
+  retryAfterMs?: number;
 }
 
 export type XeroWriteErrorVariant<TCode extends string> =
@@ -28,17 +41,15 @@ export type XeroWriteResult<T> = Result<T, XeroWriteError>;
 export type PayrollRegion = "AU" | "NZ" | "UK";
 
 export interface XeroTenantForWrite {
+  accessToken: string;
+  bindingGeneration: number;
+  capability?: string | readonly string[];
   clerk_org_id: string;
+  deadline: XeroDeadline;
   id: string;
   organisation_id: string;
   payroll_region: PayrollRegion;
-  xero_connection: {
-    access_token_auth_tag?: null | string;
-    access_token_encrypted: string;
-    access_token_iv?: null | string;
-    revoked_at: Date | null;
-    token_key_version: number;
-  };
+  tokenVersion: number | null;
   xero_tenant_id: string;
 }
 
@@ -72,6 +83,13 @@ export interface WithdrawLeaveApplicationInput {
 }
 
 export function toPlainLanguageMessage(error: XeroWriteError): string {
+  if (error.recoveryReason) {
+    return error.recoveryReason === "not_connected"
+      ? "Xero is not connected."
+      : xeroRecoveryMessage(error.recoveryReason, {
+          retryAfterMs: error.retryAfterMs,
+        });
+  }
   switch (error.code) {
     case "auth_error":
       return "Your Xero connection needs to be reauthorised. Ask an administrator to reconnect Xero in Settings > Integrations.";

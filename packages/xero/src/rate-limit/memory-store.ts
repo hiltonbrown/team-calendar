@@ -14,9 +14,11 @@ import {
 
 interface MemoryStoreOptions {
   epoch?: string;
+  expectedCredentialDomainId?: string;
   initialised?: boolean;
   limits: SharedRateLimits;
   now?: () => number;
+  observedCredentialDomainId?: string;
 }
 export class MemorySharedXeroRateStore implements SharedXeroRateStore {
   private readonly options: MemoryStoreOptions;
@@ -52,6 +54,13 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       (input.deadline && remainingMs(input.deadline) <= 0)
     ) {
       return { error: { reason: "infrastructure" }, ok: false };
+    }
+    if (
+      this.options.expectedCredentialDomainId !== undefined &&
+      this.options.expectedCredentialDomainId !==
+        this.options.observedCredentialDomainId
+    ) {
+      return { error: { reason: "credential_domain_mismatch" }, ok: false };
     }
     const now = this.now();
     const [, appKey, minuteKey, dayKey, concurrentKey, cooldownKey] =

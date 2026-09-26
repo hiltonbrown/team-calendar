@@ -39,4 +39,4 @@ export const organisationWithConnectionSelect = {
 
 export type OrganisationWithConnectionView = Prisma.OrganisationGetPayload<{
   select: typeof organisationWithConnectionSelect;
-}>;
+}> & { xeroConnectionState: import("@repo/core").XeroConnectionDisplayState };

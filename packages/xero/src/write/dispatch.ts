@@ -46,7 +46,8 @@ export async function submitLeaveApplicationForRegion(
         default:
           return unsupportedRegion();
       }
-    }
+    },
+    true
   );
 }
 
@@ -68,7 +69,8 @@ export async function approveLeaveApplicationForRegion(
         default:
           return unsupportedRegion();
       }
-    }
+    },
+    true
   );
 }
 
@@ -90,7 +92,8 @@ export async function declineLeaveApplicationForRegion(
         default:
           return unsupportedRegion();
       }
-    }
+    },
+    true
   );
 }
 
@@ -112,7 +115,8 @@ export async function withdrawLeaveApplicationForRegion(
         default:
           return unsupportedRegion();
       }
-    }
+    },
+    true
   );
 }
 

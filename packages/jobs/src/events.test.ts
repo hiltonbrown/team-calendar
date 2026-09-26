@@ -34,6 +34,7 @@ describe("jobs events", () => {
 
   it("dispatches approval reconciliation with full tenant payload", async () => {
     const result = await dispatchSyncEvent({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runType: "approval_state_reconciliation",
@@ -57,6 +58,7 @@ describe("jobs events", () => {
     const eventId = "scheduled-sync:tenant_1:people:2026-08-10T19:45Z";
     await dispatchSyncEvent(
       {
+        bindingGeneration: 1,
         clerkOrgId: "org_1",
         organisationId: "00000000-0000-4000-8000-000000000001",
         runType: "people",
@@ -105,6 +107,7 @@ describe("jobs events", () => {
 
   it("dispatches sync cancellation events", async () => {
     const result = await dispatchCancelSyncRun({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       runId: "00000000-0000-4000-8000-000000000020",
@@ -112,4 +115,19 @@ describe("jobs events", () => {
 
     expect(result).toEqual({ ok: true, value: { queued: true } });
   });
+});
+
+it("rejects a sync event missing the binding generation before queueing", async () => {
+  mocks.send.mockClear();
+  const missingGeneration: unknown = {
+    clerkOrgId: "org_1",
+    organisationId: "00000000-0000-4000-8000-000000000001",
+    runType: "people",
+    xeroTenantId: "00000000-0000-4000-8000-000000000010",
+  };
+  const result = await dispatchSyncEvent(
+    missingGeneration as Parameters<typeof dispatchSyncEvent>[0]
+  ); // Runtime input deliberately omits required generation.
+  expect(result.ok).toBe(false);
+  expect(mocks.send).not.toHaveBeenCalled();
 });

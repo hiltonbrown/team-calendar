@@ -9,7 +9,7 @@ import {
 } from "@repo/database";
 import { log } from "@repo/observability/log";
 import {
-  ensureFreshXeroConnection,
+  resolveXeroAccess,
   scrubInactiveXeroOAuthSessionCredentials,
 } from "@repo/xero";
 import type { InngestFunction } from "inngest";
@@ -222,17 +222,24 @@ export async function rotateDormantXeroConnections(
 
   let failed = 0;
   let rotated = 0;
+  const seenOwners = new Set<string>();
   for (const connection of connectionsResult.value) {
-    const refreshResult = await ensureFreshXeroConnection({
+    if (connection.ownerId && seenOwners.has(connection.ownerId)) {
+      continue;
+    }
+    if (connection.ownerId) {
+      seenOwners.add(connection.ownerId);
+    }
+    const refreshResult = await resolveXeroAccess({
+      capability: "payroll.employees.read",
       clerkOrgId: connection.clerkOrgId,
-      connectionId: connection.connectionId,
-      now,
+      deadline: { expiresAtMs: Date.now() + 30_000 },
+      expectedBindingGeneration: connection.bindingGeneration,
+      forceRefresh: true,
       organisationId: connection.organisationId,
     });
     if (refreshResult.ok) {
-      if (refreshResult.value.refreshed) {
-        rotated += 1;
-      }
+      rotated += 1;
       continue;
     }
 
@@ -308,6 +315,7 @@ export async function scheduleXeroSyncsPage(
       );
       const dispatchRes = await dispatchSyncEvent(
         {
+          bindingGeneration: tenant.bindingGeneration,
           clerkOrgId: tenant.clerkOrgId,
           organisationId: tenant.organisationId,
           runType,

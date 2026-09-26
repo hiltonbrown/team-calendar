@@ -1,7 +1,7 @@
+import { database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  ensureFreshXeroConnection: vi.fn(),
   failedRecordCreate: vi.fn(),
   fetchEmployeesForRegion: vi.fn(),
   personFindFirst: vi.fn(),
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   personUpdateMany: vi.fn(),
   personUpsert: vi.fn(),
   publishOrganisationNotificationEvent: vi.fn(),
+  resolveXeroAccess: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
     clerk_org_id: scope.clerkOrgId,
     organisation_id: scope.organisationId,
@@ -64,10 +65,41 @@ vi.mock("@repo/observability/log", () => ({
   },
 }));
 
-vi.mock("@repo/xero", () => ({
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
+vi.mock("@repo/xero", async () => ({
+  classifyXeroFailure: (
+    await vi.importActual<typeof import("@repo/xero")>("@repo/xero")
+  ).classifyXeroFailure,
   fetchEmployeesForRegion: mocks.fetchEmployeesForRegion,
+  resolveXeroAccess: async (scope) => {
+    const result = await mocks.resolveXeroAccess(scope);
+    if (!result?.ok) {
+      return result;
+    }
+    const tenant = await mocks.xeroTenantFindFirst.mock.results.at(-1)?.value;
+    return {
+      ok: true,
+      value: {
+        ...result.value,
+        accessToken: "fake-access",
+        bindingGeneration: scope.expectedBindingGeneration,
+        capability: scope.capability,
+        deadline: scope.deadline,
+        payrollRegion: tenant.payroll_region,
+        tokenVersion: 1,
+        xeroTenantDatabaseId: tenant.id,
+        xeroTenantId: tenant.xero_tenant_id ?? "fake-tenant",
+      },
+    };
+  },
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
+  toResolvedXeroTenant: (scope, value) => ({
+    ...value,
+    clerk_org_id: scope.clerkOrgId,
+    id: value.xeroTenantDatabaseId,
+    organisation_id: scope.organisationId,
+    payroll_region: value.payrollRegion,
+    xero_tenant_id: value.xeroTenantId,
+  }),
 }));
 
 import { syncXeroPeople } from "./sync-xero-people";
@@ -96,11 +128,16 @@ function buildTenant(region: "AU" | "NZ" | "UK" = "NZ") {
 describe("syncXeroPeople unit tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(database, {
+      $executeRaw: vi.fn(async () => 1),
+      $queryRaw: vi.fn(async () => []),
+      $transaction: vi.fn(async (callback) => callback(database)),
+    });
     mocks.syncRunFindFirst.mockResolvedValue(null);
     mocks.syncRunCreate.mockResolvedValue({ id: "run_1" });
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
     mocks.xeroTenantFindFirst.mockResolvedValue(buildTenant("NZ"));
-    mocks.ensureFreshXeroConnection.mockResolvedValue({
+    mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
     });
@@ -112,6 +149,7 @@ describe("syncXeroPeople unit tests", () => {
 
   it("rejects invalid input schema with validation_error", async () => {
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: "",
       organisationId: "invalid-uuid",
       xeroTenantId: "invalid-uuid",
@@ -158,6 +196,7 @@ describe("syncXeroPeople unit tests", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -221,6 +260,7 @@ describe("syncXeroPeople unit tests", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -275,6 +315,7 @@ describe("syncXeroPeople unit tests", () => {
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -299,11 +340,13 @@ describe("syncXeroPeople unit tests", () => {
       error: {
         code: "auth_error",
         message: "Xero credentials are missing or revoked.",
+        recoveryReason: "reauthorise",
       },
       ok: false,
     });
 
     const result = await syncXeroPeople({
+      bindingGeneration: 1,
       clerkOrgId: "org_1",
       organisationId: "00000000-0000-4000-8000-000000000001",
       triggerType: "manual",
@@ -318,6 +361,40 @@ describe("syncXeroPeople unit tests", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           status: "failed",
+        }),
+      })
+    );
+  });
+
+  it("cancels generation changed after fake fetch without persisting people", async () => {
+    mocks.xeroTenantFindFirst
+      .mockResolvedValueOnce(buildTenant())
+      .mockResolvedValue(null);
+    mocks.fetchEmployeesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        employees: [],
+        failures: [],
+        rawItemCount: 0,
+        seenEmployeeIds: [],
+      },
+    });
+    const result = await syncXeroPeople({
+      bindingGeneration: 1,
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      xeroTenantId: "00000000-0000-4000-8000-000000000003",
+    });
+    expect(result).toMatchObject({ ok: true, value: { status: "cancelled" } });
+    expect(mocks.personUpsert).not.toHaveBeenCalled();
+    expect(mocks.personUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.xeroTenantUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.syncRunUpdateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_summary: "generation_changed",
+          status: "cancelled",
         }),
       })
     );

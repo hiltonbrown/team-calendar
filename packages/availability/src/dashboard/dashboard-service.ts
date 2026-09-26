@@ -52,7 +52,7 @@ import {
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
 import { listRuns, listTenantSummaries } from "../sync/sync-monitor-service";
-import { hasActiveXeroConnection } from "../xero-connection-state";
+import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import { createDashboardCache, type DashboardCache } from "./dashboard-cache";
 
 export type DashboardRole =
@@ -100,14 +100,14 @@ export interface EmployeeDashboardView {
     }>;
   }>;
   balances: DashboardSection<{
-    hasActiveXeroConnection: boolean;
+    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
     isXeroLinked: boolean;
     lastFetchedAt: Date | null;
     rows: BalanceRow[];
   }>;
   header: {
     firstName: string;
-    hasActiveXeroConnection: boolean;
+    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
     lastName: string;
     locationName: string | null;
     roleLabel: "Admin" | "Employee" | "Manager" | "Owner";
@@ -274,7 +274,7 @@ export interface AdminDashboardView extends EmployeeDashboardView {
     activeTenantCount: number;
     ctaUrl: string;
     failedRunsLast24h: number;
-    hasActiveXeroConnection: boolean;
+    xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
     lastSuccessfulSync: Date | null;
     pendingFailedRecords: number;
     runsLast24h: number;
@@ -709,7 +709,7 @@ async function buildEmployeeView(
   cache: DashboardCache
 ): Promise<Result<EmployeeDashboardView, DashboardServiceError>> {
   try {
-    const [profileResult, hasXero] = await Promise.all([
+    const [profileResult, xeroStateResult] = await Promise.all([
       getPersonProfile({
         actingPersonId: input.personId,
         actingUserId: input.userId,
@@ -718,11 +718,14 @@ async function buildEmployeeView(
         personId: input.personId,
         role: peopleRole(input.actingRole),
       }),
-      hasActiveXeroConnection({
+      getXeroConnectionStateForScope({
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
       }),
     ]);
+    const xeroConnectionState = xeroStateResult.ok
+      ? xeroStateResult.value.state
+      : "unavailable";
 
     if (!profileResult.ok) {
       if (profileResult.error.code === "person_not_found") {
@@ -763,18 +766,18 @@ async function buildEmployeeView(
       value: {
         actionItems,
         balances: readySection({
-          hasActiveXeroConnection: hasXero,
           isXeroLinked: profile.balances.xeroLinked,
           lastFetchedAt,
           rows: profile.balances.rows,
+          xeroConnectionState,
         }),
         header: {
           firstName: profile.header.firstName,
-          hasActiveXeroConnection: hasXero,
           lastName: profile.header.lastName,
           locationName: profile.header.location?.name ?? null,
           roleLabel: "Employee",
           timezone: profile.header.location?.timezone ?? null,
+          xeroConnectionState,
         },
         publicHolidays,
         quickActions: {
@@ -1047,7 +1050,7 @@ async function loadSyncHealthCard(input: {
   userId: string;
 }): Promise<Result<SyncHealthCardData, DashboardServiceError>> {
   const since = addDays(new Date(), -1);
-  const [summaryResult, runsResult, hasXero] = await Promise.all([
+  const [summaryResult, runsResult, xeroStateResult] = await Promise.all([
     listTenantSummaries({
       actingRole: input.actingRole,
       actingUserId: input.userId,
@@ -1065,11 +1068,14 @@ async function loadSyncHealthCard(input: {
       organisationId: input.organisationId,
       pagination: { pageSize: 200 },
     }),
-    hasActiveXeroConnection({
+    getXeroConnectionStateForScope({
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
     }),
   ]);
+  const xeroConnectionState = xeroStateResult.ok
+    ? xeroStateResult.value.state
+    : "unavailable";
 
   if (!(summaryResult.ok && runsResult.ok)) {
     return {
@@ -1102,7 +1108,6 @@ async function loadSyncHealthCard(input: {
       failedRunsLast24h: runsResult.value.runs.filter(
         (run) => run.status === "failed" || run.status === "partial_success"
       ).length,
-      hasActiveXeroConnection: hasXero,
       lastSuccessfulSync,
       pendingFailedRecords: summaryResult.value.reduce(
         (total, summary) => total + summary.pendingFailedRecords,
@@ -1110,6 +1115,7 @@ async function loadSyncHealthCard(input: {
       ),
       runsLast24h: runsResult.value.runs.length,
       tenantCount: summaryResult.value.length,
+      xeroConnectionState,
     },
   };
 }
