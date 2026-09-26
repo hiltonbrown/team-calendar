@@ -1,0 +1,469 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => {
+  const database = {
+    $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
+    $transaction: vi.fn(),
+    xeroConnection: { findUniqueOrThrow: vi.fn(), updateMany: vi.fn() },
+    xeroCredentialOwner: {
+      create: vi.fn(),
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    xeroRefreshAttempt: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    xeroTenant: { findFirst: vi.fn(), findMany: vi.fn() },
+  };
+  return {
+    database,
+    decrypt: vi.fn(),
+    encrypt: vi.fn(),
+    exchange: vi.fn(),
+    identity: vi.fn(),
+    legacy: vi.fn(),
+  };
+});
+vi.mock("@repo/database", () => ({ database: mocks.database }));
+vi.mock("../../keys", () => ({ keys: () => ({ XERO_CLIENT_ID: "app" }) }));
+vi.mock("./identity", () => ({
+  verifyXeroAccessTokenIdentity: mocks.identity,
+}));
+vi.mock("./service", () => ({
+  ensureFreshXeroConnection: mocks.legacy,
+  exchangeToken: mocks.exchange,
+}));
+vi.mock("../crypto/tokens", () => ({
+  decryptXeroToken: mocks.decrypt,
+  encryptXeroToken: mocks.encrypt,
+}));
+
+import { createXeroDeadline } from "../rate-limit/deadline";
+import {
+  adoptXeroCredential,
+  recoverXeroRefreshAttempts,
+  refreshXeroCredentialOwner,
+  resolveXeroAccess,
+} from "./credential-owner";
+
+const db = mocks.database;
+function owner() {
+  return {
+    access_token_auth_tag: "tag",
+    access_token_encrypted: "cipher-access",
+    access_token_iv: "iv",
+    created_at: new Date(),
+    granted_scopes: ["payroll.employees"],
+    granted_scopes_known: true,
+    id: "owner",
+    identity_evidence: "access_token_jwt",
+    last_adopted_at: null,
+    last_refresh_attempt_id: null,
+    last_rotated_at: null,
+    last_verified_at: null,
+    provider_app_id: "app",
+    refresh_token_auth_tag: "tag",
+    refresh_token_encrypted: "cipher-refresh",
+    refresh_token_iv: "iv",
+    token_expires_at: new Date(Date.now() + 3_600_000),
+    token_key_version: 1,
+    token_version: 1,
+    updated_at: new Date(),
+    usability: "usable",
+    xero_user_id: "authoriser",
+  };
+}
+function attempt() {
+  return {
+    created_at: new Date(),
+    dispatched_at: new Date(),
+    expected_token_version: 1,
+    id: "attempt",
+    outcome: "pending",
+    recovery_deadline: null,
+    recovery_key_version: 1,
+    recovery_token_auth_tag: "tag",
+    recovery_token_encrypted: "cipher-refresh",
+    recovery_token_iv: "iv",
+    uncertain_since: null,
+    updated_at: new Date(),
+    xero_credential_owner_id: "owner",
+  };
+}
+function binding() {
+  return {
+    active_slot: 1,
+    binding_generation: 2,
+    clerk_org_id: "clerk",
+    credential_owner: owner(),
+    id: "binding",
+    organisation_id: "organisation",
+    payroll_region: "AU",
+    retired_at: null,
+    xero_connection: {
+      disconnected_at: null,
+      id: "connection",
+      revoked_at: null,
+      status: "active",
+    },
+    xero_tenant_id: "payroll-file",
+  };
+}
+const deadline = () => createXeroDeadline(15_000);
+const accessInput = () => ({
+  clerkOrgId: "clerk",
+  deadline: deadline(),
+  expectedBindingGeneration: 2,
+  organisationId: "organisation",
+});
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  db.$transaction.mockImplementation(
+    async (callback: (tx: typeof db) => Promise<unknown>) => callback(db)
+  );
+  db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue(owner());
+  db.xeroRefreshAttempt.findUniqueOrThrow.mockResolvedValue(attempt());
+  db.xeroTenant.findMany.mockResolvedValue([]);
+  mocks.decrypt.mockReturnValue("synthetic-token");
+  mocks.encrypt.mockReturnValue({
+    authTag: "new-tag",
+    encrypted: "new-cipher",
+    iv: "new-iv",
+    keyVersion: 1,
+  });
+  mocks.identity.mockResolvedValue({
+    ok: true,
+    value: {
+      authEventId: null,
+      expiresAt: new Date(Date.now() + 7_200_000),
+      xeroUserId: "authoriser",
+    },
+  });
+  mocks.exchange.mockResolvedValue({
+    ok: true,
+    value: {
+      access_token: "synthetic-access",
+      expires_in: 1800,
+      refresh_token: "synthetic-refresh",
+    },
+  });
+  db.xeroCredentialOwner.update.mockResolvedValue({
+    ...owner(),
+    token_version: 2,
+  });
+});
+
+describe("credential owner refresh", () => {
+  it("retains grace recovery after a dispatched server failure", async () => {
+    mocks.exchange.mockResolvedValue({
+      error: {
+        code: "network_error",
+        dispatched: true,
+        message: "Provider unavailable",
+      },
+      ok: false,
+    });
+    await refreshXeroCredentialOwner({
+      deadline: deadline(),
+      expectedTokenVersion: 1,
+      ownerId: "owner",
+    });
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outcome: "lost_response" }),
+      })
+    );
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+  });
+
+  it("commits durable intent before the token call and locks owners before sorted mirrors", async () => {
+    db.xeroTenant.findMany.mockResolvedValue([
+      { id: "binding-a", xero_connection_id: "connection-z" },
+      { id: "binding-b", xero_connection_id: "connection-a" },
+    ]);
+    const result = await refreshXeroCredentialOwner({
+      deadline: deadline(),
+      expectedTokenVersion: 1,
+      ownerId: "owner",
+    });
+    expect(result.ok).toBe(true);
+    expect(
+      db.xeroRefreshAttempt.create.mock.invocationCallOrder[0]
+    ).toBeLessThan(mocks.exchange.mock.invocationCallOrder[0] ?? 0);
+    const locks = db.$queryRaw.mock.calls.map((call) => call[1]);
+    expect(locks).toEqual([
+      "xero-owner:owner",
+      "xero-owner:owner",
+      "xero-binding:binding-a",
+      "xero-binding:binding-b",
+      "connection-a",
+      "connection-z",
+    ]);
+    expect(db.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      db.$queryRaw.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(db.xeroConnection.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          disconnected_at: null,
+          revoked_at: null,
+          status: { in: ["active", "stale"] },
+          xero_tenant: { active_slot: 1, xero_credential_owner_id: "owner" },
+        }),
+      })
+    );
+  });
+  it("invalid client configuration changes neither owners nor bindings", async () => {
+    mocks.exchange.mockResolvedValue({
+      error: { code: "client_credentials_invalid", message: "configuration" },
+      ok: false,
+    });
+    expect(
+      (
+        await refreshXeroCredentialOwner({
+          deadline: deadline(),
+          expectedTokenVersion: 1,
+          ownerId: "owner",
+        })
+      ).ok
+    ).toBe(false);
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+    expect(db.xeroCredentialOwner.updateMany).not.toHaveBeenCalled();
+    expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+  });
+  it("invalid grant requires reauthorisation without claiming remote absence", async () => {
+    mocks.exchange.mockResolvedValue({
+      error: { code: "refresh_token_invalid", message: "grant" },
+      ok: false,
+    });
+    await refreshXeroCredentialOwner({
+      deadline: deadline(),
+      expectedTokenVersion: 1,
+      ownerId: "owner",
+    });
+    expect(db.xeroCredentialOwner.update).toHaveBeenCalledWith({
+      data: { usability: "reauthorisation_required" },
+      where: { id: "owner" },
+    });
+    expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+  });
+  it("reuses a newer winner without dispatching another token request", async () => {
+    db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue({
+      ...owner(),
+      token_version: 2,
+    });
+    const result = await refreshXeroCredentialOwner({
+      deadline: deadline(),
+      expectedTokenVersion: 1,
+      ownerId: "owner",
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: "superseded",
+          recovery_token_encrypted: null,
+        }),
+      })
+    );
+  });
+  it("retains a lost response token and does not reset its grace deadline", async () => {
+    const since = new Date(Date.now() - 60_000);
+    const until = new Date(since.getTime() + 1_800_000);
+    db.xeroRefreshAttempt.findUniqueOrThrow.mockResolvedValue({
+      ...attempt(),
+      recovery_deadline: until,
+      uncertain_since: since,
+    });
+    mocks.exchange.mockResolvedValue({
+      error: { code: "unknown_error", dispatched: true, message: "network" },
+      ok: false,
+    });
+    await refreshXeroCredentialOwner({
+      deadline: deadline(),
+      expectedTokenVersion: 1,
+      ownerId: "owner",
+    });
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          outcome: "lost_response",
+          recovery_deadline: until,
+          uncertain_since: since,
+        },
+      })
+    );
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("scoped access resolution", () => {
+  it.each([
+    ["stale generation", { binding_generation: 3 }, "generation_changed"],
+    ["retired binding", { active_slot: null }, "disconnected"],
+    [
+      "disconnected connection",
+      {
+        xero_connection: {
+          disconnected_at: new Date(),
+          id: "connection",
+          revoked_at: null,
+          status: "disconnected",
+        },
+      },
+      "disconnected",
+    ],
+    [
+      "unusable owner",
+      {
+        credential_owner: { ...owner(), usability: "reauthorisation_required" },
+      },
+      "reauthorisation_required",
+    ],
+  ])(
+    "rejects %s before decrypting credentials",
+    async (_label, overrides, code) => {
+      db.xeroTenant.findFirst.mockResolvedValue({ ...binding(), ...overrides });
+      const result = await resolveXeroAccess(accessInput());
+      expect(result).toEqual({
+        error: expect.objectContaining({ code }),
+        ok: false,
+      });
+      expect(mocks.decrypt).not.toHaveBeenCalled();
+    }
+  );
+  it("filters initial and final binding reads by both tenancy IDs", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue(binding());
+    expect((await resolveXeroAccess(accessInput())).ok).toBe(true);
+    for (const [query] of db.xeroTenant.findFirst.mock.calls) {
+      expect(query.where).toMatchObject({
+        clerk_org_id: "clerk",
+        organisation_id: "organisation",
+      });
+    }
+  });
+  it("allows unknown scope data without asserting that a capability is granted", async () => {
+    const tenant = {
+      ...binding(),
+      credential_owner: {
+        ...owner(),
+        granted_scopes: [],
+        granted_scopes_known: false,
+      },
+    };
+    db.xeroTenant.findFirst.mockResolvedValue(tenant);
+    expect(
+      (
+        await resolveXeroAccess({
+          ...accessInput(),
+          capability: "payroll.employees",
+        })
+      ).ok
+    ).toBe(true);
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+  });
+  it("rejects a known missing capability", async () => {
+    db.xeroTenant.findFirst.mockResolvedValue(binding());
+    expect(
+      await resolveXeroAccess({
+        ...accessInput(),
+        capability: "payroll.timesheets",
+      })
+    ).toEqual({
+      error: expect.objectContaining({ code: "capability_missing" }),
+      ok: false,
+    });
+  });
+});
+
+describe("adoption and durable recovery", () => {
+  it("does not adopt a candidate with earlier expiry", async () => {
+    db.xeroCredentialOwner.findUnique.mockResolvedValue(owner());
+    mocks.identity.mockResolvedValue({
+      ok: true,
+      value: {
+        expiresAt: new Date(Date.now() + 600_000),
+        xeroUserId: "authoriser",
+      },
+    });
+    expect(
+      (
+        await adoptXeroCredential({
+          accessToken: "synthetic",
+          deadline: deadline(),
+          refreshToken: "synthetic",
+        })
+      ).ok
+    ).toBe(true);
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+    expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw.mock.calls.map((call) => call[1])).toEqual([
+      "xero-owner:app:authoriser",
+      "xero-owner:owner",
+    ]);
+  });
+  it("a newer adoption supersedes a pending attempt rather than proving its commit", async () => {
+    db.xeroRefreshAttempt.findMany.mockResolvedValue([attempt()]);
+    db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue({
+      ...owner(),
+      last_refresh_attempt_id: "different-attempt",
+      token_version: 2,
+    });
+    await recoverXeroRefreshAttempts({ now: new Date() });
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: "superseded",
+          recovery_token_encrypted: null,
+        }),
+      })
+    );
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+  it("matching attempt ID and exact next token version prove a lost commit", async () => {
+    db.xeroRefreshAttempt.findMany.mockResolvedValue([attempt()]);
+    db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue({
+      ...owner(),
+      last_refresh_attempt_id: "attempt",
+      token_version: 2,
+    });
+    await recoverXeroRefreshAttempts({ now: new Date() });
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ outcome: "committed" }),
+      })
+    );
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+  it("grace expiry scrubs recovery material and marks only the matching owner version unusable", async () => {
+    const old = new Date(Date.now() - 1_800_001);
+    const expired = { ...attempt(), created_at: old, dispatched_at: old };
+    db.xeroRefreshAttempt.findMany.mockResolvedValue([expired]);
+    db.xeroRefreshAttempt.findUniqueOrThrow.mockResolvedValue(expired);
+    await recoverXeroRefreshAttempts({ now: new Date() });
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: "failed",
+          recovery_key_version: null,
+          recovery_token_encrypted: null,
+        }),
+      })
+    );
+    expect(db.xeroCredentialOwner.updateMany).toHaveBeenCalledWith({
+      data: { usability: "reauthorisation_required" },
+      where: { id: "owner", token_version: 1 },
+    });
+    expect(mocks.exchange).not.toHaveBeenCalled();
+  });
+});

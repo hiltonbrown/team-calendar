@@ -1,3 +1,4 @@
+import { recoverXeroRefreshAttempts } from "@repo/xero";
 import "server-only";
 
 import type { Result } from "@repo/core";
@@ -370,6 +371,9 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
         });
       }
 
+      await step.run("recover-xero-refresh-attempts", async () =>
+        recoverXeroRefreshAttempts({ now: new Date() })
+      );
       const rotationResult = await step.run(
         "rotate-dormant-connections",
         async () => rotateDormantXeroConnections()

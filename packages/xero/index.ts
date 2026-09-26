@@ -3,6 +3,11 @@ import "./keys";
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
 export {
+  recoverXeroRefreshAttempts,
+  refreshXeroCredentialOwner,
+  resolveXeroAccess,
+} from "./src/oauth/credential-owner";
+export {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
   completeXeroTenantSelection,

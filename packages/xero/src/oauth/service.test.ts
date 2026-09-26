@@ -5,6 +5,7 @@ import { encryptXeroToken } from "../crypto/tokens";
 vi.mock("server-only", () => ({}));
 
 const dbMock = vi.hoisted(() => ({
+  $executeRaw: vi.fn(),
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
   organisation: {
@@ -18,17 +19,25 @@ const dbMock = vi.hoisted(() => ({
     updateMany: vi.fn(),
     upsert: vi.fn(),
   },
+  xeroCredentialOwner: { findUnique: vi.fn() },
   xeroOAuthSession: {
     create: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
   },
+  xeroProviderConnection: { findUnique: vi.fn(), upsert: vi.fn() },
   xeroTenant: {
     findFirst: vi.fn(),
     upsert: vi.fn(),
   },
 }));
+const loggerMock = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock("@repo/observability/log", () => ({ log: loggerMock }));
 const feedMock = vi.hoisted(() => ({
   ensureDefaultCalendarFeed: vi.fn(),
 }));
@@ -37,6 +46,23 @@ const availabilityMock = vi.hoisted(() => ({
 }));
 vi.mock("@repo/database", () => ({
   database: dbMock,
+}));
+vi.mock("./identity", () => ({
+  verifyXeroAccessTokenIdentity: vi.fn().mockResolvedValue({
+    ok: true,
+    value: {
+      authEventId: null,
+      expiresAt: new Date(Date.now() + 1_800_000),
+      xeroUserId: "user1",
+    },
+  }),
+}));
+vi.mock("./credential-owner", async (importOriginal) => ({
+  ...(await importOriginal()),
+  adoptXeroCredential: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { id: "owner1", provider_app_id: "client-id" },
+  }),
 }));
 vi.mock("@repo/feeds", () => feedMock);
 vi.mock("@repo/availability", () => availabilityMock);
@@ -63,6 +89,7 @@ interface OAuthTestStatePayload {
   nonce: string;
   organisationId: null | string;
   returnTo: string;
+  sessionId?: string;
   userId: null | string;
 }
 
@@ -133,6 +160,16 @@ beforeEach(() => {
   dbMock.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
   dbMock.xeroOAuthSession.findFirst.mockReset();
   dbMock.xeroOAuthSession.create.mockReset();
+  dbMock.xeroOAuthSession.create.mockImplementation(({ data }) => {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+      id: "session_1",
+      ...data,
+    });
+    return { id: "session_1" };
+  });
+  dbMock.xeroCredentialOwner.findUnique.mockResolvedValue(null);
+  dbMock.xeroProviderConnection.findUnique.mockResolvedValue(null);
+
   dbMock.xeroOAuthSession.update.mockReset();
   dbMock.xeroOAuthSession.updateMany.mockReset();
   dbMock.xeroOAuthSession.updateMany.mockResolvedValue({ count: 1 });
@@ -177,10 +214,10 @@ describe("isPreviewDeployment", () => {
 });
 
 describe("buildXeroOAuthStartUrl", () => {
-  it("disables Xero connect on preview deployments", () => {
+  it("disables Xero connect on preview deployments", async () => {
     process.env.VERCEL_ENV = "preview";
 
-    const result = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const result = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -188,11 +225,11 @@ describe("buildXeroOAuthStartUrl", () => {
     }
   });
 
-  it("returns oauth_not_configured when credentials are missing", () => {
+  it("returns oauth_not_configured when credentials are missing", async () => {
     delete process.env.XERO_CLIENT_ID;
     delete process.env.XERO_CLIENT_SECRET;
 
-    const result = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const result = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -201,7 +238,7 @@ describe("buildXeroOAuthStartUrl", () => {
   });
 
   it("fails closed when verifying state without the client secret", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -230,8 +267,8 @@ describe("buildXeroOAuthStartUrl", () => {
     }
   });
 
-  it("uses the pre-registered redirect URI when configured", () => {
-    const result = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+  it("uses the pre-registered redirect URI when configured", async () => {
+    const result = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -242,8 +279,8 @@ describe("buildXeroOAuthStartUrl", () => {
     }
   });
 
-  it("signs the default local return path", () => {
-    const result = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+  it("signs the default local return path", async () => {
+    const result = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -253,9 +290,9 @@ describe("buildXeroOAuthStartUrl", () => {
     }
   });
 
-  it("preserves a valid local return path with a query and fragment", () => {
+  it("preserves a valid local return path with a query and fragment", async () => {
     const returnTo = "/calendar?team=people#upcoming";
-    const result = buildXeroOAuthStartUrl({
+    const result = await buildXeroOAuthStartUrl({
       clerkOrgId: "org_1",
       returnTo,
     });
@@ -274,8 +311,8 @@ describe("buildXeroOAuthStartUrl", () => {
     "//attacker.example/path",
     "/\\attacker.example/path",
     "/settings\n/integrations",
-  ])("rejects the unsafe return path %j", (returnTo) => {
-    const result = buildXeroOAuthStartUrl({
+  ])("rejects the unsafe return path %j", async (returnTo) => {
+    const result = await buildXeroOAuthStartUrl({
       clerkOrgId: "org_1",
       returnTo,
     });
@@ -288,8 +325,55 @@ describe("buildXeroOAuthStartUrl", () => {
 });
 
 describe("completeXeroOAuth", () => {
+  it("returns and logs no code, token, state or nonce when the exchange fails", async () => {
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    if (!start.ok) {
+      throw new Error("Expected start");
+    }
+    const state =
+      new URL(start.value.redirectUrl).searchParams.get("state") ?? "";
+    const code = "sensitive-synthetic-code";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            access_token: "sensitive-synthetic-token",
+            error: "synthetic-error",
+          },
+          { status: 400 }
+        )
+      )
+    );
+    const result = await completeXeroOAuth({
+      code,
+      nonce: start.value.nonce,
+      state,
+    });
+    expect(result.ok).toBe(false);
+    const exposed = JSON.stringify({
+      logs: [
+        loggerMock.info.mock.calls,
+        loggerMock.warn.mock.calls,
+        loggerMock.error.mock.calls,
+      ],
+      result,
+    });
+    for (const secret of [
+      code,
+      state,
+      start.value.nonce,
+      "sensitive-synthetic-token",
+    ]) {
+      expect(exposed).not.toContain(secret);
+    }
+  });
+
   it("records the current binding generation for an existing payroll entity", async () => {
-    const start = buildXeroOAuthStartUrl({
+    dbMock.xeroTenant.findFirst.mockResolvedValueOnce({
+      binding_generation: 7,
+    });
+    const start = await buildXeroOAuthStartUrl({
       clerkOrgId: "org_1",
       organisationId: "90000000-0000-4000-8000-000000000002",
     });
@@ -297,9 +381,7 @@ describe("completeXeroOAuth", () => {
     if (!start.ok) {
       return;
     }
-    dbMock.xeroTenant.findFirst.mockResolvedValueOnce({
-      binding_generation: 7,
-    });
+
     dbMock.xeroOAuthSession.create.mockResolvedValueOnce({ id: "session_1" });
     vi.stubGlobal(
       "fetch",
@@ -337,7 +419,7 @@ describe("completeXeroOAuth", () => {
   });
 
   it("stores the Xero authorisation connection id in the pending session", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -381,7 +463,7 @@ describe("completeXeroOAuth", () => {
       ok: true,
       value: { sessionId: "session_1" },
     });
-    expect(dbMock.xeroOAuthSession.create).toHaveBeenCalledWith(
+    expect(dbMock.xeroOAuthSession.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           available_tenants_json: {
@@ -399,7 +481,7 @@ describe("completeXeroOAuth", () => {
   });
 
   it("rejects a missing nonce before exchanging the authorisation code", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -421,7 +503,7 @@ describe("completeXeroOAuth", () => {
   });
 
   it("rejects a mismatched nonce before exchanging the authorisation code", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -443,7 +525,7 @@ describe("completeXeroOAuth", () => {
   });
 
   it("replaces an unsafe return path from legacy signed state", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -497,9 +579,9 @@ describe("isLocalApplicationPath", () => {
 });
 
 describe("Xero OAuth state", () => {
-  it("mints distinct states for identical inputs", () => {
-    const first = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
-    const second = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+  it("mints distinct states for identical inputs", async () => {
+    const first = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const second = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(first.ok && second.ok).toBe(true);
     if (!(first.ok && second.ok)) {
       return;
@@ -513,13 +595,14 @@ describe("Xero OAuth state", () => {
 
   it("rejects an eleven-minute-old state before exchanging the authorisation code", async () => {
     const nowSpy = vi.spyOn(Date, "now");
-    nowSpy.mockReturnValueOnce(1_000_000).mockReturnValue(1_660_000);
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    nowSpy.mockReturnValue(1_000_000);
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
     }
 
+    nowSpy.mockReturnValue(1_660_000);
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
@@ -536,7 +619,7 @@ describe("Xero OAuth state", () => {
   });
 
   it("rejects a tampered state", async () => {
-    const start = buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -1320,6 +1403,66 @@ describe("ensureFreshXeroConnection", () => {
       })
     );
   });
+
+  it.each(["reencrypted-refresh-token", ""])(
+    "does not treat changed ciphertext %j as refresh proof",
+    async (changed) => {
+      const storedTokens = buildStoredTokenFields();
+      dbMock.xeroConnection.findFirst
+        .mockResolvedValueOnce({
+          ...storedTokens,
+          expires_at: new Date(input.now.getTime() + 60 * 1000),
+          revoked_at: null,
+          status: "active",
+        })
+        .mockResolvedValueOnce({
+          ...storedTokens,
+          expires_at: new Date(input.now.getTime() + 60 * 1000),
+          revoked_at: null,
+          status: "active",
+        })
+        .mockResolvedValueOnce({
+          disconnected_at: null,
+          id: input.connectionId,
+          refresh_token_auth_tag: storedTokens.refresh_token_auth_tag,
+          refresh_token_encrypted: storedTokens.refresh_token_encrypted,
+          refresh_token_iv: storedTokens.refresh_token_iv,
+          revoked_at: null,
+          status: "active",
+          token_key_version: storedTokens.token_key_version,
+        })
+        .mockResolvedValueOnce({
+          disconnected_at: null,
+          expires_at: new Date(input.now.getTime() + 60 * 1000),
+          refresh_token_encrypted: changed,
+          revoked_at: null,
+          status: "active",
+          token_key_version: 2,
+        });
+
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          Response.json(
+            {
+              access_token: "new-access-token",
+              expires_in: 1800,
+              refresh_token: "new-refresh-token",
+            },
+            { status: 200 }
+          )
+        )
+      );
+      dbMock.xeroConnection.updateMany.mockRejectedValueOnce(
+        new Error("Database connection timed out.")
+      );
+
+      dbMock.xeroConnection.updateMany.mockResolvedValue({ count: 0 });
+      const result = await ensureFreshXeroConnection(input);
+
+      expect(result.ok).toBe(false);
+    }
+  );
 
   it("refreshes inside the lock when the locked re-read is still stale", async () => {
     const storedTokens = buildStoredTokenFields();

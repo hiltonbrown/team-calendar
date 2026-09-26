@@ -374,3 +374,49 @@ export const stripe_event_delivery_state = {
 } as const
 
 export type stripe_event_delivery_state = (typeof stripe_event_delivery_state)[keyof typeof stripe_event_delivery_state]
+
+
+export const xero_credential_usability = {
+  usable: 'usable',
+  reauthorisation_required: 'reauthorisation_required'
+} as const
+
+export type xero_credential_usability = (typeof xero_credential_usability)[keyof typeof xero_credential_usability]
+
+
+export const xero_refresh_attempt_outcome = {
+  pending: 'pending',
+  superseded: 'superseded',
+  committed: 'committed',
+  lost_response: 'lost_response',
+  failed: 'failed'
+} as const
+
+export type xero_refresh_attempt_outcome = (typeof xero_refresh_attempt_outcome)[keyof typeof xero_refresh_attempt_outcome]
+
+
+export const xero_provider_connection_status = {
+  present: 'present',
+  absent_confirmed: 'absent_confirmed',
+  unknown: 'unknown'
+} as const
+
+export type xero_provider_connection_status = (typeof xero_provider_connection_status)[keyof typeof xero_provider_connection_status]
+
+
+export const xero_oauth_intent_kind = {
+  initial_binding: 'initial_binding',
+  same_file_reauthorisation: 'same_file_reauthorisation'
+} as const
+
+export type xero_oauth_intent_kind = (typeof xero_oauth_intent_kind)[keyof typeof xero_oauth_intent_kind]
+
+
+export const xero_token_exchange_status = {
+  not_started: 'not_started',
+  dispatching: 'dispatching',
+  exchanged: 'exchanged',
+  unknown: 'unknown'
+} as const
+
+export type xero_token_exchange_status = (typeof xero_token_exchange_status)[keyof typeof xero_token_exchange_status]

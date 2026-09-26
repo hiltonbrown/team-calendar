@@ -1455,3 +1455,18 @@ verified clean.
 Tailwind's preflight strips the default, so bullets on the privacy policy and
 terms pages render as indented paragraphs. Present at baseline. Worth a one-line
 fix later; not changed here to keep the production push to reviewed scope.
+
+
+## Plan 161d, canonical Xero credentials (26 September 2026)
+
+- [x] Reconcile 161b/161c drift and honour authorised online Neon through the protected live runner.
+- [x] Prove both ciphertext-change regressions fail against the original inference, then pass after correction.
+- [x] Add additive credential-owner, refresh-attempt, provider inventory and durable OAuth intent schema.
+- [x] Verify Xero access-token identity with signature, issuer, audience, client and expiry checks.
+- [x] Coordinate durable refresh, exact attempt/version recovery and reserved active mirror writes.
+- [x] Persist OAuth intent before redirect, retain candidates before inventory and adopt by verified expiry.
+- [x] Prepare singleton-only dry-run backfill and key maintenance with complete compare-and-set fences.
+- [x] Add owned integration fixtures, protected infrastructure cleanup and migration scope tests.
+- [x] Reviewer protected live integration run, ownership/restore/isolation evidence and zero residue.
+
+Review: unit, build and type gates executed in the isolated worktree. An unrelated marketing contact test timed out under unrestricted parallel unit execution; the complete unit gate passed with concurrency two and no marketing source change. Protected online Neon verification passed all 23 suites and 177 tests, verified 19 applied migration checksums and no schema drift, and confirmed all 35 cleanup selectors empty with the active-run fence released. No customer backfill or provider consent operation performed.

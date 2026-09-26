@@ -465,3 +465,5 @@ Optional variables with format constraints must be absent (commented out), not `
 | `STRIPE_PORTAL_RETURN_URL` | `packages/billing` | Return URL after the hosted Customer Portal. |
 | `STRIPE_CHECKOUT_SUCCESS_URL` | `packages/billing` | Success URL after hosted Checkout. |
 | `STRIPE_CHECKOUT_CANCEL_URL` | `packages/billing` | Cancel URL after hosted Checkout. |
+
+The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempts` and `xero_provider_connections` deliberately have no `clerk_org_id`. They coordinate one verified Xero authoriser across payroll bindings and customer accounts. Customer visibility and access remain scoped through `XeroTenant` by Clerk organisation and payroll organisation.

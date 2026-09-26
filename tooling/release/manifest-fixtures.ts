@@ -20,12 +20,11 @@ export const REQUIRED_GLOBAL_KEY_COUNTS = Object.freeze(
   Object.fromEntries(
     LIVE_FIXTURE_GLOBAL_KEY_KINDS.map((kind) => [
       kind,
-      Object.values(LIVE_FIXTURE_SUITES).reduce(
-        (total, allocation) =>
-          total +
-          ("globalKeys" in allocation ? (allocation.globalKeys[kind] ?? 0) : 0),
-        0
-      ),
+      Object.values(LIVE_FIXTURE_SUITES).reduce((total, allocation) => {
+        const allocationGlobalKeys: Partial<Record<GlobalKeyKind, number>> =
+          "globalKeys" in allocation ? allocation.globalKeys : {};
+        return total + (allocationGlobalKeys[kind] ?? 0);
+      }, 0),
     ])
   ) as Record<GlobalKeyKind, number>
 );
