@@ -177,6 +177,10 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         const tenant = connection?.xero_tenant ?? null;
         const state = organisation.xeroConnectionState;
         const status = statusForState(state);
+        const canConnect =
+          state === "not_connected" || state === "reauthorisation_required";
+        const canRecheck =
+          state === "unavailable" || state === "disconnect_pending";
         const canRefresh =
           state === "connected" &&
           connection?.status === "active" &&
@@ -265,14 +269,20 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                   >
                     {recommendedSync.label} now
                   </Button>
-                ) : (
+                ) : null}
+                {canConnect ? (
                   <Button
                     disabled={isPending}
                     onClick={() => handleConnect(organisation.id)}
                   >
                     {connection ? "Reconnect Xero" : "Connect Xero"}
                   </Button>
-                )}
+                ) : null}
+                {canRecheck ? (
+                  <Button disabled={isPending} onClick={() => router.refresh()}>
+                    Check connection again
+                  </Button>
+                ) : null}
               </div>
 
               {tenant ? (

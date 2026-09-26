@@ -12,9 +12,12 @@ import type { OrganisationWithConnectionView } from "../_connection-view";
 import { XeroClient } from "./xero-client";
 
 const mocks = vi.hoisted(() => ({
+  connectXeroAction: vi.fn(),
   disconnectXeroAction: vi.fn(),
+  dispatchManualSyncAction: vi.fn(),
   pauseTenantSyncAction: vi.fn(),
   refresh: vi.fn(),
+  refreshXeroConnectionAction: vi.fn(),
   resumeTenantSyncAction: vi.fn(),
 }));
 
@@ -23,17 +26,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/app/(authenticated)/sync/_actions", () => ({
-  dispatchManualSyncAction: vi.fn(),
+  dispatchManualSyncAction: mocks.dispatchManualSyncAction,
 }));
 
 vi.mock("./_actions", () => ({
-  connectXeroAction: vi.fn(),
+  connectXeroAction: mocks.connectXeroAction,
   disconnectXeroAction: mocks.disconnectXeroAction,
   pauseTenantSyncAction: mocks.pauseTenantSyncAction,
-  refreshXeroConnectionAction: vi.fn(),
+  refreshXeroConnectionAction: mocks.refreshXeroConnectionAction,
   resumeTenantSyncAction: mocks.resumeTenantSyncAction,
 }));
 
+const OAUTH_ACTION_REGEX = /^(Connect|Reconnect) Xero$/;
 const ROLLING_REFRESH_REGEX = /Rolling refresh in progress since/i;
 const DISCONNECT_CONFIRMATION_REGEX = /Type Acme Corp to confirm/i;
 
@@ -73,6 +77,206 @@ describe("XeroClient component", () => {
     xero_connection: baseConnection,
     xeroConnectionState: "connected",
   };
+
+  it.each([
+    {
+      message:
+        "We cannot reach Xero right now. Try again later or contact support.",
+      state: "unavailable" as const,
+    },
+    {
+      message: "Sync stopped. Xero disconnection is pending.",
+      state: "disconnect_pending" as const,
+    },
+  ])(
+    "only rechecks status when the connection is $state",
+    ({ state, message }) => {
+      render(
+        <XeroClient
+          organisations={[{ ...baseOrg, xeroConnectionState: state }]}
+        />
+      );
+
+      expect(screen.getByRole("status").textContent).toBe(message);
+      expect(
+        screen.queryByRole("button", { name: OAUTH_ACTION_REGEX })
+      ).toBeNull();
+      const recheckButtons = screen.getAllByRole("button", {
+        name: "Check connection again",
+      });
+      expect(recheckButtons).toHaveLength(1);
+      fireEvent.click(recheckButtons[0]);
+      expect(mocks.refresh).toHaveBeenCalledTimes(1);
+
+      fireEvent.click(screen.getByText("Manual sync options"));
+      for (const name of [
+        "Sync leave records",
+        "Sync balances",
+        "Reconcile approval state",
+      ]) {
+        const syncButton = screen.getByRole("button", { name });
+        expect(syncButton.hasAttribute("disabled")).toBe(true);
+        fireEvent.click(syncButton);
+      }
+      fireEvent.click(screen.getByText("Connection controls"));
+      expect(
+        screen.queryByRole("button", { name: "Refresh tokens" })
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: OAUTH_ACTION_REGEX })
+      ).toBeNull();
+      expect(mocks.connectXeroAction).not.toHaveBeenCalled();
+      expect(mocks.refreshXeroConnectionAction).not.toHaveBeenCalled();
+      expect(mocks.dispatchManualSyncAction).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    {
+      name: "Connect Xero",
+      organisation: {
+        ...baseOrg,
+        xero_connection: null,
+        xeroConnectionState: "not_connected" as const,
+      },
+    },
+    {
+      name: "Reconnect Xero",
+      organisation: {
+        ...baseOrg,
+        xeroConnectionState: "not_connected" as const,
+      },
+    },
+    {
+      name: "Reconnect Xero",
+      organisation: {
+        ...baseOrg,
+        xeroConnectionState: "reauthorisation_required" as const,
+      },
+    },
+  ])(
+    "offers one OAuth action for $organisation.xeroConnectionState ($name)",
+    async ({ name, organisation }) => {
+      mocks.connectXeroAction.mockResolvedValue({
+        error: { message: "Test-only connection failure." },
+        ok: false,
+      });
+      render(<XeroClient organisations={[organisation]} />);
+
+      const buttons = screen.getAllByRole("button", {
+        name: OAUTH_ACTION_REGEX,
+      });
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0].textContent).toBe(name);
+      expect(
+        screen.queryByRole("button", { name: "Check connection again" })
+      ).toBeNull();
+      if (organisation.xeroConnectionState === "reauthorisation_required") {
+        expect(screen.getByRole("status").textContent).toBe(
+          "Xero access needs to be renewed."
+        );
+      } else {
+        expect(screen.queryByRole("status")).toBeNull();
+      }
+      fireEvent.click(buttons[0]);
+
+      await waitFor(() =>
+        expect(mocks.connectXeroAction).toHaveBeenCalledTimes(1)
+      );
+      expect(mocks.connectXeroAction).toHaveBeenCalledWith({
+        organisationId: baseOrg.id,
+      });
+      expect(mocks.refreshXeroConnectionAction).not.toHaveBeenCalled();
+      expect(mocks.dispatchManualSyncAction).not.toHaveBeenCalled();
+    }
+  );
+
+  it("keeps active sync and token refresh actions without an OAuth prompt", async () => {
+    mocks.dispatchManualSyncAction.mockResolvedValue({
+      ok: true,
+      value: { queued: true },
+    });
+    mocks.refreshXeroConnectionAction.mockResolvedValue({
+      ok: true,
+      value: {},
+    });
+    render(<XeroClient organisations={[baseOrg]} />);
+
+    expect(
+      screen.queryByRole("button", { name: OAUTH_ACTION_REGEX })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Sync people now" }));
+    await waitFor(() =>
+      expect(mocks.dispatchManualSyncAction).toHaveBeenCalledTimes(1)
+    );
+    expect(mocks.dispatchManualSyncAction).toHaveBeenCalledWith({
+      organisationId: baseOrg.id,
+      runType: "people",
+      xeroTenantId: baseTenant.id,
+    });
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh tokens" }));
+    await waitFor(() =>
+      expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledTimes(1)
+    );
+    expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledWith({
+      connectionId: baseConnection.id,
+      organisationId: baseOrg.id,
+    });
+    expect(mocks.connectXeroAction).not.toHaveBeenCalled();
+  });
+
+  it("keeps paused syncs disabled and the audited resume action available", async () => {
+    mocks.resumeTenantSyncAction.mockResolvedValue({
+      ok: true,
+      value: { paused: false },
+    });
+    render(
+      <XeroClient
+        organisations={[
+          {
+            ...baseOrg,
+            xero_connection: {
+              ...baseConnection,
+              xero_tenant: {
+                ...baseTenant,
+                sync_paused_at: new Date("2026-09-27T00:00:00Z"),
+              },
+            },
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByText("Sync paused")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: OAUTH_ACTION_REGEX })
+    ).toBeNull();
+    fireEvent.click(screen.getByText("Manual sync options"));
+    for (const name of [
+      "Sync people now",
+      "Sync leave records",
+      "Sync balances",
+      "Reconcile approval state",
+    ]) {
+      const button = screen.getByRole("button", { name });
+      expect(button.hasAttribute("disabled")).toBe(true);
+      fireEvent.click(button);
+    }
+    expect(mocks.dispatchManualSyncAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("Connection controls"));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Resume automatic sync" })
+    );
+    await waitFor(() =>
+      expect(mocks.resumeTenantSyncAction).toHaveBeenCalledTimes(1)
+    );
+    expect(mocks.resumeTenantSyncAction).toHaveBeenCalledWith({
+      organisationId: baseOrg.id,
+      xeroTenantId: baseTenant.id,
+    });
+    expect(mocks.connectXeroAction).not.toHaveBeenCalled();
+  });
 
   it("renders Latest balance page stat label", () => {
     render(<XeroClient organisations={[baseOrg]} />);
