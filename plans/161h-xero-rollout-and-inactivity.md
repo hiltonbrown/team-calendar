@@ -24,8 +24,99 @@
 - **Risk**: MED for code, HIGH for the rollout sequence it describes
 - **Depends on**: 161b, 161c, 161d, 161e, 161f and 161g. All six DONE.
 - **Category**: dx, docs, direction
-- **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b-161g)
+- **Planned at**: approved dependency commit `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`, 26 September 2026; implementation base is `/tmp/tc-161g`, branch `codex/xero-permission-recovery`, not yet merged into main. Historical excerpts below are anchors, not current line counts.
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
+
+## Execution reconciliation, 26 September 2026
+
+This section takes precedence over historical instructions below.
+
+- All dependencies are DONE, including independently approved 161g at `fca052b`. Create
+  `/tmp/tc-161h` on `codex/xero-rollout-inactivity` from that exact commit. Do not merge or
+  change primary source. Reviewer maintains the primary plan/index. Track executor work in
+  appended `tasks/todo.md` items and review.
+- Use only the already authorised online Neon through the protected live runner. The session
+  decision in `tasks/lessons.md:211-215` supersedes every localhost/Docker/local migration
+  instruction and the blanket real-database restriction below for reviewed additive verification
+  schema and manifest-owned test data only. Reviewer owns live preparation and execution after
+  source review, with fresh identity, durable ownership, restore, consumer isolation and cleanup
+  read-back. No reset, seed, schema push, backfill or real provider operation. Actual rollout,
+  commercial namespace initialisation, cleanup enablement, deployment and customer mutations
+  remain outside scope. Keep cleanup `report_only`.
+- Generate the single additive migration with Prisma schema-diff tooling, never a live shadow
+  database. The generated client is tracked in this repository: include only mechanically
+  generated `packages/database/generated/**` updates for the new model/relations/enums, and
+  verify reproducibility through Prisma generation. Reviewer reviews SQL before any guarded
+  application. New report table is a scoped child: explicit Organisation/XeroTenant
+  relations, bounded enums or equivalent checks for kind/review status. Preserve existing
+  tables and payroll rows. Add the table to manifest-owned cleanup before applying it.
+- Scope includes necessary database package export/wrapper, root Xero metric export for the job,
+  query tests, relevant existing co-located callsite tests, `memory-store.ts` and its tests,
+  shared-store unit/integration tests, `tooling/release/cleanup.ts` and its tests,
+  `tooling/release/integration-inventory.test.ts`, database fixture registry/tests and a real
+  registered `packages/xero/src/oauth/inactivity-report.integration.test.ts`. Keep registration
+  and the actual fixture in the same commit. Reuse allocated manifest fixture slots/namespaces
+  where safe, otherwise extend ownership explicitly. Do not weaken guards or inventory tests.
+- Evaluate reserved bindings by `active_slot = 1` and `retired_at = null`, never just legacy
+  connection status. Scope all signals by both IDs. Only active nonarchived feeds establish current feed service. Aggregate recent usage
+  conservatively across their scoped token history, including rotated or revoked tokens, so
+  rotation cannot erase recent consumption; absence or unreadable coverage is unknown. Never
+  select credential, token/hash, name or payload fields.
+  An absent subscription or a status with no proven inactive meaning is `unknown`; active/trialling
+  subscriptions are active. Human audit activity must use both IDs and a non-null actor.
+  Missing audit events cannot prove no human use, because login history is unavailable: `unknown`.
+  Explicit known-null activity is allowed only as a caller-supplied proven signal in pure tests.
+  Recent human activity yields active. Archive supplies a candidate reason only after all decision signals are known and nonactive.
+  It never overrides an active signal, unknown subscription/human/feed evidence, or an
+  unreserved binding. Active signals take
+  precedence over unrelated unknown signals; otherwise unknown signals never yield candidate.
+  Onboarding is informational only, always unknown in current queries. Invalid/future input
+  dates yield unknown; thresholds are strictly older than 30/90 days, with exact boundaries
+  protected as recent. Insert validates internal tenant ID belongs to both recorded scope IDs.
+- `buildXeroInactivityReport` accepts both scope IDs, never scans/writes customers implicitly.
+  CLI requires `--clerk-org-id` and `--organisation-id`, prints counts only through the existing
+  observability logger. Report is manually invoked, writes only classification rows, no job.
+- Domain sentinel is immutable per epoch, initialise is idempotent only for matching domain,
+  mismatch must neither rewrite sentinel nor reset allowance. Old sentinel `1` and missing/malformed
+  domain fail closed. Atomic Lua verifies domain before reservations, including request replay,
+  across all rate classes. Memory supports explicit expected/observed domain for mismatch tests;
+  ordinary dev/test with no configured domain may retain existing behaviour. Redis never skips
+  domain checks based on NODE_ENV. Preserve response/release budget safety and error propagation.
+  A mismatch maps to unavailable/infrastructure fetch behaviour without provider dispatch.
+  Rollout drains every deployment whose admission code lacks this domain check, including older
+  shared-Lua deployments as well as process-local limiters. An existing legacy sentinel requires
+  a separately reviewed budget/lease-preserving transition; never flush state, blindly rewrite
+  the sentinel or rotate epochs to resolve a conflict. No such transition is executed here.
+- Metrics use closed labels and project through an allowlist at runtime. No IDs, errors, payloads,
+  or labels passed via object spreading from provider inputs. Metrics must not change lifecycle
+  results. Record store outage separately from ordinary denials and do not call mismatch an outage.
+- Evidence covers all 40 charter cases and each required level separately; mock evidence cannot
+  stand in for database/Redis/browser/provider. PASS needs same candidate, executed assertion,
+  target fingerprint and relevant fixture/cleanup evidence. Conflicting, stale, skipped, missing,
+  malformed or cross-candidate observations fail closed. No suite-exit-to-case PASS inference. Add optional bounded top-level runner metadata
+  with fixed phase/outcome codes, numeric command exit, inventory/cleanup status and fence state
+  only where actually observed; retain the first failure phase before cleanup and identify
+  authority/test/cleanup failures without raw errors. Known runner failure or failed cleanup
+  prevents overall readiness PASS even if supplied case observations claim success; validate
+  inconsistent runner status/exit combinations without changing case-level assertion evidence.
+  Empty charter observations must not erase known infrastructure outcomes. Track metadata only,
+  with no reordered guard, recovery, cleanup or provider operation.
+  Guarded runner optional `--evidence-dir` always emits JSON/Markdown, including authority errors,
+  test failures and cleanup failures. Its existing acquisition, recovery, test result, cleanup,
+  digest/fence and process-exit semantics remain intact. Partial charter report is NOT_VERIFIED
+  and exitCode 1, but does not invalidate a successful infrastructure inventory command: the
+  existing runner exit reports that command, while the evidence report states programme readiness.
+  Evidence write errors force a failing command without masking an existing failure. No
+  fabricated deployed SHA. Browser/provider readiness remains NOT_VERIFIED until Plan 160.
+- `CLAUDE.md` is now a short import of canonical `AGENTS.md`, not the historical duplicate
+  job/environment tables. Keep AGENTS authoritative; a brief lifecycle inventory pointer in
+  CLAUDE satisfies discoverability without creating a second independently maintained table.
+- Source gates run with `bun --no-env-file`, forced uncached type/unit/build tasks, boundaries,
+  release-tool tests/types, and standalone strict checking of changed integration fixtures.
+  Synthetic builds also set synthetic Xero client ID/secret as required by actual keys schema.
+  Protected live verification must run the full registered inventory and real owned Redis domain
+  mismatch/idempotence checks. Environment failures are reconciled and retried, not abandoned at
+  an arbitrary two-attempt limit. Actual unsafe scope expansion is reported to the reviewer.
 
 ## Why this matters
 
@@ -118,8 +209,7 @@ system-table `clerk_org_id` exception to `CLAUDE.md` and `PRODUCT.md`; do not ad
 **Fresh worktree setup**: `bun install --frozen-lockfile`. `bun run build` needs a valid-looking
 `DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that command only.
 
-**Local integration database**: 161b's "Local integration database" block with the `LOCAL_OK`
-check, for Step 2's migration only.
+**Database**: protected online Neon only, as specified in Execution reconciliation.
 
 **Not local gates:** `bun run preflight` and `bun run test:release` run during the rollout this
 plan documents.
@@ -133,7 +223,7 @@ plan documents.
 | Xero units | `bun run --cwd packages/xero test` | exit 0 |
 | Database units | `bun run --cwd packages/database test` | exit 0 |
 | next-config units | `bun run --cwd packages/next-config test` | exit 0 |
-| Apply migrations (local) | `bun run migrate:deploy` | exit 0 after `LOCAL_OK` |
+| Additive migration verification | Reviewer guarded online Neon workflow | checksums, schema diff and owned cleanup pass |
 | Release tool tests | `bun run test:release-tools` | exit 0 |
 | Release tool types | `bun run typecheck:release-tools` | exit 0 |
 | Whitespace | `git diff --check` | exit 0 |
@@ -251,7 +341,7 @@ model XeroInactivityClassification {
 }
 ```
 
-Generate the migration as in 161b and apply it locally.
+Generate the additive migration using Prisma schema-diff; reviewer applies only through guarded online verification after SQL review.
 
 Create `packages/database/src/queries/xero-inactivity-signals.ts`: for reserved bindings, return
 the raw signal values listed in "Current state" (scope IDs included in each row; no credentials,

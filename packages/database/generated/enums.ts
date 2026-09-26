@@ -444,3 +444,21 @@ export const xero_cleanup_attempt_state = {
 } as const
 
 export type xero_cleanup_attempt_state = (typeof xero_cleanup_attempt_state)[keyof typeof xero_cleanup_attempt_state]
+
+
+export const xero_inactivity_kind = {
+  active: 'active',
+  unknown: 'unknown',
+  candidate: 'candidate'
+} as const
+
+export type xero_inactivity_kind = (typeof xero_inactivity_kind)[keyof typeof xero_inactivity_kind]
+
+
+export const xero_inactivity_review_status = {
+  unreviewed: 'unreviewed',
+  reviewed_keep: 'reviewed_keep',
+  reviewed_escalate: 'reviewed_escalate'
+} as const
+
+export type xero_inactivity_review_status = (typeof xero_inactivity_review_status)[keyof typeof xero_inactivity_review_status]

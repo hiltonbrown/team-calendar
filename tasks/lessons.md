@@ -215,3 +215,10 @@ actionable; keep one-off task evidence in the review for that task.
   ownership, restore, consumer-isolation and cleanup evidence instead.
 
 - Xero scope denial documentation includes an exact standalone WWW-Authenticate token as well as a valid Bearer error challenge. Accept only these documented forms, test both spellings, and keep actual provider wire validation separate from documentation evidence.
+
+
+## Plan 161h reconciliation
+
+- Archive is not evidence of abandonment when subscription, human or feed history is unknown. Keep active signals first, then unknown protection, then candidate evaluation.
+- Preserve recent consumption across token rotation for active feeds; a new token with no timestamp must not erase historical use. Unreadable individual signals remain unknown while other proven active signals still decide activity.
+- Charter readiness requires each exact assertion at every required evidence level. A successful integration suite exit cannot establish forty case-level PASS observations.

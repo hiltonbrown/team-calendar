@@ -9,6 +9,7 @@ import type {
   WithdrawLeaveInput,
 } from "@repo/core";
 import { availability_record_type } from "@repo/database/generated/enums";
+import { emitXeroMetric } from "../metrics";
 import { resolveXeroAccess } from "../oauth/credential-owner";
 import { createXeroDeadline } from "../rate-limit/deadline";
 import {
@@ -87,6 +88,11 @@ async function getTenant(
 }
 
 function toProviderError(error: XeroWriteError): ProviderWriteError {
+  if (error.recoveryReason === "update_permissions") {
+    emitXeroMetric("xero.binding.permission_required", 1, {
+      reason: "update_permissions",
+    });
+  }
   return {
     ...error,
     certainty: writeErrorCertainty(error),

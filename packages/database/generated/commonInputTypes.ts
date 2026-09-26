@@ -1109,6 +1109,40 @@ export type Enumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaModel = ne
   _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
 }
 
+export type Enumxero_inactivity_kindFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel> | $Enums.xero_inactivity_kind
+}
+
+export type Enumxero_inactivity_review_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
+}
+
+export type Enumxero_inactivity_kindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_kind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
+}
+
+export type Enumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
+}
+
 export type NestedUuidFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -2184,6 +2218,40 @@ export type NestedEnumxero_cleanup_attempt_stateWithAggregatesFilter<$PrismaMode
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
   _max?: Prisma.NestedEnumxero_cleanup_attempt_stateFilter<$PrismaModel>
+}
+
+export type NestedEnumxero_inactivity_kindFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel> | $Enums.xero_inactivity_kind
+}
+
+export type NestedEnumxero_inactivity_review_statusFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
+}
+
+export type NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_kind | Prisma.Enumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_kind[] | Prisma.ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_kindWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_kind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_inactivity_kindFilter<$PrismaModel>
+}
+
+export type NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.xero_inactivity_review_status | Prisma.Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  in?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.xero_inactivity_review_status[] | Prisma.ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumxero_inactivity_review_statusWithAggregatesFilter<$PrismaModel> | $Enums.xero_inactivity_review_status
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumxero_inactivity_review_statusFilter<$PrismaModel>
 }
 
 

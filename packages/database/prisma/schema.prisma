@@ -291,32 +291,33 @@ model Organisation {
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
 
-  teams                        Team[]
-  locations                    Location[]
-  people                       Person[]
-  leave_balances               LeaveBalance[]
-  alternative_contacts         AlternativeContact[]
-  availability_records         AvailabilityRecord[]
-  availability_publications    AvailabilityPublication[]
-  feeds                        Feed[]
-  feed_tokens                  FeedToken[]
-  public_holiday_jurisdictions PublicHolidayJurisdiction[]
-  public_holidays              PublicHoliday[]
-  public_holiday_assignments   PublicHolidayAssignment[]
-  xero_connection              XeroConnection?
-  xero_cleanup_requests        XeroCleanupRequest[]
-  xero_tenants                 XeroTenant[]
-  xero_oauth_sessions          XeroOAuthSession[]
-  xero_person_matches          XeroPersonMatch[]
-  xero_sync_cursors            XeroSyncCursor[]
-  sync_runs                    SyncRun[]
-  failed_records               FailedRecord[]
-  audit_events                 AuditEvent[]
-  notifications                Notification[]
-  notification_preferences     NotificationPreference[]
-  notification_email_queue     NotificationEmailQueue[]
-  outbound_operations          OutboundOperation[]
-  organisation_settings        OrganisationSettings?
+  teams                           Team[]
+  locations                       Location[]
+  people                          Person[]
+  leave_balances                  LeaveBalance[]
+  alternative_contacts            AlternativeContact[]
+  availability_records            AvailabilityRecord[]
+  availability_publications       AvailabilityPublication[]
+  feeds                           Feed[]
+  feed_tokens                     FeedToken[]
+  public_holiday_jurisdictions    PublicHolidayJurisdiction[]
+  public_holidays                 PublicHoliday[]
+  public_holiday_assignments      PublicHolidayAssignment[]
+  xero_connection                 XeroConnection?
+  xero_inactivity_classifications XeroInactivityClassification[]
+  xero_cleanup_requests           XeroCleanupRequest[]
+  xero_tenants                    XeroTenant[]
+  xero_oauth_sessions             XeroOAuthSession[]
+  xero_person_matches             XeroPersonMatch[]
+  xero_sync_cursors               XeroSyncCursor[]
+  sync_runs                       SyncRun[]
+  failed_records                  FailedRecord[]
+  audit_events                    AuditEvent[]
+  notifications                   Notification[]
+  notification_preferences        NotificationPreference[]
+  notification_email_queue        NotificationEmailQueue[]
+  outbound_operations             OutboundOperation[]
+  organisation_settings           OrganisationSettings?
 
   @@index([clerk_org_id])
   @@map("organisations")
@@ -630,14 +631,15 @@ model XeroTenant {
   created_at                        DateTime       @default(now())
   updated_at                        DateTime       @updatedAt
 
-  organisation        Organisation            @relation(fields: [organisation_id], references: [id])
-  xero_connection     XeroConnection          @relation(fields: [xero_connection_id], references: [id])
-  credential_owner    XeroCredentialOwner?    @relation(fields: [xero_credential_owner_id], references: [id])
-  provider_connection XeroProviderConnection? @relation(fields: [xero_provider_connection_id], references: [id])
-  cleanup_requests    XeroCleanupRequest[]
-  sync_cursors        XeroSyncCursor[]
-  leave_balances      LeaveBalance[]
-  sync_runs           SyncRun[]
+  organisation               Organisation                   @relation(fields: [organisation_id], references: [id])
+  xero_connection            XeroConnection                 @relation(fields: [xero_connection_id], references: [id])
+  credential_owner           XeroCredentialOwner?           @relation(fields: [xero_credential_owner_id], references: [id])
+  provider_connection        XeroProviderConnection?        @relation(fields: [xero_provider_connection_id], references: [id])
+  inactivity_classifications XeroInactivityClassification[]
+  cleanup_requests           XeroCleanupRequest[]
+  sync_cursors               XeroSyncCursor[]
+  leave_balances             LeaveBalance[]
+  sync_runs                  SyncRun[]
 
   @@unique([provider_app_id, xero_tenant_id, active_slot], map: "xero_tenants_reserved_binding_key")
   @@index([clerk_org_id])
@@ -1409,4 +1411,37 @@ enum xero_cleanup_attempt_state {
   unknown
   blocked_authorisation
   cancelled
+}
+
+enum xero_inactivity_kind {
+  active
+  unknown
+  candidate
+}
+
+enum xero_inactivity_review_status {
+  unreviewed
+  reviewed_keep
+  reviewed_escalate
+}
+
+model XeroInactivityClassification {
+  id              String                        @id @default(uuid()) @db.Uuid
+  clerk_org_id    String
+  organisation_id String                        @db.Uuid
+  xero_tenant_id  String                        @db.Uuid
+  policy_version  Int
+  kind            xero_inactivity_kind
+  reason          String
+  review_status   xero_inactivity_review_status @default(unreviewed)
+  classified_at   DateTime                      @default(now())
+  created_at      DateTime                      @default(now())
+  updated_at      DateTime                      @updatedAt
+  organisation    Organisation                  @relation(fields: [organisation_id], references: [id])
+  xero_tenant     XeroTenant                    @relation(fields: [xero_tenant_id], references: [id])
+
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@index([xero_tenant_id])
+  @@map("xero_inactivity_classifications")
 }

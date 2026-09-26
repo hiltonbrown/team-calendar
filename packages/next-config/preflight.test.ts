@@ -16,7 +16,9 @@ const validCommonVars = {
 
 const validAppVars = {
   XERO_APP_TIER: "starter",
+  XERO_CREDENTIAL_DOMAIN_ID: "11111111-1111-4111-8111-111111111111",
   XERO_RATE_NAMESPACE_EPOCH: "test",
+  XERO_REDIRECT_URI: "https://api.teamcalendar.online/oauth/callback",
   ...validCommonVars,
   CLERK_SECRET_KEY: "clerk_sec_123456",
   DATABASE_URL:
@@ -340,4 +342,51 @@ describe("shared Xero admission preflight", () => {
     }
     expect(failure).toBeInstanceOf(Error);
   });
+});
+
+describe("credential domain and redirect production contract", () => {
+  it.each(["XERO_CREDENTIAL_DOMAIN_ID", "XERO_REDIRECT_URI"])(
+    "reports missing %s",
+    (name) => {
+      expect(() =>
+        runProductionPreflight({
+          appName: "app",
+          envVars: { ...validAppVars, [name]: undefined },
+        })
+      ).toThrow(name);
+    }
+  );
+  it("rejects non-HTTPS redirect without printing its value", () => {
+    const value = "http://secret-canary.example/callback";
+    try {
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, XERO_REDIRECT_URI: value },
+      });
+      throw new Error("Expected rejection");
+    } catch (error) {
+      expect(String(error)).toContain("XERO_REDIRECT_URI");
+      expect(String(error)).not.toContain(value);
+    }
+  });
+  it("rejects malformed credential domain without its value", () => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "api",
+        envVars: { ...validApiVars, XERO_CREDENTIAL_DOMAIN_ID: "secret-value" },
+      })
+    ).toThrow("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
+  });
+});
+
+it("rejects a whitespace credential domain exactly as runtime keys do", () => {
+  expect(() =>
+    runProductionPreflight({
+      appName: "app",
+      envVars: {
+        ...validAppVars,
+        XERO_CREDENTIAL_DOMAIN_ID: " 11111111-1111-4111-8111-111111111111 ",
+      },
+    })
+  ).toThrow("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
 });

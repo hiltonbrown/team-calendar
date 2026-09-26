@@ -5,11 +5,17 @@ const mocks = vi.hoisted(() => ({
   approveLeaveApplicationForRegion: vi.fn(),
   declineLeaveApplicationForRegion: vi.fn(),
   ensureFreshXeroConnection: vi.fn(),
+  metricLog: vi.fn(),
   resolveXeroAccess: vi.fn(),
   submitLeaveApplicationForRegion: vi.fn(),
   tenantFindFirst: vi.fn(),
   withdrawLeaveApplicationForRegion: vi.fn(),
 }));
+
+vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
+beforeEach(() => {
+  mocks.metricLog.mockReset();
+});
 
 vi.mock("@repo/database", () => ({
   database: {
@@ -244,6 +250,18 @@ describe("161g recovery regression", () => {
       });
       const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
       expect(result).toMatchObject({ error: { recoveryReason }, ok: false });
+      if (recoveryReason === "update_permissions") {
+        expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+          "Xero lifecycle metric",
+          {
+            metric: "xero.binding.permission_required",
+            reason: "update_permissions",
+            value: 1,
+          }
+        );
+      } else {
+        expect(mocks.metricLog).not.toHaveBeenCalled();
+      }
       expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
     }
   );
@@ -288,4 +306,79 @@ describe("safe neutral resolution failures", () => {
       expect(result.error).not.toHaveProperty("correlationId");
     }
   );
+});
+
+describe("permission metric outcome safety", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  it("retains a definite pre-dispatch permissions failure when metric logging throws", async () => {
+    mocks.metricLog.mockImplementation(() => {
+      throw new Error("telemetry unavailable");
+    });
+    mocks.resolveXeroAccess.mockResolvedValue({
+      error: { code: "capability_missing", message: "missing permission" },
+      ok: false,
+    });
+    const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
+    expect(result).toMatchObject({
+      error: {
+        certainty: "definitive_failure",
+        dispatchPhase: "before_dispatch",
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.binding.permission_required",
+        reason: "update_permissions",
+        value: 1,
+      }
+    );
+  });
+  it("records returned permission errors without copying provider diagnostics into metric labels", async () => {
+    mocks.resolveXeroAccess.mockResolvedValue({
+      ok: true,
+      value: {
+        accessToken: "synthetic-access",
+        bindingGeneration: 1,
+        deadline: { expiresAtMs: Date.now() + 120_000 },
+        payrollRegion: "AU",
+        tokenVersion: 1,
+        xeroTenantDatabaseId: "tenant",
+        xeroTenantId: "external-tenant",
+      },
+    });
+    mocks.approveLeaveApplicationForRegion.mockResolvedValue({
+      error: {
+        code: "permission_error",
+        dispatchPhase: "provider_response_received",
+        httpStatus: 403,
+        message: "private provider diagnostic",
+        rawPayload: { secret: "private payload" },
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(
+      await XeroWriteAdapter.approveLeaveApplication(approveInput)
+    ).toMatchObject({
+      error: {
+        certainty: "definitive_failure",
+        recoveryReason: "update_permissions",
+      },
+      ok: false,
+    });
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.binding.permission_required",
+        reason: "update_permissions",
+        value: 1,
+      }
+    );
+  });
 });

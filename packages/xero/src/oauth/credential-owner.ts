@@ -9,6 +9,7 @@ import type {
 } from "@repo/database/generated/client";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
+import { emitXeroMetric } from "../metrics";
 import {
   createXeroDeadline,
   remainingMs,
@@ -179,6 +180,9 @@ export async function refreshXeroCredentialOwner(input: {
             },
             where: { id: attemptId },
           });
+          emitXeroMetric("xero.refresh.failed", 1, {
+            outcome: "lost_response",
+          });
           return failure("invalid_token_response");
         }
         const access = encryptXeroToken(exchanged.value.access_token);
@@ -249,6 +253,9 @@ export async function refreshXeroCredentialOwner(input: {
                 outcome: { in: ["pending", "lost_response"] },
               },
             });
+            emitXeroMetric("xero.refresh.conflict", 1, {
+              outcome: "superseded",
+            });
             return null;
           }
           const uncertain = attempt.uncertain_since ?? new Date();
@@ -261,6 +268,9 @@ export async function refreshXeroCredentialOwner(input: {
               uncertain_since: uncertain,
             },
             where: { id: attemptId, outcome: "pending" },
+          });
+          emitXeroMetric("xero.refresh.failed", 1, {
+            outcome: "lost_response",
           });
           return null;
         },
@@ -532,6 +542,7 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
   for (const attempt of attempts) {
     const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
     const retry = await database.$transaction(
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve coordinated recovery and metric observations within the owner fence.
       async (tx) => {
         await boundXeroLocks(tx, deadline);
         await lockXeroOwner(tx, attempt.xero_credential_owner_id);
@@ -556,6 +567,14 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
             },
             where: { id: attempt.id },
           });
+          if (
+            owner.last_refresh_attempt_id !== attempt.id ||
+            owner.token_version !== attempt.expected_token_version + 1
+          ) {
+            emitXeroMetric("xero.refresh.conflict", 1, {
+              outcome: "superseded",
+            });
+          }
           return false;
         }
         const since =
@@ -569,6 +588,7 @@ export async function recoverXeroRefreshAttempts(input: { now: Date }) {
             data: { ...scrub, outcome: "failed" },
             where: { id: attempt.id },
           });
+          emitXeroMetric("xero.refresh.failed", 1, { outcome: "failed" });
           await tx.xeroCredentialOwner.updateMany({
             data: { usability: "reauthorisation_required" },
             where: {
@@ -627,6 +647,9 @@ async function recordExchangeFailure(
         }
       : { ...scrub, outcome: "failed" },
     where: { id: attempt.id },
+  });
+  emitXeroMetric("xero.refresh.failed", 1, {
+    outcome: ambiguous ? "lost_response" : "failed",
   });
 }
 
@@ -713,6 +736,12 @@ async function validateRefreshAttempt(
       },
       where: { id: attempt.id },
     });
+    if (
+      owner.last_refresh_attempt_id !== attempt.id ||
+      owner.token_version !== input.expectedTokenVersion + 1
+    ) {
+      emitXeroMetric("xero.refresh.conflict", 1, { outcome: "superseded" });
+    }
     return { ok: true, value: owner };
   }
   if (

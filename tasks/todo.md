@@ -1519,3 +1519,37 @@ Review: pending plan records committed at a131ec6; conflict-free merge bebd7e6 c
 ### Review
 
 Independent APPROVE on runtime `68a2aaa00a36cfcad00daa212dabb1c6fc0261b1`. PASS: lint (1098 files), forced types (19 tasks), full units (18 tasks, 2655 tests), boundaries (1054 files, 21 packages), release tools (104 tests and types), eight integration fixture static types and four synthetic app builds. Protected online Neon campaign `2262abb9-6b8c-4eda-83e7-176a4d437350` passed all 26 files and 224 tests. All 38 cleanup selectors are empty, catalogue unchanged, fence released, durable ownership and strict consumers verified, all 20 applied migration checksums match and read-only schema comparison reports no difference. Earlier failed campaigns and guarded recovery remain in the execution report. Documentation closure preserves the verified runtime exactly. Actual provider and browser execution remain NOT VERIFIED; cleanup stays report_only. Full plan delivered through a verified shared absolute path, read before implementation and copied with all reviewer reconciliation. No merge, push or deployment.
+
+
+## Plan 161h execution, 26 September 2026
+
+- Handoff: read the complete reconciled plan at `/home/hilton/Documents/teamcalendar/plans/161h-xero-rollout-and-inactivity.md` and copy it exactly into this isolated worktree. This shared readable path replaces inline handoff packaging. Base: `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`; branch: `codex/xero-rollout-inactivity`. Reviewer owns the status index and live gates.
+- [x] 1. Implement pure conservative inactivity evaluator and tests.
+- [x] 2. Implement scoped signals, report, owned integration fixture and additive migration.
+- [x] 3. Add safe lifecycle metrics and callsite tests.
+- [x] 4. Add credential-domain checks, preflight and immutable namespace verification.
+- [x] 5. Document existing enablement controls.
+- [x] 6. Implement strict forty-case evidence and runner output on all outcomes.
+- [x] 7. Document unexecuted rollout and rollback.
+- [x] 8. Reconcile lifecycle/environment docs and execute source verification.
+
+- [ ] Independent source review and protected live inventory, migration, owned Redis and cleanup read-back (reviewer-owned).
+
+### Plan 161h verification review (executor)
+
+- Focused Xero units passed initially (568 tests); final focused callsite run reached 584 before additional closed-reason and memory tests. Database and next-config focused units passed.
+- Forced source typecheck passed 19/19 tasks; full uncached units passed 18/18 tasks with `--concurrency=2`, which avoids inherited millisecond deadline contention under parallel load. Initial full run had transient management deadline contention and unfinished concurrent callsite-test mock hooks; both reconciled and rerun.
+- Forced synthetic build passed 4/4 tasks with command-only synthetic database/encryption/client settings. No live endpoint was used.
+- Release tooling passed 150 tests in 18 files before runner metadata/fault additions; tooling types and boundaries (1064 files, 21 packages) passed. Final runner additions are being verified again.
+- Strict standalone compiler includes metric UUID `@ts-expect-error` and both changed integration fixtures. PASS after placing the directive on the rejected label property; Bundler resolution retains strict checks while matching extensionless source imports.
+- Additive offline schema-diff migration `20260926130000_add_xero_inactivity_classifications`, SHA-256 `6d608df08067583e4c9f1bcd8baa1a5903ee8b2f5c8398d01164d9b6c4f47e83`, reviewed by parent. Prisma generation is tracked; retain new generated model/types and mechanically remove only trailing whitespace/unrelated formatting drift.
+- All 40 charter cases require independent level-specific assertion evidence. Infrastructure inventory results are recorded separately; browser/provider programme readiness remains NOT_VERIFIED. No push, merge, deployment, real provider action or executor live write.
+
+- Final executor reruns: `bun --no-env-file run test --force --concurrency=1` PASS all 18 tasks (the preceding concurrency-2 rerun exposed inherited 10/25ms timer scheduling flakes; production deadlines were unchanged). `bun --no-env-file run build --force` with the four synthetic variables PASS 4 tasks. Focused Xero PASS 594 tests/34 files, database PASS 107 tests/21 files, next-config PASS 47 tests/3 files.
+- Actual missing-scope inactivity CLI exits 1 with a fixed safe failure message and no SQL/provider request. Actual runner without manifest exits 1 and writes JSON/Markdown with all 40 cases NOT_VERIFIED, phase authority, no acquired fence, no cleanup, null deployed SHA.
+- Generated normalisation retains all existing context bytes where lines are equal ignoring trailing whitespace, and strips only newly added/changed lines. Reproducible helper for reviewer: `/tmp/161h-normalise-generated.py`; semantic generated output remains from Prisma 7.10.0.
+
+- Review-requested timing reconciliation: exactly the inherited operation-expiry and stalled-authoritative-body xero-fetch scenarios now use controlled Vitest timers; their original deadline, dispatch, permit-release, body-cancellation and no-observation assertions remain intact. Focused 37 tests PASS. Final uncached full units with `--concurrency=2` PASS 18 tasks.
+- Final expanded release tooling PASS 175 tests/18 files; types PASS. Final lint PASS 1114 files; strict metrics/integration fixture compilation PASS; whitespace PASS; report-only prohibited-operation search has no matches; documentation checks show both job/control references and exactly one unexecuted rollout heading.
+
+- Final staged-file audit exposed one extra EOF blank line emitted by Prisma migration generation (untracked-file whitespace was not included in the earlier unstaged check). Regenerated offline schema-diff output with mechanical EOF normalisation, no SQL edits; SHA-256 `0606302b88c98b28aadc4dd42ab4c1ce674e3f08a6d0b577f169559d062b2d93`. Corrected the prohibited-operation search invocation to valid ripgrep syntax; no matches. Both full base-to-candidate and staged whitespace checks pass after this correction.

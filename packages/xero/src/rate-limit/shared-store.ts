@@ -23,7 +23,8 @@ export type SharedRateDeniedReason =
   | "daily"
   | "concurrency"
   | "cooldown"
-  | "infrastructure";
+  | "infrastructure"
+  | "credential_domain_mismatch";
 export interface RateReservationInput {
   deadline?: XeroDeadline;
   leaseMs: number;
@@ -109,6 +110,7 @@ const replySchema = z.tuple([
     "concurrency",
     "cooldown",
     "infrastructure",
+    "credential_domain_mismatch",
     "released",
     "observed",
     "initialised",
@@ -116,6 +118,7 @@ const replySchema = z.tuple([
   ]),
 ]);
 export interface RedisSharedStoreOptions {
+  credentialDomainId?: string;
   epoch: string;
   fetchImpl?: typeof fetch;
   limits: SharedRateLimits;
@@ -151,6 +154,7 @@ export class RedisSharedXeroRateStore implements SharedXeroRateStore {
         limits.appCallsPerMinute,
         limits.concurrentRequestsPerOrg,
         input.reservationId,
+        this.options.credentialDomainId ?? "",
         ...extra,
       ],
       fetch: this.options.fetchImpl,
@@ -185,7 +189,14 @@ export class RedisSharedXeroRateStore implements SharedXeroRateStore {
       return { ok: true, value: { reservationId: input.reservationId } };
     }
     const reason = z
-      .enum(["minute", "daily", "concurrency", "cooldown", "infrastructure"])
+      .enum([
+        "minute",
+        "daily",
+        "concurrency",
+        "cooldown",
+        "infrastructure",
+        "credential_domain_mismatch",
+      ])
       .safeParse(result);
     return {
       error: { reason: reason.success ? reason.data : "infrastructure" },
@@ -224,7 +235,11 @@ export class RedisSharedXeroRateStore implements SharedXeroRateStore {
       [String(assumeSpentDaily)]
     );
     if (result !== "initialised" && result !== "existing") {
-      throw new Error("Xero rate namespace store is unavailable");
+      throw new Error(
+        result === "credential_domain_mismatch"
+          ? "Xero rate namespace credential domain mismatch"
+          : "Xero rate namespace store is unavailable"
+      );
     }
     return result === "initialised";
   }
@@ -259,6 +274,7 @@ export function getSharedXeroRateStore(
     }
     if (environment.KV_REST_API_URL && environment.KV_REST_API_TOKEN) {
       return new RedisSharedXeroRateStore({
+        credentialDomainId: environment.XERO_CREDENTIAL_DOMAIN_ID,
         epoch,
         limits,
         token: environment.KV_REST_API_TOKEN,
@@ -275,7 +291,12 @@ export function getSharedXeroRateStore(
       warnedDevelopment = true;
       log.warn("Xero development admission uses a memory store");
     }
-    return new MemorySharedXeroRateStore({ epoch, limits });
+    return new MemorySharedXeroRateStore({
+      epoch,
+      expectedCredentialDomainId: environment.XERO_CREDENTIAL_DOMAIN_ID,
+      limits,
+      observedCredentialDomainId: environment.XERO_CREDENTIAL_DOMAIN_ID,
+    });
   } catch {
     return unavailableStore;
   }
@@ -283,6 +304,7 @@ export function getSharedXeroRateStore(
 export async function initialiseXeroRateNamespace(input: {
   epoch: string;
   assumeSpentDaily: boolean;
+  credentialDomainId: string;
 }): Promise<{ initialised: number }> {
   const environment = keys();
   if (
@@ -290,12 +312,14 @@ export async function initialiseXeroRateNamespace(input: {
       environment.XERO_CLIENT_ID &&
       environment.KV_REST_API_URL &&
       environment.KV_REST_API_TOKEN &&
-      epochPattern.test(input.epoch)
+      epochPattern.test(input.epoch) &&
+      z.string().uuid().safeParse(input.credentialDomainId).success
     )
   ) {
     throw new Error("Xero rate namespace configuration is incomplete");
   }
   const store = new RedisSharedXeroRateStore({
+    credentialDomainId: input.credentialDomainId,
     epoch: input.epoch,
     limits: {
       appCallsPerMinute: 10_000,

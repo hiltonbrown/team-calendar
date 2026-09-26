@@ -1,4 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const metricLog = vi.hoisted(() => vi.fn());
+vi.mock("@repo/observability/log", () => ({
+  log: { error: vi.fn(), info: metricLog, warn: vi.fn() },
+}));
+beforeEach(() => {
+  metricLog.mockReset();
+});
+
 import { XeroRateLimiter } from "./limiter";
 import { MemorySharedXeroRateStore } from "./memory-store";
 import { xeroRateKeys } from "./shared-store";
@@ -490,74 +499,88 @@ it("preserves dispatched success when lease release fails", async () => {
 it("reports operation expiry before admission infrastructure failure", async () => {
   const { createXeroDeadline } = await import("./deadline");
   const { RedisSharedXeroRateStore } = await import("./shared-store");
-  const store = new RedisSharedXeroRateStore({
-    epoch: "test",
-    fetchImpl: () =>
-      new Promise(() => {
-        /* Unresponsive transport. */
-      }),
-    limits: {
-      appCallsPerMinute: 10,
-      callsPerDayPerOrg: 10,
-      callsPerMinutePerOrg: 10,
-      concurrentRequestsPerOrg: 5,
-    },
-    token: "test",
-    url: "https://invalid.example",
-  });
-  const fetchImpl = vi.fn();
-  await expect(
-    xeroFetch(
-      {
-        deadline: createXeroDeadline(10),
-        rateClass,
-        url: "https://api.xero.com/x",
+  vi.useFakeTimers();
+  try {
+    const store = new RedisSharedXeroRateStore({
+      epoch: "test",
+      fetchImpl: () =>
+        new Promise(() => {
+          /* Unresponsive transport. */
+        }),
+      limits: {
+        appCallsPerMinute: 10,
+        callsPerDayPerOrg: 10,
+        callsPerMinutePerOrg: 10,
+        concurrentRequestsPerOrg: 5,
       },
-      { fetchImpl, limiter: new XeroRateLimiter({}, { store }) }
-    )
-  ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
-  expect(fetchImpl).not.toHaveBeenCalled();
+      token: "test",
+      url: "https://invalid.example",
+    });
+    const fetchImpl = vi.fn();
+    const assertion = expect(
+      xeroFetch(
+        {
+          deadline: createXeroDeadline(10),
+          rateClass,
+          url: "https://api.xero.com/x",
+        },
+        { fetchImpl, limiter: new XeroRateLimiter({}, { store }) }
+      )
+    ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
+    await vi.advanceTimersByTimeAsync(10);
+    await assertion;
+    expect(fetchImpl).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it.each([401, 403])(
   "preserves %i authoritative headers when its body stalls within the absolute deadline",
   async (status) => {
-    const limiter = permissiveLimiter();
-    const release = vi.fn();
-    const observe = vi.spyOn(limiter, "observe");
-    vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
-    const cancel = vi.fn();
-    const stream = new ReadableStream({
-      cancel,
-      pull() {
-        return new Promise(() => {
-          /* Stalled provider body. */
-        });
-      },
-    });
-    const fetchImpl = vi.fn().mockResolvedValue(
-      new Response(stream, {
-        headers: { "WWW-Authenticate": 'Bearer error="insufficient_scope"' },
-        status,
-      })
-    );
-    const response = await xeroFetch(
-      {
-        deadline: { expiresAtMs: Date.now() + 25 },
-        rateClass,
-        url: "https://api.xero.com/x",
-      },
-      { fetchImpl, limiter }
-    );
-    expect(response.status).toBe(status);
-    expect(response.headers.get("WWW-Authenticate")).toBe(
-      'Bearer error="insufficient_scope"'
-    );
-    expect(await response.text()).toBe("");
-    expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(release).toHaveBeenCalledOnce();
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(observe).not.toHaveBeenCalled();
+    vi.useFakeTimers();
+    try {
+      const limiter = permissiveLimiter();
+      const release = vi.fn();
+      const observe = vi.spyOn(limiter, "observe");
+      vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
+      const cancel = vi.fn();
+      const stream = new ReadableStream({
+        cancel,
+        pull() {
+          return new Promise(() => {
+            /* Stalled provider body. */
+          });
+        },
+      });
+      const fetchImpl = vi.fn().mockResolvedValue(
+        new Response(stream, {
+          headers: { "WWW-Authenticate": 'Bearer error="insufficient_scope"' },
+          status,
+        })
+      );
+      const responsePromise = xeroFetch(
+        {
+          deadline: { expiresAtMs: Date.now() + 25 },
+          rateClass,
+          url: "https://api.xero.com/x",
+        },
+        { fetchImpl, limiter }
+      );
+      await vi.advanceTimersByTimeAsync(25);
+      const response = await responsePromise;
+      expect(response.status).toBe(status);
+      expect(response.headers.get("WWW-Authenticate")).toBe(
+        'Bearer error="insufficient_scope"'
+      );
+      expect(await response.text()).toBe("");
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(release).toHaveBeenCalledOnce();
+      expect(cancel).toHaveBeenCalledOnce();
+      expect(observe).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   }
 );
 it.each([401, 403])(
@@ -601,4 +624,66 @@ it("normalises pre-aborted signals as definite non-attempts", async () => {
   ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
   expect(acquire).not.toHaveBeenCalled();
   expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+describe("transport lifecycle metrics", () => {
+  it("fails domain mismatch before provider dispatch without reporting a store outage", async () => {
+    const store = new MemorySharedXeroRateStore({
+      expectedCredentialDomainId: "11111111-1111-4111-8111-111111111111",
+      limits: {
+        appCallsPerMinute: 100,
+        callsPerDayPerOrg: 1000,
+        callsPerMinutePerOrg: 60,
+        concurrentRequestsPerOrg: 5,
+      },
+      observedCredentialDomainId: "22222222-2222-4222-8222-222222222222",
+    });
+    const limiter = new XeroRateLimiter({ maxWaitMs: 0 }, { store });
+    const fetchImpl = vi.fn();
+    await expect(
+      xeroFetch(
+        { rateClass, url: "https://api.xero.com/x" },
+        { fetchImpl, limiter }
+      )
+    ).rejects.toMatchObject({
+      code: "admission_unavailable",
+      dispatched: false,
+    });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(metricLog).toHaveBeenCalledExactlyOnceWith("Xero lifecycle metric", {
+      class: "tenant",
+      metric: "xero.admission.denied",
+      reason: "credential_domain_mismatch",
+      value: 1,
+    });
+  });
+  it.each([false, true])(
+    "records a definite deadline failure even when metric logging throws: %s",
+    async (loggerFails) => {
+      if (loggerFails) {
+        metricLog.mockImplementation(() => {
+          throw new Error("telemetry unavailable");
+        });
+      }
+      const limiter = permissiveLimiter();
+      const acquire = vi.spyOn(limiter, "acquire");
+      const fetchImpl = vi.fn();
+      await expect(
+        xeroFetch(
+          {
+            deadline: { expiresAtMs: Date.now() - 1 },
+            rateClass,
+            url: "https://api.xero.com/x",
+          },
+          { fetchImpl, limiter }
+        )
+      ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: false });
+      expect(acquire).not.toHaveBeenCalled();
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(metricLog).toHaveBeenCalledExactlyOnceWith(
+        "Xero lifecycle metric",
+        { metric: "xero.fetch.deadline_exceeded", value: 1 }
+      );
+    }
+  );
 });

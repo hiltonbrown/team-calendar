@@ -537,3 +537,56 @@ Independent final cleanup PASS: all 38 ownership selectors are zero; durable man
 Documentation closure copies the reviewer's completed plan and DONE index exactly and updates only the Plan 161g task review. The completion commit changes four documentation files only, leaving the complete verified runtime byte-identical to `68a2aaa`. No executor database campaign or gate/build rerun is needed for this documentation-only change.
 
 Actual Xero provider/header/authorisation behaviour and Plan 160 browser execution remain **NOT VERIFIED**; the browser spec is written. Cleanup remains `report_only`. No real customer credential mutation, backfill, destructive provider cleanup, production namespace activation, OAuth scope or payroll semantics change, deployment, merge or push occurred. Full-plan shared-path packaging and the approved baseline notification timing exception remain explicitly documented.
+
+
+## Plan 161h implementation and evidence boundaries
+
+Implementation base: `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`, isolated `/tmp/tc-161h` on `codex/xero-rollout-inactivity`. The complete reconciled plan was handed off through the shared readable absolute primary path and copied exactly into this worktree, a documented packaging deviation from inline dispatch. Reviewer maintains the plan status index and independently owns online Neon verification. The executor performed no live database/provider writes, rollout, backfill, namespace initialisation or deployment.
+
+The inactivity report is manually scoped:
+
+```bash
+bun --no-env-file run --cwd packages/xero report:xero-inactivity --clerk-org-id <owned-account> --organisation-id <owned-entity>
+```
+
+It records classification rows only. Missing or unreadable evidence stays unknown. Feed lag is roughly two hours, far below the 30-day application policy. Historical recent token consumption survives rotation for active nonarchived feeds. Exact 30-day feed and 90-day human boundaries remain active. Invalid/future dates remain unknown. Archive never overrides unknown signals.
+
+Lifecycle metrics emit fixed names and finite nonnegative values through the existing structured logger. Closed labels are projected through runtime allowlists. Metric failures cannot change lifecycle outcomes.
+
+| Metric | Application alert threshold | Remediation |
+| --- | --- | --- |
+| `xero.refresh.conflict` | More than 5 in 15 minutes | Inspect coordinated owner refresh/adoption and deployment credential-domain configuration, follow 161d recovery |
+| `xero.refresh.failed` | Any lost response, or more than 3 failures in 15 minutes | Preserve attempt history; use bounded owner recovery, never restore stale refresh tokens |
+| `xero.binding.permission_required` | More than 3 in 15 minutes | Review capability and permitted update-permissions flow from 161g |
+| `xero.cleanup.unknown_oldest_age_hours` | Greater than 1 hour | Follow 161f exact-target operator procedure; issued unknown DELETE stays unresolved |
+| `xero.admission.denied` | Sustained denials for 5 minutes | Follow 161e allowance/cooldown procedure; domain mismatch requires configuration repair, never reinitialise foreign epoch |
+| `xero.store.unavailable` | Any occurrence | Stop provider admission and restore the owned shared store following 161e; no memory fallback |
+| `xero.fetch.deadline_exceeded` | More than 3 in 15 minutes | Inspect bounded lock/store/provider latency; preserve uncertain write outcomes |
+
+The optional guarded evidence output is invoked exactly as follows, after fresh protected authority preparation:
+
+```bash
+bun --no-env-file run tooling/release/run-live-integration.ts --manifest <protected-manifest-path> --evidence-dir <restricted-evidence-directory>
+```
+
+The writer emits JSON and Markdown on authority errors, test failures and cleanup failures. Bounded runner metadata records the actual phase, command exit, inventory outcome, cleanup outcome and fence state using fixed codes, independently from case assertion statuses. The original failure phase survives cleanup/release. A failed runner or cleanup prevents programme readiness even if every supplied case assertion claims PASS. Missing authority is identified without raw error messages or secret values. It never infers charter PASS from suite exit. Forty cases each require every charter level, same candidate, fresh executed assertion, matching target fingerprint, and relevant owned fixture/cleanup proof. Public reports use restricted evidence digest references; underlying commands, assertions and artefacts remain in restricted storage. The report readiness exit code is 1 until all required cases pass. As explicitly reconciled, the existing runner process exit still reports the infrastructure inventory command result; programme `NOT_VERIFIED` does not invalidate a successful inventory command. Evidence-writing failure itself is nonzero and preserves any original runner failure. Deployed SHA remains null until actually evidenced. Browser/provider readiness remains `NOT_VERIFIED` pending Plan 160.
+
+## Rollout procedure (not executed)
+
+1. Capture source, database and configuration fingerprints and the owned fixture inventory. Inspect every deployment using the Xero app and confirm one canonical database (`XERO_CREDENTIAL_DOMAIN_ID`) and one shared store. Preflight validates only the current deployment; runtime domain fencing cannot discover two different stores.
+2. Deploy 161b migration A. Run `backfill:xero-tenant-binding --dry-run`; only with zero collisions run `--apply`. Deploy migrations B and C together only afterwards. B guards the completed backfill; C forbids changing the existing external file. Deploy 161c-161f additive migrations and the 161h classification migration. Verify constraints and unchanged payroll row counts. These are operator steps requiring separate rollout authority.
+3. Audit the revision of every caller and drain every deployment using admission code without the 161h credential-domain check, including 161e-161g shared-store Lua callers as well as process-local limiters. Old Lua only checks sentinel existence and could accept a UUID sentinel during mixed deployment. Cut over all admission callers atomically before first 161h provider traffic. For a new namespace, initialise the reviewed commercial rate namespace conservatively:
+
+   ```bash
+   bun --no-env-file run --cwd packages/xero rate:initialise-namespace --epoch <e> --assume-spent-daily --credential-domain-id <id>
+   ```
+
+   An empty store is not a fresh daily allowance. The domain is immutable per epoch. Repeat initialisation with the same domain is idempotent and does not reset allowance; a foreign domain, legacy sentinel `1`, missing domain or malformed domain fails closed. Never flush, reinitialise or rotate the epoch to resolve an existing legacy sentinel. A legacy transition requires a separately reviewed operator procedure that preserves spent budgets, cooldowns and leases; it has not been implemented or executed here. Ordinary initialisation deliberately refuses legacy sentinels.
+4. Run 161d two-phase credential-owner backfill: verified identity plan, `--dry-run`, then `--apply`. Unverifiable bindings stay on the legacy path and are listed for controlled reauthorisation. Never choose account owners automatically.
+5. Deploy 161g. Verify recovery reasons, callback and bounded refresh recovery on owned fixtures. Legacy bindings continue through `resolveXeroAccess`. Attach unowned groups sharing one Xero user by controlled reauthorisation, one customer at a time with their agreement.
+6. Keep `XERO_REMOTE_CLEANUP_MODE` unset and observe frozen cleanup requests/targets in report-only mode.
+7. Enable cleanup only after the provider ledger management-token provisioning row is verified, owned live DELETE outcomes pass and the 161f operator procedure is staffed.
+8. Run the evidence writer against the exact candidate and separately record local/deployed SHAs. Complete source, configured database, distributed store, browser and live-provider levels independently. Inventory success is not programme readiness.
+9. Scrub mirrored connection credential columns and remove mirror-write only in a separately authorised follow-up after every reserved binding has an owner and no reader remains. Keep old key material while any envelope references it.
+
+Rollback stops provider admission and the cleanup worker where needed, preserves local disables, reserved bindings, attempt history and adopted credentials, and restores only a compatible reviewed version. Never restore stale refresh tokens and use them; never reverse additive migrations by deleting payroll data. Never return to silent rebinding, independent token rotation or fail-open rate limiting. An issued unresolved DELETE remains unresolved after rollback. Automatic inactivity notices/deletion, mirrored-column removal, retiring the legacy key and NZ/UK activation remain deferred.

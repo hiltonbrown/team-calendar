@@ -202,3 +202,8 @@ export type XeroCleanupRequest = Prisma.XeroCleanupRequestModel
  *
  */
 export type XeroCleanupAttempt = Prisma.XeroCleanupAttemptModel
+/**
+ * Model XeroInactivityClassification
+ *
+ */
+export type XeroInactivityClassification = Prisma.XeroInactivityClassificationModel

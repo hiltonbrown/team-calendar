@@ -80,6 +80,7 @@ export const keys = () =>
       XERO_APP_TIER: process.env.XERO_APP_TIER,
       XERO_CLIENT_ID: process.env.XERO_CLIENT_ID,
       XERO_CLIENT_SECRET: process.env.XERO_CLIENT_SECRET,
+      XERO_CREDENTIAL_DOMAIN_ID: process.env.XERO_CREDENTIAL_DOMAIN_ID,
       XERO_RATE_NAMESPACE_EPOCH: process.env.XERO_RATE_NAMESPACE_EPOCH,
       XERO_REDIRECT_URI: process.env.XERO_REDIRECT_URI,
       XERO_REMOTE_CLEANUP_MODE: process.env.XERO_REMOTE_CLEANUP_MODE,
@@ -98,6 +99,7 @@ export const keys = () =>
         .optional(),
       XERO_CLIENT_ID: z.string().optional(),
       XERO_CLIENT_SECRET: z.string().optional(),
+      XERO_CREDENTIAL_DOMAIN_ID: z.string().uuid().optional(),
       XERO_RATE_NAMESPACE_EPOCH: z
         .string()
         .regex(NAMESPACE_EPOCH_REGEX)

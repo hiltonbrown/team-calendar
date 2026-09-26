@@ -252,3 +252,48 @@ describe("production shared-store selection", () => {
     expect(unavailable).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("credential domain admission", () => {
+  it.each(["tenant", "token", "user_inventory", "app_management"] as const)(
+    "memory mismatch denies %s before spending or replay",
+    async (kind) => {
+      const store = new MemorySharedXeroRateStore({
+        expectedCredentialDomainId: "expected",
+        limits,
+        observedCredentialDomainId: "foreign",
+      });
+      const rateClass: XeroRateClass =
+        kind === "tenant" ? tenant : { kind, providerAppId: "app" };
+      const input = reservation(rateClass);
+      for (let i = 0; i < 2; i += 1) {
+        expect(await store.reserve(input)).toMatchObject({
+          error: { reason: "credential_domain_mismatch" },
+          ok: false,
+        });
+      }
+    }
+  );
+  it("passes expected domain as fixed argument before operation extras", async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () =>
+      Response.json({ result: ["credential_domain_mismatch"] })
+    );
+    const domain = "11111111-1111-4111-8111-111111111111";
+    const store = new RedisSharedXeroRateStore({
+      credentialDomainId: domain,
+      epoch: "owned",
+      fetchImpl,
+      limits,
+      token: "test",
+      url: "https://invalid.example",
+    });
+    expect(await store.reserve(reservation())).toMatchObject({
+      error: { reason: "credential_domain_mismatch" },
+      ok: false,
+    });
+    await expect(store.initialiseNamespace("app", true)).rejects.toThrow(
+      "credential domain mismatch"
+    );
+    const body = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body));
+    expect(body[17]).toBe(domain);
+  });
+});

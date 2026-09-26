@@ -1,5 +1,7 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
+
 import { randomUUID } from "node:crypto";
+import { executeRedisRestCommand } from "@repo/core";
 import {
   deleteSharedStoreFixtureKeys,
   sharedStoreFixtureEpoch,
@@ -11,6 +13,7 @@ import {
   RedisSharedXeroRateStore,
   type SharedRateLimits,
   type XeroRateClass,
+  xeroRateKeys,
 } from "./shared-store";
 
 const fixture = allocateLiveTestFixture(
@@ -34,7 +37,13 @@ function tenant(providerAppId: string, xeroTenantId = "tenant"): XeroRateClass {
   return { kind: "tenant", providerAppId, xeroTenantId };
 }
 function store(config = limits) {
-  return new RedisSharedXeroRateStore({ epoch, limits: config, token, url });
+  return new RedisSharedXeroRateStore({
+    credentialDomainId: fixture.id("credential-domain"),
+    epoch,
+    limits: config,
+    token,
+    url,
+  });
 }
 async function application(config = limits) {
   const appId = `fixture-${epoch}-${appSequence}`;
@@ -247,5 +256,129 @@ describe("owned Redis REST atomic admission", () => {
     expect(
       (await reserve(first, { kind: "token", providerAppId: appId })).ok
     ).toBe(true);
+  });
+});
+
+describe("owned Redis credential domain fence", () => {
+  it("initialisation is immutable and idempotent without resetting allowance", async () => {
+    const { appId, first } = await application({
+      ...limits,
+      callsPerDayPerOrg: 1,
+    });
+    const rateClass = tenant(appId);
+    const replay = { leaseMs: 1000, rateClass, reservationId: randomUUID() };
+    expect((await first.reserve(replay)).ok).toBe(true);
+    expect(await first.initialiseNamespace(appId, true)).toBe(false);
+    const foreign = new RedisSharedXeroRateStore({
+      credentialDomainId: fixture.id("foreign-domain"),
+      epoch,
+      limits,
+      token,
+      url,
+    });
+    await expect(foreign.initialiseNamespace(appId, false)).rejects.toThrow(
+      "credential domain mismatch"
+    );
+    for (const kind of [
+      "tenant",
+      "token",
+      "user_inventory",
+      "app_management",
+    ] as const) {
+      const scoped: XeroRateClass =
+        kind === "tenant" ? rateClass : { kind, providerAppId: appId };
+      expect(
+        await foreign.reserve({ ...replay, rateClass: scoped })
+      ).toMatchObject({
+        error: { reason: "credential_domain_mismatch" },
+        ok: false,
+      });
+    }
+    expect((await first.reserve(replay)).ok).toBe(true);
+    expect(await reserve(first, rateClass)).toMatchObject({
+      error: { reason: "daily" },
+      ok: false,
+    });
+  });
+});
+
+describe("owned Redis sentinel integrity", () => {
+  async function command(values: readonly (string | number)[]) {
+    const result = await executeRedisRestCommand({
+      command: values,
+      token,
+      url,
+    });
+    if (!result.ok) {
+      throw new Error("Owned Redis fixture command failed");
+    }
+    return result.value;
+  }
+  function snapshot(rateClass: XeroRateClass) {
+    const keys = xeroRateKeys(rateClass, epoch);
+    return Promise.all(
+      keys.map((key, index) =>
+        command([
+          index === 0 || index === 5 || index === 6 ? "GET" : "ZCARD",
+          key,
+        ])
+      )
+    );
+  }
+  it("mismatch leaves sentinel, counters and conservative allowance unchanged", async () => {
+    const appId = `fixture-${epoch}-immutable`;
+    applications.push(appId);
+    const first = store();
+    await first.initialiseNamespace(appId, true);
+    const rateClass = tenant(appId);
+    const before = await snapshot(rateClass);
+    const foreign = new RedisSharedXeroRateStore({
+      credentialDomainId: fixture.id("foreign-domain"),
+      epoch,
+      limits,
+      token,
+      url,
+    });
+    await expect(foreign.initialiseNamespace(appId, false)).rejects.toThrow(
+      "credential domain mismatch"
+    );
+    await reserve(foreign, rateClass);
+    expect(await snapshot(rateClass)).toEqual(before);
+  });
+  it.each(["1", "malformed"])(
+    "legacy/malformed sentinel %s denies all classes and cannot be rewritten",
+    async (value) => {
+      const appId = `fixture-${epoch}-sentinel-${value}`;
+      applications.push(appId);
+      const rateClass = tenant(appId);
+      await command(["SET", xeroRateKeys(rateClass, epoch)[0] ?? "", value]);
+      const before = await snapshot(rateClass);
+      const first = store();
+      await expect(first.initialiseNamespace(appId, false)).rejects.toThrow(
+        "credential domain mismatch"
+      );
+      for (const kind of [
+        "tenant",
+        "token",
+        "user_inventory",
+        "app_management",
+      ] as const) {
+        const scoped: XeroRateClass =
+          kind === "tenant" ? rateClass : { kind, providerAppId: appId };
+        expect(await reserve(first, scoped)).toMatchObject({
+          error: { reason: "credential_domain_mismatch" },
+          ok: false,
+        });
+      }
+      expect(await snapshot(rateClass)).toEqual(before);
+    }
+  );
+  it("missing deployment domain fails closed even in test mode", async () => {
+    const { appId } = await application();
+    const missing = new RedisSharedXeroRateStore({ epoch, limits, token, url });
+    expect(await reserve(missing, tenant(appId))).toMatchObject({
+      error: { reason: "credential_domain_mismatch" },
+      ok: false,
+    });
   });
 });

@@ -407,7 +407,7 @@ The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempt
 ## Inngest job rules
 
 - Job definitions in `packages/jobs`. Handlers registered in `apps/api`.
-- Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`.
+- Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`, `reconcile-xero-connections`.
 - Inngest handles retries with exponential backoff for inbound sync failures.
 - Outbound write failures are not retried automatically; they are surfaced to the user.
 - Record-level inbound failures do not fail the entire sync run.
@@ -466,6 +466,13 @@ Optional variables with format constraints must be absent (commented out), not `
 | `XERO_CLIENT_ID` | `packages/xero` | Xero OAuth app ID |
 | `XERO_CLIENT_SECRET` | `packages/xero` | Xero OAuth app secret |
 | `XERO_TOKEN_ENCRYPTION_KEY` | `packages/xero` | AES-256-GCM key for encrypting Xero OAuth tokens at rest; must be 32 bytes, base64-encoded |
+| `XERO_APP_TIER` | `packages/xero` | Required production commercial allowance: Starter 1,000/day; Core and above 5,000/day |
+| `XERO_RATE_NAMESPACE_EPOCH` | `packages/xero` | Required shared namespace epoch; initialise conservatively before traffic |
+| `XERO_CREDENTIAL_DOMAIN_ID` | `packages/xero` | UUID identifying the canonical credential database; immutable per store epoch |
+| `XERO_REDIRECT_URI` | `packages/xero` | Registered HTTPS OAuth callback, required by production preflight |
+| `XERO_REMOTE_CLEANUP_MODE` | `packages/xero` | Absent defaults to `report_only`; enable only after reviewed provider evidence |
+| `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` | `packages/xero` | Positive version for new envelopes; preserve referenced old keys |
+| `XERO_TOKEN_ENCRYPTION_KEYS_JSON` | `packages/xero` | Server-only versioned encryption key map, never print values |
 | `INNGEST_EVENT_KEY` | `packages/jobs` | Inngest event key |
 | `INNGEST_SIGNING_KEY` | `packages/jobs` | Inngest signing key |
 | `KV_REST_API_URL` | `packages/feeds` | Vercel KV endpoint |
@@ -537,3 +544,7 @@ Optional variables with format constraints must be absent (commented out), not `
 16. Reconciliation jobs, sync health UI, and audit reporting
 
 Each step: deployable, testable vertical slice.
+
+### Xero lifecycle enablement controls
+
+The binding guard and shared rate limiter are mandatory correctness controls, not discretionary toggles. A namespace without an initialised matching credential-domain sentinel denies admission. `XERO_REMOTE_CLEANUP_MODE` defaults to `report_only`; `enabled` requires reviewed provider evidence and a staffed operator procedure. Canonical credential cutover is per binding through `XeroTenant.xero_credential_owner_id`; null preserves the existing legacy fallback. Inactivity assessment is manually scoped and report-only. No job, notice, disable or deletion is driven by its classifications.

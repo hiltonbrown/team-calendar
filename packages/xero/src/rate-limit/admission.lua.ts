@@ -8,13 +8,23 @@ local dayCap = tonumber(ARGV[4])
 local appCap = tonumber(ARGV[5])
 local concurrentCap = tonumber(ARGV[6])
 local id = ARGV[7]
+local domain = ARGV[8]
+local function validDomain(value)
+  return value and string.len(value) == 36 and string.match(value, '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$')
+end
+local observedDomain = redis.call('GET', KEYS[1])
+if not validDomain(domain) then return {'credential_domain_mismatch'} end
 if operation == 'initialise' then
-  if redis.call('EXISTS', KEYS[1]) == 1 then return {'existing'} end
-  if ARGV[8] == 'true' then redis.call('SET', KEYS[7], now + 86400000, 'PX', 86400000) end
-  redis.call('SET', KEYS[1], '1')
+  if observedDomain then
+    if observedDomain == domain then return {'existing'} end
+    return {'credential_domain_mismatch'}
+  end
+  if ARGV[9] == 'true' then redis.call('SET', KEYS[7], now + 86400000, 'PX', 86400000) end
+  redis.call('SET', KEYS[1], domain)
   return {'initialised'}
 end
-if redis.call('EXISTS', KEYS[1]) == 0 then return {'infrastructure'} end
+if not observedDomain then return {'infrastructure'} end
+if not validDomain(observedDomain) or observedDomain ~= domain then return {'credential_domain_mismatch'} end
 if operation == 'release' then
   redis.call('ZREM', KEYS[5], id)
   return {'released'}
@@ -26,7 +36,7 @@ if tenant then
   redis.call('ZREMRANGEBYSCORE', KEYS[5], '-inf', now)
 end
 if operation == 'observe' then
-  local ceilings = {tonumber(ARGV[8]), tonumber(ARGV[9]), tonumber(ARGV[10])}
+  local ceilings = {tonumber(ARGV[9]), tonumber(ARGV[10]), tonumber(ARGV[11])}
   local windows = {KEYS[3], KEYS[4], KEYS[2]}
   local caps = {minuteCap, dayCap, appCap}
   local durations = {60000, 86400000, 60000}
@@ -38,7 +48,7 @@ if operation == 'observe' then
       if required > existing then redis.call('PEXPIRE', windows[i], durations[i]) end
     end
   end
-  local cooldown = tonumber(ARGV[11])
+  local cooldown = tonumber(ARGV[12])
   if cooldown and cooldown > 0 then
     local previous = tonumber(redis.call('GET', KEYS[6])) or 0
     if now + cooldown > previous then redis.call('SET', KEYS[6], now + cooldown, 'PX', cooldown) end
@@ -58,7 +68,7 @@ redis.call('PEXPIRE', KEYS[3], 60000)
 if tenant then
   redis.call('ZADD', KEYS[4], now, id)
   redis.call('PEXPIRE', KEYS[4], 86400000)
-  local lease = tonumber(ARGV[8])
+  local lease = tonumber(ARGV[9])
   redis.call('ZADD', KEYS[5], now + lease, id)
   -- Keep the key alive until its longest lease, even when later callers have shorter budgets.
   local ttl = redis.call('PTTL', KEYS[5])

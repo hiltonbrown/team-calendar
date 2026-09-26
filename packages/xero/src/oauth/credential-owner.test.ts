@@ -32,8 +32,11 @@ const mocks = vi.hoisted(() => {
     exchange: vi.fn(),
     identity: vi.fn(),
     legacy: vi.fn(),
+    metricLog: vi.fn(),
   };
 });
+vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
+
 vi.mock("@repo/database", () => ({ database: mocks.database }));
 vi.mock("../../keys", () => ({ keys: () => ({ XERO_CLIENT_ID: "app" }) }));
 vi.mock("./identity", () => ({
@@ -438,6 +441,14 @@ describe("adoption and durable recovery", () => {
       })
     );
     expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.refresh.conflict",
+        outcome: "superseded",
+        value: 1,
+      }
+    );
   });
   it("matching attempt ID and exact next token version prove a lost commit", async () => {
     db.xeroRefreshAttempt.findMany.mockResolvedValue([attempt()]);
@@ -453,6 +464,7 @@ describe("adoption and durable recovery", () => {
       })
     );
     expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.metricLog).not.toHaveBeenCalled();
   });
   it("grace expiry scrubs recovery material and marks only the matching owner version unusable", async () => {
     const old = new Date(Date.now() - 1_800_001);
@@ -474,6 +486,14 @@ describe("adoption and durable recovery", () => {
       where: { id: "owner", token_version: 1 },
     });
     expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      {
+        metric: "xero.refresh.failed",
+        outcome: "failed",
+        value: 1,
+      }
+    );
   });
 });
 
@@ -723,4 +743,92 @@ it("opts a recoverable legacy stale binding into existing scoped refresh", async
       organisationId: "organisation",
     })
   );
+});
+
+describe("refresh metric outcome safety", () => {
+  it.each([false, true])(
+    "records a dispatched lost response and preserves recovery when logger throws: %s",
+    async (loggerFails) => {
+      if (loggerFails) {
+        mocks.metricLog.mockImplementation(() => {
+          throw new Error("telemetry unavailable");
+        });
+      }
+      const error = {
+        code: "network_error",
+        dispatched: true,
+        message: "provider response lost",
+      };
+      mocks.exchange.mockResolvedValue({ error, ok: false });
+      expect(
+        await refreshXeroCredentialOwner({
+          deadline: deadline(),
+          expectedTokenVersion: 1,
+          ownerId: "owner",
+        })
+      ).toEqual({ error, ok: false });
+      expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            outcome: "lost_response",
+            recovery_deadline: expect.any(Date),
+            uncertain_since: expect.any(Date),
+          }),
+        })
+      );
+      expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+      expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+        "Xero lifecycle metric",
+        { metric: "xero.refresh.failed", outcome: "lost_response", value: 1 }
+      );
+    }
+  );
+  it("records definite exchange failure without changing its error or owner", async () => {
+    const error = {
+      code: "client_credentials_invalid",
+      message: "invalid app credentials",
+    };
+    mocks.exchange.mockResolvedValue({ error, ok: false });
+    expect(
+      await refreshXeroCredentialOwner({
+        deadline: deadline(),
+        expectedTokenVersion: 1,
+        ownerId: "owner",
+      })
+    ).toEqual({ error, ok: false });
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+    expect(db.xeroConnection.updateMany).not.toHaveBeenCalled();
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      { metric: "xero.refresh.failed", outcome: "failed", value: 1 }
+    );
+  });
+  it("preserves the superseding credential winner when metric logging throws", async () => {
+    const winner = { ...owner(), token_version: 2 };
+    db.xeroCredentialOwner.findUniqueOrThrow.mockResolvedValue(winner);
+    mocks.metricLog.mockImplementation(() => {
+      throw new Error("telemetry unavailable");
+    });
+    expect(
+      await refreshXeroCredentialOwner({
+        deadline: deadline(),
+        expectedTokenVersion: 1,
+        ownerId: "owner",
+      })
+    ).toEqual({ ok: true, value: winner });
+    expect(mocks.exchange).not.toHaveBeenCalled();
+    expect(db.xeroCredentialOwner.update).not.toHaveBeenCalled();
+    expect(db.xeroRefreshAttempt.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          outcome: "superseded",
+          recovery_token_encrypted: null,
+        }),
+      })
+    );
+    expect(mocks.metricLog).toHaveBeenCalledExactlyOnceWith(
+      "Xero lifecycle metric",
+      { metric: "xero.refresh.conflict", outcome: "superseded", value: 1 }
+    );
+  });
 });

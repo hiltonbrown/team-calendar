@@ -5,6 +5,7 @@ export { classifyXeroFailure } from "./src/adapter/classify-xero-failure";
 export { toResolvedXeroTenant } from "./src/adapter/resolved-tenant";
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
+export { emitXeroMetric } from "./src/metrics";
 export {
   aggregateXeroDisconnectReceipt,
   getXeroDisconnectReceipt,

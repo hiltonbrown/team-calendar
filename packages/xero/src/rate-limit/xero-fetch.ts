@@ -1,4 +1,5 @@
 import { keys } from "../../keys";
+import { emitXeroMetric } from "../metrics";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
 import { XeroRateLimiter } from "./limiter";
 import {
@@ -164,7 +165,10 @@ async function performAttempt(
     if (remainingMs(deadline) === 0) {
       throw new XeroFetchError("deadline_exceeded", false);
     }
-    if (gate.reason === "infrastructure") {
+    if (
+      gate.reason === "infrastructure" ||
+      gate.reason === "credential_domain_mismatch"
+    ) {
       throw new XeroFetchError("admission_unavailable", false);
     }
     return rateLimitedResponse(gate.reason);
@@ -250,6 +254,9 @@ export class XeroFetchError extends Error {
     this.name = "XeroFetchError";
     this.code = code;
     this.dispatched = dispatched;
+    if (code === "deadline_exceeded") {
+      emitXeroMetric("xero.fetch.deadline_exceeded", 1);
+    }
   }
 }
 

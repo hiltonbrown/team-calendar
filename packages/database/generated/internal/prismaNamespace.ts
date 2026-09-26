@@ -433,7 +433,8 @@ export const ModelName = {
   UsageCounter: 'UsageCounter',
   StripeEvent: 'StripeEvent',
   XeroCleanupRequest: 'XeroCleanupRequest',
-  XeroCleanupAttempt: 'XeroCleanupAttempt'
+  XeroCleanupAttempt: 'XeroCleanupAttempt',
+  XeroInactivityClassification: 'XeroInactivityClassification'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -449,7 +450,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent" | "xeroCleanupRequest" | "xeroCleanupAttempt"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent" | "xeroCleanupRequest" | "xeroCleanupAttempt" | "xeroInactivityClassification"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3191,6 +3192,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    XeroInactivityClassification: {
+      payload: Prisma.$XeroInactivityClassificationPayload<ExtArgs>
+      fields: Prisma.XeroInactivityClassificationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.XeroInactivityClassificationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.XeroInactivityClassificationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        findFirst: {
+          args: Prisma.XeroInactivityClassificationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.XeroInactivityClassificationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        findMany: {
+          args: Prisma.XeroInactivityClassificationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>[]
+        }
+        create: {
+          args: Prisma.XeroInactivityClassificationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        createMany: {
+          args: Prisma.XeroInactivityClassificationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.XeroInactivityClassificationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>[]
+        }
+        delete: {
+          args: Prisma.XeroInactivityClassificationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        update: {
+          args: Prisma.XeroInactivityClassificationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        deleteMany: {
+          args: Prisma.XeroInactivityClassificationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.XeroInactivityClassificationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.XeroInactivityClassificationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>[]
+        }
+        upsert: {
+          args: Prisma.XeroInactivityClassificationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$XeroInactivityClassificationPayload>
+        }
+        aggregate: {
+          args: Prisma.XeroInactivityClassificationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateXeroInactivityClassification>
+        }
+        groupBy: {
+          args: Prisma.XeroInactivityClassificationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroInactivityClassificationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.XeroInactivityClassificationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.XeroInactivityClassificationCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -4036,6 +4111,23 @@ export const XeroCleanupAttemptScalarFieldEnum = {
 export type XeroCleanupAttemptScalarFieldEnum = (typeof XeroCleanupAttemptScalarFieldEnum)[keyof typeof XeroCleanupAttemptScalarFieldEnum]
 
 
+export const XeroInactivityClassificationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  xero_tenant_id: 'xero_tenant_id',
+  policy_version: 'policy_version',
+  kind: 'kind',
+  reason: 'reason',
+  review_status: 'review_status',
+  classified_at: 'classified_at',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type XeroInactivityClassificationScalarFieldEnum = (typeof XeroInactivityClassificationScalarFieldEnum)[keyof typeof XeroInactivityClassificationScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -4721,6 +4813,34 @@ export type ListEnumxero_cleanup_attempt_stateFieldRefInput<$PrismaModel> = Fiel
 
 
 /**
+ * Reference to a field of type 'xero_inactivity_kind'
+ */
+export type Enumxero_inactivity_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_inactivity_kind'>
+
+
+
+/**
+ * Reference to a field of type 'xero_inactivity_kind[]'
+ */
+export type ListEnumxero_inactivity_kindFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_inactivity_kind[]'>
+
+
+
+/**
+ * Reference to a field of type 'xero_inactivity_review_status'
+ */
+export type Enumxero_inactivity_review_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_inactivity_review_status'>
+
+
+
+/**
+ * Reference to a field of type 'xero_inactivity_review_status[]'
+ */
+export type ListEnumxero_inactivity_review_statusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'xero_inactivity_review_status[]'>
+
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -4921,6 +5041,7 @@ export type GlobalOmitConfig = {
   stripeEvent?: Prisma.StripeEventOmit
   xeroCleanupRequest?: Prisma.XeroCleanupRequestOmit
   xeroCleanupAttempt?: Prisma.XeroCleanupAttemptOmit
+  xeroInactivityClassification?: Prisma.XeroInactivityClassificationOmit
 }
 
 /* Types for Logging */

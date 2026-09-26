@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { emitXeroMetric } from "../metrics";
 import { remainingMs, type XeroDeadline } from "./deadline";
 import { DEFAULT_MAX_WAIT_MS } from "./limits";
 import {
@@ -45,6 +46,7 @@ export class XeroRateLimiter {
     this.maxWaitMs = config.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
     this.store = deps.store ?? getSharedXeroRateStore(config);
   }
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve atomic admission retry and absolute deadline decisions in one auditable loop.
   async acquire(
     rateClass: XeroRateClass,
     options: {
@@ -101,6 +103,13 @@ export class XeroRateLimiter {
         };
       }
       const { reason } = result.error;
+      emitXeroMetric("xero.admission.denied", 1, {
+        class: rateClass.kind,
+        reason,
+      });
+      if (reason === "infrastructure") {
+        emitXeroMetric("xero.store.unavailable", 1, { class: rateClass.kind });
+      }
       lastDenial = reason;
       const left = Math.min(
         until - this.now(),
@@ -108,7 +117,12 @@ export class XeroRateLimiter {
           ? remainingMs(options.deadline)
           : Number.POSITIVE_INFINITY
       );
-      if (reason === "daily" || reason === "infrastructure" || left <= 0) {
+      if (
+        reason === "daily" ||
+        reason === "infrastructure" ||
+        reason === "credential_domain_mismatch" ||
+        left <= 0
+      ) {
         return { ok: false, reason };
       }
       await this.sleep(Math.min(left, backoff * (0.75 + this.random() / 2)));

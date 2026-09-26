@@ -89,6 +89,10 @@
     "./queries/xero-connection-state": {
       "types": "./queries/xero-connection-state.ts",
       "default": "./queries/xero-connection-state.ts"
+    },
+    "./queries/xero-inactivity-signals": {
+      "types": "./queries/xero-inactivity-signals.ts",
+      "default": "./queries/xero-inactivity-signals.ts"
     }
   },
   "main": "./index.ts",
