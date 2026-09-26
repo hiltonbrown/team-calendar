@@ -288,3 +288,14 @@ User confirmed online Neon verification only. A disposable local migration had s
 - `bun run test`: exit 0, 18 tasks passed.
 - Final Xero units: 23 files, 364 tests passed, including expired budgets, stalled headers and caller cancellation.
 - Build and protected live integration: final evidence appended after completion.
+
+
+### First guarded online integration run and reconciliation
+
+The protected online runner against source candidate `70faf06` collected all new Xero cases: Xero 2 files and 18 tests passed, database 41, app 2, feeds 15 and availability 21 passed. The full command exited 1 due to two existing jobs-suite prerequisites, not a Xero deadline or keyring failure. The people suite failed collection because the runner supplied Inngest signing configuration without its paired event key. The reviewer will supply the existing paired provider configuration, keeping all actual sends mocked in integration tests.
+
+The leave-records CAS test assumed its dynamically allocated person UUID sorted after a hardcoded cursor, so the mocked concurrent update never ran and the result was `succeeded` instead of `cancelled`. With reviewer approval, its initial cursor is now null (first page) and the test explicitly asserts one fetch, ensuring the database race is exercised for every allocated ID. This is a necessary test-only scope reconciliation in `packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts`.
+
+A comments-only env example amendment created `5b761dd` while the first runner was already executing `70faf06`; executed source and tests were identical. Subsequent candidates are frozen before manifest preparation. The first run's internal cleanup completed and released its fixture fence before any further source edits.
+
+Production build passed: `bun run build` with command-only synthetic validation configuration, 4 tasks successful (database, API, app, web), 40.223 seconds. No secrets or env files were committed. Full unit suite was repeated after all tests: 18 tasks passed. Final lint passed 1047 files. Generated Prisma formatting noise is restored after commands that regenerate it.

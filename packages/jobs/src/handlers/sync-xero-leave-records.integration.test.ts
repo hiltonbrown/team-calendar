@@ -837,7 +837,9 @@ describe("sync-xero-leave-records database flow", () => {
     await setupTenant(tenantA, "NZ");
     await setupPerson(tenantA);
 
-    const initialCursor = "50000000-0000-4000-8000-000000000001";
+    // First-page cursor guarantees the suite-owned person is fetched regardless
+    // of its generated UUID ordering, so the concurrent update actually runs.
+    const initialCursor = null;
     const modifiedCursor = "50000000-0000-4000-8000-000000000099";
 
     await database.xeroSyncCursor.create({
@@ -873,6 +875,7 @@ describe("sync-xero-leave-records database flow", () => {
 
     const result = await syncXeroLeaveRecords(syncInput(tenantA));
 
+    expect(mockFetchLeaveForEmployeeForRegion).toHaveBeenCalledTimes(1);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.status).toBe("cancelled");
