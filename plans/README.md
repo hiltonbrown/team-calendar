@@ -37,8 +37,8 @@ context: read the plan fully, honour its STOP conditions, update your row when d
 | [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | DONE: merged into main at `128cc66`; protected online Neon 23 files/177 tests passed; clean fixtures |
 | [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | DONE: merged into main at `bebd7e6`; approved runtime `f2aeff73`; protected live Neon and Redis passed (24 files, 187 tests); zero residue and released fence verified |
 | [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | DONE: merged into main at `bebd7e6`; approved runtime `c0ce9a13`; protected live Neon passed (26 files, 207 tests); 38 zero-residue selectors, released fence and no schema drift verified; provider/browser NOT VERIFIED |
-| [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | TODO |
-| [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | TODO |
+| [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | DONE: approved isolated codex/xero-permission-recovery, not merged; 2655 units and protected Neon 26 files / 224 tests, cleanup verified |
+| [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | DONE: approved isolated codex/xero-rollout-inactivity, not merged; 2723 units and protected Neon 27 files / 233 tests; additive migration, zero residue and no schema drift verified; rollout/provider/browser unexecuted |
 
 Status values: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` (with a one-line reason),
 `REJECTED` (with a one-line rationale).

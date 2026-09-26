@@ -451,3 +451,159 @@ Final documentation copies the reviewer's completed plan and index exactly and c
 The user's subsequent instruction, "commit all and merge to main", authorised committing all pending plan records and merging both completed slices. Pending records were committed at `a131ec6`; merge `bebd7e6` includes `codex/xero-management-cleanup` and its `codex/xero-shared-rate-limits` dependency with no conflicts. Both feature tips are ancestors of main. Before this documentation update, the complete merged tree was byte-identical to feature tip `0617120`, preserving the runtime verified in the protected 26-suite, 207-test campaign.
 
 Post-merge checks on main PASS: lint (1083 files), package boundaries (1040 files, 21 packages), release tools (16 files, 104 tests), whitespace and clean working tree. No new runtime changes, database campaign or provider operation was needed for this identical tree. The full type/unit/build and protected live evidence above remains applicable. Cleanup remains report-only; actual provider operations and browser E2E remain NOT VERIFIED. No push or deployment was performed.
+
+
+## 161g candidate execution, 26 September 2026
+
+Implementation follows the complete reconciled Plan 161g from merged baseline `dd458615590658b9574b73df24abbebba5ac5a8d`, isolated in `/tmp/tc-161g` on `codex/xero-permission-recovery`. Packaging deviation: the full plan was supplied through verified shared absolute path `/home/hilton/Documents/teamcalendar/plans/161g-xero-permission-recovery.md` instead of duplicated inline. It and its Execution reconciliation were read before implementation, then the latest reviewer-owned plan was copied into the candidate at closure. The reviewer owns `plans/README.md`; its status row was intentionally not edited.
+
+### Regression proof before implementation
+
+- Adapter collapse: the new admission-unavailable, configuration/key and resolver capability-missing cases all failed against the original adapter, which returned the same `auth_error`/not-connected result. Actual result: three new failures, five existing passes. The third early case proved resolver `capability_missing`, not an actual 401 header. Subsequent adapter/auth/read/write tests separately prove actual scope-header 401/403, exact zero refresh, plain 401 one refresh/one retry, retry scope classification and no ambiguous mutation replay.
+- State collapse: the new thrown database regression expected `{ ok: false, error: { code: "state_unavailable" } }` but received `false`: one failed, four passed at 18:59:14.
+- Event generation: the new missing-generation regression expected validation failure but queued successfully: one failed, five passed at 19:00:36. Both event schema copies now require a nonnegative integer generation.
+
+### Implemented steps
+
+Steps 2 through 4 add neutral recovery reasons, exact Bearer and FAQ standalone scope-header parsing, capability alternatives, bounded version-aware 401 recovery and one absolute operation deadline through resolver, retry, fetch and body. AU scope ledger cells cite the primary Xero OpenAPI; requested OAuth scopes and payroll semantics remain unchanged. Ordinary raw response bodies remain available for audit. Failed bounded 401/403 buffering preserves authoritative headers; pre-aborted signals carry definite pre-dispatch evidence. Missing successful mutation IDs remain outcome_unknown. Legacy recorded invalid grants return reauthorisation before HTTP; recoverable stale bindings use a resolver-only opt-in to the existing locked refresh/CAS path. App configuration incidents do not mutate customer grant state.
+
+Step 5 replaces every hasActiveXeroConnection boolean with a credential-free scoped Result state query and explicit enum gates. Actual refresh_token_invalid and retired bindings are handled consistently. Only unresolved cleanup matching the current generation is pending. Unavailable state cannot enable payroll/manual-balance bypasses. Employee resolution errors, DTO summaries and SSE messages retain distinct neutral recovery copy; no unsupported team-notified claim is displayed.
+
+Step 6 migrates sync workers and every actual sender/direct caller to server-derived generations and resolved scoped access. Actual canonical mutations, archival groups, cursors, tenant timestamps and final success are checked under the same binding advisory lock and transaction as persistence. Per-record guarded transactions preserve PostgreSQL failure isolation. Publication reads occur after canonical commit and reacquire the fence without provider/cache/queue HTTP. Changed generation cancels the run and cannot be overwritten by success. Retryable service Results reject at the registered Inngest boundary; terminal run summaries store safe reasons. Dormant rotation resolves once per owner without scheduler credential reads. Immediate post-connect and environment-gated local fallback callers now check scoped state and database tenant identity, with safe terminal fallback copy.
+
+Existing allocated owner, cleanup and jobs integration suites were extended rather than adding new suites. Real persisted fixtures cover current/stale/revoked/unreserved states, current versus superseded cleanup generation, resolver stale grant/configuration paths with fake HTTP, generation changes after fetch, stale invalid grants before persistence, and a real PostgreSQL constraint failure followed by a valid record. Fixture external tenant identifiers are unique for reserved bindings. Changed fixture static types pass. These suites have not been executed by the executor; complete online verification belongs exclusively to the protected reviewer campaign. No allocator expansion or inventory registration was necessary.
+
+Step 7 adds state/reason render regressions and one Plan 160 browser spec, `tooling/release/e2e/xero-recovery-reasons.spec.ts`, written but NOT VERIFIED. Source-wide audits find zero obsolete boolean names, direct credential readers/decryptors in migrated runtime paths, adapter null returns or availability-to-Xero imports. Every direct worker call and event sender supplies generation.
+
+Further final review proved three missing typed-reason predicates: per-employee leave records, aggregated balances and regional balance collection returned successful employee-specific failures for unknown_error/operational_incident. Corrected tests first failed with three actual successful Results (three failed, 89 passed), then all 92 focused cases passed after the reason-aware predicates. These now stop collection and reject at the retry boundary without advancing cursors or final sync timestamps. The state query also gives a usable canonical owner precedence over obsolete invalid-grant mirror metadata, with unit and owned persisted regression coverage.
+
+Scope exception: baseline reconciliation dispatchNotification(tx) already launches Redis SSE publication asynchronously during its transaction. This slice preserves that existing notification contract as explicitly reconciled, and adds no provider/cache/queue HTTP inside the new generation fence. Deferred publication reads themselves run after commit and reacquire the fence.
+
+### Verification and limitations
+
+Final candidate source gates and frozen SHA are recorded below after execution. Earlier verification failures are retained honestly: three app tests hit existing five-second timeouts while the synthetic build competed for resources; a later existing management-client 25ms real-time deadline test admitted zero fake requests instead of one. No timeout or unrelated source was changed. The settled full suite subsequently passed. A release-tool type run overlapped Prisma generation and observed incomplete generated exports; its serial rerun passed. Initial package-boundary errors from relative cross-package test imports were corrected to package imports, preserving actual classifier/encryption behaviour. Prisma generation formatting noise is restored to the exact unchanged-schema baseline.
+
+No executor database suite, actual Xero request, real credential change/backfill, destructive cleanup activation, production namespace activation, deployment, merge or push was performed. Cleanup remains report_only. Actual provider headers/authorisation and browser execution remain NOT VERIFIED. Protected online integration verification is pending independent reviewer execution on the frozen committed candidate.
+
+
+### 161g frozen candidate source gates
+
+PASS: `bun --no-env-file run fix` and `check` (1098 files); forced full typecheck (19 uncached tasks); complete units with `--concurrency=2 --force` (18 uncached tasks, 2655 tests, including Xero 548, jobs 151, database 96, core 94, availability 457, app 600 and API 252); boundaries (1054 files, 21 packages); release tools (16 files, 104 tests) and release-tool types; static compilation of all seven changed integration suites; four-app synthetic build (four uncached tasks). Whitespace and unchanged generated/schema checks pass after restoring only generated formatting noise. No source was changed to mask time-budget flakes. Candidate commit and clean status are supplied to the independent reviewer; no source edit or commit is permitted during their active campaign.
+
+The exact four-app build command used command-only synthetic root database and Xero settings, without loading an env file:
+
+```bash
+DATABASE_URL='postgresql://synthetic:synthetic@invalid.example/teamcalendar?sslmode=require' XERO_TOKEN_ENCRYPTION_KEY='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' XERO_CLIENT_ID='synthetic-build-client' XERO_CLIENT_SECRET='synthetic-build-secret' bun --no-env-file run build -- --force --concurrency=2
+```
+
+The typecheck used the same synthetic variables with `bun --no-env-file run typecheck -- --force`. Changed live fixture static compilation used `bunx tsc --ignoreConfig --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --esModuleInterop --strict --jsx react-jsx --types node,vitest/globals` followed by the five changed jobs suites and the existing owner and connection-cleanup suites. This is type verification only, not database execution. Full protected online integration and actual provider/browser evidence remain pending or NOT VERIFIED as stated above. All requested source steps are implemented; the reviewer owns independent campaign and final plan-index closure.
+
+
+### 161g first protected campaign and benchmark instrumentation correction
+
+The independent reviewer passed all source gates on `26f5ce38e412604fc4dff7c161c27a392f1c81aa`: lint, forced types (19 tasks), boundaries, complete units (18 tasks), release tools (104 tests) and types, static integration fixture types and four-app build. The reviewer then ran protected online campaign `60d45251-4d1e-4745-9c01-a1b5bfd78210`. It stopped early on the existing availability list-query benchmark and is **not a complete inventory pass**.
+
+The benchmark still counted `xeroConnection.findFirst`, while the new credential-free state boundary calls `xeroTenant.findFirst`. The narrow correction replaces that spy and its variable references only, retaining the expected `[4, 4, 4]` count and every row/payload assertion. Runtime, schema, fixture allocation and protected inventory are unchanged. The latest reviewer reconciliation is copied into this candidate.
+
+Per the reviewer's verified cleanup evidence, all 38 ownership selectors are empty, the active fence is released, durable ownership and strict consumer isolation remain valid, and the outside-owned catalogue is unchanged. No executor database access occurred. A fresh complete protected campaign remains required on the corrected clean candidate; provider/browser checks remain NOT VERIFIED and cleanup remains report_only.
+
+
+Adding the existing availability file to strict static fixture compilation exposed two pre-existing test typing issues: the unsupported third Vitest mock argument and widened fixture enum literals. The reviewer authorised removing only that argument and preserving literal types with const assertions in the same fixture. Fixture values, benchmark counts and runtime code remain unchanged. Initial static errors are recorded rather than claimed as a passing gate; the corrected candidate is verified below.
+
+
+Corrected candidate validation PASS: full lint (1098 files), strict standalone static compilation of all eight changed integration fixtures including `packages/availability/index.integration.test.ts`, and whitespace checks. Diff audit confirms that the availability integration fixture is the only changed apps/packages file relative to `26f5ce3`; all production runtime remains byte-identical. No unit, build or database suite was executed for this narrow correction, and no live DB was accessed by the executor. The reviewer will independently rerun source gates and the whole protected campaign after the clean commit. The benchmark continues to assert `[4, 4, 4]` exactly.
+
+
+### 161g interrupted second campaign and third campaign fixture reconciliation
+
+Corrected candidate `813e4b168e01c4213dc6f1597ec75a05f1668986` entered protected campaign `2d989796-bf98-4bc6-8b4a-a87e9b9237a1`. Database, hook and cleanup transport timeouts interrupted it; consumer evidence then exceeded the unchanged fifteen-minute freshness guard. This is not a completed inventory pass. The reviewer preserved the active run and original ownership, verified exact target/candidate/durable manifest/active owner and a fresh strict empty-consumer readback, archived the original evidence, and used a metadata-only compare-and-set renewal of consumer/restore evidence under the same run. Protected recovery retained every target, scope, namespace, ownership and safety guard before cleanup verification. The executor performed no database access or evidence renewal.
+
+Third protected campaign `98f41934-c2f0-4987-87e5-de7029c9c53d` passed feeds (15 tests) but failed jobs (six failed, 72 passed out of 78); the whole inventory did not pass. Failures exposed the native Promise marker assignment, an outdated successful Result expectation for retryable balance failure, two plaintext summary expectations, the 35-person absence guard case (six missing, 29 returned) at 30 seconds and the complete 505-record/two-pass approval case at 120 seconds. Ten-second cleanup hooks also failed. Independent protected cleanup verified all 38 selectors empty, unchanged outside-owned catalogue, released fence and valid durable/strict-consumer evidence. A transient stale server-metadata observation was retried against actual fresh readback without changing the fifteen-minute guard.
+
+Authorised fixture-only corrections preserve the concurrent database write and every cursor/record assertion: a structurally typed thenable binds the original awaited promise methods without assigning its read-only native marker; balance failure asserts an error Result, rejection through the registered retry helper and persisted failed/retry_later; approval fixtures expect safe reauthorise/access_denied codes. Both existing 35-person cases receive finite 120-second bounds, and the 505-record fixture receives 600 seconds while retaining all 505 rows, the first 500 approvals, five remaining candidates and both passes. Only the jobs and Xero test:integration scripts add supported maxWorkers=1, hookTimeout=30000 and testTimeout=30000. Unit scripts, dependencies, runtime deadlines, runtime source, schema and inventory remain unchanged.
+
+
+Fixture correction validation PASS: full lint (1098 files), strict standalone compilation of all eight changed integration files, scoped formatting and whitespace. The deliberate thenable property has a single-property Biome exception explaining PrismaPromise await semantics; no global rule is disabled. A synthetic in-memory promise probe passes awaited ordering, marker identity and rejection propagation without database access. No executor integration suite, database call, full unit campaign or build was run; the reviewer owns those gates and the fresh complete protected campaign. Runtime identity audit excludes only integration fixtures and the two package files' integration-script fields; production source, dependency declarations and unit commands remain byte-identical to `813e4b1`/`26f5ce3`.
+
+
+### 161g final independent approval and protected online verification
+
+APPROVE. The independent reviewer approved and verified clean runtime candidate `68a2aaa00a36cfcad00daa212dabb1c6fc0261b1` on isolated `codex/xero-permission-recovery`. Independent source gates PASS: lint 1098 files; forced types 19 uncached tasks; complete units 18 uncached tasks and 2655 tests; boundaries 1054 files and 21 packages; release tools 16 files and 104 tests plus tooling types; strict types for all eight changed integration fixtures; four uncached synthetic app builds; credential/state/adapter/dependency audits and whitespace. Generated formatting was restored exactly. No source, generated or schema content changed during the campaign.
+
+Protected online Neon campaign `2262abb9-6b8c-4eda-83e7-176a4d437350` exited zero across the complete inventory: **26 files, 224 tests and six uncached package tasks**, comprising jobs 78, feeds 15, Xero 63, availability 21, database 45 and app 2. Jobs ran serially in 434.43 seconds, retaining all 505 records, 500 first-pass approvals, five remaining candidates and both reconciliation passes. Fresh durable ownership covered 53 tenant slots and 145 kind-qualified global keys. Exact target and strict empty-consumer evidence were refreshed before execution; restore evidence used timeline `73cb5a3404beeb6412275bed23ffa160`, LSN `0/4B330298`.
+
+Independent final cleanup PASS: all 38 ownership selectors are zero; durable manifest and strict consumer isolation remain verified; the active fence is released. The outside-owned catalogue digest is unchanged at `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`. The post-run read-only audit confirms all 20 applied migration checksums match, zero pending migrations, zero active or archived Inngest apps and zero nonterminal runs. Read-only Prisma schema comparison reports `No difference detected`. All earlier unsuccessful campaigns and their guarded recovery evidence remain recorded above.
+
+Documentation closure copies the reviewer's completed plan and DONE index exactly and updates only the Plan 161g task review. The completion commit changes four documentation files only, leaving the complete verified runtime byte-identical to `68a2aaa`. No executor database campaign or gate/build rerun is needed for this documentation-only change.
+
+Actual Xero provider/header/authorisation behaviour and Plan 160 browser execution remain **NOT VERIFIED**; the browser spec is written. Cleanup remains `report_only`. No real customer credential mutation, backfill, destructive provider cleanup, production namespace activation, OAuth scope or payroll semantics change, deployment, merge or push occurred. Full-plan shared-path packaging and the approved baseline notification timing exception remain explicitly documented.
+
+
+## Plan 161h implementation and evidence boundaries
+
+Implementation base: `fca052bf78d39d03da4ad0cbc62ef29566b6cee0`, isolated `/tmp/tc-161h` on `codex/xero-rollout-inactivity`. The complete reconciled plan was handed off through the shared readable absolute primary path and copied exactly into this worktree, a documented packaging deviation from inline dispatch. Reviewer maintains the plan status index and independently owns online Neon verification. The executor performed no live database/provider writes, rollout, backfill, namespace initialisation or deployment.
+
+The inactivity report is manually scoped:
+
+```bash
+bun --no-env-file run --cwd packages/xero report:xero-inactivity --clerk-org-id <owned-account> --organisation-id <owned-entity>
+```
+
+It records classification rows only. Missing or unreadable evidence stays unknown. Feed lag is roughly two hours, far below the 30-day application policy. Historical recent token consumption survives rotation for active nonarchived feeds. Exact 30-day feed and 90-day human boundaries remain active. Invalid/future dates remain unknown. Archive never overrides unknown signals.
+
+Lifecycle metrics emit fixed names and finite nonnegative values through the existing structured logger. Closed labels are projected through runtime allowlists. Metric failures cannot change lifecycle outcomes.
+
+| Metric | Application alert threshold | Remediation |
+| --- | --- | --- |
+| `xero.refresh.conflict` | More than 5 in 15 minutes | Inspect coordinated owner refresh/adoption and deployment credential-domain configuration, follow 161d recovery |
+| `xero.refresh.failed` | Any lost response, or more than 3 failures in 15 minutes | Preserve attempt history; use bounded owner recovery, never restore stale refresh tokens |
+| `xero.binding.permission_required` | More than 3 in 15 minutes | Review capability and permitted update-permissions flow from 161g |
+| `xero.cleanup.unknown_oldest_age_hours` | Greater than 1 hour | Follow 161f exact-target operator procedure; issued unknown DELETE stays unresolved |
+| `xero.admission.denied` | Sustained denials for 5 minutes | Follow 161e allowance/cooldown procedure; domain mismatch requires configuration repair, never reinitialise foreign epoch |
+| `xero.store.unavailable` | Any occurrence | Stop provider admission and restore the owned shared store following 161e; no memory fallback |
+| `xero.fetch.deadline_exceeded` | More than 3 in 15 minutes | Inspect bounded lock/store/provider latency; preserve uncertain write outcomes |
+
+The optional guarded evidence output is invoked exactly as follows, after fresh protected authority preparation:
+
+```bash
+bun --no-env-file run tooling/release/run-live-integration.ts --manifest <protected-manifest-path> --evidence-dir <restricted-evidence-directory>
+```
+
+The writer emits JSON and Markdown on authority errors, test failures and cleanup failures. Bounded runner metadata records the actual phase, command exit, inventory outcome, cleanup outcome and fence state using fixed codes, independently from case assertion statuses. The original failure phase survives cleanup/release. A failed runner or cleanup prevents programme readiness even if every supplied case assertion claims PASS. Missing authority is identified without raw error messages or secret values. It never infers charter PASS from suite exit. Forty cases each require every charter level, same candidate, fresh executed assertion, matching target fingerprint, and relevant owned fixture/cleanup proof. Public reports use restricted evidence digest references; underlying commands, assertions and artefacts remain in restricted storage. The report readiness exit code is 1 until all required cases pass. As explicitly reconciled, the existing runner process exit still reports the infrastructure inventory command result; programme `NOT_VERIFIED` does not invalidate a successful inventory command. Evidence-writing failure itself is nonzero and preserves any original runner failure. Deployed SHA remains null until actually evidenced. Browser/provider readiness remains `NOT_VERIFIED` pending Plan 160.
+
+## Rollout procedure (not executed)
+
+1. Capture source, database and configuration fingerprints and the owned fixture inventory. Inspect every deployment using the Xero app and confirm one canonical database (`XERO_CREDENTIAL_DOMAIN_ID`) and one shared store. Preflight validates only the current deployment; runtime domain fencing cannot discover two different stores.
+2. Deploy 161b migration A. Run `backfill:xero-tenant-binding --dry-run`; only with zero collisions run `--apply`. Deploy migrations B and C together only afterwards. B guards the completed backfill; C forbids changing the existing external file. Deploy 161c-161f additive migrations and the 161h classification migration. Verify constraints and unchanged payroll row counts. These are operator steps requiring separate rollout authority.
+3. Audit the revision of every caller and drain every deployment using admission code without the 161h credential-domain check, including 161e-161g shared-store Lua callers as well as process-local limiters. Old Lua only checks sentinel existence and could accept a UUID sentinel during mixed deployment. Cut over all admission callers atomically before first 161h provider traffic. For a new namespace, initialise the reviewed commercial rate namespace conservatively:
+
+   ```bash
+   bun --no-env-file run --cwd packages/xero rate:initialise-namespace --epoch <e> --assume-spent-daily --credential-domain-id <id>
+   ```
+
+   An empty store is not a fresh daily allowance. The domain is immutable per epoch. Repeat initialisation with the same domain is idempotent and does not reset allowance; a foreign domain, legacy sentinel `1`, missing domain or malformed domain fails closed. Never flush, reinitialise or rotate the epoch to resolve an existing legacy sentinel. A legacy transition requires a separately reviewed operator procedure that preserves spent budgets, cooldowns and leases; it has not been implemented or executed here. Ordinary initialisation deliberately refuses legacy sentinels.
+4. Run 161d two-phase credential-owner backfill: verified identity plan, `--dry-run`, then `--apply`. Unverifiable bindings stay on the legacy path and are listed for controlled reauthorisation. Never choose account owners automatically.
+5. Deploy 161g. Verify recovery reasons, callback and bounded refresh recovery on owned fixtures. Legacy bindings continue through `resolveXeroAccess`. Attach unowned groups sharing one Xero user by controlled reauthorisation, one customer at a time with their agreement.
+6. Keep `XERO_REMOTE_CLEANUP_MODE` unset and observe frozen cleanup requests/targets in report-only mode.
+7. Enable cleanup only after the provider ledger management-token provisioning row is verified, owned live DELETE outcomes pass and the 161f operator procedure is staffed.
+8. Run the evidence writer against the exact candidate and separately record local/deployed SHAs. Complete source, configured database, distributed store, browser and live-provider levels independently. Inventory success is not programme readiness.
+9. Scrub mirrored connection credential columns and remove mirror-write only in a separately authorised follow-up after every reserved binding has an owner and no reader remains. Keep old key material while any envelope references it.
+
+Rollback stops provider admission and the cleanup worker where needed, preserves local disables, reserved bindings, attempt history and adopted credentials, and restores only a compatible reviewed version. Never restore stale refresh tokens and use them; never reverse additive migrations by deleting payroll data. Never return to silent rebinding, independent token rotation or fail-open rate limiting. An issued unresolved DELETE remains unresolved after rollback. Automatic inactivity notices/deletion, mirrored-column removal, retiring the legacy key and NZ/UK activation remain deferred.
+
+
+### Plan 161h independent approval and protected online verification
+
+**APPROVE** isolated runtime candidate `8325a35b328b4786181c421ce8a89e946f119a84`, branch `codex/xero-rollout-inactivity`, worktree `/tmp/tc-161h`. Independent full source/test/schema review found no remaining actionable issue. Dependencies remain DONE; 161g and 161h are approved isolated branches, not merged.
+
+Independent source gates PASS: lint 1114 files; forced types 19 uncached tasks; full units 2723 tests across 18 uncached tasks; boundaries 1068 files across 21 packages; release tooling 175 tests across 18 files and tooling types; strict metric and both changed integration-fixture types; four uncached synthetic builds; separate next-config 47 tests; all documentation, report-only prohibited-operation, scope and base-to-candidate whitespace criteria. Eleven regenerated files differed only in whitespace and were restored byte-for-byte to the reviewed candidate. The two inherited deadline timing scenarios use controlled clocks with all original assertions retained.
+
+Protected online Neon campaign `f7578441-2838-4361-9ced-0f59a19d73c3` passed all **27 files, 233 tests and six uncached tasks**, in 9m6.962s. Package totals: database 45, jobs 78, Xero 72, availability 21, feeds 15 and app 2. Jobs retained the complete 505-record fixture and both passes, completing in 456.90 seconds. Actual owned Redis domain immutability, matching reinitialisation, legacy/malformed/foreign denial and unchanged allowance assertions passed. Durable ownership covers 55 tenant slots and 146 kind-qualified global keys. Fresh strict consumer isolation and exact target identity were verified before writes; restore evidence records timeline `73cb5a3404beeb6412275bed23ffa160`, LSN `0/4BB179F8`.
+
+The independently reviewed additive migration `20260926130000_add_xero_inactivity_classifications` was applied under protected authority and the active-run fence. Final SQL SHA-256: `0606302b88c98b28aadc4dd42ab4c1ce674e3f08a6d0b577f169559d062b2d93`. All 21 applied checksums match; zero pending migrations. Read-only schema comparison reports `No difference detected`. Its first invocation did not propagate the private environment into the Prisma subprocess; an explicit environment-preserving subprocess rerun passed, with no guard or source change.
+
+Independent post-run cleanup PASS: zero owned rows across all 39 selectors, active fence released, durable manifest and strict empty-consumer isolation verified. Outside-owned catalogue digest remains `41e95ac3737a446c207e103f8c13538b2b04933b005a7de9f737beeafbc8bb8e`. All 204 pre-existing rows across 37 tables retain their exact per-table counts; the new classification table has zero rows. No registered or archived Inngest app and no nonterminal run. Source remained frozen and clean throughout the campaign. Temporary private verification credentials were removed after final read-back.
+
+Both restricted evidence artefacts are present at `/tmp/tc161h-evidence/xero-evidence.json` and `/tmp/tc161h-evidence/xero-evidence.md`, mode 0600. They record actual inventory PASS, cleanup PASS, command exit zero and released fence. All 40 charter cases and their required levels remain NOT_VERIFIED without separately supplied assertion provenance; the builder does not infer case PASS from infrastructure success. Deployed SHA is null. Production rollout, customer backfills, commercial namespace activation, destructive provider operations, browser and real Xero provider behaviour remain NOT VERIFIED or unexecuted. Cleanup remains `report_only`. No deployment, merge or push occurred.
+
+Documentation closure copies this completed reviewer plan and DONE index exactly, updates only the scoped 161h task review and appends the same evidence to the execution report. Runtime, generated output, schema and SQL remain byte-identical to the verified candidate; no repeat database campaign is required for documentation-only closure.
