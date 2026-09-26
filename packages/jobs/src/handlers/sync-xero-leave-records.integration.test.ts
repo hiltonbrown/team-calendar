@@ -369,10 +369,14 @@ describe("sync-xero-leave-records database flow", () => {
           }
           return rows;
         })();
-        // The spy adds an awaited concurrent write; retain Prisma's promise marker for its typed client contract.
-        return Object.assign(result, {
+        // Bind the awaited injection to a structural thenable without assigning the native promise's read-only marker.
+        return {
+          catch: result.catch.bind(result),
+          finally: result.finally.bind(result),
+          // biome-ignore lint/suspicious/noThenProperty: The PrismaPromise-compatible spy intentionally preserves await semantics.
+          then: result.then.bind(result),
           [Symbol.toStringTag]: "PrismaPromise" as const,
-        });
+        };
       });
 
     try {

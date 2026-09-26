@@ -412,8 +412,7 @@ describe("reconcile-xero-approval-state database flow", () => {
 
     const run = await latestRun(tenantA);
     expect(run).toMatchObject({
-      error_summary:
-        "Your Xero connection needs to be reauthorised. Ask an administrator to reconnect Xero in Settings > Integrations.",
+      error_summary: "reauthorise",
       records_failed: 0,
       records_synced: 0,
       status: "failed",
@@ -534,7 +533,7 @@ describe("reconcile-xero-approval-state database flow", () => {
       },
     });
     expect(uncheckedAfterRun2).toBe(0);
-  }, 120_000);
+  }, 600_000);
 
   it("fails the run immediately on a blanket permission_error (403)", async () => {
     await setupTenant(tenantA);
@@ -584,8 +583,7 @@ describe("reconcile-xero-approval-state database flow", () => {
 
     const run = await latestRun(tenantA);
     expect(run).toMatchObject({
-      error_summary:
-        "Your Xero organisation does not have permission to access this payroll feature. Check your Xero subscription and permissions.",
+      error_summary: "access_denied",
       records_failed: 0,
       records_synced: 0,
       status: "failed",

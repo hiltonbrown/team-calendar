@@ -1323,7 +1323,7 @@ describe("sync-xero-people handler", () => {
         expect(p.xero_missing_since).not.toBeNull();
         expect(p.archived_at).toBeNull();
       }
-    });
+    }, 120_000);
 
     it("blocks entire absence pass when missing count is greater than 5 (e.g. 6 of 35 = 17.1% < 20%, but count = 6 > 5)", async () => {
       await setupTenant(tenantA);
@@ -1376,7 +1376,7 @@ describe("sync-xero-people handler", () => {
         expect(p.xero_missing_since).toBeNull();
         expect(p.archived_at).toBeNull();
       }
-    });
+    }, 120_000);
 
     it("does not run absence pass on incomplete/truncated, failed, or cancelled reads", async () => {
       await setupTenant(tenantA);

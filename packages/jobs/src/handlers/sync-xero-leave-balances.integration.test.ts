@@ -423,10 +423,25 @@ describe("sync-xero-leave-balances database flow", () => {
       ...syncInput(tenantA),
       triggerType: "scheduled",
     });
-    expect(failedRun.ok).toBe(true);
-    if (failedRun.ok) {
-      expect(failedRun.value.status).toBe("failed");
-    }
+    expect(failedRun).toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    const { rejectRetryableSyncResult } = await import("./xero-sync-access");
+    await expect(
+      rejectRetryableSyncResult(Promise.resolve(failedRun))
+    ).rejects.toThrow("retry_later");
+    expect(
+      await database.syncRun.findFirst({
+        orderBy: { created_at: "desc" },
+        select: { error_summary: true, status: true },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+          run_type: "leave_balances",
+        },
+      })
+    ).toEqual({ error_summary: "retry_later", status: "failed" });
 
     const cursorAfterFailure = await database.xeroSyncCursor.findFirst({
       where: {
