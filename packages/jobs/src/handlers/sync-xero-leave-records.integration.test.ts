@@ -839,7 +839,7 @@ describe("sync-xero-leave-records database flow", () => {
 
     // First-page cursor guarantees the suite-owned person is fetched regardless
     // of its generated UUID ordering, so the concurrent update actually runs.
-    const initialCursor = null;
+    const initialCursor: null = null;
     const modifiedCursor = "50000000-0000-4000-8000-000000000099";
 
     await database.xeroSyncCursor.create({
