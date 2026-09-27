@@ -3,15 +3,15 @@
 **Status: IN PROGRESS. Production readiness is not verified by any plan in this directory.**
 Writing a plan proves nothing; only its recorded evidence does.
 
-Index reconciled, 27 September 2026, against integrated main `1d50742` and isolated `codex/xero-reconciliation`. The original 22 September drift-check stamps are historical anchors. Current fixes, verification and production boundaries are recorded in [160–161h reconciliation](160-161-reconciliation.md). No source-only completion certifies production readiness. Final reviewed source `5d2e57b` passes 2,810 repository tests, 395 tooling tests and protected online Neon/Redis 27 files / 246 tests; all 21 migrations verified applied, zero residue and unchanged customer content. [Published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) keeps the real Xero/browser campaign and charter sign-off NOT VERIFIED.
+Plan 160 reviewed and reconciled on 27 September 2026 at `92d67c5`. Its runtime/test/tooling tree matches historically verified `5d2e57b`; the [160-161 reconciliation](160-161-reconciliation.md) records 2,810 repository tests, 395 tooling tests and protected Neon/Redis 27 files / 246 tests, with migration and cleanup evidence. These are historical results, not fresh runs. The [published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) remains NOT VERIFIED for the real campaign and charter sign-off. Current bounded review passed 48 harness tests (four file-writing tests deliberately excluded); release-tool typecheck failed because this checkout cannot resolve declared dependency `jose`. Plan 160 now distinguishes implemented guard/report foundations from remaining recovery and operational execution wiring.
 
 ## Active plans
 
 | Plan | Scope | Priority | Status |
 | --- | --- | --- | --- |
-| [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS |
+| [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `92d67c5` on 27 September; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | TODO |
-| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: harness and diagnostic report COMPLETE at `5d2e57b`; 395 tooling tests PASS; real campaign NOT VERIFIED |
+| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: guard/report foundation and diagnostics implemented; harness correctness corrections (R1/R5-R7) plus execution/receipt/lifecycle adapters TODO; campaign NOT VERIFIED; types require dependency repair |
 | [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, references | P1 | IN PROGRESS |
 
 Plan 161 is a charter plus nine executable sub-plans. It deliberately contains no unit
@@ -63,8 +63,15 @@ one reversed instruction: its Step 3.2 says not to assume global tenant uniquene
 accounts, whereas Plan 161 has since **selected** exactly that policy and enforces it with a
 database constraint. Follow 161.
 
-Plan 160 can prepare its harness alongside both. Its final connection sign-off depends on
-161's 40-case evidence matrix (charter Section 8.3) and on 159's remaining integration work.
+Plan 160's next independent work is dependency repair, preserving child-written durable
+mutation intents during teardown (R1), correcting report delivery, connection-action scope and
+no-effect reconciliation (R5-R7), and completing scenario/lifecycle collection. Its real
+execution adapter must follow a reviewed application worker-fencing contract under Plan 159
+and go-live. Supplying fixture variables alone cannot activate the current runner. Final
+execution depends on the approved AU contract, remaining Plan 159 behaviour, compatible
+candidate/worker deployments, sanctioned fixtures and all 40 charter cases. Full completion
+wording in the historical reconciliation is narrowed by this current review; no prior live
+campaign is inferred.
 
 ## Dependency notes
 
@@ -160,6 +167,11 @@ either count means a regression test was deleted rather than fixed.
 
 ## Findings considered and rejected
 
+Plan 160 review at `92d67c5`: rejected recreating the existing guard/report/oracle foundation,
+using discovery or aggregate test totals as scenario proof, and treating local `--preflight`
+as live admission. R1-R3 and R5-R7 in Plan 160 remain actionable implementation work; its default live
+refusal is intentional until worker enforcement and recovery are verified.
+
 Recorded so they are not re-audited. Detailed reasons and provider evidence limits are in the
 Plan 161 charter and in Plan 159's own rejected list.
 
@@ -209,6 +221,8 @@ Plan 161 charter and in Plan 159's own rejected list.
   product or security gate.
 
 ## Go-live programme record
+
+Current release queue and reviewed evidence boundaries are in [go-live.md Sections 1–2 and 11](go-live.md). Its 27 September review supersedes the pending-work descriptions below; it does not certify production readiness.
 
 Historical execution evidence for [go-live.md](go-live.md), preserved. This section records
 what happened; the plan itself holds current instructions.

@@ -2,806 +2,337 @@
 
 ## 1. Execution contract
 
-- **Status**: IN PROGRESS. This is not a production-readiness certificate.
-- **Reviewed at**: `80ac9f7`, 19 September 2026, including the supplied working-tree plan consolidation.
-- **Priority**: P0 release programme. All work below is required unless a row explicitly says paid-mode only.
-- **Result**: app, API and public web run the same reviewed commit; admitted Australian customers can complete onboarding, leave approval, Xero write-back and calendar subscription; every release gate has fresh passing evidence.
-- **Default**: Australian, invitation-only `early_access`. This is the existing plan's default and matches `packages/next-config/launch-mode.ts:40`. Configure it explicitly. Do not wait for another mode-selection meeting. Paid mode requires the additional billing journey in Section 9.
-- **Database constraint**: retain this plan's live-Neon-only policy. No disposable database, reset, seed replacement, `db push`, rebaseline or `migrate dev`. Source-only verification never connects to any database.
-- **Scope**: finish the confirmed correctness, security, performance, acquisition and operational work in this file now. NZ/UK activation and new connectors remain outside the Australian product scope.
+- **Status**: IN PROGRESS. Production readiness remains NOT VERIFIED.
+- **Reviewed at**: `92d67c5`, 27 September 2026, clean working tree before this plan review.
+- **Priority / effort / risk**: P0 release programme, L, HIGH for payroll and live operations.
+- **Default**: Australian, invitation-only `early_access`, configured explicitly in each deployed project. Paid mode adds the billing journey; NZ/UK activation and new connectors are out of scope.
+- **Result**: app, API and web serve one reviewed candidate; admitted customers complete onboarding, leave decisions, Xero reconciliation and calendar subscription; every mandatory gate has attributable passing evidence.
+- **Database policy**: authorised online Neon only through the protected runner. No localhost/Docker database, reset, development seed, `db push`, rebaseline or `migrate dev`. Synthetic build URLs are validation inputs, never test databases.
+- **Plan ownership**: this file owns release closure; Plan 159 owns remaining Xero import/onboarding/AU semantics; Plan 160 owns the provider/browser campaign; Plan 161 owns lifecycle contracts and rollout sign-off. Do not reimplement completed 161 sub-plans or Plan 159's superseded Step 3.
 
-Start implementation with D1 and C6, then take the independent work in parallel.
-Provider discovery and configuration preparation start at the same time. Do not
-replace a fix with another audit, a backlog entry, a signature, a revised target
-date or a statement that somebody should investigate it. Each item closes only
-when its specified behaviour and tests pass. A discovered defect in these flows
-is fixed and regression-tested in this release, including P2 items.
+This review updates planning files only. It does not authorise deployment, payroll writes, customer backfills, provider messages, destructive remote cleanup or permanent production CI access. Reuse applicable existing authority during execution; prepare any still-unauthorised action completely before requesting its specific approval. Continue independent work while an external action is unavailable.
 
-Use existing session authorisation. This plan review does not itself authorise
-production mutations, provider messages or payroll writes. Prepare the exact
-change and verification first; obtain missing authority only for that concrete
-action. Missing access pauses that action, not independent implementation.
-Never simulate permission or mark unperformed work PASS.
+### Working rules, scope and drift
 
-### Working rules and bounded scope
+Read `PRODUCT.md`, `DESIGN.md`, `.impeccable.md` and relevant tests. Preserve Clerk Organisation and payroll Organisation isolation, Xero-owned balances, synchronous user-triggered writes, full feed URLs for authorised viewers, immutable Xero binding and fail-closed shared rate limits. A null canonical credential owner preserves the supported legacy path. Remote cleanup and inactivity remain report-only unless their separate enablement criteria are met.
 
-1. Read `PRODUCT.md`, `DESIGN.md`, `.impeccable.md` and relevant tests. Keep Clerk
-   Organisation plus payroll Organisation isolation; Xero owns balances and
-   accruals; outbound writes are synchronous; feed URLs remain complete for
-   authorised viewers. No new membership tables, payroll calculations or queued
-   outbound writes.
-2. Edit the paths named in each item, their direct callers, co-located tests,
-   required package exports/manifests and generated additive migrations only.
-   No framework overhaul, unrelated visual redesign or broad dependency update.
-3. Use Zod at boundaries, `Result` for expected service failures, named exports,
-   strict TypeScript and existing `@repo/*` package boundaries. New database
-   queries belong in `packages/database`; provider operations in `packages/xero`.
-   Follow the scoped query exemplar at `packages/database/src/tenant-query.ts:16`:
-   `where: { ...scopedQuery(clerkOrgId, organisationId), id: recordId }`.
-4. UI changes reuse the design system: Plus Jakarta Sans, semantic surface
-   tokens, 20px containers, 16px floating surfaces, 14px controls, labelled
-   statuses, keyboard focus, light/dark and recovery states. Use Australian
-   English and no em dashes.
-5. Preserve the existing plan deletions and unrelated changes. Use isolated
-   `codex/` worktrees for concurrent source work, with coherent ownership (for
-   example correctness, verification, performance and acquisition). One branch
-   per checklist row is not required. Commit logical fixes conventionally,
-   review focused diffs and integrate sequentially. Do not push, merge into a
-   shared branch or deploy without the applicable existing authorisation.
-6. At execution start compare `git diff --stat 80ac9f7..HEAD -- apps packages
-   scripts tooling .github package.json bun.lock turbo.json` and the uncommitted
-   diff with this plan's excerpts. Resolve ordinary drift by reading the new
-   implementation and updating the affected step. Do not restart the entire
-   audit or reopen independently completed fixes.
-7. Track item status and evidence in Section 11. Reconcile the active execution
-   section of `tasks/todo.md` without erasing history; capture user corrections
-   in `tasks/lessons.md`. These executor updates are not prerequisites to fixing
-   source. This review edits only `plans/` under the improve skill.
+Use Zod at boundaries, `Result` for expected failures, named exports, strict TypeScript and existing package boundaries. New database access belongs in `packages/database`; provider logic belongs in `packages/xero`. Match `packages/database/src/tenant-query.ts:36`:
 
-### What this review actually established
+```typescript
+export const scopedTo = (input: {
+  clerkOrgId: string;
+  organisationId: string;
+}) => ({
+  clerk_org_id: input.clerkOrgId,
+  organisation_id: input.organisationId,
+});
+```
 
-Local source was inspected at `80ac9f7`. The focused preflight/launch-mode suite
-passed **23 tests in 2 files** with
-`bun run --cwd packages/next-config test preflight.test.ts launch-mode.test.ts`.
-Those tests currently omit the regressions specified below. The shell has Bun
-1.3.14 and Node 24.21.0; the repository declares Bun 1.4.0 and a Node 22 runtime
-floor. The executor must use the declared Bun version for candidate evidence.
+UI fixes reuse Plus Jakarta Sans, semantic surfaces, 20px containers, 16px floating surfaces, 14px controls, labelled statuses, keyboard focus and light/dark support. Use Australian English and no em dashes. Preserve the four-reason Contact studio, Clerk-rendered sign-up and the existing calendar design.
 
-The earlier report, `tasks/go-live-readiness-report.md`, records observations
-from 18 September against older source: 12 applied migrations, zero configured
-Neon drift, broken app/web builds, incomplete environment configuration and
-unverified external journeys. The supplied plan also reported remote builds at
-`ef0fae0`. **These are historical leads, not current provider facts.** Refresh
-provider state once in O1 and immediately repair anything still wrong. This
-review did not contact production, run database tests, build applications,
-rotate credentials or exercise real customer journeys.
+**Edit scope during execution**: paths explicitly named in each item, their direct callers, co-located tests, required package exports/manifests, protected fixture registration and additive generated migrations where necessary. Each source slice records its exact file allowlist before editing. Out of scope: unrelated redesign, framework upgrades, new connectors, OrganisationSwitcher, membership tables, payroll calculations, queued outbound writes and changing guards to make tests pass. This advisor review edits only `plans/go-live.md` and its index entry.
 
-## 2. Queue, priorities and dependencies
+Run first:
 
-All source findings below have HIGH confidence from direct reads. Sizes include
-implementation and tests: S is hours, M about a day, L multiple days. They are
-estimates, not reasons to postpone work. Risk describes the change, not permission
-to leave a defect open. O1 is an execution/evidence requirement, not a claim that
-production was freshly inspected.
+```bash
+git rev-parse HEAD
+git status --short
+git diff --stat 92d67c5..HEAD -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
+git diff --stat -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
+```
 
-| ID | Required result | Category | Priority | Size / risk | Dependency for completion |
-| --- | --- | --- | --- | --- | --- |
-| D1 | Unit runs cannot touch Neon; live suites mutate only owned fixtures | Security/tests | P0 | L / HIGH | None for implementation |
-| C6 | Empty or missing manager scope cannot reveal other people's records | Security | P1 | S / LOW | D1's unit isolation before broad app test runs |
-| C1 | Uncertain Xero creates cannot duplicate leave and have a usable recovery path | Correctness | P0 | L / HIGH | D1 for database proof |
-| C2 | Partial Clerk provisioning retries and activation capture deduplicates | Correctness | P1 | M / MED | None; D1 if receipt persistence changes |
-| C3 | Failed consumed Stripe deliveries remain visible and replayable | Correctness | P1 | L / HIGH | D1 for database proof |
-| C4 | Missing email transport fails the job visibly; backlog recovers | Correctness | P1 | S / LOW | R2 for deployed configuration |
-| C5 | Malformed availability JSON returns 400 without domain queries | Correctness | P2 | S / LOW | None |
-| R1 | Preflight checks actual launch mode, never a substitute CLI value | Release | P1 | S / LOW | None |
-| R2 | Preflight matches runtime email, monitoring and status requirements | Release | P1 | S / LOW | None |
-| R3 | Sentry configuration uses its supported import | Dependencies | P2 | S / LOW | None |
-| P1 | Plans returns bounded pages with batched balances/durations | Performance | P2 | M / MED | C6; coordinate edits with C1 |
-| P2 | People filters and counts remain exact without loading all people | Performance | P2 | L / MED | C6 |
-| P3 | Sync overview/detail returns bounded summaries; raw detail is authorised on demand | Performance/security | P2 | M / MED | None |
-| P4 | Public provider import graph excludes Clerk | Performance | P2 | S / LOW | None |
-| P5 | Unconfigured analytics loads no PostHog; configured first-page capture is correct | Performance | P2 | S / LOW | Coordinate event contract with G1 |
-| G1 | Application, first-owner admission and activation measurement work end to end | Product | P1 | L / MED | C2, R2; O1 for provider configuration |
-| G2 | Support and launch operations are exercised using current evidence | Operations | P1 | M / LOW | O1 and deployed candidate |
-| G3 | Public trust pages contain no provisional identity material or obsolete launch claims | Docs/product | P2 | S / LOW | None |
-| T1 | Maintained browser release suite proves roles and critical journeys | Tests | P1 | L / MED | D1; run after affected fixes |
-| T2 | CI checks docs links and actual email rendering | Tooling | P2 | S / LOW | None |
-| T3 | First-party Node types and actual runtime support agree | Dependencies | P2 | S / LOW | None |
-| O1 | Configured providers, migrations, deployments and live journeys pass for one candidate | Release | P1 | L / HIGH | Relevant source fixes and gates |
+Compare affected excerpts and test contracts if these paths changed. Resolve ordinary drift locally; stop only the affected step if its safety or product contract changed. Use scoped `codex/` branches/worktrees, conventional commits and sequential integration. Do not push, merge or deploy without applicable authority. Executors track progress in the ledger below and `tasks/todo.md`, preserving history; this review does not edit task files.
+
+### Evidence established by this review
+
+This was a source and plan review, not a fresh release test run. The implementation paths named below were inspected. The command `git diff --stat 5d2e57b..92d67c5 -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md` returned no changes, confirming those inputs still match the latest recorded candidate. This is evidence reuse with a checked boundary, not a new PASS.
+
+The checked-in [160–161 reconciliation record](160-161-reconciliation.md) reports source candidate `5d2e57b`: 2,810 repository tests, 395 release-tool tests, build/type/lint/boundary gates, and protected online Neon/Redis run `21e2bdb1-ea5b-4acd-ac8f-f484130731ce` with 27 files / 246 tests. It records all 21 migrations applied, zero drift, 39 zero-residue selectors, released fence and unchanged outside-owned row content. Do not recreate or reapply the three migrations still described as pending in the September 19 history.
+
+That same record reports production app/API/web READY at older commit `11ce7e7`, missing lifecycle configuration names, and zero registered Inngest apps at its last read. These are dated provider observations, not live facts refreshed by this review. The [published Xero diagnostic](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) explicitly records zero LIVE/CONTROLLED execution, 26 scenarios / 92 subcases NOT VERIFIED and 40 lifecycle cases / 93 required evidence levels NOT VERIFIED. No production or provider PASS is inferred from the database inventory.
+
+### Review findings and disposition
+
+All entries below have HIGH confidence from current source reads. Effort includes tests; risk describes the required change.
+
+| Finding | Impact | Effort / risk | Evidence and disposition |
+| --- | --- | --- | --- |
+| Historical defects and pending migrations read as current work | Repeats completed changes and obscures remaining gates | S / LOW | Current implementations in Sections 4–7 and `160-161-reconciliation.md`; replace defect claims with preservation and closure criteria |
+| C1 lacks a registered real-database uncertainty/concurrency regression | Aggregate integration PASS cannot prove no duplicate submit after expiry/crash | M / HIGH | `packages/database/src/queries/outbound-operations.test.ts:11` mocks transactions; current integration inventory has no durable-submit scenario; add owned coverage under C1 |
+| Ordinary CI still mutates disposable Postgres; protected workflow is absent | Release's online-only verification policy remains unenforced in CI | M / HIGH | `.github/workflows/ci.yml:28,79,119`; finish D1 CI separation, retain existing local-runner evidence |
+| CSV export still caps/materialises 50,000 rows and points to no full-export API | P3's complete bounded export criterion is not implemented | M / MED | `packages/availability/src/sync/sync-monitor-service.ts:913-945`; complete P3, do not close it as deployed-proof-only |
+| Acquisition and browser assertions target obsolete behaviour | Tests miss the actual public form and expect a removed sign-up redirect | M / MED | Contact client posts `/api/contact` at `apps/web/app/contact/components/contact-page-content.tsx:116`; `tooling/release/e2e/admission.spec.ts:8` expects redirect; fix G1/T1 |
+| Generic browser suite also discovers dedicated Xero specs and accepts queued sync | Wrong runner context and false terminal-success evidence | M / MED | `tooling/release/playwright.config.ts:18-21`, `tooling/release/e2e/admin-and-roles.spec.ts:24`; separate inventory and observe terminal runs |
+| AU contract and worker execution remain unresolved dependencies | Credentials alone cannot make the provider campaign executable | L / HIGH | `packages/xero/src/au/write.ts:40`, `tooling/release/xero-execution-guard.ts:216`, `tooling/release/run-xero-e2e.ts:102`; complete X1/X2 before dependent live cases |
+
+## 2. Current queue, priorities and dependencies
+
+`SOURCE PRESENT` means the implementation was located, not that every acceptance test or deployed journey passed. `RECORDED PASS` refers only to the named historical evidence. No row closes without its remaining evidence. Dependencies are phase-specific: a prerequisite for deployment is preparation/source verification, not another row's final production sign-off. C2/G1 and O1/X3 share later campaign evidence without blocking each other's preparation.
+
+| ID | Current state | Remaining work | Dependency |
+| --- | --- | --- | --- |
+| D1 | Guarded runner/ownership/inventory SOURCE PRESENT; online run RECORDED PASS | Source-only CI, protected release workflow, fresh candidate-specific owned run and recovery evidence | None for CI preparation |
+| C6 | Fail-closed manager scope SOURCE PRESENT | Current regressions and deployed empty/missing-scope denial | D1 for database-backed proof |
+| C1 | Durable uncertainty/recovery SOURCE PRESENT | Add real-database concurrency/expiry/recovery/inbound-merge coverage; provider/browser proof | D1; X1 AU contract before outbound expectations |
+| C2 | Partial membership retry and stable analytics UUID SOURCE PRESENT | Deployed retry and delivered-event cardinality | Source tests independent; closure uses G1 campaign after O1 deployment |
+| C3 | Failed receipts, repair tooling and billing database regressions SOURCE PRESENT | Candidate regressions and authorised provider replay; paid checkout only in paid mode | D1/O1 |
+| C4/C5 | Email failure propagation and malformed-JSON handling SOURCE PRESENT | Current regressions and deployed email recovery | R2/O1 |
+| R1/R2/R3 | Mode/runtime/preflight/Sentry import SOURCE PRESENT | Separate actual project preflights and symbolicated candidate events | O1 |
+| P1/P2 | Bounded pages, hydration and predicates SOURCE PRESENT | Candidate parity/query-count and deployed payload proof | C6/D1 |
+| P3 | Bounded overview/detail SOURCE PRESENT; CSV incomplete | Implement complete bounded export and verify access, counts and payloads | D1 for fixture proof |
+| P4/P5 | Public provider split/lazy sanitised analytics SOURCE PRESENT | Candidate bundle/network and event-delivery proof | G1 |
+| G1 | Contact studio, protected API and activation SOURCE PRESENT | Verify `/api/contact`, Clerk admission, first-owner creation and delivered milestones | C2/R2 source checks and X1 sync contract; closure after O1 deployment |
+| G2/G3 | Trust-copy cleanup SOURCE PRESENT | Current public copy, support receipt/response and rollback | O1/T1 |
+| T1 | Browser harness SOURCE PRESENT, incomplete/stale assertions | Correct inventory/admission/terminal assertions and complete journey matrix | X2 before live worker cases; O1 |
+| T2/T3 | Docs/email CI gates and Node 22 types SOURCE PRESENT | Preserve gates, actual runtime/remote CI and email render evidence | D1 |
+| X1 | Plan 159 remaining scope TODO | Import completeness, retry safety, identity reconciliation, AU decision, onboarding/freshness | Preserve completed 161 controls |
+| X2 | Guard/report foundation SOURCE PRESENT; acquisition refused and Plan 160 corrections remain | Enforce worker fence; complete Plan 160 ledger, driver, receipt/lifecycle collector and execution/cleanup adapters | X1 for campaign expectations; D1 safety primitives; Plan 160 harness corrections before admission |
+| X3 | 161 sub-plans DONE at source/fixture level | Lifecycle configuration, safe namespace rollout, case-level and charter sign-off | Prepare config/namespace before O1 deployment; sign-off after O1 deployment and X2/Plan 160 execution |
+| O1 | Production proof NOT VERIFIED | Refresh metadata, configure, migrate only if pending, deploy one SHA, execute/reconcile journeys | Deployment: source/candidate gates, X1 contract, X2 source enforcement and X3 preparation; closure: subsequent campaign |
 
 Execution order:
 
-- **Start now**: D1 and C6; C1/C2/C3/C4/C5, R1/R2/R3, T2/T3, G3 and provider
-  discovery can progress independently. Source and mocked tests do not wait for
-  live credentials, a launch date or a business sign-off.
-- **Integrate behaviour**: P1/P2 after C6, P3/P4/P5, G1 and T1. Coordinate shared
-  files rather than allowing parallel agents to overwrite one another.
-- **Prove candidate**: database-free gates, reviewed migrations, guarded live
-  integration, project preflights, exact-SHA deployment, deployed journeys,
-  external security and operational closure. Apply new schema before tests that
-  require it. Never run the live integration gate merely to establish a baseline
-  before D1 is complete.
+1. Reconcile drift and current evidence. Start D1 CI work, C1 database regressions, P3 export, G1/T1 fixes and X1/X2 source work. Refresh read-only provider metadata in parallel when authorised.
+2. Resolve the AU contract before changing payroll transitions or expected remote states. Complete worker isolation before any worker-dependent provider/browser action. Keep routine source and protected database testing independent of unavailable provider fixtures.
+3. Freeze one candidate, run uncached source gates, compare applied schema, apply only genuinely pending reviewed migrations, then run the complete registered online inventory with fresh ownership and cleanup proof.
+4. Prepare lifecycle settings/namespace and project preflights, deploy the exact candidate under closed admission, verify registered worker revisions, then run distinct owned browser/provider campaigns. Finish support, telemetry, security and rollback evidence.
 
-## 3. Make verification safe and executable
+## 3. Finish verification infrastructure without rebuilding it
 
-### D1: Separate unit tests from guarded live fixture tests
+### D1: Preserve the protected runner and close CI policy gaps
 
-**Evidence**: `apps/app/package.json:10` uses unrestricted `vitest run`;
-`apps/app/app/(authenticated)/people/new/_actions.integration.test.ts:26` enables
-writes whenever `DATABASE_URL` exists. `packages/database/billing.integration.test.ts:40`
-runs the production catalogue synchroniser. `packages/database/src/seed/seed.integration.test.ts:62`
-runs fixed-ID development seeding. An acknowledgement alone cannot make these safe.
-`packages/database/prisma.config.ts:6` reloads `.env`, and
-`packages/database/keys.ts:10` requires a URL, so simply unsetting the URL is
-neither sufficient isolation nor a working build procedure.
+**Current source**: `tooling/release/integration-inventory.ts:4-40` enumerates six workspaces and 27 integration files. `run-live-integration.ts` validates manifest/identity, durable ownership, consumer isolation, inventory, cleanup and fence state. `packages/database/src/live-test-guard.ts` protects direct construction. `cleanup.ts:43` requires an active owner for `--apply` and `--assert-clean`; `--dry-run` remains the read-back path after fence release. Root `test:integration` sets `ALLOW_LOCAL_DATABASE_TESTS=1`, which is localhost-only and never Neon authorisation.
 
-**Scope**: workspace test scripts/configs, existing `*.integration.test.ts`,
-`packages/database/src/client.ts`, fixture and seed helpers, `.github/workflows/ci.yml`,
-`turbo.json`. Create `tooling/release/` with `database-guard.ts`,
-`database-guard.test.ts`, `run-live-integration.ts`, `cleanup.ts`,
-`migration-check.ts`, `run-source-gates.ts` and focused tests; create
-`.github/workflows/release.yml`. These are small explicit tools, not a new release platform.
-Add `tooling/release/tsconfig.json` and `tooling/release/vitest.config.ts`.
-Define root `test:release-tools` as
-`vitest run --config tooling/release/vitest.config.ts` and
-`typecheck:release-tools` as `tsc -p tooling/release/tsconfig.json --noEmit`.
-These cover tooling explicitly because it is not a Turbo workspace. Exclude
-browser/live suites from unit discovery and fail on zero discovered tests.
+**Remaining scope**: `.github/workflows/ci.yml`, new `.github/workflows/release.yml`, `tooling/release/run-source-gates.ts`, `deny-network.mjs` and tests, `tooling/release/consumer-isolation.ts` and tests, existing runner/manifest/cleanup/inventory modules only where required. Update registry, allocator and cleanup alongside any new C1/X2 integration files.
 
-1. Exclude `*.integration.test.ts` from every unit entry point, including app.
-   Give app a `test:integration` script. Inventory all six database-backed
-   workspaces: app, availability, database, feeds, jobs and Xero. Assert that
-   discovered integration files equal the allowlisted inventory; no silent skips.
-2. Guard before a real database adapter is constructed, including direct
-   `vitest path/to/integration.test.ts` invocations. Require a unique run ID,
-   `ALLOW_LIVE_DATABASE_TESTS=I_ACKNOWLEDGE_LIVE_MUTATION`, a protected target
-   manifest and a proven live identity. Environment presence is not permission.
-   A unit-mode guard denies actual database connection attempts. Preserve lazy
-   client construction needed by builds and mocked tests; test adapter/network
-   denial without breaking harmless imports.
-3. Obtain non-secret Neon project/branch/endpoint/database/role identifiers from
-   provider metadata. Compare the endpoint and expected database/role with the
-   configured connection privately, then confirm them read-only from SQL.
-   Do not invent a stable server-IP fingerprint for serverless Neon. Report
-   identifiers and PASS/FAIL only. Obtain current restore-point evidence before
-   the first mutation. A URL alone does not prove the production branch.
-4. Persist a private run manifest **before any fixture write** containing exact
-   generated tenant/organisation IDs and global fixture keys. Use a dedicated
-   server-only KV namespace, `release:run:<runId>`, plus an active-run registry;
-   confirm a read-back before allowing mutation. Keep credentials out of the
-   manifest and do not expire an unfinished run. Mirror it locally for the
-   process, but never make the runner filesystem its only copy. Completed
-   manifests retain an audit reference according to the private release-log
-   retention policy. Prove fixture keys are absent; cleanup may never adopt or
-   delete a pre-existing namespace. Apply both tenancy keys to tenant operations.
-   Record intended external creates before dispatch and returned IDs immediately
-   afterwards so interrupted creates can be reconciled by their correlation ID.
-5. Refactor billing/seed tests explicitly: do not invoke the current
-   `syncPlansFromCatalogue` or fixed-ID `seedDevelopmentData` against production.
-   Test their production catalogue semantics with mocks; retain database
-   constraint/idempotency coverage using injected per-run IDs and catalogue
-   keys. Snapshot a non-secret digest of existing production plan/limit values
-   and require it unchanged after tests. Include Stripe receipts and other
-   global rows in the exact-key manifest.
-   Keep synthetic fixtures invisible to deployed workers: use transaction-bound
-   injected clients and rollback for suites that can operate in one transaction.
-   Multi-connection/concurrency suites that need committed fixtures run in a
-   bounded, authorised live-test window with all affected production consumers
-   paused and in-flight work drained first. Inventory the actual registry in
-   `packages/jobs/src/functions.ts`, including scheduler/token maintenance,
-   notification drain, feed and usage consumers. Persist their original pause
-   states in the durable manifest and restore exactly those states after cleanup.
-   The runner fails before writes unless isolation or the verified pause window
-   is established; local provider mocks do not isolate production processes.
-   Test global scheduling queries with a fixture-scoped injected client so they
-   cannot update or dispatch events for customer tenants. No synthetic database
-   integration test may pause arbitrary customer Xero connections or issue real
-   payroll/email calls.
-   On interruption, alert the release owner, recover the durable manifest,
-   clean/reconcile fixtures, then resume only the consumers paused by this run.
-   Deployed worker journeys use sanctioned real test resources after synthetic
-   suites are cleaned and consumers resumed. Prove zero production events or
-   deliveries originated from synthetic fixtures.
-6. Implement cleanup in FK order using only manifest-owned IDs. The tool defaults
-   to dry-run counts; `--apply` requires the same guard and identity proof.
-   Repeated cleanup is harmless; a foreign ID, missing manifest, active run or
-   unexpected count fails before deletion. Run cleanup in hooks and a CI
-   `always()` step, and detect interrupted runs at next startup. A killed host
-   may execute neither hooks nor `finally`, so retain the manifest for recovery.
-   Quarantine the affected run until its exact resources are reconciled; never
-   use a broad age-based deletion across tenants.
-7. Ordinary PR CI uses a clean checkout without `.env*` secrets and supplies
-   schema-valid **non-secret build placeholders** where env validation requires
-   them. Deny database network access, including TCP and Neon WebSocket/HTTP.
-   Do not weaken production validation or copy live secrets into PR jobs.
-   Add `run-source-gates.ts` to enforce this environment and catch accidental
-   env-file loading. Remove the disposable Postgres service under the retained
-   live-only constraint. Placeholder values never identify an actual test database.
-8. Run live integration only from a protected workflow for a reviewed candidate
-   SHA, with trusted workflow code, scoped secrets and one active run at a time.
-   Use GitHub environment controls where available. Exclude untrusted PR code.
-   Do not create a second approval if the same action is already authorised.
-9. Migration-file checks compare immutable existing migration bytes against the
-   trusted base commit, ordered new directories and the schema diff. Check live
-   applied checksums separately against `_prisma_migrations`. Neither regex
-   checks nor `prisma validate` prove SQL execution, lock safety or fresh-chain
-   construction. Review those explicitly in Section 8.
+1. Convert ordinary CI to database-free source checks; remove its disposable Postgres service, migrate/deploy/drift/integration steps. Preserve docs/email, package-boundary and tooling checks. Ordinary PR code receives no live secrets or database access. Keep database verification as a separate required protected candidate check, never silently drop it.
+2. Harden the existing source wrapper's environment before relying on that claim. It currently filters database/Neon/release variables but retains other inherited provider values (`run-source-gates.ts:17-30`). Run from a clean checkout without live `.env*`, use an allowlisted synthetic environment including build-valid Xero client ID/secret and encryption material, and deny TCP plus Neon HTTP/WebSocket connections. Preserve only documented compiler IPC. Test secret inheritance/env-file loading/network denial; do not weaken production env validation.
+3. Reconcile the existing unapplied `plans/proposed-release-workflow.patch` against current CI and inventory; do not apply its old hunks blindly. Prepare a protected exact-SHA workflow using trusted workflow code, reviewed candidate checkout, private manifest, scoped secrets and one active run. A prior persistent-workflow approval rejection is recorded in Section 11; it is not proof of approval now. Finish the concrete workflow and tests first, then obtain any still-required authority for persistent production access. Local protected runs can continue under applicable authority while publication is pending.
+4. Keep the existing manifest/allocator: reserve exact tenant IDs and kind-qualified global keys before writes, verify durable read-back, prevent adoption of existing keys, preserve outside-owned catalogue/content baselines, and resume only consumer states paused by that run. Ordinary database-fixture mode remains all-consumers-paused/drained or verified strict-empty. The current provider read-back in `consumer-isolation.ts:36-98` implements only the never-registered, strict-empty case; a `pausedConsumers` map alone is not observed pause/drain proof. Before a database campaign after worker registration, implement and test fresh provider-backed pause/drain and exact restoration read-back for all affected consumers, using current Context7/provider contracts. Reject stale/missing evidence, active/queued/retrying work and unverified restoration. Do not unregister workers to manufacture the old empty-environment condition. If the provider cannot enforce the window, keep that campaign unavailable while completing independent work. X2's E2E mode is separate and must be rejected by this runner.
+5. On interruption use the protected runner's recovery mode, not a new run ID. Cleanup uses only manifest-owned resources in dependency order. An unresolved provider effect or stale consumer proof keeps the fence held and evidence incomplete. After normal release, do not reacquire a fence just to run `--assert-clean`: use `--dry-run` plus independent zero-residue, unchanged-content and released-fence checks.
 
-**Tool interfaces to implement and test** (paths above are new, not existing commands):
+**Commands**, after a fresh protected environment/manifest is prepared privately:
 
 ```bash
-bun run tooling/release/run-source-gates.ts
-bun run tooling/release/migration-check.ts --base 80ac9f7
-bun run tooling/release/run-live-integration.ts --manifest "$TC_RELEASE_MANIFEST"
-bun run tooling/release/cleanup.ts --manifest "$TC_RELEASE_MANIFEST" --dry-run
-bun run tooling/release/cleanup.ts --manifest "$TC_RELEASE_MANIFEST" --apply
-bun run tooling/release/cleanup.ts --manifest "$TC_RELEASE_MANIFEST" --assert-clean
+bun --no-env-file tooling/release/migration-check.ts --base 92d67c5
+TURBO_CONCURRENCY=1 bun --env-file="$TC_RELEASE_ENV_FILE" tooling/release/run-live-integration.ts --manifest "$TC_RELEASE_MANIFEST" --evidence-dir "$TC_RELEASE_EVIDENCE_DIR"
+bun --env-file="$TC_RELEASE_ENV_FILE" tooling/release/run-live-integration.ts --manifest "$TC_RELEASE_MANIFEST" --recover --evidence-dir "$TC_RELEASE_EVIDENCE_DIR"
+bun --env-file="$TC_RELEASE_ENV_FILE" tooling/release/cleanup.ts --manifest "$TC_RELEASE_MANIFEST" --dry-run
 ```
 
-The live runner validates authority/identity, starts the inventory, then invokes
-`bun run test:integration`. It propagates failure, captures counts per workspace
-and attempts cleanup on success or failure. The manifest path is supplied by the
-protected workflow and is never committed. Missing acknowledgement, mismatched
-identity, missing restore evidence, reused namespace, tampered manifest, direct
-unguarded invocation and unowned cleanup all exit nonzero **before a write**.
-Mock these denial cases in `database-guard.test.ts`; never test wrong-target
-protection by connecting to a different database.
+Run recovery only for an interrupted owned run, not after a successful run. These variable values are private paths, not secret contents to print. The runner invokes `bun run test:integration` with validated live context; do not run the root command directly against Neon. Current expected inventory is 27 files, increased explicitly if new registered tests land; assert discovered inventory equals registration instead of freezing old counts.
 
-**Verify**: `bun run test:release-tools` and `bun run typecheck:release-tools`
-pass the new unit tests/types and are required in ordinary CI and the source
-wrapper. Test crash recovery from a fresh process using only the durable KV
-manifest, including exact cleanup and worker-state restoration;
-`bun run tooling/release/run-source-gates.ts` passes with zero database connections;
-the first authorised focused live suite and then the full six-workspace suite
-pass with zero removable fixture residue and unchanged production catalogue.
-Historical test counts are not a substitute for the current discovered inventory.
+**Verify**: `bun run test:release-tools` and `bun run typecheck:release-tools` exit 0. Denial cases fail before writes: missing acknowledgement/identity/restore/ownership, stale consumers, reused namespace, wrong mode, unguarded direct invocation, unowned cleanup. Crash recovery from a fresh process uses the durable manifest. Final protected run records `phase=complete`, inventory PASS, cleanup PASS, exit 0 and released fence; independent read-back proves zero removable residue and unchanged outside-owned data. Workflow YAML alone is not remote execution evidence.
 
-### T2/T3: Finish ordinary CI and runtime alignment
+### T2/T3: Preserve existing CI gates and verify the actual runtime
 
-**Scope/evidence**: `.github/workflows/ci.yml` omits docs/email gates;
-`package.json:7` excludes email from root build; `apps/docs/package.json:6`
-already provides `mint broken-links`; `apps/email/package.json` provides build
-and export. Node 26 types occur in the three apps and several shared packages,
-while root `package.json` declares Node 22 support.
+`.github/workflows/ci.yml:110-117` already runs docs links, email build/export and render assertions. `apps/docs/package.json` uses `mint broken-links`; `apps/email/package.json` defines `assert-render`. Root/package Node types are aligned to 22; root `engines` supports `22 || >=24.0.0`, and Bun is pinned to 1.4.0. Do not repeat a type migration or replace the working Mint command.
 
-- Add docs lint, email build and an email export/render assertion to CI. Assert
-  nonempty rendered notification markup, working links and no unresolved template
-  values. Do not label a preview-server build as email delivery proof.
-- Align **every first-party** `@types/node` declaration with the Node 22 floor,
-  update `bun.lock`, and pin/use Bun 1.4.0. Run source gates on Node 22 and the
-  selected production Node version if different. Record Vercel's actual runtime;
-  do not raise the minimum engine as a shortcut around a type error.
-- Keep build before typecheck so `.next/types` route validators are generated.
-  Keep lint, types and boundaries separate. Root `check` is lint only.
+**Scope**: those workflow/package files only if a real drift is found, `apps/email/scripts/assert-render.tsx` and tests when templates change. Preserve `bun run --cwd apps/docs lint`, `bun run --cwd apps/email build`, `bun run --cwd apps/email export`, `bun run --cwd apps/email assert-render` in the final gate set. Root build excludes email, and the source wrapper currently omits these gates, so neither substitutes for them.
 
-**Verify**: `bun run --cwd apps/docs lint`,
-`bun run --cwd apps/email build`, `bun run --cwd apps/email export` and the
-render assertion all exit 0. Inventory with
-`rg -n '"@types/node"' package.json apps/*/package.json packages/*/package.json`:
-all first-party versions target the supported floor. Final source gate commands
-are in Section 8; no blanket dependency upgrade belongs here.
+**Verify**: all four commands exit 0 with nonempty rendered notification markup, working links and no unresolved values; record actual Vercel runtime per app, CI runtime and the compatibility run for the supported floor. Source declarations are not evidence of remote runtime configuration.
 
-## 4. Close security and correctness defects
+## 4. Preserve correctness controls and finish their proof
 
-### C6: Fail closed on empty manager scope
+The original C1–C6 runtime changes are present. Repair regressions if discovered; do not recreate tables/services merely because the September 19 ledger describes their original implementation. Remaining tests and deployed acceptance below still block closure.
 
-**Evidence/excerpts**: `packages/availability/src/plans/plan-service.ts:276`
-computes `scopedPersonIds` and passes it as `personId`; at `:895` the predicate is
-`filters.personId?.length ? { person_id: { in: filters.personId } } : {}`.
-An empty allowed set becomes no restriction. The manager Team tab calls this
-service at `apps/app/app/(authenticated)/plans/page.tsx:116`.
-`packages/availability/src/people/people-service.ts:285` similarly uses
-`role === "manager" && actingPersonId ? ... : null`; the People page passes an
-optional linked person ID, allowing a missing manager identity to lose scope.
+### C6: Prove fail-closed manager scope
 
-**Scope**: these two services, `packages/availability/src/settings/manager-scope.ts`,
-their tests, and Plans/People page tests.
+**Current state**: `packages/availability/src/plans/plan-service.ts:288` returns `notAuthorised()` for missing manager identity; `:1048-1070` intersects authorised and requested IDs and returns an empty page before loading records. `packages/availability/src/people/people-service.ts:286-301` rejects missing identity and returns zero results for empty scope.
 
-1. Keep authorisation scope separate from user filters: `null` may represent an
-   authorised unrestricted administrator; `[]` means zero authorised people.
-   Return an empty page before record loading for an empty allowed intersection.
-   Never let search filters broaden the permitted person set.
-2. A manager with no linked acting person receives the existing not-authorised
-   result or an explicit empty state, never an organisation-wide query. Preserve
-   current self/team membership semantics for valid managers.
-3. Add regressions for no reports, only unrelated requested IDs, mixed allowed
-   and forbidden IDs, missing acting person, normal manager access, owner/admin
-   access, and both Clerk and payroll Organisation isolation.
+**Scope**: those services/tests, `packages/availability/src/settings/manager-scope.ts` and tests, Plans/People page tests, `tooling/release/e2e/admin-and-roles.spec.ts` and `manager.spec.ts`.
 
-**Verify**:
-`bun run --cwd packages/availability test src/plans/plan-service.test.ts src/people/people-service.test.ts src/settings/manager-scope.test.ts`
-and `bun run --cwd apps/app test 'app/(authenticated)/plans' 'app/(authenticated)/people'`
-pass, including assertions that denied/empty scopes make no unrestricted record
-query. Run the broad app command only after D1 excludes integration files and
-denies database access; C6 source work and mocked service tests can start now.
-Add this scenario to the deployed manager test in T1.
+**Preserve and prove**: `null` is unrestricted only for authorised admin/owner; `[]` never broadens a query. Cover no reports, missing linked person, unrelated/mixed filters, valid team/self access, and foreign Clerk/payroll Organisation IDs. Denied/empty scope must not issue an unrestricted record query. Add controlled deployed empty/missing-scope cases, not only viewer denial.
 
-### C1: Persist uncertainty and complete Xero recovery
+**Verify**: `bun run --cwd packages/availability test src/plans/plan-service.test.ts src/people/people-service.test.ts src/settings/manager-scope.test.ts` and `bun run --cwd apps/app test 'app/(authenticated)/plans' 'app/(authenticated)/people'` exit 0 under source-only isolation; T1 demonstrates actual manager denial and unchanged owner/admin access.
 
-**Evidence/excerpt**: `packages/availability/src/plans/submit-service.ts:362`
-releases `claimedAt` after a thrown submit, and `:430` does so after local commit
-failure. `packages/availability/src/xero-write-claim.ts:9` defines a five-minute
-lease. Neither proves the remote create failed. `packages/xero/src/au/write.ts:65`
-can return an error after a response with no ID. The approval reconciler at
-`packages/jobs/src/handlers/reconcile-xero-approval-state.ts:271` excludes records
-without `source_remote_id`.
+### C1: Prove durable uncertainty against the real database
 
-**Scope**: those files, `packages/xero/src/write/types.ts`, the write adapter,
-`packages/core/src/ports/external-write-port.ts`,
-`packages/availability/src/plans/plan-service.ts`,
-`packages/availability/src/approvals/approval-service.ts`,
-`packages/jobs/src/handlers/sync-xero-leave-records.ts`,
-Prisma schema/migration, a new scoped repository
-`packages/database/src/queries/outbound-operations.ts` and its tests, a new
-`packages/availability/src/plans/submit-recovery-service.ts`, and protected Plans
-recovery actions/UI. Keep provider-neutral certainty types in the core port.
+**Current state**: `packages/database/src/queries/outbound-operations.ts:51` implements transactional, generation-fenced preparation. `packages/availability/src/plans/submit-service.ts:366-435` persists request fingerprints, marks dispatch before calling Xero and retains unknown outcomes after throws. `submit-recovery-service.ts` and protected Plans actions already exist. The database repository unit at `packages/database/src/queries/outbound-operations.test.ts:11-27` mocks the transaction; no current registered integration file exercises durable outbound operations directly.
 
-1. Persist a submit operation and immutable request fingerprint **before** the
-   network call. Store both tenancy IDs, record ID, actor, timestamps, safe
-   status/error code and known remote ID. Choose a database-enforced single
-   nonterminal operation per record/action. A simple one-row-per-record/action
-   current-operation table with conditional state transitions is sufficient;
-   retain history in existing audit events. Do not build a general workflow engine.
-2. Distinguish `prepared`, `outcome_unknown`, `provider_accepted`, `completed`
-   and `definitive_failure`. Mark the potentially sent state durably before
-   network dispatch so process death remains safe. Only proven pre-send failure
-   or definitive rejection unlocks another create. Timeout, connection loss,
-   provider 5xx, malformed success and local persistence failure remain unresolved.
-   Preserve the underlying Xero error taxonomy and add certainty separately.
-3. A lease releases a worker, not the unresolved operation. Retry, revert, edit,
-   archive/delete, approval and inbound mutation paths must respect the durable
-   guard after five minutes and after process restart. Replace the old tests
-   that expect thrown calls or lease expiry alone to permit another submit.
-4. Persist a returned remote ID before finalisation where possible. Finalise the
-   record/operation/audit atomically; publication and notification recovery must
-   be idempotent. A persistence failure retains uncertainty, not a new create.
-5. Deliver recovery, including records without a remote ID. Known provider-returned
-   IDs can be verified and finalised without re-creating leave. Unknown outcomes
-   show an admin/owner a bounded candidate lookup and an audited attach action:
-   verify tenant, employee, dates and leave type; record actor and reason. A
-   candidate found by matching fields or set difference is not proof of origin.
-   Never auto-attach a pre-existing match or infer absence from an incomplete
-   read. AU reads can report `ok:true, complete:false`; do not put an unbounded
-   whole-payroll scan before every synchronous submit.
-6. Keep unknown submissions blocked until the remote outcome is established.
-   Provide a definitive-not-created resolution only with independently verified
-   provider evidence and an audit reason. An age threshold or empty search is
-   insufficient. Employees see a clear pending-resolution message and existing
-   data remains visible; only authorised staff see investigation detail.
-7. Handle inbound sync arriving first. Its current create branch can make a
-   second canonical record for the same remote leave. Resolution must reconcile
-   that imported row without losing local privacy, stable UID or publication
-   sequence, leaving one active canonical representation and no duplicate event.
-   Do not delete audit history or silently attach ambiguous records.
+**Scope**: those files/tests; `packages/availability/src/plans/submit-side-effects.ts` for shared finalisation side effects; Plans actions/recovery UI; `packages/availability/src/xero-write-claim.ts`; existing inbound sync/publication callers. Add `packages/database/outbound-operations.integration.test.ts` and register it in `tooling/release/integration-inventory.ts`, allocator/global-key/cleanup contracts. Extend `packages/availability/index.integration.test.ts` or a separately registered recovery suite for service-level merge coverage. No schema change is assumed.
 
-**Tests**: concurrent double submit produces one create; timeout then retry past
-lease expiry produces none; process death/local commit failure is recoverable;
-definitive rejection permits retry; incomplete/old/multiple matches never
-silently attach; inbound sync racing resolution yields one event; foreign tenant
-and non-admin recovery fail. Add recovery service and guarded database tests.
+1. Preserve immutable snapshots and `prepared`, `outcome_unknown`, `provider_accepted`, `completed`, `definitive_failure` transitions. A worker lease releases execution ownership, not an unresolved operation. Timeout, malformed success, 5xx, process loss or local commit failure never authorise a second create. Retry/edit/archive/approval and inbound writers respect the durable guard. Only proven pre-send failure or definitive rejection permits retry.
+2. Add guarded tests with independent database clients contending for the same owned record. Assert exactly one claim and one counted mocked provider create, persisted unknown status before dispatch, unchanged denial after lease expiry and client/process restart, stale-generation finalisation rejection, and safe retry after definitive failure. Use real repository transactions; provider transport stays mocked in synthetic database suites.
+3. Prove verified known-ID recovery, admin/owner-only attach and definitive-not-created resolution. Empty, incomplete, old or ambiguous provider matches never establish absence/origin. Recovery must preserve both scopes, stable UID, privacy, publication sequence and idempotent notifications. Test inbound import racing recovery leaves one canonical publication, retaining audit history and cancelling the duplicate publication safely.
+4. Allocate all resources before writes and extend owned cleanup before running. Model fixture setup/teardown on `packages/database/billing.integration.test.ts` and the existing availability integration suite. Do not use unrelated customers, unregistered global keys or real Xero calls to manufacture a concurrency test.
+5. After X1's AU decision, Plan 160 proves the actual approved remote sequence and recovery against sanctioned fixtures. Keep provider verification separate from mocked transport plus real-database proof.
 
 **Verify**:
 
 ```bash
+bun run --cwd packages/database test src/queries/outbound-operations.test.ts
 bun run --cwd packages/availability test src/plans/submit-service.test.ts src/plans/submit-recovery-service.test.ts src/plans/plan-service.test.ts src/xero-write-claim.test.ts
 bun run --cwd packages/xero test src/au/write.test.ts src/au/read.test.ts src/adapter/xero-write-adapter.test.ts
 bun run --cwd packages/jobs test src/handlers/sync-xero-leave-records.test.ts src/handlers/reconcile-xero-approval-state.test.ts
 ```
 
-All pass; D1's live runner then proves the database concurrency invariant after
-migration. T1/O1 must resolve every controlled remote operation to a known final
-state. Synchronous user-triggered outbound writes remain the product contract.
+All exit 0; D1's protected runner discovers the new suite(s), passes the named database cases and cleans exact owned resources. Until then real-database C1 proof is NOT VERIFIED even though the previous 27-file inventory passed.
 
-### C2: Retry incomplete Clerk membership provisioning
+### C2: Verify replay repairs membership and deduplicates delivery
 
-**Scope/evidence**: `apps/api/app/webhooks/auth/route.ts:197-213` captures before
-provisioning and returns 201; `:251-280` logs unsuccessful Results and discards
-them. Use its verified Svix delivery identity at `:297`, existing
-`route.test.ts` fixtures and `packages/availability/src/people/current-user-service.ts`.
+**Current state/scope**: `apps/api/app/webhooks/auth/route.ts:222-257` provisions before capture, returns sanitised 503 on failure and uses stable delivery UUIDs. Outcomes across payroll Organisations are aggregated at `:301-343`. Preserve signature checks and `packages/availability/src/people/current-user-service.ts` idempotence; no new receipt table is assumed.
 
-- Aggregate provisioning outcomes across all active payroll Organisations.
-  Return sanitised 503 for any failure; replay leaves successful links intact
-  and repairs remaining links. Keep signature validation and org scoping.
-- Capture successful membership activation only after all links succeed and
-  deduplicate by verified delivery identity, using a durable receipt or the
-  analytics provider's supported idempotency identifier. Moving capture after
-  success alone does not deduplicate successful replays. Do not persist raw
-  webhook bodies. A receipt must not mark partially completed work successful.
-- Test all-success, all-failure, partial-failure and failure -> success -> success
-  replay: one link per person and one delivered activation event. Keep invalid
-  signatures rejected before any provisioning or analytics.
+**Verify**: `bun run --cwd apps/api test app/webhooks/auth/route.test.ts` and `bun run --cwd packages/availability test src/people/current-user-service.test.ts` exit 0. Cover all-success/failure/partial and failure -> success -> success replay with one link per person. Current unit UUID equality does not prove analytics delivery deduplication. O1 must observe one delivered activation event after replay using controlled identities, with invalid signatures rejected before provisioning/capture.
 
-**Verify**: `bun run --cwd apps/api test app/webhooks/auth/route.test.ts` and
-`bun run --cwd packages/availability test src/people/current-user-service.test.ts`
-pass. If a receipt table is added, include its guarded isolation/idempotency test
-in D1. Test analytics dedup at the delivered event boundary, not just mock calls.
+### C3: Verify repairable Stripe deliveries
 
-### C3: Make billing repairable without swallowing events
+**Current state/scope**: `apps/api/app/webhooks/payments/route.ts:18` delegates to `apps/api/lib/stripe-event-delivery.ts`; `packages/database/src/queries/billing.ts`, `packages/auth/entitlements.ts`, protected `tooling/release/replay-stripe-event.ts` and `list-failed-stripe-events.ts` implement receipt state, health fallback and replay. `packages/database/billing.integration.test.ts:312-364` includes failed -> processed and duplicate-preservation regressions.
 
-**Evidence**: `apps/api/app/webhooks/payments/route.ts:58-72,160-200` returns
-`{ ok: true }` for invalid consumed data. `:259` records it. The predicate at
-`packages/database/src/queries/billing.ts:210` treats **any** receipt as processed;
-`StripeEvent` at `packages/database/prisma/schema.prisma:1144` lacks failure state.
+**Preserve**: failed consumed events stay retryable and visible, unsupported events are ignored deliberately, replay fetches exact IDs server-side, foreign customer binding is rejected, and a stale/equal-time race cannot complete an unsuccessful mirror repair. Paid-mode unhealthy billing falls back to Basic without destructive cancellation; early-access access rules remain unchanged. Never expose raw provider bodies in operator errors.
 
-**Scope**: payment route/tests, `packages/billing/src/stripe.ts`, database billing
-queries/schema, `packages/auth/entitlements.ts` and tests, billing settings status,
-and new protected replay tooling `tooling/release/replay-stripe-event.ts`.
+**Verify**: `bun run --cwd apps/api test app/webhooks/payments/route.test.ts`, `bun run --cwd packages/billing test`, `bun run --cwd packages/auth test entitlements.test.ts` and release-tool replay tests exit 0; D1 covers existing receipt regressions. O1 records authorised failed-event repair/replay against the actual provider configuration. Real paid checkout is conditional on paid mode; C3 source/receipt verification is mandatory in early access too.
 
-1. Add delivery state (`failed`, `processed`, `ignored`), attempt count, safe
-   error category and timestamps; completion time is nullable until completed.
-   Preserve completed meaning of existing receipts through an additive migration.
-   Change `isStripeEventProcessed` to exclude failed receipts.
-2. Use an explicit decision table: subscription created/updated/deleted require
-   valid shape, matching tenant/customer and mapped catalogue price. Applied or
-   explicitly stale mirrors may complete. Unsupported event types are `ignored`.
-   Invoice/checkout events carrying a subscription ID retrieve its authoritative
-   snapshot through `@repo/billing`; valid one-off invoices with no subscription
-   are intentionally ignored. Verify the configured Stripe API-version shape
-   before changing schemas; do not treat valid unexpanded IDs as corrupt events.
-3. Missing configuration, failed provider fetch or invalid consumed data records
-   a failed receipt and returns a sanitised retryable 5xx. Surface failed/unmatched
-   IDs and safe categories in the operator view/alert, without raw payloads.
-   Throttle repeated alerts by event ID; never silently declare poison events
-   processed just to stop retries.
-4. Implement replay by exact event ID through authenticated server-side provider
-   retrieval, then the same processing function. The tool requires operator
-   credentials and validates current customer/tenant binding. No public replay
-   endpoint or unsigned caller-supplied event body. Repairs followed by replay
-   must finish the mirror and receipt once.
-5. Choose a concrete entitlement policy: in paid mode, a known tenant with a
-   newer unresolved consumed billing event uses the existing Basic fallback in
-   `activePlanKey` until repaired, denying paid-only authorisation from stale
-   mirror data. Keep existing data readable and show a billing-sync
-   recovery state. No automatic destructive cancellation. Early access retains
-   its existing access rules. Clear unhealthy state only after authoritative
-   recovery covers the newest unresolved event; stale replay cannot clear it.
-   Put the health state/query and entitlement tests in this change, not a future plan.
-6. Preserve newer-wins ordering, duplicate idempotency and foreign-customer
-   rejection. Replace existing tests that expect unknown price/missing metadata
-   to return 200 and create a completed receipt.
+### C4/C5: Verify email recovery and malformed input
 
-**Verify**: `bun run --cwd apps/api test app/webhooks/payments/route.test.ts`,
-`bun run --cwd packages/billing test`, `bun run --cwd packages/auth test entitlements.test.ts`
-and new replay/receipt tests pass. Guarded integration proves failed -> repaired
--> processed -> duplicate no-op and older-event rejection. Source repair is
-mandatory in early access too; real paid checkout is only required for paid mode.
+**Current state/scope**: `packages/notifications/src/email-queue-service.ts:92` checks transport before querying; `packages/jobs/src/handlers/send-notification-emails.ts:23` throws on failed Result. Availability POST and DELETE already catch malformed JSON at `apps/api/app/api/availability/route.ts:52` and `apps/api/app/api/availability/[recordId]/route.ts:231`.
 
-### C4: Make email failure retry and recovery real
+Preserve queued messages during missing transport, row-ID provider idempotency, recipient preferences, per-message attempts and fifth-failure terminal state. Restored transport must drain the controlled backlog and later rows. Authenticated malformed POST/DELETE returns 400 without domain queries/mutation; unauthenticated input remains 401.
 
-**Scope/evidence**: `packages/notifications/src/email-queue-service.ts:123-128`
-leaves the oldest selected rows unchanged when transport is absent.
-`packages/jobs/src/handlers/send-notification-emails.ts:12-15` returns a failed
-Result without rejecting the Inngest step. `packages/email/index.ts:39` requires
-both token and sender.
+**Verify**: `bun run --cwd packages/notifications test src/email-queue-service.test.ts`, `bun run --cwd packages/jobs test src/handlers/send-notification-emails.test.ts` and `bun run --cwd apps/api test __tests__/availability-routes.test.ts` exit 0. O1 proves a visible failed/retried job and actual controlled message receipt without recipient/body data in logs.
 
-- Validate token and sender availability before selecting any queue row; return
-  one sanitised configuration failure. Have the Inngest wrapper throw a safe
-  error on failed Result so the job actually fails and retries.
-- Keep queued messages intact during configuration failure. Preserve row-ID
-  provider idempotency, per-message attempt increments and the existing fifth
-  failure terminal state. Test recovery processes the backlog and later rows.
-- Add `packages/jobs/src/handlers/send-notification-emails.test.ts`, using the
-  existing handler-test patterns, and extend queue service tests. Preserve
-  recipient preferences and avoid recipient/body data in logs.
+## 5. Run current preflight against actual project environments
 
-**Verify**: `bun run --cwd packages/notifications test src/email-queue-service.test.ts`
-and `bun run --cwd packages/jobs test src/handlers/send-notification-emails.test.ts`
-pass. Missing transport makes zero queue queries; the handler rejects; restored
-transport delivers the controlled message in O1. R2 fixes the configuration gate.
+### R1/R2/R3: Preserve validated mode, lifecycle, email and monitoring checks
 
-### C5: Return client errors for invalid JSON
+**Current state/scope**: `packages/next-config/preflight.ts:141-155` validates actual `NEXT_PUBLIC_LAUNCH_MODE`; CLI mode is only an assertion. `:222-238` covers Sentry upload and Better Stack's complete-or-absent group; `:249-294` validates Xero encryption/keyring/version, credential domain UUID, HTTPS callback, tier/epoch and KV; `:301-315` requires runtime Resend names, sender and private application configuration. `packages/observability/next-config.ts:2` already uses `@sentry/nextjs/config`.
 
-**Scope/evidence**: `apps/api/app/api/availability/route.ts:52` (POST) and
-`apps/api/app/api/availability/[recordId]/route.ts:231` (DELETE) parse inside a
-broad 500 handler. Reuse PATCH's local parse catch at `:79-90`:
-`{ ok: false, error: { code: "invalid", message: "Malformed JSON request body" } }`.
+Preserve `preflight.ts`, `preflight.test.ts`, `bin/preflight.ts`, observability env/tests and matching README/env examples. Do not replace actual environment mode with `--mode`, accept an unsupported Resend alias, remove upload requirements, weaken keyring semantics, or rotate keys merely to make a check pass. Retain keys referenced by stored envelopes and the supported version-1 fallback. Namespace presence alone is not initialisation evidence.
 
-Add tests in `apps/api/__tests__/availability-routes.test.ts`: authenticated
-malformed POST/DELETE return 400 with zero organisation/person queries or domain
-mutations; unauthenticated malformed requests still return 401; valid behaviour
-is unchanged. **Verify**:
-`bun run --cwd apps/api test __tests__/availability-routes.test.ts` passes.
+**Verify**: `bun run --cwd packages/next-config test preflight.test.ts launch-mode.test.ts` and `bun run --cwd packages/observability test keys.test.ts` exit 0. With each actual production build/runtime environment loaded privately and separately, run `bun run preflight app`, `bun run preflight api`, `bun run preflight web` respectively; each exits 0 with actual `early_access` and secret-free diagnostics. A combined environment is invalid evidence. Sentry source-map upload and symbolication, advertised status monitors and Xero namespace read-back are separate O1/X3 observations.
 
-## 5. Make preflight reflect production reality
+## 6. Finish bounded data and browser verification
 
-### R1/R2/R3: Correct mode, email and monitoring checks
+### P1/P2: Preserve bounded Plans and People queries
 
-**Scope/evidence**: `packages/next-config/preflight.ts:39` uses
-`explicitMode || envVars.NEXT_PUBLIC_LAUNCH_MODE?.trim()`; its API email gate at
-`:143` accepts `RESEND_API_KEY`, which `packages/email/keys.ts:9` never reads,
-and does not require `RESEND_FROM`. Update `preflight.ts`, `preflight.test.ts`,
-`bin/preflight.ts`, README environment commands and relevant env examples.
-The Sentry import is in **`packages/observability/next-config.ts:2`**, not
-`packages/next-config/index.ts`. Better Stack validation already exists in
-`packages/observability/keys.ts:36`; reuse its contract.
+**Current state**: `packages/availability/src/plans/plan-service.ts:1092-1159` clamps pages to 50/default, 200/max and batches balances; the Plans page batches duration references. `packages/availability/src/people/people-service.ts:303-372` compiles status predicates, pages/counts with the same scope and hydrates only page rows. These are implemented, not proposed new APIs.
 
-1. Require actual `NEXT_PUBLIC_LAUNCH_MODE` from the inspected project
-   environment. Keep an optional CLI mode only as an assertion. Absent, invalid
-   or conflicting actual values fail even if the CLI says `early_access`.
-2. Require API `RESEND_TOKEN` with the runtime format and valid `RESEND_FROM`.
-   Reject API_KEY-only configuration unless the same alias is deliberately
-   added to runtime and tests. Prefer the existing documented token name.
-3. Validate Better Stack's key/page-ID/public-URL group as all absent or all
-   complete; configured URL must be HTTPS. All absent is an explicit disabled
-   status integration, not a healthy public status claim. Complete the real
-   service configuration in O1 where status is advertised.
-4. Check Sentry release upload configuration by variable names for each project's
-   build environment; require its organisation/project and upload credentials
-   or verified provider-managed equivalent. A DSN or token-presence check alone
-   is not source-map evidence. Keep DSN, KV, Clerk webhook, Inngest and mode-based
-   Stripe checks. For G1 include the API's private application-mail recipient.
-5. Switch `withSentryConfig` to `@sentry/nextjs/config` in observability and retain
-   current tunnel, source-map, transpilation and monitoring options. Confirm the
-   installed SDK export before editing; do not upgrade the SDK merely for this.
-6. Extend tests for absent/empty/mismatched mode, API_KEY-only transport, absent
-   sender, invalid formats, partial Better Stack, incomplete upload configuration
-   and secret-free errors. Refresh the README to run against pulled project
-   environments without overriding actual launch mode.
+**Scope**: those services/tests, `packages/availability/src/people/current-status.ts`, `packages/availability/src/duration/working-days.ts`, their scoped database helpers and existing Plans/People UI tests. Preserve value-based keyset cursors, equal-timestamp/name and deleted-cursor behaviour, overlapping dates, previous-90/next-365-day default Plans window, explicit all-history access and accurate window/empty-state copy.
 
-**Verify**: `bun run --cwd packages/next-config test preflight.test.ts launch-mode.test.ts`
-and `bun run --cwd packages/observability test keys.test.ts` pass. After loading
-one project's production environment securely, run `bun run preflight app`,
-`bun run preflight api` or `bun run preflight web` for that project: exit 0 with
-mode `early_access` and variable names/status only. Do not run all three against
-one merged environment. Production builds emit no deprecated Sentry-config import
-warning; O1 proves an uploaded, correctly symbolicated controlled event.
+People status keeps one fixed `at` instant, existing precedence and holiday/location/fallback/working-day semantics. Test every status key against `current-status.ts`, including local midnight/DST, null location, archives and empty holiday sets. No whole-organisation candidate scan or approximate counts. C6 governs page/count queries.
 
-## 6. Bound the product's data and browser work
+**Verify**: `bun run --cwd packages/availability test src/plans/plan-service.test.ts src/duration/working-days.test.ts src/people/people-service.test.ts src/people/current-status.test.ts` and `bun run --cwd apps/app test 'app/(authenticated)/plans' 'app/(authenticated)/people'` exit 0. D1-owned fixtures prove complete ID/count parity, stable paging and bounded hydration. Measure emitted SQL count/rows/duration at sizes 1, 50, 200 for the same reference years; query count must not grow per record. Record candidate-specific payload sizes and limits. Retain earlier measurements as historical comparisons, not a new baseline run.
 
-### P1: Page Plans and batch page hydration
+### P3: Complete bounded CSV export and verify monitor privacy
 
-**Scope/evidence**: `packages/availability/src/plans/plan-service.ts:885` fetches
-all IDs without `take`, `:921` re-reads every record and `:961` fetches a balance
-per record. `apps/app/app/(authenticated)/plans/page.tsx:146` calculates durations
-per item. Edit those files, Plans `_schemas.ts`/client/actions/tests, and scoped
-batch queries in `packages/database`. Reuse
-`packages/availability/src/duration/working-days.ts` reference-data helpers.
+**Current state**: `packages/availability/src/sync/sync-monitor-service.ts:285` uses per-type summaries/aggregates; initial detail and cursor pages are bounded at `:526-550`; raw detail is authorised, scoped, scrubbed and audited at `:700`. However, `exportFailedRecordsCsv` at `:913-945` fetches up to 50,001 rows, materialises one CSV and advertises a nonexistent full-export API after truncation.
 
-- Return `{ items, nextCursor, totalCount, window }`, default 50/max 200 items,
-  with stable `(starts_at, created_at, id)` keyset order. Use a displayed default
-  window of the previous 90 days through the next 365 days; provide date controls
-  and explicit all-history pagination. Include overlapping records. Counts and
-  empty-state copy describe the selected window; historical records remain reachable.
-- Load the page with its required person fields once; batch latest balances for
-  the page's person/type pairs. Load organisation, locations and applicable
-  holiday reference data once per distinct year and compute durations with
-  `computeWorkingDaysFromReferenceData`. Preserve per-record duration failures.
-- Apply the same C6 authorisation predicate to page and count queries. Keep
-  editable actions, filters, deep-linked records and modal navigation working.
-- Test equal timestamps, deleted cursor row, page changes, all-history access,
-  overlapping dates, manager scope and missing balance/holiday data. At 1, 50
-  and 200 rows for the same reference years, data-query count must be constant
-  apart from explicitly documented fixed reference queries, never per record.
+**Scope**: this service/tests, `packages/database/src/queries/` for the scoped export page query, `packages/availability/index.ts`, `apps/app/app/(authenticated)/sync/_actions.ts`, `[runId]/sync-run-detail-client.tsx` and their tests. Add an authenticated streaming download route under `apps/app/app/(authenticated)/sync/[runId]/export/route.ts` and its route test if using the preferred stream path. No raw provider payloads in exported data.
 
-**Verify**: `bun run --cwd packages/availability test src/plans/plan-service.test.ts src/duration/working-days.test.ts`
-and `bun run --cwd apps/app test 'app/(authenticated)/plans'` pass. Guarded fixture
-measurement records query count, rows and duration on the same input before/after;
-page payload is at most the requested size and all pages reproduce expected IDs.
+1. Add a server-side page reader ordered by `(created_at,id)` with at most 200 rows per query and both tenancy keys plus run ID. Authorise admin/owner and verify run ownership before emitting headers. Fix the export upper bound at request start so concurrent new failures do not make traversal endless. Keep existing safe CSV columns/escaping and audited access.
+2. Stream page chunks through the authenticated download route, applying backpressure and abort handling; have the UI download from that route instead of serialising a whole export through a server action. Preserve foreign-ID denial and CSV injection protection. If platform response limits prevent a complete export, fail clearly or provide an explicitly scoped resumable continuation; never silently truncate or claim another API exists.
+3. Add tests with multiple bounded pages, equal timestamps, empty/foreign runs, cancellation, partial query failure and more than 50,000 fixture rows generated in memory. Assert exactly-once ordered output, no raw detail and `take <= 200`. Use small owned live fixtures to verify real cursor/tenancy parity; do not insert 50,000 rows into production merely for this test.
 
-### P2: Filter People in the database without changing status meaning
+**Verify**: `bun run --cwd packages/availability test src/sync/sync-monitor-service.test.ts` and `bun run --cwd apps/app test 'app/(authenticated)/sync'` exit 0; new database helper unit and streaming-route tests pass. The obsolete truncation/full-export-API message is absent. Candidate export covers all eligible IDs while server query/page buffering remains bounded. Keep overview/count, raw-detail redaction and manager/viewer denial regressions passing.
 
-**Scope/evidence**: `packages/availability/src/people/people-service.ts:299-311`
-omits pagination for derived filters, then maps/slices every person. Use this
-service, `current-status.ts` and tests, People `_schemas.ts`/client/tests, and a
-new scoped query helper in `packages/database/src/queries/people.ts` if required.
+### P4/P5: Verify the implemented public-provider and analytics split
 
-- Push `xeroSyncFailedOnly` into a scoped relation predicate. For derived status,
-  compile scoped `some`/`none` record predicates from one fixed `at` instant and
-  the current precedence: approved leave, submitted leave, applicable public
-  holiday, `LOCAL_PRIORITY`, available. Every lower priority excludes higher ones.
-- Compute holiday applicability once per scoped location plus null/default
-  location using the existing local-date and `holidayIsNonWorking` rules.
-  Preserve CUSTOM overrides, working-day overrides and organisation fallback.
-  Use location predicates for holiday membership; do not fetch all people to
-  decide whether they match.
-- Use identical predicates for exact count and page, stable value-based
-  `(last_name, first_name, id)` cursors, default 50/max 200. Hydrate current status
-  only for the bounded page. C6 governs missing manager identity and empty scope.
-- Test every status key and precedence collision against `current-status.ts` as
-  the oracle, local midnight/DST, null location, archives, holiday overrides,
-  equal names, deleted cursor, concurrent inserts and manager visibility.
-  No background status projection job or capped-candidate approximation is needed.
+**Current state/scope**: `packages/design-system/providers/public.tsx:1` has theme/tooltip/toast composition without auth, consumed by web layout. `packages/analytics/instrumentation-client.ts:234-255` checks configuration before importing PostHog, with URL-envelope sanitisation at `:50-110`. Preserve these files/tests, authenticated provider composition and web consumers; do not rebuild the split or alter unrelated design.
 
-**Verify**: `bun run --cwd packages/availability test src/people/people-service.test.ts src/people/current-status.test.ts`
-and `bun run --cwd apps/app test 'app/(authenticated)/people'` pass. Tests assert
-`take <= pageSize + 1`, exact filtered totals and no application-wide candidate
-scan. Guarded integration compares returned IDs/counts against the fixture oracle.
+**Verify**: `bun run --cwd packages/analytics test`, `bun run --cwd apps/web test`, `bun run test:release-analytics-privacy` and the candidate web analyser exit 0 in their required isolated environments. Use installed Playwright browsers; the analytics privacy probe intercepts transport and is not production analytics proof. Assert no configured analytics means no PostHog import/network, one initial pageview and one per navigation, safe fast-navigation attribution/identity, and harmless import failure. Candidate `bun run --cwd apps/web analyze` plus actual network capture proves no Clerk in public reachable client code and no unconfigured PostHog in initial transfer. Compare identical build settings; do not call analyser module bytes actual browser transfer. Authenticated sign-in, theme and toasts still work.
 
-### P3: Bound both sync detail and its overview
+## 7. Complete acquisition and release dependencies
 
-**Scope/evidence**: `packages/availability/src/sync/sync-monitor-service.ts:421-460`
-loads all failures and timeline payloads into detail. Its overview at `:225-251`
-also loads 30 days of runs/failures, including raw rows. One tenant per
-Organisation bounds tenant count, not run or failure count. Edit that service,
-scoped database queries, and `apps/app/app/(authenticated)/sync/` actions, overview,
-run-detail client and tests.
+### G1: Verify the actual Contact studio and Clerk admission journey
 
-- Detail returns failure summaries and timeline pages (50 default/200 max) using
-  `(created_at,id)` cursors and selected safe fields, with explicit next cursors.
-  No `rawPayload` or arbitrary audit payload in initial props or ordinary pages.
-- Load a single redacted raw failure only on explicit admin/owner expansion,
-  verifying both tenancy IDs and run/failure relationship server-side, and audit
-  that access. Reuse existing secret scrubbers; apply them before serialisation.
-- Replace overview full-row loading with aggregate counts and bounded latest
-  runs per registered type. Preserve pending-failure-since-latest-success
-  semantics. CSV uses explicit bounded pages/streaming and safe columns rather
-  than silently exporting only the displayed page.
-- Test foreign IDs, viewer/manager denial, raw detail redaction, stable paging,
-  large histories and overview counts after a later successful run.
+**Current state**: `apps/web/app/contact/page.tsx:19` renders `ContactPageContent`; its client posts `/api/contact` at `components/contact-page-content.tsx:116`. `apps/api/app/api/contact/route.ts` validates the AU request, private recipient/HMAC, shared abuse controls, Resend acceptance, optional confirmation and activation. `/api/early-access` remains an existing legacy route, not the public studio endpoint. `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx:15` intentionally renders Clerk SignUp; keep Clerk as admission authority.
 
-**Verify**: `bun run --cwd packages/availability test src/sync/sync-monitor-service.test.ts`
-and `bun run --cwd apps/app test 'app/(authenticated)/sync'` pass. Large mocked
-histories yield bounded queries/payloads; guarded fixtures prove aggregate parity.
+**Scope**: those routes/components/tests, `packages/email/contact.ts` and tests, API/web env contracts, shared rate-limit helpers, `packages/analytics/activation-events.ts` and existing capture points, Clerk choose-organisation/session-task and onboarding flows, `tooling/release/e2e/admission.spec.ts` and fixture contracts. Preserve enquiry, early-access, support and bug reasons; no new CRM, applicant database, membership table or public recipient address.
 
-### P4/P5: Remove unnecessary public client code
+1. Verify actual contact validation, draft preservation on failure, per-payload idempotency, wrong-origin/content-type rejection, HMAC-derived abuse keys, rate limiting and private accepted delivery. Cover confirmation success/failure separately from team delivery so a failed optional receipt cannot duplicate the application. Keep legacy route regressions while that route is supported.
+2. Verify the published purpose/90-day retention text against the actual mailbox retention/access rule; source copy alone is not provider configuration. Use existing support hours and acknowledgement target, not a new SLA meeting.
+3. In Clerk's actual restricted mode, prove an uninvited visitor sees a rendered denial/admission state and cannot acquire an unauthorised session. Correct T1's obsolete redirect assertion; do not restore the removed app redirect. Test expired/revoked invitation, existing-user sign-in, required organisation task, and CSP loading of the configured Clerk frontend origin.
+4. Redeem a sanctioned application/user invitation for a genuinely new owner, create that customer's own Clerk Organisation, verify `org:owner` creator role and provisioned People. An existing-owner settings visit is insufficient. Subsequent member invitations target that customer's Organisation, never the operator's account. Use current Clerk Context7 guidance before provider configuration; record missing role capability without inventing roles locally.
+5. Preserve the versioned activation catalogue: Application Accepted, Customer Admitted, Organisation Provisioned, Xero Connected, Initial Sync Completed, First Feed Accessed, First Leave Submitted and First Leave Approved. Check actual durable outcomes and stable dedup identities; no applicant content, leave details or feed URLs in analytics. X1 must resolve initial-sync truth before its milestone can pass.
 
-**Evidence/scope**: `packages/design-system/index.tsx:1` statically imports
-`AuthProvider` even when `apps/web/app/layout.tsx:24` passes `auth={false}`.
-`packages/analytics/instrumentation-client.ts:1` statically imports PostHog before
-checking keys. Edit these entry points, their direct consumers, package exports,
-`apps/web/package.json` and add provider/analytics tests.
+**Verify**:
 
-- Create `packages/design-system/providers/public.tsx` containing shared
-  theme/tooltip/toast composition with no auth import. Compose it with auth in
-  the existing authenticated provider. Point web directly to the public entry.
-  Remove web's Clerk dependency only after confirming no remaining runtime use.
-- Check the public analytics configuration before dynamic PostHog import; use a
-  single initialisation promise. Schedule after hydration/idle with a fallback.
-  Preserve initial URL/referrer even if navigation happens before load, emit the
-  initial page view once, then track subsequent navigation once. Avoid default
-  autocapture plus manual duplicate pageviews. A rejected import must not break UI.
-- Test no-config means no import/network, repeat initialisation, fast navigation,
-  identity/group association and load failure. Capture public route chunk reports
-  before/after using `bun run --cwd apps/web analyze`; compare identical build
-  settings. Clerk must be absent from the public reachable client graph and
-  PostHog from the initial unconfigured graph. Verify initial compressed route
-  JS does not increase from these changes; investigate any increase, do not
-  invent a percentage saving without a measured baseline.
+```bash
+bun run --cwd apps/api test app/api/contact/route.test.ts app/api/early-access/route.test.ts
+bun run --cwd apps/web test app/contact
+bun run --cwd packages/email test contact.test.ts
+bun run --cwd packages/analytics test
+```
 
-**Verify**: focused new provider/analytics tests, `bun run --cwd apps/web test`,
-the analyser output and public T1 smoke pass; authenticated sign-in, theme and
-toasts still work. Source grep alone is not bundle evidence.
+All exit 0; T1/O1 records one privately received controlled application through `/api/contact`, one separately admitted owner in their own Organisation and delivered once-only activation milestones. Mocked analytics UUID checks are not delivery proof.
 
-## 7. Complete access, activation and customer-facing truth
+### G2/G3: Verify current public truth, support and rollback
 
-### G1: Deliver application through first-owner admission
+**Current state/scope**: `apps/web/app/about/page.tsx` and `about.test.tsx` already removed illustrative identity copy; `PRODUCT.md:26` is now Users, not the obsolete Register section. Preserve factual founder/product content, current Australian scope and future-region labels. Scope edits only to demonstrated stale public claims and their tests, not a redesign.
 
-**Evidence**: early-access default is already defined in launch-mode config;
-`apps/web/src/data/support.ts:5` is a mailto enquiry. The unrestricted source
-sign-up page is `apps/app/app/(unauthenticated)/(auth)/sign-up/[[...sign-up]]/page.tsx`.
-`apps/app/app/actions/settings/invite-member.ts:36` invites into the caller's
-**existing** Clerk Organisation, so it cannot admit the owner of a new customer.
+**Verify**: `bun run --cwd apps/web test app/about app/contact app/pricing app/integrations` exits 0. Candidate browser checks confirm no provisional identity, obsolete release date or unsupported region/refresh claim. Record actual support receipt/response times within the published target, and the Section 9 rollback rehearsal. Release date is the actual verified release, not a prerequisite. The controlled T1/O1 customer journey replaces the old three-reference-customer marketing gate; product/security/payroll tests remain mandatory.
 
-**Scope**: web contact form and primary CTA data/components, API application
-route and tests (create `apps/api/app/api/early-access/route.ts`), API/web env
-contracts, shared email sender and a private application email template,
-`packages/auth/components/choose-organization-task.tsx`,
-`apps/app/app/(unauthenticated)/(auth)/session-tasks/choose-organization/page.tsx`,
-existing sign-up/onboarding,
-analytics catalogue and success capture points, and relevant docs. No new CRM,
-custom membership table, public GitHub issue or Neon applicant store.
+### X1: Complete Plan 159's remaining import and AU contract work
 
-1. Add a validated AU application form on `/contact`. Collect email, company
-   size, country, Xero Payroll use, calendar client, current process and acquisition
-   source; constrain free-text length and reject payroll/leave attachments.
-   Primary acquisition CTAs lead here; admitted-user sign-in remains accessible.
-2. POST to the API using explicit web-origin CORS/Origin handling, JSON content
-   checks, Zod and KV-backed IP/email limits. Use bounded HMAC-derived keys, not
-   raw email/IP in KV logs. Origin is not a replacement for abuse controls.
-   Use an idempotency key and short-lived delivery receipt to suppress retries.
-   Send to an explicit private admission mailbox through Resend, returning a
-   reference only after accepted delivery. No secrets or applicant details in
-   logs/analytics. Show a useful retry state on failure.
-3. State purpose and retention before submission. Default to removing rejected
-   or inactive application correspondence after 90 days, and record the actual
-   mailbox retention rule/access list. Admission staff use the existing support
-   hours (Monday-Friday, 9 am-5 pm AEST) and acknowledge within two business days.
-   Do not block source work on a new SLA meeting.
-4. Configure Clerk invitation-only access and verify direct sign-up cannot
-   bypass admission. A platform-authorised operator issues an **application/user
-   invitation** to the new owner; that user follows the existing organisation
-   creation flow and provisions their own customer account. Verify the configured
-   creator role is `org:owner`. Subsequent team members use `inviteMember` in that
-   customer Organisation. Never invite a new customer into the operator's account.
-   Verify expired/revoked invitations, existing-user sign-in and direct
-   `/session-tasks/choose-organization` access. Use current Clerk Context7 docs
-   before configuration: [access modes](https://clerk.com/docs/guides/secure/restricting-access#invite-only)
-   and [application invitations](https://clerk.com/docs/guides/users/inviting).
-5. Implement a small versioned event catalogue in `packages/analytics` for
-   accepted application, successful sign-up/admission, organisation provisioning,
-   Xero connection, initial successful sync, first active feed access and first
-   successful submit/approval. Define event IDs and capture after the actual
-   durable result, not button click or queue acceptance. Deduplicate provider
-   retries; use tenant-safe pseudonymous identifiers, no leave data or feed URLs.
-   Create `packages/analytics/activation-events.ts` and its test with explicit
-   names: `Application Accepted`, `Customer Admitted`, `Organisation Provisioned`,
-   `Xero Connected`, `Initial Sync Completed`, `First Feed Accessed`,
-   `First Leave Submitted`, `First Leave Approved`. Keep version 1 and a property
-   allowlist in that module. Receipt reference, verified delivery ID, connection
-   ID or tenant-scoped milestone ID supplies the stable dedup key as appropriate;
-   a retry never generates a new event identity.
-   Connect the dashboard to these events and failed sync/write/delivery counts.
-   Match any existing privacy/consent requirements; P5 must preserve attribution.
+**Owner**: [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md), all active steps except superseded Step 3/X5/X6. Preserve Plan 161's immutable global binding and canonical credential controls.
 
-**Tests/verify**: API route tests for accepted/invalid/duplicate/rate-limited/
-wrong-origin/provider-failed submissions; contact keyboard/error/success tests;
-analytics event schema/idempotency tests; T1 uninvited denial and admitted-owner
-onboarding. Run `bun run --cwd apps/api test app/api/early-access/route.test.ts`,
-`bun run --cwd apps/web test app/contact`, and `bun run --cwd packages/analytics test`.
-Production proof is one controlled application
-received privately, one separately admitted owner in their own Organisation,
-provisioned people and exactly one event at each successful activation milestone.
+**Current evidence**: `packages/jobs/src/handlers/sync-xero-leave-records.ts:304-329` detects an incomplete fetch but still clears staleness; connection actions at `apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts:128` still begin immediate best-effort sync. AU `packages/xero/src/au/write.ts:40-54` creates remote leave on submit while local submit persists `submitted`; `packages/xero/src/read/leave-records.ts:152-157` maps SCHEDULED to APPROVED. This review verifies source shape, not the current remote AU contract.
 
-### G2/G3: Remove artificial launch prerequisites and provisional trust content
+Finish import completeness, retry-safe job ownership, initial people-before-leave orchestration, person/account reconciliation, truthful onboarding and calendar refresh using Plan 159's exact paths and regressions. Before changing outbound transitions, verify current official provider documentation and sanctioned provider evidence, then record the explicitly approved AU transition table in Plan 159. Preserve today's synchronous user-triggered contract and C1 uncertainty controls until that decision. Never silently move remote creation to approval to make a browser test pass.
 
-**Scope/evidence**: support hours already exist at `apps/web/src/data/support.ts:25`;
-`apps/web/app/about/page.tsx:122-183` has illustrative identity and preview labels;
-`PRODUCT.md:26` retains the deprecated Register section. Edit these public
-surfaces and directly affected tests/docs, not the wider brand design.
+**Verify**: run Plan 159's named unit/type gates under Section 8 source isolation, register new integration coverage through D1, and require Plan 160's exact scenario/subcase evidence for the chosen contract. An unresolved AU decision blocks its dependent write cases and READY, not independent source fixes.
 
-- Remove the anonymous illustrative founder/cat identity sections and preview
-  biography/profile labels unless authentic approved assets are already available.
-  Keep factual product/founder statements supported by existing material; do not
-  wait for a photo shoot or invent testimonials. Test absence of provisional copy.
-- Remove obsolete registration/launch claims and reconcile Australian scope,
-  invitation-led access, payroll operations and calendar refresh limitations
-  across public CTAs, pricing, security/help pages and product docs.
-- Replace the obsolete 14 September launch date with **the date the verified
-  candidate is actually released**. A promised date or signature does not make
-  the product ready and is not a prerequisite to implementation.
-- Supersede the three-reference-customer marketing gate for this controlled
-  early-access release with the complete controlled customer journey in T1/O1.
-  No customer-count claim is published without evidence. This removes a sales
-  dependency; it does not waive a product, security or payroll test.
-- Exercise the configured support channel with a controlled issue, confirm
-  delivery and owner response inside the published target, and run the rollback
-  procedure in Section 9. Assign the executing operator until a named handover
-  is accepted; do not wait for a committee or invent additional staff.
+### X2: Implement enforced worker isolation and production campaign acquisition
 
-**Verify**: `bun run --cwd apps/web test app/about app/contact app/pricing app/integrations`
-passes; public browser checks find no preview identity or obsolete date/region
-claim. Record support receipt/response timestamps and actual rollback evidence.
+**Current evidence**: `tooling/release/xero-execution-guard.ts:216-224` states `available: false` and requires a registered candidate revision plus an enforced owned tenant/run/generation fence, terminal drain and restoration read-back. `tooling/release/run-xero-e2e.ts:102-104` has a production `acquire` dependency that always rejects. The guard/ledger/report foundation exists; actual execution admission and campaign completion are not implemented. The concurrently reviewed Plan 160 additionally owns remaining harness correctness, driver and receipt/lifecycle collection work. Source inspection confirms `run-xero-e2e.ts:228-282` retains its pre-browser ledger object through cleanup and collects only scenarios, `xero-report.ts:760-776` can preserve exit 0 after report writes fail, and `e2e/xero-browser-mutation-scope.ts:72` applies a leave-record payload to connection actions. These Plan 160 corrections must pass before admission is enabled; an adapter alone is insufficient.
+
+**Scope**: those modules/tests, `tooling/release/consumer-isolation.ts`, protected Xero manifest/store/ledger/cleanup modules and tests, `packages/jobs/src/functions.ts`, `packages/jobs/src/client.ts`, `packages/jobs/src/handlers/xero-sync-access.ts`, and its ten registered handler modules (`schedule-xero-syncs`, `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-xero-connections`, `reconcile-xero-approval-state`, `reconcile-feed-publications`, `rebuild-feed-cache`, `recount-usage`, `send-notification-emails`) with co-located tests; `apps/api/app/api/inngest/route.ts` only where the verified revision/admission boundary requires it. Audit direct app/API dispatch callers before fixing the final allowlist. New scoped database helpers belong in `packages/database`. No production worker is enabled merely by changing the capability boolean.
+
+1. Reuse existing manifest and binding-generation contracts. Specify a bounded E2E capability containing the exact run, both tenancy IDs, binding generation, allowed handlers/operations, expiry and candidate/worker revision. Keep database-fixture mode and its all-paused/strict-empty semantics unchanged; ordinary runner rejects E2E manifests.
+2. Enforce the capability at every affected dispatch and execution boundary, including cron fan-out, queued retries and publication/notification consumers. Reject foreign, expired or stale-generation work before mutations/provider calls. Enumerate actual registered consumers, not only the seven main job names. A JSON assertion or a paused-process label is not enforcement.
+3. Under Plan 160's adapter ownership, implement the runner's real acquisition adapter: verify durable manifest and exact deployed/registered revisions, acquire ownership, verify fixtures, then supply the existing lease's independent observations, provider reconciliation, terminal cleanup and restoration hooks. Extend the existing `XeroExecutionLease` contract with Plan 160's typed lifecycle collector rather than freezing its current scenario-only shape; do not create a parallel runner. Plan 160 owns child-ledger handoff, action-specific request validation, independently verified no-effect outcomes, fresh receipt producers and report-delivery correctness; this release row owns ensuring those prerequisites and runtime enforcement land together. Missing fence proof still refuses before browser/provider work.
+4. Test expiry, wrong tenant/run/generation, stale deployment, queued retry after cancellation, host crash, partial cleanup and recovery without replaying creates. Drain/fence outstanding owned work before cleanup; unresolved remote effects retain recovery evidence/fence. Restore precisely the previous worker settings and independently read them back. Use existing runner/ledger fault tests as the pattern and add guarded database assertions only with registered ownership.
+
+**Verify**: `bun run test:release-tools`, `bun run typecheck:release-tools`, affected jobs/API unit tests and the protected full inventory exit 0. The dedicated runner refuses every invalid capability and only acquires with observed enforcement. Before this work lands, expected campaign outcome is exit 2 / NOT VERIFIED, not PASS. Plan 160 owns the ensuing real campaign; supplying fixtures or credentials alone cannot close X2.
+
+### X3: Finish lifecycle rollout with existing mandatory controls
+
+Use [161h](161h-xero-rollout-and-inactivity.md) for exact rollout contracts and the [161 charter](161-harden-xero-connection-lifecycle.md) Sections 8.3/9.3 for case-level/sign-off evidence. Sub-plan DONE does not close this release row.
+
+Refresh app/API environment inventories privately. Configure the verified commercial `XERO_APP_TIER`, immutable `XERO_CREDENTIAL_DOMAIN_ID`, matching `XERO_RATE_NAMESPACE_EPOCH`, KV pair, encryption key/version ring and registered callback before candidate admission. Preserve referenced legacy keys. Privately review namespace state and initialise conservatively using the existing `packages/xero/scripts/initialise-xero-rate-namespace.ts` only under applicable authority; never reset allowance or rotate an epoch to hide a domain conflict. Missing/mismatched sentinel must still deny admission. Drain every deployment still using the previous limiter before cutover. Conservative initialisation may reserve the current daily allowance as spent; schedule live verification after the store-reported reset/admission window rather than resetting the epoch or manufacturing allowance.
+
+Migrations are already recorded applied; apply only new pending reviewed migrations. Canonical owner cutover is per binding: prepare current snapshot-bound verified identity artefacts and dry-run any genuinely required backfill before an authorised apply; leave supported null-owner legacy bindings intact unless a reviewed cutover requires changing them. Do not bulk-backfill customers just to close a checklist. Keep `XERO_REMOTE_CLEANUP_MODE=report_only` and inactivity report-only; enabling destructive cleanup requires reviewed provider deletion/recovery evidence and a staffed operator procedure.
+
+**Verify**: each actual app/API preflight passes; independent namespace/key-reference/registered-worker read-backs agree with the candidate; all 40 charter cases at their required evidence levels and Section 9.3 have explicit outcomes. Report-only configuration does not waive required controlled cleanup-contract tests or authorise production deletion. Missing production rollout/provider/browser evidence remains NOT VERIFIED.
 
 ## 8. Verify and deploy one candidate
 
 ### A. Run database-free candidate gates
 
-Use D1's clean environment wrapper and the declared Bun version. These commands
-already exist except the wrapper/new tests explicitly identified above. Run from
-repository root; record SHA, exit status, count, duration and whether a result
-was executed or restored from cache. Set `TURBO_FORCE=true` for the final fresh
-run. Source checks must not have live provider credentials or database access.
+The current Plan 160 review records a release-tool typecheck failure from unresolved installed `jose`, despite its declaration in `packages/xero/package.json` and `bun.lock`. This review did not rerun that command. Repair dependency installation in the verification checkout and rerun the actual type gate; do not treat the historical PASS as current or add a source workaround.
+
+Use Bun 1.4.0, a recorded supported Node runtime, a clean verification checkout without live `.env*`, and D1's allowlisted synthetic environment. Install with `bun install --frozen-lockfile` before the network-denied phase; verify no manifest/lockfile drift. Do not borrow provider credentials to satisfy a source build. Record actual SHA/tree, command, exit, test counts/skips, runtime, duration and cache disposition.
+
+The existing wrapper runs Prisma generation, lint, app builds, types, boundaries, unit tests and release-tool tests/types, forcing uncached Turbo tasks:
 
 ```bash
-bun install --frozen-lockfile
-bun run --cwd packages/database build
-bun run check
-bun run build
-bun run typecheck
-bun run boundaries
-bun run test
-bun run test:release-tools
-bun run typecheck:release-tools
+bun --no-env-file tooling/release/run-source-gates.ts
+```
+
+Expected: exit 0, no database/provider connection and no live credential inheritance. Until D1's wrapper hardening lands, the clean checkout and sanitised inherited environment are separately required; `--no-env-file` alone does not block Prisma's explicit loader. The underlying required gates remain `bun run check`, `bun run build`, `bun run typecheck`, `bun run boundaries`, `bun run test`, `bun run test:release-tools` and `bun run typecheck:release-tools`, with build preceding route-aware typechecking.
+
+Run the following separately in that same clean synthetic environment, using the network-denial preload for code execution where compatible. If Mint needs documentation-network access, isolate that command with no provider secrets or database access and record the exception rather than disabling the database guard:
+
+```bash
 bun run --cwd apps/docs lint
 bun run --cwd apps/email build
 bun run --cwd apps/email export
+bun run --cwd apps/email assert-render
 git diff --check
 ```
 
-Expected: every command exits 0, no source/lockfile drift from frozen install,
-route types are checked, all discovered unit tests run, all render assertions
-pass and no database connection occurs. After source edits the executor may use
-`bun run fix` for relevant formatting, review its diff and rerun affected checks.
-This advisor review did not run a formatter or these broad application gates.
+All exit 0; email assertions inspect rendered content, not just the preview build. Review any generated-file drift. Executors may run scoped formatter fixes after source edits and rerun affected gates. This advisor review runs only plan/path/diff validation, not these application gates.
 
-### B. Generate and apply additive migrations without an empty database
+### B. Compare applied schema, then apply only pending additive migrations
+
+The latest checked-in campaign records 21/21 migrations applied and no drift. Refresh this read-only evidence against the chosen candidate and target; do not generate replacements or reapply historical migrations. The generation steps below apply only if new source changes genuinely require a migration. Preserve existing custom SQL trigger/constraint behaviour and verify it independently because Prisma schema diff does not prove unsupported database objects.
 
 1. Generate each schema change from the prior reviewed schema and new schema
    using **schema-to-schema** `prisma migrate diff --from-schema ... --to-schema
    ... --script`. Save the generated output as the next migration directory;
    do not hand-edit generated/applied migration files. This uses no shadow
    database. If the required constraint cannot be represented/generated under
-   this policy, choose an equivalent representable constraint, not a reset.
+   this policy, stop that schema step and specify the required invariant and migration approach for review. Never silently substitute a weaker constraint or reset a database.
 2. Prisma generation recipe, from `packages/database`, after setting
    `TC_SCHEMA_BASE` to the commit immediately preceding this logical schema change
    and `TC_MIGRATION_NAME` to its reviewed unique timestamp/slug:
@@ -850,15 +381,15 @@ Prisma 8 workflows or a command that creates/resets a database.
 ### C. O1: Complete provider configuration and deploy
 
 Run discovery while source work proceeds. Keep values in provider secret stores;
-evidence contains only names, status, timestamps and non-secret resource IDs.
+evidence contains only names, status, timestamps and non-secret resource IDs. Check provider metadata before treating values omitted from sensitive environment downloads as absent. Compare Production/Preview/Development database and KV identities privately; do not assume a preview is isolated. Refresh the exact target, restore point and consumer state before any authorised write.
 
 | Provider | Complete now | Passing evidence |
 | --- | --- | --- |
 | Vercel | Identify app/API/web project roots, domains and actual runtime; configure explicit early access and common URLs | Three corrected preflights against separate actual production environments |
 | Neon | Confirm project/branch, role, restore capability and scoped tests | Applied checksums, zero post-deploy drift, safe fixture cleanup and intact data invariants |
 | Clerk | Production instance, custom roles, personal accounts disabled, restricted admission, origins and webhook signing | New owner admitted to own account, member provisioning replay and four-role checks |
-| Xero | Correct AU connection, encrypted credentials, registered production callback, authorised test organisation/people | Initial sync and four synchronous writes with remote final-state reconciliation |
-| Inngest | Event/signing keys, API registration and all functions in `packages/jobs/index.ts` / `apps/api/app/api/inngest/route.ts` | Accepted event reaches registered execution and successful terminal state; failure retries visible |
+| Xero | X1 approved AU transition contract; X3 tier/domain/epoch, initialised sentinel, compatible keyring and callback; sanctioned AU fixture companies/people | Initial sync and approved synchronous write/recovery journeys with independent remote final-state evidence; report-only production cleanup preserved |
+| Inngest | Event/signing keys, signed registration and actual `packages/jobs/src/functions.ts` registry served by `apps/api/app/api/inngest/route.ts`; X2 enforced E2E isolation | Signed introspection, matching candidate/worker revision, visible functions and exact owned terminal executions/retries; strict-empty synthetic isolation is not job readiness |
 | Resend | Runtime token, verified sender/domain and private application recipient | Controlled application and notification accepted and received; failure alert delivered |
 | KV | Required app/API pairs, feed cache and application abuse controls | Cache miss/rebuild/hit/ETag and rate-limit checks using owned fixtures |
 | Sentry | DSN, upload credentials/integration and distinct projects | Candidate release/source maps and symbolicated safe server/client test events plus alert receipt |
@@ -869,8 +400,8 @@ evidence contains only names, status, timestamps and non-secret resource IDs.
 Prepare one candidate SHA/tree after integration. Run source gates, then make
 the authorised push of a reviewed candidate branch so the protected release
 workflow can check out that exact SHA. Candidate publication does not authorise
-production deployment. Run reviewed migrations, guarded integration and project
-preflights before production promotion. Fast-forward the release branch to the
+production deployment. Compare schema, apply only pending reviewed migrations, run guarded integration and project
+preflights before production promotion. Refresh consumer isolation at each stage; the earlier strict-empty proof expires when workers are registered. Use X2 enforcement for E2E, not the completed database-fixture manifest. Fast-forward the release branch to the
 tested SHA where authorised; if integration changes the SHA, rerun affected
 gates against the new candidate rather than claiming the old evidence applies.
 Deploy all three apps from that exact SHA; inspect build logs and verify actual deployment
@@ -885,20 +416,24 @@ only liveness, not proof of database, payroll, jobs or email readiness.
 
 ## 9. T1: Prove complete deployed journeys and recovery
 
-**Create** `tooling/release/playwright.config.ts`, `tooling/release/e2e/`, fixture
-setup/cleanup helpers and a root `test:release` script. Use `@playwright/test` and
-current Clerk testing guidance via Context7; check manifests before adding the
-dependency. Run against explicit app/API/web candidate URLs, with serial mutation
-fixtures, protected role credentials and per-role isolated storage state. Persist
-the D1 manifest before creating live resources. Reject a mismatched deployed SHA
-or a URL outside the configured candidate set.
+**Current source**: `tooling/release/playwright.config.ts`, `tooling/release/e2e/`, fixture/cleanup helpers and root `test:release` already exist. They are incomplete release coverage. `chromium-core` currently discovers dedicated `xero-*.spec.ts` files, Firefox/WebKit run only one read-only shell test, admission expects a removed redirect, and the admin sync test accepts queue acknowledgement.
 
-`bun run test:release` is the **new command to implement**. It must exit nonzero
-for failed/missing mandatory scenarios, report each named journey and browser
-project, and attempt deterministic cleanup. Do not mock auth or provider success
-in this release suite. Mocked fault cases stay in source tests; controlled fault
-injection in live tests must be disabled by default, narrowly authenticated and
-absent from public product routes.
+**Remaining scope**: both Playwright configs and relevant existing specs; `e2e/environment.ts`, `fixture.ts`, `global.setup.ts`, `global.teardown.ts`, ownership/ledger/provider-observer helpers and tests. Reuse installed `@playwright/test` and `@clerk/testing`; use current Context7 guidance if their API contract changes.
+
+1. Make generic and dedicated Xero inventories explicit and disjoint. Generic `test:release` must not accidentally discover dedicated Xero specs. Move/consolidate old generic payroll mutation assertions into the corresponding Plan 160 scenarios rather than execute the same payroll action twice or bypass its guard. Add discovery/config regression tests; no mandatory skipped case can yield a programme PASS.
+2. Replace `admission.spec.ts`'s redirect assertion with G1's rendered Clerk restriction and real first-owner invitation/Organisation-creation journey. Keep separate isolated contexts per role, exact owned record selection and verified session/Organisation identity before mutations.
+3. Replace `admin-and-roles.spec.ts`'s `/Sync (queued|succeeded|completed)/` success test with an exact owned run observer. Require the requested run to start after campaign start, reach successful terminal status, persist expected rows and update the UI. A prior successful run or queue acknowledgement fails this criterion. Use Plan 160's existing observer, not an unscoped latest-run query.
+4. Enumerate every row of the journey matrix below against an actual test or reproducible manual evidence step. Add missing tests, including feed rotation/privacy/cache, notifications/SSE, holiday overrides, first-owner provisioning and rollback observations. Record project/scenario coverage rather than claiming the scaffold covers it. Exercise nonmutating core interactions in Firefox and WebKit, not only shell loads; execute payroll mutations once in guarded Chromium and reuse read-only state for other browsers/viewports.
+5. Reconcile generic fixture setup/teardown with X2's verified ownership and consumer contract before worker-dependent mutations. Database-fixture and E2E runs have distinct manifests/lifetimes; never reuse a cleaned database manifest or pretend consumers are paused while executing jobs. Refuse source/deployment/worker mismatch, foreign IDs, stale fixtures or unresolved previous effects. No direct Playwright invocation may evade the protected payroll runner.
+
+**Verify**: release-tool unit/type checks pass; discovery regression proves disjoint inventories and accounts for every required scenario. Once fixtures, authority and X2 are actually ready, `bun run test:release` runs generic journeys against explicit candidate URLs. The dedicated command is:
+
+```bash
+bun --no-env-file tooling/release/run-xero-e2e.ts --manifest "$TC_XERO_MANIFEST" --preflight
+bun --no-env-file tooling/release/run-xero-e2e.ts --manifest "$TC_XERO_MANIFEST" --output "tooling/release/test-results/$TC_XERO_RUN_ID"
+```
+
+Load necessary credentials privately through the reviewed environment contract; paths/IDs above are operator-supplied. Preflight is diagnostic, not a successful journey. The real runner returns 0 only for overall PASS, 1 for FAIL and 2 for NOT VERIFIED/incomplete; before X2 is implemented it must refuse. Use its `--recover` mode for an interrupted owned run, never replay uncertain creates. Reports include every Plan 160 subcase and linked 161 evidence level. Do not mock provider success in LIVE cases; CONTROLLED fault evidence remains explicitly labelled.
 
 Use two controlled Clerk Organisations, two AU payroll Organisations inside one
 where supported, and actual `org:owner`, `org:admin`, `org:manager`, `org:viewer`
@@ -914,7 +449,7 @@ sessions for account isolation, not an unplanned switcher implementation.
 | Employee/manual entries | Create/edit/archive manual availability; draft/edit/submit/withdraw leave; provider failure gives a safe actionable state; balances display Xero values without recalculation |
 | Manager | Only visible team requests/calendar; approve and decline with required reason; state and audit agree with provider |
 | Admin/owner | Xero connect, initial people/leave/balance sync, matching, holidays, invites, settings, sync detail/raw access and billing mode complete |
-| Payroll | Separate controlled records cover submit->approve->withdraw and submit->decline; each remote ID/status is reconciled. Ambiguous submit cannot issue another create; resolution completes without duplicate canonical publication |
+| Payroll | Separate controlled records cover the approved X1 transition table for submit, approve, decline and withdraw; each applicable remote ID/status or independently observed absence is reconciled. Ambiguous submit cannot issue another create; resolution completes without duplicate canonical publication |
 | Feeds | Create, display/copy the exact URL, named/masked/private projection, all-day/DST boundaries, stable UID and material-change SEQUENCE, cache/ETag, revoke/rotate and old-token rejection pass |
 | Calendar clients | Subscribe and parse events in Outlook, Google Calendar and Apple Calendar; record initial event and subsequent fetch/update evidence. Do not promise immediate client refresh or wait idly for an unspecified polling interval |
 | Jobs | Enumerate actual registered functions, including email/usage/supporting jobs; every relevant handler has terminal-state, retry and per-record isolation evidence. Queue acknowledgement alone fails |
@@ -924,7 +459,7 @@ sessions for account isolation, not an unplanned switcher implementation.
 | Analytics/privacy | Successful milestones appear once with correct association; no application content, leave data, tokens or raw provider material in events/logs/traces |
 | Recovery/support | Failed job/webhook/email alerts reach the owner; support issue is received/responded to; rollback to the named compatible build restores healthy service |
 
-Browser matrix: run core journeys in Chromium, Firefox and WebKit; public/app
+Browser matrix: run guarded mutation journeys in Chromium and core read-only interactions in Chromium, Firefox and WebKit; public/app
 shell checks at 390, 768 and 1440 CSS pixels in light/dark. On representative
 forms, dialogs, tables and calendar views verify keyboard/focus, screen-reader
 names/announcements, 200% zoom/reflow, reduced motion and no unexpected
@@ -945,7 +480,7 @@ manifest; rerun cleanup and prove the same invariants before the next live run.
 Rollback triggers: wrong SHA, health failure, tenant disclosure, duplicate/unknown
 payroll outcome, migration anomaly or missing critical telemetry. Stop the
 specific dangerous mutation/admission path, restore the named compatible app
-build and verify health. Additive database changes remain and are forward-fixed
+build and verify health. Never roll back to silent rebinding, independent refresh-token rotation, missing durable submit guards or fail-open rate limiting. Do not restore stale refresh tokens from backups. Additive database changes remain and are forward-fixed
 unless a reviewed safe rollback exists. Record deployment ID, command/action,
 start/end timestamps and post-rollback probes. Rehearse against the controlled
 candidate without disrupting existing customers; a tabletop alone is not proof
@@ -984,11 +519,13 @@ scrubbed; auth state and `.env` files are never report attachments.
 
 ### Definition of done
 
-- [ ] Every C, D, R, P, G and T item is implemented and its named regression checks pass. No confirmed bug is closed by relabelling it P2 or deferred.
+- [ ] Every C, D, R, P, G, T and X item is implemented and its named regression checks pass. No confirmed bug is closed by relabelling it P2 or deferred.
 - [ ] All source gates, all guarded integration workspaces and all mandatory deployed journeys pass for the final candidate; skips have explicit scenario disposition and no required coverage is skipped.
 - [ ] App/API/web are healthy at the same candidate SHA; corrected preflights reflect each actual production environment.
 - [ ] Migration history/checksums, post-deploy drift and scoped data invariants pass; no unowned fixture writes or unintended active remote test artefacts remain.
-- [ ] C1 recovery and C6 manager isolation pass in source tests and controlled deployed journeys.
+- [ ] C1 has registered real-database concurrency/expiry/recovery evidence plus controlled provider proof; C6 manager empty/missing-scope denial passes in source and deployed journeys.
+- [ ] X1 approved AU transitions, X2 enforced worker admission/acquisition and X3 lifecycle rollout are complete; Plan 160 reports all 26 scenarios/92 current subcases, and the 161 charter accounts for all 40 cases/93 current required evidence levels. Updated catalogues, not stale counts, define final coverage.
+- [ ] D1 ordinary/protected CI separation is exercised remotely; T1 inventories are disjoint, Clerk admission uses the current flow and queued sync cannot pass as terminal success; P3 exports complete bounded results.
 - [ ] AU is the only enabled payroll region; complete authorised feed URLs remain usable; Xero remains authoritative for balances.
 - [ ] Application, first-owner admission, support delivery, observability/alerts, credential remediation and rollback work in practice.
 - [ ] Any paid-only gate is PASS if paid, or explicitly NOT APPLICABLE because actual mode is early access. C3 source fixes are never waived.
@@ -1000,7 +537,50 @@ truthful READY decision. It must not prevent completing the other work. Report
 the precise uncompleted action and continue it when authority/access exists;
 never replace missing proof with a waiver or a fabricated result.
 
-## 11. Execution ledger and review
+### STOP conditions and maintenance
+
+Stop only the affected action and report the exact evidence needed when:
+
+- The approved AU transition contract is absent or conflicts with current provider evidence. Do not invent payroll semantics.
+- A target, tenant/run/generation, namespace domain, credential snapshot, migration checksum or deployed/worker revision differs from its reviewed manifest. Do not alter a guard, token, epoch or manifest to make a check green.
+- Fixtures are unowned, durable recovery evidence is missing, or a remote outcome/consumer state is unresolved. Preserve the fence/ledger and reconcile through the existing recovery path before new mutations.
+- A required code change exceeds the stated item scope, or verification fails twice after a bounded fix attempt. Reconcile the affected plan/contract; continue unrelated authorised work.
+- A concrete external action lacks authority. Finish its reviewable preparation and request only the missing action, identifying any actual approval-review rejection. Historical rejections are not fresh rejections.
+
+Future submit changes must preserve durable uncertainty across every writer and inbound sync. Billing state, health and replay tests change together. Holiday/status changes update predicate/oracle tests. New integration suites update inventory, allocator and cleanup in the same commit. New worker consumers update X2 enforcement and terminal-drain proof. Launch variables/public CTAs/analytics update runtime, preflight and deployed checks together. A docs-only merge may reuse source proof only after recording exact input equivalence; it never refreshes deployment or provider state.
+
+## 11. Current execution ledger and historical evidence
+
+### Review completed, 27 September 2026
+
+- [x] Reconcile source claims and commands against `92d67c5`.
+- [x] Confirm runtime/test/config inputs match recorded `5d2e57b` evidence.
+- [x] Separate source presence, recorded tests and unexecuted production proof.
+- [x] Retain C1 database coverage, P3 export, D1 CI and G1/T1 gaps as executable work.
+- [x] Add Plan 159/160/161 ownership, AU decision and actual worker-acquisition dependencies.
+- [x] Preserve historical evidence below without treating it as the current queue.
+- [x] Complete cold plan review; remove cyclic completion dependencies by separating preparation, deployment and campaign sign-off.
+- [x] Check all local Markdown links, existing/new path references, balanced structure and `git diff --check`; no application/live gate was rerun by this review.
+- [x] Preserve concurrent Plan 160/index edits and reconcile their adapter/correctness ownership and reported dependency/typecheck failure.
+
+Update the Section 2 rows and the table below during execution. A row becomes DONE only when source, relevant regressions and required live evidence pass. Evidence status is PASS, FAIL or NOT VERIFIED; paid-only NOT APPLICABLE requires actual early-access mode. Record exact SHA, command/counts, timestamp, private evidence reference and next action. Never copy secret values, auth state, applicant details or raw provider payloads here.
+
+| Evidence track | Current disposition | Next required result |
+| --- | --- | --- |
+| Source gates | RECORDED PASS at `5d2e57b`; scoped source equivalence checked; concurrent Plan 160 review records current unresolved-dependency typecheck FAIL | Repair installed dependencies and rerun types; fresh uncached gates after remaining source changes |
+| Guarded online database/Redis | RECORDED PASS, 27 files / 246 tests, 21 migrations applied, zero residue; see reconciliation record | New C1/other registered cases and final-candidate full campaign with fresh identity/restore/consumer evidence |
+| Production inventory | Last recorded READY deploys are older `11ce7e7`; no fresh provider inspection in this review | Actual metadata/preflights, X3 activation and same-candidate deployments |
+| Provider/browser/charter | NOT VERIFIED; diagnostic has no real campaign execution | X1 decision, X2 enforcement, sanctioned fixtures/roles, complete Plan 160 and 161 case evidence |
+| Release CI | IN PROGRESS; source workflow still uses disposable database, protected workflow absent | Reviewed current patch, applicable persistent-action authority and remote execution |
+| Support/security/rollback | NOT VERIFIED; September 19 records are leads | Current receipts, credential-remediation proof, final-lockfile reachability audit and compatible rollback rehearsal |
+| Final release | TODO | Exact deployed candidate, completed mandatory gates, actual release date and READY report |
+
+### Historical record, 19 September 2026
+
+The following record is preserved for provenance only. Its commit/runtime/test counts, pending migrations, deployments, approval/access state and imperative wording are superseded by Sections 1–10 and the current ledger. Do not execute commands or request old approvals merely because they appear below. Temporary evidence paths may no longer exist; if an artefact is unavailable, refresh the affected proof rather than invent it.
+
+<details>
+<summary>Expand the original September 19 execution and review record</summary>
 
 Execution started 19 September 2026 on `codex/go-live-candidate` in
 `/home/hilton/.codex/worktrees/australian-go-live/teamcalendar`.
@@ -1014,7 +594,7 @@ verification, fixture ownership and cleanup are execution work, not reasons to
 request the same authority again. No reset or development seed replacement is
 part of that testing.
 
-Update this single ledger during implementation. A row is DONE only when its
+The following ledger was the active ledger on 19 September; it is now historical. A row is DONE only when its
 behaviour, regression checks and applicable live proof pass. Allowed status:
 TODO, IN PROGRESS, DONE, or WAITING ON EXTERNAL ACTION with the exact action.
 Keep secrets, applicant information and customer data out of this file.
@@ -1228,25 +808,4 @@ Retain the reachability dispositions in candidate
 `tasks/release-dependency-audit.md`; do not call this audit a pass. Fresh private
 output: `/tmp/teamcalendar-release-scanner/dependency-audit-final.json`.
 
-### Remaining execution requirements
-
-Status remains **IN PROGRESS, not deployed or certified live**. Source candidate
-`816b181` is clean and verified as described above. Vercel login and live database
-authorisation are resolved and must not be requested again.
-
-- Configure production Inngest, KV, Sentry and Clerk webhook signing inputs;
-  provide the application delivery recipient. Keep secret values out of chat.
-- Enable Clerk's required B2B role capability and complete the requested Clerk
-  account login so owner/manager/viewer and creator-role configuration can finish.
-- Resolve the pending exact protected-workflow patch approval. Automatic approval
-  review rejected the persistent CI production effects as beyond the existing
-  live-test authorisation. The prepared patch remains unapplied, not bypassed.
-- Confirm historical credential revocation/rotation and authorise the prepared
-  GitHub Support purge request before sending it. No credential value is needed.
-- Obtain exact Neon branch/restore evidence and consumer pause/drain evidence;
-  apply the three reviewed additive migrations, run all guarded live integration
-  suites, and verify scoped cleanup and unchanged unowned data.
-- Deploy and verify the exact candidate, execute the owned browser/payroll
-  journeys with provider reconciliation, and complete rollback and monitoring
-  evidence before marking READY. Paid Stripe execution is not a launch gate for
-  the configured invitation-only `early_access` mode.
+</details>
