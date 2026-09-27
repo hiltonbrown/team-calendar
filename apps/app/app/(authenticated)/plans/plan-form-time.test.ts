@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildFormDate, PlanRecordFormSchema } from "./_schemas";
+import {
+  buildFormDate,
+  PlanRecordFormSchema,
+  UpdatePlanRecordFormSchema,
+} from "./_schemas";
 import { formatPlanDateTime, wallClockToInstant } from "./plan-form-time";
 
 describe("plan form time", () => {
@@ -40,6 +44,35 @@ describe("plan form time", () => {
         "Australia/Brisbane"
       ).toISOString()
     ).toBe("2026-04-15T23:59:59.999Z");
+  });
+  it("validates cross-fold form fields without inferring instant ordering in UTC", () => {
+    const start = formatPlanDateTime(
+      new Date("2026-04-04T15:50:00Z"),
+      "Australia/Sydney"
+    );
+    const end = formatPlanDateTime(
+      new Date("2026-04-04T16:10:00Z"),
+      "Australia/Sydney"
+    );
+    expect(start).toEqual({ date: "2026-04-05", time: "02:50" });
+    expect(end).toEqual({ date: "2026-04-05", time: "02:10" });
+    const input = {
+      allDay: false,
+      endsAt: end.date,
+      endTime: end.time,
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      personId: "00000000-0000-4000-8000-000000000002",
+      recordType: "wfh",
+      startsAt: start.date,
+      startTime: start.time,
+    };
+    expect(PlanRecordFormSchema.safeParse(input).success).toBe(true);
+    expect(
+      UpdatePlanRecordFormSchema.safeParse({
+        ...input,
+        recordId: "00000000-0000-4000-8000-000000000099",
+      }).success
+    ).toBe(true);
   });
   it("rejects invalid dates and time values before conversion", () => {
     const input = {

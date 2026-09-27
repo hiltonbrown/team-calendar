@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RecordForm } from "./record-form";
 
@@ -47,6 +53,39 @@ const renderForm = () =>
           label: "Alex Morgan",
         },
       ]}
+      xeroConnectionState="not_connected"
+    />
+  );
+
+const renderCrossFoldForm = () =>
+  render(
+    <RecordForm
+      balanceAvailable={null}
+      canSelectPerson={false}
+      closeHref="/plans"
+      mode="edit"
+      organisationId="00000000-0000-4000-8000-000000000001"
+      people={[
+        {
+          email: "alex@example.com",
+          id: "00000000-0000-4000-8000-000000000002",
+          label: "Alex Morgan",
+        },
+      ]}
+      record={{
+        allDay: false,
+        contactabilityStatus: "contactable",
+        endsAt: "2026-04-05",
+        endTime: "02:10",
+        id: "00000000-0000-4000-8000-000000000099",
+        notesInternal: "",
+        personId: "00000000-0000-4000-8000-000000000002",
+        privacyMode: "named",
+        recordType: "wfh",
+        startsAt: "2026-04-05",
+        startTime: "02:50",
+      }}
+      timezone="Australia/Sydney"
       xeroConnectionState="not_connected"
     />
   );
@@ -125,6 +164,64 @@ describe("RecordForm", () => {
     const alert = await screen.findByRole("alert");
     expect(document.activeElement).toBe(alert);
     expect(notes.value).toBe("Keep this note");
+  });
+
+  it("submits note-only edits of a valid cross-fold interval to the server", async () => {
+    mocks.updateRecordAction.mockResolvedValue({
+      ok: true,
+      value: { id: "record" },
+    });
+    const { container } = renderCrossFoldForm();
+    fireEvent.change(screen.getByLabelText("Notes"), {
+      target: { value: "Changed note" },
+    });
+    const form = container.querySelector("form");
+    if (!form) {
+      throw new Error("Expected the record form to render.");
+    }
+    fireEvent.submit(form);
+    await waitFor(() =>
+      expect(mocks.updateRecordAction).toHaveBeenCalledOnce()
+    );
+    expect(mocks.updateRecordAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endsAt: "2026-04-05",
+        endTime: "02:10",
+        notesInternal: "Changed note",
+        recordId: "00000000-0000-4000-8000-000000000099",
+        startsAt: "2026-04-05",
+        startTime: "02:50",
+      })
+    );
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+    expect(mocks.push).toHaveBeenCalledWith("/plans");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("shows authoritative server ordering errors and preserves the edited fields", async () => {
+    mocks.updateRecordAction.mockResolvedValue({
+      error: {
+        code: "validation_error",
+        message: "End date must be after start date",
+      },
+      ok: false,
+    });
+    const { container } = renderCrossFoldForm();
+    const endTime = screen.getByLabelText("End time");
+    fireEvent.change(endTime, { target: { value: "01:10" } });
+    const form = container.querySelector("form");
+    if (!form) {
+      throw new Error("Expected the record form to render.");
+    }
+    fireEvent.submit(form);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("End date must be after start date");
+    expect(mocks.updateRecordAction).toHaveBeenCalledWith(
+      expect.objectContaining({ endTime: "01:10" })
+    );
+    expect(endTime).toHaveProperty("value", "01:10");
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.refresh).not.toHaveBeenCalled();
   });
 
   it("renders formatted balance according to balanceUnit and balanceCurrencyCode", () => {

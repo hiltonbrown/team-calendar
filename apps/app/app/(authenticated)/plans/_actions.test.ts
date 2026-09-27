@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PlanRecordFormInput } from "./_schemas";
 
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
@@ -242,6 +243,107 @@ describe("plans actions", () => {
         }),
       })
     );
+  });
+
+  it.each(["", "Changed note"])(
+    "preserves a valid interval crossing the repeated hour while saving notes %s",
+    async (notesInternal) => {
+      mocks.organisationFindFirst.mockResolvedValue({
+        timezone: "Australia/Sydney",
+      });
+      const startsAt = new Date("2026-04-04T15:50:00Z");
+      const endsAt = new Date("2026-04-04T16:10:00Z");
+      mocks.availabilityFindFirst.mockResolvedValue({
+        all_day: false,
+        ends_at: endsAt,
+        starts_at: startsAt,
+      });
+      mocks.updateRecord.mockResolvedValue({
+        ok: true,
+        value: { id: "record" },
+      });
+      const result = await updateRecordAction({
+        ...validInput,
+        allDay: false,
+        endsAt: "2026-04-05",
+        endTime: "02:10",
+        notesInternal,
+        recordId: "00000000-0000-4000-8000-000000000099",
+        recordType: "wfh",
+        startsAt: "2026-04-05",
+        startTime: "02:50",
+      });
+      expect(result.ok).toBe(true);
+      expect(mocks.updateRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          patch: expect.objectContaining({ endsAt, notesInternal, startsAt }),
+        })
+      );
+      expect(endsAt.getTime() - startsAt.getTime()).toBe(20 * 60_000);
+    }
+  );
+
+  it.each(["create", "update"])(
+    "rejects a reversed new repeated-hour interval on %s before writing",
+    async (mode) => {
+      mocks.organisationFindFirst.mockResolvedValue({
+        timezone: "Australia/Sydney",
+      });
+      const input = {
+        ...validInput,
+        allDay: false,
+        endsAt: "2026-04-05",
+        endTime: "02:10",
+        recordType: "wfh",
+        startsAt: "2026-04-05",
+        startTime: "02:50",
+      } satisfies PlanRecordFormInput;
+      const result =
+        mode === "create"
+          ? await createRecordAction(input)
+          : await updateRecordAction({
+              ...input,
+              recordId: "00000000-0000-4000-8000-000000000099",
+            });
+      expect(result).toMatchObject({
+        error: {
+          code: "validation_error",
+          message: "End date must be after start date",
+        },
+        ok: false,
+      });
+      expect(mocks.createRecord).not.toHaveBeenCalled();
+      expect(mocks.updateRecord).not.toHaveBeenCalled();
+    }
+  );
+
+  it("rejects an actually reversed edit of an existing cross-fold interval", async () => {
+    mocks.organisationFindFirst.mockResolvedValue({
+      timezone: "Australia/Sydney",
+    });
+    mocks.availabilityFindFirst.mockResolvedValue({
+      all_day: false,
+      ends_at: new Date("2026-04-04T16:10:00Z"),
+      starts_at: new Date("2026-04-04T15:50:00Z"),
+    });
+    const result = await updateRecordAction({
+      ...validInput,
+      allDay: false,
+      endsAt: "2026-04-05",
+      endTime: "01:10",
+      recordId: "00000000-0000-4000-8000-000000000099",
+      recordType: "wfh",
+      startsAt: "2026-04-05",
+      startTime: "02:50",
+    });
+    expect(result).toMatchObject({
+      error: {
+        code: "validation_error",
+        message: "End date must be after start date",
+      },
+      ok: false,
+    });
+    expect(mocks.updateRecord).not.toHaveBeenCalled();
   });
 
   it("revalidates expected paths on submit success", async () => {

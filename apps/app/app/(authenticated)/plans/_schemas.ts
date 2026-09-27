@@ -81,42 +81,29 @@ export const PlansFilterSchema = z.object({
 
 export type PlansFilterInput = z.infer<typeof PlansFilterSchema>;
 
-export const PlanRecordFormSchema = z
-  .object({
-    allDay: z.boolean().default(true),
-    contactabilityStatus: z
-      .enum([
-        "contactable",
-        "limited",
-        "unavailable",
-        "use_alternative_contact",
-      ])
-      .default("contactable"),
-    endsAt: z.iso.date("End date is required"),
-    endTime: z
-      .string()
-      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid end time")
-      .optional(),
-    notesInternal: z.string().max(2000).optional(),
-    organisationId: z.string().uuid(),
-    personId: z.string().uuid(),
-    privacyMode: z.enum(["named", "masked", "private"]).default("named"),
-    recordType: z.enum(userCreatableRecordTypes),
-    startsAt: z.iso.date("Start date is required"),
-    startTime: z
-      .string()
-      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid start time")
-      .optional(),
-  })
-  .refine(
-    (value) =>
-      buildFormDate(value.startsAt, value.startTime, value.allDay) <=
-      buildFormDate(value.endsAt, value.endTime, value.allDay, true),
-    {
-      message: "End date must be after start date",
-      path: ["endsAt"],
-    }
-  );
+// Interval ordering belongs to the server after organisation timezone conversion
+// and preservation of existing instants within a repeated hour.
+export const PlanRecordFormSchema = z.object({
+  allDay: z.boolean().default(true),
+  contactabilityStatus: z
+    .enum(["contactable", "limited", "unavailable", "use_alternative_contact"])
+    .default("contactable"),
+  endsAt: z.iso.date("End date is required"),
+  endTime: z
+    .string()
+    .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid end time")
+    .optional(),
+  notesInternal: z.string().max(2000).optional(),
+  organisationId: z.string().uuid(),
+  personId: z.string().uuid(),
+  privacyMode: z.enum(["named", "masked", "private"]).default("named"),
+  recordType: z.enum(userCreatableRecordTypes),
+  startsAt: z.iso.date("Start date is required"),
+  startTime: z
+    .string()
+    .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid start time")
+    .optional(),
+});
 
 export const UpdatePlanRecordFormSchema = PlanRecordFormSchema.extend({
   recordId: z.string().uuid(),

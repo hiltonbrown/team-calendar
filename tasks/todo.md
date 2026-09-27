@@ -1686,3 +1686,13 @@ Authorised local merge completed without conflicts on main at `f3dd965f717fd10bb
 - [x] Sanitised final evidence, scope audit and conventional worktree commits.
 
 Review: F1-F12 implementation is complete at source candidate `4c603ded644eaee7df7861d731014b00d1b0b11a`. Full source gates pass, including 2,893 unit tests and 509 release tests. The reviewed additive migration has 22 matching completed checksums, no pending migration and schema equality. Protected live run `30440382-6c42-402c-b8e3-33c0d37818f8` passes all 27 files/254 tests under actual local-worker isolation; owned residue is zero, all 39 table hashes match the 351-row baseline and the fence is released. All five paused worker identities were restored and verified. Earlier path/network/environment failures and external customer history appends remain separately documented in `plans/162-executor-evidence.md`. Authenticated browser/provider/client/deployment and actual PITR exercise are not verified by this source execution. Final evidence is a documentation-only commit; runtime/tests remain identical to the verified source candidate.
+
+### Plan 162 final-check correction, repeated-hour interval
+
+- [x] Allow an unchanged valid Sydney cross-fold interval through form-field parsing, retaining server-authoritative instant ordering.
+- [x] Verify schema, client and action regressions, including reversed/new intervals and existing DST gap/fold/precision cases.
+- [ ] Freeze the correction; reviewer repeats complete source gates and a fresh protected live campaign before merge.
+
+The prior `4c603ded` source and live results remain historical proof for that candidate. A final check found that client/shared schema UTC-wall-clock ordering rejected an existing valid 20-minute interval (Sydney 02:50 daylight time to 02:10 standard time) before server preservation of the original instants. Verification for the correction is pending; the earlier live PASS is not evidence for the new source.
+
+Focused correction verification: four form/time/action/loader files pass all 41 tests; app TypeScript check and focused Biome checks exit zero. The schema now validates external field shapes only; existing scoped server conversion/preservation performs actual instant ordering and rejects gaps/reversed intervals before any writer call. An initial new test fixture widened its record type to string; the fixture now satisfies the form input type and the unchanged app typecheck passes. Full source gates and fresh exact-candidate live verification remain pending with the reviewer.
