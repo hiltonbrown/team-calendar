@@ -31,6 +31,25 @@ deployed-candidate handoffs remain missing. No live campaign PASS or production 
 
 Plan 160 reviewed and reconciled on 27 September 2026 at `92d67c5`. Its runtime/test/tooling tree matches historically verified `5d2e57b`; the [160-161 reconciliation](160-161-reconciliation.md) records 2,810 repository tests, 395 tooling tests and protected Neon/Redis 27 files / 246 tests, with migration and cleanup evidence. These are historical results, not fresh runs. The [published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) remains NOT VERIFIED for the real campaign and charter sign-off. The initial bounded review passed 48 harness tests (four file-writing tests deliberately excluded); release-tool typecheck then failed because declared dependency `jose` was missing locally. The follow-up frozen installation repairs that gap and main release-tool types now pass. Plan 160 now distinguishes implemented guard/report foundations from remaining recovery and operational execution wiring.
 
+## ICS and calendar review
+
+[Review 162](162-ics-calendar-review.md) records the focused read-only review at
+`514efb5` on 27 September 2026: 12 vetted finding groups, four grounded direction
+options, and 236 passing focused tests across 33 files. No source changes or live
+client/database verification were performed. Execution-plan scope selection is pending.
+
+Recommended first workstreams: calendar manager authorisation; publication/cache job
+contracts; stable ICS identity and coherent publication versions; cache generation and
+HTTP revalidation; restored-feed token issuance and authoritative displayed URLs.
+Viewer previews and calendar date/navigation fixes follow. Publication-version design
+must precede the shared durable cache-generation implementation; HTTP revalidation,
+job corrections and the isolated UI fixes can land independently.
+
+Plan 159 retains calendar freshness/import ownership. Plan 160 and go-live retain
+the live publication and calendar-client campaign. Review 162 does not certify those
+plans or duplicate their execution infrastructure. Rejected leads and unverified
+areas are recorded in the review.
+
 ## Active plans
 
 | Plan | Scope | Priority | Status |
