@@ -33,32 +33,17 @@ export default defineConfig({
         video: "retain-on-failure",
       },
     },
-    ...(discovery
-      ? [
-          {
-            name: "xero-controlled-browser",
-            testMatch: /xero-intent-guards\.spec\.ts/,
-            use: {
-              ...devices["Desktop Chrome"],
-              screenshot: "off" as const,
-              trace: "off" as const,
-              video: "off" as const,
-            },
-          },
-        ]
-      : [
-          {
-            name: "xero-controlled-browser",
-            testMatch:
-              /xero-(intent-guards|recovery-reasons|disconnect-receipts)\.spec\.ts/,
-            use: {
-              ...devices["Desktop Chrome"],
-              screenshot: "off" as const,
-              trace: "off" as const,
-              video: "off" as const,
-            },
-          },
-        ]),
+    {
+      name: "xero-controlled-browser",
+      testMatch:
+        /xero-(intent-guards|recovery-reasons|disconnect-receipts)\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        screenshot: "off" as const,
+        trace: "off" as const,
+        video: "off" as const,
+      },
+    },
   ],
   reporter: [["list"]],
   retries: 0,

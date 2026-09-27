@@ -1620,3 +1620,23 @@ Review: the new restart regression first failed against the original worker (1 f
 - [x] Run focused source gates; freeze for root-owned full and protected live verification.
 
 Review: 35 focused database tests (artefact, actual locked apply and unchanged pure planner) pass. Both operator scripts and the existing lifecycle fixture pass strict TypeScript; nine changed files pass lint and whitespace. Actual package CLI rejects missing intent and an old unversioned artefact with exit 1 before any SQL, using a synthetic invalid-domain database URL. Seven new registered lifecycle cases exercise the same actual guarded application function with owned synthetic envelopes: unchanged verified expired singleton, idempotent planner rerun, reauthorisation, key change, generation, retirement, disconnect and foreign scopes. These integration cases are written but await the root-owned protected online campaign. Identity still comes from verified JWT claims; fingerprints only bind that proof to the exact encrypted snapshot. No customer backfill, schema change or provider request was performed. An automatic permission-review timeout on one large edit command was reconciled by smaller approved edits; no unsafe action was inferred or bypassed.
+
+# Plan 160 execution
+
+- [x] Read lessons, full reconciled plan and project references; install frozen dependencies.
+- [x] R1: child closure, authoritative post-drain ledger and recovery regressions.
+- [x] R7: strict causal no-effect receipt ingestion and conservative ledger contract, tested with injected audit producers. Actual operational producer remains unavailable.
+- [x] R3: strict campaign and lifecycle collector; terminal-phase merge, failure isolation and recovery contracts.
+- [x] R5: report delivery failure remains nonzero.
+- [x] R6: action-specific connection scope and complete browser discovery. Actual deployed request serialization remains NOT VERIFIED.
+- [x] Review enforceable runtime prerequisites; preserve default refusal where unavailable.
+- [ ] Run current source gates and authorised protected online inventory when available.
+- [ ] Produce sanitised actual diagnostics; review every hunk and commit isolated branch.
+
+## Review
+
+In progress. Fresh frozen installation installed 3,565 packages. No runtime lease is admitted until actual worker enforcement is evidenced. Historical test totals and fixtures do not supply campaign proof.
+
+Plan 160 source review: frozen install unchanged lockfile; full release tools 457 tests / 32 files PASS, release-tool types PASS, full lint PASS. Uncached application build 4/4 tasks PASS, then repository types 19/19 PASS. Repository units 2,810 tests / 18 tasks PASS with TURBO_CONCURRENCY=1; initial concurrent run hit an unchanged 5-second OAuth unit timeout under host CPU contention, no timeout or test modification. Boundaries and whitespace PASS. Discovery is 110 tests in five files: 26 parent IDs, exact 92 suffixes, 18 auxiliary guards, no execution. The stale-snapshot correction was reverted temporarily in this isolated checkout for regression proof: the separate child-ledger success test failed because local cleanup ran over unresolved child intent (exit 1); the corrected source passed the same test (exit 0). Private log: /tmp/plan160-r1-old-behaviour.log.
+
+Application/worker/controlled campaign admission remains unavailable under the concrete handoff in plans/160-execution-prerequisites.md. No app, schema, dependency, payroll policy, deployment or provider operation was changed. Eleven verified whitespace-only Prisma build outputs were restored to HEAD. Baseline online domain verification is owned by the advisor; exact corrected-source online verification follows the frozen runtime commit. Actual diagnostic reports and final isolated documentation are pending.

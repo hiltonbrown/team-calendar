@@ -320,6 +320,9 @@ const observationSchema = z.strictObject({
   restrictedEvidenceLocations: z.array(referenceSchema).max(20),
   status: z.enum(["PASS", "FAIL", "NOT_VERIFIED", "SKIPPED"]),
 });
+export function parseXeroEvidenceObservation(value: unknown) {
+  return observationSchema.parse(value);
+}
 export type XeroEvidenceObservation = z.infer<typeof observationSchema>;
 const runnerPhaseSchema = z.enum([
   "authority",
@@ -371,6 +374,48 @@ const inputSchema = z.strictObject({
   results: z.record(z.string(), z.unknown()),
   runner: runnerSchema.optional(),
 });
+function parseEvidenceCaseObservations(raw: unknown, onInvalid?: () => void) {
+  const observations = Array.isArray(raw) ? raw : [raw];
+  const accepted: XeroEvidenceObservation[] = [];
+  for (const observation of observations) {
+    try {
+      accepted.push(observationSchema.parse(observation));
+    } catch (error) {
+      if (!onInvalid) {
+        throw error;
+      }
+      onInvalid();
+    }
+  }
+  return accepted;
+}
+export function parseXeroEvidenceInput(
+  value: unknown,
+  onInvalid?: () => void
+): XeroEvidenceInput {
+  const input = inputSchema.parse(value);
+  const results: XeroEvidenceInput["results"] = {};
+  for (const definition of XERO_EVIDENCE_CASES) {
+    const raw = input.results[definition.caseId];
+    if (raw !== undefined) {
+      results[definition.caseId] = parseEvidenceCaseObservations(
+        raw,
+        onInvalid
+      );
+    }
+  }
+  if (
+    Object.keys(input.results).some(
+      (id) => !XERO_EVIDENCE_CASES.some((entry) => entry.caseId === id)
+    )
+  ) {
+    if (!onInvalid) {
+      throw new Error("Unrecognised lifecycle case");
+    }
+    onInvalid();
+  }
+  return { ...input, results };
+}
 type ParsedInput = z.infer<typeof inputSchema>;
 const prerequisiteByLevel: Record<
   XeroEvidenceLevel,
@@ -483,9 +528,12 @@ function assessObservation(
       return "Record protected fixture ownership and restricted assertion evidence";
     }
     if (
-      (observation.cleanupStatus !== "FAIL" &&
+      observation.status !== "FAIL" &&
+      observation.assertionPassed &&
+      observation.observedAssertion === "assertion_passed" &&
+      ((observation.cleanupStatus !== "FAIL" &&
         observation.cleanupStatus !== "PASS") ||
-      !observation.cleanupEvidenceReference
+        !observation.cleanupEvidenceReference)
     ) {
       return "Verify owned fixture cleanup and record its restricted evidence reference";
     }

@@ -13,7 +13,6 @@ import {
   roleEmail,
 } from "./environment.js";
 
-const environment = releaseEnvironment();
 const browserErrors = new WeakMap<Browser, string[]>();
 
 export const test = base.extend<{ errors: string[] }>({
@@ -36,6 +35,7 @@ export const test = base.extend<{ errors: string[] }>({
 export { expect } from "@playwright/test";
 
 export async function useRole(browser: Browser, role: ReleaseRole) {
+  const environment = releaseEnvironment();
   const errors = browserErrors.get(browser);
   if (!errors) {
     throw new Error("Role pages require the automatic browser error fixture");

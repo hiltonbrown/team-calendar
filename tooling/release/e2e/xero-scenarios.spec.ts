@@ -12,6 +12,10 @@ for (const scenario of XERO_SCENARIOS.filter(
     const id = `${scenario.id}.${suffix}`;
     test(`${id}: ${scenario.name}`, async ({ browser }) => {
       test.skip(
+        id.startsWith("X26."),
+        "Terminal cleanup is collected by the runner after child closure and owned drain"
+      );
+      test.skip(
         id.startsWith("X08."),
         "Fresh scheduled worker observer requires actual enforced tenant/run/generation fencing and registered workers"
       );
