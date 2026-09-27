@@ -180,6 +180,103 @@ describe("durable feed representation", () => {
     const reentry = await establishFeedRepresentation(input);
     expect(reentry.ok && reentry.value.events[0]?.publishedSequence).toBe(5);
   });
+  it("versions horizon turnover once while preserving the unchanged surviving event", async () => {
+    const departing = {
+      ...event(),
+      publishedUid: "departing@ical.teamcalendar.online",
+      sourceRecordId: "departing",
+    };
+    const arriving = {
+      ...event(),
+      publishedUid: "arriving@ical.teamcalendar.online",
+      sourceRecordId: "arriving",
+    };
+    mocks.ledger.mockResolvedValue([
+      existing(),
+      existing({
+        id: "departing-ledger",
+        published_uid: departing.publishedUid,
+        representation_hash: hashEventRepresentation(departing),
+        source_key: "availability:departing",
+      }),
+    ]);
+    mocks.project.mockResolvedValueOnce({
+      ok: true,
+      value: [event(), departing],
+    });
+    const before = await establishFeedRepresentation(input);
+    expect(before.ok).toBe(true);
+    if (!before.ok) {
+      throw new Error("Initial representation failed");
+    }
+    mocks.feed.mockResolvedValue({
+      last_etag: "old",
+      name: "Team",
+      representation_generation: before.value.generation,
+      representation_hash: before.value.fingerprint,
+    });
+    mocks.project.mockResolvedValueOnce({
+      ok: true,
+      value: [event(), arriving],
+    });
+    const after = await establishFeedRepresentation(input);
+    expect(after.ok).toBe(true);
+    if (!after.ok) {
+      throw new Error("Turnover representation failed");
+    }
+    expect(after.value.generation).toBe(before.value.generation + 1);
+    expect(
+      after.value.events.find((value) => value.sourceRecordId === "record")
+    ).toEqual(
+      before.value.events.find((value) => value.sourceRecordId === "record")
+    );
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          present: false,
+          published_sequence: { increment: 1 },
+        }),
+        where: expect.objectContaining({ id: "departing-ledger" }),
+      })
+    );
+    const arrived = after.value.events.find(
+      (value) => value.sourceRecordId === "arriving"
+    );
+    expect(arrived?.publishedSequence).toBe(0);
+    mocks.ledger.mockResolvedValue([
+      existing(),
+      existing({
+        id: "departing-ledger",
+        present: false,
+        source_key: "availability:departing",
+      }),
+      existing({
+        id: "arriving-ledger",
+        published_at: arrived?.publishedAt,
+        published_sequence: 0,
+        published_uid: arriving.publishedUid,
+        representation_hash: hashEventRepresentation(arriving),
+        source_key: "availability:arriving",
+      }),
+    ]);
+    mocks.feed.mockResolvedValue({
+      last_etag: null,
+      name: "Team",
+      representation_generation: after.value.generation,
+      representation_hash: after.value.fingerprint,
+    });
+    mocks.project.mockResolvedValueOnce({
+      ok: true,
+      value: [event(), arriving],
+    });
+    const repeated = await establishFeedRepresentation(input);
+    expect(repeated.ok).toBe(true);
+    expect(repeated.ok && repeated.value.generation).toBe(
+      after.value.generation
+    );
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+  });
   it("versions holiday edits under their separate source identity", async () => {
     const holiday = {
       ...event(),
