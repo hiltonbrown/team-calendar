@@ -2,6 +2,27 @@
 
 Last reviewed: 2026-09-27
 
+## Task: Verify Plan 161f against integrated main, 27 September 2026
+
+- [x] Read the complete original plan and reconciliations, then audit each implementation requirement against integrated source and meaningful regression assertions.
+- [x] Run focused management-client, cleanup, disconnect, worker, database-query, action and receipt UI unit regressions with `bun --no-env-file`; record actual collection counts and outcomes.
+- [x] Verify the current main source matches the tested candidate outside documentation, then refresh authorised online Neon ownership, migrations, schema, cleanup and outside-owned preservation evidence through the protected procedure.
+- [x] Reconcile the final verification report and distinguish source/unit/database proof from unexecuted management-provider and authenticated browser observations.
+
+### Review
+
+Verification started from clean current main `b208409` by fast-forward only. The canonical session instruction remains online Neon through protected authority, with no localhost or Docker provisioning. Focused unit checks make no provider calls or integration writes. The independent requirement audit and fresh verification are complete with the evidence boundaries recorded below.
+
+Focused unit verification PASS on `b208409`: eight files / 190 tests, all four invocations exit zero. From `packages/xero`, `NODE_ENV=test bun --no-env-file x vitest run src/oauth/management-client.test.ts src/oauth/connection-cleanup.test.ts src/oauth/service.test.ts keys.test.ts --exclude '**/*.integration.test.ts'` collected four files / 144 tests. From `packages/jobs`, `NODE_ENV=test bun --no-env-file x vitest run --config vitest.config.mts src/handlers/reconcile-xero-connections.test.ts` collected one file / nine tests. From `packages/database`, `NODE_ENV=test bun --no-env-file x vitest run --config vitest.config.mts src/queries/xero-cleanup.test.ts` collected one file / three tests. From `apps/app`, `NODE_ENV=test bun --no-env-file x vitest run --config vitest.config.mts 'app/(authenticated)/settings/integrations/xero/_actions.test.ts' 'app/(authenticated)/settings/integrations/xero/xero-client.test.tsx'` collected two files / 34 tests. Logs are `/tmp/tc-161f-verify-{xero,jobs,database,app}-units.log`.
+
+The source comparison from `5d2e57bb963a4d34304aa5094e1df1548f01d0a1` to current main returns no changed path outside `plans`, `tasks` and `reports`. This preserves the prior exact-source campaign boundary; the runtime audit, read-only live-evidence refresh and final report reconciliation are now complete. Provider calls and integration writes were not performed by these focused tests.
+
+Independent fresh source audit PASS with no defect found. Root separately reviewed the database state transitions, application actions, receipt copy, operator procedure and browser specification, and inspected the actual 190-test logs and assertions. `finaliseLocalXeroDisconnect` remains byte-identical to approved Plan 161f candidate `c0ce9a13b7b188d4805bf74d0d85d9cbeac68d69`. Actual Bun CLI missing-intent and full-intent report-only invocations each exit 1 before database/service imports. Direct cleanup-module import under `react-server` passes with synthetic configuration and a fetch guard that throws, without network activity.
+
+Fresh authorised read-only Neon verification at `2026-09-27T00:25:15.275Z` PASS: exact target identity; all 21 applied migration checksums matching with zero pending, including cleanup migration checksum `d038fcd0041cb6b0cebcffca869c9c01053895eb597e053da19a2d4d68dc1d96`; cleanup enums verified; zero unvalidated constraints; zero prior-owned cleanup requests and attempts; Redis active fence absent; and Prisma schema comparison reporting no difference. All 38 table counts and all-column content hashes across 204 pre-existing rows match the prior post-run evidence. The unchanged source retains protected campaign `21e2bdb1-ea5b-4acd-ac8f-f484130731ce` as its write-suite evidence: 27 files / 246 tests / six uncached tasks PASS with all 39 owned selectors empty. This follow-up performed no new write campaign. Read-only checks create no new fixture-write authority.
+
+Root completed the current verification record in Plan 161f and its index. Real management-tier provisioning, management-token acquisition, targeted provider DELETE and authenticated application-browser observations remain NOT VERIFIED. Default cleanup mode remains `report_only`; mocked unit responses and source/database proof do not substitute for those provider or browser observations.
+
 ## Task: Reconcile Plans 160 through 161h, 27 September 2026
 
 - [x] Read the original plans and independently reconcile their requirements against integrated source, migrations and meaningful regression assertions.
