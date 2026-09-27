@@ -1,21 +1,54 @@
 import { z } from "zod";
 
-const planSchema = z.strictObject({
-  action: z.enum([
-    "create",
-    "approve",
-    "decline",
-    "withdraw",
-    "connect",
-    "disconnect",
-  ]),
-  dateFrom: z.iso.date(),
-  dateUntil: z.iso.date(),
-  employeeId: z.uuid().nullable(),
-  leaveTypeId: z.uuid().nullable(),
-  organisationId: z.uuid(),
-  recordId: z.uuid().nullable(),
-});
+const planSchema = z
+  .strictObject({
+    action: z.enum([
+      "create",
+      "approve",
+      "decline",
+      "withdraw",
+      "connect",
+      "disconnect",
+    ]),
+    confirmationText: z.string().min(1).nullable().optional(),
+    connectionId: z.uuid().nullable().optional(),
+    dateFrom: z.iso.date(),
+    dateUntil: z.iso.date(),
+    disconnectMode: z.enum(["destructive", "soft"]).nullable().optional(),
+    employeeId: z.uuid().nullable(),
+    leaveTypeId: z.uuid().nullable(),
+    organisationId: z.uuid(),
+    recordId: z.uuid().nullable(),
+  })
+  .superRefine((scope, context) => {
+    const connectionAction =
+      scope.action === "connect" || scope.action === "disconnect";
+    if (connectionAction ? scope.recordId !== null : scope.recordId === null) {
+      context.addIssue({
+        code: "custom",
+        message: "Action requires its exact resource scope",
+      });
+    }
+    if (scope.action === "disconnect") {
+      if (
+        !(scope.connectionId && scope.disconnectMode && scope.confirmationText)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Disconnect requires exact private metadata",
+        });
+      }
+    } else if (
+      scope.connectionId ||
+      scope.disconnectMode ||
+      scope.confirmationText
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Connection metadata is only valid for disconnect",
+      });
+    }
+  });
 export type XeroBrowserMutationScope = z.infer<typeof planSchema>;
 export function assertXeroBrowserMutationPage(
   address: string,
@@ -27,6 +60,7 @@ export function assertXeroBrowserMutationPage(
   const { origin } = new URL(appUrl);
   if (
     url.origin !== origin ||
+    url.searchParams.getAll("org").length !== 1 ||
     url.searchParams.get("org") !== plan.organisationId ||
     url.hash
   ) {
@@ -59,7 +93,8 @@ export function assertXeroBrowserMutationPage(
     }
   } else if (
     url.pathname !== "/settings/integrations/xero" &&
-    url.pathname !== "/settings/integrations/xero/connect"
+    (plan.action !== "connect" ||
+      url.pathname !== "/settings/integrations/xero/connect")
   ) {
     throw new Error("Connection page is outside the owned scope");
   }
@@ -68,19 +103,45 @@ export function assertXeroBrowserMutationRequest(
   value: unknown,
   scope: XeroBrowserMutationScope
 ) {
+  const plan = planSchema.parse(scope);
   const envelope = z.array(z.unknown()).length(1).parse(value);
-  const payloadSchema = z.strictObject({
-    organisationId: z.uuid(),
-    recordId: z.uuid(),
-  });
+  const organisationSchema = z.strictObject({ organisationId: z.uuid() });
+  if (plan.action === "connect") {
+    const payload = organisationSchema.parse(envelope[0]);
+    if (payload.organisationId !== plan.organisationId) {
+      throw new Error("Browser connect request has foreign payroll scope");
+    }
+    return;
+  }
+  if (plan.action === "disconnect") {
+    const payload = organisationSchema
+      .extend({
+        confirmationText: z.string().min(1),
+        connectionId: z.uuid(),
+        mode: z.enum(["destructive", "soft"]),
+      })
+      .parse(envelope[0]);
+    if (
+      payload.organisationId !== plan.organisationId ||
+      payload.connectionId !== plan.connectionId ||
+      payload.mode !== plan.disconnectMode ||
+      payload.confirmationText !== plan.confirmationText
+    ) {
+      throw new Error(
+        "Browser disconnect request disagrees with private intent metadata"
+      );
+    }
+    return;
+  }
+  const payloadSchema = organisationSchema.extend({ recordId: z.uuid() });
   const payload = (
-    scope.action === "decline"
-      ? payloadSchema.extend({ reason: z.string().min(1) })
+    plan.action === "decline"
+      ? payloadSchema.extend({ reason: z.string().trim().min(1) })
       : payloadSchema
   ).parse(envelope[0]);
   if (
-    payload.organisationId !== scope.organisationId ||
-    (scope.recordId !== null && payload.recordId !== scope.recordId)
+    payload.organisationId !== plan.organisationId ||
+    payload.recordId !== plan.recordId
   ) {
     throw new Error(
       "Browser mutation request has foreign or missing intent scope"

@@ -235,6 +235,12 @@ export function validateXeroCollectedObservations(
   startedAt: string,
   endedAt: string
 ) {
+  if (
+    entries.some((entry) => !XERO_SUBCASE_IDS.includes(entry.id)) ||
+    new Set(entries.map((entry) => entry.id)).size !== entries.length
+  ) {
+    throw new Error("Unknown or duplicate collected subcase");
+  }
   const input = bootstrapXeroReport(startedAt, runId);
   input.candidateSha = candidateSha;
   input.endedAt = endedAt;
@@ -244,5 +250,7 @@ export function validateXeroCollectedObservations(
       (subcase) => entries.find((entry) => entry.id === subcase.id) ?? subcase
     ),
   }));
-  return buildXeroReport(input).json.scenarios;
+  return buildXeroReport(input).json.scenarios.map(
+    ({ name, expected, requiredMode, ...observation }) => observation
+  );
 }

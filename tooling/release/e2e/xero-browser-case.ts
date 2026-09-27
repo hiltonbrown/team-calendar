@@ -87,9 +87,12 @@ const fixtureSchema = z.strictObject({
         "connect",
         "disconnect",
       ]),
+      confirmationText: z.string().nullable().optional(),
+      connectionId: z.uuid().nullable().optional(),
       correlationId: z.uuid(),
       dateFrom: z.iso.date(),
       dateUntil: z.iso.date(),
+      disconnectMode: z.enum(["destructive", "soft"]).nullable().optional(),
       fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
       locator: locatorSchema,
     })
@@ -208,6 +211,11 @@ export async function executeXeroBrowserSubcase(
   if (fixture.id.startsWith("X24.") && !fixture.feedAssertion) {
     throw new Error("Exact feed publication assertion is unavailable");
   }
+  if (fixture.id.startsWith("X26.")) {
+    throw new Error(
+      "Cleanup assertions require terminal-phase receipts after owned teardown"
+    );
+  }
   if (fixture.id.startsWith("X08.")) {
     throw new Error(
       "Fresh fenced scheduled observer is unavailable on the current platform"
@@ -271,8 +279,11 @@ export async function executeXeroBrowserSubcase(
       const { mutation } = fixture;
       const mutationScope = {
         action: mutation.action,
+        confirmationText: mutation.confirmationText,
+        connectionId: mutation.connectionId,
         dateFrom: mutation.dateFrom,
         dateUntil: mutation.dateUntil,
+        disconnectMode: mutation.disconnectMode,
         employeeId: fixture.employeeId,
         leaveTypeId: fixture.leaveTypeId,
         organisationId: owned.organisationId,

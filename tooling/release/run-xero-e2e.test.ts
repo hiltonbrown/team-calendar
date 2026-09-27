@@ -1,5 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import {
   chmodSync,
   mkdirSync,
@@ -12,7 +13,20 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runXeroE2e, type XeroRunnerDependencies } from "./run-xero-e2e.js";
+import {
+  runXeroE2e,
+  superviseXeroBrowser,
+  type XeroRunnerDependencies,
+} from "./run-xero-e2e.js";
+import { readXeroExecutionManifest } from "./xero-execution-guard.js";
+import {
+  dispatchXeroIntent,
+  makeXeroLedger,
+  persistXeroLedger,
+  readXeroLedger,
+  recordXeroIntent,
+  type XeroLedgerEntry,
+} from "./xero-ledger.js";
 import { writeXeroReport } from "./xero-report.js";
 
 const cleanupPaths: string[] = [];
@@ -201,7 +215,7 @@ describe("Xero runner diagnostic bootstrap", () => {
       }),
       assertDurable: () => Promise.resolve(),
       assertSource: vi.fn(),
-      browser: async () => 1,
+      browser: async () => ({ closed: true, exitCode: 1 }),
       importConfiguration: async () => ({}),
     };
     const report = await runXeroE2e(
@@ -296,6 +310,7 @@ describe("Xero runner diagnostic bootstrap", () => {
     );
     recordPaths(report);
     expect(report.exitCode).toBe(2);
+    expect(report.json.verifiedRunId).toBeNull();
     expect(acquire).not.toHaveBeenCalled();
     expect(durable).not.toHaveBeenCalled();
     expect(readdirSync(input.dir)).toEqual(["manifest.json"]);
@@ -348,7 +363,7 @@ describe("Xero runner diagnostic bootstrap", () => {
               }),
             assertDurable: () => Promise.resolve(),
             assertSource: vi.fn(),
-            browser: () => Promise.resolve(1),
+            browser: () => Promise.resolve({ closed: true, exitCode: 1 }),
             importConfiguration: () => Promise.resolve(),
             writeReport:
               fault === "writer"
@@ -374,3 +389,352 @@ describe("Xero runner diagnostic bootstrap", () => {
     }
   );
 });
+
+describe("browser writer closure", () => {
+  it.each(["error", "abort", "nonzero"])(
+    "waits for actual close after %s and preserves unknown detached writers",
+    async (fault) => {
+      const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+      const controller = new AbortController();
+      const control = { exists: vi.fn(() => false), kill: vi.fn() };
+      let settled = false;
+      const result = superviseXeroBrowser(
+        child,
+        controller.signal,
+        control,
+        50
+      ).then((value) => {
+        settled = true;
+        return value;
+      });
+      if (fault === "error") {
+        child.emit("error", new Error("private"));
+      }
+      if (fault === "abort") {
+        controller.abort();
+      }
+      child.emit("exit", fault === "nonzero" ? 1 : 0);
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      child.emit("close", fault === "nonzero" ? 1 : 0);
+      expect(await result).toEqual({ closed: false, exitCode: 1 });
+    }
+  );
+  it("awaits delayed group closure after graceful success", async () => {
+    const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+    let alive = true;
+    const result = superviseXeroBrowser(
+      child,
+      new AbortController().signal,
+      { exists: () => alive, kill: vi.fn() },
+      200
+    );
+    child.emit("close", 0);
+    alive = false;
+    expect(await result).toEqual({ closed: true, exitCode: 0 });
+  });
+  it("bounds failed shutdown, escalates and keeps closure unknown", async () => {
+    const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+    const controller = new AbortController();
+    const kill = vi.fn();
+    const result = superviseXeroBrowser(
+      child,
+      controller.signal,
+      { exists: () => true, kill },
+      40
+    );
+    controller.abort();
+    expect(await result).toEqual({ closed: false, exitCode: 1 });
+    expect(kill.mock.calls.map(([signal]) => signal)).toEqual([
+      "SIGTERM",
+      "SIGKILL",
+    ]);
+  });
+  it("failed spawn grants no closure until its close event", async () => {
+    const child = new EventEmitter();
+    const result = superviseXeroBrowser(
+      child,
+      new AbortController().signal,
+      { exists: () => false, kill: vi.fn() },
+      50
+    );
+    child.emit("error", new Error("spawn"));
+    child.emit("close", -2);
+    expect(await result).toEqual({ closed: true, exitCode: 1 });
+  });
+});
+describe("separate durable browser ledger", () => {
+  it.each([
+    "success",
+    "error",
+    "interruption",
+    "malformed",
+    "missing",
+    "mismatched",
+    "unknown-close",
+  ])("preserves child state and fence on %s", async (fault) => {
+    const input = manifest();
+    const authority = readXeroExecutionManifest(input.path);
+    const path = resolve(input.dir, "xero-ledger.json");
+    const reference = `sha256:${"b".repeat(64)}`;
+    const cleanupLocal = vi.fn(async () => reference);
+    const releaseFence = vi.fn(async () => reference);
+    const observe = vi.fn(async () => []);
+    const outside = vi.fn(async () => reference);
+    const browser = vi.fn(async () => {
+      const childLedger = readXeroLedger(path, authority);
+      const entry: XeroLedgerEntry = {
+        action: "create",
+        bindingGeneration: 1,
+        cleanup: "pending",
+        cleanupReference: null,
+        clerkOrgId: authority.owned[0]?.clerkOrgId ?? "",
+        dateFrom: "2026-10-01",
+        dateUntil: "2026-10-02",
+        fingerprint: "a".repeat(64),
+        id: randomUUID(),
+        intendedAt: new Date().toISOString(),
+        localId: null,
+        organisationId: authority.owned[0]?.organisationId ?? "",
+        outcome: "intended",
+        remoteId: null,
+        updatedAt: new Date().toISOString(),
+      };
+      recordXeroIntent(path, childLedger, entry, authority);
+      await dispatchXeroIntent(
+        path,
+        childLedger,
+        entry.id,
+        async () => undefined,
+        () => ({ localId: null, remoteId: null }),
+        authority
+      );
+      if (fault === "malformed") {
+        writeFileSync(path, "malformed", { mode: 0o600 });
+      }
+      if (fault === "missing") {
+        rmSync(path);
+      }
+      if (fault === "mismatched") {
+        const raw = JSON.parse(readFileSync(path, "utf8"));
+        raw.runId = randomUUID();
+        writeFileSync(path, JSON.stringify(raw), { mode: 0o600 });
+      }
+      if (fault === "error") {
+        throw new Error("child still unknown");
+      }
+      if (fault === "interruption") {
+        process.emit("SIGINT");
+      }
+      return {
+        closed: fault !== "unknown-close",
+        exitCode: fault === "success" ? 0 : 1,
+      };
+    });
+    const dependencies: XeroRunnerDependencies = {
+      acquire: async () => ({
+        cleanup: {
+          cleanupLocal,
+          cleanupRemote: vi.fn(),
+          drainOwnedWorkers: async () => reference,
+          observe,
+          releaseFence,
+          restoreWorkers: async () => reference,
+          verifyOutsideOwned: outside,
+        },
+        collect: () => Promise.reject(new Error("missing proof")),
+        context: {
+          appUrl: "https://app.example",
+          verifiedFenceReference: reference,
+        },
+        deployments: [],
+        terminalCleanup: async () => ({
+          fenceReleased: true,
+          local: "PASS",
+          outsideOwned: "PASS",
+          provider: "PASS",
+          retained: [],
+          workers: "PASS",
+        }),
+        verifyFixtures: async () => undefined,
+      }),
+      assertDurable: async () => undefined,
+      assertSource: vi.fn(),
+      browser,
+      importConfiguration: async () => undefined,
+    };
+    const report = await runXeroE2e(
+      ["--manifest", input.path, "--output", input.dir],
+      dependencies
+    );
+    recordPaths(report);
+    expect(report.exitCode).not.toBe(0);
+    expect(cleanupLocal).not.toHaveBeenCalled();
+    expect(releaseFence).not.toHaveBeenCalled();
+    expect(outside).toHaveBeenCalled();
+    if (["success", "interruption"].includes(fault)) {
+      expect(observe).toHaveBeenCalledOnce();
+      const stored = readXeroLedger(path, authority);
+      expect(stored.entries).toHaveLength(1);
+      expect(stored.entries[0]?.outcome).toBe("uncertain");
+      const recovered = await runXeroE2e(
+        ["--manifest", input.path, "--output", input.dir, "--recover"],
+        dependencies
+      );
+      expect(recovered.exitCode).not.toBe(0);
+      expect(browser).toHaveBeenCalledOnce();
+      expect(readXeroLedger(path, authority).entries).toHaveLength(1);
+      expect(releaseFence).not.toHaveBeenCalled();
+    }
+  });
+});
+
+it("does not revive polling when close arrives after bounded unknown shutdown", async () => {
+  vi.useFakeTimers();
+  try {
+    const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+    const controller = new AbortController();
+    const result = superviseXeroBrowser(
+      child,
+      controller.signal,
+      { exists: () => true, kill: vi.fn() },
+      30
+    );
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(30);
+    expect(await result).toMatchObject({ closed: false });
+    child.emit("close", 0);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it.each([0, 1])(
+  "terminates lingering descendants after close code %s without granting writer closure",
+  async (code) => {
+    vi.useFakeTimers();
+    try {
+      const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+      const kill = vi.fn();
+      const result = superviseXeroBrowser(
+        child,
+        new AbortController().signal,
+        { exists: () => true, kill },
+        90
+      );
+      child.emit("close", code);
+      await vi.advanceTimersByTimeAsync(90);
+      expect(await result).toEqual({ closed: false, exitCode: 1 });
+      expect(kill.mock.calls.map(([signal]) => signal)).toEqual([
+        "SIGTERM",
+        "SIGKILL",
+      ]);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+it.each([
+  "missing",
+  "unknown",
+  "wrong-run",
+  "wrong-candidate",
+  "stale",
+  "future",
+  "rejected",
+  "fixture-failure",
+  "verified",
+])(
+  "requires independent prior browser closure during recovery: %s",
+  async (fault) => {
+    const input = manifest();
+    const authority = readXeroExecutionManifest(input.path);
+    const ledgerPath = resolve(input.dir, "xero-ledger.json");
+    persistXeroLedger(ledgerPath, makeXeroLedger(authority));
+    const cleanupLocal = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const releaseFence = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const drain = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const outside = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const closure = vi.fn(() => {
+      if (fault === "rejected") {
+        return Promise.reject(new Error("private prior writer"));
+      }
+      let observedAt = Date.now();
+      if (fault === "stale") {
+        observedAt -= 60_000;
+      }
+      if (fault === "future") {
+        observedAt += 60_000;
+      }
+      return Promise.resolve({
+        candidateSha:
+          fault === "wrong-candidate" ? "c".repeat(40) : authority.candidateSha,
+        closed: fault !== "unknown",
+        observedAt: new Date(observedAt).toISOString(),
+        reference: `sha256:${"d".repeat(64)}`,
+        runId: fault === "wrong-run" ? randomUUID() : authority.runId,
+      });
+    });
+    const browser = vi.fn();
+    const result = await runXeroE2e(
+      ["--manifest", input.path, "--output", input.dir, "--recover"],
+      {
+        acquire: async () => ({
+          cleanup: {
+            cleanupLocal,
+            cleanupRemote: async () => ({
+              disposition: "reconciled",
+              reference: `sha256:${"d".repeat(64)}`,
+            }),
+            drainOwnedWorkers: drain,
+            observe: async () => [],
+            releaseFence,
+            restoreWorkers: async () => `sha256:${"d".repeat(64)}`,
+            verifyOutsideOwned: outside,
+          },
+          collect: () => Promise.reject(new Error("no campaign proof")),
+          context: {
+            appUrl: "https://app.example",
+            verifiedFenceReference: `sha256:${"d".repeat(64)}`,
+          },
+          deployments: [],
+          terminalCleanup: async () => ({
+            fenceReleased: true,
+            local: "PASS",
+            outsideOwned: "PASS",
+            provider: "PASS",
+            retained: [],
+            workers: "PASS",
+          }),
+          verifyFixtures: () =>
+            fault === "fixture-failure"
+              ? Promise.reject(new Error("private fixture"))
+              : Promise.resolve(),
+          ...(fault === "missing"
+            ? {}
+            : { verifyRecoveryBrowserClosure: closure }),
+        }),
+        assertDurable: async () => undefined,
+        assertSource: vi.fn(),
+        browser,
+        importConfiguration: async () => undefined,
+      }
+    );
+    recordPaths(result);
+    expect(browser).not.toHaveBeenCalled();
+    expect(drain).toHaveBeenCalled();
+    expect(outside).toHaveBeenCalled();
+    expect(cleanupLocal).toHaveBeenCalledTimes(fault === "verified" ? 1 : 0);
+    expect(releaseFence).toHaveBeenCalledTimes(fault === "verified" ? 1 : 0);
+    expect(readXeroLedger(ledgerPath, authority).fenceReleased).toBe(
+      fault === "verified"
+    );
+    if (fault === "fixture-failure") {
+      expect(closure).not.toHaveBeenCalled();
+    }
+    expect(result.exitCode).not.toBe(0);
+  }
+);

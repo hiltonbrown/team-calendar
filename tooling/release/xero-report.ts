@@ -131,6 +131,19 @@ const observationSchema = z.strictObject({
   status: statusSchema,
 });
 export type XeroObservation = z.infer<typeof observationSchema>;
+export function parseXeroScenarioEvidence(value: unknown) {
+  return evidenceSchema.parse(value);
+}
+export function parseXeroObservationShell(value: unknown) {
+  return observationSchema
+    .omit({ evidence: true })
+    .extend({ evidence: z.array(z.unknown()).max(40) })
+    .strict()
+    .parse(value);
+}
+export function parseXeroObservation(value: unknown) {
+  return observationSchema.parse(value);
+}
 export function parseXeroObservations(value: unknown) {
   return z.array(scenarioSchema).max(100).parse(value);
 }
@@ -513,7 +526,7 @@ export function buildXeroReport(value: unknown) {
   const identityValid =
     input.verifiedRunId === input.runId &&
     input.candidateSha !== null &&
-    input.harnessSha !== null &&
+    input.harnessSha === input.candidateSha &&
     input.environment !== null &&
     input.contractDecision !== null &&
     Date.parse(input.endedAt) >= Date.parse(input.startedAt) &&
@@ -549,6 +562,8 @@ export function buildXeroReport(value: unknown) {
       deploymentValid &&
       identityValid &&
       validationErrors.length === 0 &&
+      !input.limitations.includes("invalid-evidence") &&
+      !input.limitations.includes("evidence-unavailable") &&
       input.toolVersions !== null &&
       input.authorisedFixtures !== null &&
       input.authorisedFixtures.length > 0
@@ -637,7 +652,18 @@ export function buildXeroReport(value: unknown) {
     "| --- | --- | --- | --- | --- | --- |",
     ...scenarios.map(
       (entry) =>
-        `| ${entry.id} | ${entry.name} | ${entry.requiredMode} | ${entry.status} | ${entry.actual}; ${entry.reason} | ${entry.evidence.length} validated links |`
+        `| ${entry.id} | ${entry.name} | ${entry.requiredMode} | ${entry.status} | ${entry.expected} Observed: ${entry.actual}; ${entry.reason} | ${entry.evidence.length} validated links |`
+    ),
+    "",
+    "## Subcase evidence",
+    "",
+    "| ID | Result | Fixture | Observed result and reason | UTC window | Evidence |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...scenarios.flatMap((scenario) =>
+      scenario.subcases.map(
+        (entry) =>
+          `| ${entry.id} | ${entry.status} | ${entry.correlation.fixtureAlias ?? "unavailable"} | ${entry.actual}; ${entry.reason} | ${entry.startedAt ?? "unexecuted"} to ${entry.endedAt ?? "unexecuted"} | ${entry.evidence.map((link) => `${link.layer}: ${link.path} (sha256:${link.sha256})`).join("; ") || "unavailable"} |`
+      )
     ),
     "",
     "## Defects",
@@ -712,6 +738,7 @@ export function writeXeroReport(
 export function reportCli(args: string[]) {
   let report = buildXeroReport(bootstrapXeroReport());
   let built = false;
+  let delivered = false;
   try {
     if (
       args.length !== 4 ||
@@ -759,6 +786,7 @@ export function reportCli(args: string[]) {
     }
     built = true;
     writeXeroReport(args[3], report);
+    delivered = true;
   } catch {
     if (!built) {
       const input = bootstrapXeroReport();
@@ -767,11 +795,15 @@ export function reportCli(args: string[]) {
     }
     try {
       writeXeroReport("reports/xero-e2e", report);
+      delivered = true;
     } catch {
       process.stderr.write(
         `${JSON.stringify(report.json)}\n${report.markdown}`
       );
     }
+  }
+  if (!delivered && report.exitCode !== 1) {
+    return 2;
   }
   return report.exitCode;
 }

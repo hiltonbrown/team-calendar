@@ -7,7 +7,6 @@ import { expect, test, useRole } from "./fixture.js";
 // under the authenticated admin's Clerk Org, with the stated persisted receipts.
 // Disconnect is then an idempotent receipt read; no provider DELETE is issued.
 // Missing scenario fixtures fail explicitly. This spec has not been executed.
-const environment = releaseEnvironment();
 const cases = [
   {
     message:
@@ -28,6 +27,7 @@ for (const scenario of cases) {
   test(`disconnect receipt remains truthful: ${scenario.remoteStatus}`, async ({
     browser,
   }) => {
+    const environment = releaseEnvironment();
     const fixtures = z
       .array(
         z.object({

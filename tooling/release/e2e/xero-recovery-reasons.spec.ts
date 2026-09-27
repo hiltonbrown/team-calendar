@@ -6,7 +6,6 @@ import { expect, test, useRole } from "./fixture.js";
 // Written for Plan 160, NOT_VERIFIED. The campaign must seed these scenarios
 // in manifest-owned organisations and use only fake Xero responses. This spec
 // reads rendered recovery states and never triggers a provider operation.
-const environment = releaseEnvironment();
 const messages = [
   ["update_permissions", "Update Xero permissions to continue."],
   ["reauthorise", "Xero access needs to be renewed."],
@@ -39,6 +38,7 @@ const FixtureSchema = z.object({
 
 for (const [reason, message] of messages) {
   test(`Xero recovery remains distinct: ${reason}`, async ({ browser }) => {
+    const environment = releaseEnvironment();
     const fixtures = z
       .array(FixtureSchema)
       .length(messages.length)

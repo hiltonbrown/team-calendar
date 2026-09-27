@@ -1,5 +1,14 @@
-import { readFileSync, rmSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import {
   XERO_EVIDENCE_CASES,
   type XeroEvidenceInput,
@@ -216,6 +225,21 @@ describe("Xero report evidence", () => {
     input.lifecycleInput = undefined;
     expect(buildXeroReport(input).exitCode).toBe(2);
   });
+  it.each([false, true])(
+    "rejects a mismatched harness candidate while preserving failure=%s",
+    (failed) => {
+      const input = completeInput();
+      input.harnessSha = "c".repeat(40);
+      if (failed) {
+        first(input).status = "FAIL";
+        first(input).actual = "assertion-failed";
+        first(input).reason = "assertion-failed";
+      }
+      const report = buildXeroReport(input);
+      expect(report.exitCode).toBe(failed ? 1 : 2);
+      expect(report.json.overall).toBe(failed ? "FAIL" : "NOT VERIFIED");
+    }
+  );
   it("rejects lifecycle run or candidate mismatch", () => {
     const input = completeInput();
     input.lifecycleRunId = "00000000-0000-4000-8000-000000000001";
@@ -455,3 +479,35 @@ describe("Xero report evidence", () => {
     expect(buildXeroReport(input).exitCode).toBe(2);
   });
 });
+
+it.each(["neither", "one"])(
+  "all-PASS evidence cannot certify %s required reports delivered",
+  (fault) => {
+    const original = process.cwd();
+    const cwd = mkdtempSync(resolve(tmpdir(), "xero-delivery-"));
+    const input = completeInput();
+    const filename = `${input.startedAt.slice(0, 10)}-${input.runId}`;
+    const saved = resolve(cwd, "input.json");
+    writeFileSync(saved, JSON.stringify(input));
+    const target = resolve(cwd, "reports/xero-e2e");
+    mkdirSync(target, { recursive: true });
+    mkdirSync(
+      resolve(target, `${filename}.${fault === "one" ? "md" : "json"}`)
+    );
+    const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    try {
+      process.chdir(cwd);
+      expect(
+        reportCli(["--input", saved, "--output", "reports/xero-e2e"])
+      ).toBe(2);
+      expect(stderr.mock.calls.flat().join("")).toContain('"overall":"PASS"');
+      expect(existsSync(resolve(target, `${filename}.md`))).toBe(
+        fault === "one"
+      );
+    } finally {
+      process.chdir(original);
+      stderr.mockRestore();
+      rmSync(cwd, { force: true, recursive: true });
+    }
+  }
+);

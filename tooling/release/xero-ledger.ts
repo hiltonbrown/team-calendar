@@ -14,12 +14,73 @@ import {
 import { dirname, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import type { XeroExecutionManifest } from "./xero-execution-guard.js";
+import { privateXeroArtefact } from "./xero-observations.js";
 
 export type XeroLedgerAuthority = Pick<
   XeroExecutionManifest,
   "runId" | "candidateSha" | "owned" | "dateWindow"
 >;
 const referenceSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/);
+const noEffectSchema = z.strictObject({
+  action: z.enum([
+    "create",
+    "approve",
+    "decline",
+    "withdraw",
+    "connect",
+    "disconnect",
+  ]),
+  bindingGeneration: z.number().int().nonnegative(),
+  candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
+  causalEvidence: referenceSchema,
+  cause: z.enum([
+    "cancelled-before-dispatch",
+    "rejected-before-provider",
+    "approved-local-only",
+  ]),
+  clerkOrgId: z.string().min(1),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+  intentId: z.uuid(),
+  observedAt: z.iso.datetime(),
+  organisationId: z.uuid(),
+  providerDispatched: z.literal(false),
+  runId: z.uuid(),
+});
+const noEffectReceiptSchema = noEffectSchema
+  .omit({ causalEvidence: true })
+  .extend({
+    providerDispatchCount: z.literal(0),
+    schemaVersion: z.literal(1),
+    source: z.enum([
+      "browser-request-rejected",
+      "application-provider-rejection",
+      "approved-transition-local-only",
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const expected = {
+      "approved-local-only": "approved-transition-local-only",
+      "cancelled-before-dispatch": "browser-request-rejected",
+      "rejected-before-provider": "application-provider-rejection",
+    };
+    if (expected[value.cause] !== value.source) {
+      context.addIssue({
+        code: "custom",
+        message: "Causal dispatch receipt contradicts its source",
+      });
+    }
+  });
+export function ingestXeroNoEffectProof(path: string, output: string) {
+  const bytes = readFileSync(privateXeroArtefact(path, output));
+  const { providerDispatchCount, schemaVersion, source, ...proof } =
+    noEffectReceiptSchema.parse(JSON.parse(bytes.toString("utf8")));
+  return noEffectSchema.parse({
+    ...proof,
+    causalEvidence: `sha256:${createHash("sha256").update(bytes).digest("hex")}`,
+  });
+}
+export type XeroNoEffectProof = z.infer<typeof noEffectSchema>;
 const entrySchema = z.strictObject({
   action: z.enum([
     "create",
@@ -39,6 +100,7 @@ const entrySchema = z.strictObject({
   id: z.uuid(),
   intendedAt: z.iso.datetime(),
   localId: z.uuid().nullable(),
+  noEffectProof: noEffectSchema.nullable().optional(),
   organisationId: z.uuid(),
   outcome: z.enum([
     "intended",
@@ -46,6 +108,7 @@ const entrySchema = z.strictObject({
     "uncertain",
     "observed",
     "definite-non-attempt",
+    "verified-no-effect",
   ]),
   remoteId: z.string().min(1).max(128).nullable(),
   updatedAt: z.iso.datetime(),
@@ -184,6 +247,18 @@ function assertEntryAuthority(
 ) {
   assertAuthority(ledger, authority);
   entrySchema.parse(entry);
+  if (
+    entry.outcome === "definite-non-attempt" ||
+    entry.outcome === "verified-no-effect"
+  ) {
+    assertNoEffectProof(entry, entry.noEffectProof, authority);
+    if (
+      (entry.outcome === "definite-non-attempt") !==
+      (entry.noEffectProof?.cause === "cancelled-before-dispatch")
+    ) {
+      throw new Error("No-effect outcome contradicts causal evidence");
+    }
+  }
   const resource = authority.owned.find(
     (owned) =>
       owned.clerkOrgId === entry.clerkOrgId &&
@@ -220,7 +295,82 @@ export function readXeroLedger(path: string, authority: XeroLedgerAuthority) {
   for (const entry of ledger.entries) {
     assertEntryAuthority(ledger, entry, authority);
   }
+  if (
+    new Set(ledger.entries.map((entry) => entry.id)).size !==
+    ledger.entries.length
+  ) {
+    throw new Error("Duplicate durable mutation intents");
+  }
   return ledger;
+}
+function assertNoEffectProof(
+  entry: XeroLedgerEntry,
+  value: unknown,
+  authority: XeroLedgerAuthority
+) {
+  const proof = noEffectSchema.parse(value);
+  if (
+    proof.action !== entry.action ||
+    proof.intentId !== entry.id ||
+    proof.clerkOrgId !== entry.clerkOrgId ||
+    proof.organisationId !== entry.organisationId ||
+    proof.bindingGeneration !== entry.bindingGeneration ||
+    proof.fingerprint !== entry.fingerprint ||
+    proof.candidateSha !== authority.candidateSha ||
+    proof.runId !== authority.runId ||
+    Date.parse(proof.observedAt) < Date.parse(entry.intendedAt) ||
+    Date.parse(proof.observedAt) > Date.now() ||
+    entry.remoteId !== null
+  ) {
+    throw new Error("No-effect proof is foreign, stale or contradictory");
+  }
+  return proof;
+}
+export async function observeXeroNoEffect(
+  path: string,
+  id: string,
+  observe: (entry: Readonly<XeroLedgerEntry>) => Promise<XeroNoEffectProof>,
+  authority: XeroLedgerAuthority
+) {
+  const ledger = readXeroLedger(path, authority);
+  const entry = ledger.entries.find((item) => item.id === id);
+  if (
+    !entry ||
+    ledger.fenceReleased ||
+    ledger.closure.state !== "pending" ||
+    !["intended", "dispatched", "uncertain"].includes(entry.outcome)
+  ) {
+    throw new Error("No-effect observation cannot replace a terminal effect");
+  }
+  const originalEntry = JSON.stringify(entry);
+  const observed = await observe(structuredClone(entry));
+  const current = readXeroLedger(path, authority);
+  const currentEntry = current.entries.find((item) => item.id === id);
+  if (
+    !currentEntry ||
+    current.fenceReleased ||
+    current.closure.state !== "pending" ||
+    JSON.stringify(currentEntry) !== originalEntry
+  ) {
+    throw new Error(
+      "Mutation authority or intent changed during no-effect observation"
+    );
+  }
+  const proof = assertNoEffectProof(currentEntry, observed, authority);
+  if (
+    (proof.cause === "cancelled-before-dispatch") !==
+    (currentEntry.outcome === "intended")
+  ) {
+    throw new Error("No-effect proof contradicts dispatch state");
+  }
+  currentEntry.noEffectProof = proof;
+  currentEntry.outcome =
+    proof.cause === "cancelled-before-dispatch"
+      ? "definite-non-attempt"
+      : "verified-no-effect";
+  currentEntry.updatedAt = proof.observedAt;
+  persistXeroLedger(path, current);
+  return currentEntry;
 }
 export function recordXeroIntent(
   path: string,
@@ -247,7 +397,8 @@ export function recordXeroIntent(
   if (
     entry.outcome !== "intended" ||
     entry.cleanup !== "pending" ||
-    entry.remoteId !== null
+    entry.remoteId !== null ||
+    (entry.noEffectProof !== null && entry.noEffectProof !== undefined)
   ) {
     throw new Error("New mutation intent is invalid");
   }
@@ -318,29 +469,60 @@ export interface XeroCleanupHooks {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep worker drain, independent remote observation and durable fence closure in their audited order.
 export async function reconcileXeroLedger(
   path: string,
-  ledger: XeroLedger,
+  snapshot: XeroLedger,
   hooks: XeroCleanupHooks,
   authority: XeroLedgerAuthority
 ) {
-  assertAuthority(ledger, authority);
-  for (const entry of ledger.entries) {
-    assertEntryAuthority(ledger, entry, authority);
-  }
+  assertAuthority(snapshot, authority);
   const failures: string[] = [];
+  let drain: string;
   try {
-    ledger.closure.drain = referenceSchema.parse(
-      await hooks.drainOwnedWorkers()
-    );
-    persistXeroLedger(path, ledger);
+    drain = referenceSchema.parse(await hooks.drainOwnedWorkers());
   } catch {
-    failures.push("worker-drain");
+    // Observation is safe, but a failed drain cannot grant a writer or cleanup lease.
+    const durable = readXeroLedger(path, authority);
+    for (const entry of durable.entries) {
+      try {
+        await hooks.observe(entry);
+      } catch {
+        /* Remains unresolved. */
+      }
+    }
+    try {
+      await hooks.verifyOutsideOwned();
+    } catch {
+      failures.push("outside-owned");
+    }
+    return {
+      failures: [...failures, "worker-drain"],
+      fenceReleased: false,
+      unresolved: true,
+    };
   }
+  // The browser and worker writers are now closed. Never persist the parent's stale snapshot.
+  const ledger = readXeroLedger(path, authority);
+  if (ledger.fenceReleased) {
+    if (
+      ledger.closure.state !== "released" ||
+      Object.values(ledger.closure).some((value) => value === null)
+    ) {
+      throw new Error("Incomplete released ledger");
+    }
+    return { failures, fenceReleased: true, unresolved: false };
+  }
+  ledger.closure.drain = drain;
+  persistXeroLedger(path, ledger);
   for (const entry of ledger.entries) {
     if (entry.cleanup === "reconciled" || entry.cleanup === "retained") {
       continue;
     }
     try {
-      if (entry.outcome === "definite-non-attempt") {
+      if (
+        entry.outcome === "definite-non-attempt" ||
+        entry.outcome === "verified-no-effect"
+      ) {
+        assertNoEffectProof(entry, entry.noEffectProof, authority);
+        entry.cleanupReference = entry.noEffectProof?.causalEvidence ?? null;
         entry.cleanup = "reconciled";
       } else {
         const matches = await hooks.observe(entry);

@@ -10,6 +10,7 @@ import {
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { z } from "zod";
+import type { XeroCampaignCollection } from "./xero-campaign-collector.js";
 import {
   currentXeroWorkerCapability,
   readXeroExecutionManifest,
@@ -35,6 +36,14 @@ import {
   type XeroReportInput,
 } from "./xero-report.js";
 import { assertReviewedXeroSource } from "./xero-source-integrity.js";
+
+const recoveryBrowserClosureSchema = z.strictObject({
+  candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
+  closed: z.literal(true),
+  observedAt: z.iso.datetime(),
+  reference: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  runId: z.uuid(),
+});
 
 interface Options {
   manifest: string;
@@ -82,11 +91,16 @@ export function parseXeroCli(args: readonly string[]): Options {
 export interface XeroExecutionLease {
   cleanup: XeroCleanupHooks;
   // Fresh per-subcase evidence, never an aggregate child exit result.
-  collect: () => Promise<XeroReportInput["scenarios"]>;
+  collect: (
+    phase: "actions" | "terminal",
+    previous: XeroCampaignCollection | null,
+    terminalStartedAt?: string
+  ) => Promise<XeroCampaignCollection>;
   context: { appUrl: string; verifiedFenceReference: string };
   deployments: XeroReportInput["deployments"];
   terminalCleanup: () => Promise<XeroReportInput["cleanup"]>;
   verifyFixtures: () => Promise<void>;
+  verifyRecoveryBrowserClosure?: () => Promise<unknown>;
 }
 export interface XeroRunnerDependencies {
   acquire: (manifest: XeroExecutionManifest) => Promise<XeroExecutionLease>;
@@ -95,36 +109,173 @@ export interface XeroRunnerDependencies {
   browser: (
     environment: NodeJS.ProcessEnv,
     signal: AbortSignal
-  ) => Promise<number>;
+  ) => Promise<XeroBrowserResult>;
   importConfiguration: () => Promise<unknown>;
   writeReport?: typeof writeXeroReport;
+}
+export interface XeroBrowserResult {
+  closed: boolean;
+  exitCode: number;
+}
+interface BrowserProcess {
+  once: {
+    (event: "error", listener: (error: Error) => void): unknown;
+    (
+      event: "close",
+      listener: (code: number | null, signal: NodeJS.Signals | null) => void
+    ): unknown;
+  };
+  pid?: number;
+}
+// close does not prove detached browsers have closed after an error or forced termination.
+export function superviseXeroBrowser(
+  child: BrowserProcess,
+  signal: AbortSignal,
+  processControl: {
+    exists: () => boolean;
+    kill: (signal: NodeJS.Signals) => void;
+  },
+  shutdownMs = 15_000
+): Promise<XeroBrowserResult> {
+  return new Promise((resolveResult) => {
+    let failed = false;
+    let closed = false;
+    let exitCode = 1;
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    let escalation: ReturnType<typeof setTimeout> | undefined;
+    let poll: ReturnType<typeof setTimeout> | undefined;
+    let termination: ReturnType<typeof setTimeout> | undefined;
+    let finished = false;
+    const finish = (confirmed: boolean) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      clearTimeout(deadline);
+      clearTimeout(escalation);
+      clearTimeout(poll);
+      clearTimeout(termination);
+      signal.removeEventListener("abort", stop);
+      resolveResult({
+        closed: confirmed,
+        exitCode: failed || signal.aborted ? 1 : exitCode,
+      });
+    };
+    const boundShutdown = () => {
+      deadline ??= setTimeout(() => finish(false), shutdownMs);
+    };
+    const stop = () => {
+      if (finished) {
+        return;
+      }
+      failed = true;
+      clearTimeout(termination);
+      processControl.kill("SIGTERM");
+      escalation ??= setTimeout(
+        () => processControl.kill("SIGKILL"),
+        Math.floor(shutdownMs / 3)
+      );
+      boundShutdown();
+    };
+    const confirm = () => {
+      if (finished) {
+        return;
+      }
+      if (closed && !processControl.exists()) {
+        // An unspawned process has no writers. Otherwise only graceful success certifies Playwright teardown.
+        finish(
+          child.pid === undefined ||
+            (!(failed || signal.aborted) && exitCode === 0)
+        );
+        return;
+      }
+      poll = setTimeout(confirm, 25);
+    };
+    child.once("error", () => {
+      stop();
+    });
+    child.once("close", (code: number | null) => {
+      if (finished) {
+        return;
+      }
+      closed = true;
+      exitCode = code ?? 1;
+      if (exitCode === 0) {
+        boundShutdown();
+      } else {
+        stop();
+      }
+      confirm();
+      if (!finished && exitCode === 0) {
+        termination ??= setTimeout(stop, Math.floor(shutdownMs / 3));
+      }
+    });
+    signal.addEventListener("abort", stop, { once: true });
+    if (signal.aborted) {
+      stop();
+    }
+  });
+}
+export function spawnXeroBrowser(
+  environment: NodeJS.ProcessEnv,
+  signal: AbortSignal
+): Promise<XeroBrowserResult> {
+  const child = spawn(
+    "bun",
+    [
+      "--no-env-file",
+      "./node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "tooling/release/xero-e2e.config.ts",
+    ],
+    {
+      detached: true,
+      env: environment,
+      stdio: "ignore",
+    }
+  );
+  return superviseXeroBrowser(child, signal, {
+    exists: () => {
+      if (!child.pid) {
+        return false;
+      }
+      try {
+        process.kill(-child.pid, 0);
+        return true;
+      } catch (error) {
+        return !(
+          error instanceof Error &&
+          "code" in error &&
+          error.code === "ESRCH"
+        );
+      }
+    },
+    kill: (killSignal) => {
+      try {
+        if (child.pid) {
+          process.kill(-child.pid, killSignal);
+        }
+      } catch {
+        /* Keep unknown writer closure fenced. */
+      }
+    },
+  });
 }
 const defaultDependencies: XeroRunnerDependencies = {
   acquire: () =>
     Promise.reject(new Error(currentXeroWorkerCapability().reason)),
-  browser: (environment, signal) =>
-    new Promise((resolveExit, reject) => {
-      const child = spawn(
-        "bunx",
-        [
-          "playwright",
-          "test",
-          "--config",
-          "tooling/release/xero-e2e.config.ts",
-        ],
-        { env: environment, signal, stdio: "ignore" }
-      );
-      child.once("error", reject);
-      child.once("exit", (code) => resolveExit(code ?? 1));
-    }),
+  browser: spawnXeroBrowser,
   importConfiguration: () => import("@playwright/test"),
 };
 function markUnavailable(input: XeroReportInput, reason: XeroReason) {
   input.limitations = [...new Set([...input.limitations, reason])];
   input.scenarios = input.scenarios.map((entry) => ({
-    ...emptyObservation(entry.id, reason),
+    ...(entry.status === "FAIL" ? entry : emptyObservation(entry.id, reason)),
     subcases: entry.subcases.map((subcase) =>
-      emptyObservation(subcase.id, reason)
+      subcase.status === "FAIL" || subcase.status === "PASS"
+        ? subcase
+        : emptyObservation(subcase.id, reason)
     ),
   }));
 }
@@ -157,6 +308,8 @@ export async function runXeroE2e(
   let ledger: XeroLedger | null = null;
   let ledgerPath: string | null = null;
   let authority: XeroExecutionManifest | null = null;
+  let browserClosed = true;
+  let collected: XeroCampaignCollection | null = null;
   let failureReason: XeroReason = "invalid-cli";
   const interrupt = () => controller.abort();
   process.once("SIGINT", interrupt);
@@ -164,13 +317,13 @@ export async function runXeroE2e(
   try {
     output = privateOutput(output);
     const options = parseXeroCli(args);
+    browserClosed = !options.recover;
     failureReason = "manifest-unavailable";
     const raw = readFileSync(resolve(options.manifest), "utf8");
     failureReason = "manifest-invalid";
     const manifest = readXeroExecutionManifest(resolve(options.manifest));
     authority = manifest;
     input.runId = manifest.runId;
-    input.verifiedRunId = manifest.runId;
     input.candidateSha = manifest.candidateSha;
     input.environment = manifest.environment;
     input.contractDecision = manifest.contractDecision;
@@ -236,7 +389,27 @@ export async function runXeroE2e(
     input.deployments = lease.deployments;
     failureReason = "missing-prerequisite";
     await lease.verifyFixtures();
+    input.verifiedRunId = manifest.runId;
     if (options.recover) {
+      if (!lease.verifyRecoveryBrowserClosure) {
+        throw new Error(
+          "Prior browser writer closure requires independent verification"
+        );
+      }
+      const proof = recoveryBrowserClosureSchema.parse(
+        await lease.verifyRecoveryBrowserClosure()
+      );
+      if (
+        proof.runId !== manifest.runId ||
+        proof.candidateSha !== manifest.candidateSha ||
+        Date.parse(proof.observedAt) < Date.parse(input.startedAt) ||
+        Date.parse(proof.observedAt) > Date.now()
+      ) {
+        throw new Error(
+          "Prior browser writer closure proof is foreign or stale"
+        );
+      }
+      browserClosed = true;
       markUnavailable(input, "recovery-required");
     } else {
       const contextPath = resolve(output, "runner-context.json");
@@ -249,7 +422,8 @@ export async function runXeroE2e(
         runId: manifest.runId,
         verifiedFenceReference: lease.context.verifiedFenceReference,
       });
-      const exit = await dependencies.browser(
+      browserClosed = false;
+      const browserResult = await dependencies.browser(
         {
           ...process.env,
           TC_XERO_MANIFEST: resolve(options.manifest),
@@ -258,7 +432,11 @@ export async function runXeroE2e(
         },
         controller.signal
       );
-      if (exit !== 0) {
+      browserClosed = browserResult.closed;
+      if (!browserClosed) {
+        throw new Error("Browser writer closure is unresolved");
+      }
+      if (browserResult.exitCode !== 0) {
         input.defects.push({
           id: "browser-campaign",
           owner: "160",
@@ -267,7 +445,8 @@ export async function runXeroE2e(
           status: "open",
         });
       }
-      input.scenarios = parseXeroObservations(await lease.collect());
+      collected = await lease.collect("actions", null);
+      assignCollection(input, collected);
     }
   } catch {
     markUnavailable(
@@ -276,7 +455,17 @@ export async function runXeroE2e(
     );
   } finally {
     if (lease && ledger && ledgerPath && authority) {
+      if (!collected) {
+        try {
+          collected = await lease.collect("actions", null);
+          assignCollection(input, collected);
+        } catch {
+          input.limitations.push("evidence-unavailable");
+        }
+      }
+      const terminalStartedAt = new Date().toISOString();
       try {
+        await requireBrowserWriterClosure(lease, browserClosed);
         const cleanup = await reconcileXeroLedger(
           ledgerPath,
           ledger,
@@ -293,9 +482,24 @@ export async function runXeroE2e(
         input.cleanup.fenceReleased =
           input.cleanup.fenceReleased && cleanup.fenceReleased;
       } catch {
+        try {
+          await lease.cleanup.verifyOutsideOwned();
+        } catch {
+          /* Preserve recovery data. */
+        }
         input.cleanup.provider = "FAIL";
         input.cleanup.fenceReleased = false;
         input.limitations.push("cleanup-incomplete");
+      }
+      try {
+        const terminal = await lease.collect(
+          "terminal",
+          collected,
+          terminalStartedAt
+        );
+        assignCollection(input, terminal);
+      } catch {
+        input.limitations.push("evidence-unavailable");
       }
     }
     input.endedAt = new Date().toISOString();
@@ -303,6 +507,43 @@ export async function runXeroE2e(
     process.removeListener("SIGTERM", interrupt);
   }
   return finishReport(input, dependencies);
+}
+async function requireBrowserWriterClosure(
+  lease: XeroExecutionLease,
+  closed: boolean
+) {
+  if (closed) {
+    return;
+  }
+  // Safe observation continues, but deletion and ownership release cannot begin.
+  try {
+    await lease.cleanup.drainOwnedWorkers();
+  } catch {
+    /* Keep the fence. */
+  }
+  try {
+    await lease.cleanup.verifyOutsideOwned();
+  } catch {
+    /* Keep recovery evidence. */
+  }
+  throw new Error("Browser writer closure is unresolved");
+}
+function assignCollection(
+  input: XeroReportInput,
+  collected: XeroCampaignCollection
+) {
+  input.scenarios = parseXeroObservations(collected.scenarios);
+  input.lifecycleInput = collected.lifecycleInput;
+  input.lifecycleRunId = collected.lifecycleRunId;
+  input.limitations.push(...collected.limitations);
+  input.defects.push(
+    ...collected.defects.filter(
+      (defect) => !input.defects.some((existing) => existing.id === defect.id)
+    )
+  );
+  if (collected.limitations.includes("invalid-evidence")) {
+    input.verifiedRunId = null;
+  }
 }
 function finishReport(
   input: XeroReportInput,

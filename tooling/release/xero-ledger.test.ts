@@ -6,13 +6,16 @@ import {
   mkdtempSync,
   rmSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   dispatchXeroIntent,
+  ingestXeroNoEffectProof,
   makeXeroLedger,
+  observeXeroNoEffect,
   persistXeroLedger,
   readXeroLedger,
   reconcileXeroLedger,
@@ -20,6 +23,7 @@ import {
   type XeroCleanupHooks,
   type XeroLedgerAuthority,
   type XeroLedgerEntry,
+  type XeroNoEffectProof,
 } from "./xero-ledger.js";
 
 const directories: string[] = [];
@@ -229,6 +233,7 @@ describe("durable Xero mutation recovery", () => {
       fingerprint: "c".repeat(64),
       id: randomUUID(),
     });
+    persistXeroLedger(path, ledger);
     const cleanup = hooks();
     vi.mocked(cleanup.observe).mockResolvedValueOnce([]);
     const result = await reconcileXeroLedger(path, ledger, cleanup, authority);
@@ -288,8 +293,26 @@ describe("durable Xero mutation recovery", () => {
   });
   it("recovers definite non-attempt entries when the original mutation quota is full", async () => {
     const { path, ledger, entry, authority } = fixture();
-    entry.outcome = "definite-non-attempt";
-    persistXeroLedger(path, ledger);
+    await observeXeroNoEffect(
+      path,
+      entry.id,
+      async (intent) => ({
+        action: intent.action,
+        bindingGeneration: intent.bindingGeneration,
+        candidateSha: authority.candidateSha,
+        causalEvidence: reference,
+        cause: "cancelled-before-dispatch",
+        clerkOrgId: intent.clerkOrgId,
+        fingerprint: intent.fingerprint,
+        intentId: intent.id,
+        observedAt: new Date().toISOString(),
+        organisationId: intent.organisationId,
+        providerDispatched: false,
+        runId: authority.runId,
+      }),
+      authority
+    );
+    Object.assign(entry, readXeroLedger(path, authority).entries[0]);
     const maximum = authority.owned[0]?.maximumMutations;
     if (maximum === undefined) {
       throw new Error("Missing fixture quota");
@@ -302,6 +325,7 @@ describe("durable Xero mutation recovery", () => {
           ...entry,
           fingerprint: index.toString(16).padStart(64, "0"),
           id: randomUUID(),
+          noEffectProof: null,
           outcome: "intended",
         },
         authority
@@ -316,6 +340,7 @@ describe("durable Xero mutation recovery", () => {
           ...entry,
           fingerprint: "c".repeat(64),
           id: randomUUID(),
+          noEffectProof: null,
           outcome: "intended",
         },
         authority
@@ -377,4 +402,203 @@ describe("durable Xero mutation recovery", () => {
     ).rejects.toThrow("budget");
     expect(dispatch).toHaveBeenCalledOnce();
   });
+});
+
+describe("causal independent no-effect receipts", () => {
+  it.each(["rejected-before-provider", "approved-local-only"] as const)(
+    "reconciles dispatched %s without a remote effect and preserves its mutation charge",
+    async (cause) => {
+      const { authority, entry, ledger, path } = fixture();
+      await dispatchXeroIntent(
+        path,
+        ledger,
+        entry.id,
+        async () => undefined,
+        () => ({ localId: null, remoteId: null }),
+        authority
+      );
+      const receiptPath = resolve(path, "..", "no-effect.json");
+      writeFileSync(
+        receiptPath,
+        JSON.stringify({
+          action: entry.action,
+          bindingGeneration: entry.bindingGeneration,
+          candidateSha: authority.candidateSha,
+          cause,
+          clerkOrgId: entry.clerkOrgId,
+          fingerprint: entry.fingerprint,
+          intentId: entry.id,
+          observedAt: new Date().toISOString(),
+          organisationId: entry.organisationId,
+          providerDispatchCount: 0,
+          providerDispatched: false,
+          runId: authority.runId,
+          schemaVersion: 1,
+          source:
+            cause === "approved-local-only"
+              ? "approved-transition-local-only"
+              : "application-provider-rejection",
+        }),
+        { mode: 0o600 }
+      );
+      await observeXeroNoEffect(
+        path,
+        entry.id,
+        async () => ingestXeroNoEffectProof(receiptPath, resolve(path, "..")),
+        authority
+      );
+      expect(readXeroLedger(path, authority).entries[0]?.outcome).toBe(
+        "verified-no-effect"
+      );
+      const cleanup = hooks();
+      expect(
+        await reconcileXeroLedger(path, ledger, cleanup, authority)
+      ).toMatchObject({ fenceReleased: true, unresolved: false });
+      expect(cleanup.observe).not.toHaveBeenCalled();
+      expect(cleanup.cleanupRemote).not.toHaveBeenCalled();
+    }
+  );
+  it.each([
+    "accepted-create",
+    "wrong-action",
+    "wrong-run",
+    "wrong-scope",
+    "empty-query",
+    "timeout",
+  ])("rejects %s as absence proof", async (fault) => {
+    const { authority, entry, ledger, path } = fixture();
+    await dispatchXeroIntent(
+      path,
+      ledger,
+      entry.id,
+      async () => undefined,
+      () => ({ localId: null, remoteId: null }),
+      authority
+    );
+    const proof = {
+      action: entry.action,
+      bindingGeneration: entry.bindingGeneration,
+      candidateSha: authority.candidateSha,
+      causalEvidence: reference,
+      cause: "rejected-before-provider" as const,
+      clerkOrgId: entry.clerkOrgId,
+      fingerprint: entry.fingerprint,
+      intentId: entry.id,
+      observedAt: new Date().toISOString(),
+      organisationId: entry.organisationId,
+      providerDispatched: false as const,
+      runId: authority.runId,
+    };
+    if (fault === "wrong-action") {
+      proof.action = "withdraw";
+    }
+    if (fault === "wrong-run") {
+      proof.runId = randomUUID();
+    }
+    if (fault === "wrong-scope") {
+      proof.clerkOrgId = "org_foreign";
+    }
+    const observer = () => {
+      if (["accepted-create", "empty-query", "timeout"].includes(fault)) {
+        return Promise.reject(
+          new Error("No causal non-dispatch receipt exists")
+        );
+      }
+      return Promise.resolve(proof);
+    };
+    await expect(
+      observeXeroNoEffect(path, entry.id, observer, authority)
+    ).rejects.toThrow();
+    expect(readXeroLedger(path, authority).entries[0]?.outcome).toBe(
+      "uncertain"
+    );
+  });
+  it("refuses legacy manually labelled non-attempts without proof", () => {
+    const { authority, entry, ledger, path } = fixture();
+    entry.outcome = "definite-non-attempt";
+    persistXeroLedger(path, ledger);
+    expect(() => readXeroLedger(path, authority)).toThrow();
+  });
+});
+
+function cancellationProof(
+  entry: Readonly<XeroLedgerEntry>,
+  authority: XeroLedgerAuthority
+): XeroNoEffectProof {
+  return {
+    action: entry.action,
+    bindingGeneration: entry.bindingGeneration,
+    candidateSha: authority.candidateSha,
+    causalEvidence: reference,
+    cause: "cancelled-before-dispatch",
+    clerkOrgId: entry.clerkOrgId,
+    fingerprint: entry.fingerprint,
+    intentId: entry.id,
+    observedAt: new Date().toISOString(),
+    organisationId: entry.organisationId,
+    providerDispatched: false,
+    runId: authority.runId,
+  };
+}
+it.each(["dispatch", "closure", "release"])(
+  "rejects a no-effect proof after concurrent %s",
+  async (change) => {
+    const { authority, entry, path } = fixture();
+    await expect(
+      observeXeroNoEffect(
+        path,
+        entry.id,
+        (observed) => {
+          const current = readXeroLedger(path, authority);
+          const target = current.entries.find((item) => item.id === entry.id);
+          if (!target) {
+            throw new Error("fixture");
+          }
+          if (change === "dispatch") {
+            target.outcome = "dispatched";
+          }
+          if (change === "closure") {
+            current.closure.state = "releasing";
+          }
+          if (change === "release") {
+            current.fenceReleased = true;
+          }
+          persistXeroLedger(path, current);
+          return Promise.resolve(cancellationProof(observed, authority));
+        },
+        authority
+      )
+    ).rejects.toThrow("changed during no-effect observation");
+    const current = readXeroLedger(path, authority);
+    expect(current.entries[0]?.outcome).toBe(
+      change === "dispatch" ? "dispatched" : "intended"
+    );
+    expect(current.entries[0]?.noEffectProof).toBeUndefined();
+    expect(current.closure.state).toBe(
+      change === "closure" ? "releasing" : "pending"
+    );
+    expect(current.fenceReleased).toBe(change === "release");
+  }
+);
+it("preserves an independently inserted sibling when applying a no-effect proof", async () => {
+  const { authority, entry, path } = fixture();
+  const sibling = { ...entry, fingerprint: "c".repeat(64), id: randomUUID() };
+  await observeXeroNoEffect(
+    path,
+    entry.id,
+    (observed) => {
+      const current = readXeroLedger(path, authority);
+      recordXeroIntent(path, current, sibling, authority);
+      return Promise.resolve(cancellationProof(observed, authority));
+    },
+    authority
+  );
+  const current = readXeroLedger(path, authority);
+  expect(current.entries).toHaveLength(2);
+  expect(current.entries.find((item) => item.id === entry.id)?.outcome).toBe(
+    "definite-non-attempt"
+  );
+  expect(current.entries.find((item) => item.id === sibling.id)).toEqual(
+    sibling
+  );
 });

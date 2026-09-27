@@ -276,8 +276,31 @@ describe("Xero charter evidence", () => {
     expect(caseResult(malformed, "161-06").status).toBe("NOT_VERIFIED");
     expect(JSON.stringify(report)).not.toContain("DO_NOT_PUBLISH");
   });
+  it.each([null, undefined])(
+    "reports absent evidence as unverified without a malformed diagnosis",
+    (value) => {
+      const report = buildXeroEvidence(value);
+      expect(report.exitCode).toBe(1);
+      expect(report.json.status).toBe("NOT_VERIFIED");
+      expect(report.json.validationErrors).toEqual([]);
+      expect(report.json.cases).toHaveLength(40);
+      expect(report.json.cases.flatMap((entry) => entry.evidence)).toHaveLength(
+        93
+      );
+      expect(
+        report.json.cases
+          .flatMap((entry) => entry.evidence)
+          .every(
+            (entry) =>
+              entry.status === "NOT_VERIFIED" &&
+              entry.remainingAction ===
+                "Provide and execute the required evidence input"
+          )
+      ).toBe(true);
+      expect(report.markdown).not.toContain("Correct malformed evidence input");
+    }
+  );
   it.each([
-    null,
     {},
     { candidateSha: "bad" },
     { ...input(), prerequisites: { configured_database: "true" } },
