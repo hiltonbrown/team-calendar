@@ -1,15 +1,17 @@
 # Plan 162 executor evidence
 
-Status: COMPLETE for the authorised source corrections F1-F12. All required source gates and the complete protected live integration inventory pass. Deployment, payroll/provider operations and client compatibility campaigns were outside this execution.
+Status: COMPLETE for the authorised source corrections F1-F12 and both final-check form corrections. The final verified source is `f95c8c3710bdd7680a44233e70974bd80fe81524`. All required source gates and the complete protected live integration inventory pass. Deployment, payroll/provider operations and client compatibility campaigns were outside this execution.
 
-## Candidate and ownership
+The initial execution record below remains historical evidence for `4c603ded`. The final-check section records the later corrections and fresh exact-candidate verification; no earlier live result is attributed to the final source.
+
+## Initial execution candidate and ownership
 
 - Worktree: `/home/hilton/.codex/worktrees/ics-calendar-fixes/teamcalendar`.
 - Branch: `codex/ics-calendar-fixes`; source baseline: `43e844b`.
 - Implementation: `4691228fbdbbb8cf57a1570e392dc9357ccde2f4`.
 - Horizon regression: `ea2438e63e93b0451a81025314fbb67437f5f650`.
-- Final source/test candidate: `4c603ded644eaee7df7861d731014b00d1b0b11a`.
-- Final evidence commit changes only this file and `tasks/todo.md`. Runtime and tests remain byte-identical to the exact live candidate above.
+- Initial reviewed source/test candidate: `4c603ded644eaee7df7861d731014b00d1b0b11a`.
+- Initial evidence commit changes only this file and `tasks/todo.md`. Runtime and tests remain byte-identical to the exact live candidate above.
 - No main-branch source changes, push, merge, PR, dependency upgrades, lockfile changes or committed secrets.
 
 The reviewer approved the durable representation/schema design, explicit calendar slot contract and limited fixture-cache cleanup plumbing before implementation. The generated additive SQL was separately reviewed before online application. The live-database instruction remained authoritative throughout; no local database, disposable database or new Neon branch was substituted.
@@ -33,11 +35,11 @@ The reviewer approved the durable representation/schema design, explicit calenda
 
 The shared representation uses the conservative compatibility bound `last_rendered_at >= source.created_at`, preserving UID and seeding the prior sequence plus one, including sequence-zero records/holidays. This is possible prior publication evidence, not proof that each event appeared within the old scope/horizon. Once a ledger entry exists, it governs future versions. Never-rendered/new sources start at zero. No-op and unchanged horizon survivors retain UID/SEQUENCE/DTSTAMP.
 
-## Source verification
+## Initial source verification
 
 The executor ran focused availability, feeds, feed jobs, ICS route, calendar/plans and feed component/loader/service suites while implementing. The final positive preview/cache refinements passed their focused suite and explicit strict integration-file typecheck. The reviewer independently ran the frozen candidate's full gates. Underlying commands below are established by the package scripts and log banners, not invented outer shell invocations.
 
-| Command | Final result |
+| Command | Initial result |
 | --- | --- |
 | `bun install --frozen-lockfile` | Exit 0; lockfile unchanged. |
 | `bun run --cwd packages/database build` | Exit 0; required generated delegates/schema present. |
@@ -67,7 +69,7 @@ Earlier source invocations are retained as failures: production build configurat
 
 Actual authorised target was independently read from SQL: project `soft-dream-28768887`, branch `br-frosty-union-a7sc6dl7`, endpoint `ep-cold-pond-a7ar2epd`. Credentials were consumed privately, omitted from this evidence and never committed.
 
-## Protected full live campaign
+## Initial protected full live campaign
 
 Final run: `30440382-6c42-402c-b8e3-33c0d37818f8` at exact candidate `4c603ded644eaee7df7861d731014b00d1b0b11a`.
 
@@ -114,6 +116,46 @@ The whole baseline whitespace comparison reports one harmless extra blank line a
 
 Only the permitted implementation paths and explicitly reviewed adjacent plans/time/cleanup documentation paths changed. The final documentation commit contains no runtime/test changes. No database or process mutation occurred while writing this final record.
 
+## Final-check corrections and exact-candidate verification
+
+The final user-authorised check required two focused form corrections. Commit `146a74de6a2c09d3b86f0b188227a3edceb16c88` removes timezone-agnostic ordering from the shared/client field schema while retaining all external field validation. The scoped server resolver remains authoritative: it resolves the organisation timezone, preserves matching existing endpoint instants and validates actual ordering before invoking a writer. A valid saved Sydney 20-minute cross-fold event starts at `2026-04-04T15:50:00Z` and ends at `2026-04-04T16:10:00Z`, displaying 02:50 daylight time to 02:10 standard time. Schema, actual client submission and server-action regressions prove unchanged and note-only saves preserve those instants. Reversed new/edit intervals and DST gaps fail without writes; existing earliest-fold, later-fold and seconds-precision assertions remain.
+
+Commit `f95c8c3710bdd7680a44233e70974bd80fe81524` permits equal endpoints only for all-day records, matching their existing inclusive canonical contract. Timed intervals remain strictly positive. Five action regressions prove note-only preservation of an existing same-day record with both endpoints at midnight, reversed all-day create/update rejection without writes and zero-length timed create/update rejection without writes. The sole runtime delta from `146a74d` is this server ordering conditional. No additional database model, migration or DTO was introduced.
+
+The final focused command passed four files and 46 tests:
+
+```sh
+bun --no-env-file run --cwd apps/app test 'app/(authenticated)/plans/plan-form-time.test.ts' 'app/(authenticated)/plans/_actions.test.ts' 'app/(authenticated)/plans/record-form.test.tsx' 'app/(authenticated)/plans/record-form-data.test.tsx'
+```
+
+App TypeScript and focused Biome checks also exited zero. The first timed-fix test fixture widened a record type to string; it was corrected with the existing form input type and the unchanged typecheck passed. The reviewer approved both minimal contracts and the positive/no-write regression assertions.
+
+The timed-fix candidate `146a74d` separately passed all nine source gates (2,901 unit tests and 509 release tests) and protected run `52edd117`: six uncached tasks, 27 files and 254 tests. Its 39-table/377-existing-row content hashes, 22 matching migrations, zero pending migrations, schema/integrity, fixture cleanup and original five worker restoration were independently verified. That run remains historical evidence for its own candidate. The all-day draft remained ignored and unapplied until that campaign closed and workers were restored.
+
+The reviewer then independently ran all nine source commands at exact final candidate `f95c8c3710bdd7680a44233e70974bd80fe81524`. Each command receipt in `/tmp/tc162-final-merge-source-gates.log` records exit zero:
+
+| Command | Final result |
+| --- | --- |
+| `bun run --cwd packages/database build` | PASS; required generated client present. |
+| `bun run check` | PASS; 1,166 files. |
+| `bun run build` | PASS; four uncached tasks. |
+| `bun run typecheck` | PASS; 19 uncached tasks, generated Next types retained. |
+| `bun run boundaries` | PASS; 1,081 files/21 packages. |
+| `bun run test` | PASS; 18 uncached tasks, 2,906 tests. |
+| `bun run test:release-tools` | PASS; 33 files, 509 tests. |
+| `bun run typecheck:release-tools` | PASS. |
+| `bun x --no-install tsc -p .cache/162-support/tsconfig.integration.json --noEmit --listFiles` | PASS; both changed integration suites explicitly included. |
+
+The same reviewed clean environment, serial execution and network-denial preload were used for source gates. An initial sandbox EROFS occurred before Prisma generation; the authorised worktree retry passed without source changes. After source processes closed, the 13 regenerated Prisma formatting-only paths were independently verified with `git diff -w --exit-code` and restored to committed HEAD. The applied migration bytes/checksum were preserved.
+
+Fresh protected run `a7c995f0-27bc-4535-b758-51e2c60c0ac7` verified the exact clean final candidate. The reviewed `.cache/162-support/final-merge-run-live.ts` monitor launched `bun run --conditions=react-server tooling/release/run-live-integration.ts` with absolute manifest/evidence paths under `.cache/162-support/final-merge-run/`, `--preacquired` and `TURBO_CONCURRENCY=1`. The existing full inventory ran without skipped suites: app 2, availability 22, Xero 72, feeds 22, jobs 84 and database 52 tests, totalling 254 tests in 27 files/six uncached tasks.
+
+The runner monitor records 2026-09-27 08:08:43.341 to 08:18:47.631 UTC, exit zero and null isolation failure. The protected receipt records inventory PASS, cleanup PASS, complete phase and released fence. A fresh identity-checked pause/drain of the same five actual local workers protected the fixture window. Independent coherent REPEATABLE READ read-back proves all 39 table counts/full hashes equal the 386-existing-row baseline; the executor also compared the complete private snapshot metadata byte/content structures and confirmed equality. All 22 completed migration checksums match, none are pending, pinned Prisma diff reports no difference, all 12 existing integrity counts are zero and the immutable binding trigger is enabled. Owned database/cache/shared-store fixture residue is zero.
+
+After reviewed closure, the same five original worker identities were restored at 08:19:57.513 UTC. The reviewer independently confirmed original R/S states, the unchanged ten-function catalogue and API HTTP 200 at 08:20 UTC. Private receipts/logs remain in `.cache/162-support/final-merge-run/` and `/tmp/tc162-final-merge-{live,readback,schema-diff,invariants,resume}.log`. These are operational records, not committed credentials.
+
+This completion record changes only `plans/162-executor-evidence.md` and `tasks/todo.md`; runtime/tests remain byte-identical to the exact verified final candidate. No executor database, worker-signal or main-merge action was taken for either correction or this documentation. Root owns the explicitly authorised main merge. The prior 806/c581/304 histories, external customer appends and source environment/timing failures remain preserved above. Browser, client/provider/deployment campaigns and actual PITR availability/exercise remain NOT VERIFIED or outside this source execution.
+
 ## Files changed
 
 ```text
@@ -135,6 +177,7 @@ apps/app/app/(authenticated)/plans/plan-form-time.test.ts
 apps/app/app/(authenticated)/plans/plan-form-time.ts
 apps/app/app/(authenticated)/plans/record-form-data.test.tsx
 apps/app/app/(authenticated)/plans/record-form-data.ts
+apps/app/app/(authenticated)/plans/record-form.test.tsx
 apps/app/app/(authenticated)/plans/record-form.tsx
 apps/app/components/calendar/calendar-create-launcher.test.tsx
 apps/app/components/calendar/calendar-day-view.tsx
