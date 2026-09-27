@@ -8,8 +8,10 @@ main. All nine vetted defect groups are corrected at runtime/test candidate
 lingering browser processes, failure-preserving duplicate/correlation collection,
 phase provenance and retention, exact report candidate identity and absent-evidence
 wording. Shared assertion validation also prevents semantically foreign duplicates
-from displacing valid failures. The reviewed source is approved for local integration;
-main merge is pending. No push or deployment is authorised.
+from displacing valid failures. The reviewed source is merged into main at
+`f3dd965f717fd10bb9d8d0025e087549e53f3541`. Post-merge lint, release types, all 505
+release-tool tests and boundaries PASS; the complete runtime/test tree matches the
+verified candidate. No push or deployment was performed.
 
 All fresh gates PASS: lint, four uncached builds, 19 uncached type tasks, 2,810
 repository tests, 505 release-tool tests, release types and boundaries. Exact-runtime
@@ -98,7 +100,7 @@ regression proving import does not need credentials and role execution still val
 
 - **Status: IN PROGRESS.** Diagnostic reporting, guarded interfaces, catalogue and
   observer foundations are implemented. Scoped recovery/collection corrections are approved
-  at follow-up runtime `5d5889c`, approved for local integration. Operational campaign wiring
+  at follow-up runtime `5d5889c`, merged into main at `f3dd965`. Operational campaign wiring
   and prerequisites remain TODO. Live application/browser/provider verification is
   **NOT VERIFIED**.
 - **Priority:** P1. **Effort:** L. **Risk:** HIGH for execution/cleanup; LOW for plan edits.

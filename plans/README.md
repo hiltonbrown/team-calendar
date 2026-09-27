@@ -4,10 +4,11 @@
 Writing a plan proves nothing; only its recorded evidence does.
 
 Plan 160 follow-up review corrected nine vetted defect groups at `5d5889c` and is
-approved for the explicitly authorised local merge. Fresh checks PASS: 2,810
+merged into main at `f3dd965`. Fresh checks PASS: 2,810
 repository tests, 505 harness tests, lint, build, types and boundaries; protected online
 run `b207173c-ec6b-4bef-ba68-3937ad8227df` passes 246 tests with zero owned residue,
-unchanged existing content/schema and released ownership. Main integration is pending.
+unchanged existing content/schema and released ownership. Main post-merge lint,
+release types, all 505 release tests and boundaries PASS; tested runtime bytes are unchanged.
 Full Plan 160 and the real provider/browser campaign remain IN PROGRESS/NOT VERIFIED.
 See the [follow-up review](160-execution-review.md) and
 [latest diagnostic](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md).
@@ -33,7 +34,7 @@ Plan 160 reviewed and reconciled on 27 September 2026 at `92d67c5`. Its runtime/
 | --- | --- | --- | --- |
 | [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `92d67c5` on 27 September; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | TODO |
-| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: follow-up recovery/evidence fixes APPROVED at `5d5889c`, local merge pending; 2,810 units / 505 harness / 246 protected online tests PASS; real lease, operational drivers/producers and prerequisites remain TODO; campaign NOT VERIFIED |
+| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: follow-up recovery/evidence fixes merged at `f3dd965`, tested runtime `5d5889c`; 2,810 units / 505 harness / 246 protected online tests PASS; real lease, operational drivers/producers and prerequisites remain TODO; campaign NOT VERIFIED |
 | [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, references | P1 | IN PROGRESS |
 
 Plan 161 is a charter plus nine executable sub-plans. It deliberately contains no unit
@@ -87,7 +88,7 @@ database constraint. Follow 161.
 
 Plan 160's reviewed source now supplies durable recovery, report delivery,
 connection-action scope, strict causal ingestion and scenario/lifecycle collection contracts.
-The follow-up candidate `5d5889c` is approved for the user-authorised local integration.
+The follow-up candidate `5d5889c` is integrated into main at `f3dd965`.
 Its next operational work must follow the concrete application worker-fencing contract
 under Plan 159 and go-live. Fixture variables alone cannot activate the refused runner.
 Actual causal audit, case/controlled-handler producers and scheduled X08 remain required.
