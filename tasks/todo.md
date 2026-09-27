@@ -1713,3 +1713,14 @@ Final-check review: both scoped form corrections are complete and approved at `f
 Fresh protected run `a7c995f0-27bc-4535-b758-51e2c60c0ac7` at that exact source passes all 27 files/254 tests/six uncached tasks (08:08:43.341 to 08:18:47.631 UTC). The actual-worker monitor exits zero with no isolation failure. Inventory/cleanup pass, owned residue is zero and the fence is released. Independent read-back proves all 39 full table hashes/counts equal the 386-existing-row baseline, 22 matching completed migration checksums, zero pending migrations, schema equality and integrity. The original five worker identities were restored at 08:19:57.513 UTC, then the reviewer confirmed R/S states, the ten-function catalogue and API HTTP 200 at 08:20 UTC.
 
 Final evidence changes only this task record and `plans/162-executor-evidence.md`; runtime/tests remain byte-identical to the verified final source. Root owns the user-authorised main merge. Historical candidate results and all earlier path/network/environment/recovery failures remain intact. Browser/client/provider/deployment campaigns and actual PITR availability/exercise remain NOT VERIFIED or outside scope.
+
+### Plan 162 authorised main merge
+
+- [x] Commit final review documents at `d009d36` and verify documentation-only executor head `ae501c8` preserves exact tested source `f95c8c3`.
+- [x] Merge the approved branch into main without conflicts at `142d128ec2d2068df9f0b6be147a0c710ba2b25a`.
+- [x] Independently prove merged source/tests equal the build- and live-tested final candidate.
+- [x] Repeat main lint, types, boundaries, all 2,906 unit tests, 509 release tests and release types, all passing with uncached serial execution.
+- [x] Restore only 13 independently verified formatting-only generated artefacts after checks close; preserve the applied migration checksum and final clean source.
+- [x] Commit final merge/results documentation; no push or deployment.
+
+Review: user-authorised local merge is complete. Main post-merge command receipts all exit zero in `/tmp/tc162-main-post-merge-gates.log`; tested-source equality passes before and after generated artefact restoration. Source and migration bytes remain unchanged from the final verified candidate. Actual browser/provider/client/deployment campaigns and PITR availability/exercise remain outside this correction slice.

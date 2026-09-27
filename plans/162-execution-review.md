@@ -9,8 +9,11 @@ Both final-check date-edit defects are corrected. Fresh verification passes
 existing rows, matched 22 completed migration checksums with none pending,
 passed schema/integrity checks, removed owned fixtures and released ownership.
 The five original workers were restored and independently checked. The user's
-subsequent instruction authorises the local main commit and merge; post-merge
-identity and checks will be recorded below.
+subsequent instruction authorised the local main commit and merge, completed
+without conflicts at `142d128`. Main post-merge checks pass and its source/tests
+remain identical to the verified candidate. The final documentation branch head
+is `ae501c890f4c0f096e25d19bc3bb79df8c9a51f9`; its only changes from `f95c8c3`
+are sanitised execution evidence and the completed task record.
 
 Original approved source candidate: `4c603ded644eaee7df7861d731014b00d1b0b11a`.
 Implementation commit: `4691228fbdbbb8cf57a1570e392dc9357ccde2f4`.
@@ -214,10 +217,10 @@ included. Source/live proof remains tied to its exact verified candidate.
 
 - [x] Fresh independent final code review and focused regression checks.
 - [x] Read-only current live migration/schema and integrity check.
-- [ ] Commit the advisor's reviewed plan documents and any necessary scoped fixes.
-- [ ] Merge the approved feature branch into main, preserving unrelated work.
-- [ ] Verify main source equals the tested source and post-merge checks pass.
-- [ ] Record merge identity and final clean status.
+- [x] Commit the advisor's reviewed plan documents and any necessary scoped fixes.
+- [x] Merge the approved feature branch into main, preserving unrelated work.
+- [x] Verify main source equals the tested source and post-merge checks pass.
+- [x] Record merge identity and final clean status.
 
 The fresh feed review found no remaining blocker. The advisor reproduced a
 calendar edit defect with the actual schema: a valid Sydney interval from
@@ -312,3 +315,44 @@ logs use `/tmp/tc162-final-merge-` prefixes and the ignored private evidence bun
 is `.cache/162-support/final-merge-run/` in the executor worktree.
 Actual browser/provider/client, deployment and PITR restore proof remain
 NOT VERIFIED; those broader campaigns are outside this correction slice.
+
+## Authorised main merge and post-merge verification
+
+The advisor committed the reviewed four plan documents at
+`d009d3667dbc1c38773ea663662510ff1bbda44b`. The executor's final documentation
+commit `ae501c890f4c0f096e25d19bc3bb79df8c9a51f9` was independently read in full:
+only `plans/162-executor-evidence.md` and `tasks/todo.md` changed, whitespace
+passed and runtime/tests equal `f95c8c3`. Main was clean before the merge.
+
+Merge `142d128ec2d2068df9f0b6be147a0c710ba2b25a` combines those exact parents
+without conflicts. Independent whole-tree equality outside plan/task records
+passes against `f95c8c3`. The applied migration retains SHA-256
+`18ffd7cc8703b8b196b62b57f385cf965741765113c46a3c75ed9a020092b002`.
+No dependency or lockfile changes were introduced.
+
+The reviewer independently ran six original commands on merged main:
+
+| Command | Post-merge result |
+| --- | --- |
+| `bun run check` | PASS, 1,166 files |
+| `bun run typecheck` | PASS, 19 uncached tasks |
+| `bun run boundaries` | PASS, 1,081 files/21 packages |
+| `bun run test` | PASS, 18 uncached tasks/2,906 tests |
+| `bun run test:release-tools` | PASS, 33 files/509 tests |
+| `bun run typecheck:release-tools` | PASS |
+
+Actual command receipts all exit zero in `/tmp/tc162-main-post-merge-gates.log`.
+The private wrapper checks the exact clean merge commit and tested-source
+equality before execution, forces uncached serial gates and denies source-test
+network access. The final source's independently passed build and protected
+live campaign retain exact runtime/test equality after merge. No source fixes,
+test timeout changes or database reruns were needed after merging.
+
+All 13 regenerated Prisma artefacts were independently proved whitespace-only
+after every post-merge process closed and restored individually. Main then
+returned to clean status and tested-source equality passed again. Final edits
+only record this merge and completed checks, correct documentation whitespace
+and update the checklist; source and migration bytes remain unchanged. The
+generated applied SQL's historical trailing blank line remains preserved.
+No push or deployment was performed. Browser/provider/client and PITR limits
+remain as recorded above.

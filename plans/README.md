@@ -10,14 +10,15 @@ instructions. Refresh candidate-specific protected ownership, target, consumer
 isolation and cleanup evidence; missing safeguards are implementation work.
 Historical live results never establish a new candidate's pass.
 
-Plan 162 final pre-merge check is APPROVED under the user's subsequent commit
+Plan 162 is merged to main at `142d128` under the user's subsequent commit
 and merge instruction. Fresh feed review found no blocker; the valid timed edit
 crossing Sydney's repeated hour and inclusive same-day all-day edit are corrected
 at `f95c8c3`. All fresh source gates pass, including 2,906 unit and 509 release
 tests. Exact-candidate protected live campaign `a7c995f0` passes all 254 tests,
 preserves 39 tables/386 existing rows and confirms schema, cleanup, released
-ownership and restoration of the original workers. Local merge and post-merge
-verification follow. Prior
+ownership and restoration of the original workers. Main post-merge lint, types,
+boundaries, all 2,906 units and 509 release tests pass; source/tests equal the
+exact verified candidate. No push or deployment was performed. Prior
 `4c603ded` and `146a74d` results remain historical candidate-specific evidence.
 
 Plan 160 follow-up review corrected nine vetted defect groups at `5d5889c` and is
@@ -62,8 +63,9 @@ and all 27 files/254 protected live tests PASS. The reviewed additive migration 
 applied; 22 checksums and schema equality, all 39 table hashes/386 existing rows,
 zero owned residue, released ownership and restoration of the five original
 local worker identities are verified. Earlier failures and external appends are
-retained as separate evidence. The subsequent user request authorises local
-commit/merge to main after this final review. No push or deployment is included.
+retained as separate evidence. The subsequent user-authorised local merge is
+`142d128`; post-merge checks pass with source/tests unchanged. The executor's
+documentation-only head is `ae501c8`. No push or deployment was performed.
 Use the already authorised online Neon database through the protected live runner for
 all database verification. This follows `tasks/lessons.md` and the user's explicit
 instruction; no localhost, Docker, disposable database or new Neon branch fallback.
@@ -86,7 +88,7 @@ areas are recorded in the review.
 
 | Plan | Scope | Priority | Status |
 | --- | --- | --- | --- |
-| [162: ICS and calendar corrections](162-execution-plan.md) | All twelve confirmed feed/calendar defects and both final-check date edits | P1 | DONE: approved final source `f95c8c3`, 2,906 units / 509 release / 254 protected live tests; migration/content/cleanup and original worker restoration verified, local merge authorised |
+| [162: ICS and calendar corrections](162-execution-plan.md) | All twelve confirmed feed/calendar defects and both final-check date edits | P1 | DONE: merged main `142d128`, tested source `f95c8c3`; 2,906 units / 509 release / 254 protected live tests and post-merge checks PASS; content/schema/cleanup and original workers verified |
 | [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `92d67c5` on 27 September; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | TODO |
 | [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: follow-up recovery/evidence fixes merged at `f3dd965`, tested runtime `5d5889c`; 2,810 units / 505 harness / 246 protected online tests PASS; real lease, operational drivers/producers and prerequisites remain TODO; campaign NOT VERIFIED |

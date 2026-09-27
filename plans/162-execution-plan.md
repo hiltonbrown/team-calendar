@@ -5,7 +5,7 @@
 ## Status and authority
 
 - Status: DONE for all confirmed findings F1-F12 and both final-check date-edit corrections, final source `f95c8c3`, independently verified on 27 September 2026. [Execution review](162-execution-review.md) records the scoped approval and evidence; wider go-live/provider/client campaigns remain separate.
-- Final pre-merge check: APPROVE at `f95c8c3`. All fresh source gates pass, including 2,906 unit and 509 release tests. Exact-candidate protected live campaign `a7c995f0` passes 27 files/254 tests, with full 39-table/386-row preservation, matching migration/schema/integrity checks, zero owned residue, released ownership and restoration of the five original workers. Local merge and post-merge checks follow the user's authorisation.
+- Final check and merge: APPROVE at `f95c8c3`, merged to main without conflicts at `142d128`. All fresh source gates pass, including 2,906 unit and 509 release tests. Exact-candidate protected live campaign `a7c995f0` passes 27 files/254 tests, with full 39-table/386-row preservation, matching migration/schema/integrity checks, zero owned residue, released ownership and restoration of the five original workers. Main post-merge lint/types/boundaries, 2,906 unit tests and 509 release tests pass with source/tests unchanged.
 - Subsequent user instruction explicitly authorises the reviewer to commit and merge locally to main after final checks. This supersedes the earlier execution-only merge restriction. No push or deployment is included; the executor still works and commits only in its isolated branch.
 - Planned at: `43e844b`. `git diff --exit-code 514efb5..43e844b -- apps packages tooling .github package.json bun.lock PRODUCT.md DESIGN.md .impeccable.md` exits 0: audit runtime is unchanged.
 - Priority: P1 correctness/privacy, followed by P2 calendar interaction/performance and P3 catalogue.
@@ -139,7 +139,7 @@ The slot design and named plan-form-time.ts helper are approved: explicit date/t
 
 The live-cache cleanup design is approved. Validate actual Redis SCAN envelopes, including numeric-string cursors, rather than trusting a TypeScript generic. Suite teardown purges owned feed keys before deleting feed rows, and protected interrupted-run cleanup follows the same order. Assert foreign keys remain untouched. Real cache tests must fail explicitly if the dedicated fixture pair is absent; an optional-cache no-op cannot prove live caching.
 
-## Completion review, 27 September 2026
+## Original isolated completion review, 27 September 2026
 
 - [x] All F1-F12 implemented in the managed worktree and full diff reviewed.
 - [x] Full source gates independently pass at `4c603ded`, including 2,893 unit tests and 509 release tests.
@@ -148,5 +148,14 @@ The live-cache cleanup design is approved. Validate actual Redis SCAN envelopes,
 - [x] All 39 table content hashes/351 pre-existing rows preserved, owned fixtures cleaned and ownership released.
 - [x] Actual local worker pause held through closure; all five original identities restored and endpoints verified.
 - [x] Sanitised evidence and completed tasks committed at `2228223`, with runtime/tests equal to the verified candidate and clean worktree.
-- [x] Advisor verdict APPROVE; no merge, push or deployment. Historical failures and unverified browser/provider/client/PITR evidence remain explicit in the execution review.
+- [x] Original advisor verdict APPROVE; no merge, push or deployment during that initial execution. Historical failures and unverified browser/provider/client/PITR evidence remain explicit in the execution review.
 
+## Final-check and authorised merge completion, 27 September 2026
+
+- [x] Both cross-fold timed-edit and inclusive all-day edit defects fixed with meaningful positive and no-write regressions.
+- [x] Final source `f95c8c3` independently passes full gates, 2,906 unit tests and 509 release tests.
+- [x] Fresh exact-source live run `a7c995f0` passes 27 files/254 tests, full 39-table/386-row preservation, schema/integrity/cleanup and original worker restoration.
+- [x] Final documentation head `ae501c8` contains only evidence/tasks and preserves tested source byte-for-byte.
+- [x] User-authorised main merge `142d128` completes without conflicts; tested-source equality passes.
+- [x] Main post-merge lint, both types, boundaries, 2,906 unit tests and 509 release tests pass; generated formatting-only artefacts restored and final records committed.
+- [x] No push or deployment; actual browser/provider/client/PITR proof remains outside this correction slice.
