@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { wallClockToInstant } from "./plan-form-time";
 
 export const xeroLeaveRecordTypes = [
   "annual_leave",
@@ -91,15 +92,21 @@ export const PlanRecordFormSchema = z
         "use_alternative_contact",
       ])
       .default("contactable"),
-    endsAt: z.string().min(1, "End date is required"),
-    endTime: z.string().optional(),
+    endsAt: z.iso.date("End date is required"),
+    endTime: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid end time")
+      .optional(),
     notesInternal: z.string().max(2000).optional(),
     organisationId: z.string().uuid(),
     personId: z.string().uuid(),
     privacyMode: z.enum(["named", "masked", "private"]).default("named"),
     recordType: z.enum(userCreatableRecordTypes),
-    startsAt: z.string().min(1, "Start date is required"),
-    startTime: z.string().optional(),
+    startsAt: z.iso.date("Start date is required"),
+    startTime: z
+      .string()
+      .regex(/^(?:[01]\d|2[0-3]):[0-5]\d$|^$/, "Enter a valid start time")
+      .optional(),
   })
   .refine(
     (value) =>
@@ -130,10 +137,15 @@ export function buildFormDate(
   date: string,
   time: string | undefined,
   allDay: boolean,
-  isEnd = false
+  isEnd = false,
+  timezone = "UTC"
 ): Date {
   if (allDay) {
     return new Date(`${date}T${isEnd ? "23:59:59.999" : "00:00:00.000"}Z`);
   }
-  return new Date(`${date}T${time || (isEnd ? "17:00" : "09:00")}:00.000Z`);
+  return wallClockToInstant(
+    date,
+    time || (isEnd ? "17:00" : "09:00"),
+    timezone
+  );
 }

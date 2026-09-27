@@ -104,11 +104,8 @@ describe("feed-service getFeedDetail cross-tenant behavior", () => {
     vi.clearAllMocks();
   });
 
-  it("returns feed_not_found and logs cross-tenant access attempt when feed is in another org", async () => {
-    mocks.feedFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      clerk_org_id: "org_other",
-      organisation_id: "00000000-0000-4000-8000-000000000009",
-    });
+  it("returns feed_not_found without reading another organisation for diagnostics", async () => {
+    mocks.feedFindFirst.mockResolvedValue(null);
 
     const result = await getFeedDetail({
       ...baseInput,
@@ -120,22 +117,11 @@ describe("feed-service getFeedDetail cross-tenant behavior", () => {
       error: { code: "feed_not_found" },
       ok: false,
     });
-    expect(mocks.logError).toHaveBeenCalledWith(
-      "Cross-tenant resource access attempt",
-      {
-        actingClerkOrgId: baseInput.clerkOrgId,
-        actingOrganisationId: baseInput.organisationId,
-        resourceId: "00000000-0000-4000-8000-000000000099",
-        resourceType: "feed",
-      }
-    );
+    expect(mocks.logError).not.toHaveBeenCalled();
   });
 
   it("returns identical result for cross-tenant feed and non-existent feed", async () => {
-    mocks.feedFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      clerk_org_id: "org_other",
-      organisation_id: "00000000-0000-4000-8000-000000000009",
-    });
+    mocks.feedFindFirst.mockResolvedValue(null);
     const crossTenantResult = await getFeedDetail({
       ...baseInput,
       actingPersonId,

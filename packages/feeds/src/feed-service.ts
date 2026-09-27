@@ -1,4 +1,3 @@
-import { log } from "@repo/observability/log";
 import "server-only";
 
 import { withinLimit } from "@repo/auth/server";
@@ -547,7 +546,7 @@ export async function restoreFeed(
       where: scopedFeed(parsed.data),
     });
     if (!existing) {
-      return await feedNotFound(parsed.data);
+      return feedNotFound();
     }
     if (existing.status !== "archived") {
       return invalidTransition();
@@ -692,7 +691,7 @@ export async function getFeedDetail(
       where: scopedFeed(parsed.data),
     });
     if (!feed) {
-      return await feedNotFound(parsed.data);
+      return feedNotFound();
     }
 
     const scopes = feed.scopes.map((scope) => ({
@@ -813,7 +812,7 @@ async function transitionFeed(
       where: scopedFeed(parsed.data),
     });
     if (!existing) {
-      return await feedNotFound(parsed.data);
+      return feedNotFound();
     }
     if (existing.status === "archived" || existing.archived_at) {
       return feedArchived();
@@ -847,7 +846,7 @@ async function loadFeedForUpdate(
     where: scopedFeed(input),
   });
   if (!feed) {
-    return await feedNotFound(input);
+    return feedNotFound();
   }
   if (feed.status === "archived" || feed.archived_at) {
     return feedArchived();
@@ -930,27 +929,7 @@ function toTokenHistoryItem(token: TokenRow): TokenHistoryItem {
   };
 }
 
-async function feedNotFound(input: {
-  clerkOrgId: string;
-  feedId: string;
-  organisationId: string;
-}): Promise<Result<never, FeedServiceError>> {
-  const exists = await database.feed.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.feedId },
-  });
-  if (
-    exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
-      exists.organisation_id !== input.organisationId)
-  ) {
-    log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
-      actingOrganisationId: input.organisationId,
-      resourceId: input.feedId,
-      resourceType: "feed",
-    });
-  }
+function feedNotFound(): Result<never, FeedServiceError> {
   return {
     error: { code: "feed_not_found", message: "Feed not found." },
     ok: false,

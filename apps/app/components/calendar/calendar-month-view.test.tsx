@@ -33,6 +33,55 @@ describe("CalendarMonthView", () => {
     expect(grid).not.toBeNull();
   });
 
+  it("preserves validated scope and all filters in overflow and mobile drill-down links", () => {
+    const filters = {
+      anchor: "2026-04-01",
+      approvalStatus: ["approved", "submitted"],
+      includeDrafts: true,
+      locationId: ["00000000-0000-4000-8000-000000000200"],
+      personType: ["employee"],
+      recordType: ["wfh"],
+      recordTypeCategory: "local_only",
+      scopeType: "team",
+      scopeValue: "00000000-0000-4000-8000-000000000100",
+      surface: "calendar",
+      view: "month",
+    } as const;
+    render(
+      <CalendarMonthView
+        actingPersonId={null}
+        data={calendarRange({ eventCount: 5 })}
+        filters={{
+          ...filters,
+          approvalStatus: [...filters.approvalStatus],
+          locationId: [...filters.locationId],
+          personType: [...filters.personType],
+          recordType: [...filters.recordType],
+        }}
+        orgQueryValue="org_1"
+        selectedPersonId={null}
+      />
+    );
+    for (const name of ["+2 more", "View day"]) {
+      const href = screen.getByRole("link", { name }).getAttribute("href");
+      const params = new URL(href ?? "", "https://example.com").searchParams;
+      expect(params.get("view")).toBe("day");
+      expect(params.get("anchor")).toBe("2026-04-15");
+      expect(params.get("org")).toBe("org_1");
+      expect(params.get("scopeType")).toBe("team");
+      expect(params.get("scopeValue")).toBe(filters.scopeValue);
+      expect(params.get("recordTypeCategory")).toBe("local_only");
+      expect(params.get("includeDrafts")).toBe("true");
+      expect(params.getAll("approvalStatus")).toEqual([
+        "approved",
+        "submitted",
+      ]);
+      expect(params.getAll("recordType")).toEqual(["wfh"]);
+      expect(params.getAll("personType")).toEqual(["employee"]);
+      expect(params.getAll("locationId")).toEqual(filters.locationId);
+    }
+  });
+
   it("ensures calendar create control has no focusable interactive descendants", () => {
     render(
       <CalendarMonthView

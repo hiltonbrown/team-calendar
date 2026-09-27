@@ -436,21 +436,10 @@ export const updateManualAvailability = async (
   }
 
   try {
-    const derivedUidKey = deriveAvailabilityUidKey({
-      clerkOrgId: tenant.clerkOrgId,
-      endsAt: merged.data.endsAt,
-      organisationId: tenant.organisationId,
-      personId: existing.person_id,
-      recordType: merged.data.recordType,
-      sourceType: "manual",
-      stableSourceKey: recordId,
-      startsAt: merged.data.startsAt,
-    });
     const record = await database.availabilityRecord.update({
       data: {
         all_day: merged.data.allDay,
         contactability: merged.data.contactability,
-        derived_uid_key: derivedUidKey,
         ends_at: merged.data.endsAt,
         include_in_feed: merged.data.includeInFeed,
         notes_internal: merged.data.notesInternal,

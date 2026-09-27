@@ -1,4 +1,3 @@
-import { log } from "@repo/observability/log";
 import "server-only";
 
 import type { Result } from "@repo/core";
@@ -60,8 +59,20 @@ export async function previewFeed(
       },
     });
     if (!feed) {
-      return await feedNotFound(parsed.data);
+      return feedNotFound();
     }
+
+    const actingPerson = await database.person.findFirst({
+      select: { id: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: parsed.data.clerkOrgId,
+        clerk_user_id: parsed.data.actingUserId,
+        is_active: true,
+        organisation_id: parsed.data.organisationId,
+      },
+    });
+    const actingPersonId = actingPerson?.id ?? null;
 
     const requestedPrivacy = parsed.data.privacyMode ?? feed.privacy_mode;
     if (!isAdminOrOwner(role) && requestedPrivacy !== feed.privacy_mode) {
@@ -69,7 +80,7 @@ export async function previewFeed(
     }
 
     const visible = await canViewFeed({
-      actingPersonId: parsed.data.actingPersonId ?? null,
+      actingPersonId,
       clerkOrgId: parsed.data.clerkOrgId,
       createdByUserId: feed.created_by_user_id,
       organisationId: parsed.data.organisationId,
@@ -87,7 +98,7 @@ export async function previewFeed(
     }
 
     const result = await projectFeedEvents({
-      actingPersonId: parsed.data.actingPersonId ?? null,
+      actingPersonId,
       actingRole: role,
       clerkOrgId: parsed.data.clerkOrgId,
       feedId: parsed.data.feedId,
@@ -110,27 +121,7 @@ export async function previewFeed(
   }
 }
 
-async function feedNotFound(input: {
-  clerkOrgId: string;
-  feedId: string;
-  organisationId: string;
-}): Promise<Result<never, PreviewServiceError>> {
-  const exists = await database.feed.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.feedId },
-  });
-  if (
-    exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
-      exists.organisation_id !== input.organisationId)
-  ) {
-    log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
-      actingOrganisationId: input.organisationId,
-      resourceId: input.feedId,
-      resourceType: "feed",
-    });
-  }
+function feedNotFound(): Result<never, PreviewServiceError> {
   return {
     error: { code: "feed_not_found", message: "Feed not found." },
     ok: false,

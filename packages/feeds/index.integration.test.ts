@@ -1,5 +1,7 @@
+import { executeRedisRestCommand } from "@repo/core";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { z } from "zod";
 
 // getFeedDetail builds the full subscribe URL from the API origin and
 // requires it to be configured. Provide one for the integration environment.
@@ -10,6 +12,16 @@ const fixture = allocateLiveTestFixture(
   "packages/feeds/index.integration.test.ts"
 );
 const {
+  materialiseAvailabilityPublication,
+  archiveFeed,
+  restoreFeed,
+  resumeFeed,
+  issueToken,
+  purgeFeedCacheEntries,
+  setFeedCacheClientForTests,
+  feedCacheKey,
+  getCachedFeedBody,
+  setCachedFeedBody,
   createFeed,
   createInitialTokenWithClient,
   ensureDefaultCalendarFeed,
@@ -22,6 +34,93 @@ const {
   signedFeedTokenId,
 } = await import("./index");
 const { database } = await import("@repo/database");
+
+const { url: fixtureKvUrl, token: fixtureKvToken } = z
+  .object({ token: z.string().min(1), url: z.string().url() })
+  .parse({
+    token: process.env.TC_TEST_KV_REST_API_TOKEN,
+    url: process.env.TC_TEST_KV_REST_API_URL,
+  });
+async function listOwnedFeedCacheKeys(input: {
+  feedIds: string[];
+}): Promise<string[]> {
+  const keys = new Set<string>();
+  for (const feedId of input.feedIds) {
+    z.string().uuid().parse(feedId);
+    let cursor = 0;
+    do {
+      const [next, entries] = z
+        .tuple([z.coerce.number().int().nonnegative(), z.array(z.string())])
+        .parse(
+          await fixtureRedis([
+            "SCAN",
+            cursor,
+            "MATCH",
+            `feed:${feedId}:*`,
+            "COUNT",
+            100,
+          ])
+        );
+      for (const key of entries) {
+        expect(key.startsWith(`feed:${feedId}:`)).toBe(true);
+        keys.add(key);
+      }
+      cursor = next;
+    } while (cursor !== 0);
+  }
+  return [...keys];
+}
+async function purgeOwnedFeedCacheKeys(input: {
+  feedIds: string[];
+}): Promise<void> {
+  for (const feedId of input.feedIds) {
+    const result = await purgeFeedCacheEntries({ feedId });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error(result.error.message);
+    }
+  }
+  expect(await listOwnedFeedCacheKeys(input)).toEqual([]);
+}
+async function fixtureRedis<T>(command: Array<string | number>): Promise<T> {
+  const result = await executeRedisRestCommand<T>({
+    command,
+    token: fixtureKvToken,
+    url: fixtureKvUrl,
+  });
+  if (!result.ok) {
+    throw new Error("Owned feed Redis command failed");
+  }
+  return result.value;
+}
+setFeedCacheClientForTests({
+  del: (...keys) => fixtureRedis(["DEL", ...keys]),
+  get: async <T>(key: string): Promise<T | null> => {
+    const value = await fixtureRedis<string | null>(["GET", key]);
+    // The shared cache client contract parses its stored JSON envelope.
+    return value === null ? null : JSON.parse(value);
+  },
+  scan: async (cursor, options) =>
+    z
+      .tuple([z.coerce.number(), z.array(z.string())])
+      .parse(
+        await fixtureRedis<unknown>([
+          "SCAN",
+          cursor,
+          "MATCH",
+          options.match ?? "*",
+          "COUNT",
+          options.count ?? 100,
+        ])
+      ),
+  set: (key, value, options) =>
+    fixtureRedis([
+      "SET",
+      key,
+      JSON.stringify(value),
+      ...(options?.ex ? ["EX", options.ex] : []),
+    ]),
+});
 
 const tenant = {
   ...fixture.tenants[0],
@@ -52,6 +151,323 @@ describe("feed services", () => {
       })
     ).resolves.toBe(0);
     await database.$disconnect();
+  });
+
+  test("keeps current event bytes stable and versions missed canonical edits per feed", async () => {
+    const created = await createTestFeed();
+    const seeded = await seedRepresentationRecord();
+    const first = await renderFeedForToken(created.plaintext);
+    expect(first.ok).toBe(true);
+    if (!first.ok) {
+      throw new Error(first.error.message);
+    }
+    const firstLedger = await database.feedEventPublication.findFirstOrThrow({
+      where: { ...seeded.scope, feed_id: created.feedId },
+    });
+    expect(firstLedger.published_sequence).toBe(0);
+    const repeated = await Promise.all([
+      renderFeedForToken(created.plaintext),
+      renderFeedForToken(created.plaintext),
+    ]);
+    for (const result of repeated) {
+      expect(result.ok && result.value.body).toBe(first.value.body);
+      expect(result.ok && result.value.etag).toBe(first.value.etag);
+    }
+    await database.availabilityRecord.updateMany({
+      data: {
+        ends_at: new Date(seeded.startsAt.getTime() + 86_400_000),
+        starts_at: new Date(seeded.startsAt.getTime() + 86_400_000),
+        title: "Changed without canonical materialisation",
+      },
+      where: { ...seeded.scope, id: seeded.recordId },
+    });
+    const changed = await renderFeedForToken(created.plaintext);
+    expect(changed.ok && changed.value.body).toContain(
+      "Changed without canonical"
+    );
+    const changedLedger = await database.feedEventPublication.findFirstOrThrow({
+      where: { ...seeded.scope, feed_id: created.feedId },
+    });
+    expect(changedLedger.published_uid).toBe(firstLedger.published_uid);
+    expect(changedLedger.published_sequence).toBe(1);
+    expect(changedLedger.published_at.getTime()).toBeGreaterThanOrEqual(
+      firstLedger.published_at.getTime()
+    );
+    await expect(
+      database.feedEventPublication.count({
+        where: {
+          clerk_org_id: otherTenant.clerkOrgId,
+          organisation_id: otherTenant.organisationId,
+        },
+      })
+    ).resolves.toBe(0);
+  });
+
+  test("upgrades historical record and holiday sequence zero while new materialised records start zero", async () => {
+    const created = await createTestFeed();
+    const old = await seedRepresentationRecord();
+    await database.availabilityRecord.updateMany({
+      data: { created_at: new Date("2020-01-01") },
+      where: { ...old.scope, id: old.recordId },
+    });
+    expect(
+      await materialiseAvailabilityPublication({
+        availabilityRecordId: old.recordId,
+        clerkOrgId: tenant.clerkOrgId,
+        organisationId: tenant.organisationId,
+      })
+    ).toMatchObject({ ok: true });
+    const holiday = await database.publicHoliday.create({
+      data: {
+        ...old.scope,
+        country_code: "AU",
+        created_at: new Date("2020-01-01"),
+        holiday_date: old.startsAt,
+        holiday_type: "public",
+        name: "Historical holiday",
+        source: "manual",
+      },
+    });
+    const fresh = await seedRepresentationRecord();
+    expect(
+      await materialiseAvailabilityPublication({
+        availabilityRecordId: fresh.recordId,
+        clerkOrgId: tenant.clerkOrgId,
+        organisationId: tenant.organisationId,
+      })
+    ).toMatchObject({ ok: true });
+    await database.feed.updateMany({
+      data: {
+        includes_public_holidays: true,
+        last_rendered_at: new Date("2025-01-01"),
+      },
+      where: { ...old.scope, id: created.feedId },
+    });
+    expect(await renderFeedForToken(created.plaintext)).toMatchObject({
+      ok: true,
+    });
+    const rows = await database.feedEventPublication.findMany({
+      where: { ...old.scope, feed_id: created.feedId },
+    });
+    expect(
+      rows.find((row) => row.source_key === `availability:${old.recordId}`)
+        ?.published_sequence
+    ).toBe(1);
+    expect(
+      rows.find((row) => row.source_key === `holiday:${holiday.id}`)
+        ?.published_sequence
+    ).toBe(1);
+    expect(
+      rows.find((row) => row.source_key === `availability:${fresh.recordId}`)
+        ?.published_sequence
+    ).toBe(0);
+  });
+
+  test("uses real Redis while fencing a stale immutable write after privacy changes", async () => {
+    const created = await createTestFeed();
+    const seeded = await seedRepresentationRecord();
+    const initial = await renderFeedForToken(created.plaintext);
+    if (!initial.ok) {
+      throw new Error(initial.error.message);
+    }
+    const oldKey = feedCacheKey({
+      etag: initial.value.etag,
+      feedId: created.feedId,
+    });
+    expect(await getCachedFeedBody(oldKey)).toMatchObject({
+      ok: true,
+      value: { etag: initial.value.etag },
+    });
+    await database.feed.updateMany({
+      data: { privacy_mode: "private" },
+      where: { ...seeded.scope, id: created.feedId },
+    });
+    const privateBody = await renderFeedForToken(created.plaintext);
+    if (!privateBody.ok) {
+      throw new Error(privateBody.error.message);
+    }
+    expect(privateBody.value.body).not.toContain("Owned Person");
+    await setCachedFeedBody({
+      body: initial.value.body,
+      etag: initial.value.etag,
+      key: oldKey,
+      ttlSeconds: 3600,
+    });
+    const revalidated = await renderFeedForToken(created.plaintext);
+    expect(revalidated.ok && revalidated.value.body).toBe(
+      privateBody.value.body
+    );
+    expect(revalidated.ok && revalidated.value.etag).toBe(
+      privateBody.value.etag
+    );
+    const ownedCache = {
+      feedIds: [created.feedId],
+    };
+    expect(
+      (await listOwnedFeedCacheKeys(ownedCache)).length
+    ).toBeGreaterThanOrEqual(2);
+    await purgeOwnedFeedCacheKeys(ownedCache);
+    expect(await listOwnedFeedCacheKeys(ownedCache)).toEqual([]);
+  });
+
+  test("versions person, location and privacy output and retains removal history", async () => {
+    const created = await createTestFeed();
+    const seeded = await seedRepresentationRecord();
+    await renderFeedForToken(created.plaintext);
+    await database.person.updateMany({
+      data: { display_name: "Renamed Person" },
+      where: { ...seeded.scope, id: seeded.personId },
+    });
+    const renamed = await renderFeedForToken(created.plaintext);
+    expect(renamed.ok && renamed.value.body).toContain("Renamed Person");
+    await database.location.updateMany({
+      data: { name: "Sydney" },
+      where: { ...seeded.scope, id: seeded.locationId },
+    });
+    const relocated = await renderFeedForToken(created.plaintext);
+    expect(relocated.ok && relocated.value.body).toContain("LOCATION:Sydney");
+    await database.feed.updateMany({
+      data: { privacy_mode: "private" },
+      where: { ...seeded.scope, id: created.feedId },
+    });
+    const privateBody = await renderFeedForToken(created.plaintext);
+    expect(privateBody.ok && privateBody.value.body).toContain("SUMMARY:Busy");
+    expect(privateBody.ok && privateBody.value.body).not.toContain(
+      "Renamed Person"
+    );
+    expect(privateBody.ok && privateBody.value.body).not.toContain(
+      "LOCATION:Sydney"
+    );
+    const beforeRemoval = await database.feedEventPublication.findFirstOrThrow({
+      where: { ...seeded.scope, feed_id: created.feedId },
+    });
+    await database.availabilityRecord.updateMany({
+      data: { archived_at: new Date() },
+      where: { ...seeded.scope, id: seeded.recordId },
+    });
+    const removed = await renderFeedForToken(created.plaintext);
+    expect(removed.ok && removed.value.body).not.toContain("BEGIN:VEVENT");
+    await database.availabilityRecord.updateMany({
+      data: { archived_at: null },
+      where: { ...seeded.scope, id: seeded.recordId },
+    });
+    await renderFeedForToken(created.plaintext);
+    const returned = await database.feedEventPublication.findFirstOrThrow({
+      where: { ...seeded.scope, feed_id: created.feedId },
+    });
+    expect(returned.published_uid).toBe(beforeRemoval.published_uid);
+    expect(returned.published_sequence).toBe(
+      beforeRemoval.published_sequence + 2
+    );
+  });
+
+  test("versions holiday edits and membership when feed settings change", async () => {
+    const created = await createTestFeed();
+    const seeded = await seedRepresentationRecord();
+    await database.feed.updateMany({
+      data: { includes_public_holidays: true },
+      where: { ...seeded.scope, id: created.feedId },
+    });
+    const holiday = await database.publicHoliday.create({
+      data: {
+        ...seeded.scope,
+        country_code: "AU",
+        holiday_date: seeded.startsAt,
+        holiday_type: "public",
+        name: "Owned holiday",
+        source: "manual",
+      },
+    });
+    const first = await renderFeedForToken(created.plaintext);
+    expect(first.ok && first.value.body).toContain("Owned holiday");
+    await database.publicHoliday.updateMany({
+      data: { name: "Renamed holiday" },
+      where: { ...seeded.scope, id: holiday.id },
+    });
+    const second = await renderFeedForToken(created.plaintext);
+    expect(second.ok && second.value.body).toContain("Renamed holiday");
+    const ledger = await database.feedEventPublication.findFirstOrThrow({
+      where: {
+        ...seeded.scope,
+        feed_id: created.feedId,
+        source_key: `holiday:${holiday.id}`,
+      },
+    });
+    expect(ledger.published_sequence).toBe(1);
+    await database.feed.updateMany({
+      data: { includes_public_holidays: false },
+      where: { ...seeded.scope, id: created.feedId },
+    });
+    const excluded = await renderFeedForToken(created.plaintext);
+    expect(excluded.ok && excluded.value.body).not.toContain("Renamed holiday");
+  });
+
+  test("restores, issues exactly one new token, resumes, and keeps predecessor revoked", async () => {
+    const created = await createTestFeed();
+    const input = {
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: created.feedId,
+      organisationId: tenant.organisationId,
+    };
+    expect(await archiveFeed(input)).toMatchObject({ ok: true });
+    expect(await restoreFeed(input)).toMatchObject({ ok: true });
+    const issued = await Promise.all([issueToken(input), issueToken(input)]);
+    expect(issued.filter((result) => result.ok)).toHaveLength(1);
+    const fresh = issued.find((result) => result.ok);
+    if (!fresh?.ok) {
+      throw new Error("Owned token issuance failed");
+    }
+    expect(await resumeFeed(input)).toMatchObject({ ok: true });
+    expect(await renderFeedForToken(created.plaintext)).toMatchObject({
+      ok: true,
+      value: { status: "revoked" },
+    });
+    expect(await renderFeedForToken(fresh.value.plaintext)).toMatchObject({
+      ok: true,
+      value: { status: "active" },
+    });
+    expect(
+      await issueToken({
+        ...input,
+        clerkOrgId: otherTenant.clerkOrgId,
+        organisationId: otherTenant.organisationId,
+      })
+    ).toMatchObject({ ok: false });
+  });
+
+  test("serialises token issuance with archive so restore cannot resurrect an issued token", async () => {
+    const feed = await createFeedWithoutToken();
+    const input = {
+      actingRole: "org:admin",
+      actingUserId: "user_admin",
+      clerkOrgId: tenant.clerkOrgId,
+      feedId: feed.id,
+      organisationId: tenant.organisationId,
+    };
+    const [issued, archived] = await Promise.all([
+      issueToken(input),
+      archiveFeed(input),
+    ]);
+    expect(archived.ok).toBe(true);
+    await expect(
+      database.feedToken.count({
+        where: {
+          clerk_org_id: tenant.clerkOrgId,
+          feed_id: feed.id,
+          organisation_id: tenant.organisationId,
+          status: "active",
+        },
+      })
+    ).resolves.toBe(0);
+    expect(await restoreFeed(input)).toMatchObject({ ok: true });
+    if (issued.ok) {
+      expect(await renderFeedForToken(issued.value.plaintext)).toMatchObject({
+        ok: true,
+        value: { status: "revoked" },
+      });
+    }
   });
 
   test("exposes the one-active-token partial unique index", async () => {
@@ -621,6 +1037,57 @@ describe("feed services", () => {
   });
 });
 
+async function seedRepresentationRecord() {
+  const scope = {
+    clerk_org_id: tenant.clerkOrgId,
+    organisation_id: tenant.organisationId,
+  };
+  const startsAt = new Date();
+  startsAt.setUTCHours(0, 0, 0, 0);
+  startsAt.setUTCDate(startsAt.getUTCDate() + 2);
+  const location = await database.location.create({
+    data: {
+      ...scope,
+      country_code: "AU",
+      name: "Brisbane",
+      timezone: "Australia/Brisbane",
+    },
+  });
+  const person = await database.person.create({
+    data: {
+      ...scope,
+      email: `owned-${crypto.randomUUID()}@example.test`,
+      employment_type: "employee",
+      first_name: "Owned",
+      last_name: "Person",
+      location_id: location.id,
+      source_system: "MANUAL",
+    },
+  });
+  const record = await database.availabilityRecord.create({
+    data: {
+      ...scope,
+      approval_status: "approved",
+      contactability: "contactable",
+      derived_uid_key: `${crypto.randomUUID()}@ical.teamcalendar.online`,
+      ends_at: startsAt,
+      person_id: person.id,
+      privacy_mode: "named",
+      record_type: "wfh",
+      source_type: "manual",
+      starts_at: startsAt,
+      title: "Owned availability",
+    },
+  });
+  return {
+    locationId: location.id,
+    personId: person.id,
+    recordId: record.id,
+    scope,
+    startsAt,
+  };
+}
+
 async function createTestFeed() {
   const result = await createFeed({
     actingRole: "org:admin",
@@ -683,6 +1150,19 @@ async function createTenant(input: typeof tenant) {
 }
 
 async function cleanTestData() {
+  const feeds = await database.feed.findMany({
+    select: { id: true },
+    where: {
+      clerk_org_id: { in: clerkOrgIds },
+      organisation_id: {
+        in: [tenant.organisationId, otherTenant.organisationId],
+      },
+    },
+  });
+  await purgeOwnedFeedCacheKeys({
+    feedIds: feeds.map((feed) => feed.id),
+  });
+
   await database.clerkOrgSubscription.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
@@ -701,6 +1181,9 @@ async function cleanTestData() {
   await database.publicHolidayJurisdiction.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
+  await database.feedEventPublication.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
   await database.feedToken.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
@@ -708,6 +1191,18 @@ async function cleanTestData() {
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.feed.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.availabilityPublication.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.availabilityRecord.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.person.deleteMany({
+    where: { clerk_org_id: { in: clerkOrgIds } },
+  });
+  await database.location.deleteMany({
     where: { clerk_org_id: { in: clerkOrgIds } },
   });
   await database.organisation.deleteMany({

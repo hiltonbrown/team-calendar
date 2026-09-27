@@ -127,9 +127,13 @@ async function upsertPublication(
       // A concurrent caller materialised the same record between our read and
       // this insert. Reload the winning row and fall through to the update
       // path so materialisation stays idempotent under concurrency.
-      existing = await client.availabilityPublication.findUnique({
+      existing = await client.availabilityPublication.findFirst({
         select: existingPublicationSelect,
-        where: { availability_record_id: record.id },
+        where: {
+          availability_record_id: record.id,
+          clerk_org_id: record.clerk_org_id,
+          organisation_id: record.organisation_id,
+        },
       });
       if (!existing) {
         throw error;
@@ -175,7 +179,11 @@ async function upsertPublication(
       published_uid: published.uid,
     },
     select: publicationSelect,
-    where: { id: existing.id },
+    where: {
+      clerk_org_id: record.clerk_org_id,
+      id: existing.id,
+      organisation_id: record.organisation_id,
+    },
   });
   return { changed: true, publication: updated };
 }
@@ -214,7 +222,7 @@ function projectPublishedRecord(record: RecordRow): {
       privacyMode: record.privacy_mode,
       recordTypeLabel,
     }),
-    uid: record.derived_uid_key,
+    uid: record.publication?.published_uid ?? record.derived_uid_key,
   };
 }
 

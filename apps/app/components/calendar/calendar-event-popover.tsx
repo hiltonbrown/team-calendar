@@ -14,17 +14,20 @@ import type { ReactNode } from "react";
 import { statusToneClasses } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
 import { calendarEventSourceLabel } from "./calendar-event-provenance";
+import { formatCalendarEventDateRange } from "./calendar-local-time";
 
 interface CalendarEventPopoverProps {
   children: ReactNode;
   event: CalendarEvent;
   orgQueryValue: string | null;
+  timezone?: string;
 }
 
 export function CalendarEventPopover({
   children,
   event,
   orgQueryValue,
+  timezone = "UTC",
 }: CalendarEventPopoverProps) {
   const recordTypeLabel =
     event.recordType === "private"
@@ -50,7 +53,10 @@ export function CalendarEventPopover({
         <dl className="mt-4 grid gap-3 text-label-lg">
           <Detail label="Status" value={statusLabel(event.approvalStatus)} />
           <Detail label="Source" value={calendarEventSourceLabel(event)} />
-          <Detail label="When" value={formatEventDateRange(event)} />
+          <Detail
+            label="When"
+            value={formatCalendarEventDateRange(event, timezone)}
+          />
           {event.contactabilityStatus ? (
             <Detail
               label="Contactability"
@@ -98,28 +104,6 @@ function Detail({ label, value }: { label: string; value: string }) {
       <dd className="mt-0.5 text-foreground">{value}</dd>
     </div>
   );
-}
-
-function formatEventDateRange(event: CalendarEvent): string {
-  const formatter = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const timeFormatter = new Intl.DateTimeFormat("en-AU", {
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-  });
-  const start = formatter.format(new Date(event.startsAt));
-  const end = formatter.format(new Date(event.endsAt));
-  if (!event.allDay) {
-    return `${start}, ${timeFormatter.format(new Date(event.startsAt))} to ${timeFormatter.format(new Date(event.endsAt))}`;
-  }
-  if (start === end) {
-    return start;
-  }
-  return `${start} to ${end}`;
 }
 
 function labelForValue(value: string): string {

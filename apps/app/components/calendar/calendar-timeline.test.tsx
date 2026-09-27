@@ -24,6 +24,68 @@ describe("CalendarTimeline", () => {
     ).toBeDefined();
   });
 
+  it("preserves scope and category on desktop and mobile day links", () => {
+    render(
+      <CalendarTimeline
+        data={calendarRange()}
+        filters={{
+          includeDrafts: true,
+          recordTypeCategory: "local_only",
+          scopeType: "team",
+          scopeValue: "00000000-0000-4000-8000-000000000100",
+          surface: "calendar",
+          view: "week",
+        }}
+        orgQueryValue="org_1"
+      />
+    );
+    const links = screen
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href")?.startsWith("/calendar?"));
+    expect(links.length).toBeGreaterThan(7);
+    for (const link of links) {
+      const params = new URL(
+        link.getAttribute("href") ?? "",
+        "https://example.com"
+      ).searchParams;
+      expect(params.get("view")).toBe("day");
+      expect(params.get("scopeType")).toBe("team");
+      expect(params.get("scopeValue")).toBe(
+        "00000000-0000-4000-8000-000000000100"
+      );
+      expect(params.get("recordTypeCategory")).toBe("local_only");
+      expect(params.get("includeDrafts")).toBe("true");
+    }
+  });
+
+  it("shows both local dates for an overnight timed entry", () => {
+    const data = calendarRange();
+    const [firstDay] = data.days;
+    const [firstEvent] = firstDay.events;
+    render(
+      <CalendarTimeline
+        data={{
+          ...data,
+          days: data.days.map((day) => ({
+            ...day,
+            events: [
+              {
+                ...firstEvent,
+                allDay: false,
+                endsAt: new Date("2026-04-15T16:00:00Z"),
+                startsAt: new Date("2026-04-15T13:00:00Z"),
+              },
+            ],
+          })),
+        }}
+        orgQueryValue={null}
+      />
+    );
+    expect(
+      screen.getAllByText("15 April 2026, 23:00 to 16 April 2026, 02:00")
+    ).toHaveLength(2);
+  });
+
   it("caps the initial lane set and lets the viewer reveal everyone", () => {
     render(
       <CalendarTimeline

@@ -1671,3 +1671,18 @@ The follow-up source slice is verified and approved; overall Plan 160 remains IN
 
 
 Authorised local merge completed without conflicts on main at `f3dd965f717fd10bb9d8d0025e087549e53f3541`, combining advisor documentation `6453d15` and reviewed feature head `d27b0f1ee86c4ff23cdde1acead41a5253c117e0`. An independent exact-tree comparison outside plans, tasks and reports confirms equality with the source- and online-tested runtime `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`. Root owns the post-merge source checks and final documentation commit. Actual browser/provider campaign, per-case charter evidence and current PITR retention/restore remain NOT VERIFIED; overall Plan 160 remains IN PROGRESS. No push, deployment, worker activation or provider mutation was performed.
+
+
+## Plan 162 execution, isolated worktree
+
+- [x] Read intent and lessons, confirm baseline source and bootstrap frozen dependencies.
+- [x] Calendar authorisation and interaction fixes with focused regression evidence.
+- [x] Reviewer-approved coherent representation design and generated additive SQL.
+- [x] Job payload/retry translation, stable manual UID and private HTTP revalidation.
+- [x] Restored feed issuance, scoped preview identity and surfaced failures.
+- [x] Calendar time conversion, navigation filters, overlap precomputation and catalogue.
+- [x] Complete representation, cache and lifecycle regressions plus integration cases.
+- [ ] Full source gates and reviewed protected exact-candidate live campaign.
+- [ ] Sanitised final evidence, scope audit and conventional worktree commits.
+
+Review: source implementation and focused verification are complete. Full build (4 tasks), types (19 tasks), units (18 tasks), lint, boundaries, release tooling (509 tests) and release types passed. Explicit integration-file typecheck passed. Protected exact-candidate live migration and regression evidence remain pending.

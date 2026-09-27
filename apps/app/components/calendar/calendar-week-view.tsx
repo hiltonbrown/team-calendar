@@ -100,6 +100,7 @@ export function CalendarWeekView({
                       <CalendarEventChip
                         event={event}
                         orgQueryValue={orgQueryValue}
+                        timezone={data.range.timezone}
                       />
                     </li>
                   ))}

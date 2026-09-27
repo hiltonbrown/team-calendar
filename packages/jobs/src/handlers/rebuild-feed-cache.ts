@@ -15,7 +15,7 @@ import { inngest } from "../client";
 
 const FEED_CACHE_TTL_SECONDS = 3600;
 
-const RebuildFeedCacheInputSchema = z.object({
+export const RebuildFeedCacheInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   feedId: z.string().uuid(),
   organisationId: z.string().uuid(),
@@ -40,9 +40,13 @@ export const rebuildFeedCacheFunction: InngestFunction.Any =
       triggers: { event: "rebuild-feed-cache" },
     },
     async ({ event, step }) =>
-      await step.run("rebuild-feed-cache", async () =>
-        rebuildFeedCache(event.data)
-      )
+      await step.run("rebuild-feed-cache", async () => {
+        const result = await rebuildFeedCache(event.data);
+        if (!result.ok) {
+          throw new Error(result.error.message);
+        }
+        return result.value;
+      })
   );
 
 export async function rebuildFeedCache(
@@ -97,19 +101,33 @@ export async function rebuildFeedCache(
         organisationId: context.organisationId,
       });
       return {
-        ok: true,
-        value: { feedId: feed.id, rebuilt: false, skipped: false },
+        error: { code: "unknown_error", message: rendered.error.message },
+        ok: false,
       };
     }
 
-    await setCachedFeedBody({
+    const cached = await setCachedFeedBody({
       body: rendered.value.body,
       etag: rendered.value.etag,
       key: feedCacheKey({
+        etag: rendered.value.etag,
         feedId: feed.id,
-        privacyMode: feed.privacy_mode,
       }),
       ttlSeconds: FEED_CACHE_TTL_SECONDS,
+    });
+
+    if (!cached.ok) {
+      return { error: cached.error, ok: false };
+    }
+
+    await database.feed.updateMany({
+      data: { last_etag: rendered.value.etag, last_rendered_at: new Date() },
+      where: {
+        clerk_org_id: context.clerkOrgId,
+        id: feed.id,
+        organisation_id: context.organisationId,
+        representation_generation: rendered.value.generation,
+      },
     });
 
     return {

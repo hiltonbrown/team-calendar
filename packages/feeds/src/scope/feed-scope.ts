@@ -145,6 +145,7 @@ export async function validateScopes(input: {
 
 export async function resolvePeopleForFeed(input: {
   actingPersonId?: string | null;
+  client?: Prisma.TransactionClient;
   clerkOrgId: string;
   createdByUserId?: string | null;
   organisationId: string;
@@ -154,7 +155,7 @@ export async function resolvePeopleForFeed(input: {
   try {
     const people =
       input.preloaded?.people.filter((person) => person.is_active) ??
-      (await database.person.findMany({
+      (await (input.client ?? database).person.findMany({
         orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
         select: personSelect,
         where: peopleWhereForFeedScope(input),
@@ -181,7 +182,10 @@ export async function resolvePeopleForFeed(input: {
         first.displayName.localeCompare(second.displayName)
       ),
     };
-  } catch {
+  } catch (error) {
+    if (input.client) {
+      throw error;
+    }
     return unknownError("Failed to resolve feed scope.");
   }
 }

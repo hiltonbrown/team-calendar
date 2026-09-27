@@ -3,6 +3,7 @@ import {
   ALL_PRIVACY_MODES,
   feedCacheKey,
   invalidateFeedCache,
+  purgeFeedCacheEntries,
   setFeedCacheClientForTests,
 } from "./feed-cache";
 
@@ -132,5 +133,39 @@ describe("invalidateFeedCache", () => {
 
   it("matches expected privacy modes", () => {
     expect(ALL_PRIVACY_MODES).toEqual(["named", "masked", "private"]);
+  });
+});
+
+describe("immutable cache fixture purge", () => {
+  const feedId = "10000000-0000-4000-8000-000000000001";
+  it("coerces Redis string cursors and removes only exact feed prefix keys", async () => {
+    const del = vi.fn().mockResolvedValue(1);
+    const scan = vi
+      .fn()
+      .mockResolvedValueOnce(["2", [`feed:${feedId}:old`]])
+      .mockResolvedValueOnce(["0", [`feed:${feedId}:new`]]);
+    setFeedCacheClientForTests({ del, get: vi.fn(), scan, set: vi.fn() });
+    expect(await purgeFeedCacheEntries({ feedId })).toEqual({
+      ok: true,
+      value: { deletedCount: 2 },
+    });
+    expect(del).toHaveBeenCalledWith(
+      `feed:${feedId}:old`,
+      `feed:${feedId}:new`
+    );
+    expect(scan).toHaveBeenCalledTimes(2);
+  });
+  it("refuses foreign keys and never deletes them", async () => {
+    const del = vi.fn();
+    setFeedCacheClientForTests({
+      del,
+      get: vi.fn(),
+      scan: vi.fn().mockResolvedValue(["0", ["feed:foreign:key"]]),
+      set: vi.fn(),
+    });
+    expect(await purgeFeedCacheEntries({ feedId })).toMatchObject({
+      ok: false,
+    });
+    expect(del).not.toHaveBeenCalled();
   });
 });

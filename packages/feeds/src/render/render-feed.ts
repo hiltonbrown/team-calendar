@@ -6,13 +6,16 @@ import type { Prisma } from "@repo/database";
 import { database } from "@repo/database";
 import type { availability_privacy_mode } from "@repo/database/generated/enums";
 import { log } from "@repo/observability/log";
-import ical, { ICalEventTransparency } from "ical-generator";
+import ical, { ICalEventClass, ICalEventTransparency } from "ical-generator";
 import {
   feedCacheKey,
   getCachedFeedBody,
   setCachedFeedBody,
 } from "../cache/feed-cache";
-import { projectFeedEvents } from "../projection/feed-projection";
+import {
+  establishFeedRepresentation,
+  type FeedRepresentation,
+} from "../publication/feed-representation";
 import {
   hashFeedToken,
   signedFeedTokenId,
@@ -60,6 +63,8 @@ export type FeedRenderError =
 export interface FeedBody {
   body: string;
   etag: string;
+  fingerprint: string;
+  generation: number;
 }
 
 // Build the ICS body and its etag for a feed under a given privacy mode. Shared by the
@@ -72,179 +77,235 @@ export async function renderFeedBody(input: {
   organisationId: string;
   privacyMode: availability_privacy_mode;
 }): Promise<Result<FeedBody, FeedRenderError>> {
-  const projected = await projectFeedEvents({
-    actingRole: "viewer",
-    clerkOrgId: input.clerkOrgId,
-    feedId: input.feedId,
-    horizonDays: 366,
-    organisationId: input.organisationId,
-    privacyMode: input.privacyMode,
-  });
-  if (!projected.ok) {
-    if (projected.error.code === "feed_not_found") {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const snapshot = await establishFeedRepresentation(input);
+    if (!snapshot.ok) {
+      return snapshot;
+    }
+    try {
+      const { body, etag } = await bodyForRepresentation(
+        input.feedId,
+        snapshot.value
+      );
+      const current = await establishFeedRepresentation(input);
+      if (!current.ok) {
+        return current;
+      }
+      if (current.value.fingerprint !== snapshot.value.fingerprint) {
+        continue;
+      }
       return {
-        error: { code: "not_found", message: "Feed not found" },
+        ok: true,
+        value: {
+          body,
+          etag,
+          fingerprint: snapshot.value.fingerprint,
+          generation: snapshot.value.generation,
+        },
+      };
+    } catch (error) {
+      log.warn("Feed ICS serialisation failed", {
+        error,
+        feedId: input.feedId,
+      });
+      return {
+        error: { code: "unknown_error", message: "Failed to render feed" },
         ok: false,
       };
     }
-    log.warn("Feed projection failed", {
-      errorCode: projected.error.code,
-      feedId: input.feedId,
-    });
-    return {
-      error: { code: "unknown_error", message: "Failed to render feed" },
-      ok: false,
-    };
   }
-
-  try {
-    const calendar = ical({
-      name: input.feedName,
-      prodId: { company: "Team Calendar", product: "Team Calendar" },
-    });
-
-    for (const event of projected.value) {
-      calendar.createEvent({
-        allDay: event.allDay,
-        description: event.description ?? undefined,
-        end: event.endsAt,
-        id: event.publishedUid,
-        location: event.location ?? undefined,
-        sequence: event.publishedSequence,
-        start: event.startsAt,
-        summary: event.summary,
-        transparency: ICalEventTransparency.OPAQUE,
-      });
-    }
-
-    const body = calendar.toString();
-    const etag = createHash("sha256").update(body).digest("hex");
-    return { ok: true, value: { body, etag } };
-  } catch (error) {
-    log.warn("Feed ICS serialisation failed", { error, feedId: input.feedId });
-    return {
-      error: { code: "unknown_error", message: "Failed to render feed" },
-      ok: false,
-    };
-  }
+  return {
+    error: {
+      code: "unknown_error",
+      message: "Feed changed during rendering. Please retry.",
+    },
+    ok: false,
+  };
 }
 
 export async function cachedEtagForToken(
   token: string
 ): Promise<null | string> {
-  const feedToken = await resolveFeedToken(token);
-
-  if (
-    feedToken?.status !== "active" ||
-    (feedToken.expires_at && feedToken.expires_at < new Date()) ||
-    feedToken.feed.status !== "active"
-  ) {
-    return null;
-  }
-
-  const key = feedCacheKey({
-    feedId: feedToken.feed.id,
-    privacyMode: feedToken.feed.privacy_mode,
-  });
-  const cached = await getCachedFeedBody(key);
-  if (cached.ok && cached.value) {
-    return cached.value.etag;
-  }
-
-  return null;
+  const result = await renderFeedForToken(token);
+  return result.ok && result.value.status === "active"
+    ? result.value.etag
+    : null;
 }
 
 export async function renderFeedForToken(
   token: string
 ): Promise<Result<RenderedFeed, FeedRenderError>> {
-  const feedToken = await resolveFeedToken(token);
+  try {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await renderFeedAttempt(token);
+      if (result) {
+        return result;
+      }
+    }
+    return {
+      error: {
+        code: "unknown_error",
+        message: "Feed changed during rendering. Please retry.",
+      },
+      ok: false,
+    };
+  } catch {
+    return {
+      error: { code: "unknown_error", message: "Failed to load current feed." },
+      ok: false,
+    };
+  }
+}
 
+async function renderFeedAttempt(
+  token: string
+): Promise<Result<RenderedFeed, FeedRenderError> | null> {
+  const feedToken = await resolveFeedToken(token);
   if (!feedToken) {
     return {
       error: { code: "not_found", message: "Feed not found" },
       ok: false,
     };
   }
-
-  if (feedToken.status !== "active") {
-    return {
-      ok: true,
-      value: { body: "", etag: "", status: feedToken.status },
-    };
+  const inactive = await persistedInactiveStatus(feedToken);
+  if (inactive) {
+    return { ok: true, value: { body: "", etag: "", status: inactive } };
   }
-
-  if (feedToken.expires_at && feedToken.expires_at < new Date()) {
-    await database.feedToken.update({
-      data: { status: "expired" },
-      where: { id: feedToken.id },
-    });
-    return {
-      ok: true,
-      value: { body: "", etag: "", status: "expired" },
-    };
-  }
-
-  if (feedToken.feed.status !== "active") {
-    return {
-      ok: true,
-      value: { body: "", etag: "", status: "revoked" },
-    };
-  }
-
-  const key = feedCacheKey({
-    feedId: feedToken.feed.id,
-    privacyMode: feedToken.feed.privacy_mode,
-  });
-  const cached = await getCachedFeedBody(key);
-  if (cached.ok && cached.value) {
-    return {
-      ok: true,
-      value: withActivation({ ...cached.value, status: "active" }, feedToken),
-    };
-  }
-
-  const rendered = await renderFeedBody({
+  const input = {
     clerkOrgId: feedToken.clerk_org_id,
     feedId: feedToken.feed_id,
     feedName: feedToken.feed.name,
     organisationId: feedToken.organisation_id,
     privacyMode: feedToken.feed.privacy_mode,
-  });
+  };
+  const rendered = await renderFeedBody(input);
   if (!rendered.ok) {
-    return { error: rendered.error, ok: false };
+    return rendered;
+  }
+  await persistRenderedBody(feedToken, rendered.value);
+  const current = await establishFeedRepresentation(input);
+  if (!current.ok) {
+    return current;
+  }
+  if (current.value.fingerprint !== rendered.value.fingerprint) {
+    return null;
+  }
+  const finalToken = await resolveFeedToken(token);
+  if (!finalToken) {
+    return {
+      error: { code: "not_found", message: "Feed not found" },
+      ok: false,
+    };
+  }
+  const finalInactive = await persistedInactiveStatus(finalToken);
+  if (finalInactive) {
+    return { ok: true, value: { body: "", etag: "", status: finalInactive } };
   }
   const { body, etag } = rendered.value;
-
-  await Promise.all([
-    database.feed.update({
-      data: {
-        last_etag: etag,
-        last_rendered_at: new Date(),
-      },
-      // Scope the write by clerk_org_id and organisation_id as well as the unique id,
-      // per the tenant-isolation rule that every tenant-data query filters by clerk_org_id.
-      where: {
-        clerk_org_id: feedToken.clerk_org_id,
-        id: feedToken.feed_id,
-        organisation_id: feedToken.organisation_id,
-      },
-    }),
-  ]);
-
-  // The KV cache is a performance layer; a write failure must not fail the response.
-  try {
-    await setCachedFeedBody({ body, etag, key, ttlSeconds: 3600 });
-  } catch (error) {
-    log.warn("Feed cache write failed", {
-      error,
-      feedId: feedToken.feed_id,
-    });
-  }
-
   return {
     ok: true,
-    value: withActivation({ body, etag, status: "active" }, feedToken),
+    value: withActivation({ body, etag, status: "active" }, finalToken),
   };
+}
+
+async function bodyForRepresentation(
+  feedId: string,
+  snapshot: FeedRepresentation
+): Promise<{ body: string; etag: string }> {
+  if (snapshot.cacheEtag) {
+    const cached = await getCachedFeedBody(
+      feedCacheKey({ etag: snapshot.cacheEtag, feedId })
+    );
+    if (cached.ok && cached.value?.etag === snapshot.cacheEtag) {
+      return cached.value;
+    }
+  }
+  const calendar = ical({
+    name: snapshot.feedName,
+    prodId: { company: "Team Calendar", product: "Team Calendar" },
+  });
+  for (const event of snapshot.events) {
+    if (!event.publishedAt) {
+      throw new Error("Feed event lacks a durable publication timestamp");
+    }
+    calendar.createEvent({
+      allDay: event.allDay,
+      class:
+        event.eventClass === "PUBLIC"
+          ? ICalEventClass.PUBLIC
+          : ICalEventClass.PRIVATE,
+      description: event.description ?? undefined,
+      end: event.endsAt,
+      id: event.publishedUid,
+      location: event.location ?? undefined,
+      sequence: event.publishedSequence,
+      stamp: event.publishedAt,
+      start: event.startsAt,
+      summary: event.summary,
+      transparency: ICalEventTransparency.OPAQUE,
+    });
+  }
+  const body = calendar.toString();
+  return { body, etag: createHash("sha256").update(body).digest("hex") };
+}
+
+async function persistRenderedBody(
+  token: FeedTokenRow,
+  rendered: FeedBody
+): Promise<void> {
+  await database.feed.updateMany({
+    data: { last_etag: rendered.etag, last_rendered_at: new Date() },
+    where: {
+      clerk_org_id: token.clerk_org_id,
+      id: token.feed_id,
+      organisation_id: token.organisation_id,
+      representation_generation: rendered.generation,
+    },
+  });
+  try {
+    const stored = await setCachedFeedBody({
+      body: rendered.body,
+      etag: rendered.etag,
+      key: feedCacheKey({ etag: rendered.etag, feedId: token.feed_id }),
+      ttlSeconds: 3600,
+    });
+    if (!stored.ok) {
+      log.warn("Feed cache write failed", { feedId: token.feed_id });
+    }
+  } catch (error) {
+    log.warn("Feed cache write failed", { error, feedId: token.feed_id });
+  }
+}
+
+async function persistedInactiveStatus(
+  token: FeedTokenRow
+): Promise<"expired" | "revoked" | null> {
+  const inactive = tokenInactiveStatus(token);
+  if (inactive === "expired" && token.status === "active") {
+    await database.feedToken.updateMany({
+      data: { status: "expired" },
+      where: {
+        clerk_org_id: token.clerk_org_id,
+        expires_at: { lt: new Date() },
+        id: token.id,
+        organisation_id: token.organisation_id,
+        status: "active",
+      },
+    });
+  }
+  return inactive;
+}
+
+function tokenInactiveStatus(
+  token: FeedTokenRow
+): "expired" | "revoked" | null {
+  if (token.status !== "active") {
+    return token.status;
+  }
+  if (token.expires_at && token.expires_at < new Date()) {
+    return "expired";
+  }
+  return token.feed.status === "active" ? null : "revoked";
 }
 
 function withActivation(

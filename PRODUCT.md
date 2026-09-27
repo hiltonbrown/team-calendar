@@ -541,9 +541,13 @@ Where `stable_source_key` is:
 - for Xero records: `xero_tenant_id + employee_id + leave_type + start + end + units`
 - for manual records: the `availability_records.id`
 
+The formula assigns creation identity. Manual date, type and title edits preserve the assigned UID. Existing publication UIDs remain authoritative for upgraded feed events.
+
 ### SEQUENCE handling
 
-`published_sequence` on `availability_publications` increments when the published representation changes materially. Never create a new UID for an updated event; increment SEQUENCE instead.
+`availability_publications` retains canonical materialisation state. Subscriber output versions are durable per feed in `feed_event_publications`, keyed by feed and canonical source identity. Each row stores the immutable UID, representation hash, sequence, publication timestamp and presence. Its sequence and timestamp advance only for material serialised changes or membership removal/re-entry. First upgraded events with historical feed rendering at or after their creation start at their prior canonical sequence plus one, including sequence-zero records and holidays. This is a conservative compatibility bound, not proof the event appeared under a prior scope or horizon. Events without that historical rendering evidence start at zero. Durable ledger rows govern all subsequent versions.
+
+The feed representation hash covers its name and ordered serialised events. `feeds.representation_generation` advances when that output changes. Every subscriber request and rebuild establishes the authoritative projection and versions in one serializable transaction. All projection reads share that transaction and both tenancy keys. A second authoritative snapshot fences late cache reads and renders; bounded conflict retries fail safely when a coherent representation cannot be established. Canonical materialisation failures do not permit new content under old versions. Immutable cache keys use feed ID and ETag; deletion is best effort, while authoritative projection determines visibility. No-op output retains identical UID, sequence, timestamp, body and ETag. Masked and private output use CLASS PRIVATE. Removed identities remain in the ledger so a returning event retains its UID and advances its version.
 
 ---
 

@@ -28,13 +28,17 @@ import {
   toneForCalendarEvent,
 } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
+import type { CalendarFilterInput } from "../../app/(authenticated)/calendar/_schemas";
 import {
   calendarEventSourceLabel,
   isManualCalendarEvent,
 } from "./calendar-event-provenance";
+import { formatCalendarEventDateRange } from "./calendar-local-time";
+import { calendarDayHref } from "./calendar-url-state";
 
 interface CalendarTimelineProps {
   data: CalendarRange;
+  filters?: CalendarFilterInput;
   orgQueryValue: string | null;
 }
 
@@ -57,6 +61,7 @@ const namePartPattern = /\s+/;
 
 export function CalendarTimeline({
   data,
+  filters,
   orgQueryValue,
 }: CalendarTimelineProps) {
   const events = useMemo(() => uniqueEvents(data), [data]);
@@ -145,6 +150,7 @@ export function CalendarTimeline({
         <div className="calendar-runway-scroll overflow-x-auto pb-1">
           <div className="min-w-[64rem]">
             <RunwayDayHeader
+              filters={filters}
               maxAffected={maxAffected}
               orgQueryValue={orgQueryValue}
               summaries={summaries}
@@ -177,9 +183,11 @@ export function CalendarTimeline({
           event={selectedEvent}
           onClose={closeDetail}
           orgQueryValue={orgQueryValue}
+          timezone={data.range.timezone}
         />
         <MobileRunway
           data={data}
+          filters={filters}
           maxAffected={maxAffected}
           onSelect={selectEvent}
           orgQueryValue={orgQueryValue}
@@ -192,6 +200,7 @@ export function CalendarTimeline({
           event={selectedEvent}
           onClose={closeDetail}
           orgQueryValue={orgQueryValue}
+          timezone={data.range.timezone}
         />
       </div>
 
@@ -288,10 +297,12 @@ function LegendItem({ icon, label }: { icon: ReactNode; label: string }) {
 }
 
 function RunwayDayHeader({
+  filters,
   maxAffected,
   orgQueryValue,
   summaries,
 }: {
+  filters?: CalendarFilterInput;
   maxAffected: number;
   orgQueryValue: string | null;
   summaries: ReturnType<typeof daySummary>[];
@@ -309,6 +320,7 @@ function RunwayDayHeader({
       </div>
       {summaries.map((summary) => (
         <CoverageDayHeader
+          filters={filters}
           key={summary.dateOnly}
           maxAffected={maxAffected}
           orgQueryValue={orgQueryValue}
@@ -320,10 +332,12 @@ function RunwayDayHeader({
 }
 
 function CoverageDayHeader({
+  filters,
   maxAffected,
   orgQueryValue,
   summary,
 }: {
+  filters?: CalendarFilterInput;
   maxAffected: number;
   orgQueryValue: string | null;
   summary: ReturnType<typeof daySummary>;
@@ -344,10 +358,7 @@ function CoverageDayHeader({
         "group relative flex min-h-28 flex-col justify-between bg-surface-container-high px-3 py-3 outline-none transition-colors hover:bg-surface-container-highest focus-visible:z-10 focus-visible:ring-3 focus-visible:ring-ring",
         summary.isToday && "bg-primary-container text-on-primary-container"
       )}
-      href={withOrg(
-        `/calendar?view=day&anchor=${summary.dateOnly}`,
-        orgQueryValue
-      )}
+      href={calendarDayHref(summary.dateOnly, filters, orgQueryValue)}
     >
       {summary.isToday ? (
         <span
@@ -543,10 +554,12 @@ function RunwayDetail({
   event,
   onClose,
   orgQueryValue,
+  timezone,
 }: {
   event: CalendarEvent | null;
   onClose: () => void;
   orgQueryValue: string | null;
+  timezone: string;
 }) {
   if (!event) {
     return (
@@ -589,7 +602,7 @@ function RunwayDetail({
               </span>
             </div>
             <p className="mt-1 text-body-sm text-muted-foreground">
-              {formatEventDateRange(event)}
+              {formatCalendarEventDateRange(event, timezone)}
             </p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-label-lg">
               <DetailDatum
@@ -658,12 +671,14 @@ function DetailDatum({ label, value }: { label: string; value: string }) {
 }
 
 function MobileRunway({
+  filters,
   data,
   maxAffected,
   onSelect,
   orgQueryValue,
   selectedEventId,
 }: {
+  filters?: CalendarFilterInput;
   data: CalendarRange;
   maxAffected: number;
   onSelect: (event: CalendarEvent, trigger: HTMLButtonElement) => void;
@@ -699,12 +714,7 @@ function MobileRunway({
                 </p>
               </div>
               <Button asChild size="sm" variant="ghost">
-                <Link
-                  href={withOrg(
-                    `/calendar?view=day&anchor=${dateOnly}`,
-                    orgQueryValue
-                  )}
-                >
+                <Link href={calendarDayHref(dateOnly, filters, orgQueryValue)}>
                   Open day
                 </Link>
               </Button>
@@ -962,27 +972,6 @@ function formatFullDay(date: Date): string {
     timeZone: "UTC",
     weekday: "long",
   }).format(date);
-}
-
-function formatEventDateRange(event: CalendarEvent): string {
-  const dateFormatter = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-  const timeFormatter = new Intl.DateTimeFormat("en-AU", {
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-  });
-  const startDate = new Date(event.startsAt);
-  const endDate = new Date(event.endsAt);
-  const start = dateFormatter.format(startDate);
-  const end = dateFormatter.format(endDate);
-  if (!event.allDay) {
-    return `${start}, ${timeFormatter.format(startDate)} to ${timeFormatter.format(endDate)}`;
-  }
-  return start === end ? start : `${start} to ${end}`;
 }
 
 function initialsForName(name: string): string {

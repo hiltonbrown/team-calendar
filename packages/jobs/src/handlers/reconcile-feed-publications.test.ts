@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   availabilityRecordFindMany: vi.fn(),
-  feedIdsForPeople: vi.fn(() => Promise.resolve<string[]>([])),
+  createFunction: vi.fn(),
+  feedIdsForPeople: vi.fn(() =>
+    Promise.resolve<Array<{ id: string; privacyMode: string }>>([])
+  ),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   materialiseAvailabilityPublication: vi.fn(),
 }));
@@ -10,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
-    createFunction: vi.fn(() => ({ id: "reconcile-feed-publications" })),
+    createFunction: mocks.createFunction,
     send: mocks.inngestSend,
   },
 }));
@@ -57,6 +60,25 @@ function materialised(changed: boolean) {
   };
 }
 
+const registeredHandler = mocks.createFunction.mock.calls[0]?.[1];
+
+it("throws execution failures with valid input at the queue boundary", async () => {
+  const handler = registeredHandler;
+  expect(handler).toBeTypeOf("function");
+  mocks.availabilityRecordFindMany.mockRejectedValueOnce(
+    new Error("Database unavailable")
+  );
+  await expect(
+    handler({
+      event: { data: input() },
+      step: {
+        run: (_name: string, execute: () => Promise<unknown>) => execute(),
+      },
+    })
+  ).rejects.toThrow();
+  expect(mocks.availabilityRecordFindMany).toHaveBeenCalled();
+});
+
 describe("reconcileFeedPublications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -64,7 +86,9 @@ describe("reconcileFeedPublications", () => {
       { id: RECORD_A, person_id: PERSON_ID },
       { id: RECORD_B, person_id: PERSON_ID },
     ]);
-    mocks.feedIdsForPeople.mockResolvedValue(["feed-a"]);
+    mocks.feedIdsForPeople.mockResolvedValue([
+      { id: "20000000-0000-4000-8000-000000000001", privacyMode: "named" },
+    ]);
   });
 
   it("materialises every record with both scope keys and no per-record invalidation", async () => {
@@ -127,11 +151,19 @@ describe("reconcileFeedPublications", () => {
       organisationId: ORGANISATION_ID,
       personIds: [PERSON_ID],
     });
+    const { RebuildFeedCacheInputSchema } = await import(
+      "./rebuild-feed-cache"
+    );
+    const dispatched = mocks.inngestSend.mock.calls[0]?.[0];
+    expect(dispatched).toHaveLength(1);
+    expect(
+      RebuildFeedCacheInputSchema.safeParse(dispatched?.[0]?.data).success
+    ).toBe(true);
     expect(mocks.inngestSend).toHaveBeenCalledWith([
       {
         data: {
           clerkOrgId: CLERK_ORG_ID,
-          feedId: "feed-a",
+          feedId: "20000000-0000-4000-8000-000000000001",
           organisationId: ORGANISATION_ID,
           reason: "publication_reconciled",
         },

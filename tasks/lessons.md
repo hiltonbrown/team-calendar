@@ -232,3 +232,12 @@ actionable; keep one-off task evidence in the review for that task.
 - Apply exact candidate equality in offline report validation as well as the execution runner. Non-null metadata cannot establish that the harness and application share a candidate.
 - After an asynchronous independent observation, re-read durable state before applying its result. Require the target intent and authority to remain unchanged; preserve unrelated entries added during the wait. Recovery must freshly establish prior writer closure before any cleanup, including when fixture verification fails.
 - Validate each receipt before accounting for duplicates. Keep independently proven failures regardless of sibling validity or order, and carry incomplete-evidence markers through every collection phase. Assertion, ownership and cleanup receipt phases must match the actual action or terminal stage.
+
+
+## All-plan live database authority
+
+- The user's instruction to use the live database applies to all authorised plans.
+  Follow the protected online runner and refresh ownership, restore, consumer
+  isolation, cleanup and exact-candidate evidence. Stale plan instructions for a
+  local or disposable database are superseded; incomplete tooling is implementation
+  work, not a reason to request the same database permission again.

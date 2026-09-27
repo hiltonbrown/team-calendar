@@ -109,7 +109,7 @@ export async function GET(
   if (ifNoneMatch && etagMatches(ifNoneMatch, quotedEtag)) {
     return new Response(null, {
       headers: {
-        "Cache-Control": "max-age=3600, must-revalidate",
+        "Cache-Control": "private, no-cache, must-revalidate",
         ETag: quotedEtag,
       },
       status: 304,
@@ -119,7 +119,7 @@ export async function GET(
   // Return the active feed
   return new Response(body, {
     headers: {
-      "Cache-Control": "max-age=3600, must-revalidate",
+      "Cache-Control": "private, no-cache, must-revalidate",
       "Content-Type": "text/calendar;charset=utf-8",
       ETag: quotedEtag,
     },

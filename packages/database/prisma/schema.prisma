@@ -1008,30 +1008,55 @@ model PublicHolidayAssignment {
 }
 
 model Feed {
-  id                       String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id             String
-  organisation_id          String                    @db.Uuid
-  name                     String
-  slug                     String
-  description              String?
-  status                   feed_status               @default(active)
-  privacy_mode             availability_privacy_mode @default(named)
-  includes_public_holidays Boolean                   @default(false)
-  last_rendered_at         DateTime?
-  last_etag                String?
-  created_by_user_id       String?
-  archived_at              DateTime?
-  created_at               DateTime                  @default(now())
-  updated_at               DateTime                  @updatedAt
+  id                        String                    @id @default(uuid()) @db.Uuid
+  clerk_org_id              String
+  organisation_id           String                    @db.Uuid
+  name                      String
+  slug                      String
+  description               String?
+  status                    feed_status               @default(active)
+  privacy_mode              availability_privacy_mode @default(named)
+  includes_public_holidays  Boolean                   @default(false)
+  last_rendered_at          DateTime?
+  representation_hash       String?
+  representation_generation Int                       @default(0)
+  last_etag                 String?
+  created_by_user_id        String?
+  archived_at               DateTime?
+  created_at                DateTime                  @default(now())
+  updated_at                DateTime                  @updatedAt
 
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  scopes       FeedScope[]
-  tokens       FeedToken[]
+  organisation       Organisation           @relation(fields: [organisation_id], references: [id])
+  event_publications FeedEventPublication[]
+  scopes             FeedScope[]
+  tokens             FeedToken[]
 
   @@unique([clerk_org_id, slug])
   @@index([clerk_org_id])
   @@index([organisation_id])
   @@map("feeds")
+}
+
+model FeedEventPublication {
+  id                  String   @id @default(uuid()) @db.Uuid
+  clerk_org_id        String
+  organisation_id     String   @db.Uuid
+  feed_id             String   @db.Uuid
+  source_key          String
+  published_uid       String
+  representation_hash String
+  published_sequence  Int      @default(0)
+  published_at        DateTime
+  present             Boolean  @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @updatedAt
+
+  feed Feed @relation(fields: [feed_id], references: [id])
+
+  @@unique([feed_id, source_key])
+  @@index([clerk_org_id])
+  @@index([organisation_id])
+  @@map("feed_event_publications")
 }
 
 model FeedScope {

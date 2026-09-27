@@ -266,6 +266,72 @@ describe("manual availability services", () => {
     });
   });
 
+  test("preserves creation UID and advances material publication while saving edited Brisbane slot instants", async () => {
+    const actor = { orgRole: "org:admin", userId: "user_admin" };
+    const startsAt = new Date("2026-10-02T23:00:00.000Z");
+    const endsAt = new Date("2026-10-03T00:00:00.000Z");
+    const created = await createManualAvailability(
+      contextFor(tenantA),
+      {
+        ...inputFor(tenantA),
+        allDay: false,
+        endsAt,
+        startsAt,
+      },
+      actor
+    );
+    expect(created.ok).toBe(true);
+    if (!created.ok) {
+      throw new Error(created.error.message);
+    }
+    const where = {
+      clerk_org_id: tenantA.clerkOrgId,
+      id: created.value.id,
+      organisation_id: tenantA.organisationId,
+    };
+    const original = await database.availabilityRecord.findFirstOrThrow({
+      include: { publication: true },
+      where,
+    });
+    expect(original.starts_at.toISOString()).toBe(startsAt.toISOString());
+    expect(original.ends_at.toISOString()).toBe(endsAt.toISOString());
+    const updated = await updateManualAvailability(
+      contextFor(tenantA),
+      created.value.id,
+      {
+        allDay: false,
+        endsAt: new Date("2026-10-04T00:00:00.000Z"),
+        recordType: "training",
+        startsAt: new Date("2026-10-03T23:00:00.000Z"),
+      },
+      actor
+    );
+    expect(updated.ok).toBe(true);
+    const stored = await database.availabilityRecord.findFirstOrThrow({
+      include: { publication: true },
+      where,
+    });
+    expect(stored.starts_at.toISOString()).toBe("2026-10-03T23:00:00.000Z");
+    expect(stored.ends_at.toISOString()).toBe("2026-10-04T00:00:00.000Z");
+    expect(stored.derived_uid_key).toBe(original.derived_uid_key);
+    expect(stored.publication?.published_uid).toBe(
+      original.publication?.published_uid
+    );
+    expect(original.publication).not.toBeNull();
+    expect(stored.publication?.published_sequence).toBe(
+      (original.publication?.published_sequence ?? 0) + 1
+    );
+    expect(
+      await database.availabilityRecord.count({
+        where: {
+          ...where,
+          clerk_org_id: tenantB.clerkOrgId,
+          organisation_id: tenantB.organisationId,
+        },
+      })
+    ).toBe(0);
+  });
+
   test("updates and archives only manual records in the active tenant", async () => {
     const created = await createManualAvailability(
       contextFor(tenantA),
