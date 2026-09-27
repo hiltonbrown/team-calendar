@@ -544,200 +544,208 @@ describe("runner and collector ordering", () => {
   it.each([false, true])(
     "merges late terminal proof and preserves cleanup failure=%s",
     async (failCleanup) => {
-      const sha = execFileSync("git", ["rev-parse", "HEAD"], {
-        encoding: "utf8",
-      }).trim();
-      const f = fixture(false, sha);
-      const reference = `sha256:${"b".repeat(64)}`;
-      const events: string[] = [];
-      const { runId } = f.options;
-      const { organisationId } = f.options.owned[0];
-      const value = {
-        candidateSha: sha,
-        contractDecision: "au-contract-v1",
-        databaseManifest: {
-          active: true,
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const phaseStart = Date.parse("2026-09-27T05:00:00.000Z");
+      vi.setSystemTime(phaseStart);
+      try {
+        const sha = execFileSync("git", ["rev-parse", "HEAD"], {
+          encoding: "utf8",
+        }).trim();
+        const f = fixture(false, sha);
+        const reference = `sha256:${"b".repeat(64)}`;
+        const events: string[] = [];
+        const { runId } = f.options;
+        const { organisationId } = f.options.owned[0];
+        const value = {
           candidateSha: sha,
-          durableManifestConfirmed: true,
-          namespace: `release:run:${randomUUID()}`,
-          owned: {
-            clerkOrgIds: ["org_owned"],
-            globalKeys: [],
-            organisationIds: [organisationId],
+          contractDecision: "au-contract-v1",
+          databaseManifest: {
+            active: true,
+            candidateSha: sha,
+            durableManifestConfirmed: true,
+            namespace: `release:run:${randomUUID()}`,
+            owned: {
+              clerkOrgIds: ["org_owned"],
+              globalKeys: [],
+              organisationIds: [organisationId],
+            },
+            pausedConsumers: {},
+            restoreEvidence: {
+              observedAt: new Date().toISOString(),
+              reference: "owned-restore",
+            },
+            runId: randomUUID(),
+            target: {
+              branchId: "owned",
+              database: "owned",
+              endpointId: "owned",
+              hostname: "owned.neon.tech",
+              projectId: "owned",
+              role: "owned",
+            },
+            version: 1,
           },
-          pausedConsumers: {},
-          restoreEvidence: {
-            observedAt: new Date().toISOString(),
-            reference: "owned-restore",
+          dateWindow: { from: "2026-10-01", until: "2026-10-03" },
+          deployments: {
+            api: "https://api.example",
+            app: "https://app.example",
+            web: "https://web.example",
           },
-          runId: randomUUID(),
-          target: {
-            branchId: "owned",
-            database: "owned",
-            endpointId: "owned",
-            hostname: "owned.neon.tech",
-            projectId: "owned",
-            role: "owned",
+          environment: "owned-candidate",
+          mode: "xero-e2e",
+          owned: [
+            {
+              ...f.options.owned[0],
+              cohort: "A",
+              employeeIds: [randomUUID()],
+              independentRecoveryAlias: null,
+              leaveTypeIds: [randomUUID()],
+              maximumMutations: 2,
+              permittedOperations: ["read", "create"],
+              xeroTenantId: randomUUID(),
+            },
+          ],
+          runId,
+          version: 2,
+          workers: {
+            allowedFunctions: ["sync-xero-people"],
+            drainRequired: true,
+            environmentId: "owned",
+            expectedRevision: sha,
+            fenceGeneration: 1,
+            priorState: {},
+            restoreRequired: true,
           },
-          version: 1,
-        },
-        dateWindow: { from: "2026-10-01", until: "2026-10-03" },
-        deployments: {
-          api: "https://api.example",
-          app: "https://app.example",
-          web: "https://web.example",
-        },
-        environment: "owned-candidate",
-        mode: "xero-e2e",
-        owned: [
-          {
-            ...f.options.owned[0],
-            cohort: "A",
-            employeeIds: [randomUUID()],
-            independentRecoveryAlias: null,
-            leaveTypeIds: [randomUUID()],
-            maximumMutations: 2,
-            permittedOperations: ["read", "create"],
-            xeroTenantId: randomUUID(),
-          },
-        ],
-        runId,
-        version: 2,
-        workers: {
-          allowedFunctions: ["sync-xero-people"],
-          drainRequired: true,
-          environmentId: "owned",
-          expectedRevision: sha,
-          fenceGeneration: 1,
-          priorState: {},
-          restoreRequired: true,
-        },
-      };
-      f.save("manifest.json", value);
-      let proof: ReturnType<typeof fixture> | null = null;
-      let actionsReady = false;
-      let terminalReady = false;
-      const deps: XeroRunnerDependencies = {
-        acquire: async () => ({
-          cleanup: {
-            cleanupLocal: () => {
-              events.push("local");
-              if (failCleanup) {
-                return Promise.reject(new Error("owned failure"));
+        };
+        f.save("manifest.json", value);
+        let proof: ReturnType<typeof fixture> | null = null;
+        let actionsReady = false;
+        let terminalReady = false;
+        const deps: XeroRunnerDependencies = {
+          acquire: async () => ({
+            cleanup: {
+              cleanupLocal: () => {
+                events.push("local");
+                if (failCleanup) {
+                  return Promise.reject(new Error("owned failure"));
+                }
+                return Promise.resolve(reference);
+              },
+              cleanupRemote: async () => ({
+                disposition: "reconciled",
+                reference,
+              }),
+              drainOwnedWorkers: () => {
+                events.push("drain");
+                return Promise.resolve(reference);
+              },
+              observe: async () => [],
+              releaseFence: () => {
+                events.push("release");
+                return Promise.resolve(reference);
+              },
+              restoreWorkers: () => {
+                events.push("restore");
+                return Promise.resolve(reference);
+              },
+              verifyOutsideOwned: () => {
+                events.push("outside");
+                return Promise.resolve(reference);
+              },
+            },
+            collect: (phase, previous, terminalStart) => {
+              events.push(phase);
+              expect(actionsReady).toBe(true);
+              if (!proof) {
+                throw new Error("No action producer ran");
               }
-              return Promise.resolve(reference);
-            },
-            cleanupRemote: async () => ({
-              disposition: "reconciled",
-              reference,
-            }),
-            drainOwnedWorkers: () => {
-              events.push("drain");
-              return Promise.resolve(reference);
-            },
-            observe: async () => [],
-            releaseFence: () => {
-              events.push("release");
-              return Promise.resolve(reference);
-            },
-            restoreWorkers: () => {
-              events.push("restore");
-              return Promise.resolve(reference);
-            },
-            verifyOutsideOwned: () => {
-              events.push("outside");
-              return Promise.resolve(reference);
-            },
-          },
-          collect: (phase, previous, terminalStart) => {
-            events.push(phase);
-            expect(actionsReady).toBe(true);
-            if (!proof) {
-              throw new Error("No action producer ran");
-            }
-            if (phase === "actions") {
+              if (phase === "actions") {
+                return Promise.resolve(
+                  collectXeroCampaign({
+                    ...proof.options,
+                    endedAt: new Date().toISOString(),
+                  })
+                );
+              }
+              expect(terminalReady).toBe(true);
               return Promise.resolve(
                 collectXeroCampaign({
-                  ...proof.options,
+                  ...proof.terminalOptions,
                   endedAt: new Date().toISOString(),
+                  previous,
+                  terminalStartedAt: terminalStart,
                 })
               );
-            }
-            expect(terminalReady).toBe(true);
-            return Promise.resolve(
-              collectXeroCampaign({
-                ...proof.terminalOptions,
-                endedAt: new Date().toISOString(),
-                previous,
-                terminalStartedAt: terminalStart,
-              })
-            );
+            },
+            context: {
+              appUrl: "https://app.example",
+              verifiedFenceReference: reference,
+            },
+            deployments: ["app", "api", "web", "workers"].map((alias) => ({
+              alias: alias as "app" | "api" | "web" | "workers",
+              observedAt: new Date().toISOString(),
+              reference,
+              revision: sha,
+            })), // Exact enum fixture names.
+            terminalCleanup: () => {
+              events.push("terminal-cleanup");
+              if (!proof) {
+                throw new Error("No action producer ran");
+              }
+              vi.setSystemTime(phaseStart + 4000);
+              const terminalTime = new Date().toISOString();
+              proof.terminalReceipts(terminalTime, terminalTime);
+              terminalReady = true;
+              return Promise.resolve({
+                fenceReleased: true,
+                local: "PASS",
+                outsideOwned: "PASS",
+                provider: "PASS",
+                retained: [],
+                workers: "PASS",
+              });
+            },
+            verifyFixtures: async () => undefined,
+          }),
+          assertDurable: async () => undefined,
+          assertSource: vi.fn(),
+          browser: () => {
+            events.push("browser");
+            vi.setSystemTime(phaseStart + 3000);
+            proof = fixture(false, sha, runId, organisationId);
+            actionsReady = true;
+            return Promise.resolve({ closed: true, exitCode: 0 });
           },
-          context: {
-            appUrl: "https://app.example",
-            verifiedFenceReference: reference,
-          },
-          deployments: ["app", "api", "web", "workers"].map((alias) => ({
-            alias: alias as "app" | "api" | "web" | "workers",
-            observedAt: new Date().toISOString(),
-            reference,
-            revision: sha,
-          })), // Exact enum fixture names.
-          terminalCleanup: () => {
-            events.push("terminal-cleanup");
-            if (!proof) {
-              throw new Error("No action producer ran");
-            }
-            const terminalTime = new Date().toISOString();
-            proof.terminalReceipts(terminalTime, terminalTime);
-            terminalReady = true;
-            return Promise.resolve({
-              fenceReleased: true,
-              local: "PASS",
-              outsideOwned: "PASS",
-              provider: "PASS",
-              retained: [],
-              workers: "PASS",
-            });
-          },
-          verifyFixtures: async () => undefined,
-        }),
-        assertDurable: async () => undefined,
-        assertSource: vi.fn(),
-        browser: async () => {
-          events.push("browser");
-          await new Promise((resolveDelay) => setTimeout(resolveDelay, 2100));
-          proof = fixture(false, sha, runId, organisationId);
-          actionsReady = true;
-          return { closed: true, exitCode: 0 };
-        },
-        importConfiguration: async () => undefined,
-        writeReport: vi.fn(() => ({
-          jsonPath: "unused",
-          markdownPath: "unused",
-        })),
-      };
-      const result = await runXeroE2e(
-        [
-          "--manifest",
-          resolve(f.options.output, "manifest.json"),
-          "--output",
-          f.options.output,
-        ],
-        deps
-      );
-      roots.push(
-        resolve("tooling/release/test-results", result.json.diagnosticRunId)
-      );
-      expect(events.indexOf("actions")).toBeLessThan(events.indexOf("local"));
-      expect(events.indexOf("terminal-cleanup")).toBeLessThan(
-        events.indexOf("terminal")
-      );
-      expect(result.exitCode).toBe(failCleanup ? 1 : 0);
-      expect(
-        result.json.scenarios.find((entry) => entry.id === "X26")?.status
-      ).toBe("PASS");
-      expect(result.json.lifecycle.cases).toHaveLength(40);
+          importConfiguration: async () => undefined,
+          writeReport: vi.fn(() => ({
+            jsonPath: "unused",
+            markdownPath: "unused",
+          })),
+        };
+        const result = await runXeroE2e(
+          [
+            "--manifest",
+            resolve(f.options.output, "manifest.json"),
+            "--output",
+            f.options.output,
+          ],
+          deps
+        );
+        roots.push(
+          resolve("tooling/release/test-results", result.json.diagnosticRunId)
+        );
+        expect(events.indexOf("actions")).toBeLessThan(events.indexOf("local"));
+        expect(events.indexOf("terminal-cleanup")).toBeLessThan(
+          events.indexOf("terminal")
+        );
+        expect(result.exitCode).toBe(failCleanup ? 1 : 0);
+        expect(
+          result.json.scenarios.find((entry) => entry.id === "X26")?.status
+        ).toBe("PASS");
+        expect(result.json.lifecycle.cases).toHaveLength(40);
+      } finally {
+        vi.useRealTimers();
+      }
     }
   );
 });
