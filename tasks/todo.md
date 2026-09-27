@@ -1682,7 +1682,7 @@ Authorised local merge completed without conflicts on main at `f3dd965f717fd10bb
 - [x] Restored feed issuance, scoped preview identity and surfaced failures.
 - [x] Calendar time conversion, navigation filters, overlap precomputation and catalogue.
 - [x] Complete representation, cache and lifecycle regressions plus integration cases.
-- [ ] Full source gates and reviewed protected exact-candidate live campaign.
-- [ ] Sanitised final evidence, scope audit and conventional worktree commits.
+- [x] Full source gates and reviewed protected exact-candidate live campaign.
+- [x] Sanitised final evidence, scope audit and conventional worktree commits.
 
-Review: source implementation and focused verification are complete. Full build (4 tasks), types (19 tasks), units (18 tasks), lint, boundaries, release tooling (509 tests) and release types passed. Explicit integration-file typecheck passed. Protected exact-candidate live migration and regression evidence remain pending.
+Review: F1-F12 implementation is complete at source candidate `4c603ded644eaee7df7861d731014b00d1b0b11a`. Full source gates pass, including 2,893 unit tests and 509 release tests. The reviewed additive migration has 22 matching completed checksums, no pending migration and schema equality. Protected live run `30440382-6c42-402c-b8e3-33c0d37818f8` passes all 27 files/254 tests under actual local-worker isolation; owned residue is zero, all 39 table hashes match the 351-row baseline and the fence is released. All five paused worker identities were restored and verified. Earlier path/network/environment failures and external customer history appends remain separately documented in `plans/162-executor-evidence.md`. Authenticated browser/provider/client/deployment and actual PITR exercise are not verified by this source execution. Final evidence is a documentation-only commit; runtime/tests remain identical to the verified source candidate.
