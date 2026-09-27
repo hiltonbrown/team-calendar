@@ -225,6 +225,21 @@ describe("Xero report evidence", () => {
     input.lifecycleInput = undefined;
     expect(buildXeroReport(input).exitCode).toBe(2);
   });
+  it.each([false, true])(
+    "rejects a mismatched harness candidate while preserving failure=%s",
+    (failed) => {
+      const input = completeInput();
+      input.harnessSha = "c".repeat(40);
+      if (failed) {
+        first(input).status = "FAIL";
+        first(input).actual = "assertion-failed";
+        first(input).reason = "assertion-failed";
+      }
+      const report = buildXeroReport(input);
+      expect(report.exitCode).toBe(failed ? 1 : 2);
+      expect(report.json.overall).toBe(failed ? "FAIL" : "NOT VERIFIED");
+    }
+  );
   it("rejects lifecycle run or candidate mismatch", () => {
     const input = completeInput();
     input.lifecycleRunId = "00000000-0000-4000-8000-000000000001";

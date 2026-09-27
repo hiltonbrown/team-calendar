@@ -371,6 +371,7 @@ function fixture(
     terminalStartedAt,
   };
   return {
+    artifact,
     cleanup,
     lifecycle,
     observations,
@@ -963,5 +964,339 @@ it.each(["bytes", "metadata"])(
     const collection = collectXeroCampaign(f.options);
     expect(collection.limitations).toContain("invalid-evidence");
     expect(f.report(collection).exitCode).toBe(1);
+  }
+);
+
+function readRestricted(f: ReturnType<typeof fixture>, reference: string) {
+  return JSON.parse(
+    readFileSync(
+      resolve(
+        f.options.output,
+        `sanitised/${reference.slice("restricted:sha256:".length)}.json`
+      ),
+      "utf8"
+    )
+  );
+}
+function saveLifecycle(f: ReturnType<typeof fixture>) {
+  f.save("lifecycle-observations.json", {
+    candidateSha: f.options.candidateSha,
+    input: f.lifecycle,
+    runId: f.options.runId,
+    schemaVersion: 1,
+  });
+}
+function failedLifecycle(
+  f: ReturnType<typeof fixture>,
+  entry: XeroEvidenceObservation
+) {
+  const failed = {
+    ...structuredClone(entry),
+    assertionPassed: false,
+    exitCodeOrObservedResult: 1,
+    observedAssertion: "assertion_failed",
+    status: "FAIL" as const,
+  };
+  const proof = readRestricted(f, entry.restrictedEvidenceLocations[0] ?? "");
+  proof.observation = structuredClone(failed);
+  failed.restrictedEvidenceLocations = [f.artifact(proof)];
+  return failed;
+}
+function failedLayer(
+  f: ReturnType<typeof fixture>,
+  entry: XeroObservation,
+  index = 0
+) {
+  const link = entry.evidence[index];
+  if (!link) {
+    throw new Error("fixture");
+  }
+  const receipt = JSON.parse(
+    readFileSync(resolve(f.options.output, link.path), "utf8")
+  );
+  receipt.assertionPassed = false;
+  receipt.terminal = "failed";
+  const path = `failed-${randomUUID()}.json`;
+  f.save(path, receipt);
+  return ingestXeroLayerReceipt(resolve(f.options.output, path), {
+    ...f.options,
+    endedAt: entry.endedAt ?? "",
+    fixtureAlias: "fixture-owned",
+    layer: link.layer,
+    observationId: entry.id,
+    startedAt: entry.startedAt ?? "",
+  });
+}
+function finish(
+  f: ReturnType<typeof fixture>,
+  actions: ReturnType<typeof collectXeroCampaign>
+) {
+  f.terminalReceipts();
+  return collectXeroCampaign({ ...f.terminalOptions, previous: actions });
+}
+
+it.each(["fail-first", "fail-last", "malformed-first", "pass-duplicate"])(
+  "scenario duplicate layer %s preserves failure and denies duplicate PASS",
+  (order) => {
+    const f = fixture();
+    const entry = structuredClone(f.observations[0]);
+    if (!entry) {
+      throw new Error("fixture");
+    }
+    const [pass] = entry.evidence;
+    const fail = failedLayer(f, entry);
+    const duplicates =
+      {
+        "fail-first": [fail, pass],
+        "fail-last": [pass, fail],
+        "malformed-first": [{}, fail],
+        "pass-duplicate": [pass, pass],
+      }[order] ?? [];
+    f.save(`${entry.id}-observation.json`, {
+      ...entry,
+      evidence: [...duplicates, ...entry.evidence.slice(1)],
+    });
+    const actions = collectXeroCampaign(f.options);
+    expect(actions.limitations).toContain("invalid-evidence");
+    const terminal = finish(f, actions);
+    expect(terminal.limitations).toContain("invalid-evidence");
+    expect(f.report(terminal).exitCode).toBe(
+      order === "pass-duplicate" ? 2 : 1
+    );
+  }
+);
+
+it.each(["operationAlias", "eventAlias", "logicalRunAlias", "origin"])(
+  "keeps valid failed layer alongside uncorrelated %s sibling",
+  (field) => {
+    const f = fixture();
+    const entry = structuredClone(
+      f.observations.find((value) => value.id === "X04.completion")
+    );
+    if (!entry) {
+      throw new Error("fixture");
+    }
+    const fail = failedLayer(
+      f,
+      entry,
+      entry.evidence.findIndex((link) => link.layer === "database")
+    );
+    const index = entry.evidence.findIndex(
+      (link) => link.layer === (field === "origin" ? "provider" : "worker")
+    );
+    const sibling = entry.evidence[index];
+    if (!sibling) {
+      throw new Error("fixture");
+    }
+    const receipt = JSON.parse(
+      readFileSync(resolve(f.options.output, sibling.path), "utf8")
+    );
+    receipt[field] = field === "operationAlias" ? "foreign-alias" : null;
+    f.save("foreign-layer.json", receipt);
+    entry.evidence[index] = ingestXeroLayerReceipt(
+      resolve(f.options.output, "foreign-layer.json"),
+      {
+        ...f.options,
+        endedAt: entry.endedAt ?? "",
+        fixtureAlias: "fixture-owned",
+        layer: sibling.layer,
+        observationId: entry.id,
+        startedAt: entry.startedAt ?? "",
+      }
+    );
+    entry.evidence[
+      entry.evidence.findIndex((link) => link.layer === "database")
+    ] = fail;
+    f.save(`${entry.id}-observation.json`, entry);
+    const actions = collectXeroCampaign(f.options);
+    expect(actions.limitations).toContain("invalid-evidence");
+    expect(f.report(finish(f, actions)).exitCode).toBe(1);
+  }
+);
+
+it.each(["fail-first", "fail-last", "invalid-first", "pass-duplicate"])(
+  "lifecycle duplicate level %s retains valid FAIL and invalid marker",
+  (order) => {
+    const f = fixture();
+    const entries = f.lifecycle.results["161-01"];
+    if (!(Array.isArray(entries) && entries[0])) {
+      throw new Error("fixture");
+    }
+    const pass = structuredClone(entries[0]);
+    const fail = failedLifecycle(f, pass);
+    const invalid = structuredClone(pass);
+    invalid.restrictedEvidenceLocations = [f.artifact({})];
+    const duplicates =
+      {
+        "fail-first": [fail, pass],
+        "fail-last": [pass, fail],
+        "invalid-first": [invalid, fail],
+        "pass-duplicate": [pass, pass],
+      }[order] ?? [];
+    f.lifecycle.results["161-01"] = [...duplicates, ...entries.slice(1)];
+    saveLifecycle(f);
+    const actions = collectXeroCampaign(f.options);
+    expect(actions.limitations).toContain("invalid-evidence");
+    const terminal = finish(f, actions);
+    expect(terminal.limitations).toContain("invalid-evidence");
+    expect(f.report(terminal).exitCode).toBe(
+      order === "pass-duplicate" ? 2 : 1
+    );
+  }
+);
+
+it.each(["fail-first", "fail-last", "malformed-first", "malformed-last"])(
+  "terminal cleanup duplicates %s retain FAIL disposition",
+  (order) => {
+    const f = fixture();
+    const actions = collectXeroCampaign(f.options);
+    const [pass] = f.cleanup;
+    if (!pass) {
+      throw new Error("fixture");
+    }
+    const proof = readRestricted(f, pass.cleanupEvidenceReference);
+    proof.cleanupStatus = "FAIL";
+    const fail = {
+      ...pass,
+      cleanupEvidenceReference: f.artifact(proof),
+      cleanupStatus: "FAIL",
+    };
+    f.terminalReceipts();
+    const envelope = JSON.parse(
+      readFileSync(resolve(f.options.output, "lifecycle-cleanup.json"), "utf8")
+    );
+    const duplicates =
+      {
+        "fail-first": [fail, pass],
+        "fail-last": [pass, fail],
+        "malformed-first": [{}, fail],
+        "malformed-last": [fail, {}],
+      }[order] ?? [];
+    envelope.receipts = [...duplicates, ...f.cleanup.slice(1)];
+    f.save("lifecycle-cleanup.json", envelope);
+    const terminal = collectXeroCampaign({
+      ...f.terminalOptions,
+      previous: actions,
+    });
+    expect(terminal.limitations).toContain("invalid-evidence");
+    expect(
+      terminal.defects.some((defect) => defect.reason === "cleanup-incomplete")
+    ).toBe(true);
+    const results = terminal.lifecycleInput?.results["161-01"];
+    const retained = Array.isArray(results)
+      ? results.find((entry) => entry.evidenceLevel === pass.evidenceLevel)
+      : results;
+    expect(retained?.cleanupStatus).toBe("FAIL");
+    expect(f.report(terminal).exitCode).toBe(1);
+  }
+);
+
+it.each(["assertion", "ownership"])(
+  "rejects hash-consistent terminal-phase %s artefact",
+  (kind) => {
+    const f = fixture();
+    const results = f.lifecycle.results["161-01"];
+    const entry = Array.isArray(results)
+      ? results.find((value) => value.evidenceLevel === "database")
+      : undefined;
+    if (!entry?.fixtureOwnershipReference) {
+      throw new Error("fixture");
+    }
+    const reference =
+      kind === "assertion"
+        ? entry.restrictedEvidenceLocations[0]
+        : entry.fixtureOwnershipReference;
+    const proof = readRestricted(f, reference ?? "");
+    proof.phase = "terminal";
+    const changed = f.artifact(proof);
+    if (kind === "assertion") {
+      entry.restrictedEvidenceLocations = [changed];
+    } else {
+      entry.fixtureOwnershipReference = changed;
+    }
+    saveLifecycle(f);
+    const actions = collectXeroCampaign(f.options);
+    expect(actions.limitations).toContain("invalid-evidence");
+    expect(f.report(finish(f, actions)).exitCode).toBe(2);
+  }
+);
+
+it.each(
+  [
+    "wrong-assertion",
+    "foreign-candidate",
+    "wrong-command",
+    "skipped",
+    "unexecuted",
+    "wrong-target",
+  ].flatMap((fault) => [
+    { fault, invalidFirst: true },
+    { fault, invalidFirst: false },
+  ])
+)(
+  "preserves valid database FAIL beside semantic $fault duplicate, invalidFirst=$invalidFirst",
+  ({ fault, invalidFirst }) => {
+    const f = fixture(true);
+    const entries = f.lifecycle.results["161-01"];
+    const valid = Array.isArray(entries)
+      ? entries.find((entry) => entry.evidenceLevel === "database")
+      : undefined;
+    if (!(Array.isArray(entries) && valid)) {
+      throw new Error("fixture");
+    }
+    const invalid = structuredClone(valid);
+    if (fault === "wrong-assertion") {
+      const other = XERO_EVIDENCE_CASES.find(
+        (entry) => entry.caseId === "161-02"
+      );
+      if (!other) {
+        throw new Error("fixture");
+      }
+      invalid.expectedAssertion = other.requirement;
+    }
+    if (fault === "foreign-candidate") {
+      invalid.candidateSha = "f".repeat(40);
+    }
+    if (fault === "wrong-command") {
+      invalid.commandOrRunnerScenario = "161-02:database";
+    }
+    if (fault === "skipped") {
+      invalid.status = "NOT_VERIFIED";
+      invalid.exitCodeOrObservedResult = "skipped";
+    }
+    if (fault === "unexecuted") {
+      invalid.executed = false;
+    }
+    if (fault === "wrong-target") {
+      invalid.nonSecretTargetFingerprint = `sha256:${"f".repeat(64)}`;
+    }
+    // Only the assertion observation changes. Its producer envelope remains bound
+    // to the current owned run, so semantic validation must reject the sibling.
+    const proof = readRestricted(f, valid.restrictedEvidenceLocations[0] ?? "");
+    proof.observation = structuredClone(invalid);
+    invalid.restrictedEvidenceLocations = [f.artifact(proof)];
+    const duplicates = invalidFirst ? [invalid, valid] : [valid, invalid];
+    f.lifecycle.results["161-01"] = [
+      ...entries.filter((entry) => entry.evidenceLevel !== "database"),
+      ...duplicates,
+    ];
+    saveLifecycle(f);
+    const actions = collectXeroCampaign(f.options);
+    expect(actions.limitations).toContain("invalid-evidence");
+    const accepted = actions.lifecycleInput?.results["161-01"];
+    const database = Array.isArray(accepted)
+      ? accepted.find((entry) => entry.evidenceLevel === "database")
+      : undefined;
+    expect(database?.restrictedEvidenceLocations).toEqual(
+      valid.restrictedEvidenceLocations
+    );
+    const terminal = finish(f, actions);
+    expect(terminal.limitations).toContain("invalid-evidence");
+    const report = f.report(terminal);
+    expect(report.exitCode).toBe(1);
+    expect(
+      report.json.lifecycle.cases.find((entry) => entry.caseId === "161-01")
+        ?.status
+    ).toBe("FAIL");
   }
 );

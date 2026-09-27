@@ -342,21 +342,35 @@ export async function observeXeroNoEffect(
   ) {
     throw new Error("No-effect observation cannot replace a terminal effect");
   }
-  const proof = assertNoEffectProof(entry, await observe(entry), authority);
+  const originalEntry = JSON.stringify(entry);
+  const observed = await observe(structuredClone(entry));
+  const current = readXeroLedger(path, authority);
+  const currentEntry = current.entries.find((item) => item.id === id);
+  if (
+    !currentEntry ||
+    current.fenceReleased ||
+    current.closure.state !== "pending" ||
+    JSON.stringify(currentEntry) !== originalEntry
+  ) {
+    throw new Error(
+      "Mutation authority or intent changed during no-effect observation"
+    );
+  }
+  const proof = assertNoEffectProof(currentEntry, observed, authority);
   if (
     (proof.cause === "cancelled-before-dispatch") !==
-    (entry.outcome === "intended")
+    (currentEntry.outcome === "intended")
   ) {
     throw new Error("No-effect proof contradicts dispatch state");
   }
-  entry.noEffectProof = proof;
-  entry.outcome =
+  currentEntry.noEffectProof = proof;
+  currentEntry.outcome =
     proof.cause === "cancelled-before-dispatch"
       ? "definite-non-attempt"
       : "verified-no-effect";
-  entry.updatedAt = proof.observedAt;
-  persistXeroLedger(path, ledger);
-  return entry;
+  currentEntry.updatedAt = proof.observedAt;
+  persistXeroLedger(path, current);
+  return currentEntry;
 }
 export function recordXeroIntent(
   path: string,

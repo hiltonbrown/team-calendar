@@ -483,10 +483,13 @@ function aggregate(
 function needsOwnership(level: XeroEvidenceLevel): boolean {
   return level !== "unit" && level !== "source_audit" && level !== "mock";
 }
-function assessObservation(
+export function assessXeroEvidenceAssertion(
   observation: XeroEvidenceObservation,
   scenario: XeroEvidenceCase,
-  input: ParsedInput
+  input: Pick<
+    XeroEvidenceInput,
+    "candidateSha" | "assessedAt" | "expectedTargetFingerprints"
+  >
 ): string | null {
   if (observation.candidateSha !== input.candidateSha) {
     return "Execute the assertion on this candidate; cross-candidate evidence rejected";
@@ -518,25 +521,36 @@ function assessObservation(
   ) {
     return "Establish the expected target fingerprint and execute against that target";
   }
-  if (needsOwnership(observation.evidenceLevel)) {
-    if (
-      !(
-        observation.fixtureOwnershipReference &&
-        observation.restrictedEvidenceLocations.length
-      )
-    ) {
-      return "Record protected fixture ownership and restricted assertion evidence";
-    }
-    if (
-      observation.status !== "FAIL" &&
-      observation.assertionPassed &&
-      observation.observedAssertion === "assertion_passed" &&
-      ((observation.cleanupStatus !== "FAIL" &&
-        observation.cleanupStatus !== "PASS") ||
-        !observation.cleanupEvidenceReference)
-    ) {
-      return "Verify owned fixture cleanup and record its restricted evidence reference";
-    }
+  if (
+    needsOwnership(observation.evidenceLevel) &&
+    !(
+      observation.fixtureOwnershipReference &&
+      observation.restrictedEvidenceLocations.length
+    )
+  ) {
+    return "Record protected fixture ownership and restricted assertion evidence";
+  }
+  return null;
+}
+function assessObservation(
+  observation: XeroEvidenceObservation,
+  scenario: XeroEvidenceCase,
+  input: ParsedInput
+): string | null {
+  const issue = assessXeroEvidenceAssertion(observation, scenario, input);
+  if (issue) {
+    return issue;
+  }
+  if (
+    needsOwnership(observation.evidenceLevel) &&
+    observation.status !== "FAIL" &&
+    observation.assertionPassed &&
+    observation.observedAssertion === "assertion_passed" &&
+    ((observation.cleanupStatus !== "FAIL" &&
+      observation.cleanupStatus !== "PASS") ||
+      !observation.cleanupEvidenceReference)
+  ) {
+    return "Verify owned fixture cleanup and record its restricted evidence reference";
   }
   return null;
 }
@@ -545,7 +559,8 @@ function levelReport(
   scenario: XeroEvidenceCase,
   input: ParsedInput | null,
   invalid: boolean,
-  observations: XeroEvidenceObservation[]
+  observations: XeroEvidenceObservation[],
+  absentInput: boolean
 ): XeroEvidenceLevelReport {
   const pending = (
     remainingAction: string,
@@ -557,7 +572,11 @@ function levelReport(
     status: "NOT_VERIFIED",
   });
   if (!input) {
-    return pending("Correct malformed evidence input before verification");
+    return pending(
+      absentInput
+        ? "Provide and execute the required evidence input"
+        : "Correct malformed evidence input before verification"
+    );
   }
   const prerequisite = prerequisiteByLevel[level];
   if (input.prerequisites[prerequisite] !== true) {
@@ -607,7 +626,8 @@ function levelReport(
 }
 function caseReport(
   scenario: XeroEvidenceCase,
-  input: ParsedInput | null
+  input: ParsedInput | null,
+  absentInput: boolean
 ): XeroEvidenceCaseReport {
   const raw = input?.results[scenario.caseId];
   const entries = Array.isArray(raw) ? raw : [raw];
@@ -620,7 +640,7 @@ function caseReport(
     entry.success ? [entry.data] : []
   );
   const evidence = scenario.requiredEvidenceLevels.map((level) =>
-    levelReport(level, scenario, input, invalid, observations)
+    levelReport(level, scenario, input, invalid, observations, absentInput)
   );
   const observation = evidence.find((entry) => entry.observation)?.observation;
   return {
@@ -742,16 +762,22 @@ export function buildXeroEvidence(value: unknown): {
   markdown: string;
   exitCode: 0 | 1;
 } {
+  const absentInput = value === null || value === undefined;
   const parsed = inputSchema.safeParse(value);
   const input = parsed.success ? parsed.data : null;
   const knownCases = new Set<string>(
     XERO_EVIDENCE_CASES.map((entry) => entry.caseId)
   );
-  const validationErrors = input
-    ? Object.keys(input.results)
+  const validationErrors: string[] = [];
+  if (input) {
+    validationErrors.push(
+      ...Object.keys(input.results)
         .filter((id) => !knownCases.has(id))
         .map(() => "Unrecognised evidence case")
-    : ["Malformed evidence input"];
+    );
+  } else if (!absentInput) {
+    validationErrors.push("Malformed evidence input");
+  }
   if (input?.deployedSha === null) {
     validationErrors.push("Deployed candidate evidence is missing");
   } else if (input && input.deployedSha !== input.candidateSha) {
@@ -766,7 +792,7 @@ export function buildXeroEvidence(value: unknown): {
     (name) => input?.prerequisites[name] !== true
   );
   const cases = XERO_EVIDENCE_CASES.map((scenario) =>
-    caseReport(scenario, input)
+    caseReport(scenario, input, absentInput)
   );
   const caseStatus = aggregate(cases.map((entry) => entry.status));
   const assertionStatus: XeroEvidenceStatus =

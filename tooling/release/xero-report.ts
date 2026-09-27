@@ -526,7 +526,7 @@ export function buildXeroReport(value: unknown) {
   const identityValid =
     input.verifiedRunId === input.runId &&
     input.candidateSha !== null &&
-    input.harnessSha !== null &&
+    input.harnessSha === input.candidateSha &&
     input.environment !== null &&
     input.contractDecision !== null &&
     Date.parse(input.endedAt) >= Date.parse(input.startedAt) &&

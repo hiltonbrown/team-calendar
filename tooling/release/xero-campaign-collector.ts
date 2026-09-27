@@ -3,6 +3,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
 import {
+  assessXeroEvidenceAssertion,
   buildXeroEvidence,
   parseXeroEvidenceInput,
   parseXeroEvidenceObservation,
@@ -166,6 +167,9 @@ function lifecycleArtefact(
       throw new Error("Lifecycle artefact ownership disagrees");
     }
   }
+  if (kind !== "cleanup" && receipt.phase !== "actions") {
+    throw new Error("Lifecycle action artefact has a terminal phase");
+  }
   if (
     kind === "cleanup" &&
     (receipt.phase !== "terminal" ||
@@ -188,6 +192,41 @@ function assertionFields(
   } = value;
   return assertion;
 }
+function assertScenarioLayerCorrelation(
+  receipt: XeroScenarioEvidence,
+  entry: Pick<XeroObservation, "correlation">
+) {
+  if (
+    receipt.operationAlias !== entry.correlation.operationAlias ||
+    (receipt.layer === "worker" &&
+      !(receipt.eventAlias && receipt.logicalRunAlias)) ||
+    (receipt.layer === "provider" &&
+      receipt.mode === "LIVE" &&
+      receipt.origin !== "https://api.xero.com")
+  ) {
+    throw new Error("Independent layer correlation disagrees");
+  }
+}
+
+function retainScenarioLayer(
+  evidence: Map<string, XeroScenarioEvidence>,
+  receipt: XeroScenarioEvidence,
+  onInvalid: () => void
+) {
+  const previous = evidence.get(receipt.layer);
+  if (previous) {
+    onInvalid();
+  }
+  if (
+    !previous ||
+    receipt.assertion === "failed" ||
+    receipt.terminal === "failed"
+  ) {
+    evidence.set(receipt.layer, receipt);
+  }
+  return previous !== undefined;
+}
+
 function collectObservation(
   path: string,
   input: CollectionInput,
@@ -209,15 +248,11 @@ function collectObservation(
   ) {
     throw new Error("Campaign observation scope or freshness disagrees");
   }
-  const layers = new Set<string>();
-  const evidence: XeroScenarioEvidence[] = [];
+  const evidence = new Map<string, XeroScenarioEvidence>();
+  let invalid = false;
   for (const value of entry.evidence) {
     try {
       const link = parseXeroScenarioEvidence(value);
-      if (layers.has(link.layer)) {
-        throw new Error("Duplicate independent layer");
-      }
-      layers.add(link.layer);
       const receipt = ingestXeroLayerReceipt(resolve(input.output, link.path), {
         candidateSha: input.candidateSha,
         endedAt: entry.endedAt ?? "",
@@ -244,12 +279,20 @@ function collectObservation(
           "Observation reference disagrees with actual receipt bytes"
         );
       }
-      evidence.push(receipt);
+      assertScenarioLayerCorrelation(receipt, entry);
+      invalid = retainScenarioLayer(evidence, receipt, onInvalid) || invalid;
     } catch {
+      invalid = true;
       onInvalid();
     }
   }
-  return { ...entry, evidence };
+  return {
+    ...entry,
+    ...(invalid
+      ? { reason: "invalid-evidence" as const, status: "NOT VERIFIED" as const }
+      : {}),
+    evidence: [...evidence.values()],
+  };
 }
 function sameLifecycleScope(
   left: ReturnType<typeof lifecycleArtefact>,
@@ -323,21 +366,35 @@ function verifyLifecycleObservations(
   for (const definition of XERO_EVIDENCE_CASES) {
     const raw = lifecycle.results[definition.caseId];
     const observations = evidenceObservations(raw);
-    const levels = new Set<string>();
-    const accepted: XeroEvidenceObservation[] = [];
+    const accepted = new Map<string, XeroEvidenceObservation>();
     for (const observation of observations) {
       try {
-        if (levels.has(observation.evidenceLevel)) {
-          throw new Error("Duplicate lifecycle assertion level");
+        if (assessXeroEvidenceAssertion(observation, definition, lifecycle)) {
+          throw new Error(
+            "Lifecycle assertion identity or execution is invalid"
+          );
         }
-        levels.add(observation.evidenceLevel);
         verifyLifecycleAssertion(observation, definition.caseId, input);
-        accepted.push(observation);
+        const previous = accepted.get(observation.evidenceLevel);
+        if (previous) {
+          onInvalid();
+        }
+        if (
+          !previous ||
+          observation.status === "FAIL" ||
+          !observation.assertionPassed ||
+          observation.observedAssertion === "assertion_failed" ||
+          observation.exitCodeOrObservedResult === "assertion_failed" ||
+          (typeof observation.exitCodeOrObservedResult === "number" &&
+            observation.exitCodeOrObservedResult !== 0)
+        ) {
+          accepted.set(observation.evidenceLevel, observation);
+        }
       } catch {
         onInvalid();
       }
     }
-    lifecycle.results[definition.caseId] = accepted;
+    lifecycle.results[definition.caseId] = [...accepted.values()];
   }
 }
 function applyLifecycleCleanupReceipt(
@@ -393,6 +450,12 @@ function applyLifecycleCleanupReceipt(
   if (!sameLifecycleScope(proof, assertion)) {
     throw new Error("Lifecycle cleanup belongs to another owned fixture");
   }
+  if (
+    observation.cleanupStatus === "FAIL" &&
+    receipt.cleanupStatus === "PASS"
+  ) {
+    return;
+  }
   observation.cleanupStatus = receipt.cleanupStatus;
   observation.cleanupEvidenceReference = receipt.cleanupEvidenceReference;
 }
@@ -423,16 +486,16 @@ function collectLifecycleCleanup(
       try {
         const receipt = cleanupReceiptSchema.parse(value);
         const key = `${receipt.caseId}:${receipt.evidenceLevel}`;
-        if (seen.has(key)) {
-          throw new Error("Duplicate lifecycle cleanup receipt");
-        }
-        seen.add(key);
         applyLifecycleCleanupReceipt(
           lifecycle,
           receipt,
           input,
           onCleanupFailure
         );
+        if (seen.has(key)) {
+          onInvalid();
+        }
+        seen.add(key);
       } catch {
         onInvalid();
       }
@@ -577,6 +640,7 @@ export function collectXeroCampaign(
   if (input !== value) {
     invalid();
   }
+  limitations.push(...(input.previous?.limitations ?? []));
   defects.push(...(input.previous?.defects ?? []));
   validateCollectionWindow(input);
   const entries = collectScenarioObservations(input, invalid);

@@ -23,6 +23,7 @@ import {
   type XeroCleanupHooks,
   type XeroLedgerAuthority,
   type XeroLedgerEntry,
+  type XeroNoEffectProof,
 } from "./xero-ledger.js";
 
 const directories: string[] = [];
@@ -518,4 +519,86 @@ describe("causal independent no-effect receipts", () => {
     persistXeroLedger(path, ledger);
     expect(() => readXeroLedger(path, authority)).toThrow();
   });
+});
+
+function cancellationProof(
+  entry: Readonly<XeroLedgerEntry>,
+  authority: XeroLedgerAuthority
+): XeroNoEffectProof {
+  return {
+    action: entry.action,
+    bindingGeneration: entry.bindingGeneration,
+    candidateSha: authority.candidateSha,
+    causalEvidence: reference,
+    cause: "cancelled-before-dispatch",
+    clerkOrgId: entry.clerkOrgId,
+    fingerprint: entry.fingerprint,
+    intentId: entry.id,
+    observedAt: new Date().toISOString(),
+    organisationId: entry.organisationId,
+    providerDispatched: false,
+    runId: authority.runId,
+  };
+}
+it.each(["dispatch", "closure", "release"])(
+  "rejects a no-effect proof after concurrent %s",
+  async (change) => {
+    const { authority, entry, path } = fixture();
+    await expect(
+      observeXeroNoEffect(
+        path,
+        entry.id,
+        (observed) => {
+          const current = readXeroLedger(path, authority);
+          const target = current.entries.find((item) => item.id === entry.id);
+          if (!target) {
+            throw new Error("fixture");
+          }
+          if (change === "dispatch") {
+            target.outcome = "dispatched";
+          }
+          if (change === "closure") {
+            current.closure.state = "releasing";
+          }
+          if (change === "release") {
+            current.fenceReleased = true;
+          }
+          persistXeroLedger(path, current);
+          return Promise.resolve(cancellationProof(observed, authority));
+        },
+        authority
+      )
+    ).rejects.toThrow("changed during no-effect observation");
+    const current = readXeroLedger(path, authority);
+    expect(current.entries[0]?.outcome).toBe(
+      change === "dispatch" ? "dispatched" : "intended"
+    );
+    expect(current.entries[0]?.noEffectProof).toBeUndefined();
+    expect(current.closure.state).toBe(
+      change === "closure" ? "releasing" : "pending"
+    );
+    expect(current.fenceReleased).toBe(change === "release");
+  }
+);
+it("preserves an independently inserted sibling when applying a no-effect proof", async () => {
+  const { authority, entry, path } = fixture();
+  const sibling = { ...entry, fingerprint: "c".repeat(64), id: randomUUID() };
+  await observeXeroNoEffect(
+    path,
+    entry.id,
+    (observed) => {
+      const current = readXeroLedger(path, authority);
+      recordXeroIntent(path, current, sibling, authority);
+      return Promise.resolve(cancellationProof(observed, authority));
+    },
+    authority
+  );
+  const current = readXeroLedger(path, authority);
+  expect(current.entries).toHaveLength(2);
+  expect(current.entries.find((item) => item.id === entry.id)?.outcome).toBe(
+    "definite-non-attempt"
+  );
+  expect(current.entries.find((item) => item.id === sibling.id)).toEqual(
+    sibling
+  );
 });

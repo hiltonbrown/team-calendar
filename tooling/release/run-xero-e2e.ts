@@ -37,6 +37,14 @@ import {
 } from "./xero-report.js";
 import { assertReviewedXeroSource } from "./xero-source-integrity.js";
 
+const recoveryBrowserClosureSchema = z.strictObject({
+  candidateSha: z.string().regex(/^[a-f0-9]{40}$/),
+  closed: z.literal(true),
+  observedAt: z.iso.datetime(),
+  reference: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+  runId: z.uuid(),
+});
+
 interface Options {
   manifest: string;
   output: string | null;
@@ -92,6 +100,7 @@ export interface XeroExecutionLease {
   deployments: XeroReportInput["deployments"];
   terminalCleanup: () => Promise<XeroReportInput["cleanup"]>;
   verifyFixtures: () => Promise<void>;
+  verifyRecoveryBrowserClosure?: () => Promise<unknown>;
 }
 export interface XeroRunnerDependencies {
   acquire: (manifest: XeroExecutionManifest) => Promise<XeroExecutionLease>;
@@ -135,6 +144,7 @@ export function superviseXeroBrowser(
     let deadline: ReturnType<typeof setTimeout> | undefined;
     let escalation: ReturnType<typeof setTimeout> | undefined;
     let poll: ReturnType<typeof setTimeout> | undefined;
+    let termination: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const finish = (confirmed: boolean) => {
       if (finished) {
@@ -144,6 +154,7 @@ export function superviseXeroBrowser(
       clearTimeout(deadline);
       clearTimeout(escalation);
       clearTimeout(poll);
+      clearTimeout(termination);
       signal.removeEventListener("abort", stop);
       resolveResult({
         closed: confirmed,
@@ -158,10 +169,11 @@ export function superviseXeroBrowser(
         return;
       }
       failed = true;
+      clearTimeout(termination);
       processControl.kill("SIGTERM");
       escalation ??= setTimeout(
         () => processControl.kill("SIGKILL"),
-        Math.floor((shutdownMs * 2) / 3)
+        Math.floor(shutdownMs / 3)
       );
       boundShutdown();
     };
@@ -188,8 +200,15 @@ export function superviseXeroBrowser(
       }
       closed = true;
       exitCode = code ?? 1;
-      boundShutdown();
+      if (exitCode === 0) {
+        boundShutdown();
+      } else {
+        stop();
+      }
       confirm();
+      if (!finished && exitCode === 0) {
+        termination ??= setTimeout(stop, Math.floor(shutdownMs / 3));
+      }
     });
     signal.addEventListener("abort", stop, { once: true });
     if (signal.aborted) {
@@ -298,6 +317,7 @@ export async function runXeroE2e(
   try {
     output = privateOutput(output);
     const options = parseXeroCli(args);
+    browserClosed = !options.recover;
     failureReason = "manifest-unavailable";
     const raw = readFileSync(resolve(options.manifest), "utf8");
     failureReason = "manifest-invalid";
@@ -371,6 +391,25 @@ export async function runXeroE2e(
     await lease.verifyFixtures();
     input.verifiedRunId = manifest.runId;
     if (options.recover) {
+      if (!lease.verifyRecoveryBrowserClosure) {
+        throw new Error(
+          "Prior browser writer closure requires independent verification"
+        );
+      }
+      const proof = recoveryBrowserClosureSchema.parse(
+        await lease.verifyRecoveryBrowserClosure()
+      );
+      if (
+        proof.runId !== manifest.runId ||
+        proof.candidateSha !== manifest.candidateSha ||
+        Date.parse(proof.observedAt) < Date.parse(input.startedAt) ||
+        Date.parse(proof.observedAt) > Date.now()
+      ) {
+        throw new Error(
+          "Prior browser writer closure proof is foreign or stale"
+        );
+      }
+      browserClosed = true;
       markUnavailable(input, "recovery-required");
     } else {
       const contextPath = resolve(output, "runner-context.json");

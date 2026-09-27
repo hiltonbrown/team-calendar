@@ -21,6 +21,8 @@ import {
 import { readXeroExecutionManifest } from "./xero-execution-guard.js";
 import {
   dispatchXeroIntent,
+  makeXeroLedger,
+  persistXeroLedger,
   readXeroLedger,
   recordXeroIntent,
   type XeroLedgerEntry,
@@ -608,3 +610,131 @@ it("does not revive polling when close arrives after bounded unknown shutdown", 
     vi.useRealTimers();
   }
 });
+
+it.each([0, 1])(
+  "terminates lingering descendants after close code %s without granting writer closure",
+  async (code) => {
+    vi.useFakeTimers();
+    try {
+      const child = Object.assign(new EventEmitter(), { pid: 12_345 });
+      const kill = vi.fn();
+      const result = superviseXeroBrowser(
+        child,
+        new AbortController().signal,
+        { exists: () => true, kill },
+        90
+      );
+      child.emit("close", code);
+      await vi.advanceTimersByTimeAsync(90);
+      expect(await result).toEqual({ closed: false, exitCode: 1 });
+      expect(kill.mock.calls.map(([signal]) => signal)).toEqual([
+        "SIGTERM",
+        "SIGKILL",
+      ]);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+it.each([
+  "missing",
+  "unknown",
+  "wrong-run",
+  "wrong-candidate",
+  "stale",
+  "future",
+  "rejected",
+  "fixture-failure",
+  "verified",
+])(
+  "requires independent prior browser closure during recovery: %s",
+  async (fault) => {
+    const input = manifest();
+    const authority = readXeroExecutionManifest(input.path);
+    const ledgerPath = resolve(input.dir, "xero-ledger.json");
+    persistXeroLedger(ledgerPath, makeXeroLedger(authority));
+    const cleanupLocal = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const releaseFence = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const drain = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const outside = vi.fn(async () => `sha256:${"d".repeat(64)}`);
+    const closure = vi.fn(() => {
+      if (fault === "rejected") {
+        return Promise.reject(new Error("private prior writer"));
+      }
+      let observedAt = Date.now();
+      if (fault === "stale") {
+        observedAt -= 60_000;
+      }
+      if (fault === "future") {
+        observedAt += 60_000;
+      }
+      return Promise.resolve({
+        candidateSha:
+          fault === "wrong-candidate" ? "c".repeat(40) : authority.candidateSha,
+        closed: fault !== "unknown",
+        observedAt: new Date(observedAt).toISOString(),
+        reference: `sha256:${"d".repeat(64)}`,
+        runId: fault === "wrong-run" ? randomUUID() : authority.runId,
+      });
+    });
+    const browser = vi.fn();
+    const result = await runXeroE2e(
+      ["--manifest", input.path, "--output", input.dir, "--recover"],
+      {
+        acquire: async () => ({
+          cleanup: {
+            cleanupLocal,
+            cleanupRemote: async () => ({
+              disposition: "reconciled",
+              reference: `sha256:${"d".repeat(64)}`,
+            }),
+            drainOwnedWorkers: drain,
+            observe: async () => [],
+            releaseFence,
+            restoreWorkers: async () => `sha256:${"d".repeat(64)}`,
+            verifyOutsideOwned: outside,
+          },
+          collect: () => Promise.reject(new Error("no campaign proof")),
+          context: {
+            appUrl: "https://app.example",
+            verifiedFenceReference: `sha256:${"d".repeat(64)}`,
+          },
+          deployments: [],
+          terminalCleanup: async () => ({
+            fenceReleased: true,
+            local: "PASS",
+            outsideOwned: "PASS",
+            provider: "PASS",
+            retained: [],
+            workers: "PASS",
+          }),
+          verifyFixtures: () =>
+            fault === "fixture-failure"
+              ? Promise.reject(new Error("private fixture"))
+              : Promise.resolve(),
+          ...(fault === "missing"
+            ? {}
+            : { verifyRecoveryBrowserClosure: closure }),
+        }),
+        assertDurable: async () => undefined,
+        assertSource: vi.fn(),
+        browser,
+        importConfiguration: async () => undefined,
+      }
+    );
+    recordPaths(result);
+    expect(browser).not.toHaveBeenCalled();
+    expect(drain).toHaveBeenCalled();
+    expect(outside).toHaveBeenCalled();
+    expect(cleanupLocal).toHaveBeenCalledTimes(fault === "verified" ? 1 : 0);
+    expect(releaseFence).toHaveBeenCalledTimes(fault === "verified" ? 1 : 0);
+    expect(readXeroLedger(ledgerPath, authority).fenceReleased).toBe(
+      fault === "verified"
+    );
+    if (fault === "fixture-failure") {
+      expect(closure).not.toHaveBeenCalled();
+    }
+    expect(result.exitCode).not.toBe(0);
+  }
+);
