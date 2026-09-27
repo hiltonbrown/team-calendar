@@ -66,7 +66,7 @@ describe("GET /ical/:token.ics", () => {
       "text/calendar;charset=utf-8"
     );
     expect(response.headers.get("Cache-Control")).toBe(
-      "max-age=3600, must-revalidate"
+      "private, no-cache, must-revalidate"
     );
     expect(mocks.renderFeedForToken).toHaveBeenCalledTimes(1);
     expect(mocks.renderFeedForToken).toHaveBeenCalledWith("feed-token");
@@ -79,7 +79,7 @@ describe("GET /ical/:token.ics", () => {
     expect(await response.text()).toBe("");
     expect(response.headers.get("ETag")).toBe('"feed-hash"');
     expect(response.headers.get("Cache-Control")).toBe(
-      "max-age=3600, must-revalidate"
+      "private, no-cache, must-revalidate"
     );
     expect(mocks.renderFeedForToken).toHaveBeenCalledTimes(1);
   });

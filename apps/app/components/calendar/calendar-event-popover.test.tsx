@@ -25,6 +25,27 @@ describe("CalendarEventPopover", () => {
     expect(screen.getByRole("link", { name: "View plan" })).toBeDefined();
   });
 
+  it("shows an overnight span in the explicit organisation timezone", async () => {
+    render(
+      <CalendarEventPopover
+        event={{
+          ...event(),
+          allDay: false,
+          endsAt: new Date("2026-04-15T16:00:00Z"),
+          startsAt: new Date("2026-04-15T13:00:00Z"),
+        }}
+        orgQueryValue={null}
+        timezone="Australia/Brisbane"
+      >
+        <button type="button">Open</button>
+      </CalendarEventPopover>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(
+      await screen.findByText("15 April 2026, 23:00 to 16 April 2026, 02:00")
+    ).toBeDefined();
+  });
+
   it("shows plain Xero errors without raw details", async () => {
     render(
       <CalendarEventPopover

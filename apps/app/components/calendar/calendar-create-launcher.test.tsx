@@ -59,7 +59,7 @@ describe("CalendarCreateLauncher", () => {
     render(
       <CalendarCreateLauncher
         personId="00000000-0000-4000-8000-000000000011"
-        startsAt="2026-04-15T09:00:00.000Z"
+        startsAt="2026-04-15T09:00"
       >
         Add at 09:00
       </CalendarCreateLauncher>
@@ -70,5 +70,13 @@ describe("CalendarCreateLauncher", () => {
         name: "Add availability for 15 April 2026 at 09:00",
       })
     ).toBeDefined();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Add availability for 15 April 2026 at 09:00",
+      })
+    );
+    expect(mocks.push).toHaveBeenCalledWith(
+      "/plans/new?startsAt=2026-04-15T09%3A00&personId=00000000-0000-4000-8000-000000000011&org=org_1"
+    );
   });
 });

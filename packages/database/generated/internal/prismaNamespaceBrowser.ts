@@ -73,6 +73,7 @@ export const ModelName = {
   PublicHoliday: 'PublicHoliday',
   PublicHolidayAssignment: 'PublicHolidayAssignment',
   Feed: 'Feed',
+  FeedEventPublication: 'FeedEventPublication',
   FeedScope: 'FeedScope',
   FeedToken: 'FeedToken',
   Notification: 'Notification',
@@ -619,6 +620,8 @@ export const FeedScalarFieldEnum = {
   privacy_mode: 'privacy_mode',
   includes_public_holidays: 'includes_public_holidays',
   last_rendered_at: 'last_rendered_at',
+  representation_hash: 'representation_hash',
+  representation_generation: 'representation_generation',
   last_etag: 'last_etag',
   created_by_user_id: 'created_by_user_id',
   archived_at: 'archived_at',
@@ -627,6 +630,24 @@ export const FeedScalarFieldEnum = {
 } as const
 
 export type FeedScalarFieldEnum = (typeof FeedScalarFieldEnum)[keyof typeof FeedScalarFieldEnum]
+
+
+export const FeedEventPublicationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  feed_id: 'feed_id',
+  source_key: 'source_key',
+  published_uid: 'published_uid',
+  representation_hash: 'representation_hash',
+  published_sequence: 'published_sequence',
+  published_at: 'published_at',
+  present: 'present',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type FeedEventPublicationScalarFieldEnum = (typeof FeedEventPublicationScalarFieldEnum)[keyof typeof FeedEventPublicationScalarFieldEnum]
 
 
 export const FeedScopeScalarFieldEnum = {

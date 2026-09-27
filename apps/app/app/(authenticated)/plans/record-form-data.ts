@@ -9,9 +9,11 @@ import {
 } from "@repo/availability";
 import { database, scopedQuery } from "@repo/database";
 import { notFound, redirect } from "next/navigation";
+import { z } from "zod";
 import { withOrg } from "@/lib/navigation/org-url";
 import { requireActiveOrgPageContext } from "@/lib/server/require-active-org-page-context";
 import type { PlanRecordFormInput } from "./_schemas";
+import { formatPlanDateTime } from "./plan-form-time";
 
 interface LoadPlanFormDataInput {
   org?: string;
@@ -20,7 +22,12 @@ interface LoadPlanFormDataInput {
   startsAt?: string;
 }
 
-const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const PrefillStartSchema = z.union([
+  z.iso.date(),
+  z.iso
+    .datetime({ local: true, precision: -1 })
+    .refine((value) => !value.endsWith("Z")),
+]);
 
 export async function loadPlanFormData({
   org,
@@ -105,21 +112,13 @@ export async function loadPlanFormData({
     notFound();
   }
 
+  const organisation = await database.organisation.findFirst({
+    select: { timezone: true },
+    where: { archived_at: null, clerk_org_id: clerkOrgId, id: organisationId },
+  });
+  const timezone = organisation?.timezone ?? "UTC";
   const record = recordResult?.ok
-    ? {
-        allDay: recordResult.value.allDay,
-        contactabilityStatus: recordResult.value.contactabilityStatus,
-        endsAt: dateInput(recordResult.value.endsAt),
-        endTime: timeInput(recordResult.value.endsAt),
-        id: recordResult.value.id,
-        notesInternal: recordResult.value.notesInternal ?? "",
-        personId: recordResult.value.personId,
-        privacyMode: recordResult.value.privacyMode,
-        recordType: recordResult.value
-          .recordType as PlanRecordFormInput["recordType"],
-        startsAt: dateInput(recordResult.value.startsAt),
-        startTime: timeInput(recordResult.value.startsAt),
-      }
+    ? toEditableRecord(recordResult.value, timezone)
     : undefined;
   const prefillRecord =
     record ??
@@ -161,16 +160,9 @@ export async function loadPlanFormData({
       label: `${person.first_name} ${person.last_name}`,
     })),
     record: prefillRecord,
+    timezone,
     xeroConnectionState,
   };
-}
-
-function dateInput(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function timeInput(date: Date): string {
-  return date.toISOString().slice(11, 16);
 }
 
 function createPrefillRecord({
@@ -182,24 +174,49 @@ function createPrefillRecord({
   personId?: string;
   startsAt?: string;
 }) {
-  if (!startsAt) {
+  const parsed = PrefillStartSchema.safeParse(startsAt);
+  if (!parsed.success) {
     return;
   }
-  const date = startsAt.includes("T") ? startsAt.slice(0, 10) : startsAt;
-  if (!DATE_ONLY_PATTERN.test(date)) {
-    return;
-  }
+  const date = parsed.data.slice(0, 10);
+  const startTime = parsed.data.includes("T") ? parsed.data.slice(11, 16) : "";
+  const end = startTime
+    ? new Date(new Date(`${date}T${startTime}:00Z`).getTime() + 3_600_000)
+    : null;
   const requestedPerson = people.find((person) => person.id === personId);
   return {
-    allDay: true,
+    allDay: !startTime,
     contactabilityStatus: "contactable" as const,
-    endsAt: date,
-    endTime: "",
+    endsAt: end?.toISOString().slice(0, 10) ?? date,
+    endTime: end?.toISOString().slice(11, 16) ?? "",
     notesInternal: "",
     personId: requestedPerson?.id ?? people[0]?.id ?? "",
     privacyMode: "named" as const,
     recordType: "annual_leave" as const,
     startsAt: date,
-    startTime: "",
+    startTime,
+  };
+}
+
+function toEditableRecord(
+  record: Extract<Awaited<ReturnType<typeof getRecord>>, { ok: true }>["value"],
+  timezone: string
+) {
+  const displayTimezone = record.allDay ? "UTC" : timezone;
+  const start = formatPlanDateTime(record.startsAt, displayTimezone);
+  const end = formatPlanDateTime(record.endsAt, displayTimezone);
+  return {
+    allDay: record.allDay,
+    contactabilityStatus: record.contactabilityStatus,
+    endsAt: end.date,
+    endTime: end.time,
+    id: record.id,
+    notesInternal: record.notesInternal ?? "",
+    personId: record.personId,
+    privacyMode: record.privacyMode,
+    // Persisted records have already passed the user-creatable record validator.
+    recordType: record.recordType as PlanRecordFormInput["recordType"],
+    startsAt: start.date,
+    startTime: start.time,
   };
 }

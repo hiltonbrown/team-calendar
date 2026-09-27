@@ -17,6 +17,10 @@ describe("inactivity report fixture cleanup registration", () => {
     expect(inventory.indexOf('"xero_inactivity_classifications"')).toBeLessThan(
       inventory.indexOf('"xero_tenants"')
     );
+    expect(inventory.indexOf('"feed_event_publications"')).toBeGreaterThan(-1);
+    expect(inventory.indexOf('"feed_event_publications"')).toBeLessThan(
+      inventory.indexOf('"feeds"')
+    );
     expect(source.split("for (const table of scopedTables)")).toHaveLength(4);
     expect(source).toContain("AND organisation_id IN");
     expect(source).toContain("assertActiveRunOwner(manifest");

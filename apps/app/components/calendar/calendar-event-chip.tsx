@@ -15,11 +15,13 @@ import {
 interface CalendarEventChipProps {
   event: CalendarEvent;
   orgQueryValue: string | null;
+  timezone?: string;
 }
 
 export function CalendarEventChip({
   event,
   orgQueryValue,
+  timezone = "UTC",
 }: CalendarEventChipProps) {
   const style = statusToneClasses[toneForCalendarEvent(event)];
   const microLabel = treatmentLabel(event.renderTreatment);
@@ -28,7 +30,11 @@ export function CalendarEventChip({
   const accessibleLabel = calendarEventAccessibleLabel(event);
 
   return (
-    <CalendarEventPopover event={event} orgQueryValue={orgQueryValue}>
+    <CalendarEventPopover
+      event={event}
+      orgQueryValue={orgQueryValue}
+      timezone={timezone}
+    >
       <button
         aria-label={accessibleLabel}
         className={cn(

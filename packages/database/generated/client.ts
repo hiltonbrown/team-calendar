@@ -152,6 +152,11 @@ export type PublicHolidayAssignment = Prisma.PublicHolidayAssignmentModel
  */
 export type Feed = Prisma.FeedModel
 /**
+ * Model FeedEventPublication
+ *
+ */
+export type FeedEventPublication = Prisma.FeedEventPublicationModel
+/**
  * Model FeedScope
  * 
  */

@@ -1,15 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createFunction: vi.fn(),
   feedCacheKey: vi.fn(() => "feed:cache:key"),
   feedFindFirst: vi.fn(),
+  feedUpdateMany: vi.fn(),
   invalidateFeedCache: vi.fn(() =>
     Promise.resolve({ ok: true, value: { deletedCount: 0 } })
   ),
   renderFeedBody: vi.fn(() =>
     Promise.resolve({
       ok: true,
-      value: { body: "BEGIN:VCALENDAR", etag: "abc" },
+      value: {
+        body: "BEGIN:VCALENDAR",
+        etag: "abc",
+        fingerprint: "current",
+        generation: 1,
+      },
     })
   ),
   setCachedFeedBody: vi.fn(() =>
@@ -20,12 +27,14 @@ const mocks = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
-    createFunction: vi.fn(() => ({ id: "rebuild-feed-cache" })),
+    createFunction: mocks.createFunction,
     send: vi.fn(),
   },
 }));
 vi.mock("@repo/database", () => ({
-  database: { feed: { findFirst: mocks.feedFindFirst } },
+  database: {
+    feed: { findFirst: mocks.feedFindFirst, updateMany: mocks.feedUpdateMany },
+  },
 }));
 vi.mock("@repo/feeds", () => ({
   feedCacheKey: mocks.feedCacheKey,
@@ -51,6 +60,31 @@ function input(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+const registeredHandler = mocks.createFunction.mock.calls[0]?.[1];
+
+it("throws execution failures with valid input at the queue boundary", async () => {
+  const handler = registeredHandler;
+  expect(handler).toBeTypeOf("function");
+  mocks.feedFindFirst.mockResolvedValue({
+    id: FEED_ID,
+    name: "Team feed",
+    privacy_mode: "named",
+  });
+  mocks.renderFeedBody.mockResolvedValueOnce({
+    error: { code: "unknown_error", message: "Projection unavailable" },
+    ok: false,
+  });
+  await expect(
+    handler({
+      event: { data: input() },
+      step: {
+        run: (_name: string, execute: () => Promise<unknown>) => execute(),
+      },
+    })
+  ).rejects.toThrow();
+  expect(mocks.renderFeedBody).toHaveBeenCalled();
+});
 
 describe("rebuildFeedCache", () => {
   beforeEach(() => {
@@ -116,6 +150,29 @@ describe("rebuildFeedCache", () => {
     expect(mocks.invalidateFeedCache).toHaveBeenCalledWith({ feedId: FEED_ID });
     expect(mocks.renderFeedBody).not.toHaveBeenCalled();
     expect(mocks.setCachedFeedBody).not.toHaveBeenCalled();
+  });
+
+  it("reports rendering failure instead of a successful rebuild", async () => {
+    mocks.renderFeedBody.mockResolvedValueOnce({
+      error: {
+        code: "unknown_error",
+        message: "Projection unavailable",
+      },
+      ok: false,
+    });
+    expect(await rebuildFeedCache(input())).toMatchObject({ ok: false });
+    expect(mocks.setCachedFeedBody).not.toHaveBeenCalled();
+  });
+
+  it("reports KV failure instead of claiming the body was cached", async () => {
+    mocks.setCachedFeedBody.mockResolvedValueOnce({
+      error: {
+        code: "unknown_error",
+        message: "Cache unavailable",
+      },
+      ok: false,
+    });
+    expect(await rebuildFeedCache(input())).toMatchObject({ ok: false });
   });
 
   it("rejects payloads missing a scope key", async () => {

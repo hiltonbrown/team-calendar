@@ -41,6 +41,8 @@ const FeedDetailPage = async ({
   const modes = canManage
     ? (["named", "masked", "private"] as const)
     : ([detail.value.privacyMode] as const);
+  const previewErrors: Partial<Record<"named" | "masked" | "private", string>> =
+    {};
   const previews = Object.fromEntries(
     await Promise.all(
       modes.map(async (mode) => {
@@ -53,6 +55,9 @@ const FeedDetailPage = async ({
           organisationId,
           privacyMode: mode,
         });
+        if (!result.ok) {
+          previewErrors[mode] = result.error.message;
+        }
         return [
           mode,
           result.ok
@@ -75,6 +80,7 @@ const FeedDetailPage = async ({
           canManage={canManage}
           detail={detail.value}
           organisationId={organisationId}
+          previewErrors={previewErrors}
           previews={previews}
         />
       </div>

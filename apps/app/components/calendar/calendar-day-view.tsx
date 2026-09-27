@@ -85,6 +85,7 @@ export function CalendarDayView({
                     event={event}
                     key={`${event.id}-${dateOnly}`}
                     orgQueryValue={orgQueryValue}
+                    timezone={data.range.timezone}
                   />
                 ))}
               </div>
@@ -95,12 +96,13 @@ export function CalendarDayView({
             events={earlierEvents}
             label="Earlier than 06:00"
             orgQueryValue={orgQueryValue}
+            timezone={data.range.timezone}
           />
 
           <div className="overflow-hidden rounded-2xl bg-background">
             {hours.map((hour) => {
               const hourLabel = `${String(hour).padStart(2, "0")}:00`;
-              const startsAt = `${dateOnly}T${hourLabel}:00.000Z`;
+              const startsAt = `${dateOnly}T${hourLabel}`;
               const hourEvents = timedEvents.filter(
                 (event) =>
                   hourInTimeZone(
@@ -125,6 +127,7 @@ export function CalendarDayView({
                         event={event}
                         key={`${event.id}-${hour}`}
                         orgQueryValue={orgQueryValue}
+                        timezone={data.range.timezone}
                       />
                     ))}
                     <CalendarCreateLauncher
@@ -143,6 +146,7 @@ export function CalendarDayView({
             events={laterEvents}
             label="Later than 20:59"
             orgQueryValue={orgQueryValue}
+            timezone={data.range.timezone}
           />
         </div>
       )}
@@ -154,10 +158,12 @@ function OffHoursGroup({
   events,
   label,
   orgQueryValue,
+  timezone,
 }: {
   events: CalendarRange["days"][number]["events"];
   label: string;
   orgQueryValue: string | null;
+  timezone: string;
 }) {
   if (events.length === 0) {
     return null;
@@ -173,6 +179,7 @@ function OffHoursGroup({
             event={event}
             key={event.id}
             orgQueryValue={orgQueryValue}
+            timezone={timezone}
           />
         ))}
       </div>

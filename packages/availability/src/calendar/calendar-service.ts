@@ -245,10 +245,11 @@ export async function getCalendarRange(
     };
 
     const allPeople = await loadPeople(parsed.data);
-    const managerReportIds =
-      parsed.data.role === "manager" && parsed.data.actingPersonId
-        ? transitiveReportIds(allPeople, parsed.data.actingPersonId)
-        : new Set<string>();
+    const managerReportIds = authorisedReportIds(
+      parsed.data,
+      allPeople,
+      settingsResult
+    );
     const scopedPeopleResult = resolvePeopleForScope(parsed.data, allPeople, {
       includeIndirectReports:
         settingsResult.ok &&
@@ -295,15 +296,21 @@ export async function getCalendarRange(
       timezone,
     });
     const failedCounts = countFailedByPerson(events);
-    const days = dayDateOnly.map((dateOnly) => ({
+    const dayBoundaries = dayDateOnly.map((dateOnly) => ({
+      dateOnly,
+      end: zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone),
+      start: zonedStartOfDayToUtc(dateOnly, timezone),
+    }));
+    const today = dateOnlyInTimeZone(new Date(), timezone);
+    const days = dayBoundaries.map(({ dateOnly, end, start }) => ({
       date: dateOnlyToUtcDate(dateOnly),
       dayOfWeek: dateOnlyToUtcDate(
         dateOnly
       ).getUTCDay() as CalendarDay["dayOfWeek"],
-      events: events.filter((event) =>
-        eventOverlapsDate(event, dateOnly, timezone)
+      events: events.filter(
+        (event) => event.startsAt < end && event.endsAt > start
       ),
-      isToday: dateOnly === dateOnlyInTimeZone(new Date(), timezone),
+      isToday: dateOnly === today,
       publicHolidays: holidays.get(dateOnly) ?? [],
     }));
     const xeroStateResult = await getXeroConnectionStateForScope({
@@ -363,36 +370,25 @@ export async function getEventDetail(
     if (!record) {
       return await recordNotFound(parsed.data);
     }
-    const includeIndirectReports =
-      settingsResult.ok &&
-      settingsResult.value.managerVisibilityScope === "all_team_leave";
-    const allPeople =
-      parsed.data.role === "manager" && parsed.data.actingPersonId
-        ? await loadPeople({
-            actingPersonId: parsed.data.actingPersonId ?? null,
-            actingUserId: parsed.data.actingUserId,
-            anchorDate: new Date(),
-            clerkOrgId: parsed.data.clerkOrgId,
-            filters: {},
-            organisationId: parsed.data.organisationId,
-            role: parsed.data.role,
-            scope: { type: "all_teams" },
-            view: "month",
-          })
-        : [];
-    let managerReportIds = new Set<string>();
-    if (parsed.data.role === "manager" && parsed.data.actingPersonId) {
-      managerReportIds = includeIndirectReports
-        ? transitiveReportIds(allPeople, parsed.data.actingPersonId)
-        : new Set(
-            allPeople
-              .filter(
-                (person) =>
-                  person.manager_person_id === parsed.data.actingPersonId
-              )
-              .map((person) => person.id)
-          );
+    const allPeople = await loadPeople({
+      actingPersonId: parsed.data.actingPersonId ?? null,
+      actingUserId: parsed.data.actingUserId,
+      anchorDate: new Date(),
+      clerkOrgId: parsed.data.clerkOrgId,
+      filters: {},
+      organisationId: parsed.data.organisationId,
+      role: parsed.data.role,
+      scope: { type: "all_teams" },
+      view: "month",
+    });
+    if (!allPeople.some((person) => person.id === record.person_id)) {
+      return notAuthorised();
     }
+    const managerReportIds = authorisedReportIds(
+      parsed.data,
+      allPeople,
+      settingsResult
+    );
     if (
       !canViewRecord({
         actingPersonId: parsed.data.actingPersonId ?? null,
@@ -446,7 +442,12 @@ function resolvePeopleForScope(
   }
 ): Result<ScopedPerson[], CalendarServiceError> {
   const actingPersonId = input.actingPersonId ?? null;
-  if (!(actingPersonId || isAdminOrOwner(input.role))) {
+  if (
+    !(
+      isAdminOrOwner(input.role) ||
+      people.some((candidate) => candidate.id === actingPersonId)
+    )
+  ) {
     return notAuthorised();
   }
 
@@ -459,9 +460,7 @@ function resolvePeopleForScope(
     const scopedPeople = people.filter(
       (candidate) =>
         candidate.id === actingPersonId ||
-        candidate.manager_person_id === actingPersonId ||
-        (options.includeIndirectReports &&
-          options.managerReportIds.has(candidate.id))
+        options.managerReportIds.has(candidate.id)
     );
     return { ok: true, value: scopedPeople };
   }
@@ -484,21 +483,7 @@ function resolvePeopleForScope(
   }
 
   if (input.scope.type === "team") {
-    const teamPeople = people.filter(
-      (candidate) => candidate.team_id === input.scope.value
-    );
-    if (isAdminOrOwner(input.role)) {
-      return { ok: true, value: teamPeople };
-    }
-    const hasDirectReportOnTeam = teamPeople.some(
-      (candidate) =>
-        candidate.manager_person_id === actingPersonId ||
-        (options.includeIndirectReports &&
-          options.managerReportIds.has(candidate.id))
-    );
-    return hasDirectReportOnTeam
-      ? { ok: true, value: teamPeople }
-      : invalidScope();
+    return resolveTeamPeople(input, people, options);
   }
 
   const person = people.find((candidate) => candidate.id === input.scope.value);
@@ -516,6 +501,37 @@ function resolvePeopleForScope(
     return { ok: true, value: [person] };
   }
   return invalidScope();
+}
+
+function resolveTeamPeople(
+  input: ParsedRangeInput,
+  people: ScopedPerson[],
+  options: {
+    includeIndirectReports: boolean;
+    managerReportIds: ReadonlySet<string>;
+  }
+): Result<ScopedPerson[], CalendarServiceError> {
+  const teamPeople = people.filter(
+    (candidate) => candidate.team_id === input.scope.value
+  );
+  if (isAdminOrOwner(input.role)) {
+    return { ok: true, value: teamPeople };
+  }
+  if (
+    !teamPeople.some((candidate) => options.managerReportIds.has(candidate.id))
+  ) {
+    return invalidScope();
+  }
+  return {
+    ok: true,
+    value: options.includeIndirectReports
+      ? teamPeople
+      : teamPeople.filter(
+          (candidate) =>
+            candidate.id === input.actingPersonId ||
+            options.managerReportIds.has(candidate.id)
+        ),
+  };
 }
 
 function applyPeopleFilters(
@@ -796,9 +812,6 @@ function relationshipToOwner(
   if (targetPerson.id === actor.actingPersonId) {
     return "self";
   }
-  if (targetPerson.manager_person_id === actor.actingPersonId) {
-    return "manager";
-  }
   if (actor.role === "manager" && actor.managerReportIds.has(targetPerson.id)) {
     return "manager";
   }
@@ -851,12 +864,34 @@ function resolveLocalRange(
   const monthStart = `${anchor.slice(0, 8)}01`;
   const start = startOfWeekMonday(monthStart);
   const monthEnd = lastDayOfMonth(anchor);
-  const end = addDays(startOfWeekMonday(addDays(monthEnd, 6)), 7);
+  const end = addDays(startOfWeekMonday(monthEnd), 7);
   return {
     dateOnlyValues: dateRange(start, addDays(end, -1)),
     endDateOnly: end,
     startDateOnly: start,
   };
+}
+
+function authorisedReportIds(
+  actor: { actingPersonId?: string | null; role: CalendarRole },
+  people: ScopedPerson[],
+  settings: Awaited<ReturnType<typeof getSettings>>
+): Set<string> {
+  if (
+    actor.role !== "manager" ||
+    !actor.actingPersonId ||
+    !settings.ok ||
+    !people.some((person) => person.id === actor.actingPersonId)
+  ) {
+    return new Set<string>();
+  }
+  return settings.value.managerVisibilityScope === "all_team_leave"
+    ? transitiveReportIds(people, actor.actingPersonId)
+    : new Set(
+        people
+          .filter((person) => person.manager_person_id === actor.actingPersonId)
+          .map((person) => person.id)
+      );
 }
 
 function transitiveReportIds(
@@ -894,16 +929,6 @@ function countFailedByPerson(events: CalendarEvent[]): Map<string, number> {
     }
   }
   return counts;
-}
-
-function eventOverlapsDate(
-  event: Pick<CalendarEvent, "endsAt" | "startsAt">,
-  dateOnly: string,
-  timezone: string
-): boolean {
-  const start = zonedStartOfDayToUtc(dateOnly, timezone);
-  const end = zonedStartOfDayToUtc(addDays(dateOnly, 1), timezone);
-  return event.startsAt < end && event.endsAt > start;
 }
 
 function effectivePersonType(

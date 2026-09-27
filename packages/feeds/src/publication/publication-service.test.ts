@@ -129,7 +129,7 @@ vi.mock("@repo/database", () => ({
   database: {
     availabilityPublication: {
       create: mocks.availabilityPublicationCreate,
-      findUnique: mocks.availabilityPublicationFindUnique,
+      findFirst: mocks.availabilityPublicationFindUnique,
       update: mocks.availabilityPublicationUpdate,
     },
     availabilityRecord: {

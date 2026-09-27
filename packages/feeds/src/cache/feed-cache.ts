@@ -1,6 +1,7 @@
 import "server-only";
 
 import { executeRedisRestCommand, type Result } from "@repo/core";
+import { z } from "zod";
 import { keys } from "../../keys";
 
 export interface FeedCacheError {
@@ -34,9 +35,10 @@ export const ALL_PRIVACY_MODES = ["named", "masked", "private"] as const;
 
 export function feedCacheKey(input: {
   feedId: string;
-  privacyMode: string;
+  etag?: string;
+  privacyMode?: string;
 }): string {
-  return `feed:${input.feedId}:${input.privacyMode}`;
+  return `feed:${input.feedId}:${input.etag ?? input.privacyMode}`;
 }
 
 export async function getCachedFeedBody(
@@ -98,6 +100,48 @@ export async function invalidateFeedCache(input: {
     return { ok: true, value: { deletedCount: cacheKeys.length } };
   } catch {
     return cacheError("Failed to invalidate feed cache.");
+  }
+}
+
+export async function purgeFeedCacheEntries(input: {
+  feedId: string;
+}): Promise<Result<{ deletedCount: number }, FeedCacheError>> {
+  const id = z.string().uuid().safeParse(input.feedId);
+  if (!id.success) {
+    return cacheError("Invalid feed cache identity.");
+  }
+  try {
+    const client = getFeedCacheClient();
+    if (!client) {
+      return { ok: true, value: { deletedCount: 0 } };
+    }
+    const prefix = `feed:${id.data}:`;
+    const cacheKeys = new Set<string>();
+    let cursor = 0;
+    let pages = 0;
+    do {
+      const [next, entries] = z
+        .tuple([z.coerce.number().int().nonnegative(), z.array(z.string())])
+        .parse(await client.scan(cursor, { count: 100, match: `${prefix}*` }));
+      for (const key of entries) {
+        if (!key.startsWith(prefix)) {
+          return cacheError("Feed cache scan returned a foreign identity.");
+        }
+        cacheKeys.add(key);
+      }
+      cursor = next;
+      pages += 1;
+      if (pages > 100_000) {
+        return cacheError("Feed cache scan exceeded its page bound.");
+      }
+    } while (cursor !== 0);
+    const entries = [...cacheKeys];
+    for (let offset = 0; offset < entries.length; offset += 100) {
+      await client.del(...entries.slice(offset, offset + 100));
+    }
+    return { ok: true, value: { deletedCount: entries.length } };
+  } catch {
+    return cacheError("Failed to purge feed cache entries.");
   }
 }
 

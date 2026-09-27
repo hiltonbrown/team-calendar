@@ -35,6 +35,7 @@ import {
   type UpdatePlanRecordFormInput,
   UpdatePlanRecordFormSchema,
 } from "./_schemas";
+import { formatPlanDateTime } from "./plan-form-time";
 
 export type PlanActionError =
   | PlanServiceError
@@ -126,28 +127,24 @@ export async function createRecordAction(
     return context;
   }
 
+  const dates = await resolveFormDates(parsed.data, context.value);
+  if (!dates.ok) {
+    return dates;
+  }
+
   const result = await createRecord({
     actingOrgRole: context.value.orgRole,
     allDay: parsed.data.allDay,
     clerkOrgId: context.value.clerkOrgId,
     contactabilityStatus: parsed.data.contactabilityStatus,
     createdByUserId: context.value.userId,
-    endsAt: buildFormDate(
-      parsed.data.endsAt,
-      parsed.data.endTime,
-      parsed.data.allDay,
-      true
-    ),
+    endsAt: dates.value.endsAt,
     notesInternal: parsed.data.notesInternal,
     organisationId: context.value.organisationId,
     personId: parsed.data.personId,
     privacyMode: parsed.data.privacyMode,
     recordType: parsed.data.recordType,
-    startsAt: buildFormDate(
-      parsed.data.startsAt,
-      parsed.data.startTime,
-      parsed.data.allDay
-    ),
+    startsAt: dates.value.startsAt,
   });
 
   if (!result.ok) {
@@ -173,6 +170,15 @@ export async function updateRecordAction(
     return context;
   }
 
+  const dates = await resolveFormDates(
+    parsed.data,
+    context.value,
+    parsed.data.recordId
+  );
+  if (!dates.ok) {
+    return dates;
+  }
+
   const result = await updateRecord({
     actingOrgRole: context.value.orgRole,
     actingUserId: context.value.userId,
@@ -181,20 +187,11 @@ export async function updateRecordAction(
     patch: {
       allDay: parsed.data.allDay,
       contactabilityStatus: parsed.data.contactabilityStatus,
-      endsAt: buildFormDate(
-        parsed.data.endsAt,
-        parsed.data.endTime,
-        parsed.data.allDay,
-        true
-      ),
+      endsAt: dates.value.endsAt,
       notesInternal: parsed.data.notesInternal,
       privacyMode: parsed.data.privacyMode,
       recordType: parsed.data.recordType,
-      startsAt: buildFormDate(
-        parsed.data.startsAt,
-        parsed.data.startTime,
-        parsed.data.allDay
-      ),
+      startsAt: dates.value.startsAt,
     },
     recordId: parsed.data.recordId,
   });
@@ -585,4 +582,79 @@ function validationError(message?: string): PlanActionResult<never> {
     },
     ok: false,
   };
+}
+
+async function resolveFormDates(
+  input: PlanRecordFormInput,
+  context: { clerkOrgId: string; organisationId: string },
+  recordId?: string
+): Promise<PlanActionResult<{ startsAt: Date; endsAt: Date }>> {
+  const organisation = await database.organisation.findFirst({
+    select: { timezone: true },
+    where: {
+      archived_at: null,
+      clerk_org_id: context.clerkOrgId,
+      id: context.organisationId,
+    },
+  });
+  if (!organisation) {
+    return validationError("Organisation not found.");
+  }
+  const timezone = organisation.timezone ?? "UTC";
+  let startsAt = buildFormDate(
+    input.startsAt,
+    input.startTime,
+    input.allDay,
+    false,
+    timezone
+  );
+  let endsAt = buildFormDate(
+    input.endsAt,
+    input.endTime,
+    input.allDay,
+    true,
+    timezone
+  );
+  const existing = recordId
+    ? await database.availabilityRecord.findFirst({
+        select: { all_day: true, ends_at: true, starts_at: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: context.clerkOrgId,
+          id: recordId,
+          organisation_id: context.organisationId,
+        },
+      })
+    : null;
+  if (existing && existing.all_day === input.allDay) {
+    const displayTimezone = input.allDay ? "UTC" : timezone;
+    const originalStart = formatPlanDateTime(
+      existing.starts_at,
+      displayTimezone
+    );
+    const originalEnd = formatPlanDateTime(existing.ends_at, displayTimezone);
+    if (
+      originalStart.date === input.startsAt &&
+      (input.allDay || originalStart.time === input.startTime)
+    ) {
+      startsAt = existing.starts_at;
+    }
+    if (
+      originalEnd.date === input.endsAt &&
+      (input.allDay || originalEnd.time === input.endTime)
+    ) {
+      endsAt = existing.ends_at;
+    }
+  }
+  if (
+    !(Number.isFinite(startsAt.getTime()) && Number.isFinite(endsAt.getTime()))
+  ) {
+    return validationError(
+      "This time does not exist in the organisation timezone. Choose another time."
+    );
+  }
+  if (input.allDay ? endsAt < startsAt : endsAt <= startsAt) {
+    return validationError("End date must be after start date");
+  }
+  return { ok: true, value: { endsAt, startsAt } };
 }

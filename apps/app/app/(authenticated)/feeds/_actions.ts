@@ -8,6 +8,7 @@ import {
   buildFeedSubscribeUrl,
   createFeed,
   type FeedServiceError,
+  issueToken,
   normaliseRole,
   pauseFeed,
   restoreFeed,
@@ -122,6 +123,37 @@ export async function restoreFeedAction(
   input: FeedCommandActionInput
 ): Promise<FeedActionResult<{ feedId: string }>> {
   return await command(input, restoreFeed);
+}
+
+export async function issueTokenAction(
+  input: FeedCommandActionInput
+): Promise<FeedActionResult<{ subscribeUrl: string; tokenId: string }>> {
+  const parsed = FeedCommandActionSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError("Invalid feed");
+  }
+  const context = await resolveAdminContext(parsed.data.organisationId);
+  if (!context.ok) {
+    return context;
+  }
+  const result = await issueToken({
+    ...parsed.data,
+    actingRole: context.value.role,
+    actingUserId: context.value.userId,
+    clerkOrgId: context.value.clerkOrgId,
+    organisationId: context.value.organisationId,
+  });
+  if (!result.ok) {
+    return result;
+  }
+  revalidateFeedPaths(parsed.data.feedId);
+  return {
+    ok: true,
+    value: {
+      subscribeUrl: buildFeedSubscribeUrl(result.value.plaintext),
+      tokenId: result.value.tokenId,
+    },
+  };
 }
 
 export async function rotateTokenAction(

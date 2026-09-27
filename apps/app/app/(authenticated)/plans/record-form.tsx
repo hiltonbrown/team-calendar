@@ -67,6 +67,7 @@ interface RecordFormProps {
   organisationId: string;
   people: PlanPersonOption[];
   record?: EditablePlanRecord;
+  timezone?: string;
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
 
@@ -103,6 +104,7 @@ export function RecordForm({
   organisationId,
   people,
   record,
+  timezone = "UTC",
 }: RecordFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -385,6 +387,9 @@ export function RecordForm({
 
       {!allDay && (
         <div className="grid gap-4 md:grid-cols-2">
+          <p className="text-body-sm text-muted-foreground">
+            Times are in {timezone}.
+          </p>
           <Field label="Start time" labelFor="plan-start-time">
             <Input
               defaultValue={record?.startTime || "09:00"}

@@ -1671,3 +1671,45 @@ The follow-up source slice is verified and approved; overall Plan 160 remains IN
 
 
 Authorised local merge completed without conflicts on main at `f3dd965f717fd10bb9d8d0025e087549e53f3541`, combining advisor documentation `6453d15` and reviewed feature head `d27b0f1ee86c4ff23cdde1acead41a5253c117e0`. An independent exact-tree comparison outside plans, tasks and reports confirms equality with the source- and online-tested runtime `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`. Root owns the post-merge source checks and final documentation commit. Actual browser/provider campaign, per-case charter evidence and current PITR retention/restore remain NOT VERIFIED; overall Plan 160 remains IN PROGRESS. No push, deployment, worker activation or provider mutation was performed.
+
+
+## Plan 162 execution, isolated worktree
+
+- [x] Read intent and lessons, confirm baseline source and bootstrap frozen dependencies.
+- [x] Calendar authorisation and interaction fixes with focused regression evidence.
+- [x] Reviewer-approved coherent representation design and generated additive SQL.
+- [x] Job payload/retry translation, stable manual UID and private HTTP revalidation.
+- [x] Restored feed issuance, scoped preview identity and surfaced failures.
+- [x] Calendar time conversion, navigation filters, overlap precomputation and catalogue.
+- [x] Complete representation, cache and lifecycle regressions plus integration cases.
+- [x] Full source gates and reviewed protected exact-candidate live campaign.
+- [x] Sanitised final evidence, scope audit and conventional worktree commits.
+
+Review: F1-F12 implementation is complete at source candidate `4c603ded644eaee7df7861d731014b00d1b0b11a`. Full source gates pass, including 2,893 unit tests and 509 release tests. The reviewed additive migration has 22 matching completed checksums, no pending migration and schema equality. Protected live run `30440382-6c42-402c-b8e3-33c0d37818f8` passes all 27 files/254 tests under actual local-worker isolation; owned residue is zero, all 39 table hashes match the 351-row baseline and the fence is released. All five paused worker identities were restored and verified. Earlier path/network/environment failures and external customer history appends remain separately documented in `plans/162-executor-evidence.md`. Authenticated browser/provider/client/deployment and actual PITR exercise are not verified by this source execution. Final evidence is a documentation-only commit; runtime/tests remain identical to the verified source candidate.
+
+### Plan 162 final-check correction, repeated-hour interval
+
+- [x] Allow an unchanged valid Sydney cross-fold interval through form-field parsing, retaining server-authoritative instant ordering.
+- [x] Verify schema, client and action regressions, including reversed/new intervals and existing DST gap/fold/precision cases.
+- [x] Freeze the correction; reviewer repeats complete source gates and a fresh protected live campaign before merge.
+
+The prior `4c603ded` source and live results remain historical proof for that candidate. A final check found that client/shared schema UTC-wall-clock ordering rejected an existing valid 20-minute interval (Sydney 02:50 daylight time to 02:10 standard time) before server preservation of the original instants. That observation required fresh verification; the earlier live PASS is not evidence for the new source. The later exact-candidate results are recorded below.
+
+Focused correction verification: four form/time/action/loader files pass all 41 tests; app TypeScript check and focused Biome checks exit zero. The schema now validates external field shapes only; existing scoped server conversion/preservation performs actual instant ordering and rejects gaps/reversed intervals before any writer call. An initial new test fixture widened its record type to string; the fixture now satisfies the form input type and the unchanged app typecheck passes. The reviewer subsequently repeated complete source and fresh exact-candidate live verification, recorded below.
+
+### Plan 162 final-check correction, inclusive all-day endpoints
+
+- [x] Preserve equal midnight endpoints of valid same-day all-day records on note-only edits.
+- [x] Verify positive all-day preservation, reversed all-day no-write and strictly positive timed interval regressions, plus the existing timezone/fold/gap cases.
+- [x] Freeze the correction; reviewer repeats full source gates and a fresh protected live campaign at the final source before merge.
+
+The timed-interval correction at `146a74de6a2c09d3b86f0b188227a3edceb16c88` subsequently passed full source gates (2,901 unit tests/509 release tests) and protected run `52edd117` (27 files/254 tests). Cleanup, all 39 table hashes/377 existing rows, 22 checksums, zero pending migrations and restoration of the same five workers were independently verified. This is historical evidence for that candidate. A further final check found that preserving equal midnight endpoints of an existing inclusive all-day record reached a timed-only strict ordering guard. The reviewed minimal conditional permits equality only for all-day records; fresh verification of the final source is recorded below. No old live pass is attributed to this correction.
+
+Focused all-day correction verification: four form/time/action/loader files pass all 46 tests, app TypeScript check exits zero and focused Biome checks pass five files. The sole runtime change is the server ordering conditional: non-negative all-day intervals, strictly positive timed intervals. The reviewer completed full source gates and a new exact-candidate protected live campaign before merge, recorded below. No executor database or process operation was performed for this correction.
+
+
+Final-check review: both scoped form corrections are complete and approved at `f95c8c3710bdd7680a44233e70974bd80fe81524`. All nine source gates pass: 2,906 unit tests, 509 release tests, four uncached build tasks, 19 uncached type tasks, lint/boundaries and explicit changed-integration-file types. The initial sandbox EROFS was retried with authorised worktree access; 13 independently verified generated formatting-only changes were restored after all source processes closed, leaving clean frozen source.
+
+Fresh protected run `a7c995f0-27bc-4535-b758-51e2c60c0ac7` at that exact source passes all 27 files/254 tests/six uncached tasks (08:08:43.341 to 08:18:47.631 UTC). The actual-worker monitor exits zero with no isolation failure. Inventory/cleanup pass, owned residue is zero and the fence is released. Independent read-back proves all 39 full table hashes/counts equal the 386-existing-row baseline, 22 matching completed migration checksums, zero pending migrations, schema equality and integrity. The original five worker identities were restored at 08:19:57.513 UTC, then the reviewer confirmed R/S states, the ten-function catalogue and API HTTP 200 at 08:20 UTC.
+
+Final evidence changes only this task record and `plans/162-executor-evidence.md`; runtime/tests remain byte-identical to the verified final source. Root owns the user-authorised main merge. Historical candidate results and all earlier path/network/environment/recovery failures remain intact. Browser/client/provider/deployment campaigns and actual PITR availability/exercise remain NOT VERIFIED or outside scope.

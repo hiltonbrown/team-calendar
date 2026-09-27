@@ -147,6 +147,42 @@ describe("manual-records-service authorisation", () => {
     expect(mocks.personFindFirst).toHaveBeenCalledTimes(1);
   });
 
+  it("preserves the assigned UID while changing manual dates and type", async () => {
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce({
+        ...recordView,
+        derived_uid_key: "assigned@ical.teamcalendar.online",
+        person: targetPerson,
+        person_id: targetPerson.id,
+        preferred_contact_method: "Email",
+        source_type: "manual",
+      })
+      .mockResolvedValueOnce(null);
+    const result = await updateManualAvailability(
+      tenant,
+      recordView.id,
+      {
+        ...validInput,
+        endsAt: new Date("2026-07-02T17:00:00.000Z"),
+        recordType: "training",
+        startsAt: new Date("2026-07-02T09:00:00.000Z"),
+      },
+      { orgRole: "org:admin", userId: "user_admin" }
+    );
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          derived_uid_key: expect.anything(),
+        }),
+        where: expect.objectContaining({
+          clerk_org_id: tenant.clerkOrgId,
+          organisation_id: tenant.organisationId,
+        }),
+      })
+    );
+  });
+
   it("rejects a peer updating another person's manual record", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({

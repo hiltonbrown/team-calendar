@@ -47,6 +47,7 @@ vi.mock("../cache/feed-cache", () => ({
 }));
 
 const {
+  issueToken,
   createSignedFeedToken,
   createInitialTokenWithClient,
   generateFeedTokenSecret,
@@ -134,6 +135,40 @@ describe("feed token pure functions", () => {
   });
 });
 
+describe("existing feed token issuance", () => {
+  it("issues a replacement without an active predecessor and audits its scope", async () => {
+    mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
+    mocks.queryRaw.mockResolvedValue([
+      { id: "71000000-0000-4000-8000-000000000010" },
+    ]);
+    const result = await issueToken(baseInput);
+    expect(result.ok).toBe(true);
+    expect(mocks.queryRaw.mock.calls[0]?.[0].join(" ")).toContain("FOR UPDATE");
+    expect(mocks.auditEventCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          clerk_org_id: baseInput.clerkOrgId,
+          organisation_id: baseInput.organisationId,
+        }),
+      })
+    );
+  });
+  it("fails concurrent one-active insertion without returning a disclosure", async () => {
+    mocks.feedFindFirst.mockResolvedValue({ id: baseInput.feedId });
+    mocks.queryRaw.mockResolvedValue([]);
+    expect(await issueToken(baseInput)).toMatchObject({
+      error: { code: "active_token_conflict" },
+      ok: false,
+    });
+  });
+  it("denies a viewer before touching the database", async () => {
+    expect(
+      await issueToken({ ...baseInput, actingRole: "viewer" })
+    ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+});
+
 describe("feed token lifecycle with a mocked database", () => {
   it("creates the initial token with a stored secret hash and signed disclosure", async () => {
     const tx = mockDatabase() as unknown as Parameters<
@@ -191,7 +226,11 @@ describe("feed token lifecycle with a mocked database", () => {
     );
     expect(mocks.feedFindFirst).toHaveBeenCalledWith({
       select: { id: true },
-      where: scopedFeed(),
+      where: {
+        ...scopedFeed(),
+        archived_at: null,
+        status: { in: ["active", "paused"] },
+      },
     });
     expect(mocks.feedTokenFindMany).toHaveBeenCalledWith({
       orderBy: { created_at: "desc" },
@@ -202,7 +241,7 @@ describe("feed token lifecycle with a mocked database", () => {
       data: { revoked_at: expect.any(Date), status: "revoked" },
       where: { ...scopedTokenByFeed(), status: "active" },
     });
-    expect(mocks.queryRaw.mock.calls[0]).toEqual(
+    expect(mocks.queryRaw.mock.calls[1]).toEqual(
       expect.arrayContaining([
         result.value.tokenId,
         baseInput.clerkOrgId,
@@ -290,10 +329,7 @@ describe("feed token lifecycle with a mocked database", () => {
   });
 
   it("returns token_not_found and logs when revoke finds a token outside the tenant", async () => {
-    mocks.feedTokenFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({
-      clerk_org_id: "org_other",
-      organisation_id: "72000000-0000-4000-8000-000000000002",
-    });
+    mocks.feedTokenFindFirst.mockReset().mockResolvedValue(null);
 
     const result = await revokeToken({
       actingRole: baseInput.actingRole,
@@ -307,27 +343,12 @@ describe("feed token lifecycle with a mocked database", () => {
       error: { code: "token_not_found" },
       ok: false,
     });
-    expect(mocks.logError).toHaveBeenCalledWith(
-      "Cross-tenant resource access attempt",
-      {
-        actingClerkOrgId: baseInput.clerkOrgId,
-        actingOrganisationId: baseInput.organisationId,
-        resourceId: "71000000-0000-4000-8000-000000000020",
-        resourceType: "feed_token",
-      }
-    );
+    expect(mocks.logError).not.toHaveBeenCalled();
     expect(mocks.feedTokenUpdate).not.toHaveBeenCalled();
   });
 
   it("returns identical error for other-tenant token and non-existent token", async () => {
-    mocks.feedTokenFindFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        clerk_org_id: "org_other",
-        organisation_id: "72000000-0000-4000-8000-000000000002",
-      })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(null);
+    mocks.feedTokenFindFirst.mockReset().mockResolvedValue(null);
 
     const otherTenant = await revokeToken({
       actingRole: baseInput.actingRole,

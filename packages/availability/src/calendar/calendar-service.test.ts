@@ -141,6 +141,212 @@ describe("calendar-service", () => {
     );
   });
 
+  it.each(["all_teams", "my_team", "team"] as const)(
+    "excludes indirect reports from %s under direct-only visibility",
+    async (type) => {
+      mocks.availabilityFindMany.mockResolvedValue([
+        record("direct", ids.person),
+        record("indirect", ids.indirect),
+      ]);
+      const result = await getCalendarRange({
+        ...baseInput,
+        scope: type === "team" ? { type, value: ids.team } : { type },
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value.people.map((item) => item.id)).toEqual([
+        ids.manager,
+        ids.person,
+      ]);
+      expect(
+        result.value.days.flatMap((day) => day.events).map((event) => event.id)
+      ).not.toContain("indirect");
+      expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            person_id: { in: [ids.manager, ids.person] },
+          }),
+        })
+      );
+    }
+  );
+
+  it("denies explicit indirect-person range under direct-only visibility", async () => {
+    const result = await getCalendarRange({
+      ...baseInput,
+      scope: { type: "person", value: ids.indirect },
+    });
+    expect(result).toMatchObject({
+      error: { code: "invalid_scope" },
+      ok: false,
+    });
+  });
+
+  it("preserves indirect reports and their manager details when all-team visibility is enabled", async () => {
+    mocks.getSettings.mockResolvedValue({
+      ok: true,
+      value: {
+        managerVisibilityScope: "all_team_leave",
+        showPendingOnCalendar: true,
+      },
+    });
+    mocks.availabilityFindMany.mockResolvedValue([
+      record("indirect", ids.indirect),
+    ]);
+    const result = await getCalendarRange({
+      ...baseInput,
+      scope: { type: "person", value: ids.indirect },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.days.flatMap((day) => day.events)[0]).toMatchObject({
+      notesInternal: "Private note",
+    });
+  });
+
+  it("fails closed to self when settings cannot be read", async () => {
+    mocks.getSettings.mockResolvedValue({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    const result = await getCalendarRange({
+      ...baseInput,
+      scope: { type: "all_teams" },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.value.people.map((candidate) => candidate.id)).toEqual([
+      ids.manager,
+    ]);
+    expect(await getEventDetail(detailInput())).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+  });
+
+  it.each([null, ids.otherOrg])(
+    "denies missing or inactive manager identity %s",
+    async (actingPersonId) => {
+      expect(
+        await getCalendarRange({ ...baseInput, actingPersonId })
+      ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
+    }
+  );
+
+  it("scopes range and detail people and records to both tenant boundaries", async () => {
+    await getCalendarRange(baseInput);
+    await getEventDetail(detailInput());
+    const scope = {
+      archived_at: null,
+      clerk_org_id: ids.clerkOrg,
+      organisation_id: ids.org,
+    };
+    expect(mocks.personFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ ...scope, is_active: true }),
+      })
+    );
+    expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(scope) })
+    );
+    expect(mocks.availabilityFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining(scope) })
+    );
+  });
+
+  it("denies detail for an archived or inactive person", async () => {
+    mocks.personFindMany.mockResolvedValue(
+      people.filter((candidate) => candidate.id !== ids.person)
+    );
+    expect(await getEventDetail(detailInput())).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+  });
+
+  it.each([
+    ["2026-03-15", "2026-02-23", "2026-04-05", 42],
+    ["2026-09-15", "2026-08-31", "2026-10-04", 35],
+    ["2021-02-15", "2021-02-01", "2021-02-28", 28],
+    ["2024-02-15", "2024-01-29", "2024-03-03", 35],
+  ])(
+    "ends the %s month grid after the final day's week",
+    async (anchor, first, last, count) => {
+      const result = await getCalendarRange({
+        ...baseInput,
+        anchorDate: new Date(`${anchor}T12:00:00Z`),
+        view: "month",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value.days).toHaveLength(count);
+      expect(result.value.days[0].date.toISOString().slice(0, 10)).toBe(first);
+      expect(result.value.days.at(-1)?.date.toISOString().slice(0, 10)).toBe(
+        last
+      );
+    }
+  );
+
+  it.each([
+    ["2026-04-05", "2026-04-04T13:00:00Z", "2026-04-05T14:00:00Z", 25],
+    ["2026-10-04", "2026-10-03T14:00:00Z", "2026-10-04T13:00:00Z", 23],
+  ])(
+    "projects overlap on a DST boundary day %s",
+    async (anchor, start, end, hours) => {
+      mocks.organisationFindFirst.mockResolvedValue({
+        timezone: "Australia/Sydney",
+      });
+      mocks.availabilityFindMany.mockResolvedValue([
+        {
+          ...record("inside", ids.person),
+          ends_at: new Date(end),
+          starts_at: new Date(start),
+        },
+        {
+          ...record("ends-at-start", ids.person),
+          ends_at: new Date(start),
+          starts_at: new Date(new Date(start).getTime() - 3_600_000),
+        },
+        {
+          ...record("starts-at-end", ids.person),
+          ends_at: new Date(new Date(end).getTime() + 3_600_000),
+          starts_at: new Date(end),
+        },
+      ]);
+      const result = await getCalendarRange({
+        ...baseInput,
+        anchorDate: new Date(`${anchor}T00:00:00Z`),
+        view: "day",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) {
+        return;
+      }
+      expect(result.value.days[0].events.map((event) => event.id)).toEqual([
+        "inside",
+      ]);
+      expect(result.value.range.start.toISOString()).toBe(
+        new Date(start).toISOString()
+      );
+      expect(result.value.range.end.toISOString()).toBe(
+        new Date(end).toISOString()
+      );
+      expect(
+        (result.value.range.end.getTime() -
+          result.value.range.start.getTime()) /
+          3_600_000
+      ).toBe(hours);
+    }
+  );
+
   it("maps source category filters to source type predicates", async () => {
     await getCalendarRange({
       ...baseInput,
@@ -221,7 +427,14 @@ describe("calendar-service", () => {
     );
   });
 
-  it("withholds xero write errors from peers in range output", async () => {
+  it("withholds xero write errors from peers in all-team range output", async () => {
+    mocks.getSettings.mockResolvedValue({
+      ok: true,
+      value: {
+        managerVisibilityScope: "all_team_leave",
+        showPendingOnCalendar: true,
+      },
+    });
     const result = await getCalendarRange({
       ...baseInput,
       scope: { type: "team", value: ids.team },

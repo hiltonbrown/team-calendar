@@ -47,9 +47,13 @@ export const reconcileFeedPublicationsFunction: InngestFunction.Any =
       triggers: { event: "reconcile-feed-publications" },
     },
     async ({ event, step }) =>
-      await step.run("reconcile-feed-publications", async () =>
-        reconcileFeedPublications(event.data)
-      )
+      await step.run("reconcile-feed-publications", async () => {
+        const result = await reconcileFeedPublications(event.data);
+        if (!result.ok) {
+          throw new Error(result.error.message);
+        }
+        return result.value;
+      })
   );
 
 export async function reconcileFeedPublications(
@@ -128,10 +132,10 @@ export async function reconcileFeedPublications(
         personIds: [...changedPersonIds],
       });
       await inngest.send(
-        feedIds.map((feedId) => ({
+        feedIds.map((feed) => ({
           data: {
             clerkOrgId: context.clerkOrgId,
-            feedId,
+            feedId: feed.id,
             organisationId: context.organisationId,
             reason: "publication_reconciled",
           },

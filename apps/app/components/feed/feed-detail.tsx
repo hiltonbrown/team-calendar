@@ -28,6 +28,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   archiveFeedAction,
+  issueTokenAction,
   pauseFeedAction,
   restoreFeedAction,
   resumeFeedAction,
@@ -45,43 +46,54 @@ interface PreviewEvent {
   summary: string;
 }
 
+interface FeedDetailData {
+  activeTokenHint: {
+    createdAt: Date;
+    hint: string;
+    lastUsedAt: Date | null;
+  } | null;
+  description: string | null;
+  id: string;
+  includesPublicHolidays: boolean;
+  name: string;
+  privacyMode: "masked" | "named" | "private";
+  scopeSummary: string;
+  scopes: Array<{ id: string; label: string; scopeType: string }>;
+  status: "active" | "archived" | "paused";
+  subscribeUrl: string | null;
+  tokenHistory?: Array<{
+    createdAt: Date;
+    id: string;
+    revokedAt: Date | null;
+    status: string;
+  }>;
+}
+
+interface TokenDisclosure {
+  basis: string;
+  url: string | null;
+}
+
 export function FeedDetail({
   canManage,
   detail,
   organisationId,
   previews,
+  previewErrors = {},
 }: {
   canManage: boolean;
-  detail: {
-    activeTokenHint: {
-      createdAt: Date;
-      hint: string;
-      lastUsedAt: Date | null;
-    } | null;
-    description: string | null;
-    id: string;
-    includesPublicHolidays: boolean;
-    name: string;
-    privacyMode: "masked" | "named" | "private";
-    scopeSummary: string;
-    scopes: Array<{ id: string; label: string; scopeType: string }>;
-    status: "active" | "archived" | "paused";
-    subscribeUrl: string | null;
-    tokenHistory?: Array<{
-      createdAt: Date;
-      id: string;
-      revokedAt: Date | null;
-      status: string;
-    }>;
-  };
+  detail: FeedDetailData;
   organisationId: string;
   previews: Partial<Record<"masked" | "named" | "private", PreviewEvent[]>>;
+  previewErrors?: Partial<Record<"masked" | "named" | "private", string>>;
 }) {
   const router = useRouter();
   const [confirmation, setConfirmation] = useState<"archive" | "rotate" | null>(
     null
   );
-  const [subscribeUrl, setSubscribeUrl] = useState(detail.subscribeUrl);
+  const receiptBasis = `${detail.id}:${detail.status}:${detail.subscribeUrl ?? ""}`;
+  const [disclosure, setDisclosure] = useState<TokenDisclosure | null>(null);
+  const subscribeUrl = resolveSubscribeUrl(detail, receiptBasis, disclosure);
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{
     text: string;
@@ -98,12 +110,31 @@ export function FeedDetail({
         setMessage({ text: result.error.message, tone: "error" });
         return;
       }
-      setSubscribeUrl(result.value.subscribeUrl);
+      setDisclosure({ basis: receiptBasis, url: result.value.subscribeUrl });
       setMessage({
         text: "Feed token rotated. The subscribe URL has been updated.",
         tone: "status",
       });
       setConfirmation(null);
+      router.refresh();
+    });
+  };
+
+  const issue = () => {
+    startTransition(async () => {
+      const result = await issueTokenAction({
+        feedId: detail.id,
+        organisationId,
+      });
+      if (!result.ok) {
+        setMessage({ text: result.error.message, tone: "error" });
+        return;
+      }
+      setDisclosure({ basis: receiptBasis, url: result.value.subscribeUrl });
+      setMessage({
+        text: "A new subscribe URL has been created.",
+        tone: "status",
+      });
       router.refresh();
     });
   };
@@ -119,6 +150,9 @@ export function FeedDetail({
       if (!result.ok) {
         setMessage({ text: result.error.message, tone: "error" });
         return;
+      }
+      if (action === "archive") {
+        setDisclosure({ basis: receiptBasis, url: null });
       }
       setMessage({
         text: transitionSuccessMessage(action),
@@ -177,7 +211,7 @@ export function FeedDetail({
 
       <section className="rounded-xl bg-muted p-5">
         <h3 className="font-semibold text-title-md">Preview and visibility</h3>
-        <PreviewTabs previews={previews} />
+        <PreviewTabs errors={previewErrors} previews={previews} />
       </section>
 
       <details className="rounded-xl bg-muted p-5 text-label-lg">
@@ -208,54 +242,92 @@ export function FeedDetail({
       </details>
 
       {canManage ? (
-        <details className="rounded-xl bg-muted p-5 text-label-lg">
-          <summary className="cursor-pointer font-semibold">
-            Token history and lifecycle
-          </summary>
-          {detail.tokenHistory && detail.tokenHistory.length > 0 ? (
-            <ul className="mt-4 space-y-2">
-              {detail.tokenHistory.map((token) => (
-                <li
-                  className="flex flex-wrap items-center justify-between gap-2 text-label-md"
-                  key={token.id}
-                >
-                  <span className="font-mono">••••{token.id.slice(-4)}</span>
-                  <span className="flex items-center gap-2">
-                    <Badge variant="secondary">{token.status}</Badge>
-                    <span className="text-muted-foreground">
-                      {formatDate(token.createdAt)}
-                    </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 text-muted-foreground">No prior tokens.</p>
-          )}
-          <p className="mt-4 text-label-md text-muted-foreground">
-            {detail.activeTokenHint
-              ? `Active token created ${formatDate(detail.activeTokenHint.createdAt)}${detail.activeTokenHint.lastUsedAt ? `, last used ${formatDate(detail.activeTokenHint.lastUsedAt)}` : ", never used"}`
-              : "This feed has no active token."}
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button
-              disabled={isPending || detail.status === "archived"}
-              onClick={() => setConfirmation("rotate")}
-              type="button"
-              variant="secondary"
-            >
-              <RotateCwIcon className="mr-2 size-4" />
-              Rotate token
-            </Button>
-            <FeedLifecycleActions
-              isPending={isPending}
-              onTransition={transition}
-              status={detail.status}
-            />
-          </div>
-        </details>
+        <TokenLifecycle
+          detail={detail}
+          isPending={isPending}
+          onIssue={issue}
+          onRotate={() => setConfirmation("rotate")}
+          onTransition={transition}
+        />
       ) : null}
     </div>
+  );
+}
+
+function resolveSubscribeUrl(
+  detail: Pick<FeedDetailData, "status" | "subscribeUrl">,
+  receiptBasis: string,
+  disclosure: TokenDisclosure | null
+): string | null {
+  if (detail.status === "archived") {
+    return null;
+  }
+  if (disclosure?.basis === receiptBasis) {
+    return disclosure.url;
+  }
+  return detail.subscribeUrl;
+}
+
+function TokenLifecycle({
+  detail,
+  isPending,
+  onIssue,
+  onRotate,
+  onTransition,
+}: {
+  detail: FeedDetailData;
+  isPending: boolean;
+  onIssue: () => void;
+  onRotate: () => void;
+  onTransition: (action: "archive" | "pause" | "restore" | "resume") => void;
+}) {
+  return (
+    <details className="rounded-xl bg-muted p-5 text-label-lg">
+      <summary className="cursor-pointer font-semibold">
+        Token history and lifecycle
+      </summary>
+      {detail.tokenHistory && detail.tokenHistory.length > 0 ? (
+        <ul className="mt-4 space-y-2">
+          {detail.tokenHistory.map((token) => (
+            <li
+              className="flex flex-wrap items-center justify-between gap-2 text-label-md"
+              key={token.id}
+            >
+              <span className="font-mono">••••{token.id.slice(-4)}</span>
+              <span className="flex items-center gap-2">
+                <Badge variant="secondary">{token.status}</Badge>
+                <span className="text-muted-foreground">
+                  {formatDate(token.createdAt)}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 text-muted-foreground">No prior tokens.</p>
+      )}
+      <p className="mt-4 text-label-md text-muted-foreground">
+        {detail.activeTokenHint
+          ? `Active token created ${formatDate(detail.activeTokenHint.createdAt)}${detail.activeTokenHint.lastUsedAt ? `, last used ${formatDate(detail.activeTokenHint.lastUsedAt)}` : ", never used"}`
+          : "This feed has no active token."}
+      </p>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Button
+          disabled={isPending || detail.status === "archived"}
+          onClick={() => (detail.activeTokenHint ? onRotate() : onIssue())}
+          type="button"
+          variant="secondary"
+        >
+          <RotateCwIcon className="mr-2 size-4" />
+          {detail.activeTokenHint ? "Rotate token" : "Create subscribe URL"}
+        </Button>
+        <FeedLifecycleActions
+          isPending={isPending}
+          onTransition={onTransition}
+          status={detail.status}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -431,7 +503,9 @@ function transitionSuccessMessage(
 
 function PreviewTabs({
   previews,
+  errors,
 }: {
+  errors: Partial<Record<"masked" | "named" | "private", string>>;
   previews: Partial<Record<"masked" | "named" | "private", PreviewEvent[]>>;
 }) {
   const modes = Object.keys(previews) as Array<"masked" | "named" | "private">;
@@ -446,33 +520,61 @@ function PreviewTabs({
       </TabsList>
       {modes.map((mode) => (
         <TabsContent className="mt-4 space-y-3" key={mode} value={mode}>
-          {(previews[mode] ?? []).length === 0 ? (
-            <p className="text-body-sm text-muted-foreground">
-              No upcoming events. Your feed will update automatically when leave
-              or availability is added.
-            </p>
-          ) : (
-            previews[mode]?.map((event) => (
-              <div
-                className="rounded-2xl bg-background p-3 text-label-lg"
-                key={event.sourceRecordId}
-              >
-                <div className="font-medium">{event.summary}</div>
-                <div className="mt-1 text-label-md text-muted-foreground">
-                  {formatDate(new Date(event.startsAt))} to{" "}
-                  {formatDate(new Date(event.endsAt))}
-                </div>
-                {event.description ? (
-                  <p className="mt-2 text-muted-foreground">
-                    {event.description}
-                  </p>
-                ) : null}
-              </div>
-            ))
-          )}
+          <PreviewContents error={errors[mode]} events={previews[mode] ?? []} />
         </TabsContent>
       ))}
     </Tabs>
+  );
+}
+
+function PreviewContents({
+  error,
+  events,
+}: {
+  error: string | undefined;
+  events: PreviewEvent[];
+}) {
+  const router = useRouter();
+  if (error) {
+    return (
+      <div role="alert">
+        <p className="text-body-sm text-error">{error}</p>
+        <Button
+          onClick={() => router.refresh()}
+          type="button"
+          variant="secondary"
+        >
+          Retry preview
+        </Button>
+      </div>
+    );
+  }
+  if (events.length === 0) {
+    return (
+      <p className="text-body-sm text-muted-foreground">
+        No upcoming events. Your feed will update automatically when leave or
+        availability is added.
+      </p>
+    );
+  }
+  return (
+    <>
+      {events.map((event) => (
+        <div
+          className="rounded-2xl bg-background p-3 text-label-lg"
+          key={event.sourceRecordId}
+        >
+          <div className="font-medium">{event.summary}</div>
+          <div className="mt-1 text-label-md text-muted-foreground">
+            {formatDate(new Date(event.startsAt))} to{" "}
+            {formatDate(new Date(event.endsAt))}
+          </div>
+          {event.description ? (
+            <p className="mt-2 text-muted-foreground">{event.description}</p>
+          ) : null}
+        </div>
+      ))}
+    </>
   );
 }
 

@@ -10,7 +10,6 @@ import {
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
-import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { invalidateFeedCache } from "../cache/feed-cache";
 import { scopedFeed } from "../scope/scoped-feed";
@@ -151,7 +150,7 @@ export async function createInitialTokenWithClient(
     where: scopedFeed(input),
   });
   if (!feed) {
-    return await feedNotFound(tx, input);
+    return feedNotFound();
   }
 
   const existing = await tx.feedToken.findFirst({
@@ -205,6 +204,59 @@ export async function createInitialTokenWithClient(
   return { ok: true, value: { hint, plaintext, tokenId: token.id } };
 }
 
+export async function issueToken(
+  input: unknown
+): Promise<Result<TokenDisclosure, TokenServiceError>> {
+  const parsed = RotateTokenInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return validationError(parsed.error);
+  }
+  if (!isAdminOrOwner(parsed.data.actingRole)) {
+    return notAuthorised();
+  }
+  try {
+    return await database.$transaction(async (tx) => {
+      await lockFeedForTokenChange(tx, parsed.data);
+      const feed = await tx.feed.findFirst({
+        select: { id: true },
+        where: {
+          ...scopedFeed(parsed.data),
+          archived_at: null,
+          status: { in: ["active", "paused"] },
+        },
+      });
+      if (!feed) {
+        return feedNotFound();
+      }
+      const tokenId = randomUUID();
+      const tokenHash = hashFeedToken(generateFeedTokenSecret());
+      const plaintext = createSignedFeedToken({ tokenHash, tokenId });
+      const hint = plaintext.slice(-4);
+      const token = await insertActiveToken(tx, {
+        clerkOrgId: parsed.data.clerkOrgId,
+        feedId: parsed.data.feedId,
+        hint,
+        organisationId: parsed.data.organisationId,
+        rotatedFromTokenId: null,
+        tokenHash,
+        tokenId,
+      });
+      if (!token) {
+        return activeTokenConflict();
+      }
+      await auditToken(tx, parsed.data, "feeds.token_created", token.id, {
+        actingUserId: parsed.data.actingUserId,
+        feedId: parsed.data.feedId,
+        hint,
+        tokenId: token.id,
+      });
+      return { ok: true, value: { hint, plaintext, tokenId: token.id } };
+    });
+  } catch {
+    return unknownError("Failed to create feed token.");
+  }
+}
+
 export async function rotateToken(
   input: unknown
 ): Promise<
@@ -220,12 +272,17 @@ export async function rotateToken(
 
   try {
     const result = await database.$transaction(async (tx) => {
+      await lockFeedForTokenChange(tx, parsed.data);
       const feed = await tx.feed.findFirst({
         select: { id: true },
-        where: scopedFeed(parsed.data),
+        where: {
+          ...scopedFeed(parsed.data),
+          archived_at: null,
+          status: { in: ["active", "paused"] },
+        },
       });
       if (!feed) {
-        return await feedNotFound(tx, parsed.data);
+        return feedNotFound();
       }
 
       const activeTokens = await tx.feedToken.findMany({
@@ -307,6 +364,20 @@ export async function rotateToken(
   }
 }
 
+async function lockFeedForTokenChange(
+  tx: Prisma.TransactionClient,
+  input: InitialTokenInput
+): Promise<void> {
+  // Lifecycle writes also lock this row, so archive cannot finish before a delayed issuance.
+  await tx.$queryRaw`
+    SELECT "id" FROM "feeds"
+    WHERE "id" = ${input.feedId}::uuid
+      AND "clerk_org_id" = ${input.clerkOrgId}
+      AND "organisation_id" = ${input.organisationId}::uuid
+    FOR UPDATE
+  `;
+}
+
 async function insertActiveToken(
   tx: Prisma.TransactionClient,
   input: {
@@ -383,7 +454,7 @@ export async function revokeToken(
         },
       });
       if (!token) {
-        return await tokenNotFound(tx, parsed.data);
+        return tokenNotFound();
       }
 
       if (token.status !== "revoked") {
@@ -447,52 +518,14 @@ export async function revokeAllFeedTokens(input: {
   }
 }
 
-async function feedNotFound(
-  client: Prisma.TransactionClient,
-  input: { clerkOrgId: string; feedId: string; organisationId: string }
-): Promise<Result<never, TokenServiceError>> {
-  const exists = await client.feed.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.feedId },
-  });
-  if (
-    exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
-      exists.organisation_id !== input.organisationId)
-  ) {
-    log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
-      actingOrganisationId: input.organisationId,
-      resourceId: input.feedId,
-      resourceType: "feed",
-    });
-  }
+function feedNotFound(): Result<never, TokenServiceError> {
   return {
     error: { code: "feed_not_found", message: "Feed not found." },
     ok: false,
   };
 }
 
-async function tokenNotFound(
-  tx: Prisma.TransactionClient,
-  input: { clerkOrgId: string; organisationId: string; tokenId: string }
-): Promise<Result<never, TokenServiceError>> {
-  const exists = await tx.feedToken.findFirst({
-    select: { clerk_org_id: true, organisation_id: true },
-    where: { id: input.tokenId },
-  });
-  if (
-    exists &&
-    (exists.clerk_org_id !== input.clerkOrgId ||
-      exists.organisation_id !== input.organisationId)
-  ) {
-    log.error("Cross-tenant resource access attempt", {
-      actingClerkOrgId: input.clerkOrgId,
-      actingOrganisationId: input.organisationId,
-      resourceId: input.tokenId,
-      resourceType: "feed_token",
-    });
-  }
+function tokenNotFound(): Result<never, TokenServiceError> {
   return {
     error: { code: "token_not_found", message: "Token not found." },
     ok: false,

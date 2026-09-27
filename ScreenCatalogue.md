@@ -363,26 +363,26 @@ Spot-checked guard literals for S-03, S-10, S-17, S-22, S-27 against live `requi
 
 ### S-07: Calendar
 
-**Route:** `/calendar`. No modal behaviour; clicking a record opens a popover, clicking a blank date/slot navigates to `/plans/new`.
+**Route:** `/calendar`. Month/day record chips open a popover; week timeline entries open an inline detail panel. Blank-date and timed-slot creation navigates to `/plans/new`, including its intercepted modal when available.
 **Guard:** `requirePageRole("org:viewer")`. Access: all roles (scoped).
 **Evidence:** `apps/app/app/(authenticated)/calendar/page.tsx`; `apps/app/components/calendar/{calendar-toolbar,calendar-event-chip,calendar-event-popover,calendar-event-provenance,calendar-day-view,calendar-week-view,calendar-month-view,calendar-timeline,calendar-create-launcher,calendar-scan-panel}.tsx`.
 **Country context:** Public holidays filtered to each location's configured set.
 
 **Purpose:** Visual calendar of availability, leave, and public holidays across individuals and teams.
 
-**User interactions, as-built:** View select: Day/Week/Month, plus a surface toggle between the grid views and a `CalendarTimeline` "Coverage" view. Scope select: Myself/My team/All teams/specific team/specific person. Filter sheet: record category, approval status, person type, location, with a "Reset calendar filters" action. **New, undocumented at the last pass:** an `ActiveFilterSummary` chip row ("Currently showing: …") renders below the toolbar controls; and, when not on the Coverage surface, a `CalendarScanPanel` sidebar ("Today in view") renders beside the grid, listing up to 3 people/holidays with a status dot for today, a "View N more" link, and a link into day view. Clicking a record opens a popover; clicking a blank date/slot navigates to `/plans/new` with the date/person prefilled.
+**User interactions, as-built:** Day/Week/Month view selection, date navigation and Today. Week uses the `CalendarTimeline` with person lanes, affected-person counts, inline entry details and a chronological mobile list; no separate surface toggle is rendered. Scope select: Myself/My team/All teams/specific team/specific person. Filters: record category, approval status, person type and location, with reset and active-filter summary. Month/day views show `CalendarScanPanel` beside the main view, with a day-detail link and overflow count. Month overflow/mobile agenda, week desktop/mobile day links and the scan panel preserve the current validated scope and filters. Toolbar Add actions are available on desktop and in a persistent mobile safe-area bar. Date-only creation prefills all-day mode; timed day slots prefill their wall-clock hour and a one-hour end in the organisation timezone. Timed event details use that timezone and show both dates for overnight spans; all-day dates retain date-only semantics.
 
 **Role variations:** Scope selector default differs by role.
 
 **Data displayed:** Record chips coloured by provenance/status tone, each paired with a leaf/pencil provenance icon: confirmed correctly implemented. Public holiday rows/pills in the lavender `accent-container` tone. The new sidebar surfaces the same tone system via coloured dots.
 
-**States:** No route-level `loading.tsx`/`error.tsx`; manual inline `FetchErrorState`. `CalendarScanPanel` renders nothing when there are no days to show, and "No one is unavailable" when the selected day has zero items.
+**States:** Route-level `loading.tsx` provides an announced skeleton; `error.tsx` offers Try again while preserving the current URL/filter state. Service failures render inline `FetchErrorState` with a calendar retry action. The week timeline distinguishes an empty scope and people without recorded unavailability. `CalendarScanPanel` renders nothing when there are no days and "No one is unavailable" for a selected day with zero items.
 
 **Design requirements:** Chips: `rounded-xl px-2 py-1 text-xs ring-1`, `dashed` treatment for submitted/pending, 65% opacity for drafts. No backdrop blur anywhere in this surface either.
 
 **`[v5 proposal]` interaction improvements:**
-- Add a persistent, thumb-reachable "Add" affordance for mobile. **Still open**, re-confirmed: no floating action button exists anywhere in the calendar surface.
-- ~~Pair the calendar chip's provenance colour with the leaf/pencil icon.~~ **Done, re-confirmed still correct.**
+- ~~Add a persistent, thumb-reachable Add affordance for mobile.~~ Done: toolbar includes the mobile safe-area action.
+- ~~Pair provenance colour with the leaf/pencil icon.~~ Done: record chips and timeline details retain explicit source icons/labels.
 
 ---
 

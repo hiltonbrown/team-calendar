@@ -419,6 +419,7 @@ export const ModelName = {
   PublicHoliday: 'PublicHoliday',
   PublicHolidayAssignment: 'PublicHolidayAssignment',
   Feed: 'Feed',
+  FeedEventPublication: 'FeedEventPublication',
   FeedScope: 'FeedScope',
   FeedToken: 'FeedToken',
   Notification: 'Notification',
@@ -450,7 +451,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent" | "xeroCleanupRequest" | "xeroCleanupAttempt" | "xeroInactivityClassification"
+    modelProps: "organisation" | "organisationSettings" | "team" | "location" | "person" | "alternativeContact" | "xeroConnection" | "xeroCredentialOwner" | "xeroRefreshAttempt" | "xeroProviderConnection" | "xeroTenant" | "xeroOAuthSession" | "xeroSyncCursor" | "availabilityRecord" | "outboundOperation" | "availabilityPublication" | "leaveBalance" | "xeroPersonMatch" | "publicHolidayJurisdiction" | "publicHoliday" | "publicHolidayAssignment" | "feed" | "feedEventPublication" | "feedScope" | "feedToken" | "notification" | "notificationPreference" | "notificationEmailQueue" | "syncRun" | "failedRecord" | "auditEvent" | "plan" | "planLimit" | "clerkOrgSubscription" | "usageCounter" | "stripeEvent" | "xeroCleanupRequest" | "xeroCleanupAttempt" | "xeroInactivityClassification"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2079,6 +2080,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FeedCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FeedCountAggregateOutputType> | number
+        }
+      }
+    }
+    FeedEventPublication: {
+      payload: Prisma.$FeedEventPublicationPayload<ExtArgs>
+      fields: Prisma.FeedEventPublicationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FeedEventPublicationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FeedEventPublicationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        findFirst: {
+          args: Prisma.FeedEventPublicationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FeedEventPublicationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        findMany: {
+          args: Prisma.FeedEventPublicationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>[]
+        }
+        create: {
+          args: Prisma.FeedEventPublicationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        createMany: {
+          args: Prisma.FeedEventPublicationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FeedEventPublicationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>[]
+        }
+        delete: {
+          args: Prisma.FeedEventPublicationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        update: {
+          args: Prisma.FeedEventPublicationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        deleteMany: {
+          args: Prisma.FeedEventPublicationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FeedEventPublicationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FeedEventPublicationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>[]
+        }
+        upsert: {
+          args: Prisma.FeedEventPublicationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FeedEventPublicationPayload>
+        }
+        aggregate: {
+          args: Prisma.FeedEventPublicationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFeedEventPublication>
+        }
+        groupBy: {
+          args: Prisma.FeedEventPublicationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FeedEventPublicationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FeedEventPublicationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FeedEventPublicationCountAggregateOutputType> | number
         }
       }
     }
@@ -3817,6 +3892,8 @@ export const FeedScalarFieldEnum = {
   privacy_mode: 'privacy_mode',
   includes_public_holidays: 'includes_public_holidays',
   last_rendered_at: 'last_rendered_at',
+  representation_hash: 'representation_hash',
+  representation_generation: 'representation_generation',
   last_etag: 'last_etag',
   created_by_user_id: 'created_by_user_id',
   archived_at: 'archived_at',
@@ -3825,6 +3902,24 @@ export const FeedScalarFieldEnum = {
 } as const
 
 export type FeedScalarFieldEnum = (typeof FeedScalarFieldEnum)[keyof typeof FeedScalarFieldEnum]
+
+
+export const FeedEventPublicationScalarFieldEnum = {
+  id: 'id',
+  clerk_org_id: 'clerk_org_id',
+  organisation_id: 'organisation_id',
+  feed_id: 'feed_id',
+  source_key: 'source_key',
+  published_uid: 'published_uid',
+  representation_hash: 'representation_hash',
+  published_sequence: 'published_sequence',
+  published_at: 'published_at',
+  present: 'present',
+  created_at: 'created_at',
+  updated_at: 'updated_at'
+} as const
+
+export type FeedEventPublicationScalarFieldEnum = (typeof FeedEventPublicationScalarFieldEnum)[keyof typeof FeedEventPublicationScalarFieldEnum]
 
 
 export const FeedScopeScalarFieldEnum = {
@@ -5026,6 +5121,7 @@ export type GlobalOmitConfig = {
   publicHoliday?: Prisma.PublicHolidayOmit
   publicHolidayAssignment?: Prisma.PublicHolidayAssignmentOmit
   feed?: Prisma.FeedOmit
+  feedEventPublication?: Prisma.FeedEventPublicationOmit
   feedScope?: Prisma.FeedScopeOmit
   feedToken?: Prisma.FeedTokenOmit
   notification?: Prisma.NotificationOmit

@@ -21,6 +21,35 @@ describe("CalendarToolbar", () => {
     vi.clearAllMocks();
   });
 
+  it.each([
+    ["2026-01-31", "Next month", "2026-02-28"],
+    ["2026-03-31", "Previous month", "2026-02-28"],
+    ["2024-01-31", "Next month", "2024-02-29"],
+    ["2026-01-30", "Next month", "2026-02-28"],
+    ["2026-01-29", "Next month", "2026-02-28"],
+    ["2024-03-30", "Previous month", "2024-02-29"],
+    ["2026-12-31", "Next month", "2027-01-31"],
+  ])("clamps month navigation from %s", (anchor, label, expected) => {
+    render(
+      <CalendarToolbar
+        actingPersonId={null}
+        data={calendarRange()}
+        filters={{
+          anchor,
+          includeDrafts: false,
+          recordTypeCategory: "all",
+          surface: "calendar",
+          view: "month",
+        }}
+        locations={[]}
+        orgQueryValue={null}
+        teams={[]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(mocks.setFilterParams).toHaveBeenCalledWith({ anchor: expected });
+  });
+
   it("provides one desktop and one safe-area mobile Add affordance", () => {
     render(
       <CalendarToolbar

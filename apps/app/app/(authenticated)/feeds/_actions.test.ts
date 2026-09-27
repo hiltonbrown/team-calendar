@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   },
   dispatchNotification: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  issueToken: vi.fn(),
   log: {
     error: vi.fn(),
   },
@@ -33,6 +34,7 @@ vi.mock("@repo/feeds", () => ({
   buildFeedSubscribeUrl: (token: string) =>
     `https://calendar.example/ical/${token}.ics`,
   createFeed: mocks.createFeed,
+  issueToken: mocks.issueToken,
   normaliseRole: (role: string | null | undefined) =>
     role?.replace("org:", "") ?? "viewer",
   pauseFeed: mocks.pauseFeed,
@@ -60,6 +62,7 @@ vi.mock("@repo/notifications", () => ({
 
 const {
   createFeedAction,
+  issueTokenAction,
   pauseFeedAction,
   rotateTokenAction,
   updateFeedAction,
@@ -97,6 +100,76 @@ describe("feed actions", () => {
     mocks.database.feed.findFirst.mockResolvedValue({
       name: "Internal Calendar",
     });
+  });
+
+  it.each(["org:admin", "org:owner"])(
+    "issues a usable URL with authorised %s identity and both tenant scopes",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.issueToken.mockResolvedValue({
+        ok: true,
+        value: { plaintext: "issued_plaintext", tokenId: "token-issued" },
+      });
+      const result = await issueTokenAction({ feedId, organisationId });
+      expect(result).toEqual({
+        ok: true,
+        value: {
+          subscribeUrl: "https://calendar.example/ical/issued_plaintext.ics",
+          tokenId: "token-issued",
+        },
+      });
+      expect(mocks.issueToken).toHaveBeenCalledWith({
+        actingRole: orgRole.replace("org:", ""),
+        actingUserId: "user_1",
+        clerkOrgId: "org_1",
+        feedId,
+        organisationId,
+      });
+      expect(mocks.revalidatePath).toHaveBeenCalledWith("/feeds");
+      expect(mocks.revalidatePath).toHaveBeenCalledWith(`/feeds/${feedId}`);
+    }
+  );
+
+  it.each(["org:viewer", "org:manager", null])(
+    "denies token issuance to %s without calling the service",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      expect(await issueTokenAction({ feedId, organisationId })).toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.issueToken).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
+    }
+  );
+
+  it("rejects an inaccessible organisation before token issuance", async () => {
+    mocks.getActiveOrgContext.mockResolvedValue({
+      error: { message: "Organisation is not available" },
+      ok: false,
+    });
+    expect(await issueTokenAction({ feedId, organisationId })).toMatchObject({
+      error: { code: "not_authorised" },
+      ok: false,
+    });
+    expect(mocks.issueToken).not.toHaveBeenCalled();
+  });
+
+  it("returns issuance failures without revalidation or a URL receipt", async () => {
+    const failure = {
+      error: { code: "conflict", message: "An active token already exists" },
+      ok: false,
+    };
+    mocks.issueToken.mockResolvedValue(failure);
+    expect(await issueTokenAction({ feedId, organisationId })).toEqual(failure);
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed token issuance input", async () => {
+    expect(
+      await issueTokenAction({ feedId: "invalid", organisationId })
+    ).toMatchObject({ error: { code: "validation_error" }, ok: false });
+    expect(mocks.issueToken).not.toHaveBeenCalled();
   });
 
   it("revalidates feed and settings paths after create", async () => {

@@ -28,8 +28,11 @@ export interface PreviewEvent {
   description: string | null;
   displayName: string;
   endsAt: Date;
+  eventClass?: "PUBLIC" | "PRIVATE";
+  hasPublication?: boolean;
   isPublicHoliday: boolean;
   location: string | null;
+  publishedAt?: Date;
   publishedSequence: number;
   publishedUid: string;
   recordType: availability_record_type | "public_holiday";
@@ -42,6 +45,7 @@ export interface FeedProjectionContext {
   actingPersonId?: string | null;
   actingRole: FeedRole;
   clerkOrgId: string;
+  client?: Prisma.TransactionClient;
   feedId: string;
   horizonDays: number;
   organisationId: string;
@@ -58,7 +62,8 @@ export async function projectFeedEvents(
   input: FeedProjectionContext
 ): Promise<Result<PreviewEvent[], FeedProjectionError>> {
   try {
-    const feed = await database.feed.findFirst({
+    const client = input.client ?? database;
+    const feed = await client.feed.findFirst({
       select: feedProjectionSelect,
       where: {
         archived_at: null,
@@ -78,6 +83,7 @@ export async function projectFeedEvents(
     const peopleResult = await resolvePeopleForFeed({
       actingPersonId: input.actingPersonId ?? null,
       clerkOrgId: input.clerkOrgId,
+      client: input.client,
       createdByUserId: feed.created_by_user_id,
       organisationId: input.organisationId,
       scopes: feed.scopes.map((scope) => ({
@@ -102,7 +108,7 @@ export async function projectFeedEvents(
     const records =
       personIds.length === 0
         ? []
-        : await database.availabilityRecord.findMany({
+        : await client.availabilityRecord.findMany({
             orderBy: [{ starts_at: "asc" }, { id: "asc" }],
             select: recordSelect,
             where: {
@@ -122,7 +128,8 @@ export async function projectFeedEvents(
     const events = records.map((record) =>
       projectAvailabilityRecord(
         record,
-        stricterPrivacyMode(record.privacy_mode, privacyMode)
+        stricterPrivacyMode(record.privacy_mode, privacyMode),
+        feed.last_rendered_at
       )
     );
 
@@ -130,8 +137,10 @@ export async function projectFeedEvents(
       events.push(
         ...(await projectPublicHolidays({
           clerkOrgId: input.clerkOrgId,
+          client: input.client,
           horizonEnd,
           horizonStart,
+          lastRenderedAt: feed.last_rendered_at,
           organisationId: input.organisationId,
           personLocations,
           privacyMode,
@@ -147,7 +156,10 @@ export async function projectFeedEvents(
           first.summary.localeCompare(second.summary)
       ),
     };
-  } catch {
+  } catch (error) {
+    if (input.client) {
+      throw error;
+    }
     return {
       error: {
         code: "unknown_error",
@@ -206,7 +218,8 @@ function exclusiveAllDayEnd(inclusiveEnd: Date): Date {
 
 function projectAvailabilityRecord(
   record: RecordRow,
-  privacyMode: availability_privacy_mode
+  privacyMode: availability_privacy_mode,
+  lastRenderedAt: Date | null
 ): PreviewEvent {
   const personName =
     record.person.display_name ??
@@ -221,9 +234,14 @@ function projectAvailabilityRecord(
     endsAt: record.all_day
       ? exclusiveAllDayEnd(record.ends_at)
       : record.ends_at,
+    eventClass: privacyMode === "named" ? "PUBLIC" : "PRIVATE",
+    hasPublication: Boolean(
+      lastRenderedAt && record.created_at <= lastRenderedAt
+    ),
     isPublicHoliday: false,
     location:
       privacyMode === "private" ? null : (record.person.location?.name ?? null),
+    publishedAt: record.publication?.published_at ?? record.updated_at,
     publishedSequence:
       record.publication?.published_sequence ?? record.derived_sequence,
     publishedUid: record.publication?.published_uid ?? record.derived_uid_key,
@@ -240,6 +258,8 @@ function projectAvailabilityRecord(
 }
 
 async function projectPublicHolidays(input: {
+  lastRenderedAt: Date | null;
+  client?: Prisma.TransactionClient;
   clerkOrgId: string;
   horizonEnd: Date;
   horizonStart: Date;
@@ -256,7 +276,7 @@ async function projectPublicHolidays(input: {
   >;
   privacyMode: availability_privacy_mode;
 }): Promise<PreviewEvent[]> {
-  const holidays = await database.publicHoliday.findMany({
+  const holidays = await (input.client ?? database).publicHoliday.findMany({
     orderBy: { holiday_date: "asc" },
     select: holidaySelect,
     where: {
@@ -333,8 +353,13 @@ async function projectPublicHolidays(input: {
           ? "Public holiday"
           : `Public holiday: ${holiday.name}`,
       endsAt,
+      eventClass: input.privacyMode === "named" ? "PUBLIC" : "PRIVATE",
+      hasPublication: Boolean(
+        input.lastRenderedAt && holiday.created_at <= input.lastRenderedAt
+      ),
       isPublicHoliday: true,
       location: null,
+      publishedAt: holiday.updated_at,
       publishedSequence: 0,
       publishedUid: `${holiday.id}${icsUidSuffix}`,
       recordType: "public_holiday",
@@ -372,6 +397,7 @@ export function labelForRecordType(
 const feedProjectionSelect = {
   created_by_user_id: true,
   includes_public_holidays: true,
+  last_rendered_at: true,
   privacy_mode: true,
   scopes: {
     select: {
@@ -384,6 +410,7 @@ const feedProjectionSelect = {
 const recordSelect = {
   all_day: true,
   contactability: true,
+  created_at: true,
   derived_sequence: true,
   derived_uid_key: true,
   ends_at: true,
@@ -403,6 +430,7 @@ const recordSelect = {
   privacy_mode: true,
   publication: {
     select: {
+      published_at: true,
       published_sequence: true,
       published_uid: true,
     },
@@ -410,6 +438,7 @@ const recordSelect = {
   record_type: true,
   starts_at: true,
   title: true,
+  updated_at: true,
 } satisfies Prisma.AvailabilityRecordSelect;
 
 type RecordRow = Prisma.AvailabilityRecordGetPayload<{
@@ -426,9 +455,11 @@ const holidaySelect = {
     },
   },
   country_code: true,
+  created_at: true,
   default_classification: true,
   holiday_date: true,
   id: true,
   name: true,
   region_code: true,
+  updated_at: true,
 } satisfies Prisma.PublicHolidaySelect;

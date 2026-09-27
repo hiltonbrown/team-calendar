@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   canViewFeed: vi.fn(),
   feedFindFirst: vi.fn(),
+  personFindFirst: vi.fn(() =>
+    Promise.resolve({ id: "30000000-0000-4000-8000-000000000003" })
+  ),
   projectFeedEvents: vi.fn(),
 }));
 
@@ -12,6 +15,7 @@ vi.mock("@repo/database", () => ({
     feed: {
       findFirst: mocks.feedFindFirst,
     },
+    person: { findFirst: mocks.personFindFirst },
   },
 }));
 
@@ -68,8 +72,75 @@ const sampleEvent = {
 
 describe("previewFeed", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.personFindFirst.mockResolvedValue({ id: validPersonId });
   });
+
+  it.each(
+    ["org:viewer", "org:manager"].flatMap((actingRole) =>
+      [undefined, "30000000-0000-4000-8000-000000000099"].map(
+        (actingPersonId) => ({ actingPersonId, actingRole })
+      )
+    )
+  )(
+    "resolves the active scoped identity for $actingRole with caller identity $actingPersonId",
+    async ({ actingRole, actingPersonId }) => {
+      mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
+      mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
+      mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
+      const result = await previewFeed({
+        ...baseInput,
+        actingPersonId,
+        actingRole,
+      });
+      expect(result.ok).toBe(true);
+      expect(mocks.personFindFirst).toHaveBeenCalledWith({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: validClerkOrgId,
+          clerk_user_id: validUserId,
+          is_active: true,
+          organisation_id: validOrgId,
+        },
+      });
+      expect(mocks.canViewFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ actingPersonId: validPersonId })
+      );
+      expect(mocks.projectFeedEvents).toHaveBeenCalledWith(
+        expect.objectContaining({ actingPersonId: validPersonId })
+      );
+    }
+  );
+
+  it.each(["org:viewer", "org:manager"])(
+    "denies missing, foreign or inactive identity for %s without projecting",
+    async (actingRole) => {
+      mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
+      mocks.personFindFirst.mockResolvedValueOnce(null);
+      mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: false });
+      const result = await previewFeed({
+        ...baseInput,
+        actingPersonId: undefined,
+        actingRole,
+      });
+      expect(result.ok).toBe(false);
+      expect(mocks.personFindFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            archived_at: null,
+            clerk_org_id: validClerkOrgId,
+            is_active: true,
+            organisation_id: validOrgId,
+          }),
+        })
+      );
+      expect(mocks.canViewFeed).toHaveBeenCalledWith(
+        expect.objectContaining({ actingPersonId: null })
+      );
+      expect(mocks.projectFeedEvents).not.toHaveBeenCalled();
+    }
+  );
 
   it("happy path: produces expected preview payload", async () => {
     mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);

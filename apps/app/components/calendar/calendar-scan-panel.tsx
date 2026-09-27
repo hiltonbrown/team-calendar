@@ -7,14 +7,18 @@ import {
   toneForCalendarEvent,
 } from "@/components/availability/availability-status";
 import { withOrg } from "@/lib/navigation/org-url";
+import type { CalendarFilterInput } from "../../app/(authenticated)/calendar/_schemas";
+import { calendarDayHref } from "./calendar-url-state";
 
 interface CalendarScanPanelProps {
   data: CalendarRange;
+  filters?: CalendarFilterInput;
   orgQueryValue: string | null;
 }
 
 export function CalendarScanPanel({
   data,
+  filters,
   orgQueryValue,
 }: CalendarScanPanelProps) {
   const day = selectScanDay(data);
@@ -25,8 +29,9 @@ export function CalendarScanPanel({
   const items = scanItemsForDay(day, orgQueryValue);
   const visibleItems = items.slice(0, 3);
   const remainingCount = items.length - visibleItems.length;
-  const dayHref = withOrg(
-    `/calendar?view=day&anchor=${day.date.toISOString().slice(0, 10)}`,
+  const dayHref = calendarDayHref(
+    day.date.toISOString().slice(0, 10),
+    filters,
     orgQueryValue
   );
 
@@ -173,6 +178,7 @@ function scanTitle(day: CalendarDay): string {
   const formatter = new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
     month: "long",
+    timeZone: "UTC",
     weekday: "short",
   });
   return day.isToday ? "Today in view" : formatter.format(day.date);

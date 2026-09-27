@@ -142,6 +142,11 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     );
   }
 
+  const calendarFilters: CalendarFilterInput = {
+    ...parsedFilters,
+    scopeType: scope.value.type,
+    scopeValue: scope.value.value,
+  };
   const selectedPersonId =
     scope.value.type === "person" ? scope.value.value : null;
 
@@ -175,6 +180,7 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
         {dataResult.value.view === "week" ? (
           <CalendarTimeline
             data={dataResult.value}
+            filters={calendarFilters}
             orgQueryValue={orgQueryValue}
           />
         ) : (
@@ -182,11 +188,13 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
             {renderCalendarView({
               actingPersonId: currentPerson?.id ?? null,
               data: dataResult.value,
+              filters: calendarFilters,
               orgQueryValue,
               selectedPersonId,
             })}
             <CalendarScanPanel
               data={dataResult.value}
+              filters={calendarFilters}
               orgQueryValue={orgQueryValue}
             />
           </div>
@@ -251,11 +259,13 @@ function DisconnectedXeroBanner({
 function renderCalendarView({
   actingPersonId,
   data,
+  filters,
   orgQueryValue,
   selectedPersonId,
 }: {
   actingPersonId: string | null;
   data: CalendarRange;
+  filters: CalendarFilterInput;
   orgQueryValue: string | null;
   selectedPersonId: string | null;
 }) {
@@ -273,6 +283,7 @@ function renderCalendarView({
     <CalendarMonthView
       actingPersonId={actingPersonId}
       data={data}
+      filters={filters}
       orgQueryValue={orgQueryValue}
       selectedPersonId={selectedPersonId}
     />

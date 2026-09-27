@@ -10,6 +10,10 @@ import {
   assertDurableManifestReadBack,
   assertLiveDatabaseAuthority,
 } from "./database-guard.js";
+import {
+  listOwnedFeedCacheKeys,
+  purgeOwnedFeedCacheKeys,
+} from "./feed-cache-fixture-cleanup.js";
 import { unsupportedGlobalFixtureKeys } from "./global-fixture-keys.js";
 import {
   assertXeroFixtureInfrastructureOwned,
@@ -73,6 +77,7 @@ const scopedTables = [
   "failed_records",
   "sync_runs",
   "availability_publications",
+  "feed_event_publications",
   "feed_tokens",
   "feed_scopes",
   "feeds",
@@ -123,6 +128,18 @@ const scopedSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds
 const clerkSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)})`;
 const organisationSql = `clerk_org_id IN (${placeholders(1, manifest.owned.clerkOrgIds.length)}) AND id IN (${placeholders(1 + manifest.owned.clerkOrgIds.length, manifest.owned.organisationIds.length)})`;
 
+const ownedFeedRows = await database.feed.findMany({
+  select: { id: true },
+  where: {
+    clerk_org_id: { in: manifest.owned.clerkOrgIds },
+    organisation_id: { in: manifest.owned.organisationIds },
+  },
+});
+const feedCacheInput = {
+  feedIds: ownedFeedRows.map((feed) => feed.id),
+  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL,
+};
 const countRows = async (table: string, sql: string, values: string[]) => {
   const rows = await database.$queryRawUnsafe<Array<{ count: bigint }>>(
     `SELECT COUNT(*)::bigint AS count FROM "${table}" WHERE ${sql}`,
@@ -161,6 +178,7 @@ const counts: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+counts.feed_cache_keys = (await listOwnedFeedCacheKeys(feedCacheInput)).length;
 counts.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   counts[table] = await countRows(table, scopedSql, scopedValues);
@@ -226,6 +244,7 @@ if (mode === "--apply") {
       "Cleanup refused while manifest-owned sync runs are active"
     );
   }
+  await purgeOwnedFeedCacheKeys(feedCacheInput);
   await database.$transaction(async (transaction) => {
     await lockXeroFixtureInfrastructure(transaction);
     await assertXeroFixtureInfrastructureOwned(transaction, manifest.owned);
@@ -286,6 +305,7 @@ const residue: Record<string, number> = await countXeroFixtureInfrastructure(
   database,
   manifest.owned
 );
+residue.feed_cache_keys = (await listOwnedFeedCacheKeys(feedCacheInput)).length;
 residue.shared_store_keys = await countSharedStoreFixtureKeys(sharedStoreInput);
 for (const table of scopedTables) {
   residue[table] = await countRows(table, scopedSql, scopedValues);

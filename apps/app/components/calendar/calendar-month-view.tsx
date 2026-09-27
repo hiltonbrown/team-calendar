@@ -3,13 +3,15 @@ import { Button } from "@repo/design-system/components/ui/button";
 import { cn } from "@repo/design-system/lib/utils";
 import Link from "next/link";
 import { statusToneClasses } from "@/components/availability/availability-status";
-import { withOrg } from "@/lib/navigation/org-url";
+import type { CalendarFilterInput } from "../../app/(authenticated)/calendar/_schemas";
 import { CalendarCreateLauncher } from "./calendar-create-launcher";
 import { CalendarEventChip } from "./calendar-event-chip";
+import { calendarDayHref } from "./calendar-url-state";
 
 interface CalendarMonthViewProps {
   actingPersonId: string | null;
   data: CalendarRange;
+  filters?: CalendarFilterInput;
   maxEventsPerDay?: number;
   orgQueryValue: string | null;
   selectedPersonId: string | null;
@@ -20,6 +22,7 @@ const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export function CalendarMonthView({
   actingPersonId,
   data,
+  filters,
   maxEventsPerDay = 3,
   orgQueryValue,
   selectedPersonId,
@@ -93,13 +96,15 @@ export function CalendarMonthView({
                         event={event}
                         key={`${event.id}-${dateOnly}`}
                         orgQueryValue={orgQueryValue}
+                        timezone={data.range.timezone}
                       />
                     ))}
                     {hiddenCount > 0 && (
                       <Button asChild size="sm" variant="ghost">
                         <Link
-                          href={withOrg(
-                            `/calendar?view=day&anchor=${dateOnly}`,
+                          href={calendarDayHref(
+                            dateOnly,
+                            filters,
                             orgQueryValue
                           )}
                         >
@@ -145,10 +150,7 @@ export function CalendarMonthView({
                 <h3 className="font-semibold text-title-sm">{dateLabel}</h3>
                 <Button asChild size="sm" variant="ghost">
                   <Link
-                    href={withOrg(
-                      `/calendar?view=day&anchor=${dateOnly}`,
-                      orgQueryValue
-                    )}
+                    href={calendarDayHref(dateOnly, filters, orgQueryValue)}
                   >
                     View day
                   </Link>
@@ -169,6 +171,7 @@ export function CalendarMonthView({
                       event={event}
                       key={`${event.id}-${dateOnly}-agenda`}
                       orgQueryValue={orgQueryValue}
+                      timezone={data.range.timezone}
                     />
                   ))
                 ) : (
