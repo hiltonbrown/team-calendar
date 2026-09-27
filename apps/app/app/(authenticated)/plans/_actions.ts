@@ -653,7 +653,7 @@ async function resolveFormDates(
       "This time does not exist in the organisation timezone. Choose another time."
     );
   }
-  if (endsAt <= startsAt) {
+  if (input.allDay ? endsAt < startsAt : endsAt <= startsAt) {
     return validationError("End date must be after start date");
   }
   return { ok: true, value: { endsAt, startsAt } };

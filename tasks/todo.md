@@ -1696,3 +1696,13 @@ Review: F1-F12 implementation is complete at source candidate `4c603ded644eaee7d
 The prior `4c603ded` source and live results remain historical proof for that candidate. A final check found that client/shared schema UTC-wall-clock ordering rejected an existing valid 20-minute interval (Sydney 02:50 daylight time to 02:10 standard time) before server preservation of the original instants. Verification for the correction is pending; the earlier live PASS is not evidence for the new source.
 
 Focused correction verification: four form/time/action/loader files pass all 41 tests; app TypeScript check and focused Biome checks exit zero. The schema now validates external field shapes only; existing scoped server conversion/preservation performs actual instant ordering and rejects gaps/reversed intervals before any writer call. An initial new test fixture widened its record type to string; the fixture now satisfies the form input type and the unchanged app typecheck passes. Full source gates and fresh exact-candidate live verification remain pending with the reviewer.
+
+### Plan 162 final-check correction, inclusive all-day endpoints
+
+- [x] Preserve equal midnight endpoints of valid same-day all-day records on note-only edits.
+- [x] Verify positive all-day preservation, reversed all-day no-write and strictly positive timed interval regressions, plus the existing timezone/fold/gap cases.
+- [ ] Freeze the correction; reviewer repeats full source gates and a fresh protected live campaign at the final source before merge.
+
+The timed-interval correction at `146a74de6a2c09d3b86f0b188227a3edceb16c88` subsequently passed full source gates (2,901 unit tests/509 release tests) and protected run `52edd117` (27 files/254 tests). Cleanup, all 39 table hashes/377 existing rows, 22 checksums, zero pending migrations and restoration of the same five workers were independently verified. This is historical evidence for that candidate. A further final check found that preserving equal midnight endpoints of an existing inclusive all-day record reached a timed-only strict ordering guard. The reviewed minimal conditional permits equality only for all-day records; verification of the new source remains pending. No old live pass is attributed to this correction.
+
+Focused all-day correction verification: four form/time/action/loader files pass all 46 tests, app TypeScript check exits zero and focused Biome checks pass five files. The sole runtime change is the server ordering conditional: non-negative all-day intervals, strictly positive timed intervals. Full source gates and a new exact-candidate protected live campaign remain pending before merge. No database or process operation was performed for this correction.

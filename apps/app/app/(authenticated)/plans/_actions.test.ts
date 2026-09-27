@@ -346,6 +346,104 @@ describe("plans actions", () => {
     expect(mocks.updateRecord).not.toHaveBeenCalled();
   });
 
+  it("preserves inclusive same-midnight all-day endpoints on a note-only edit", async () => {
+    const instant = new Date("2026-04-15T00:00:00Z");
+    mocks.availabilityFindFirst.mockResolvedValue({
+      all_day: true,
+      ends_at: instant,
+      starts_at: instant,
+    });
+    mocks.updateRecord.mockResolvedValue({ ok: true, value: { id: "record" } });
+    const result = await updateRecordAction({
+      ...validInput,
+      endsAt: "2026-04-15",
+      notesInternal: "Changed note",
+      recordId: "00000000-0000-4000-8000-000000000099",
+      recordType: "wfh",
+      startsAt: "2026-04-15",
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.updateRecord).toHaveBeenCalledWith(
+      expect.objectContaining({
+        patch: expect.objectContaining({
+          allDay: true,
+          endsAt: instant,
+          notesInternal: "Changed note",
+          startsAt: instant,
+        }),
+      })
+    );
+  });
+
+  it.each(["create", "update"])(
+    "rejects reversed inclusive all-day dates on %s before writing",
+    async (mode) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        all_day: true,
+        ends_at: new Date("2026-04-15T00:00:00Z"),
+        starts_at: new Date("2026-04-15T00:00:00Z"),
+      });
+      const input = {
+        ...validInput,
+        endsAt: "2026-04-14",
+        recordType: "wfh",
+        startsAt: "2026-04-15",
+      } satisfies PlanRecordFormInput;
+      const result =
+        mode === "create"
+          ? await createRecordAction(input)
+          : await updateRecordAction({
+              ...input,
+              recordId: "00000000-0000-4000-8000-000000000099",
+            });
+      expect(result).toMatchObject({
+        error: {
+          code: "validation_error",
+          message: "End date must be after start date",
+        },
+        ok: false,
+      });
+      expect(mocks.createRecord).not.toHaveBeenCalled();
+      expect(mocks.updateRecord).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(["create", "update"])(
+    "rejects zero-length timed intervals on %s before writing",
+    async (mode) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        all_day: false,
+        ends_at: new Date("2026-04-15T00:00:00Z"),
+        starts_at: new Date("2026-04-14T23:00:00Z"),
+      });
+      const input = {
+        ...validInput,
+        allDay: false,
+        endsAt: "2026-04-15",
+        endTime: "09:00",
+        recordType: "wfh",
+        startsAt: "2026-04-15",
+        startTime: "09:00",
+      } satisfies PlanRecordFormInput;
+      const result =
+        mode === "create"
+          ? await createRecordAction(input)
+          : await updateRecordAction({
+              ...input,
+              recordId: "00000000-0000-4000-8000-000000000099",
+            });
+      expect(result).toMatchObject({
+        error: {
+          code: "validation_error",
+          message: "End date must be after start date",
+        },
+        ok: false,
+      });
+      expect(mocks.createRecord).not.toHaveBeenCalled();
+      expect(mocks.updateRecord).not.toHaveBeenCalled();
+    }
+  );
+
   it("revalidates expected paths on submit success", async () => {
     mocks.submitDraftRecord.mockResolvedValue({
       ok: true,
