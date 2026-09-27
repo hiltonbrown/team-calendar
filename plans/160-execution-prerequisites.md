@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS. This handoff records concrete runtime contracts absent from the reviewed candidate. It grants no deployment, worker activation, provider deletion or payroll operation.
 
-Reviewed source: d6da4e8fbab70e3135e3a7a33fd49cb0c24a91a2, 27 September 2026. The isolated harness corrections require their own frozen candidate and fresh gates. Fresh operational metadata is maintained by the advisor in plans/160-execution-review.md.
+Reviewed application source: d6da4e8fbab70e3135e3a7a33fd49cb0c24a91a2, 27 September 2026. The initial isolated harness corrections were frozen and independently verified at 76a5dfb2b8c87faf27d6313e31c114b053be1f4c; their results are recorded below. Fresh operational metadata is maintained by the advisor in plans/160-execution-review.md.
 
 ## Enforced execution lease
 
@@ -22,7 +22,7 @@ The causal no-effect ingestion contract requires a private dispatch-audit receip
 
 ## Browser closure and recovery
 
-Playwright launches browser subprocesses in detached process groups on Unix. Parent process-group disappearance after error/SIGINT/SIGTERM is insufficient to establish all mutation writer closure. The supervisor waits for the actual child close with bounded termination/escalation, and treats non-graceful closure as unknown. Independent worker drain and outside-owned checks may continue; provider/local deletion and fence release remain denied. A production adapter needs a separately verified browser-writer closure receipt or an operator closure procedure for the same run before recovery can safely reconcile effects.
+Playwright launches browser subprocesses in detached process groups on Unix. Parent process-group disappearance after error/SIGINT/SIGTERM is insufficient to establish all mutation writer closure. The supervisor waits for the actual child close with bounded termination/escalation, and treats non-graceful closure as unknown. Independent worker drain and outside-owned checks may continue; provider/local deletion and fence release remain denied. Recovery requires an acquired lease to independently verify all prior mutation writers and return a strict fresh closure proof for this exact run and candidate, with a hashed evidence reference. Missing, rejected, stale or foreign proof retains the fence and permits only independent drain/outside-owned observation. The adapter must observe every prior browser mutation writer, not infer closure from PID or process-group absence. Default capability remains unavailable.
 
 A graceful successful CLI close, empty tracked process group and normal Playwright context teardown permit ledger reconciliation. The durable ledger is read only after worker drain, and the parent pre-browser snapshot is never persisted over child entries. Missing, corrupt or foreign ledger state preserves the fence. Recovery retains prior action evidence, observes uncertain creates without replay and collects terminal receipts after cleanup.
 
@@ -34,7 +34,7 @@ The operator must supply exact sanctioned fixture scopes, mutation dates/budgets
 
 The authorised online Neon domain regression runs independently through the existing protected live runner. No localhost, Docker, new database or ALLOW_LOCAL_DATABASE_TESTS=1 against Neon is an allowed fallback. Its inventory PASS, source unit PASS and synthetic receipt validation never become case-level LIVE or CONTROLLED campaign evidence.
 
-## Frozen harness and actual diagnostic
+## Initial frozen harness and actual diagnostic
 
 Harness runtime candidate: `76a5dfb2b8c87faf27d6313e31c114b053be1f4c`. Source checks and protected online domain regressions are recorded separately in the task review and advisor execution review. They do not admit an execution lease or certify provider/browser cases.
 
@@ -43,3 +43,11 @@ The actual runner invocation without an available manifest produced `reports/xer
 Independent source checks PASS: frozen install, release tools 457 tests / 32 files, release types, lint, four uncached builds, then 19 uncached type tasks, 2,810 repository tests / 18 uncached tasks and package boundaries. The test-only Date clock commit preserves the actual runtime candidate. Earlier overloaded deadline and synthetic ordering failures are retained in the task review; assertions were not weakened.
 
 Protected online domain run `f782ad54-69b6-4bf3-ada0-08a535215c19` PASS at that exact runtime: 27 files, 246 tests, six uncached tasks, 39 empty owned selectors, unchanged 38-table catalogue and 204 existing rows, 21 migrations with none pending, 12 integrity checks, unchanged legacy binding, enabled immutable trigger and released fence with verified durable authority/strict consumers. This proves the protected domain regression and cleanup. Actual provider/browser campaign and per-case charter levels remain NOT VERIFIED, as does current PITR retention/restore exercise. No runtime worker or controlled-case admission is supplied by these results.
+
+## Follow-up error and oversight review
+
+Corrected harness runtime candidate: `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`. Independent review confirmed report identity, asynchronous no-effect observation, prior-writer recovery and duplicate evidence failure-isolation omissions. Corrections enforce the same strict candidate, scope, execution, time and phase authority before selecting evidence. Valid failures survive invalid or duplicate siblings; collection limitations remain monotonic through terminal merge. Missing lifecycle evidence is reported as unavailable, while malformed non-null input retains the sanitised validation error. No operational driver capability has been added.
+
+Fresh actual missing-manifest diagnostics: `reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.json` and `.md`. Both remain catalogue-complete and NOT VERIFIED, with zero LIVE/CONTROLLED executions and null verified identity. Actual offline rendering is byte-identical. Earlier report and gate evidence remain historical. All required source gates PASS: 505 release-tool tests in 32 files, release types, lint, four forced build tasks, 19 forced repository type tasks, 2,810 repository tests in 18 forced tasks and boundaries. The actual report CLI exits 2; JSON SHA-256 `8a0bfb93d6f54ad479d52220056bba6e3900b49a9b5f320ed6ffff3b3fddf5e1`, Markdown SHA-256 `597b50832b56bf9c04e656ce8132b0492c5133915fd7a51f4d781e294ec641a1`.
+
+Protected exact-source follow-up run `b207173c-ec6b-4bef-ba68-3937ad8227df` PASS at the corrected runtime, 03:26:45.886 to 03:34:15.360 UTC on 27 September 2026: 27 files, 246 tests and six uncached tasks. All 39 owned selectors are empty; the 38-table catalogue and 204 existing rows are unchanged. All 21 migration checksums match, zero are pending, 12 integrity checks pass and pre/post schema comparisons report no difference. Immutable trigger and legacy binding are unchanged; fence released, durable authority and strict consumer isolation verified. Source review APPROVE. Documentation closure preserves that exact runtime for the authorised merge. These source and protected domain results do not certify the actual browser/provider campaign, per-case charter levels or current PITR retention/restore exercise; overall Plan 160 remains IN PROGRESS.

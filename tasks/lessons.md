@@ -226,3 +226,9 @@ actionable; keep one-off task evidence in the review for that task.
 ## Plans 160 to 161h live verification reminder, 27 September 2026
 
 - The Plan 161 online Neon rule at lines 211 to 215 remains authoritative. A synthetic build URL is only a build setting, never the integration-test target. Once domain fixes are frozen, begin their regression campaign through the protected live runner with refreshed ownership, restore, consumer isolation and cleanup evidence while independent harness work continues. Do not delay live verification behind unrelated harness builds or revisit local database setup.
+
+## Plan 160 evidence and recovery review
+
+- Apply exact candidate equality in offline report validation as well as the execution runner. Non-null metadata cannot establish that the harness and application share a candidate.
+- After an asynchronous independent observation, re-read durable state before applying its result. Require the target intent and authority to remain unchanged; preserve unrelated entries added during the wait. Recovery must freshly establish prior writer closure before any cleanup, including when fixture verification fails.
+- Validate each receipt before accounting for duplicates. Keep independently proven failures regardless of sibling validity or order, and carry incomplete-evidence markers through every collection phase. Assertion, ownership and cleanup receipt phases must match the actual action or terminal stage.
