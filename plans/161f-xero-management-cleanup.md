@@ -26,6 +26,20 @@
 - **Planned at**: commit `6b934be`, 23 September 2026 (reviewed and re-stamped from `8652c31`; excerpts re-read at `6b934be`, before 161b-161e)
 - **Programme charter**: `plans/161-harden-xero-connection-lifecycle.md`
 
+## Current verification, 27 September 2026
+
+**PASS for implementation and database verification at integrated main `b208409add590ce3bddb0c6ee1e7be153d6927dc`.** This current section takes precedence over historical executor baselines, drift expectations, worktree instructions and inventory counts below. The original 161f implementation is already merged; do not recreate the migration or re-execute the original feature slice. Read the historical requirements as the contract, locate current functions by name and use the current protected inventory of 27 files.
+
+Fresh focused verification passes **eight files / 190 tests**: management client, cleanup, service and keys (144), cleanup worker (9), cleanup health query (3), server actions and receipt UI (34). Independent source review confirms exact app/tenant/owner target freezing, app/configuration-isolated management credentials, bounded single targeted DELETE, local-only disconnect, lock/lease/generation fencing, durable pre-dispatch markers, unknown-outcome retention, operator-only same-target reissue, truthful credential-free receipts and registered per-attempt durable cron steps. The terminal-confirmation retirement recovery added during reconciliation is present and independently covered. Destructive local finalisation remains byte-identical to approved 161f runtime `c0ce9a13`. No obsolete `remoteRevoked` or inline revoke functions remain.
+
+Fresh actual CLI checks: missing intent exits 1; fully specified report-only intent exits 1 before database/cleanup service imports; direct cleanup-module import under `react-server` succeeds with synthetic source-only settings and zero network calls. These synthetic values are never database verification targets. The three-receipt browser specification remains written and **NOT VERIFIED**, with no fabricated provider/browser execution.
+
+Current source outside plans/tasks/reports is byte-identical to reviewed candidate `5d2e57b`, which passed the protected online Neon/Redis campaign `21e2bdb1-ea5b-4acd-ac8f-f484130731ce`: **27 files / 246 tests / six uncached tasks**, cleanup PASS, all 39 selectors zero and released fence. That campaign includes the real persisted 161f lifecycle/worker cases with fake provider responses. The complete lint/type/build/unit/tooling gates recorded in [cross-plan reconciliation](160-161-reconciliation.md) remain applicable to this identical source. The current verification does not claim a new write campaign.
+
+Fresh read-only Neon read-back at `2026-09-27T00:25:15.275Z` verifies exact authorised target, **21 matching applied migration checksums / zero pending**, cleanup migration `20260926060000_add_xero_cleanup_requests` checksum `d038fcd0041cb6b0cebcffca869c9c01053895eb597e053da19a2d4d68dc1d96`, both cleanup enums, zero unvalidated cleanup constraints, zero prior manifest-owned cleanup request/attempt rows and absent active-run fence. Live Prisma schema comparison reports **No difference detected**. All 38 pre-existing table counts and all-column content hashes remain unchanged, totalling 204 rows. These checks are read-only; they do not create fresh write authority or substitute for the protected runner.
+
+Restricted fresh logs: `/tmp/tc-161f-verify-{xero,jobs,database,app}-units.log`, `/tmp/tc-161f-verify-live-readonly.log`, `/tmp/tc-161f-verify-schema.log`, `/tmp/tc-161f-verify-content.log`, `/tmp/tc-161f-verify-cli-missing.log`, `/tmp/tc-161f-verify-cli-disabled.log`, `/tmp/tc-161f-verify-import.log`. No implementation defect was found and no runtime/schema change is needed. Cron registration here means the repository functions array; deployed Inngest registration/execution is not certified. Actual management-tier provisioning, Xero client-credentials acquisition, targeted deletion and authenticated browser receipt execution remain **NOT VERIFIED**. Remote cleanup remains `report_only` until the separate production evidence gates pass.
+
 ## Execution reconciliation, 26 September 2026
 
 This section overrides conflicting historical instructions below. Execute from approved dependency commit `af649c24dcca6ed44aca02952e802915a4c288be` on the isolated `codex/xero-shared-rate-limits` branch. Plan 161e is DONE and need not be merged into main to serve as this worktree baseline. Create `/tmp/tc-161f` on `codex/xero-management-cleanup`; never merge or push. Expected drift consists of 161b binding, 161c deadlines, 161d canonical credentials and 161e endpoint-class threading, plus the reviewed documentation import-stub change. `xeroRateKeys` now lives in `rate-limit/shared-store.ts`, not `xero-fetch.ts`.
@@ -152,8 +166,9 @@ and `provider_connection`, `tenant_binding`, `cleanup_request`, `cleanup_attempt
 
 ## Commands you will need
 
-**Fresh worktree setup**: `bun install --frozen-lockfile`. Build needs a valid-looking
-`DATABASE_URL` and a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY` for that command only.
+**Fresh worktree setup**: `bun install --frozen-lockfile`. Source-only build needs a synthetic valid-looking
+`DATABASE_URL`, a 32-byte base64 `XERO_TOKEN_ENCRYPTION_KEY`, and synthetic nonempty
+`XERO_CLIENT_ID` and `XERO_CLIENT_SECRET` for that command only.
 
 **Protected integration database and store:** use only the authorised online Neon and KV targets through the protected live runner, with fresh identity, ownership, restore, strict consumer isolation, active fence and cleanup. Never provision Docker or localhost. A run collecting zero named tests fails. Apply only reviewed pending additive migrations under protected authority. Current read-back shows all 21 migrations applied, none pending; do not reapply them.
 
@@ -435,7 +450,7 @@ show, with existing `packages/design-system` components:
 - `pending`: "Sync stopped. Xero disconnection is pending."
 - `confirmed_deleted` / `confirmed_absent`: "Disconnected from Xero."
 - `partially_confirmed` / `unknown` / `blocked_authorisation`: "Sync stopped. We could not confirm
-  the Xero disconnection. Our team has been notified."
+  the Xero disconnection. Contact support for help."
 
 Update every `remoteRevoked` occurrence listed in "Current state".
 
@@ -551,7 +566,7 @@ All must hold:
 - [x] `bun run check`, `bun run typecheck` exit 0
 - [x] `bun run --cwd packages/xero test`, `bun run --cwd packages/jobs test`, `bun run --cwd packages/database test` exit 0
 - [x] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
-- [x] `TURBO_CONCURRENCY=2 bun tooling/release/run-live-integration.ts --manifest <protected-manifest>` exits 0 against the authorised online Neon target, listing all 26 suites including both new suites
+- [x] The complete protected online runner exits 0 against the authorised Neon target, listing all 27 current suites including both 161f suites (26 at original 161f delivery); fresh invocation uses the private environment/manifest command in the table above
 - [x] `bun run test:release-tools && bun run typecheck:release-tools` exit 0
 - [x] `git diff --check` exits 0
 - [x] `grep -rn "remoteRevoked" packages/ apps/ --include=*.ts --include=*.tsx --exclude-dir=.next --exclude-dir=node_modules` returns no matches
