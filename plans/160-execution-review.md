@@ -1,6 +1,10 @@
 # Plan 160 execution review, 27 September 2026
 
-Status: IN PROGRESS. Reviewer baseline: `d6da4e8fbab70e3135e3a7a33fd49cb0c24a91a2`.
+Status: IN PROGRESS. Current documentation-verification baseline: main `514efb5`,
+with merged/tested runtime `5d5889c` and local merge `f3dd965`. Initial reviewer
+baseline: `d6da4e8fbab70e3135e3a7a33fd49cb0c24a91a2`. The dated initial sections
+below retain their original observations; follow-up integration and updated-plan
+verification appear later in this record.
 User instruction: execute Plan 160, reconcile stops and continue. During the initial pass the improve advisor
 did not edit source or merge the executor branch. This file records fresh observations,
 separate from the historical evidence in the main plan.
@@ -403,3 +407,48 @@ and whitespace. Logs are in `/tmp/plan160-postmerge-review/`. Full repository te
 build/types and protected online evidence remain applicable to the identical source.
 The published diagnostic hashes are unchanged. Full Plan 160 remains IN PROGRESS
 and actual browser/provider/PITR observations remain NOT VERIFIED.
+
+
+## Updated-plan verification, 27 September 2026
+
+Verification baseline: main `514efb5`, after merge `f3dd965`. Scope is the four
+updated Plan 160 documents: the execution plan, prerequisites, review and index.
+This review changes plans only; it does not repeat a provider campaign or infer
+new deployment/database observations.
+
+- [x] Read lessons and compare the updated plans with the merged source.
+- [x] Complete fresh-context implementation and independent evidence reviews.
+- [x] Reconcile actionable baselines, completed steps and remaining prerequisites.
+- [x] Verify local references, catalogue/report identity and recorded evidence.
+- [x] Validate the final plan-only diff and record the result.
+
+
+Result: APPROVE the corrected plans. Both independent reviews confirmed the current
+source/evidence records and identified stale executable instructions in the main
+plan/index. Those instructions still called for already-merged recovery, collector,
+report-output and discovery work. The active drift baseline and excerpts now match
+`5d5889c`; Steps 1-2 preserve completed contracts, and Step 3 starts the remaining
+operational work. The completion ledger separates verified source from unresolved
+lease/producers/campaign/restore evidence. Recovery adapter requirements explicitly
+include fresh independent prior-writer proof. The prerequisite/review headers record
+main integration, and initial observations remain labelled history.
+
+The documented discovery expectation is corrected from 97 tests/three specs to
+110 tests/five specs (92 registered suffixes plus 18 auxiliary guards). A fresh
+credential-free `--list` invocation confirms 110/5 and exit 0; no scenario executed.
+Fresh credential-free release-tool types also exit 0. Private command logs are
+`/tmp/plan160-plan-verification/{types,discovery}.log`.
+
+Independent evidence review rechecked ancestry, exact runtime equality, available
+gate summaries, protected run summary/inventory and actual diagnostic bytes. All
+recorded counts, verdicts, cleanup evidence and report hashes agree. The latest
+report still has 26 scenarios/92 suffixes/40 charter cases/93 levels, null admitted
+run/candidate/harness identity, zero LIVE/CONTROLLED and NOT VERIFIED. Both reviewers
+re-read the corrections and approved them with no remaining actionable finding.
+
+Plan validation confirms 37 local Markdown links resolve, all scenario/subcase/cohort
+tables are byte-identical to the merged plan, report hashes unchanged and the entire
+source/test tree unchanged. Exactly these four plan files changed; whitespace and
+added-text language checks pass. No source, report, task, environment or external
+resource changed during this documentation verification. No database/provider suite
+was repeated, no deployment state was refreshed, and campaign/PITR remains NOT VERIFIED.

@@ -10,6 +10,9 @@ run `b207173c-ec6b-4bef-ba68-3937ad8227df` passes 246 tests with zero owned resi
 unchanged existing content/schema and released ownership. Main post-merge lint,
 release types, all 505 release tests and boundaries PASS; tested runtime bytes are unchanged.
 Full Plan 160 and the real provider/browser campaign remain IN PROGRESS/NOT VERIFIED.
+The current execution steps and completion ledger were verified against main `514efb5`;
+completed safety contracts are preservation checks, and remaining execution starts with
+Plan 160 Step 3. Discovery is 110 tests/five specs, with no scenario execution implied.
 See the [follow-up review](160-execution-review.md) and
 [latest diagnostic](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md).
 
@@ -192,8 +195,10 @@ either count means a regression test was deleted rather than fixed.
 
 Plan 160 review at `92d67c5`: rejected recreating the existing guard/report/oracle foundation,
 using discovery or aggregate test totals as scenario proof, and treating local `--preflight`
-as live admission. R1-R3 and R5-R7 in Plan 160 remain actionable implementation work; its default live
-refusal is intentional until worker enforcement and recovery are verified.
+as live admission. That initial remaining-work assessment is superseded by merged runtime
+`5d5889c`: R1/R3/R5/R6 and R7 ingestion contracts are implemented and verified. Actual
+operational admission, causal/layer producers, complete case drivers and campaign proof
+remain open; default live refusal stays intentional until runtime enforcement is verified.
 
 Recorded so they are not re-audited. Detailed reasons and provider evidence limits are in the
 Plan 161 charter and in Plan 159's own rejected list.

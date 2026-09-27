@@ -28,6 +28,8 @@ IN PROGRESS. Operational producers/admission, sanctioned fixtures/sessions, the 
 transition decision and actual browser/provider observations remain required. Current
 PITR retention/restore exercise remains NOT VERIFIED. Initial records below retain
 their original source and dates; this follow-up supersedes their source verdict.
+The executable baseline, Steps 1-2 and completion ledger below are reconciled to
+merged runtime `5d5889c`; continue with Step 3 and the remaining work in Steps 4-8.
 
 ## Initial execution reconciliation, 27 September 2026
 
@@ -65,7 +67,7 @@ Neon/Redis inventory passes 27 files / 246 tests with independent cleanup, conte
 migration and fence read-back. Details and initial failed reruns are preserved in
 [execution review](160-execution-review.md).
 
-The actual new [diagnostic report](/home/hilton/.codex/worktrees/xero-e2e-verification/teamcalendar/reports/xero-e2e/2026-09-27-0663c396-8a8c-432e-ba06-173a914b2513.md)
+The actual new [diagnostic report](../reports/xero-e2e/2026-09-27-0663c396-8a8c-432e-ba06-173a914b2513.md)
 and JSON account for 26/92/40/93, remain NOT VERIFIED and reproduce byte-for-byte offline
 with exit 2. No LIVE or CONTROLLED case was executed. The source slice is reviewable on
 `codex/xero-e2e-verification`; it is not merged into this checkout. Full Plan 160 remains
@@ -106,7 +108,9 @@ regression proving import does not need credentials and role execution still val
 - **Priority:** P1. **Effort:** L. **Risk:** HIGH for execution/cleanup; LOW for plan edits.
 - **Category:** tests, correctness verification, operational reporting.
 - **Planned at:** originally `246ba27`, 20 September 2026.
-- **Reviewed and reconciled at:** `92d67c5`, 27 September 2026.
+- **Initial review:** `92d67c5`, 27 September 2026.
+- **Current plan verification:** main `514efb5`, 27 September 2026; source/test baseline
+  `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`, integrated at `f3dd965`.
 - **Depends on:** Plan 159's approved AU transition contract and remaining import, identity,
   onboarding and calendar behaviour; the runtime fencing contract in Step 3; a compatible
   deployed candidate; owned fixtures and applicable provider-operation authority.
@@ -122,22 +126,23 @@ Review checklist for this revision:
 - [x] Replace stale instructions with current excerpts, scoped remaining steps and gates.
 - [x] Finish independent plan review and plan-only diff validation.
 
-### Evidence ledger
+### Evidence ledger at merged runtime `5d5889c`
 
 | Evidence | Result and boundary |
 | --- | --- |
-| Current source identity | PASS: `git diff --name-only 5d2e57b..92d67c5 -- . ':!plans' ':!tasks' ':!reports'` is empty. Current runtime, tests, tooling and lockfile match the historically verified source. This is not a fresh gate or deployment run. |
-| Historical full source gates | Recorded PASS at `b211d87` / `5d2e57b`: 2,810 repository tests, 395 release-tool tests, lint, build, types and boundaries. Details: `plans/160-161-reconciliation.md:54-56`. Preserve the original candidate and date. |
-| Historical protected Neon/Redis inventory | Recorded PASS at `5d2e57b`: 27 files / 246 tests, 21 migrations applied, 39 residue selectors zero and outside-owned content unchanged. Details: `plans/160-161-reconciliation.md:79-85`. No database/provider operation was repeated during this review. |
-| Current bounded tests | PASS: 48 report/oracle/import-observer tests; four report-writing tests deliberately excluded from this read-only review. These are harness units, not LIVE or CONTROLLED campaign observations. Exact command is below. |
-| Current inventory discovery | PASS: dedicated `--list` returned 97 tests in 3 files; 92 registered suffixes plus five intent guards. No browser or scenario ran. |
-| Current release-tool types | FAIL: `bun --no-env-file run typecheck:release-tools` reports TS2307 for `jose` at `packages/xero/src/oauth/identity.ts:7`. `packages/xero/package.json` and `bun.lock` already declare `jose` 6.2.12. Repair dependency installation in the executor checkout, then rerun; no source workaround or dependency upgrade is indicated. |
-| Published diagnostic report | [JSON](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.json) and [Markdown](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md): 26 scenarios / 92 subcases / 40 charter cases accounted for; 0 LIVE and 0 CONTROLLED executions, all NOT VERIFIED; verified execution identity null. Source and successful database-run metadata do not promote per-case results. |
-| Historical early-failure CLI | [Missing-manifest diagnostic](../reports/xero-e2e/2026-09-26-c58df8ac-b0e4-4f2a-bb88-cb38db335af9.json) records incomplete setup, null candidate/harness and exit 2 in the execution record. Report files were inspected, not regenerated here. |
-| Current provider/deployment/browser state | NOT VERIFIED. The 27 September inventory in `plans/160-161-reconciliation.md:75-77` is a prior observation of an older production revision, missing lifecycle configuration and unregistered workers. Refresh before execution; do not present it as a live observation from this review. |
+| Merged source identity | PASS: candidate `5d5889c` and executor `d27b0f1` are ancestors of main `514efb5`; the entire tree outside `plans`, `tasks` and `reports` is byte-identical to `5d5889c`. Merge `f3dd965` is local integration, not deployment. |
+| Follow-up full source gates | PASS at `5d5889c`: lint, four uncached builds, 19 uncached type tasks, 2,810 repository tests, 505 release-tool tests, release types and boundaries. Initial failed attempts are retained in [execution review](160-execution-review.md). |
+| Protected online domain inventory | PASS at `5d5889c`, run `b207173c-ec6b-4bef-ba68-3937ad8227df`: 27 files/246 tests/six uncached tasks; 39 zero owned selectors; unchanged 38-table content/schema across 204 existing rows; 21 matching migrations/zero pending; released fence. This is domain regression proof, not case-level provider/browser proof or a PITR exercise. |
+| Main post-merge checks | PASS: lint 1,156 files, release types, original release-tool command 505 tests/32 files, boundaries 1,072 files/21 packages and whitespace. No source difference from the fully tested candidate. |
+| Dependency installation | Repaired by frozen install without source/lockfile edits; main release types PASS. The initial missing-`jose` error is historical, not remaining work. |
+| Discovery inventory | Five specs, 110 listed tests: 92 registered suffixes and 18 auxiliary guards. Discovery does not execute a browser scenario or certify any case. |
+| Latest actual diagnostic | [JSON](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.json) and [Markdown](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md): 26/92/40/93 accounted for, zero LIVE/CONTROLLED, NOT VERIFIED, null admitted candidate/harness/run identity. Actual CLI and byte-identical offline rendering exit 2. |
+| Initial diagnostic and gate history | Preserved in [execution review](160-execution-review.md) and [160-161 reconciliation](160-161-reconciliation.md), with their original candidates and dates. The older reports remain unchanged. |
+| Application/provider/deployment/PITR | NOT VERIFIED for the merged campaign candidate. Dated metadata, aggregate suite exits and local integration cannot certify current registered workers, provider cases, deployment readiness or a restore exercise. |
 
-The review does not recertify every Plan 161 implementation, audit NZ/UK, run all CI gates,
-or inspect live credentials, provider state, infrastructure, browser sessions or customer data.
+This plan verification checks documentation against source and retained evidence. It does not
+recertify every Plan 161 implementation, audit NZ/UK or refresh external provider/configuration
+state. The actual operational prerequisites remain in [the handoff](160-execution-prerequisites.md).
 
 ## Drift check and repository conventions
 
@@ -146,13 +151,13 @@ Run before implementation:
 ```bash
 git rev-parse HEAD
 git status --short
-git diff --stat 92d67c5..HEAD -- tooling/release packages/xero packages/jobs packages/availability packages/database apps/app apps/api package.json bun.lock .github/workflows/ci.yml .gitignore
+git diff --stat 5d5889c65a1caf545cfde8cc8198392b8ddd6e7f..HEAD -- tooling/release packages/xero packages/jobs packages/availability packages/database apps/app apps/api package.json bun.lock .github/workflows/ci.yml .gitignore
 ```
 
-Changes require comparison with the symbols/excerpts below, not blind rejection because the
-old implementation landed. If the recovery or execution contracts differ materially, update
-this plan before touching them. Record concurrent edits and preserve them. During this review,
-`plans/go-live.md` acquired an unrelated concurrent edit; it is outside this task's edits.
+The baseline already contains the reviewed fixes. On main `514efb5`, this scoped source diff
+is empty. Compare any future drift with the current symbols/excerpts below before changing
+contracts; record and preserve concurrent edits. The unrelated go-live review remains outside
+this task's scope. A future source change requires new candidate provenance and applicable gates.
 
 Bun 1.4.0, TypeScript, Next.js App Router/Turborepo, Vitest and Playwright are already declared.
 Use strict types, Zod input validation, named exports, co-located tests and Australian English.
@@ -165,72 +170,68 @@ keyboard focus and status announcements. This is not a redesign.
 
 ## Current implementation and vetted findings
 
-All source locations below were read at `92d67c5`; line numbers are navigation aids.
+All source locations below were checked against main `514efb5`, whose source is identical
+to `5d5889c`. Line numbers are navigation aids; named symbols are the drift-check anchors.
 
 | Component | Current behaviour |
 | --- | --- |
-| `tooling/release/run-xero-e2e.ts:149-325` | Bootstraps diagnostic reporting before CLI/manifest parsing; enforces source identity, private output, guarded browser startup and cleanup/report paths. Default acquisition always rejects. |
-| `tooling/release/xero-execution-guard.ts:37-129` | Strict version 2 `xero-e2e` manifest embeds a distinct version 1 database manifest and validates scope, revisions, dates and independent recovery aliases. The ordinary database guard still rejects the foreign mode. |
-| `tooling/release/xero-execution-manifest-store.ts:154-178` | Durable manifest persistence/read-back exists. Equality proves manifest identity, not actual worker isolation or run ownership. |
-| `tooling/release/xero-scenarios.ts` | All 26 IDs and 92 suffixes are registered with evidence modes/layers. Four scenarios, X03/X05/X14/X22, are CONTROLLED; the other 22 are LIVE. |
-| `tooling/release/xero-report.ts:165-229,572-610` | Strict report schema and offline renderer include lifecycle input. All 40 lifecycle cases and matching identity/time are required for PASS. The runner has no lifecycle collector assignment yet. |
-| `tooling/release/xero-ledger.ts:152-169,225-295,319-417` | Atomically persisted intent/outcome/recovery ledger and injected cleanup hooks exist; browser and parent currently hold separate snapshots. |
-| `tooling/release/e2e/xero-provider-oracle.ts:47-152` | Independent raw AU assertions and authorised reads through the existing resolver/deadline/`xeroFetch` path exist. No production status mapper is used as the oracle. |
-| `tooling/release/e2e/xero-independent-snapshot-cli.ts:94-125` | Scoped, action-aware observation supports imported records. The ordinary `provider-snapshot-cli.ts` still has its legacy submit join; it is not the dedicated lane's proof path. |
-| `tooling/release/e2e/xero-import-observer.ts` and `xero-publication-probe.ts` | Exact initial-import identities and actual publication before/after checks exist with units. Their existence does not prove a real campaign ran. |
-| `tooling/release/e2e/global.teardown.ts` | Uses `reconcileReleaseTeardown` instead of asserting reconciliation before attempting cleanup. The old excerpt was superseded. |
-| `tooling/release/xero-e2e.config.ts:5-74` | Runner context required; one worker, zero retries, 15-minute test timeout; OAuth capture disabled. Discovery is intentionally narrower than execution's controlled browser projects. |
+| `tooling/release/run-xero-e2e.ts`, `runXeroE2e` and `defaultDependencies` | Bootstraps diagnostics before CLI/manifest parsing; guards source/output/browser startup. Acquired leases collect action and terminal evidence. Default acquisition still rejects unavailable operational worker capability. |
+| `tooling/release/xero-execution-guard.ts`, `parseXeroExecutionManifest` | Strict version 2 E2E manifest embeds distinct version 1 database authority. Manifest identity alone does not prove actual worker isolation; ordinary database authority still rejects a foreign mode. |
+| `tooling/release/xero-execution-manifest-store.ts`, `persistXeroExecutionManifest` and `assertDurableXeroExecutionManifestReadBack` | Durable manifest persistence/read-back exists; operational admission must enforce the runtime contract separately. |
+| `tooling/release/xero-scenarios.ts` | All 26 IDs and 92 suffixes are registered: X03/X05/X14/X22 CONTROLLED, the other 22 LIVE. Registration is not execution. |
+| `tooling/release/xero-campaign-collector.ts`, `collectXeroCampaign` | Strict scenario/lifecycle receipts, same-run action/terminal collection, hash/provenance checks and shared assertion semantics. Preserves verified failures and invalid-evidence limitations across sibling conflicts and phases. Actual receipt producers remain absent. |
+| `tooling/release/xero-report.ts`, `buildXeroReport` and `reportCli` | Requires exact candidate/harness identity and complete scenario/charter proof for PASS. Distinguishes absent lifecycle input from malformed input. Output failures remain nonzero with sanitised fallback. |
+| `tooling/release/xero-ledger.ts`, `observeXeroNoEffect` and `reconcileXeroLedger` | Re-reads durable state after asynchronous observation and worker drain, rejects changed authority/targets and preserves child/sibling intents. Only independently proven dispositions permit cleanup/release. |
+| `tooling/release/run-xero-e2e.ts`, `spawnXeroBrowser` and recovery branch | Bounded graceful shutdown and descendant termination; forced/unknown closure stays fenced. Same-run recovery needs fresh exact-run/candidate prior-writer proof even when fixture setup fails. |
+| `tooling/release/e2e/xero-browser-mutation-scope.ts`, `assertXeroBrowserMutationRequest` | Strict action-specific leave/connect/disconnect payload admission. Actual deployed Next.js request serialisation remains to be verified. |
+| `tooling/release/e2e/xero-provider-oracle.ts`, `readIndependentAuLeave` | Independent raw AU assertions and authorised reads through resolver/deadline/`xeroFetch`, without using the production status mapper as oracle. |
+| `tooling/release/e2e/xero-independent-snapshot-cli.ts`, `xero-import-observer.ts` and `xero-publication-probe.ts` | Scoped action-aware observations, exact initial-import identities and actual publication before/after helpers exist. Their units do not certify a campaign. The ordinary legacy provider observer remains outside this lane. |
+| `tooling/release/e2e/global.teardown.ts` | Uses `reconcileReleaseTeardown`; do not restore the obsolete pre-cleanup assertion path. |
+| `tooling/release/xero-e2e.config.ts` and `e2e/fixture.ts` | Execution needs runner context; one worker, no retries, 15-minute test timeout and no OAuth capture. Discovery includes all five specs; role environment validation runs inside `useRole` before creating a context. |
 
-| ID | Finding | Category | Impact | Effort | Fix risk | Confidence | Evidence |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| R1 | Parent cleanup can overwrite child-written mutation intents | Correctness/security | Once execution is enabled, the parent can reconcile an empty/stale ledger and delete local recovery state or release the fence without observing child mutations | M | HIGH: cleanup ownership | HIGH | `run-xero-e2e.ts:228-234,278-285`; `e2e/xero-browser-case.ts:346-373`; `xero-ledger.ts:330-334` |
-| R2 | Operational campaign adapters are absent | Tests/architecture | Valid manifests and credentials cannot activate the CLI; worker admission, real fixture/cleanup adapters, non-UI receipt production and scheduled X08 execution still need implementation | L | HIGH: provider/worker isolation | HIGH | `run-xero-e2e.ts:82-104`; `xero-execution-guard.ts:216-224`; `e2e/xero-browser-case.ts:104-117,211-214,498-545`; `e2e/xero-browser-fixtures.ts:102-110` |
-| R3 | Lifecycle proof cannot reach the runner report | Tests | `collect()` returns only scenarios; even otherwise complete execution cannot satisfy the 40-case lifecycle gate through the production runner | M | MED: false-positive reporting | HIGH | `run-xero-e2e.ts:82-89,270`; `xero-report.ts:572-581` |
-| R5 | Offline renderer can exit 0 when neither report was written | Correctness/DX | An all-PASS input retains exit 0 after both output attempts fail, violating the required report-delivery contract | S | LOW | HIGH | `xero-report.ts:760-776`; compare runner fallback `run-xero-e2e.ts:315-320` |
-| R6 | Connection requests use the leave-action payload validator | Correctness/tests | Connect and disconnect calls are rejected because the harness requires a `recordId` and rejects actual connection fields | M | MED: protected request admission | HIGH | `e2e/xero-browser-mutation-scope.ts:67-80`; `apps/app/app/(authenticated)/settings/integrations/xero/xero-client.tsx:51-84` |
-| R7 | Dispatched no-effect actions have no verified cleanup disposition | Correctness/tests | Cancelled, denied or approved local-only actions remain unresolved because the observer must return exactly one remote effect | M | MED: proving absence | HIGH | `e2e/xero-browser-case.ts:365-373`; `xero-ledger.ts:283-286,343-357`; existing test sets `definite-non-attempt` directly rather than exercising a producer |
-| R4 | Completion, preflight and discovery wording overstated the implemented capability | Docs/DX | Executors could repeat completed work, treat local preflight as deployment validation, or count 97 discovered tests as campaign execution | S | LOW | HIGH | `run-xero-e2e.ts:208-223`; `xero-e2e.config.ts:37-62`; historical reconciliation `:89-91` |
+| Finding | Current disposition | Remaining boundary |
+| --- | --- | --- |
+| R1, durable child state/recovery | Fixed and regression-tested, merged runtime `5d5889c` | Real lease must independently establish prior writer closure and owned worker drain. |
+| R2, operational campaign adapters | TODO | Actual worker admission, fixture/cleanup adapters, producers and scheduled X08 execution. |
+| R3, runner lifecycle collection | Contract implemented and tested | Wire the existing action/terminal collector to actual per-case producers. |
+| R4, overstated completion/discovery/preflight wording | Reconciled to the merged source in this plan verification | No discovery/preflight or aggregate suite becomes campaign PASS. |
+| R5, report delivery success after write failure | Fixed and regression-tested | Retain nonzero delivery failure semantics in future changes. |
+| R6, connection payload validation | Fixed and regression-tested | Obtain actual deployed request serialisation proof under scoped authority. |
+| R7, no-effect disposition | Strict causal ingestion/ledger contract implemented and tested | Actual dispatch-audit producer and approved no-call cases remain unverified. |
+| Follow-up nine defect groups | Fixed and independently reviewed at `5d5889c` | Preserve conservative recovery, exact identity, receipt validation and terminal failure retention. |
 
-R1 is dormant behind default execution refusal. Keep that refusal until the correction and
-runtime prerequisite are proven. R4 is corrected in this revision; R1-R3 and R5-R7 remain implementation
-work. This review makes no source fix.
-
-Load-bearing current excerpts:
+Current load-bearing excerpts:
 
 ```typescript
-// tooling/release/run-xero-e2e.ts:102-104
+// tooling/release/run-xero-e2e.ts:265-269
 const defaultDependencies: XeroRunnerDependencies = {
   acquire: () =>
     Promise.reject(new Error(currentXeroWorkerCapability().reason)),
+  browser: spawnXeroBrowser,
 ```
 
 ```typescript
-// tooling/release/run-xero-e2e.ts:278-285
-if (lease && ledger && ledgerPath && authority) {
-  try {
-    const cleanup = await reconcileXeroLedger(
-      ledgerPath,
-      ledger,
-      lease.cleanup,
-      authority
-    );
+// tooling/release/xero-ledger.ts:502-503
+// The browser and worker writers are now closed. Never persist the parent's stale snapshot.
+const ledger = readXeroLedger(path, authority);
 ```
 
-The browser separately calls `readXeroLedger`, `recordXeroIntent` and `dispatchXeroIntent`.
-`reconcileXeroLedger` subsequently persists the parent's supplied object immediately after
-drain. Reloading durable child state after all writers stop is therefore a safety requirement.
+`reconcileXeroLedger` validates authority and drains owned workers before this durable read.
+The runner separately requires proven browser-writer closure. Preserve both checks; neither
+an old parent snapshot nor a drained worker alone proves safe cleanup.
 
 ## Scope and execution ownership
 
-This review edits only this plan and its row/notes in `plans/README.md`.
+This verification edits only this plan, its prerequisite/review records and `plans/README.md`.
 
 A later Plan 160 executor may modify these existing harness files and their co-located tests:
 
 - `tooling/release/{run-xero-e2e,xero-ledger,xero-observations,xero-report,xero-evidence,xero-execution-guard,xero-execution-manifest-store,xero-source-integrity,xero-scenarios,xero-e2e.config}.ts`.
 - `tooling/release/e2e/{xero-browser-case,xero-browser-fixtures,xero-browser-mutation-scope,xero-provider-oracle,xero-import-observer,xero-publication-probe,xero-readonly-assertions}.ts`.
 - `tooling/release/e2e/{xero-independent-snapshot-cli,xero-import-observer-cli,xero-browser-scope-cli}.ts` and the five existing `xero-*.spec.ts` files matched by the dedicated config.
-- New `tooling/release/xero-execution-adapter.ts` and `.test.ts` for the lease implementation,
-  plus `xero-campaign-collector.ts` and `.test.ts` for receipts/lifecycle collection.
+- New `tooling/release/xero-execution-adapter.ts` and `.test.ts` for the lease implementation;
+  extend the existing `xero-campaign-collector.ts` and `.test.ts` only where actual producers
+  require it. Do not recreate the collector.
 - Additive changes to `tooling/release/{consumer-isolation,active-run-registry,database-guard}.ts`
   and tests only where the reviewed runtime contract requires them. Preserve version 1's
   all-consumers-paused/strict-empty behaviour and foreign-mode rejection.
@@ -248,7 +249,7 @@ advisor owns review/index updates.
 
 ## Commands and verification policy
 
-For a fresh executor checkout, `bun install --frozen-lockfile` should resolve declared
+For a fresh executor checkout, `bun --no-env-file install --frozen-lockfile` should resolve declared
 packages, including `jose`, without a lockfile edit. This review does not install packages.
 If resolution still fails after a correct install, capture the specific error and reconcile
 the environment before continuing dependent checks.
@@ -256,16 +257,16 @@ the environment before continuing dependent checks.
 | Purpose | Command | Expected result |
 | --- | --- | --- |
 | Harness units | `bun --no-env-file run test:release-tools` | Exit 0; required tests executed, no invented campaign PASS |
-| Harness types | `bun --no-env-file run typecheck:release-tools` | Exit 0 after dependency repair |
+| Harness types | `bun --no-env-file run typecheck:release-tools` | Exit 0; merged checkout already passes |
 | Lint | `bun --no-env-file run check` | Exit 0 |
 | Build before repository types | `bun --no-env-file run build -- --force`, then `bun --no-env-file run typecheck -- --force` | All uncached tasks exit 0 |
-| Repository units/boundaries | `bun --no-env-file run test -- --force`, then `bun --no-env-file run boundaries` | Exit 0 |
+| Repository units/boundaries | `bun --no-env-file run test -- --force --concurrency=1 -- --maxWorkers=1`, then `bun --no-env-file run boundaries` | Exit 0 |
 | CI integration gate | `bun run test:integration` | All registered suites pass on CI's isolated localhost PostgreSQL/Redis setup; never run this directly against Neon |
 | Protected configured-database verification | `TURBO_CONCURRENCY=1 bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-db-manifest> --evidence-dir <private-evidence-dir>` | Exact owned target, full current inventory, cleanup and fence read-back PASS; historically 27 files / 246 tests, not a fixed future count |
-| Read-only discovery | `TC_XERO_DISCOVERY=1 bun --no-env-file ./node_modules/@playwright/test/cli.js test --config tooling/release/xero-e2e.config.ts --list` | Current inventory: 97 tests in 3 files, comprising 92 suffixes and 5 intent guards; no scenario executed |
+| Read-only discovery | `TC_XERO_DISCOVERY=1 bun --no-env-file ./node_modules/@playwright/test/cli.js test --config tooling/release/xero-e2e.config.ts --list` | Merged inventory: 110 tests in 5 files, comprising 92 suffixes and 18 auxiliary guards; no scenario executed |
 | Local manifest/source preflight | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <private-xero-manifest> --preflight` | Exit 2, both reports; validates local manifest/source/config import only. Does not read durable authority, verify deployments, acquire workers or prove fixture readiness |
-| Full campaign, after Steps 1-5 | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <private-xero-manifest> --output tooling/release/test-results/<run-id>` | Exit 0 only all required proof PASS; 1 FAIL; 2 incomplete/NOT VERIFIED. Current default adapter refuses execution |
-| Recovery, after Steps 1-5 | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <same-private-xero-manifest> --recover --output tooling/release/test-results/<same-run-id>` | Cleanup/report only, no create replay; current default adapter also refuses recovery |
+| Full campaign, after remaining Steps 3-5 | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <private-xero-manifest> --output tooling/release/test-results/<run-id>` | Exit 0 only all required proof PASS; 1 FAIL; 2 incomplete/NOT VERIFIED. Current default adapter refuses execution |
+| Recovery, after remaining Steps 3-5 | `bun --no-env-file ./tooling/release/run-xero-e2e.ts --manifest <same-private-xero-manifest> --recover --output tooling/release/test-results/<same-run-id>` | Cleanup/report only, no create replay; current default adapter also refuses recovery |
 | Offline renderer | `bun --no-env-file ./tooling/release/xero-report.ts --input <saved-sanitised-json> --output reports/xero-e2e` | Reproduces evidence verdict and exit code; no credentials required. Use a copy in an isolated checkout when preserving original reports |
 | Private output / whitespace | `git check-ignore -v tooling/release/test-results/probe.json` and `git diff --check` | Matching ignore rule and exit 0 |
 
@@ -282,99 +283,59 @@ disabled. The renderer's `--output reports/xero-e2e` deliberately contains only 
 reports and is not the private runner output. Never commit tokens, raw payroll, cookies,
 storage state, headers or capability URLs.
 
-This review's bounded test command, with file-writing tests deliberately excluded:
+## Step 1: Verify and preserve the completed durable recovery contract
 
-```bash
-bun --no-env-file ./node_modules/vitest/vitest.mjs run --config tooling/release/vitest.config.ts tooling/release/xero-report.test.ts tooling/release/e2e/xero-provider-oracle.test.ts tooling/release/e2e/xero-import-observer.test.ts --testNamePattern '^(?!.*(?:saved JSON|offline rerender|standalone renderer)).*$'
-```
+Implemented, tested and merged at `5d5889c`. This is a preservation gate before integrating
+new operational adapters, not an instruction to repeat the fixes.
 
-## Step 1: Preserve durable child intents through teardown and recovery
+Preserve authoritative durable reads after browser closure/worker drain, strict no-effect
+proofs, changed-target rejection and sibling retention after asynchronous observation.
+Unknown or forced writer closure retains the fence. Same-run recovery requires fresh
+independent proof with exact candidate/run, `closed: true`, observation time within the
+current invocation and a hashed reference. Missing proof or a fixture-verification failure
+cannot permit local deletion or release. Legacy unproven no-effect labels remain unsafe.
 
-Independent source work; do this before enabling a real execution lease.
-
-1. In `run-xero-e2e.ts` and `xero-ledger.ts`, make the persisted ledger authoritative
-   after browser execution. Quiesce the child and its mutation writers, drain/fence owned
-   workers, then read and validate the latest ledger before any persist/reconciliation.
-   Do not overwrite durable intent with the pre-browser snapshot. Preserve entry identity,
-   authority hash, mutation budgets and uncertain outcome state.
-2. Handle child error/nonzero exit and SIGINT/SIGTERM without entering cleanup while the
-   child can still mutate. Await actual child closure or record unresolved shutdown; a
-   spawn error/abort notification alone is not proof of closure. Bound the wait. If closure
-   or durable read cannot be verified, retain the fence and recovery evidence.
-3. Preserve safe independent observation/outside-owned checks on failure. Missing, corrupt
-   or mismatched ledgers must never become a new empty ledger. New runs refuse an existing
-   ledger; recovery must use the same run/candidate/authority without replaying creates.
-4. Add a runner-level regression in `run-xero-e2e.test.ts`: the injected browser loads a
-   separate ledger object, durably writes and dispatches an intent, then succeeds, fails or
-   is interrupted. Teardown must observe that intent and keep unresolved outcomes; neither
-   local deletion nor fence release may run while the effect is uncertain. Test malformed
-   child state, delayed child closure and repeated recovery. Use `xero-ledger.test.ts`'s
-   authority fixtures and cleanup-hook spies; do not test only a shared in-memory object.
-
-5. Address R7 with a typed, independently verified no-effect outcome in the observer/ledger
-   contract. Include exact action, scope, observation time and causal non-dispatch/rejection
-   evidence. An empty query, expired credentials or a timed-out create cannot prove absence.
-   Distinguish definite non-attempt from a dispatched but proven no-effect action and preserve
-   mutation-budget semantics. Test valid cancellation/denial/local-only disposition separately
-   from uncertain accepted-create refusal; do not patch the ledger to a safe label by hand.
+Existing regressions in `run-xero-e2e.test.ts` and `xero-ledger.test.ts` cover separate
+child-written state, normal/error/interrupted teardown, uncertain outcomes, changed durable
+state, missing/corrupt/foreign authority and recovery closure. Add adapter-specific regressions
+in Step 4 without replacing this contract or replaying creates.
 
 **Verify:** `bun --no-env-file run test:release-tools -- tooling/release/run-xero-e2e.test.ts tooling/release/xero-ledger.test.ts`
-and `bun --no-env-file run typecheck:release-tools` exit 0. The new cross-process-state
-regression must fail on the old implementation and pass on the correction. Default live
-admission remains denied, including when all local manifest fields are valid.
+and `bun --no-env-file run typecheck:release-tools` exit 0 in a credential-free environment.
+Current default live admission stays denied until the concrete operational contract is proved.
 
-## Step 2: Complete scenario and lifecycle evidence collection contracts
+## Step 2: Verify and reuse the completed collection/report contracts
 
-This source work can proceed with controlled test doubles before live infrastructure exists.
+Implemented, tested and merged at `5d5889c`. `collectXeroCampaign` already validates scenario
+and lifecycle observations using the existing charter schema and shared assertion validator.
+`XeroExecutionLease.collect` accepts `actions` or `terminal`, prior collection and the actual
+terminal start. The runner collects action evidence while mappings exist, reconciles cleanup,
+then collects/merges terminal X26 and lifecycle cleanup evidence. Recovery retains earlier
+action proof and never turns terminal cleanup into a replayed scenario run.
 
-1. Add `xero-campaign-collector.ts`. Collect fresh per-subcase observation files through
-   the existing strict schemas and `ingestXeroLayerReceipt` / `validateXeroCollectedObservations`.
-   Missing files produce explicit NOT VERIFIED rows. Reject unknown/duplicate IDs, stale
-   run/candidate/scope, wrong mode, queued-only outcomes and mismatched artefact hashes.
-2. Extend `XeroExecutionLease.collect` and runner assignment to carry scenarios plus
-   `lifecycleInput` and `lifecycleRunId`, with a typed validated result. Integrate existing
-   `buildXeroEvidence`; do not invent a second charter schema. Capture all 40 cases and
-   required levels, target fingerprints, assertion timestamps, ownership and cleanup refs.
-   Its status spelling is `NOT_VERIFIED`; scenario/report status is `NOT VERIFIED`.
-   Split collection into pre-cleanup action evidence and post-cleanup terminal evidence.
-   The current runner collects at `run-xero-e2e.ts:270`, before reconciliation at `:280`
-   and terminal cleanup at `:286`. Persist provider/operation/database/UI observations while
-   their mappings still exist; then collect actual cleanup receipts at each teardown stage
-   and merge X26 plus lifecycle cleanup references after teardown, before final rendering.
-   Move X26's five suffixes out of the generic pre-cleanup browser loop into this terminal
-   phase while preserving their IDs, required layers and discovery/accounting. Recovery
-   follows the same sequence, retaining original action evidence without replaying it.
-   Never reread deleted fixtures to manufacture earlier state or predict cleanup success.
-3. Preserve FAIL evidence when collection is partially unavailable. A failed required
-   assertion must not disappear into a generic missing-prerequisite diagnostic. Retain
-   usable prior observations on recovery without presenting cleanup as a new scenario run.
-4. Extend report tests with runner-to-collector integration: complete synthetic 26/92/40
-   proof reaches PASS; omitting or swapping one lifecycle run, target or candidate produces
-   non-PASS. Add an ordering regression whose cleanup writes fresh terminal receipts only
-   after action collection: X26 and lifecycle cleanup evidence must appear in the final
-   report, and a cleanup failure must override earlier passing action evidence. Assert
-   collection never needs deleted fixtures and recovery does not repeat scenario mutations.
-   Synthetic fixtures test validation only and never enter a published live report.
-5. Keep the human report actionable: sanitised expected/observed assertions, failure
-   reproduction using fixture aliases, fix owner and evidence references. Current enum-only
-   `actual`/`reason` fields remain a safe baseline; add bounded validated detail/reference
-   fields where needed. Verify referenced evidence bytes before export and preserve privacy.
+Preserve exact scope/run/candidate/time/hash/mode/phase checks, independent per-receipt
+validation, monotonic cleanup failures and retained invalid-evidence limitations. A valid
+failure survives malformed, foreign or duplicate siblings. Missing required proof remains
+NOT VERIFIED. Lifecycle status uses `NOT_VERIFIED`, scenario status uses `NOT VERIFIED`.
+Synthetic complete-catalogue tests validate this plumbing, not actual producer execution.
 
-6. Correct R5 in `reportCli`: track delivery failure independently of the evidence verdict.
-   If required output cannot be written, preserve FAIL=1 and otherwise return incomplete=2,
-   even when the evidence itself is PASS. Preserve the report and emit sanitised stderr.
-   Add an all-PASS/unwritable-output regression alongside the existing FAIL writer test;
-   verify neither required file was delivered and the CLI does not return 0.
+`reportCli` already returns nonzero when required report output fails, and emits sanitised
+fallback. `buildXeroReport` requires harness/candidate equality and reports absent lifecycle
+input as unavailable. Keep these behaviours when wiring real producers in Steps 4-5.
+Actual expected/observed details, alias-based reproduction and remediation references must
+remain bounded, validated and private where appropriate.
 
 **Verify:** `bun --no-env-file run test:release-tools` and
-`bun --no-env-file run typecheck:release-tools` exit 0. Explicitly test no parent PASS from a
-process exit, missing layer, mock LIVE receipt, aggregate database success or absent lifecycle
-input. Report-write failure preserves FAIL/nonzero and emits sanitised fallback output.
+`bun --no-env-file run typecheck:release-tools` exit 0 without service credentials. Existing
+runner/collector/report tests cover full synthetic 26/92/40/93 accounting, terminal ordering,
+wrong identity/target/time/phase, incomplete evidence and unwritable output. New producer
+work needs meaningful causal execution tests in addition to these existing contract tests.
 
 ## Step 3: Establish application and operational prerequisites
 
 These are dependencies, not permissions this document grants and not application edits within
-Plan 160. Continue Steps 1-2 while the dependent work is unavailable.
+Plan 160. Preserve Steps 1-2 and continue safe source/report work while dependent
+operational actions are unavailable.
 
 | Owner | Required handoff before dependent execution | Acceptance evidence |
 | --- | --- | --- |
@@ -412,8 +373,10 @@ Start only after the application/worker contract in Step 3 is concrete. Implemen
    E2E. If the reviewed runtime contract cannot coexist with current observer guards, stop
    dependent work and specify the missing prerequisite instead of bypassing either guard.
 3. Implement every lease member: fixture verification, fresh deployment observations,
-   guarded runner context, the collector from Step 2, remote/local cleanup hooks and
-   terminal cleanup evidence. Bind exact private fixture and role-session files; never
+   guarded runner context, the existing action/terminal collector from Step 2, remote/local
+   cleanup hooks, terminal cleanup evidence and `verifyRecoveryBrowserClosure`. The latter
+   is optional in the interface but required to admit recovery; implement strict independent
+   prior-writer proof and retain the fence when proof is unavailable. Bind exact private fixture and role-session files; never
    assume supplying `TC_XERO_CASE_FIXTURES` proves they were produced safely.
 4. Integrate `persistXeroExecutionManifest` / read-back at the correct ownership boundary;
    add read-only live admission diagnostics separately from current local `--preflight`.
@@ -439,8 +402,8 @@ fresh read-back evidence; injected adapters are not sufficient to remove the def
    locator click plus visible heading is not the complete assertion. Verify provider raw
    ID, employee/type/dates/units/status independently of production mapping and preserve
    local intent such as withdrawal separately from remote representation.
-   Address R6 in `xero-browser-mutation-scope.ts` and its tests with action-specific strict
-   payload schemas. Current production connect arguments are `{ organisationId }`; disconnect
+   Preserve the already implemented action-specific strict payload schemas in
+   `xero-browser-mutation-scope.ts` and its tests. Current production connect arguments are `{ organisationId }`; disconnect
    arguments are `{ confirmationText, connectionId, mode, organisationId }`, as observed in
    `xero-client.tsx:51-84`. Carry approved connection ID/mode/confirmation and candidate action
    identity in private scope metadata; reject wrong entity/connection/mode and unknown fields.
@@ -457,9 +420,10 @@ fresh read-back evidence; injected adapters are not sufficient to remove the def
 5. Retain X04 exact import IDs/fresh start, X24 actual before-read and X25 read-only layout
    assertions. Add tests for causal receipt timing and failure propagation. Keep denied
    requests and no-call transitions explicitly verified rather than inventing remote IDs.
-6. Reconcile discovery with all runtime projects, including recovery/receipt specs that the
-   current discovery branch omits. Preserve every registered suffix; label auxiliary guard
-   tests separately. Inventory accounting must never claim the tests executed.
+6. Preserve all-five-spec discovery, already implemented and verified as 110 tests
+   (92 registered suffixes plus 18 auxiliary guards). Reconcile inventory if producer work
+   changes it; preserve every suffix and label auxiliary tests separately. Listing tests
+   never proves they executed.
 
 **Verify:** harness units/types exit 0; discovery accounts for all 26 scenarios / 92 suffixes
 and names all runtime spec files after the change. Each scenario has an implemented driver,
@@ -661,47 +625,55 @@ not sufficient. Update the Plan 160 index row with observed results and remainin
 
 ## Completion criteria and execution ledger
 
-Source foundation completion and campaign completion are separate deliverables. The following
-are pending for the remaining implementation; historical gate checkboxes do not carry forward.
+Source foundation completion and campaign completion are separate deliverables. Checked
+items below certify the merged source slice and its recorded gates only. A future source
+change must repeat applicable checks at its new candidate; campaign prerequisites remain open.
 
-- [ ] Dependency installation repaired; current release-tool types pass without a source workaround.
-- [ ] R1 regression proves child-written durable intents survive normal/error/interrupted teardown;
-      unresolved effects cannot delete local recovery data or release ownership.
-- [ ] R5 report-output failure stays nonzero even with PASS evidence; R6 connection payloads
-      match the frozen candidate with strict scope checks; R7 no-effect proof is conservative.
-- [ ] Actual execution lease, partial-acquisition recovery and worker/runtime fencing are verified.
-- [ ] Fresh per-layer receipt producers and runner lifecycle collection are implemented and tested.
-- [ ] All 26 scenarios / 92 suffixes have executable assertions; X08 and controlled-handler work
-      are complete, with every auxiliary runtime browser spec represented in inventory.
-- [ ] Final candidate passes check, build then typecheck, test, boundaries, full release-tool
-      tests/types and the required integration gate through the appropriate protected target.
-- [ ] Applicable AU decision, implementation dependencies, fixture scope, role sessions and exact
+- [x] Frozen dependency installation repaired; main release types pass without a source workaround.
+- [x] R1 and follow-up recovery regressions preserve durable child/sibling intents and retain
+      uncertain effects or writer closure without deleting local recovery data/releasing ownership.
+- [x] R5 output failure remains nonzero; R6 strict action-specific connection validation and
+      R7 conservative causal ingestion are implemented and tested.
+- [x] Scenario/lifecycle action and terminal collection contracts are implemented and tested;
+      verified failures and invalid-evidence limitations survive duplicate/phase conflicts.
+- [x] Merged runtime `5d5889c` passes source gates and exact-source protected domain inventory;
+      post-merge checks confirm unchanged source/test bytes.
+- [x] Both actual diagnostic formats exist for the recorded attempts, with matching verdict,
+      catalogue, null unadmitted identity and byte-identical offline rendering.
+- [x] Scoped merge/review/index records distinguish source, domain, campaign and production proof.
+- [ ] Actual execution lease, partial-acquisition recovery, independent prior-writer proof and
+      worker/runtime fencing are implemented and verified under the concrete prerequisite contract.
+- [ ] Real per-layer and causal no-effect receipt producers execute every required assertion.
+- [ ] All 26 scenarios/92 suffixes have complete actual drivers; X08 and controlled handlers
+      execute with registered candidate-specific terminal proof.
+- [ ] Approved AU decision, implementation dependencies, fixture scopes, role sessions and exact
       deployed/registered revisions are evidenced before dependent execution.
-- [ ] Real campaign accounts for every case and level; all required live and controlled assertions
-      pass for an overall PASS, with no queued-only, stale, mocked-live or aggregate proof.
-- [ ] Provider/local/worker cleanup and outside-owned invariants verified; any retained history is
-      explicitly safe. Unknown outcomes remain recoverable and prevent PASS.
-- [ ] Both sanitised reports exist for every attempted run, including failure and incomplete setup;
-      verdict/counts/exit codes agree and source/report provenance is recorded.
-- [ ] Only scoped changes are present and README status distinguishes foundation, campaign and
-      production sign-off. Plan 161 charter and whole-product readiness remain separate decisions.
+- [ ] The campaign candidate passes applicable fresh gates after operational source changes.
+- [ ] Real campaign accounts for every required case/level and all live/controlled assertions pass,
+      with no queued-only, stale, mocked-live or aggregate substitution.
+- [ ] Actual provider/local/worker cleanup and outside-owned invariants are verified; retention
+      is explicitly safe and unknown outcomes remain recoverable, preventing PASS.
+- [ ] Current restore prerequisites are evidenced; a timeline/LSN reference alone is not PITR proof.
+- [ ] Both sanitised reports are produced for every subsequent attempt, including incomplete setup,
+      with truthful source/evidence provenance and derived verdict/count/exit consistency.
 
 | Deliverable | Current status |
 | --- | --- |
-| Plan review/reconciliation | Updated at `92d67c5`; scoped validation recorded below |
-| Guard/report/catalogue/observer foundation | Implemented at `5d2e57b`; current source identity confirmed |
-| Historical source and protected database verification | Recorded PASS, source-matching; not freshly rerun |
-| Current release-tool typecheck | PASS in the frozen-install executor checkout; no dependency/lockfile change |
-| R1/R5/R6 and R7 ingestion contract | APPROVED in isolated branch at `76a5dfb`; actual no-effect producer and deployed serialization proof remain missing |
-| Scenario/lifecycle collection | APPROVED provenance, failure isolation and terminal merge contracts; synthetic catalogue proof only |
-| Operational execution and evidence adapters | TODO, actual admission, full case drivers and receipt producers depend on the concrete prerequisite handoff |
-| Diagnostic report delivery | COMPLETE, fresh actual CLI JSON/Markdown and byte-identical offline rerender, exit 2; all required cases honestly NOT VERIFIED |
-| Live Xero application/browser campaign | NOT VERIFIED; no live execution performed by this review |
+| Plan verification | Reconciled against main `514efb5` and tested runtime `5d5889c`, 27 September 2026 |
+| Guard/report/catalogue/observer foundation | Implemented; preserved through merge `f3dd965` |
+| Source and protected domain verification | PASS at `5d5889c`; 505 release tests, 2,810 repository tests and 246 protected online tests, with cleanup evidence |
+| Main dependency/types and post-merge checks | PASS, frozen install without dependency/lockfile change |
+| R1/R5/R6, R7 ingestion and follow-up recovery/evidence corrections | Merged and independently approved; actual producer/deployed serialisation proof remain open |
+| Scenario/lifecycle collection contracts | Implemented and tested; real producer execution remains TODO |
+| Operational execution/evidence adapters | TODO, exact admission, full case drivers and receipt producers follow Step 3 handoff |
+| Actual diagnostic delivery | COMPLETE for recorded attempts; latest actual missing-manifest pair rerenders byte-identically, exit 2 |
+| Live Xero application/browser campaign | NOT VERIFIED; no campaign observations supplied by these gates |
+| PITR retention/restore exercise | NOT VERIFIED; fresh target reference does not establish a successful restore |
 
-A completed diagnostic report can have FAIL or NOT VERIFIED. That completes its reporting
-obligation, not this plan's full verification objective. Keep Plan 160 IN PROGRESS while its
-required implementation or campaign evidence is outstanding. Do not call the integration
-verified until all applicable PASS requirements hold.
+A diagnostic report can have FAIL or NOT VERIFIED and satisfy its reporting obligation.
+It does not complete this plan's full verification objective. Keep Plan 160 IN PROGRESS
+until required operational implementation and campaign evidence are complete. Plan 161
+charter sign-off and whole-product readiness remain separate decisions.
 
 ## Stop conditions and maintenance
 
@@ -738,7 +710,7 @@ Considered and rejected:
   recovery evidence before remote reconciliation.
 - Choosing Plan 159's AU write policy or modifying ordinary release journeys during verification.
 
-## Review result
+## Initial review result, historical
 
 Review complete at `92d67c5`. Two bounded source/evidence reviews and a fresh-context handoff
 review informed this revision. The cold review's terminal-collection ordering concern was
@@ -755,3 +727,17 @@ database, provider, authenticated browser and production configuration were not 
 This review's edits are this plan and its README record. Concurrent go-live plan/index edits
 are preserved. The immediate executable work is dependency repair and Steps 1-2; operational
 admission and dependent campaign work follow the concrete prerequisites in Step 3.
+
+
+## Current plan verification result
+
+Reviewed against main `514efb5`, whose entire source/test tree matches merged and verified
+`5d5889c`. The current implementation, drift baseline, Steps 1-2, discovery command and
+completion ledger now reflect those fixes. The prerequisite/review/index records distinguish
+initial history from the merged source. The remaining execution starts with Step 3;
+Steps 4-8 require real worker admission, receipt/case producers and the existing operational
+prerequisites. No missing authority or observation is inferred from source/domain PASS.
+
+Validation and independent review results are recorded in
+[execution review](160-execution-review.md#updated-plan-verification-27-september-2026).
+This verification changes plans only and does not repeat a database/provider campaign.
