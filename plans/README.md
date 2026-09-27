@@ -3,6 +3,23 @@
 **Status: IN PROGRESS. Production readiness is not verified by any plan in this directory.**
 Writing a plan proves nothing; only its recorded evidence does.
 
+User instruction, 27 September 2026: refer to `tasks/lessons.md` and use the
+authorised live database for all plans. This applies to subsequent execution as
+well as Plan 162 and supersedes stale localhost, Docker or disposable-database
+instructions. Refresh candidate-specific protected ownership, target, consumer
+isolation and cleanup evidence; missing safeguards are implementation work.
+Historical live results never establish a new candidate's pass.
+
+Plan 162 final pre-merge check is APPROVED under the user's subsequent commit
+and merge instruction. Fresh feed review found no blocker; the valid timed edit
+crossing Sydney's repeated hour and inclusive same-day all-day edit are corrected
+at `f95c8c3`. All fresh source gates pass, including 2,906 unit and 509 release
+tests. Exact-candidate protected live campaign `a7c995f0` passes all 254 tests,
+preserves 39 tables/386 existing rows and confirms schema, cleanup, released
+ownership and restoration of the original workers. Local merge and post-merge
+verification follow. Prior
+`4c603ded` and `146a74d` results remain historical candidate-specific evidence.
+
 Plan 160 follow-up review corrected nine vetted defect groups at `5d5889c` and is
 merged into main at `f3dd965`. Fresh checks PASS: 2,810
 repository tests, 505 harness tests, lint, build, types and boundaries; protected online
@@ -36,14 +53,29 @@ Plan 160 reviewed and reconciled on 27 September 2026 at `92d67c5`. Its runtime/
 [Review 162](162-ics-calendar-review.md) records the focused read-only review at
 `514efb5` on 27 September 2026: 12 vetted finding groups, four grounded direction
 options, and 236 passing focused tests across 33 files. No source changes or live
-client/database verification were performed. Execution-plan scope selection is pending.
+client/database verification were performed during the audit. On 27 September the user
+authorised execution of all confirmed fixes F1-F12. [Execution plan](162-execution-plan.md)
+is DONE in managed worktree `ics-calendar-fixes`, branch `codex/ics-calendar-fixes`,
+based on `43e844b`. [Independent execution review](162-execution-review.md) verifies
+final source candidate `f95c8c3`: full source gates, 2,906 units, 509 release tests
+and all 27 files/254 protected live tests PASS. The reviewed additive migration is
+applied; 22 checksums and schema equality, all 39 table hashes/386 existing rows,
+zero owned residue, released ownership and restoration of the five original
+local worker identities are verified. Earlier failures and external appends are
+retained as separate evidence. The subsequent user request authorises local
+commit/merge to main after this final review. No push or deployment is included.
+Use the already authorised online Neon database through the protected live runner for
+all database verification. This follows `tasks/lessons.md` and the user's explicit
+instruction; no localhost, Docker, disposable database or new Neon branch fallback.
+The four product direction options are not implementation scope. Actual browser,
+provider/client and PITR restore proof are not established by this correction slice.
 
-Recommended first workstreams: calendar manager authorisation; publication/cache job
+Completed workstreams: calendar manager authorisation; publication/cache job
 contracts; stable ICS identity and coherent publication versions; cache generation and
 HTTP revalidation; restored-feed token issuance and authoritative displayed URLs.
-Viewer previews and calendar date/navigation fixes follow. Publication-version design
-must precede the shared durable cache-generation implementation; HTTP revalidation,
-job corrections and the isolated UI fixes can land independently.
+Viewer previews, calendar date/navigation fixes, overlap projection and catalogue
+corrections are also complete. The durable publication/cache design was reviewed
+before implementation and additive migration deployment.
 
 Plan 159 retains calendar freshness/import ownership. Plan 160 and go-live retain
 the live publication and calendar-client campaign. Review 162 does not certify those
@@ -54,6 +86,7 @@ areas are recorded in the review.
 
 | Plan | Scope | Priority | Status |
 | --- | --- | --- | --- |
+| [162: ICS and calendar corrections](162-execution-plan.md) | All twelve confirmed feed/calendar defects and both final-check date edits | P1 | DONE: approved final source `f95c8c3`, 2,906 units / 509 release / 254 protected live tests; migration/content/cleanup and original worker restoration verified, local merge authorised |
 | [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `92d67c5` on 27 September; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | TODO |
 | [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: follow-up recovery/evidence fixes merged at `f3dd965`, tested runtime `5d5889c`; 2,810 units / 505 harness / 246 protected online tests PASS; real lease, operational drivers/producers and prerequisites remain TODO; campaign NOT VERIFIED |

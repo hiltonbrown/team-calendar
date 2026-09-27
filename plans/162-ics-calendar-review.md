@@ -2,9 +2,9 @@
 
 - Reviewed at: `514efb5`, 27 September 2026.
 - Final source drift check: HEAD advanced concurrently to `573d804` through plan-only changes. `git diff --exit-code 514efb5..573d804 -- apps packages tooling .github package.json bun.lock PRODUCT.md DESIGN.md .impeccable.md` exits 0. Reviewed runtime and test inputs are unchanged; existing Plan 160 changes were committed by another workflow, not this review.
-- Status: REVIEW COMPLETE; execution scope selection pending.
+- Status: DONE for confirmed corrections F1-F12 and both final-check date-edit fixes, independently verified at final source `f95c8c3`. The user required the existing live database for all plans. [Execution plan](162-execution-plan.md) records the contract; [execution review](162-execution-review.md) records 2,906 unit tests, 509 release tests and 254 protected live tests, full content/schema preservation, cleanup and worker restoration. Local main merge is subsequently authorised. Product direction options remain unselected.
 - Method: improve skill, standard depth, focused on feeds and calendar functionality.
-- Source changes: none. This document is an evidence-backed roadmap, not an executable implementation plan or production sign-off.
+- Original audit source changes: none. Subsequent corrections are implemented in the isolated `codex/ics-calendar-fixes` worktree. This focused review does not establish production sign-off.
 - Existing uncommitted Plan 160 and index changes were preserved.
 
 The next investment should make the existing calendar and feed journey reliable. The core exists, including signed subscription URLs, privacy projection, scope resolution, publication rows, token concurrency controls, cache handling and month/week/day surfaces. The important gaps are inconsistent authorisation, mismatched producer/consumer contracts and publication metadata that can disagree with the events actually emitted.
@@ -98,7 +98,7 @@ Reconcile calendar catalogue S-07 with the shipped route, loading/error states, 
 
 ## Recommended execution ordering
 
-The first five workstreams are recommendations awaiting selection, not five written executor plans:
+The original recommended order below informed the selected F1-F12 execution contract. All confirmed corrections are now implemented and verified:
 
 1. Calendar authorisation (F1), independent and first priority.
 2. Feed delivery jobs (F2), independent and a prerequisite for trustworthy repair/rebuild evidence.
@@ -158,5 +158,6 @@ Coverage boundaries: focused correctness/security/tests review of feeds, associa
 - [x] Focused tests and synthetic probes completed.
 - [x] Findings ranked and direction options separated.
 - [x] Scope and verification limits recorded.
-- [ ] User selects execution-plan scope.
-- [ ] Selected self-contained plans authored and indexed.
+- [x] User selects execution-plan scope: all confirmed fixes F1-F12.
+- [x] Self-contained execution contract authored and indexed.
+- [x] Executor source, live-database verification and independent final review complete at `f95c8c3`: 2,906 unit tests, 509 release tests, 254 protected live tests; migration/content/cleanup and original worker restoration verified.
