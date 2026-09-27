@@ -287,11 +287,16 @@ describe("feed services", () => {
       throw new Error(privateBody.error.message);
     }
     expect(privateBody.value.body).not.toContain("Owned Person");
-    await setCachedFeedBody({
+    const lateWrite = await setCachedFeedBody({
       body: initial.value.body,
       etag: initial.value.etag,
       key: oldKey,
       ttlSeconds: 3600,
+    });
+    expect(lateWrite.ok).toBe(true);
+    expect(await getCachedFeedBody(oldKey)).toMatchObject({
+      ok: true,
+      value: { body: initial.value.body, etag: initial.value.etag },
     });
     const revalidated = await renderFeedForToken(created.plaintext);
     expect(revalidated.ok && revalidated.value.body).toBe(

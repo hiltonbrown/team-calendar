@@ -76,15 +76,21 @@ describe("previewFeed", () => {
     mocks.personFindFirst.mockResolvedValue({ id: validPersonId });
   });
 
-  it.each(["org:viewer", "org:manager"])(
-    "resolves the active scoped identity for %s and ignores a supplied identity",
-    async (actingRole) => {
+  it.each(
+    ["org:viewer", "org:manager"].flatMap((actingRole) =>
+      [undefined, "30000000-0000-4000-8000-000000000099"].map(
+        (actingPersonId) => ({ actingPersonId, actingRole })
+      )
+    )
+  )(
+    "resolves the active scoped identity for $actingRole with caller identity $actingPersonId",
+    async ({ actingRole, actingPersonId }) => {
       mocks.feedFindFirst.mockResolvedValueOnce(mockFeedRecord);
       mocks.canViewFeed.mockResolvedValueOnce({ ok: true, value: true });
       mocks.projectFeedEvents.mockResolvedValueOnce({ ok: true, value: [] });
       const result = await previewFeed({
         ...baseInput,
-        actingPersonId: "30000000-0000-4000-8000-000000000099",
+        actingPersonId,
         actingRole,
       });
       expect(result.ok).toBe(true);
