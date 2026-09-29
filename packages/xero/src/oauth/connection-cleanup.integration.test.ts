@@ -1,5 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration suite naming.
+
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { xeroCampaignStoreCredentials } from "@repo/database/xero-campaign-store";
 import {
   afterAll,
   beforeAll,
@@ -156,7 +159,7 @@ describe("local cleanup transaction", () => {
     const fetchSpy = vi
       .fn()
       .mockRejectedValue(new Error("No provider requests authorised"));
-    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
     const result = await disconnect();
     expect(result).toMatchObject({
       ok: true,
@@ -336,7 +339,7 @@ describe("local cleanup transaction", () => {
     const fetch = vi.fn(async () =>
       Response.json({ Organisations: [{ CountryCode: "AU", Name: "Cleanup" }] })
     );
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
     return fetch;
   }
   async function changeAttempt(
@@ -489,3 +492,17 @@ describe("local cleanup transaction", () => {
     ).toMatchObject({ active_slot: 1, binding_generation: 2 });
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));
+
+const nativeFixtureFetch = globalThis.fetch;
+function fixtureProviderFetch(provider: typeof fetch): typeof fetch {
+  return (url, init) =>
+    String(url) ===
+    xeroCampaignStoreCredentials().url.replace(FIXTURE_TRAILING_SLASHES, "")
+      ? nativeFixtureFetch(url, init)
+      : provider(url, init);
+}
+
+const FIXTURE_TRAILING_SLASHES = /\/+$/;

@@ -1,3 +1,4 @@
+import { withXeroCampaignProviderEffect } from "@repo/database/xero-campaign-access";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const metricLog = vi.hoisted(() => vi.fn());
@@ -686,4 +687,45 @@ describe("transport lifecycle metrics", () => {
       );
     }
   );
+});
+
+// Transport policy tests isolate the limiter; campaign effects have dedicated protocol coverage.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignProviderEffect: vi.fn(
+    (_rateClass: unknown, operation: () => Promise<unknown>) => operation()
+  ),
+}));
+
+it("keeps the campaign effect open until a successful response body is readable", async () => {
+  const outcomes: string[] = [];
+  vi.mocked(withXeroCampaignProviderEffect).mockImplementationOnce(
+    async (_target, operation) => {
+      try {
+        const result = await operation();
+        outcomes.push("completed");
+        return result;
+      } catch (error) {
+        outcomes.push("uncertain");
+        throw error;
+      }
+    }
+  );
+  const response = new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.error(new Error("body transport failed"));
+      },
+    }),
+    { status: 200 }
+  );
+  await expect(
+    xeroFetch(
+      { maxAttempts: 1, rateClass, url: "https://api.xero.com/x" },
+      {
+        fetchImpl: vi.fn().mockResolvedValue(response),
+        limiter: permissiveLimiter(),
+      }
+    )
+  ).rejects.toThrow();
+  expect(outcomes).toEqual(["uncertain"]);
 });

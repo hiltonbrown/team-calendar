@@ -1,3 +1,5 @@
+import { withXeroCampaignProviderEffect } from "@repo/database/xero-campaign-access";
+import { XeroCampaignDeniedError } from "@repo/database/xero-campaign-contract";
 import { keys } from "../../keys";
 import { emitXeroMetric } from "../metrics";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
@@ -139,8 +141,11 @@ function canRetryError(
   retryOnAmbiguousFailure: boolean
 ): boolean {
   return (
-    !(error instanceof XeroFetchError || input.init?.signal?.aborted) &&
-    shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
+    !(
+      error instanceof XeroFetchError ||
+      error instanceof XeroCampaignDeniedError ||
+      input.init?.signal?.aborted
+    ) && shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
   );
 }
 
@@ -185,29 +190,39 @@ async function performAttempt(
     }
     signal.throwIfAborted();
     dispatched = true;
-    const fetched = await raceAbort(
-      fetchImpl(input.url, { ...input.init, redirect: "manual", signal }),
-      signal
+    return await withXeroCampaignProviderEffect(
+      {
+        ...input.rateClass,
+        method: input.init?.method ?? "GET",
+        tenantHeader: new Headers(input.init?.headers).get("Xero-Tenant-Id"),
+        url: input.url,
+      },
+      async () => {
+        const fetched = await raceAbort(
+          fetchImpl(input.url, { ...input.init, redirect: "manual", signal }),
+          signal
+        );
+        if (fetched.status >= 300 && fetched.status < 400) {
+          fetched.body?.cancel().catch(() => {
+            /* The body may already be closed. */
+          });
+          throw new XeroFetchError("redirect_rejected", true);
+        }
+        const buffered = await bufferWithRejectionEvidence(
+          fetched,
+          signal,
+          input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
+        );
+        const headers = new Headers(buffered.headers);
+        if (buffered.status !== 429) {
+          headers.delete("Retry-After");
+        }
+        if (remainingMs(deadline) > 0) {
+          await limiter.observe(input.rateClass, headers, deadline);
+        }
+        return buffered;
+      }
     );
-    if (fetched.status >= 300 && fetched.status < 400) {
-      fetched.body?.cancel().catch(() => {
-        /* The body may already be closed. */
-      });
-      throw new XeroFetchError("redirect_rejected", true);
-    }
-    const buffered = await bufferWithRejectionEvidence(
-      fetched,
-      signal,
-      input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
-    );
-    const headers = new Headers(buffered.headers);
-    if (buffered.status !== 429) {
-      headers.delete("Retry-After");
-    }
-    if (remainingMs(deadline) > 0) {
-      await limiter.observe(input.rateClass, headers, deadline);
-    }
-    return buffered;
   } catch (error) {
     if (signal.aborted) {
       // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.

@@ -4,6 +4,25 @@ Status: IN PROGRESS. This handoff records concrete runtime contracts absent from
 
 Current plan-verification baseline: main `514efb5`, 27 September 2026. Corrected harness/source candidate `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f` is merged at `f3dd965`; the entire tree outside plans, tasks and reports is unchanged from that verified candidate. The application-source review began at `d6da4e8`, with initial harness candidate `76a5dfb`; those dated results are retained below as history. Operational metadata in [execution review](160-execution-review.md) is dated evidence and must be refreshed before dependent admission.
 
+## Continuation, 29 September 2026
+
+The isolated `codex/xero-e2e-completion` branch now implements shared campaign control,
+worker dispatch/execution admission, persistence fencing and provider effect accounting.
+Observer coexistence and three real causal producer functions are implemented with
+regressions. This supersedes the corresponding source-absence observations below only
+for that isolated candidate. Full final verification is recorded in
+[the continuation review](160-completion-review.md).
+
+The default campaign remains unavailable: ordinary work already in flight before
+reservation, synchronous action/OAuth admission, intentional binding-generation
+changes, exact mutation targets, real registered-worker evidence, partial acquisition,
+independent writer closure/drain/restoration and the complete scenario drivers remain
+unresolved. The AU policy and sanctioned fixture/session questions remain pending.
+Production app/API/web are still at `42bb840`, not the continuation source; app/API
+metadata confirms missing tier/namespace/domain configuration. Full browser/provider
+execution and current PITR proof remain NOT VERIFIED. Historical evidence below retains
+its original source/date and must not be presented as this candidate's result.
+
 ## Enforced execution lease
 
 `packages/jobs/src/handlers/xero-sync-access.ts` validates Clerk/payroll organisation and binding generation. `packages/jobs/src/events.ts` carries a sync operation run identifier, not an independently admitted E2E campaign authority. `SyncXeroPeopleInputSchema` and the registered handlers do not consult the E2E execution manifest, active-run ownership or an allowed function inventory. Consequently an E2E manifest cannot enable current workers safely. `currentXeroWorkerCapability().available` remains false.

@@ -1,6 +1,15 @@
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -1881,3 +1890,6 @@ it("cancels legacy invalid-grant state racing after fake fetch without canonical
     })
   ).toEqual({ last_people_sync_at: null });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

@@ -219,3 +219,16 @@ describe("app management client", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
+
+// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignCredentialScope: (
+    _scope: unknown,
+    _tenant: string,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignProviderEffect: (
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));

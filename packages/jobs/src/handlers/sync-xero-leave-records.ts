@@ -1,3 +1,11 @@
+import {
+  assertXeroCampaignAccess,
+  currentXeroCampaignInvocation,
+  dispatchXeroCampaignChild,
+  withXeroCampaignInvocation,
+  withXeroCampaignScopedEffect,
+} from "@repo/database/xero-campaign-access";
+import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
 
 import {
@@ -54,6 +62,7 @@ const noUnresolvedSubmitOperationWhere =
 
 const SyncXeroLeaveRecordsInputSchema = z.object({
   bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -165,14 +174,30 @@ export const syncXeroLeaveRecordsFunction: InngestFunction.Any =
       id: "sync-xero-leave-records",
       triggers: { event: "sync-xero-leave-records" },
     },
-    async ({ event, step }) =>
+    async ({ event, step, runId: workerRunId }) =>
       await step.run("sync-leave-records", async () =>
-        rejectRetryableSyncResult(syncXeroLeaveRecords(event.data))
+        rejectRetryableSyncResult(syncXeroLeaveRecords(event.data, workerRunId))
       )
   );
 
+export function syncXeroLeaveRecords(
+  input: unknown,
+  workerRunId: string | null = null
+) {
+  const parsed = SyncXeroLeaveRecordsInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return Promise.resolve(validationError(parsed.error));
+  }
+  return withXeroCampaignInvocation(
+    "sync-xero-leave-records",
+    input,
+    () => syncXeroLeaveRecordsUnderCampaign(input),
+    workerRunId
+  );
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, tenant readiness, batching, publication updates and finalisation.
-export async function syncXeroLeaveRecords(
+async function syncXeroLeaveRecordsUnderCampaign(
   input: unknown
 ): Promise<SyncXeroLeaveRecordsResult> {
   const parsed = SyncXeroLeaveRecordsInputSchema.safeParse(input);
@@ -1311,17 +1336,32 @@ async function enqueueFeedRebuilds(
     return;
   }
 
-  await inngest.send(
-    uniqueFeedIds.map((feedId) => ({
-      data: {
-        clerkOrgId: context.clerkOrgId,
-        feedId,
-        organisationId: context.organisationId,
-        reason: "xero_leave_records_synced",
-      },
-      name: "rebuild-feed-cache",
-    }))
-  );
+  if (currentXeroCampaignInvocation()) {
+    for (const feedId of uniqueFeedIds) {
+      await dispatchXeroCampaignChild(
+        "rebuild-feed-cache",
+        {
+          clerkOrgId: context.clerkOrgId,
+          feedId,
+          organisationId: context.organisationId,
+          reason: "xero_leave_records_synced",
+        },
+        (event) => inngest.send(event)
+      );
+    }
+  } else {
+    await inngest.send(
+      uniqueFeedIds.map((feedId) => ({
+        data: {
+          clerkOrgId: context.clerkOrgId,
+          feedId,
+          organisationId: context.organisationId,
+          reason: "xero_leave_records_synced",
+        },
+        name: "rebuild-feed-cache",
+      }))
+    );
+  }
 }
 
 function validateLeaveRecord(
@@ -1481,21 +1521,24 @@ async function publishRunStatusChanged(
   status: string
 ) {
   try {
-    await publishOrganisationNotificationEvent(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        payload: {
+    await assertXeroCampaignAccess(context);
+    await withXeroCampaignScopedEffect(context, () =>
+      publishOrganisationNotificationEvent(
+        {
+          clerkOrgId: context.clerkOrgId,
           organisationId: context.organisationId,
-          runId,
-          runType: "leave_records",
-          status,
-          xeroTenantId: context.xeroTenantId,
         },
-        type: "sync.run_status_changed",
-      }
+        {
+          payload: {
+            organisationId: context.organisationId,
+            runId,
+            runType: "leave_records",
+            status,
+            xeroTenantId: context.xeroTenantId,
+          },
+          type: "sync.run_status_changed",
+        }
+      )
     );
   } catch (error) {
     if (

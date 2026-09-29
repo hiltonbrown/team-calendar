@@ -1,3 +1,9 @@
+import {
+  assertXeroCampaignAccess,
+  withXeroCampaignInvocation,
+  withXeroCampaignScopedEffect,
+} from "@repo/database/xero-campaign-access";
+import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
 
 import type { Result } from "@repo/core";
@@ -31,6 +37,7 @@ import {
 
 const SyncXeroLeaveBalancesInputSchema = z.object({
   bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -103,14 +110,32 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
       id: "sync-xero-leave-balances",
       triggers: { event: "sync-xero-leave-balances" },
     },
-    async ({ event, step }) =>
+    async ({ event, step, runId: workerRunId }) =>
       await step.run("sync-leave-balances", async () =>
-        rejectRetryableSyncResult(syncXeroLeaveBalances(event.data))
+        rejectRetryableSyncResult(
+          syncXeroLeaveBalances(event.data, workerRunId)
+        )
       )
   );
 
+export function syncXeroLeaveBalances(
+  input: unknown,
+  workerRunId: string | null = null
+) {
+  const parsed = SyncXeroLeaveBalancesInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return Promise.resolve(validationError(parsed.error));
+  }
+  return withXeroCampaignInvocation(
+    "sync-xero-leave-balances",
+    input,
+    () => syncXeroLeaveBalancesUnderCampaign(input),
+    workerRunId
+  );
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates balance sync paging, cursor compare-and-swap, and lifecycle updates.
-export async function syncXeroLeaveBalances(
+async function syncXeroLeaveBalancesUnderCampaign(
   input: unknown
 ): Promise<SyncXeroLeaveBalancesResult> {
   const parsed = SyncXeroLeaveBalancesInputSchema.safeParse(input);
@@ -797,21 +822,24 @@ async function publishRunStatusChanged(
   status: "cancelled" | "failed" | "partial_success" | "running" | "succeeded"
 ) {
   try {
-    await publishOrganisationNotificationEvent(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        payload: {
+    await assertXeroCampaignAccess(context);
+    await withXeroCampaignScopedEffect(context, () =>
+      publishOrganisationNotificationEvent(
+        {
+          clerkOrgId: context.clerkOrgId,
           organisationId: context.organisationId,
-          runId,
-          runType: "leave_balances",
-          status,
-          xeroTenantId: context.xeroTenantId,
         },
-        type: "sync.run_status_changed",
-      }
+        {
+          payload: {
+            organisationId: context.organisationId,
+            runId,
+            runType: "leave_balances",
+            status,
+            xeroTenantId: context.xeroTenantId,
+          },
+          type: "sync.run_status_changed",
+        }
+      )
     );
   } catch (error) {
     if (

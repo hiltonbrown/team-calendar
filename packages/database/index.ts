@@ -18,3 +18,5 @@ export {
   scopedQuery,
   scopedTo,
 } from "./src/tenant-query";
+export { withDatabaseWriteGuard } from "./src/write-guard";
+export { lockXeroCampaign } from "./src/xero-campaign-lock";

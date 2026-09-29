@@ -185,3 +185,26 @@ it("cancels deferred projection when binding generation changed after canonical 
   ).rejects.toBeInstanceOf(XeroBindingChangedError);
   expect(effect).not.toHaveBeenCalled();
 });
+
+// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
+  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
+  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
+  currentXeroCampaignInvocation: vi.fn(() => undefined),
+  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
+  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
+  withXeroCampaignInvocation: vi.fn(
+    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+  withXeroCampaignScopedEffect: (
+    _scope: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignScopedInvocation: vi.fn(
+    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
+}));

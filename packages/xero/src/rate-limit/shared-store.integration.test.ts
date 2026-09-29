@@ -2,6 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import {
   deleteSharedStoreFixtureKeys,
   sharedStoreFixtureEpoch,
@@ -382,3 +383,6 @@ describe("owned Redis sentinel integrity", () => {
     });
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

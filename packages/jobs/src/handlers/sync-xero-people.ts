@@ -1,3 +1,9 @@
+import {
+  assertXeroCampaignAccess,
+  withXeroCampaignInvocation,
+  withXeroCampaignScopedEffect,
+} from "@repo/database/xero-campaign-access";
+import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
 
 import type { Result } from "@repo/core";
@@ -28,6 +34,7 @@ import {
 
 const SyncXeroPeopleInputSchema = z.object({
   bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
@@ -65,14 +72,30 @@ export const syncXeroPeopleFunction: InngestFunction.Any =
       id: "sync-xero-people",
       triggers: { event: "sync-xero-people" },
     },
-    async ({ event, step }) =>
+    async ({ event, step, runId: workerRunId }) =>
       await step.run("sync-people", async () =>
-        rejectRetryableSyncResult(syncXeroPeople(event.data))
+        rejectRetryableSyncResult(syncXeroPeople(event.data, workerRunId))
       )
   );
 
+export function syncXeroPeople(
+  input: unknown,
+  workerRunId: string | null = null
+) {
+  const parsed = SyncXeroPeopleInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return Promise.resolve(validationError(parsed.error));
+  }
+  return withXeroCampaignInvocation(
+    "sync-xero-people",
+    input,
+    () => syncXeroPeopleUnderCampaign(input),
+    workerRunId
+  );
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, tenant readiness, batching, per-record outcomes and finalisation.
-export async function syncXeroPeople(input: unknown): Promise<
+async function syncXeroPeopleUnderCampaign(input: unknown): Promise<
   Result<
     {
       fetched: number;
@@ -718,21 +741,24 @@ async function publishRunStatusChanged(
   status: string
 ) {
   try {
-    await publishOrganisationNotificationEvent(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        payload: {
+    await assertXeroCampaignAccess(context);
+    await withXeroCampaignScopedEffect(context, () =>
+      publishOrganisationNotificationEvent(
+        {
+          clerkOrgId: context.clerkOrgId,
           organisationId: context.organisationId,
-          runId,
-          runType: "people",
-          status,
-          xeroTenantId: context.xeroTenantId,
         },
-        type: "sync.run_status_changed",
-      }
+        {
+          payload: {
+            organisationId: context.organisationId,
+            runId,
+            runType: "people",
+            status,
+            xeroTenantId: context.xeroTenantId,
+          },
+          type: "sync.run_status_changed",
+        }
+      )
     );
   } catch (error) {
     if (

@@ -1,5 +1,6 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository convention.
 import { database } from "@repo/database";
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { listResolvedXeroCleanupRequests } from "@repo/database/queries/xero-cleanup";
 import {
@@ -7,7 +8,15 @@ import {
   reissueXeroCleanupAttempt,
   retireResolvedCleanupRequest,
 } from "@repo/xero";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 vi.mock("server-only", () => ({}));
 const management = vi.hoisted(() => ({
@@ -487,3 +496,6 @@ describe("fenced Xero cleanup worker", () => {
     expect(retired.binding_generation).toBe(input.binding.binding_generation);
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

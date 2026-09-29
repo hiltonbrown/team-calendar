@@ -61,6 +61,26 @@ describe("independent raw AU provider oracle", () => {
     expect(rawProviderDate("/Date(0+0000)/")).toBe("1970-01-01");
     expect(() => rawProviderDate("invalid")).toThrow();
   });
+  it("awaits rejected asynchronous authority before configuration or provider access", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    try {
+      await expect(
+        readIndependentAuLeave({
+          assertAuthority: () => Promise.reject(new Error("authority revoked")),
+          bindingGeneration: 1,
+          clerkOrgId: "org-owned",
+          expectedTenantId: "owned",
+          organisationId: "owned",
+          providerAppId: "owned",
+          remoteId: null,
+        })
+      ).rejects.toThrow("authority revoked");
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it("LIVE never uses the NODE_ENV=test in-memory rate fallback when shared configuration is missing", async () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("KV_REST_API_URL", "");

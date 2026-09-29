@@ -1,4 +1,5 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration suite naming.
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
   afterAll,
@@ -249,3 +250,6 @@ describe("owned report-only inactivity persistence", () => {
     });
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

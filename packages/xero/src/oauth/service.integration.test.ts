@@ -1,6 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository's .integration.test.ts convention.
 
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { xeroCampaignStoreCredentials } from "@repo/database/xero-campaign-store";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
@@ -124,7 +126,7 @@ describe("ensureFreshXeroConnection integration", () => {
         }
       )
     );
-    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
 
     const result = await ensureFreshXeroConnection({
       clerkOrgId: fixture.clerkOrgId,
@@ -217,7 +219,7 @@ describe("ensureFreshXeroConnection integration", () => {
         { headers: { "content-type": "application/json" }, status: 200 }
       )
     );
-    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
 
     const results = await Promise.all([
       ensureFreshXeroConnection({
@@ -299,16 +301,18 @@ describe("ensureFreshXeroConnection integration", () => {
     });
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockImplementation(
-        async () =>
-          new Response(
-            JSON.stringify({
-              Organisations: [
-                { CountryCode: "AU", Name: "Integration Payroll" },
-              ],
-            }),
-            { headers: { "content-type": "application/json" }, status: 200 }
-          )
+      fixtureProviderFetch(
+        vi.fn().mockImplementation(
+          async () =>
+            new Response(
+              JSON.stringify({
+                Organisations: [
+                  { CountryCode: "AU", Name: "Integration Payroll" },
+                ],
+              }),
+              { headers: { "content-type": "application/json" }, status: 200 }
+            )
+        )
       )
     );
     const input = {
@@ -433,7 +437,7 @@ describe("ensureFreshXeroConnection integration", () => {
     const fetchSpy = vi
       .fn()
       .mockRejectedValue(new Error("No provider request is authorised"));
-    vi.stubGlobal("fetch", fetchSpy);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
     const input = {
       clerkOrgId: fixture.clerkOrgId,
       connectionId: fixture.connectionId,
@@ -862,10 +866,12 @@ async function createSelectionSession(
 function stubAustralianPayroll() {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue(
-      Response.json({
-        Organisations: [{ CountryCode: "AU", Name: "Integration Payroll" }],
-      })
+    fixtureProviderFetch(
+      vi.fn().mockResolvedValue(
+        Response.json({
+          Organisations: [{ CountryCode: "AU", Name: "Integration Payroll" }],
+        })
+      )
     )
   );
 }
@@ -887,3 +893,17 @@ function configureVersionTwo() {
     JSON.stringify({ "2": Buffer.alloc(32, 8).toString("base64") })
   );
 }
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(allocation));
+
+const nativeFixtureFetch = globalThis.fetch;
+function fixtureProviderFetch(provider: typeof fetch): typeof fetch {
+  return (url, init) =>
+    String(url) ===
+    xeroCampaignStoreCredentials().url.replace(FIXTURE_TRAILING_SLASHES, "")
+      ? nativeFixtureFetch(url, init)
+      : provider(url, init);
+}
+
+const FIXTURE_TRAILING_SLASHES = /\/+$/;

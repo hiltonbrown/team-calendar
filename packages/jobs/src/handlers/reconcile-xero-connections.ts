@@ -1,3 +1,7 @@
+import {
+  withXeroCampaignScopedInvocation,
+  xeroCampaignAllowsOrdinaryMaintenance,
+} from "@repo/database/xero-campaign-access";
 import "server-only";
 import {
   getOldestUnknownXeroCleanupUpdatedAt,
@@ -16,6 +20,9 @@ export async function reconcileXeroConnections(): Promise<{
   processed: number;
   failed: number;
 }> {
+  if (!(await xeroCampaignAllowsOrdinaryMaintenance())) {
+    return { failed: 0, processed: 0 };
+  }
   const attempts = await listDueXeroCleanupAttempts({
     limit: 50,
     now: new Date(),
@@ -24,7 +31,11 @@ export async function reconcileXeroConnections(): Promise<{
   let failed = 0;
   for (const attempt of attempts) {
     try {
-      await processXeroCleanupAttempt(attempt);
+      await withXeroCampaignScopedInvocation(
+        "reconcile-xero-connections",
+        attempt,
+        () => processXeroCleanupAttempt(attempt)
+      );
       processed += 1;
     } catch {
       failed += 1;
@@ -38,7 +49,11 @@ export async function reconcileXeroConnections(): Promise<{
   const resolved = await listResolvedXeroCleanupRequests({ limit: 50 });
   for (const request of resolved) {
     try {
-      await retireResolvedCleanupRequest(request);
+      await withXeroCampaignScopedInvocation(
+        "reconcile-xero-connections",
+        request,
+        () => retireResolvedCleanupRequest(request)
+      );
       processed += 1;
     } catch {
       failed += 1;
@@ -55,6 +70,9 @@ export const reconcileXeroConnectionsFunction = inngest.createFunction(
     triggers: { cron: "*/15 * * * *" },
   },
   async ({ step }) => {
+    if (!(await xeroCampaignAllowsOrdinaryMaintenance())) {
+      return { failed: 0, processed: 0 };
+    }
     const attempts = await step.run("list-due-xero-cleanup", () =>
       listDueXeroCleanupAttempts({ limit: 50, now: new Date() })
     );
@@ -63,7 +81,11 @@ export const reconcileXeroConnectionsFunction = inngest.createFunction(
     for (const attempt of attempts) {
       try {
         await step.run(`cleanup-${attempt.attemptId}`, () =>
-          processXeroCleanupAttempt(attempt)
+          withXeroCampaignScopedInvocation(
+            "reconcile-xero-connections",
+            attempt,
+            () => processXeroCleanupAttempt(attempt)
+          )
         );
         processed += 1;
       } catch {
@@ -81,7 +103,11 @@ export const reconcileXeroConnectionsFunction = inngest.createFunction(
     for (const request of resolved) {
       try {
         await step.run(`retire-cleanup-${request.requestId}`, () =>
-          retireResolvedCleanupRequest(request)
+          withXeroCampaignScopedInvocation(
+            "reconcile-xero-connections",
+            request,
+            () => retireResolvedCleanupRequest(request)
+          )
         );
         processed += 1;
       } catch {

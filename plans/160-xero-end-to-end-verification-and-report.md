@@ -1,5 +1,74 @@
 # Plan 160: Verify the complete Xero integration and publish an evidence report
 
+## Completion continuation, 29 September 2026
+
+User instruction: complete execution and read all lessons. Current baseline is main
+`42bb840`; all of `tasks/lessons.md` has been read. Existing Steps 1-2 fixes are
+preservation gates. Implementation runs in `/tmp/tc-plan160-complete-20260929`, branch
+`codex/xero-e2e-completion`, with independent review and candidate-specific verification.
+The existing protected online Neon target is authorised; no local or new database fallback.
+
+- [x] Read lessons, current plan, prior execution and runtime prerequisite handoff.
+- [x] Refresh real deployment/configuration, worker, fixture and database prerequisites; record missing handoffs.
+- [ ] Implement remaining operational receipt producers and admission/lease contracts.
+- [ ] Resolve the concrete application worker-fencing prerequisite with tests, preserving ordinary isolation.
+- [ ] Verify the frozen candidate through source gates and the protected online inventory.
+- [ ] Execute all admitted scenarios, reconcile effects and publish both reports.
+- [ ] Independently review source/evidence and reconcile completion status honestly.
+
+Scoped prerequisite work needed by this execution must be made concrete before coding.
+The initial independent source unit is `tooling/release/xero-observation-producers.ts`
+and its co-located tests, plus existing observer/collector files only where integration
+requires them. It must produce causal observations from actual queries/handler outcomes,
+never fill missing proof with labels. Source review identified a prerequisite runtime slice:
+`packages/database/src/xero-campaign-*`, the database campaign advisory-lock helper, both
+Inngest dispatchers, the four Xero handlers and their binding-access helper, scheduler
+and credential maintenance, plus affected downstream guards. The observer slice owns
+`tooling/release/xero-observer-authority.ts`, the three observer/scope CLIs and awaited
+provider-oracle authority. These changes must preserve existing binding controls, deny
+reserved resources without exact campaign admission, and retain unavailable capability
+until browser actions, drain and recovery are enforced. No new database is authorised.
+The AU transition decision is pending an asynchronous user question; no payroll
+policy is selected by this continuation. Existing provider fixture authority will be
+verified from protected records; customer identities are not borrowed for tests.
+
+
+### Fresh prerequisite observations, 29 September 2026
+
+Read-only Vercel metadata confirms app/API/web production deployments are READY at
+`42bb8405dc3b84049080a50fb580fa3bc576fcbe`. All nine environment pulls succeeded.
+All six app/API database URLs have the same private fingerprint; environment names
+therefore do not establish isolation. No `TC_XERO*` campaign configuration was found.
+App/API metadata and pulls still lack `XERO_APP_TIER`, `XERO_RATE_NAMESPACE_EPOCH`
+and `XERO_CREDENTIAL_DOMAIN_ID`. Sensitive download blanks were not treated as
+absence evidence.
+
+Read-only SQL confirms the existing authorised Neon project `soft-dream-28768887`,
+branch `br-frosty-union-a7sc6dl7`, endpoint `ep-cold-pond-a7ar2epd`, database `neondb`,
+role `neondb_owner`, and 22 applied migrations. The `release:active-run` key is empty.
+There is one pre-existing non-release-prefixed scheduled `leave_balances` SyncRun
+with status `running`, started and last updated at 27 September 2026 00:04 UTC.
+It has not been altered or adopted as a campaign fixture. Fresh production Inngest
+reads return HTTP 200, one environment, and app/run envelopes with no data collection;
+this establishes neither candidate registration nor a terminal result for that SQL row.
+At the read-only prerequisite assessment, no live integration mutation or Xero operation had been performed. Subsequent exact-candidate integration evidence is recorded in the continuation review.
+
+The generic campaign infrastructure belongs in `packages/database/src/xero-campaign-*`
+to avoid an availability-to-Xero dependency cycle; provider request enforcement stays in
+`packages/xero`. A provider-neutral `packages/database/src/write-guard.ts` gives each
+mutation/interactive transaction fresh authority and a shared advisory lock. It preserves
+separate provider calls and durable local transitions rather than spanning an entire
+remote operation with a database transaction. Application action ticket targets and
+intentional connect/disconnect generation changes remain to be resolved before browser
+mutation admission is enabled.
+
+
+The continuation implements worker/provider admission, guarded persistence, observer
+authority, three causal observation producers and manifest-owned integration fixtures.
+The real browser/OAuth admission and deployment/drain prerequisites remain unresolved;
+`currentXeroWorkerCapability()` deliberately remains unavailable. See the
+[continuation review](160-completion-review.md) for exact verification and remaining work.
+
 ## Follow-up verification and authorised integration, 27 September 2026
 
 The user requested another error and oversight pass, fixes, then commit and merge to

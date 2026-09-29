@@ -1724,3 +1724,16 @@ Final evidence changes only this task record and `plans/162-executor-evidence.md
 - [x] Commit final merge/results documentation; no push or deployment.
 
 Review: user-authorised local merge is complete. Main post-merge command receipts all exit zero in `/tmp/tc162-main-post-merge-gates.log`; tested-source equality passes before and after generated artefact restoration. Source and migration bytes remain unchanged from the final verified candidate. Actual browser/provider/client/deployment campaigns and PITR availability/exercise remain outside this correction slice.
+
+
+## Plan 160 completion, 29 September 2026
+
+- [x] Read all lessons and reconciled Plan 160.
+- [x] Review runtime fence and observer prerequisites before implementation.
+- [x] Implement worker/provider admission, persistence fencing and causal observation producer foundations.
+- [ ] Complete synchronous action/OAuth admission, acquisition drain and the real campaign lease/drivers.
+- [ ] Verify the final candidate and protected online inventory.
+- [ ] Execute admitted scenarios and reconcile cleanup and reports.
+- [ ] Independent review and final evidence reconciliation.
+
+Review: in progress; live/browser/provider results require actual admitted execution.

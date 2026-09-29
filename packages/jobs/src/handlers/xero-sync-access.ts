@@ -1,3 +1,7 @@
+import {
+  assertXeroCampaignAccess,
+  lockXeroCampaignPersistence,
+} from "@repo/database/xero-campaign-access";
 import "server-only";
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -61,6 +65,7 @@ export async function withXeroBinding<T>(
   const afterCommit: Array<() => Promise<void>> = [];
   const result = await database.$transaction(
     async (tx) => {
+      await lockXeroCampaignPersistence(scope, tx);
       await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-binding:${scope.xeroTenantId}`}, 0))::text AS acquired`;
       const tenant = await tx.xeroTenant.findFirst({
@@ -104,9 +109,12 @@ export async function withXeroBinding<T>(
       if (!tenant) {
         throw new XeroBindingChangedError();
       }
-      return bindingTransactions.run({ afterCommit, scope, tx }, () =>
-        operation(tx)
+      const committedResult = await bindingTransactions.run(
+        { afterCommit, scope, tx },
+        () => operation(tx)
       );
+      await assertXeroCampaignAccess(scope);
+      return committedResult;
     },
     { maxWait: 10_000, timeout: 30_000 }
   );
@@ -120,6 +128,7 @@ export async function resolveSyncTenant(
   scope: XeroSyncScope,
   capability: string | readonly string[]
 ) {
+  await assertXeroCampaignAccess(scope);
   const loaded = await database.xeroTenant.findFirst({
     select: {
       id: true,

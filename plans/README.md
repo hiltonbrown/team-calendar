@@ -10,6 +10,14 @@ instructions. Refresh candidate-specific protected ownership, target, consumer
 isolation and cleanup evidence; missing safeguards are implementation work.
 Historical live results never establish a new candidate's pass.
 
+Plan 160 continuation on 29 September uses isolated branch `codex/xero-e2e-completion`
+from `42bb840`. It adds worker/provider and database admission, observer authority,
+causal receipt producers and protected campaign fixtures. Full Plan 160 remains
+IN PROGRESS: browser/OAuth admission, full drivers, real lease/drain, sanctioned
+fixtures/sessions, AU policy and deployment prerequisites are still missing.
+The [continuation review](160-completion-review.md) owns fresh exact-candidate evidence.
+No provider campaign result is inferred from the protected domain regression suite.
+
 Plan 162 is merged to main at `142d128` under the user's subsequent commit
 and merge instruction. Fresh feed review found no blocker; the valid timed edit
 crossing Sydney's repeated hour and inclusive same-day all-day edit are corrected

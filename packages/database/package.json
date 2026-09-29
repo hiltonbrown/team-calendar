@@ -97,6 +97,22 @@
     "./xero-credential-identity-artifact": {
       "types": "./xero-credential-identity-artifact.ts",
       "default": "./xero-credential-identity-artifact.ts"
+    },
+    "./xero-campaign-access": {
+      "types": "./src/xero-campaign-access.ts",
+      "default": "./src/xero-campaign-access.ts"
+    },
+    "./xero-campaign-contract": {
+      "types": "./src/xero-campaign-contract.ts",
+      "default": "./src/xero-campaign-contract.ts"
+    },
+    "./xero-campaign-store": {
+      "types": "./src/xero-campaign-store.ts",
+      "default": "./src/xero-campaign-store.ts"
+    },
+    "./live-campaign-fixture": {
+      "types": "./src/live-campaign-fixture.ts",
+      "default": "./src/live-campaign-fixture.ts"
     }
   },
   "main": "./index.ts",
