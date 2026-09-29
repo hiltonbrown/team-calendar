@@ -458,3 +458,151 @@ it("raw store transitions cannot close active or uncertain work", async () => {
     store.compareAndSet(draining, { ...fixture.readControl(), phase: "closed" })
   ).rejects.toThrow();
 });
+
+const supportedPayrollReads = [
+  "/payroll.xro/1.0/Employees",
+  "/payroll.xro/1.0/Employees?page=1",
+  "/payroll.xro/1.0/Employees?page=200",
+  "/payroll.xro/1.0/LeaveApplications/v2?page=2",
+  "/payroll.xro/1.0/PayItems",
+  `/payroll.xro/1.0/Employees/${uuid(20)}`,
+  `/payroll.xro/1.0/LeaveApplications/${uuid(21)}`,
+  "/payroll.xro/2.0/employees?page=1",
+  `/payroll.xro/2.0/employees/${uuid(20)}/leave`,
+  `/payroll.xro/2.0/employees/${uuid(20)}/leaveBalances`,
+  `/payroll.xro/2.0/employees/${uuid(20)}/leave/${uuid(21)}`,
+];
+function payrollTarget(path: string, method = "GET") {
+  return {
+    kind: "tenant",
+    method,
+    providerAppId: "fixture-app",
+    tenantHeader: uuid(4),
+    url: `https://api.xero.com${path}`,
+    xeroTenantId: uuid(4),
+  };
+}
+function withProviderAuthority(
+  mode: "worker" | "observer",
+  operation: () => Promise<void>
+) {
+  const fixture = storeFixture();
+  if (mode === "observer") {
+    return withXeroCampaignObservation(
+      authority,
+      operation,
+      fixture.configuration
+    );
+  }
+  return withXeroCampaignInvocation(
+    functionId,
+    { ...scope, campaign },
+    operation,
+    "worker-1",
+    fixture.configuration
+  );
+}
+describe.each(["worker", "observer"] as const)(
+  "exact %s provider routes",
+  (mode) => {
+    it.each(supportedPayrollReads)(
+      "permits implemented regional GET %s",
+      async (path) => {
+        await withProviderAuthority(mode, () =>
+          assertXeroCampaignProviderAccess(payrollTarget(path))
+        );
+      }
+    );
+    it.each([
+      ["/payroll.xro/1.0/UnknownOperation", "GET"],
+      ["/payroll.xro/1.0/Employees", "DELETE"],
+      ["/payroll.xro/1.0/Employees", "POST"],
+      ["/payroll.xro/1.0/Employees", "HEAD"],
+      ["/payroll.xro/1.0/LeaveApplications", "POST"],
+      [`/payroll.xro/1.0/LeaveApplications/${uuid(21)}/approve`, "POST"],
+      [`/payroll.xro/1.0/LeaveApplications/${uuid(21)}/reject`, "POST"],
+      [`/payroll.xro/1.0/Employees/${uuid(20)}/unreviewed`, "GET"],
+      ["/payroll.xro/2.0/unknown", "GET"],
+      [`/payroll.xro/2.0/employees/${uuid(20)}/leave`, "PATCH"],
+      [
+        `/payroll.xro/2.0/employees/${uuid(20)}/leave/${uuid(21)}/unknown`,
+        "GET",
+      ],
+      ["/payroll.xro/1.0/Employees%2Funreviewed", "GET"],
+      ["/payroll.xro/1.0/unreviewed/../Employees", "GET"],
+      ["/payroll.xro/1.0/%2e%2e/1.0/Employees", "GET"],
+      ["/payroll.xro/1.0/Employees/", "GET"],
+      ["/payroll.xro/1.0/Employees?page=1&page=2", "GET"],
+      ["/payroll.xro/1.0/Employees?page=1&unreviewed=true", "GET"],
+      ["/payroll.xro/1.0/Employees?page=0", "GET"],
+      ["/payroll.xro/1.0/Employees?page=201", "GET"],
+      ["/payroll.xro/1.0/PayItems?page=1", "GET"],
+    ])("denies unreviewed route or method %s %s", async (path, method) => {
+      await withProviderAuthority(mode, async () => {
+        await expect(
+          assertXeroCampaignProviderAccess(payrollTarget(path, method))
+        ).rejects.toThrow("xero_campaign_admission_denied");
+      });
+    });
+  }
+);
+
+it.each([
+  ["submit", "/payroll.xro/1.0/LeaveApplications"],
+  ["approve", `/payroll.xro/1.0/LeaveApplications/${uuid(21)}/approve`],
+  ["decline", `/payroll.xro/1.0/LeaveApplications/${uuid(21)}/reject`],
+  ["withdraw", `/payroll.xro/1.0/LeaveApplications/${uuid(21)}/reject`],
+])("preserves ordinary unreserved synchronous %s", async (_action, path) => {
+  storeFixture(null);
+  await expect(
+    assertXeroCampaignProviderAccess(payrollTarget(path, "POST"))
+  ).resolves.toBeUndefined();
+});
+it("preserves scoped token refresh POST while denying observer and campaign management authority", async () => {
+  const token = {
+    kind: "token",
+    method: "POST",
+    providerAppId: "fixture-app",
+    url: "https://identity.xero.com/connect/token",
+  };
+  await withProviderAuthority("worker", async () => {
+    await expect(
+      assertXeroCampaignProviderAccess(token)
+    ).resolves.toBeUndefined();
+    await expect(
+      assertXeroCampaignProviderAccess({ ...token, method: "GET" })
+    ).rejects.toThrow();
+    await expect(
+      assertXeroCampaignProviderAccess({
+        ...token,
+        url: `${token.url}?unreviewed=true`,
+      })
+    ).rejects.toThrow();
+    await expect(
+      assertXeroCampaignProviderAccess({ ...token, kind: "app_management" })
+    ).rejects.toThrow();
+    await expect(
+      assertXeroCampaignProviderAccess({
+        ...token,
+        kind: "app_management",
+        method: "DELETE",
+        url: `https://api.xero.com/connections/${uuid(20)}`,
+      })
+    ).rejects.toThrow();
+  });
+  await withProviderAuthority("observer", async () => {
+    await expect(assertXeroCampaignProviderAccess(token)).rejects.toThrow();
+  });
+  storeFixture(null);
+  await expect(
+    assertXeroCampaignProviderAccess({ ...token, kind: "app_management" })
+  ).resolves.toBeUndefined();
+  await expect(
+    assertXeroCampaignProviderAccess({
+      ...token,
+      kind: "app_management",
+      method: "DELETE",
+      url: `https://api.xero.com/connections/${uuid(20)}`,
+    })
+  ).resolves.toBeUndefined();
+});

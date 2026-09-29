@@ -454,13 +454,13 @@ function assertProviderTarget(target: ProviderTarget) {
     throw new XeroCampaignDeniedError();
   }
   const url = new URL(target.url);
-  if (url.username || url.password || url.hash) {
+  if (url.username || url.password || url.hash || url.href !== target.url) {
     throw new XeroCampaignDeniedError();
   }
   if (target.kind === "tenant") {
     if (
       url.origin !== "https://api.xero.com" ||
-      !PAYROLL_PATH.test(url.pathname) ||
+      !isCampaignPayrollRead(url, target.method ?? "GET") ||
       target.tenantHeader !== target.xeroTenantId
     ) {
       throw new XeroCampaignDeniedError();
@@ -837,7 +837,56 @@ export async function dispatchXeroCampaignChild(
   return sent;
 }
 
-const PAYROLL_PATH = /^\/payroll\.xro\/(1\.0|2\.0)\/[A-Za-z]/;
+const CAMPAIGN_COLLECTION_PATHS = new Set([
+  "/payroll.xro/1.0/Employees",
+  "/payroll.xro/1.0/LeaveApplications/v2",
+  "/payroll.xro/2.0/employees",
+]);
+const CAMPAIGN_PAGE_QUERY = /^\?page=[1-9]\d*$/;
+const CAMPAIGN_PROVIDER_ID = z.uuid();
+function isCampaignPayrollRead(url: URL, method: string): boolean {
+  // Worker and observer tickets do not grant synchronous action/target mutation authority.
+  if (method !== "GET") {
+    return false;
+  }
+  if (CAMPAIGN_COLLECTION_PATHS.has(url.pathname)) {
+    return (
+      url.search === "" ||
+      (CAMPAIGN_PAGE_QUERY.test(url.search) &&
+        Number(url.searchParams.get("page")) <= 200)
+    );
+  }
+  if (url.search !== "") {
+    return false;
+  }
+  if (url.pathname === "/payroll.xro/1.0/PayItems") {
+    return true;
+  }
+  const segments = url.pathname.split("/");
+  if (
+    segments[0] !== "" ||
+    segments[1] !== "payroll.xro" ||
+    !CAMPAIGN_PROVIDER_ID.safeParse(segments[4]).success
+  ) {
+    return false;
+  }
+  if (segments[2] === "1.0") {
+    return (
+      segments.length === 5 &&
+      (segments[3] === "Employees" || segments[3] === "LeaveApplications")
+    );
+  }
+  if (segments[2] !== "2.0" || segments[3] !== "employees") {
+    return false;
+  }
+  return (
+    (segments.length === 6 &&
+      (segments[5] === "leave" || segments[5] === "leaveBalances")) ||
+    (segments.length === 7 &&
+      segments[5] === "leave" &&
+      CAMPAIGN_PROVIDER_ID.safeParse(segments[6]).success)
+  );
+}
 
 export async function withXeroCampaignScopedEffect<T>(
   scope: Pick<XeroCampaignScope, "clerkOrgId" | "organisationId">,
