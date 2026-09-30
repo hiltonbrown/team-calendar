@@ -121,7 +121,7 @@ export async function initialiseLiveCampaignFixture(fixture: LiveTestFixture) {
     .parse(
       await database.$transaction(async (tx) => {
         await tx.$executeRaw`SET TRANSACTION READ ONLY`;
-        return tx.$queryRaw`SELECT current_database() AS database, current_user AS role,
+        return tx.$queryRaw`SELECT current_database()::text AS database, current_user::text AS role,
         current_setting('neon.project_id') AS "projectId",
         current_setting('neon.branch_id') AS "branchId",
         current_setting('neon.endpoint_id') AS "endpointId"`;

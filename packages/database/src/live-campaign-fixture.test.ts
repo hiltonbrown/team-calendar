@@ -178,6 +178,9 @@ describe("real-store protected campaign fixture", () => {
       expect.objectContaining({ method: "POST", redirect: "error" })
     );
     expect(mocks.execute).toHaveBeenCalledWith(["SET TRANSACTION READ ONLY"]);
+    expect(mocks.query.mock.calls[0]?.[0].join("")).toContain(
+      "current_database()::text AS database, current_user::text AS role"
+    );
     expect(mocks.query).toHaveBeenCalledOnce();
     const writes = commands.filter(
       (args) => args[0] === "EVAL" && args[1].includes("'NX'")

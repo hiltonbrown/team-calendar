@@ -3,6 +3,8 @@
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
+import { withXeroCampaignScopedInvocation } from "@repo/database/xero-campaign-access";
+import { XeroCampaignDeniedError } from "@repo/database/xero-campaign-contract";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
@@ -205,28 +207,55 @@ async function updateTenantPauseState(
     return context;
   }
 
-  await database.xeroTenant.updateMany({
-    data: {
-      sync_paused_at: paused ? new Date() : null,
-    },
-    where: {
-      clerk_org_id: context.value.clerkOrgId,
-      id: parsed.data.xeroTenantId,
-      organisation_id: context.value.organisationId,
-    },
-  });
-
-  await database.auditEvent.create({
-    data: {
-      ...auditBase(context.value),
-      action: paused ? "xero.tenant_sync_paused" : "xero.tenant_sync_resumed",
-      entity_id: parsed.data.xeroTenantId,
-      entity_type: "xero_tenant",
-      metadata: {},
-      resource_id: parsed.data.xeroTenantId,
-      resource_type: "xero_tenant",
-    },
-  });
+  let updated: boolean;
+  try {
+    updated = await withXeroCampaignScopedInvocation(
+      "xero.settings.tenant-sync-state",
+      {
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        xeroTenantId: parsed.data.xeroTenantId,
+      },
+      () =>
+        database.$transaction(async (tx) => {
+          const result = await tx.xeroTenant.updateMany({
+            data: { sync_paused_at: paused ? new Date() : null },
+            where: {
+              clerk_org_id: context.value.clerkOrgId,
+              id: parsed.data.xeroTenantId,
+              organisation_id: context.value.organisationId,
+            },
+          });
+          if (result.count === 0) {
+            return false;
+          }
+          await tx.auditEvent.create({
+            data: {
+              ...auditBase(context.value),
+              action: paused
+                ? "xero.tenant_sync_paused"
+                : "xero.tenant_sync_resumed",
+              entity_id: parsed.data.xeroTenantId,
+              entity_type: "xero_tenant",
+              metadata: {},
+              resource_id: parsed.data.xeroTenantId,
+              resource_type: "xero_tenant",
+            },
+          });
+          return true;
+        })
+    );
+  } catch (error) {
+    if (error instanceof XeroCampaignDeniedError) {
+      return unknownError(
+        "Xero settings are temporarily unavailable. Please try again later."
+      );
+    }
+    throw error;
+  }
+  if (!updated) {
+    return validationError("Xero tenant was not found in this organisation.");
+  }
 
   revalidate();
   return { ok: true, value: { paused: true } };

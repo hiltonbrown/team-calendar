@@ -14,6 +14,7 @@ import {
   assertXeroCampaignAuthority,
   assertXeroCampaignProviderAccess,
   claimXeroCampaignScheduledDispatch,
+  initialiseXeroCampaign,
   recordXeroCampaignDispatch,
   transitionXeroCampaign,
   withXeroCampaignInvocation,
@@ -360,6 +361,197 @@ describe("campaign dispatch and effects", () => {
         fixture.configuration
       )
     ).rejects.toThrow();
+  });
+});
+
+describe("ordinary provider attempts before acquisition", () => {
+  const target = {
+    kind: "tenant",
+    providerAppId: "fixture-app",
+    tenantHeader: uuid(4),
+    url: "https://api.xero.com/payroll.xro/1.0/Employees",
+    xeroTenantId: uuid(4),
+  };
+  function acquisitionControl() {
+    const control = controlFixture({ phase: "acquiring", tickets: [] });
+    return {
+      ...control,
+      resources: control.resources.map((resource) => ({
+        ...resource,
+        xeroTenantId: null,
+      })),
+    };
+  }
+  beforeEach(() => {
+    databaseMocks.transaction.mockImplementation(async (operation) =>
+      operation({ xeroTenant: { findMany: async () => [] } })
+    );
+  });
+  it("rejects a sentinel target replacement between read and atomic acquisition", async () => {
+    const fixture = storeFixture(null);
+    const store = new XeroCampaignStore(fixture.configuration);
+    const original = store.command.bind(store);
+    vi.spyOn(store, "command").mockImplementation((parts) => {
+      if (parts[1]?.includes("local reservationCount")) {
+        fixture.values.set(
+          fixture.keys.sentinel,
+          JSON.stringify({
+            credentialDomainId: uuid(1),
+            databaseTargetHash: `sha256:${"b".repeat(64)}`,
+            version: 1,
+          })
+        );
+      }
+      return original(parts);
+    });
+    await expect(store.initialise(acquisitionControl())).rejects.toThrow(
+      "xero_campaign_admission_denied"
+    );
+    expect(fixture.values.has(fixture.keys.control(campaign.runId))).toBe(
+      false
+    );
+  });
+  it("holds acquisition until a started ordinary response is complete", async () => {
+    const fixture = storeFixture(null);
+    let release: () => void = () => {
+      throw new Error("Missing release");
+    };
+    let started: () => void = () => {
+      throw new Error("Missing start");
+    };
+    const entered = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    const wait = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ordinary = withXeroCampaignProviderEffect(target, async () => {
+      started();
+      await wait;
+      return "response buffered";
+    });
+    await entered;
+    const hash = fixture.hashes.get(
+      fixture.keys.ordinaryProviderAttempts(
+        target.providerAppId,
+        target.xeroTenantId
+      )
+    );
+    expect(
+      [...(hash?.values() ?? [])].map((raw) => JSON.parse(raw).state)
+    ).toEqual(["dispatched"]);
+    await expect(
+      initialiseXeroCampaign(acquisitionControl(), fixture.configuration)
+    ).rejects.toThrow("xero_campaign_admission_denied");
+    release();
+    await expect(ordinary).resolves.toBe("response buffered");
+    expect(fixture.hashes.size).toBe(0);
+    await expect(
+      initialiseXeroCampaign(acquisitionControl(), fixture.configuration)
+    ).resolves.toMatchObject({ phase: "acquiring" });
+    const late = vi.fn(async () => "late");
+    await expect(withXeroCampaignProviderEffect(target, late)).rejects.toThrow(
+      "xero_campaign_admission_denied"
+    );
+    expect(late).not.toHaveBeenCalled();
+  });
+  it("allows an unrelated tenant attempt while preserving the reserved tenant", async () => {
+    const fixture = storeFixture();
+    const other = { ...target, tenantHeader: uuid(90), xeroTenantId: uuid(90) };
+    await expect(
+      withXeroCampaignProviderEffect(other, async () => "unrelated")
+    ).resolves.toBe("unrelated");
+    await expect(
+      withXeroCampaignProviderEffect(target, async () => "reserved")
+    ).rejects.toThrow("xero_campaign_admission_denied");
+    expect(fixture.hashes.size).toBe(0);
+  });
+  it("refuses completion after target or attempt identity changes", async () => {
+    const fixture = storeFixture(null);
+    const store = new XeroCampaignStore(fixture.configuration);
+    const attempt = await store.beginOrdinaryProviderAttempt(
+      target.providerAppId,
+      target.xeroTenantId
+    );
+    await expect(
+      store.finishOrdinaryProviderAttempt(
+        { ...attempt, externalTenantId: uuid(90) },
+        "completed"
+      )
+    ).rejects.toThrow("xero_campaign_admission_denied");
+    fixture.values.set(
+      fixture.keys.sentinel,
+      JSON.stringify({
+        credentialDomainId: uuid(1),
+        databaseTargetHash: `sha256:${"b".repeat(64)}`,
+        version: 1,
+      })
+    );
+    await expect(
+      store.finishOrdinaryProviderAttempt(attempt, "completed")
+    ).rejects.toThrow("xero_campaign_admission_denied");
+    expect(
+      fixture.hashes.get(
+        fixture.keys.ordinaryProviderAttempts(
+          target.providerAppId,
+          target.xeroTenantId
+        )
+      )?.size
+    ).toBe(1);
+  });
+  it("fails closed when the durable ordinary attempt ledger reaches its cap", async () => {
+    const fixture = storeFixture(null);
+    fixture.hashes.set(
+      fixture.keys.ordinaryProviderAttempts(
+        target.providerAppId,
+        target.xeroTenantId
+      ),
+      new Map(
+        Array.from({ length: 2000 }, (_, index) => [String(index), "uncertain"])
+      )
+    );
+    const operation = vi.fn(async () => "not dispatched");
+    await expect(
+      withXeroCampaignProviderEffect(target, operation)
+    ).rejects.toThrow("xero_campaign_admission_denied");
+    expect(operation).not.toHaveBeenCalled();
+  });
+  it("keeps an ambiguous ordinary server response uncertain", async () => {
+    const fixture = storeFixture(null);
+    const response = await withXeroCampaignProviderEffect(
+      { ...target, method: "POST" },
+      async () => new Response(null, { status: 503 })
+    );
+    expect(response.status).toBe(503);
+    const hash = fixture.hashes.get(
+      fixture.keys.ordinaryProviderAttempts(
+        target.providerAppId,
+        target.xeroTenantId
+      )
+    );
+    expect(
+      [...(hash?.values() ?? [])].map((raw) => JSON.parse(raw).state)
+    ).toEqual(["uncertain"]);
+  });
+  it("retains an uncertain ordinary attempt and denies acquisition", async () => {
+    const fixture = storeFixture(null);
+    await expect(
+      withXeroCampaignProviderEffect(target, () =>
+        Promise.reject(new Error("response lost"))
+      )
+    ).rejects.toThrow("response lost");
+    const hash = fixture.hashes.get(
+      fixture.keys.ordinaryProviderAttempts(
+        target.providerAppId,
+        target.xeroTenantId
+      )
+    );
+    expect(
+      [...(hash?.values() ?? [])].map((raw) => JSON.parse(raw).state)
+    ).toEqual(["uncertain"]);
+    await expect(
+      initialiseXeroCampaign(acquisitionControl(), fixture.configuration)
+    ).rejects.toThrow("xero_campaign_admission_denied");
   });
 });
 

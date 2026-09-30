@@ -574,7 +574,30 @@ export async function withXeroCampaignProviderEffect<T>(
   operation: () => Promise<T>
 ): Promise<T> {
   await assertXeroCampaignProviderAccess(rateClass);
-  return trackCampaignEffect(operation);
+  if (invocations.getStore() || observations.getStore()) {
+    return trackCampaignEffect(operation);
+  }
+  const store =
+    credentials.getStore()?.store ??
+    ordinaryScopes.getStore()?.store ??
+    new XeroCampaignStore();
+  const attempt = await store.beginOrdinaryProviderAttempt(
+    rateClass.providerAppId,
+    rateClass.kind === "tenant" ? rateClass.xeroTenantId : undefined
+  );
+  let outcome: "completed" | "uncertain" = "uncertain";
+  try {
+    const result = await operation();
+    outcome =
+      result instanceof Response &&
+      (rateClass.method ?? "GET") !== "GET" &&
+      result.status >= 500
+        ? "uncertain"
+        : "completed";
+    return result;
+  } finally {
+    await store.finishOrdinaryProviderAttempt(attempt, outcome);
+  }
 }
 async function trackCampaignEffect<T>(operation: () => Promise<T>): Promise<T> {
   const invocation = invocations.getStore();

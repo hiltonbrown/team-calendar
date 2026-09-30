@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
 import {
@@ -62,6 +62,8 @@ export function xeroCampaignKeys(domain: string) {
   return {
     active: `${prefix}:active`,
     control: (runId: string) => `${prefix}:run:${runId}`,
+    ordinaryProviderAttempts: (app: string, tenant?: string) =>
+      `${prefix}:ordinary-provider-attempts:${digest(JSON.stringify([app, tenant ?? null]))}`,
     organisation: (id: string) => `${prefix}:organisation:${id}`,
     provider: (app: string, tenant?: string) =>
       `${prefix}:provider:${digest(JSON.stringify([app, tenant ?? null]))}`,
@@ -82,9 +84,13 @@ redis.call('set', KEYS[1], ARGV[2])
 return 1
 `;
 const INITIALISE = `
-if not redis.call('get', KEYS[1]) or redis.call('get', 'release:active-run') ~= ARGV[3] then return 0 end
+local sentinel = redis.call('get', KEYS[1])
+if not sentinel or redis.call('get', 'release:active-run') ~= ARGV[3] then return 0 end
+local identity = cjson.decode(sentinel)
+if identity.version ~= 1 or identity.credentialDomainId ~= ARGV[7] or identity.databaseTargetHash ~= ARGV[8] then return 0 end
 if redis.call('exists', KEYS[2]) ~= 0 then return 0 end
-for i = 3, #KEYS do
+local reservationCount = tonumber(ARGV[6])
+for i = 3, 2 + reservationCount do
   local previous = redis.call('get', KEYS[i])
   if previous then
     local raw = redis.call('get', ARGV[4] .. previous)
@@ -93,8 +99,44 @@ for i = 3, #KEYS do
     if value.phase ~= 'closed' or value.epoch >= tonumber(ARGV[5]) then return 0 end
   end
 end
+for i = 3 + reservationCount, #KEYS do
+  if redis.call('hlen', KEYS[i]) ~= 0 then return 0 end
+end
 redis.call('set', KEYS[2], ARGV[2])
-for i = 3, #KEYS do redis.call('set', KEYS[i], ARGV[1]) end
+for i = 3, 2 + reservationCount do redis.call('set', KEYS[i], ARGV[1]) end
+return 1
+`;
+const START_ORDINARY_PROVIDER_ATTEMPT = `
+local sentinel = redis.call('get', KEYS[1])
+if not sentinel then return 0 end
+local identity = cjson.decode(sentinel)
+if identity.version ~= 1 or identity.credentialDomainId ~= ARGV[2] or identity.databaseTargetHash ~= ARGV[3] then return 0 end
+local previous = redis.call('get', KEYS[2])
+if previous then
+  local raw = redis.call('get', ARGV[4] .. previous)
+  if not raw or cjson.decode(raw).phase ~= 'closed' then return 0 end
+end
+if redis.call('hlen', KEYS[3]) >= 2000 or redis.call('hexists', KEYS[3], ARGV[1]) ~= 0 then return 0 end
+redis.call('hset', KEYS[3], ARGV[1], cjson.encode({state='dispatched', credentialDomainId=ARGV[2], databaseTargetHash=ARGV[3], providerAppId=ARGV[5], externalTenantId=ARGV[6]}))
+return 1
+`;
+const FINISH_ORDINARY_PROVIDER_ATTEMPT = `
+local sentinel = redis.call('get', KEYS[1])
+if not sentinel then return 0 end
+local identity = cjson.decode(sentinel)
+if identity.version ~= 1 or identity.credentialDomainId ~= ARGV[3] or identity.databaseTargetHash ~= ARGV[4] then return 0 end
+local raw = redis.call('hget', KEYS[2], ARGV[1])
+if not raw then return 0 end
+local attempt = cjson.decode(raw)
+if attempt.state ~= 'dispatched' or attempt.credentialDomainId ~= ARGV[3] or attempt.databaseTargetHash ~= ARGV[4] or attempt.providerAppId ~= ARGV[5] or attempt.externalTenantId ~= ARGV[6] then return 0 end
+if ARGV[2] == 'completed' then
+  redis.call('hdel', KEYS[2], ARGV[1])
+elseif ARGV[2] == 'uncertain' then
+  attempt.state = 'uncertain'
+  redis.call('hset', KEYS[2], ARGV[1], cjson.encode(attempt))
+else
+  return 0
+end
 return 1
 `;
 const readResult = z.tuple([
@@ -213,6 +255,70 @@ export class XeroCampaignStore {
   }
   readRun(runId: string) {
     return this.snapshot(this.keys.control(runId), runId);
+  }
+  /** Register before dispatch; acquisition checks the same hash atomically. */
+  async beginOrdinaryProviderAttempt(
+    providerAppId: string,
+    externalTenantId?: string
+  ) {
+    const snapshot = await this.snapshot(
+      this.keys.provider(providerAppId, externalTenantId)
+    );
+    const id = randomUUID();
+    const result = await this.command([
+      "EVAL",
+      START_ORDINARY_PROVIDER_ATTEMPT,
+      "3",
+      this.keys.sentinel,
+      this.keys.provider(providerAppId, externalTenantId),
+      this.keys.ordinaryProviderAttempts(providerAppId, externalTenantId),
+      id,
+      snapshot.sentinel.credentialDomainId,
+      snapshot.sentinel.databaseTargetHash,
+      this.keys.control(""),
+      providerAppId,
+      externalTenantId ?? "",
+    ]);
+    if (result !== 1) {
+      throw new XeroCampaignDeniedError();
+    }
+    return {
+      credentialDomainId: snapshot.sentinel.credentialDomainId,
+      databaseTargetHash: snapshot.sentinel.databaseTargetHash,
+      externalTenantId: externalTenantId ?? "",
+      id,
+      providerAppId,
+    };
+  }
+  async finishOrdinaryProviderAttempt(
+    attempt: {
+      credentialDomainId: string;
+      databaseTargetHash: string;
+      externalTenantId: string;
+      id: string;
+      providerAppId: string;
+    },
+    outcome: "completed" | "uncertain"
+  ) {
+    const result = await this.command([
+      "EVAL",
+      FINISH_ORDINARY_PROVIDER_ATTEMPT,
+      "2",
+      this.keys.sentinel,
+      this.keys.ordinaryProviderAttempts(
+        attempt.providerAppId,
+        attempt.externalTenantId || undefined
+      ),
+      attempt.id,
+      outcome,
+      attempt.credentialDomainId,
+      attempt.databaseTargetHash,
+      attempt.providerAppId,
+      attempt.externalTenantId,
+    ]);
+    if (result !== 1) {
+      throw new XeroCampaignDeniedError();
+    }
   }
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Check immutable authority and monotonic ticket/effect evidence before the atomic update.
   async compareAndSet(
@@ -412,6 +518,15 @@ export class XeroCampaignStore {
       this.keys.sentinel,
       this.keys.control(control.runId),
       ...reservations,
+      ...new Set(
+        control.resources.flatMap((resource) => [
+          this.keys.ordinaryProviderAttempts(resource.providerAppId),
+          this.keys.ordinaryProviderAttempts(
+            resource.providerAppId,
+            resource.externalTenantId
+          ),
+        ])
+      ),
     ];
     const result = await this.command([
       "EVAL",
@@ -423,6 +538,9 @@ export class XeroCampaignStore {
       control.databaseRunId,
       this.keys.control(""),
       String(control.epoch),
+      String(reservations.length),
+      control.credentialDomainId,
+      control.databaseTargetHash,
     ]);
     if (result !== 1) {
       throw new XeroCampaignDeniedError();

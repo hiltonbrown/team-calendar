@@ -11,8 +11,12 @@ import {
   reserveXeroCampaignTicket,
   transitionXeroCampaign,
   withXeroCampaignInvocation,
+  withXeroCampaignProviderEffect,
 } from "./src/xero-campaign-access";
-import { XeroCampaignControlSchema } from "./src/xero-campaign-contract";
+import {
+  type XeroCampaignControl,
+  XeroCampaignControlSchema,
+} from "./src/xero-campaign-contract";
 import {
   XeroCampaignStore,
   xeroCampaignStoreCredentials,
@@ -31,6 +35,9 @@ const runId = fixture.id("campaign-run");
 const functionId = "controlled-database-fence-test";
 let candidateSha = "";
 let ticketIndex = 0;
+let control: XeroCampaignControl;
+const providerAppId = fixture.globalKey("provider_app");
+const externalTenantId = fixture.id("external-tenant");
 function barrier() {
   let release: () => void = () => {
     throw new Error("Barrier not initialised");
@@ -76,7 +83,7 @@ beforeAll(async () => {
       name: "Campaign fixture unchanged",
     })),
   });
-  const control = XeroCampaignControlSchema.parse({
+  control = XeroCampaignControlSchema.parse({
     allowedFunctions: [functionId],
     candidateSha,
     closure: null,
@@ -95,8 +102,8 @@ beforeAll(async () => {
       {
         ...scope,
         credentialOwnerId: null,
-        externalTenantId: fixture.id("external-tenant"),
-        providerAppId: fixture.globalKey("provider_app"),
+        externalTenantId,
+        providerAppId,
       },
     ],
     runId,
@@ -104,8 +111,6 @@ beforeAll(async () => {
     tickets: [],
     version: 1,
   });
-  await initialiseXeroCampaign(control);
-  await transitionXeroCampaign(runId, 1, "active");
 });
 
 afterAll(async () => {
@@ -122,6 +127,36 @@ afterAll(async () => {
     ...xeroCampaignStoreCredentials(),
   });
   await database.$disconnect();
+});
+
+it("holds real campaign acquisition until a prior ordinary provider response completes", async () => {
+  const entered = barrier();
+  const release = barrier();
+  const ordinary = withXeroCampaignProviderEffect(
+    {
+      kind: "tenant",
+      providerAppId,
+      tenantHeader: externalTenantId,
+      url: "https://api.xero.com/payroll.xro/1.0/Employees",
+      xeroTenantId: externalTenantId,
+    },
+    async () => {
+      entered.release();
+      await release.ready;
+      return "buffered";
+    }
+  );
+  try {
+    await Promise.race([entered.ready, ordinary]);
+    await expect(initialiseXeroCampaign(control)).rejects.toThrow(
+      "xero_campaign_admission_denied"
+    );
+  } finally {
+    release.release();
+  }
+  await expect(ordinary).resolves.toBe("buffered");
+  await initialiseXeroCampaign(control);
+  await transitionXeroCampaign(runId, 1, "active");
 });
 
 describe("real shared-store and PostgreSQL campaign fencing", () => {
@@ -193,4 +228,29 @@ describe("real shared-store and PostgreSQL campaign fencing", () => {
       "Campaign fixture committed"
     );
   });
+});
+
+it("allows an unrelated tenant in the same app and retains an uncertain response", async () => {
+  const unrelatedTenant = fixture.id("unrelated-external-tenant");
+  const store = new XeroCampaignStore();
+  const operation = vi.fn(() => Promise.reject(new Error("response lost")));
+  await expect(
+    withXeroCampaignProviderEffect(
+      {
+        kind: "tenant",
+        providerAppId,
+        tenantHeader: unrelatedTenant,
+        url: "https://api.xero.com/payroll.xro/1.0/Employees",
+        xeroTenantId: unrelatedTenant,
+      },
+      operation
+    )
+  ).rejects.toThrow("response lost");
+  expect(operation).toHaveBeenCalledOnce();
+  expect(
+    await store.command([
+      "HLEN",
+      store.keys.ordinaryProviderAttempts(providerAppId, unrelatedTenant),
+    ])
+  ).toBe(1);
 });
