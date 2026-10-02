@@ -1,31 +1,13 @@
-import { parseArgs } from "node:util";
 import { log } from "@repo/observability/log";
+import { parseXeroNamespaceInitialisationArgs } from "../src/rate-limit/namespace-initialisation";
 import { initialiseXeroRateNamespace } from "../src/rate-limit/shared-store";
 
 async function main(): Promise<void> {
-  const { values } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      "assume-spent-daily": { type: "boolean" },
-      "credential-domain-id": { type: "string" },
-      epoch: { type: "string" },
-    },
-    strict: true,
-  });
-  if (
-    !(values.epoch && values["credential-domain-id"]) ||
-    values["assume-spent-daily"] !== true
-  ) {
-    throw new Error(
-      "Explicit --epoch, --credential-domain-id and --assume-spent-daily are required"
-    );
-  }
-  const counts = await initialiseXeroRateNamespace({
-    assumeSpentDaily: true,
-    credentialDomainId: values["credential-domain-id"],
-    epoch: values.epoch,
-  });
-  log.info("Xero rate namespace initialisation", counts);
+  const { policy, ...input } = parseXeroNamespaceInitialisationArgs(
+    process.argv.slice(2)
+  );
+  const counts = await initialiseXeroRateNamespace(input);
+  log.info("Xero rate namespace initialisation", { ...counts, policy });
 }
 main().catch((error: unknown) => {
   log.error(
