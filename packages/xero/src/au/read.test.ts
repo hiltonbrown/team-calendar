@@ -334,14 +334,11 @@ describe("AU leave balance reads", () => {
       expect(result.value.failures).toEqual([]);
     }
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer access-token",
-        }),
-      })
-    );
+    for (const [, request] of fetchMock.mock.calls) {
+      expect(new Headers(request?.headers).get("Authorization")).toBe(
+        "Bearer access-token"
+      );
+    }
   });
 
   it("isolates a single not-found employee and keeps the other balances", async () => {
@@ -491,9 +488,9 @@ describe("161g AU scoped read evidence", () => {
       id: "tenant_1",
       tokenVersion: 1,
     });
-    expect(fetchMock.mock.calls[1]?.[1]?.headers).toMatchObject({
-      "Xero-Tenant-Id": "sibling-payroll",
-    });
+    expect(
+      new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("Xero-Tenant-Id")
+    ).toBe("sibling-payroll");
   });
 });
 

@@ -32,14 +32,12 @@ function buildXeroTenant() {
 }
 
 function expectBearerAccessToken(fetchMock: ReturnType<typeof vi.fn>) {
-  expect(fetchMock).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.objectContaining({
-      headers: expect.objectContaining({
-        Authorization: "Bearer access-token",
-      }),
-    })
-  );
+  expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
+  for (const [, request] of fetchMock.mock.calls) {
+    expect(new Headers(request?.headers).get("Authorization")).toBe(
+      "Bearer access-token"
+    );
+  }
 }
 
 describe("AU payroll write path", () => {

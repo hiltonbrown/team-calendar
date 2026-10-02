@@ -104,15 +104,17 @@ describe("NZ employee reads", () => {
     expect(result.value.failures).toHaveLength(1);
     expect(result.value.rawItemCount).toBe(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/payroll.xro/2.0/employees?page=1"),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer access-token",
-          "Xero-Tenant-Id": "xero-tenant-nz-1",
-        }),
-      })
-    );
+    expect(
+      fetchMock.mock.calls.map(([url, request]) => ({
+        authorization: new Headers(request?.headers).get("Authorization"),
+        tenant: new Headers(request?.headers).get("Xero-Tenant-Id"),
+        url: String(url),
+      }))
+    ).toContainEqual({
+      authorization: "Bearer access-token",
+      tenant: "xero-tenant-nz-1",
+      url: expect.stringContaining("/payroll.xro/2.0/employees?page=1"),
+    });
   });
 
   it("uses raw page length, not valid employee count, to continue pagination", async () => {
@@ -320,15 +322,17 @@ describe("NZ leave record reads", () => {
       units: 12,
       updatedDateUtc: "2026-07-01T04:00:00.000Z",
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/payroll.xro/2.0/employees/emp-nz-1/leave"),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer access-token",
-          "Xero-Tenant-Id": "xero-tenant-nz-1",
-        }),
-      })
-    );
+    expect(
+      fetchMock.mock.calls.map(([url, request]) => ({
+        authorization: new Headers(request?.headers).get("Authorization"),
+        tenant: new Headers(request?.headers).get("Xero-Tenant-Id"),
+        url: String(url),
+      }))
+    ).toContainEqual({
+      authorization: "Bearer access-token",
+      tenant: "xero-tenant-nz-1",
+      url: expect.stringContaining("/payroll.xro/2.0/employees/emp-nz-1/leave"),
+    });
   });
 
   it("maps Completed and Estimated period statuses to APPROVED", () => {
