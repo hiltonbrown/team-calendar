@@ -14,6 +14,7 @@ import {
   assertXeroCampaignAuthority,
   assertXeroCampaignProviderAccess,
   claimXeroCampaignScheduledDispatch,
+  dispatchXeroCampaignChild,
   initialiseXeroCampaign,
   reconcileXeroCampaignActionBinding,
   recordXeroCampaignDispatch,
@@ -23,6 +24,7 @@ import {
   withXeroCampaignInvocation,
   withXeroCampaignObservation,
   withXeroCampaignProviderEffect,
+  withXeroCampaignWrite,
 } from "./xero-campaign-access";
 import { xeroCampaignActionTargetHash } from "./xero-campaign-contract";
 import { XeroCampaignStore } from "./xero-campaign-store";
@@ -390,7 +392,7 @@ describe("campaign dispatch and effects", () => {
     expect(fixture.readControl().effects[0]?.outcome).toBe("uncertain");
     expect(fixture.readControl().tickets[0]?.outcome).toBe("failed");
   });
-  it("drain blocks further effects while a started attempt closes its durable entry", async () => {
+  it("drain preserves the admitted invocation while a started attempt closes its durable entry", async () => {
     const fixture = storeFixture();
     await withXeroCampaignInvocation(
       functionId,
@@ -416,7 +418,9 @@ describe("campaign dispatch and effects", () => {
             );
           }
         );
-        await expect(assertXeroCampaignAccess(scope)).rejects.toThrow();
+        await expect(assertXeroCampaignAccess(scope)).resolves.toMatchObject({
+          ticket: { outcome: "running" },
+        });
       },
       "worker-1",
       fixture.configuration
@@ -1285,12 +1289,12 @@ describe("intentional binding transition evidence", () => {
     target: { organisationId: scope.organisationId },
     userId,
   };
-  function setup() {
+  function setup(selectedAction = actionId) {
     const control = controlFixture({
-      allowedFunctions: [actionId],
+      allowedFunctions: [selectedAction],
       sanctionedActors: [
         {
-          actions: [actionId],
+          actions: [selectedAction],
           clerkOrgId: scope.clerkOrgId,
           organisationId: scope.organisationId,
           userId,
@@ -1301,11 +1305,11 @@ describe("intentional binding transition evidence", () => {
       ...control,
       tickets: control.tickets.map((ticket) => ({
         ...ticket,
-        functionId: actionId,
+        functionId: selectedAction,
         scheduledSlot: null,
         targetHash: xeroCampaignActionTargetHash({
           clerkOrgId: input.clerkOrgId,
-          functionId: actionId,
+          functionId: selectedAction,
           organisationId: input.organisationId,
           target: input.target,
           userId,
@@ -1330,6 +1334,35 @@ describe("intentional binding transition evidence", () => {
       xero_tenant_id: uuid(4),
     };
   }
+  it("reconciles the shipped tenant-selection action ID during graceful drain", async () => {
+    const shippedAction = "xero.tenant-selection";
+    const fixture = setup(shippedAction);
+    await withXeroCampaignAction(shippedAction, input, async () => {
+      await transitionXeroCampaign(
+        campaign.runId,
+        campaign.epoch,
+        "draining",
+        fixture.configuration
+      );
+      databaseMocks.bindings.mockResolvedValue([
+        {
+          ...retiredBinding(),
+          active_slot: 1,
+          retired_at: null,
+          retirement_reason: null,
+        },
+      ]);
+      await reconcileXeroCampaignActionBinding();
+      await assertXeroCampaignAccess({ ...scope, bindingGeneration: 3 });
+    });
+    expect(fixture.readControl().bindingTransitions).toMatchObject([
+      { next: { bindingGeneration: 3, bindingState: "active" } },
+    ]);
+    expect(fixture.readControl().tickets[0]).toMatchObject({
+      functionId: shippedAction,
+      outcome: "succeeded",
+    });
+  });
   it("records old and observed generations and retains ownership after disconnect", async () => {
     const fixture = setup();
     await withXeroCampaignAction(actionId, input, async () => {
@@ -1349,7 +1382,12 @@ describe("intentional binding transition evidence", () => {
       fixture.values.get(fixture.keys.organisation(scope.organisationId))
     ).toBe(campaign.runId);
   });
-  it.each(["xero.oauth.start", "leave.approve", "sync-xero-leave-records"])(
+  it.each([
+    "xero.oauth.start",
+    "xero.tenant-selection",
+    "leave.approve",
+    "sync-xero-leave-records",
+  ])(
     "retired binding admission is constrained for %s",
     async (nextFunction) => {
       const fixture = setup();
@@ -1394,7 +1432,9 @@ describe("intentional binding transition evidence", () => {
             operation
           )
         : withXeroCampaignAction(nextFunction, input, operation);
-      if (nextFunction === "xero.oauth.start") {
+      if (
+        ["xero.oauth.start", "xero.tenant-selection"].includes(nextFunction)
+      ) {
         await expect(result).resolves.toBe("admitted");
       } else {
         await expect(result).rejects.toThrow();
@@ -1447,4 +1487,107 @@ describe("intentional binding transition evidence", () => {
       fixture.values.get(fixture.keys.organisation(scope.organisationId))
     ).toBe(campaign.runId);
   });
+});
+
+describe("graceful campaign drain", () => {
+  it("lets the exact running invocation persist and finish after revocation but refuses new dispatch", async () => {
+    const fixture = storeFixture();
+    await withXeroCampaignInvocation(
+      functionId,
+      { ...scope, campaign },
+      async () => {
+        await transitionXeroCampaign(
+          campaign.runId,
+          campaign.epoch,
+          "draining",
+          fixture.configuration
+        );
+        const effect = vi.fn(() => Promise.resolve("persisted"));
+        await expect(withXeroCampaignWrite(scope, effect)).resolves.toBe(
+          "persisted"
+        );
+        expect(effect).toHaveBeenCalledOnce();
+        const send = vi.fn(() => Promise.resolve({ ids: ["must-not-send"] }));
+        await expect(
+          dispatchXeroCampaignChild(functionId, scope, send)
+        ).rejects.toThrow();
+        expect(send).not.toHaveBeenCalled();
+      },
+      "worker-owned",
+      fixture.configuration
+    );
+    expect(fixture.readControl().phase).toBe("draining");
+    expect(fixture.readControl().tickets[0]?.outcome).toBe("succeeded");
+  });
+  it("does not let an existing invocation identity admit a new call after revocation", async () => {
+    const fixture = storeFixture(controlFixture({ phase: "draining" }));
+    const operation = vi.fn(() => Promise.resolve());
+    await expect(
+      withXeroCampaignInvocation(
+        functionId,
+        { ...scope, campaign },
+        operation,
+        "worker-owned",
+        fixture.configuration
+      )
+    ).rejects.toThrow();
+    expect(operation).not.toHaveBeenCalled();
+  });
+});
+
+describe("provider admission during graceful drain", () => {
+  const target = {
+    kind: "tenant",
+    providerAppId: "fixture-app",
+    tenantHeader: uuid(4),
+    url: "https://api.xero.com/payroll.xro/1.0/Employees",
+    xeroTenantId: uuid(4),
+  };
+  it.each(["before-check", "before-effect-cas"])(
+    "prevents new provider dispatch when revoked %s",
+    async (timing) => {
+      const fixture = storeFixture();
+      const transport = vi.fn(() => Promise.resolve(new Response("{}")));
+      await withXeroCampaignInvocation(
+        functionId,
+        { ...scope, campaign },
+        async () => {
+          if (timing === "before-check") {
+            await transitionXeroCampaign(
+              campaign.runId,
+              campaign.epoch,
+              "draining",
+              fixture.configuration
+            );
+          } else {
+            const original = fixture.fetchImpl.getMockImplementation();
+            fixture.fetchImpl.mockImplementation((url, init) => {
+              const command: string[] = JSON.parse(String(init?.body));
+              if (
+                command[0] === "EVAL" &&
+                command.some((part) => part.includes('"providerDispatch":true'))
+              ) {
+                fixture.writeControl({
+                  ...fixture.readControl(),
+                  phase: "draining",
+                });
+              }
+              if (!original) {
+                throw new Error("Missing fixture store transport");
+              }
+              return original(url, init);
+            });
+          }
+          await expect(
+            withXeroCampaignProviderEffect(target, transport)
+          ).rejects.toThrow("xero_campaign_admission_denied");
+          expect(transport).not.toHaveBeenCalled();
+        },
+        "worker-owned",
+        fixture.configuration
+      );
+      expect(fixture.readControl().effects).toEqual([]);
+      expect(fixture.readControl().tickets[0]?.outcome).toBe("succeeded");
+    }
+  );
 });

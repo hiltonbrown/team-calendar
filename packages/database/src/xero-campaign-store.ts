@@ -476,12 +476,25 @@ export class XeroCampaignStore {
         throw new XeroCampaignDeniedError();
       }
     }
+    if (
+      before.phase !== "active" &&
+      parsed.effects.some(
+        (effect) =>
+          effect.providerDispatch === true &&
+          !before.effects.some(
+            (previousEffect) => previousEffect.id === effect.id
+          )
+      )
+    ) {
+      throw new XeroCampaignDeniedError();
+    }
     for (const effect of before.effects) {
       const updated = parsed.effects.find((entry) => entry.id === effect.id);
       if (
         !updated ||
         updated.dispatchId !== effect.dispatchId ||
         updated.providerRequest !== effect.providerRequest ||
+        updated.providerDispatch !== effect.providerDispatch ||
         (effect.outcome !== "dispatched" &&
           updated.providerResponseStatus !== effect.providerResponseStatus) ||
         (effect.outcome !== "dispatched" && updated.outcome !== effect.outcome)
@@ -576,7 +589,7 @@ export class XeroCampaignStore {
           !(control && ticket && resource) ||
           control.runId !== input.runId ||
           control.epoch !== input.epoch ||
-          control.phase !== "active" ||
+          !["active", "draining"].includes(control.phase) ||
           control.candidateSha !== this.input.runtimeRevision ||
           Date.parse(control.expiresAt) <= Date.now() ||
           ticket.userId !== input.userId ||
@@ -584,7 +597,9 @@ export class XeroCampaignStore {
           ticket.organisationId !== input.organisationId ||
           ticket.outcome !== "running" ||
           !ticket.targetHash ||
-          !["xero.oauth.select", "xero.disconnect"].includes(ticket.functionId)
+          !["xero.tenant-selection", "xero.disconnect"].includes(
+            ticket.functionId
+          )
         ) {
           throw new XeroCampaignDeniedError();
         }
@@ -602,7 +617,7 @@ export class XeroCampaignStore {
           where: {
             clerk_org_id: input.clerkOrgId,
             organisation_id: input.organisationId,
-            ...(ticket.functionId === "xero.oauth.select"
+            ...(ticket.functionId === "xero.tenant-selection"
               ? { active_slot: 1, retired_at: null }
               : { id: resource.xeroTenantId ?? "" }),
           },
@@ -901,6 +916,7 @@ function validCampaignBindingState(
 ) {
   const state = campaignBindingState(binding);
   return (
-    state !== null && (functionId !== "xero.oauth.select" || state === "active")
+    state !== null &&
+    (functionId !== "xero.tenant-selection" || state === "active")
   );
 }

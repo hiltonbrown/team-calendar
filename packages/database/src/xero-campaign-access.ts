@@ -30,7 +30,7 @@ interface Invocation {
 const RECONNECT_ACTIONS = new Set([
   "xero.oauth.start",
   "xero.oauth.callback",
-  "xero.oauth.select",
+  "xero.tenant-selection",
 ]);
 const invocations = new AsyncLocalStorage<Invocation>();
 const inlineChildren = new AsyncLocalStorage<{
@@ -137,6 +137,17 @@ async function admission(
   if (!campaign) {
     throw new XeroCampaignDeniedError();
   }
+  const current = invocations.getStore();
+  const continuing =
+    current?.store === store &&
+    current.functionId === functionId &&
+    current.campaign.runId === campaign.runId &&
+    current.campaign.epoch === campaign.epoch &&
+    current.campaign.dispatchId === campaign.dispatchId &&
+    snapshot.control.tickets.some(
+      (entry) =>
+        entry.dispatchId === campaign.dispatchId && entry.outcome === "running"
+    );
   const control = assertSnapshot(
     snapshot,
     {
@@ -144,6 +155,7 @@ async function admission(
       ...campaign,
       candidateSha: store.input.runtimeRevision,
       functionId,
+      phases: continuing ? ["active", "draining"] : ["active"],
     },
     store
   );
@@ -866,6 +878,7 @@ async function trackCampaignEffect<T>(
         dispatchId: invocation.campaign.dispatchId,
         id,
         outcome: "dispatched",
+        providerDispatch: providerTarget !== undefined,
         providerRequest,
       },
     ],

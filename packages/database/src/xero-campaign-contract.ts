@@ -82,6 +82,7 @@ export const XeroCampaignControlSchema = z.strictObject({
         dispatchId: z.uuid(),
         id: z.uuid(),
         outcome: z.enum(["dispatched", "completed", "uncertain"]),
+        providerDispatch: z.boolean().optional(),
         providerRequest: z.string().nullable().optional(),
         providerResponseStatus: z
           .number()
