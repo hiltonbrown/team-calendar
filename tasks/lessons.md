@@ -149,6 +149,10 @@ actionable; keep one-off task evidence in the review for that task.
   safe in-scope fallbacks and put concrete tooling or environment limitations
   in `plans/README.md`; do not turn a non-product constraint into a new approval
   stop.
+- A host permission denial ends only the denied action. Record it with the
+  exact operator command in `plans/README.md` in the same turn, finish every
+  independent deliverable, and report. Never close with “if you approve” offers
+  or a menu of options after the operator has said not to block.
 - When the user authorises a concrete resolution for a plan's documented truth
   conflict, record the decision and residual issue in `plans/README.md`, then
   continue execution. Do not reopen the same STOP condition as a blocker.
