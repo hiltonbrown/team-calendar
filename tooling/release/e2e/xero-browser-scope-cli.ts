@@ -4,6 +4,8 @@ import { Pool } from "pg";
 import { z } from "zod";
 import { requireXeroObserverAuthority } from "../xero-observer-authority.js";
 
+import { assertXeroBrowserBinding } from "./xero-browser-mutation-scope.js";
+
 const recordTypePattern = /^[a-z_]+$/;
 
 const alias = z
@@ -118,16 +120,7 @@ try {
         scope
       ),
     ]);
-    const binding = results[0]?.rows[0];
-    if (
-      resource.bindingGeneration === 0
-        ? results[0]?.rows.length !== 0
-        : results[0]?.rows.length !== 1 ||
-          binding?.binding_generation !== resource.bindingGeneration ||
-          binding?.xero_tenant_id !== resource.xeroTenantId
-    ) {
-      throw new Error("Browser payroll binding or generation is stale");
-    }
+    assertXeroBrowserBinding(results[0]?.rows, resource);
     const fingerprint = createHash("sha256")
       .update(JSON.stringify(results.map((result) => result.rows)))
       .digest("hex");

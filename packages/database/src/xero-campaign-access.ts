@@ -9,9 +9,11 @@ import {
   XeroCampaignDeniedError,
   type XeroCampaignEvent,
   XeroCampaignEventSchema,
+  type XeroCampaignProviderRequest,
   type XeroCampaignScope,
   XeroCampaignScopeSchema,
   type XeroCampaignTicket,
+  xeroCampaignActionTargetHash,
 } from "./xero-campaign-contract";
 import {
   type XeroCampaignSnapshot,
@@ -25,10 +27,28 @@ interface Invocation {
   scope: XeroCampaignScope;
   store: XeroCampaignStore;
 }
+const RECONNECT_ACTIONS = new Set([
+  "xero.oauth.start",
+  "xero.oauth.callback",
+  "xero.oauth.select",
+]);
 const invocations = new AsyncLocalStorage<Invocation>();
+const inlineChildren = new AsyncLocalStorage<{
+  dispatchId: string;
+  functionId: string;
+}>();
+const actions = new AsyncLocalStorage<{
+  campaign: XeroCampaignEvent;
+  functionId: string;
+  targetHash: string;
+  userId: string;
+}>();
 type OrdinaryScope = Pick<XeroCampaignScope, "clerkOrgId" | "organisationId"> &
   Partial<XeroCampaignScope>;
 const ordinaryScopes = new AsyncLocalStorage<{
+  active: boolean;
+  pending: Set<Promise<unknown>>;
+  acceptedMutation: boolean;
   scope: OrdinaryScope;
   store: XeroCampaignStore;
 }>();
@@ -139,6 +159,26 @@ async function admission(
   ) {
     throw new XeroCampaignDeniedError();
   }
+  const resource = control.resources.find(
+    (entry) => entry.organisationId === scope.organisationId
+  );
+  if (
+    resource?.bindingState === "retired" &&
+    (ticket.userId === null ||
+      !(
+        RECONNECT_ACTIONS.has(functionId) ||
+        (functionId === "xero.disconnect" &&
+          ticket.outcome === "running" &&
+          invocations.getStore()?.campaign.dispatchId === ticket.dispatchId &&
+          control.bindingTransitions?.some(
+            (transition) =>
+              transition.dispatchId === ticket.dispatchId &&
+              transition.next.bindingState === "retired"
+          ))
+      ))
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
   return { snapshot, store, ticket };
 }
 function assertSameScope(expected: OrdinaryScope, actual: XeroCampaignScope) {
@@ -161,7 +201,7 @@ export async function assertXeroCampaignAccess(scope: XeroCampaignScope) {
       observer.input.organisationId
     );
     assertSnapshot(snapshot, observer.input, observer.store);
-    return { snapshot, store: observer.store };
+    return { snapshot, store: observer.store, ticket: undefined };
   }
   const current = invocations.getStore();
   const scoped = current ?? credentials.getStore() ?? ordinaryScopes.getStore();
@@ -192,7 +232,10 @@ export async function assertXeroCampaignDispatch(
 }
 export async function reserveXeroCampaignTicket(
   input: XeroCampaignAuthorityInput,
-  ticket: Omit<XeroCampaignTicket, "outcome" | "eventIds" | "workerRunId">,
+  ticket: Omit<
+    XeroCampaignTicket,
+    "outcome" | "eventIds" | "workerRunId" | "providerRequests"
+  > & { providerRequests?: XeroCampaignProviderRequest[] },
   configuration?: XeroCampaignStoreInput
 ) {
   const store = new XeroCampaignStore(configuration);
@@ -236,7 +279,13 @@ export async function reserveXeroCampaignTicket(
     ...control,
     tickets: [
       ...control.tickets,
-      { ...ticket, eventIds: [], outcome: "reserved", workerRunId: null },
+      {
+        ...ticket,
+        eventIds: [],
+        outcome: "reserved",
+        providerRequests: ticket.providerRequests ?? [],
+        workerRunId: null,
+      },
     ],
   });
   return {
@@ -272,6 +321,57 @@ export async function recordXeroCampaignDispatch(
 const invocationInput = XeroCampaignScopeSchema.extend({
   campaign: XeroCampaignEventSchema.optional(),
 });
+async function withOrdinaryInvocation<T>(
+  scope: OrdinaryScope,
+  store: XeroCampaignStore,
+  operation: () => Promise<T>,
+  functionId = "xero.scoped-effect"
+): Promise<T> {
+  const inherited = ordinaryScopes.getStore();
+  if (inherited) {
+    if (
+      !inherited.active ||
+      inherited.scope.clerkOrgId !== scope.clerkOrgId ||
+      inherited.scope.organisationId !== scope.organisationId
+    ) {
+      throw new XeroCampaignDeniedError();
+    }
+    const pending = Promise.resolve().then(operation);
+    inherited.pending.add(pending);
+    const settled = () => inherited.pending.delete(pending);
+    pending.then(settled, settled);
+    return pending;
+  }
+  const attempt = await store.beginOrdinaryInvocation(scope, functionId);
+  const context = {
+    acceptedMutation: false,
+    active: true,
+    pending: new Set<Promise<unknown>>(),
+    scope,
+    store,
+  };
+  let outcome: "completed" | "uncertain" = "uncertain";
+  let result: T;
+  let unfinished: Promise<unknown>[] = [];
+  try {
+    result = await ordinaryScopes.run(context, operation);
+    outcome = ordinaryResultIsUncertain(context, result)
+      ? "uncertain"
+      : "completed";
+  } finally {
+    context.active = false;
+    unfinished = [...context.pending];
+    await Promise.allSettled(unfinished);
+    if (unfinished.length) {
+      outcome = "uncertain";
+    }
+    await store.finishOrdinaryInvocation(attempt, outcome);
+  }
+  if (unfinished.length) {
+    throw new XeroCampaignDeniedError();
+  }
+  return result;
+}
 export async function withXeroCampaignInvocation<T>(
   functionId: string,
   value: unknown,
@@ -288,11 +388,25 @@ export async function withXeroCampaignInvocation<T>(
   const admitted = await admission(scope, functionId, campaign, store);
   const guardedOperation = () =>
     withDatabaseWriteGuard(
-      (tx) => lockXeroCampaignPersistence(scope, tx),
+      (tx) =>
+        lockXeroCampaignPersistence(invocations.getStore()?.scope ?? scope, tx),
       operation
     );
   if (!(campaign && admitted.snapshot.control && admitted.ticket)) {
-    return ordinaryScopes.run({ scope, store }, guardedOperation);
+    return withOrdinaryInvocation(scope, store, guardedOperation, functionId);
+  }
+  const action = actions.getStore();
+  if (
+    admitted.ticket.userId !== null &&
+    (!action ||
+      action.campaign.dispatchId !== campaign.dispatchId ||
+      action.campaign.runId !== campaign.runId ||
+      action.campaign.epoch !== campaign.epoch ||
+      action.functionId !== functionId ||
+      action.userId !== admitted.ticket.userId ||
+      action.targetHash !== admitted.ticket.targetHash)
+  ) {
+    throw new XeroCampaignDeniedError();
   }
   if (!["reserved", "failed"].includes(admitted.ticket.outcome)) {
     throw new XeroCampaignDeniedError();
@@ -309,7 +423,10 @@ export async function withXeroCampaignInvocation<T>(
   try {
     const result = await invocations.run(
       { campaign, functionId, scope, store },
-      guardedOperation
+      inlineChildren.getStore()?.dispatchId === campaign.dispatchId &&
+        inlineChildren.getStore()?.functionId === functionId
+        ? operation
+        : guardedOperation
     );
     outcome =
       result &&
@@ -442,10 +559,12 @@ export async function transitionXeroCampaign(
   );
 }
 interface ProviderTarget {
+  bodyHash?: string | null;
   kind: string;
   method?: string;
   providerAppId: string;
   tenantHeader?: string | null;
+  tokenGrantType?: string | null;
   url?: string;
   xeroTenantId?: string;
 }
@@ -476,6 +595,111 @@ function assertProviderTarget(target: ProviderTarget) {
     // Campaign connection-management authority requires a separate exact connection ticket.
     throw new XeroCampaignDeniedError();
   }
+}
+function campaignProviderRequest(
+  target: ProviderTarget,
+  control: XeroCampaignControl | null,
+  ticket: XeroCampaignTicket | undefined
+): string | null {
+  const action = actions.getStore();
+  if (!action) {
+    assertProviderTarget(target);
+    return null;
+  }
+  if (
+    !(control && ticket) ||
+    ticket.userId !== action.userId ||
+    ticket.targetHash !== action.targetHash ||
+    !target.url
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  const url = new URL(target.url);
+  if (
+    url.username ||
+    url.password ||
+    url.hash ||
+    url.href !== target.url ||
+    !["https://api.xero.com", "https://identity.xero.com"].includes(url.origin)
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  if (target.kind === "tenant" && target.tenantHeader !== target.xeroTenantId) {
+    throw new XeroCampaignDeniedError();
+  }
+  if (
+    (target.method ?? "GET") === "GET" &&
+    target.kind === "tenant" &&
+    isCampaignPayrollRead(url, "GET")
+  ) {
+    return null;
+  }
+  if (
+    target.kind === "token" &&
+    target.url === "https://identity.xero.com/connect/token"
+  ) {
+    assertProviderTarget(target);
+    if (target.tokenGrantType === "refresh_token") {
+      return null;
+    }
+    if (
+      action.functionId !== "xero.oauth.callback" ||
+      target.tokenGrantType !== "authorization_code"
+    ) {
+      throw new XeroCampaignDeniedError();
+    }
+    if (
+      control.effects.some(
+        (effect) =>
+          effect.dispatchId === action.campaign.dispatchId &&
+          effect.providerRequest === "oauth-code"
+      )
+    ) {
+      throw new XeroCampaignDeniedError();
+    }
+    return "oauth-code";
+  }
+  return exactCampaignProviderGrant(target, control, ticket, action);
+}
+function exactCampaignProviderGrant(
+  target: ProviderTarget,
+  control: XeroCampaignControl,
+  ticket: XeroCampaignTicket,
+  action: { functionId: string; campaign: XeroCampaignEvent }
+): string {
+  const grants = ticket.providerRequests ?? [];
+  const index = grants.findIndex(
+    (request) =>
+      request.url === target.url &&
+      request.method === (target.method ?? "GET") &&
+      request.bodyHash === target.bodyHash
+  );
+  const grant = grants[index];
+  if (
+    !grant ||
+    (target.kind === "app_management" &&
+      action.functionId !== "xero.disconnect")
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  const identity = `request:${index}`;
+  const prior = control.effects.filter(
+    (effect) =>
+      effect.dispatchId === action.campaign.dispatchId &&
+      effect.providerRequest === identity
+  );
+  if (
+    prior.length >= grant.maxAttempts ||
+    prior.some(
+      (effect) =>
+        effect.outcome !== "completed" ||
+        (grant.method !== "GET" &&
+          ![401, 429].includes(effect.providerResponseStatus ?? 0))
+    )
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  return identity;
 }
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Match exact observer, worker or ordinary credential authority to the same provider target.
 export async function assertXeroCampaignProviderAccess(
@@ -509,8 +733,12 @@ export async function assertXeroCampaignProviderAccess(
   const store =
     invocation?.store ?? credential?.store ?? new XeroCampaignStore();
   if (invocation) {
-    assertProviderTarget(rateClass);
     const current = await assertXeroCampaignAccess(invocation.scope);
+    campaignProviderRequest(
+      rateClass,
+      current.snapshot.control,
+      current.ticket
+    );
     const resource = current.snapshot.control?.resources.find(
       (entry) => entry.organisationId === invocation.scope.organisationId
     );
@@ -573,9 +801,12 @@ export async function withXeroCampaignProviderEffect<T>(
   rateClass: ProviderTarget,
   operation: () => Promise<T>
 ): Promise<T> {
+  if (ordinaryScopes.getStore()?.active === false) {
+    throw new XeroCampaignDeniedError();
+  }
   await assertXeroCampaignProviderAccess(rateClass);
   if (invocations.getStore() || observations.getStore()) {
-    return trackCampaignEffect(operation);
+    return trackCampaignEffect(operation, rateClass);
   }
   const store =
     credentials.getStore()?.store ??
@@ -588,6 +819,16 @@ export async function withXeroCampaignProviderEffect<T>(
   let outcome: "completed" | "uncertain" = "uncertain";
   try {
     const result = await operation();
+    const ordinary = ordinaryScopes.getStore();
+    if (
+      ordinary &&
+      (rateClass.method ?? "GET") !== "GET" &&
+      result instanceof Response &&
+      result.status >= 200 &&
+      result.status < 300
+    ) {
+      ordinary.acceptedMutation = true;
+    }
     outcome =
       result instanceof Response &&
       (rateClass.method ?? "GET") !== "GET" &&
@@ -599,27 +840,49 @@ export async function withXeroCampaignProviderEffect<T>(
     await store.finishOrdinaryProviderAttempt(attempt, outcome);
   }
 }
-async function trackCampaignEffect<T>(operation: () => Promise<T>): Promise<T> {
+async function trackCampaignEffect<T>(
+  operation: () => Promise<T>,
+  providerTarget?: ProviderTarget
+): Promise<T> {
   const invocation = invocations.getStore();
   if (!invocation) {
     return operation();
   }
-  const { snapshot, store } = await assertXeroCampaignAccess(invocation.scope);
+  const { snapshot, store, ticket } = await assertXeroCampaignAccess(
+    invocation.scope
+  );
   if (!snapshot.control) {
     throw new XeroCampaignDeniedError();
   }
+  const providerRequest = providerTarget
+    ? campaignProviderRequest(providerTarget, snapshot.control, ticket)
+    : null;
   const id = randomUUID();
   await store.compareAndSet(snapshot, {
     ...snapshot.control,
     effects: [
       ...snapshot.control.effects,
-      { dispatchId: invocation.campaign.dispatchId, id, outcome: "dispatched" },
+      {
+        dispatchId: invocation.campaign.dispatchId,
+        id,
+        outcome: "dispatched",
+        providerRequest,
+      },
     ],
   });
   let outcome: "completed" | "uncertain" = "uncertain";
+  let providerResponseStatus: number | null = null;
   try {
     const result = await operation();
-    outcome = "completed";
+    providerResponseStatus =
+      providerTarget && result instanceof Response ? result.status : null;
+    outcome =
+      result instanceof Response &&
+      providerTarget &&
+      (providerTarget.method ?? "GET") !== "GET" &&
+      result.status >= 500
+        ? "uncertain"
+        : "completed";
     return result;
   } finally {
     const latest = await store.readOrganisation(
@@ -636,7 +899,7 @@ async function trackCampaignEffect<T>(operation: () => Promise<T>): Promise<T> {
     await store.compareAndSet(latest, {
       ...latest.control,
       effects: latest.control.effects.map((entry) =>
-        entry.id === id ? { ...entry, outcome } : entry
+        entry.id === id ? { ...entry, outcome, providerResponseStatus } : entry
       ),
     });
   }
@@ -756,10 +1019,12 @@ export async function withXeroCampaignCredentialScope<T>(
   if (ordinary) {
     return credentials.run({ externalTenantId, scope, store }, operation);
   }
-  return credentials.run({ externalTenantId, scope, store }, () =>
-    withDatabaseWriteGuard(
-      (tx) => lockXeroCampaignPersistence(scope, tx),
-      operation
+  return withOrdinaryInvocation(scope, store, () =>
+    credentials.run({ externalTenantId, scope, store }, () =>
+      withDatabaseWriteGuard(
+        (tx) => lockXeroCampaignPersistence(scope, tx),
+        operation
+      )
     )
   );
 }
@@ -791,15 +1056,19 @@ export async function withXeroCampaignScopedInvocation<T>(
   if (scope.campaign) {
     throw new XeroCampaignDeniedError();
   }
-  return ordinaryScopes.run({ scope, store }, () =>
-    withDatabaseWriteGuard(async (tx) => {
-      const { lockXeroCampaign } = await import("@repo/database");
-      await lockXeroCampaign(tx, store.input.credentialDomainId);
-      const latest = await store.readOrganisation(scope.organisationId);
-      if (latest.control && latest.control.phase !== "closed") {
-        throw new XeroCampaignDeniedError();
-      }
-    }, operation)
+  return withOrdinaryInvocation(
+    scope,
+    store,
+    () =>
+      withDatabaseWriteGuard(async (tx) => {
+        const { lockXeroCampaign } = await import("@repo/database");
+        await lockXeroCampaign(tx, store.input.credentialDomainId);
+        const latest = await store.readOrganisation(scope.organisationId);
+        if (latest.control && latest.control.phase !== "closed") {
+          throw new XeroCampaignDeniedError();
+        }
+      }, operation),
+    functionId
   );
 }
 export async function dispatchXeroCampaignChild(
@@ -813,10 +1082,13 @@ export async function dispatchXeroCampaignChild(
 ) {
   const invocation = invocations.getStore();
   if (!invocation) {
-    if (!(await xeroCampaignAllowsOrdinaryMaintenance(data))) {
-      throw new XeroCampaignDeniedError();
-    }
-    return send({ data, name: functionId });
+    const store = ordinaryScopes.getStore()?.store ?? new XeroCampaignStore();
+    return withOrdinaryInvocation(
+      data,
+      store,
+      () => send({ data, name: functionId }),
+      functionId
+    );
   }
   if (
     data.clerkOrgId !== invocation.scope.clerkOrgId ||
@@ -831,9 +1103,11 @@ export async function dispatchXeroCampaignChild(
       candidateSha: invocation.store.input.runtimeRevision,
     },
     {
-      ...invocation.scope,
+      bindingGeneration: invocation.scope.bindingGeneration,
+      clerkOrgId: invocation.scope.clerkOrgId,
       dispatchId: randomUUID(),
       functionId,
+      organisationId: invocation.scope.organisationId,
       scheduledSlot: null,
       schedulerRunId: null,
       targetHash: null,
@@ -925,8 +1199,275 @@ export async function withXeroCampaignScopedEffect<T>(
     }
     return withXeroCampaignEffect(invocation.scope, operation);
   }
-  if (!(await xeroCampaignAllowsOrdinaryMaintenance(scope))) {
+  const store = ordinaryScopes.getStore()?.store ?? new XeroCampaignStore();
+  return await withOrdinaryInvocation(scope, store, operation);
+}
+
+const actionInputSchema = z.strictObject({
+  campaign: XeroCampaignEventSchema.optional(),
+  clerkOrgId: z.string().min(1),
+  organisationId: z.uuid(),
+  target: z.json(),
+  userId: z.string().min(1),
+});
+
+/** Application entrypoints supply authenticated scope and their validated action target. */
+export async function withXeroCampaignAction<T>(
+  functionId: string,
+  value: {
+    campaign?: XeroCampaignEvent;
+    clerkOrgId: string;
+    organisationId: string;
+    target: unknown;
+    userId: string;
+  },
+  operation: () => Promise<T>
+): Promise<T> {
+  const input = actionInputSchema.parse(value);
+  if (actions.getStore() || invocations.getStore()) {
     throw new XeroCampaignDeniedError();
   }
-  return operation();
+  if (!input.campaign) {
+    return withXeroCampaignScopedInvocation(functionId, input, operation);
+  }
+  const store = new XeroCampaignStore();
+  const snapshot = await store.readOrganisation(input.organisationId);
+  const resource = snapshot.control?.resources.find(
+    (entry) =>
+      entry.organisationId === input.organisationId &&
+      entry.clerkOrgId === input.clerkOrgId
+  );
+  if (!resource) {
+    throw new XeroCampaignDeniedError();
+  }
+  const scope = {
+    bindingGeneration: resource.bindingGeneration,
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+    xeroTenantId: resource.xeroTenantId,
+  };
+  const admitted = await admission(scope, functionId, input.campaign, store);
+  const targetHash = xeroCampaignActionTargetHash({
+    clerkOrgId: input.clerkOrgId,
+    functionId,
+    organisationId: input.organisationId,
+    target: input.target,
+    userId: input.userId,
+  });
+  if (
+    admitted.ticket?.outcome !== "reserved" ||
+    admitted.ticket.userId !== input.userId ||
+    admitted.ticket.targetHash !== targetHash ||
+    !snapshot.control?.sanctionedActors.some(
+      (actor) =>
+        actor.userId === input.userId &&
+        actor.clerkOrgId === input.clerkOrgId &&
+        actor.organisationId === input.organisationId &&
+        actor.actions.includes(functionId)
+    )
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  const { database } = await import("@repo/database");
+  const bindings = await database.xeroTenant.findMany({
+    select: {
+      active_slot: true,
+      binding_generation: true,
+      id: true,
+      provider_app_id: true,
+      retired_at: true,
+      retirement_reason: true,
+      xero_tenant_id: true,
+    },
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+      ...(resource.bindingState === "retired"
+        ? { id: resource.xeroTenantId ?? "" }
+        : { active_slot: 1, retired_at: null }),
+    },
+  });
+  if (
+    resource.bindingGeneration === 0
+      ? bindings.length !== 0 || resource.xeroTenantId !== null
+      : bindings.length !== 1 ||
+        bindings[0]?.id !== resource.xeroTenantId ||
+        bindings[0]?.binding_generation !== resource.bindingGeneration ||
+        bindings[0]?.xero_tenant_id !== resource.externalTenantId
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  if (
+    resource.bindingState === "retired" &&
+    (!RECONNECT_ACTIONS.has(functionId) ||
+      bindings[0]?.active_slot !== null ||
+      bindings[0]?.retired_at === null ||
+      bindings[0]?.retirement_reason !== "disconnected" ||
+      bindings[0]?.provider_app_id !== resource.providerAppId)
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  return actions.run(
+    { campaign: input.campaign, functionId, targetHash, userId: input.userId },
+    () =>
+      withXeroCampaignInvocation(
+        functionId,
+        { ...scope, campaign: input.campaign },
+        operation,
+        null,
+        store.input
+      )
+  );
+}
+
+/** The signed OAuth state carries a distinct callback ticket, never a replay of start. */
+export async function reserveXeroCampaignActionContinuation(
+  functionId: string,
+  input: { userId: string; target: unknown }
+): Promise<XeroCampaignEvent | undefined> {
+  const invocation = invocations.getStore();
+  const action = actions.getStore();
+  if (!(invocation || action)) {
+    return undefined;
+  }
+  if (
+    !(invocation && action) ||
+    invocation.functionId !== "xero.oauth.start" ||
+    functionId !== "xero.oauth.callback" ||
+    action.userId !== input.userId
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  const authority = await assertXeroCampaignAccess(invocation.scope);
+  return reserveXeroCampaignTicket(
+    {
+      ...invocation.scope,
+      ...invocation.campaign,
+      candidateSha: invocation.store.input.runtimeRevision,
+    },
+    {
+      bindingGeneration: invocation.scope.bindingGeneration,
+      clerkOrgId: invocation.scope.clerkOrgId,
+      dispatchId: randomUUID(),
+      functionId,
+      organisationId: invocation.scope.organisationId,
+      providerRequests: authority.ticket?.providerRequests?.filter(
+        (request) => request.method === "GET"
+      ),
+      scheduledSlot: null,
+      schedulerRunId: null,
+      targetHash: xeroCampaignActionTargetHash({
+        clerkOrgId: invocation.scope.clerkOrgId,
+        functionId,
+        organisationId: invocation.scope.organisationId,
+        target: input.target,
+        userId: input.userId,
+      }),
+      userId: input.userId,
+    },
+    invocation.store.input
+  );
+}
+
+/** Call after the service commits its binding transition and before dispatching children. */
+export async function reconcileXeroCampaignActionBinding(): Promise<void> {
+  const invocation = invocations.getStore();
+  const action = actions.getStore();
+  if (!(invocation || action)) {
+    return;
+  }
+  if (!(invocation && action)) {
+    throw new XeroCampaignDeniedError();
+  }
+  await trackCampaignEffect(() =>
+    invocation.store.reconcileActionBinding(
+      {
+        ...invocation.scope,
+        ...invocation.campaign,
+        userId: action.userId,
+      },
+      (resource) => {
+        invocation.scope = {
+          bindingGeneration: resource.bindingGeneration,
+          clerkOrgId: resource.clerkOrgId,
+          organisationId: resource.organisationId,
+          xeroTenantId: resource.xeroTenantId,
+        };
+      }
+    )
+  );
+}
+
+/** Run an existing registered handler with separate worker authority under the parent write guard. */
+export async function withXeroCampaignChildInvocation<T>(
+  functionId: string,
+  data: { clerkOrgId: string; organisationId: string; [key: string]: unknown },
+  handler: (payload: Record<string, unknown>) => Promise<T>
+): Promise<T> {
+  const parent = invocations.getStore();
+  if (!parent) {
+    return handler(data);
+  }
+  if (
+    data.clerkOrgId !== parent.scope.clerkOrgId ||
+    data.organisationId !== parent.scope.organisationId
+  ) {
+    throw new XeroCampaignDeniedError();
+  }
+  const campaign = await reserveXeroCampaignTicket(
+    {
+      ...parent.scope,
+      ...parent.campaign,
+      candidateSha: parent.store.input.runtimeRevision,
+    },
+    {
+      bindingGeneration: parent.scope.bindingGeneration,
+      clerkOrgId: parent.scope.clerkOrgId,
+      dispatchId: randomUUID(),
+      functionId,
+      organisationId: parent.scope.organisationId,
+      scheduledSlot: null,
+      schedulerRunId: null,
+      targetHash: null,
+      userId: null,
+    },
+    parent.store.input
+  );
+  const result = await inlineChildren.run(
+    { dispatchId: campaign.dispatchId, functionId },
+    () =>
+      actions.exit(() =>
+        invocations.exit(() =>
+          handler({
+            ...data,
+            bindingGeneration: parent.scope.bindingGeneration,
+            campaign,
+            xeroTenantId: parent.scope.xeroTenantId,
+          })
+        )
+      )
+  );
+  const snapshot = await parent.store.readOrganisation(
+    parent.scope.organisationId
+  );
+  const child = snapshot.control?.tickets.find(
+    (ticket) => ticket.dispatchId === campaign.dispatchId
+  );
+  if (!(child && ["succeeded", "failed"].includes(child.outcome))) {
+    throw new XeroCampaignDeniedError();
+  }
+  await assertXeroCampaignAccess(parent.scope);
+  return result;
+}
+
+function ordinaryResultIsUncertain(
+  context: { acceptedMutation: boolean },
+  result: unknown
+) {
+  return (
+    context.acceptedMutation &&
+    result !== null &&
+    typeof result === "object" &&
+    Reflect.get(result, "ok") === false
+  );
 }

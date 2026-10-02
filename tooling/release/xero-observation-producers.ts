@@ -52,7 +52,7 @@ const canonicalLeaveSchema = z.object({
 });
 const operationInputSchema = contextSchema.extend({
   expected: z.strictObject({
-    action: z.literal("submit"),
+    action: z.enum(["submit", "approve"]),
     employeeId: z.uuid(),
     endsAt: z.iso.date(),
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/),
@@ -359,12 +359,13 @@ export async function produceXeroOperationObservation(
           to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS completed_at
         FROM outbound_operations
         WHERE clerk_org_id=$1 AND organisation_id=$2::uuid AND id=$3::uuid
-          AND availability_record_id=$4::uuid AND action='submit'`,
+          AND availability_record_id=$4::uuid AND action::text=$5`,
         [
           authority.fixture.clerkOrgId,
           authority.fixture.organisationId,
           input.expected.operationId,
           input.expected.recordId,
+          input.expected.action,
         ]
       );
       return z.array(operationSchema).parse(result.rows);

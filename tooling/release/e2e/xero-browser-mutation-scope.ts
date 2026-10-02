@@ -148,3 +148,32 @@ export function assertXeroBrowserMutationRequest(
     );
   }
 }
+
+const bindingObservationSchema = z.array(
+  z.object({
+    active_slot: z.number().int().nullable(),
+    binding_generation: z.number().int().nonnegative(),
+    retired_at: z.unknown(),
+    xero_tenant_id: z.uuid(),
+  })
+);
+
+/** Retired history remains in the snapshot digest but cannot become the current binding. */
+export function assertXeroBrowserBinding(
+  rows: unknown,
+  resource: { bindingGeneration: number; xeroTenantId: string | null }
+) {
+  const bindings = bindingObservationSchema.parse(rows);
+  const current = bindings.filter(
+    (row) => row.active_slot === 1 && row.retired_at === null
+  );
+  if (
+    resource.bindingGeneration === 0
+      ? bindings.length !== 0
+      : current.length !== 1 ||
+        current[0]?.binding_generation !== resource.bindingGeneration ||
+        current[0]?.xero_tenant_id !== resource.xeroTenantId
+  ) {
+    throw new Error("Browser payroll binding or generation is stale");
+  }
+}

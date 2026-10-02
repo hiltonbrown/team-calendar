@@ -129,6 +129,63 @@ afterAll(async () => {
   await database.$disconnect();
 });
 
+it("retains real ordinary invocation ownership through accepted response and local commit", async () => {
+  const accepted = barrier();
+  const persist = barrier();
+  const worker = withXeroCampaignInvocation(
+    functionId,
+    scope,
+    async () => {
+      await withXeroCampaignProviderEffect(
+        {
+          kind: "tenant",
+          providerAppId,
+          tenantHeader: externalTenantId,
+          url: "https://api.xero.com/payroll.xro/1.0/Employees",
+          xeroTenantId: externalTenantId,
+        },
+        () => Promise.resolve(new Response("controlled accepted response"))
+      );
+      accepted.release();
+      await persist.ready;
+      await database.organisation.update({
+        data: { name: "Campaign fixture unchanged" },
+        where,
+      });
+    },
+    fixture.key("ordinary-worker")
+  );
+  try {
+    await Promise.race([accepted.ready, worker]);
+    await expect(initialiseXeroCampaign(control)).rejects.toThrow(
+      "xero_campaign_admission_denied"
+    );
+    const store = new XeroCampaignStore();
+    expect(
+      await store.command([
+        "HLEN",
+        store.keys.ordinaryInvocations(scope.organisationId),
+      ])
+    ).toBe(1);
+    expect(
+      await store.command([
+        "HLEN",
+        store.keys.ordinaryProviderAttempts(providerAppId, externalTenantId),
+      ])
+    ).toBe(0);
+  } finally {
+    persist.release();
+  }
+  await worker;
+  const store = new XeroCampaignStore();
+  expect(
+    await store.command([
+      "HLEN",
+      store.keys.ordinaryInvocations(scope.organisationId),
+    ])
+  ).toBe(0);
+});
+
 it("holds real campaign acquisition until a prior ordinary provider response completes", async () => {
   const entered = barrier();
   const release = barrier();
@@ -253,4 +310,32 @@ it("allows an unrelated tenant in the same app and retains an uncertain response
       store.keys.ordinaryProviderAttempts(providerAppId, unrelatedTenant),
     ])
   ).toBe(1);
+});
+
+it("rejects a sentinel replacement between live read and compare-and-set", async () => {
+  const store = new XeroCampaignStore();
+  const snapshot = await store.readRun(runId);
+  const raw = snapshot.sentinelRaw;
+  try {
+    await store.command([
+      "SET",
+      store.keys.sentinel,
+      JSON.stringify({
+        ...snapshot.sentinel,
+        databaseTargetHash: `sha256:${"f".repeat(64)}`,
+      }),
+    ]);
+    if (!snapshot.control) {
+      throw new Error("Campaign control missing");
+    }
+    await expect(
+      store.compareAndSet(snapshot, {
+        ...snapshot.control,
+        phase: "recovering",
+      })
+    ).rejects.toThrow("xero_campaign_admission_denied");
+  } finally {
+    await store.command(["SET", store.keys.sentinel, raw]);
+  }
+  expect((await store.readRun(runId)).control?.phase).toBe("draining");
 });

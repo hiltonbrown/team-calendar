@@ -135,7 +135,11 @@ function bindings(): XeroObserverBindings {
 
 function transport() {
   const input = bindings();
-  const identity = { ...input.databaseManifest.target, readOnly: "on" };
+  const identity = {
+    ...input.databaseManifest.target,
+    readOnly: "on",
+    timezone: "UTC",
+  };
   const query = vi.fn(
     async (sql: string): Promise<unknown> =>
       sql.startsWith("SELECT") ? { rows: [identity] } : { rows: [] }
@@ -222,6 +226,9 @@ describe("read-only independent observations", () => {
     expect(test.client.query.mock.calls[0]).toEqual([
       "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
     ]);
+    expect(test.client.query.mock.calls[1]).toEqual([
+      "SET LOCAL TIME ZONE 'UTC'",
+    ]);
     expect(test.client.query.mock.calls.at(-1)).toEqual(["ROLLBACK"]);
     expect(test.assertCurrent).toHaveBeenCalledTimes(3);
     expect(test.client.release).toHaveBeenCalledOnce();
@@ -245,6 +252,7 @@ describe("read-only independent observations", () => {
     "database",
     "role",
     "readOnly",
+    "timezone",
   ] as const)(
     "rejects SQL %s drift before observing tenant data",
     async (key) => {

@@ -62,6 +62,7 @@ const sqlIdentitySchema = z.object({
         projectId: z.string(),
         readOnly: z.literal("on"),
         role: z.string(),
+        timezone: z.literal("UTC"),
       })
     )
     .length(1),
@@ -101,12 +102,14 @@ export async function withXeroReadOnlyObservation<
     await client.query(
       "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
     );
+    await client.query("SET LOCAL TIME ZONE 'UTC'");
     const {
       rows: [identity],
     } = sqlIdentitySchema.parse(
       await client.query(
         `SELECT current_database() AS database, current_user AS role,
           current_setting('transaction_read_only') AS "readOnly",
+          current_setting('TimeZone') AS timezone,
           current_setting('neon.project_id') AS "projectId",
           current_setting('neon.branch_id') AS "branchId",
           current_setting('neon.endpoint_id') AS "endpointId"`

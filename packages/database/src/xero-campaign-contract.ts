@@ -17,11 +17,21 @@ export const XeroCampaignScopeSchema = z.object({
 });
 export type XeroCampaignScope = z.infer<typeof XeroCampaignScopeSchema>;
 export const XeroCampaignResourceSchema = XeroCampaignScopeSchema.extend({
+  bindingState: z.enum(["active", "retired"]).optional(),
   credentialOwnerId: z.uuid().nullable(),
   externalTenantId: z.uuid(),
   providerAppId: z.string().min(1),
   xeroTenantId: z.uuid().nullable(),
 }).strict();
+export const XeroCampaignProviderRequestSchema = z.strictObject({
+  bodyHash: reference.nullable(),
+  maxAttempts: z.number().int().positive().max(4),
+  method: z.enum(["GET", "POST", "PUT", "DELETE"]),
+  url: z.url(),
+});
+export type XeroCampaignProviderRequest = z.infer<
+  typeof XeroCampaignProviderRequestSchema
+>;
 export const XeroCampaignTicketSchema = z.strictObject({
   bindingGeneration: z.number().int().nonnegative(),
   clerkOrgId: z.string().min(1),
@@ -30,6 +40,10 @@ export const XeroCampaignTicketSchema = z.strictObject({
   functionId: z.string().min(1).max(100),
   organisationId: z.uuid(),
   outcome: z.enum(["reserved", "running", "succeeded", "failed"]),
+  providerRequests: z
+    .array(XeroCampaignProviderRequestSchema)
+    .max(20)
+    .optional(),
   scheduledSlot: z.string().nullable(),
   schedulerRunId: z.string().nullable(),
   targetHash: reference.nullable(),
@@ -38,6 +52,17 @@ export const XeroCampaignTicketSchema = z.strictObject({
 });
 export const XeroCampaignControlSchema = z.strictObject({
   allowedFunctions: z.array(z.string().min(1).max(100)).min(1).max(40),
+  bindingTransitions: z
+    .array(
+      z.strictObject({
+        dispatchId: z.uuid(),
+        next: XeroCampaignResourceSchema,
+        observedAt: z.iso.datetime(),
+        previous: XeroCampaignResourceSchema,
+      })
+    )
+    .max(100)
+    .optional(),
   candidateSha: sha,
   closure: z
     .strictObject({
@@ -57,6 +82,14 @@ export const XeroCampaignControlSchema = z.strictObject({
         dispatchId: z.uuid(),
         id: z.uuid(),
         outcome: z.enum(["dispatched", "completed", "uncertain"]),
+        providerRequest: z.string().nullable().optional(),
+        providerResponseStatus: z
+          .number()
+          .int()
+          .min(100)
+          .max(599)
+          .nullable()
+          .optional(),
       })
     )
     .max(2000)
@@ -116,4 +149,30 @@ export class XeroCampaignDeniedError extends Error {
   constructor() {
     super("xero_campaign_admission_denied");
   }
+}
+
+function canonicalActionTarget(value: z.core.util.JSONType): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalActionTarget).join(",")}]`;
+  }
+  return `{${Object.keys(value)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${canonicalActionTarget(value[key])}`)
+    .join(",")}}`;
+}
+
+/** Hash only the server-validated action input and authenticated actor. */
+export function xeroCampaignActionTargetHash(input: {
+  functionId: string;
+  clerkOrgId: string;
+  organisationId: string;
+  userId: string;
+  target: unknown;
+}) {
+  return `sha256:${createHash("sha256")
+    .update(canonicalActionTarget(z.json().parse(input)))
+    .digest("hex")}`;
 }

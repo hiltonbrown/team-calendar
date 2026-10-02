@@ -392,6 +392,22 @@ describe("actual Xero observation producers", () => {
     expect(mocks.provider).not.toHaveBeenCalled();
     expect(mocks.end).toHaveBeenCalledOnce();
   });
+  it("observes approval creates with their own action identity", async () => {
+    const approval = operationInput();
+    mocks.query.mockResolvedValue({
+      rows: [{ ...operation(), action: "approve" }],
+    });
+    const result = await produceXeroOperationObservation({
+      ...approval,
+      expected: { ...approval.expected, action: "approve" },
+      observationId: "X11.authorised-approval",
+    });
+    expect(result.receipt.assertionPassed).toBe(true);
+    expect(mocks.query).toHaveBeenCalledWith(
+      expect.stringContaining("action::text=$5"),
+      expect.arrayContaining(["approve"])
+    );
+  });
   it("queries the exact submitted operation and proves ordered dispatch, acceptance and completion", async () => {
     mocks.query.mockResolvedValue({ rows: [operation()] });
     const result = await produceXeroOperationObservation(operationInput());
@@ -400,7 +416,7 @@ describe("actual Xero observation producers", () => {
       expect.stringContaining(
         "clerk_org_id=$1 AND organisation_id=$2::uuid AND id=$3::uuid"
       ),
-      ["org_owned", ids.organisation, ids.operation, ids.record]
+      ["org_owned", ids.organisation, ids.operation, ids.record, "submit"]
     );
     expect(mocks.provider).not.toHaveBeenCalled();
   });

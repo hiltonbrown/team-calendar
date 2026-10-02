@@ -112,6 +112,41 @@ export function storeFixture(
         values.get("release:active-run") ?? null,
         pointer ?? null,
       ];
+    } else if (command[1]?.includes("local prior =")) {
+      const pointer = values.get(redisKeys[1] ?? "");
+      const prior = pointer ? values.get(`${args[2]}${pointer}`) : null;
+      const hash = hashes.get(redisKeys[2] ?? "") ?? new Map<string, string>();
+      result =
+        values.get(redisKeys[0] ?? "") === args[1] &&
+        (!pointer || (prior && JSON.parse(prior).phase === "closed")) &&
+        hash.size < 2000 &&
+        !hash.has(args[0] ?? "")
+          ? 1
+          : 0;
+      if (result === 1) {
+        hash.set(args[0] ?? "", args[3] ?? "");
+        hashes.set(redisKeys[2] ?? "", hash);
+      }
+    } else if (command[1]?.includes("local invocation =")) {
+      const hash = hashes.get(redisKeys[1] ?? "");
+      result =
+        values.get(redisKeys[0] ?? "") === args[1] &&
+        hash?.get(args[0] ?? "") === args[2]
+          ? 1
+          : 0;
+      if (result === 1 && hash) {
+        if (args[3] === "completed") {
+          hash.delete(args[0] ?? "");
+        } else {
+          hash.set(
+            args[0] ?? "",
+            JSON.stringify({ ...JSON.parse(args[2] ?? ""), state: "uncertain" })
+          );
+        }
+        if (!hash.size) {
+          hashes.delete(redisKeys[1] ?? "");
+        }
+      }
     } else if (
       command[1]?.includes("local previous = redis.call('get', KEYS[2])")
     ) {
@@ -219,7 +254,8 @@ export function storeFixture(
       const key = redisKeys[0] ?? "";
       result =
         values.get(key) === args[0] &&
-        values.get("release:active-run") === args[2]
+        values.get("release:active-run") === args[2] &&
+        values.get(redisKeys[1] ?? "") === args[3]
           ? 1
           : 0;
       if (result === 1) {
