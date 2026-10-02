@@ -54,6 +54,11 @@ describe("live fixture registry", () => {
           clerkOrgIds,
           globalKeys: [
             ...Array.from(
+              { length: 13 },
+              (_, index) =>
+                `campaign_domain:11111111-1111-4111-8111-${String(index).padStart(12, "0")}`
+            ),
+            ...Array.from(
               { length: 7 },
               (_, index) =>
                 `plan_id:22222222-2222-4222-8222-${index.toString().padStart(12, "0")}`
@@ -71,7 +76,7 @@ describe("live fixture registry", () => {
               (_, index) => `credential_owner:owner_release_${index}`
             ),
             ...Array.from(
-              { length: 9 },
+              { length: 10 },
               (_, index) => `provider_app:app_release_${index}`
             ),
             ...Array.from(
@@ -123,7 +128,7 @@ describe("live fixture registry", () => {
       item.tenants.map((tenant) => tenant.organisationId)
     );
 
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(27);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
@@ -352,7 +357,7 @@ describe("live fixture registry", () => {
       item.tenants.map((tenant) => tenant.organisationId)
     );
 
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(27);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(

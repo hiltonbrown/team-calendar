@@ -112,6 +112,10 @@ describe("approval modals", () => {
       <DeclineModal onClose={vi.fn()} onSuccess={onSuccess} record={record} />
     );
 
+    expect(
+      screen.getByText("The reason will be visible to the employee.")
+    ).toBeDefined();
+
     fireEvent.change(screen.getByLabelText("Reason"), {
       target: { value: "Coverage is not available." },
     });
@@ -123,7 +127,7 @@ describe("approval modals", () => {
         reason: "Coverage is not available.",
         recordId: record.id,
       });
-      expect(mocks.toastSuccess).toHaveBeenCalledWith("Leave declined in Xero");
+      expect(mocks.toastSuccess).toHaveBeenCalledWith("Leave declined");
       expect(onSuccess).toHaveBeenCalledTimes(1);
     });
   });

@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  auth: vi.fn().mockResolvedValue({ orgId: "org_1", userId: "user_1" }),
+  cancelXeroOAuth: vi.fn(),
   completeXeroOAuth: vi.fn(),
   isLocalApplicationPath: vi.fn(),
   isPreviewDeployment: vi.fn(),
 }));
 
+vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+
 vi.mock("@repo/xero", () => ({
+  cancelXeroOAuth: mocks.cancelXeroOAuth,
   completeXeroOAuth: mocks.completeXeroOAuth,
   isLocalApplicationPath: mocks.isLocalApplicationPath,
   isPreviewDeployment: mocks.isPreviewDeployment,
@@ -36,6 +41,30 @@ describe("Xero OAuth callback route", () => {
     });
   });
 
+  it("sends denied consent through signed cancellation without exchanging a token", async () => {
+    mocks.cancelXeroOAuth.mockResolvedValue({
+      ok: true,
+      value: {
+        redirectTo: "/settings/integrations/xero?xero=cancelled",
+        sessionId: "session_1",
+      },
+    });
+    const response = await GET(
+      new Request(
+        "https://api.example.com/api/xero/oauth/callback?error=access_denied&state=signed",
+        { headers: { cookie: "xero_oauth_nonce=nonce" } }
+      )
+    );
+    expect(response.status).toBe(307);
+    expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+    expect(mocks.cancelXeroOAuth).toHaveBeenCalledWith({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      nonce: "nonce",
+      state: "signed",
+    });
+  });
+
   it("rejects a missing nonce cookie without exchanging the code", async () => {
     mocks.completeXeroOAuth.mockResolvedValue({
       error: {
@@ -48,6 +77,8 @@ describe("Xero OAuth callback route", () => {
 
     expect(response.status).toBe(400);
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "code",
       nonce: null,
       state: "state",
@@ -66,6 +97,8 @@ describe("Xero OAuth callback route", () => {
       "https://api.example.com/settings/integrations/xero/connect?session=session_1"
     );
     expect(mocks.completeXeroOAuth).toHaveBeenCalledWith({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "code",
       nonce: "matching-nonce",
       state: "state",

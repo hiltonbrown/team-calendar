@@ -5,6 +5,10 @@ import { afterAll, describe, expect, test, vi } from "vitest";
 import { PrismaClient } from "./generated/client";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 import { scopedQuery } from "./src/tenant-query";
+import {
+  createWriteGuardedClient,
+  withDatabaseWriteGuard,
+} from "./src/write-guard";
 
 vi.mock("server-only", () => ({}));
 
@@ -214,5 +218,103 @@ describe("transaction-bound live tenant invariants", () => {
         where: { clerk_org_id: clerkOrgId, id: organisationId },
       })
     ).resolves.toBe(0);
+  });
+});
+
+function ownedGuardOrganisation(index: 0 | 1) {
+  const tenant = fixture.tenants[index];
+  if (!tenant) {
+    throw new Error("Protected fixture tenant is unavailable");
+  }
+  return {
+    clerk_org_id: tenant.clerkOrgId,
+    country_code: "AU",
+    id: tenant.organisationId,
+    name: "Release guarded rollback fixture",
+  };
+}
+
+async function assertGuardOrganisationsAbsent() {
+  for (const index of [0, 1] as const) {
+    const data = ownedGuardOrganisation(index);
+    await expect(
+      database.organisation.count({
+        where: { clerk_org_id: data.clerk_org_id, id: data.id },
+      })
+    ).resolves.toBe(0);
+  }
+}
+
+describe("guarded live transaction rollback", () => {
+  const guarded = createWriteGuardedClient(database);
+
+  test("rolls back a direct write when final authority is revoked", async () => {
+    const data = ownedGuardOrganisation(0);
+    const denied = new Error("REVOKED_RELEASE_WRITE_AUTHORITY");
+    let checks = 0;
+    await expect(
+      withDatabaseWriteGuard(
+        async (transaction) => {
+          checks += 1;
+          if (checks === 2) {
+            await expect(
+              transaction.organisation.count({
+                where: { clerk_org_id: data.clerk_org_id, id: data.id },
+              })
+            ).resolves.toBe(1);
+            throw denied;
+          }
+        },
+        () => guarded.organisation.create({ data })
+      )
+    ).rejects.toBe(denied);
+    expect(checks).toBe(2);
+    await assertGuardOrganisationsAbsent();
+  });
+
+  test("keeps global and callback writes in one uncommitted transaction", async () => {
+    const first = ownedGuardOrganisation(0);
+    const second = ownedGuardOrganisation(1);
+    const denied = new Error("REVOKED_RELEASE_TRANSACTION_AUTHORITY");
+    let checks = 0;
+    await expect(
+      withDatabaseWriteGuard(
+        () => {
+          checks += 1;
+          return checks === 2 ? Promise.reject(denied) : Promise.resolve();
+        },
+        () =>
+          guarded.$transaction(
+            async (transaction) => {
+              await transaction.organisation.create({ data: first });
+              await guarded.organisation.create({ data: second });
+              for (const data of [first, second]) {
+                await expect(
+                  transaction.organisation.count({
+                    where: { clerk_org_id: data.clerk_org_id, id: data.id },
+                  })
+                ).resolves.toBe(1);
+              }
+              await assertGuardOrganisationsAbsent();
+            },
+            { timeout: 30_000 }
+          )
+      )
+    ).rejects.toBe(denied);
+    expect(checks).toBe(2);
+    await assertGuardOrganisationsAbsent();
+  });
+
+  test("rejects a lazy write first awaited after invocation closure", async () => {
+    const data = ownedGuardOrganisation(0);
+    const check = vi.fn(async () => undefined);
+    let pending: PromiseLike<unknown> | undefined;
+    await withDatabaseWriteGuard(check, () => {
+      pending = guarded.organisation.create({ data });
+      return Promise.resolve();
+    });
+    await expect(pending).rejects.toThrow("invocation has closed");
+    expect(check).not.toHaveBeenCalled();
+    await assertGuardOrganisationsAbsent();
   });
 });

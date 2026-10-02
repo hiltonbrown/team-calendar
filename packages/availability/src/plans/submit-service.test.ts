@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   computeWorkingDays: vi.fn(),
   dispatchNotification: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
+  hasUnresolved: vi.fn(),
   markSubmitCompleted: vi.fn(),
   markSubmitDefinitiveFailure: vi.fn(),
   markSubmitDispatchStarted: vi.fn(),
@@ -21,8 +22,10 @@ const mocks = vi.hoisted(() => ({
   materialiseAvailabilityPublication: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined })
   ),
+  organisationFindFirst: vi.fn(),
   personFindFirst: vi.fn(),
   prepareAndClaimSubmitOperation: vi.fn(),
+  publishPersistedNotification: vi.fn().mockResolvedValue(undefined),
   releaseSideEffects: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
@@ -31,6 +34,7 @@ const mocks = vi.hoisted(() => ({
     organisation_id: scope.organisationId,
   })),
   submitLeaveApplicationForRegion: vi.fn(),
+  transactionCommitted: vi.fn(),
   withdrawLeaveApplicationForRegion: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
@@ -39,19 +43,23 @@ vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   database: {
-    $transaction: async (callback: (tx: unknown) => unknown) =>
-      await callback({
+    $transaction: async (callback: (tx: unknown) => unknown) => {
+      const result = await callback({
         auditEvent: { create: mocks.auditCreate },
         availabilityRecord: { updateMany: mocks.availabilityUpdateMany },
-      }),
+      });
+      mocks.transactionCommitted();
+      return result;
+    },
     availabilityRecord: {
       findFirst: mocks.availabilityFindFirst,
       updateMany: mocks.availabilityClaimUpdateMany,
     },
+    organisation: { findFirst: mocks.organisationFindFirst },
     person: { findFirst: mocks.personFindFirst },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
-  hasUnresolvedSubmitOperation: vi.fn(),
+  hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,
@@ -69,6 +77,7 @@ vi.mock("../xero-connection-state", () => ({
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
+  publishPersistedNotification: mocks.publishPersistedNotification,
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
@@ -87,6 +96,7 @@ const mockPort = {
 };
 
 const {
+  createLeaveOnApproval,
   retrySubmission,
   revertToDraft,
   submitDraftRecord,
@@ -94,7 +104,8 @@ const {
 } = await import("./submit-service");
 
 const input = {
-  actingOrgRole: "org:viewer",
+  actingOrgRole: "org:admin",
+  actingPersonId: "00000000-0000-4000-8000-000000000012",
   actingUserId: "user_1",
   clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
@@ -103,7 +114,7 @@ const input = {
 
 const record = {
   all_day: true,
-  approval_status: "draft",
+  approval_status: "submitted",
   clerk_org_id: input.clerkOrgId,
   derived_sequence: 2,
   ends_at: new Date("2026-05-05T23:59:59.999Z"),
@@ -146,6 +157,8 @@ const xeroTenant = {
 describe("submit-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.hasUnresolved.mockResolvedValue(false);
+    mocks.organisationFindFirst.mockResolvedValue({ country_code: "AU" });
     mocks.availabilityFindFirst.mockReset();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
@@ -181,6 +194,191 @@ describe("submit-service", () => {
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
   });
 
+  it("submits locally after eligibility checks without creating payroll leave or an outbound operation", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "draft",
+    });
+    const result = await submitDraftRecord(input, mockPort);
+    expect(result.ok).toBe(true);
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "submitted" }),
+        where: expect.objectContaining({ source_remote_id: null }),
+      })
+    );
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.resolveXeroEmployeeId).toHaveBeenCalled();
+    expect(mocks.resolveXeroLeaveTypeId).toHaveBeenCalled();
+    expect(mocks.prepareAndClaimSubmitOperation).not.toHaveBeenCalled();
+  });
+
+  it.each(["NZ", "UK"])(
+    "rejects unsupported %s local submissions",
+    async (country_code) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "draft",
+      });
+      mocks.organisationFindFirst.mockResolvedValue({ country_code });
+      expect(await submitDraftRecord(input, mockPort)).toMatchObject({
+        ok: false,
+      });
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+    }
+  );
+
+  it("does not accept local leave when its payroll mapping is missing", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "draft",
+    });
+    mocks.resolveXeroEmployeeId.mockResolvedValueOnce({
+      error: { code: "missing_mapping", message: "Employee mapping required." },
+      ok: false,
+    });
+    expect(await submitDraftRecord(input, mockPort)).toMatchObject({
+      error: { code: "submission_blocked_resolution" },
+      ok: false,
+    });
+    expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("keeps local submission notification transactional without publishing SSE before commit", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "draft",
+    });
+    mocks.dispatchNotification.mockResolvedValueOnce({
+      error: { message: "Notification insert failed" },
+      ok: false,
+    });
+    expect(await submitDraftRecord(input, mockPort)).toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "leave_submitted" }),
+      expect.anything(),
+      { publishRealtime: false }
+    );
+    expect(mocks.materialiseAvailabilityPublication).not.toHaveBeenCalled();
+    expect(mocks.publishPersistedNotification).not.toHaveBeenCalled();
+    expect(mocks.transactionCommitted).not.toHaveBeenCalled();
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("publishes the manager notification only after the submission commits", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "draft",
+    });
+    mocks.dispatchNotification.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        emailQueued: true,
+        inAppDelivered: true,
+        notificationId: "notification_1",
+      },
+    });
+    expect((await submitDraftRecord(input, mockPort)).ok).toBe(true);
+    expect(mocks.transactionCommitted.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.publishPersistedNotification.mock.invocationCallOrder[0]
+    );
+    expect(mocks.publishPersistedNotification).toHaveBeenCalledWith({
+      clerkOrgId: input.clerkOrgId,
+      notificationId: "notification_1",
+      organisationId: input.organisationId,
+    });
+    expect(mocks.dispatchNotification).toHaveBeenCalledOnce();
+  });
+
+  it.each(["NZ", "GB"])(
+    "rejects %s approval creation before claim or provider",
+    async (country_code) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.organisationFindFirst.mockResolvedValue({ country_code });
+      expect(await createLeaveOnApproval(input, mockPort)).toMatchObject({
+        error: { code: "not_a_leave_type" },
+        ok: false,
+      });
+      expect(mocks.prepareAndClaimSubmitOperation).not.toHaveBeenCalled();
+      expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([null, { id: "00000000-0000-4000-8000-000000000077" }])(
+    "derives approval attribution from the authenticated scoped person",
+    async (person) => {
+      mocks.availabilityFindFirst.mockResolvedValue(record);
+      mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+        ok: true,
+        value: { rawResponse: {}, remoteId: "remote_1" },
+      });
+      mocks.personFindFirst.mockResolvedValue(person);
+      expect((await createLeaveOnApproval(input, mockPort)).ok).toBe(true);
+      expect(mocks.personFindFirst).toHaveBeenCalledWith({
+        select: { id: true },
+        where: {
+          archived_at: null,
+          clerk_org_id: input.clerkOrgId,
+          clerk_user_id: input.actingUserId,
+          organisation_id: input.organisationId,
+        },
+      });
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            approved_by_person_id: person?.id ?? null,
+          }),
+        })
+      );
+    }
+  );
+
+  it("rejects duplicate local submission without a provider call", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    expect(await submitDraftRecord(input, mockPort)).toMatchObject({
+      error: { code: "invalid_state_for_submit" },
+      ok: false,
+    });
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
+  it("withdraws a local pending request without contacting Xero", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    expect((await withdrawSubmission(input, mockPort)).ok).toBe(true);
+    expect(mocks.withdrawLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.resolveXeroEmployeeId).not.toHaveBeenCalled();
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "withdrawn" }),
+      })
+    );
+  });
+
+  it("blocks withdrawal while an approval create outcome is unknown", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.hasUnresolved.mockResolvedValue(true);
+    expect(await withdrawSubmission(input, mockPort)).toMatchObject({
+      error: { code: "submission_outcome_unknown" },
+      ok: false,
+    });
+    expect(mocks.withdrawLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("retries a definitively failed legacy submission locally", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "xero_sync_failed",
+      failed_action: "submit",
+    });
+    expect((await retrySubmission(input, mockPort)).ok).toBe(true);
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["update_permissions", "Update Xero permissions to continue."],
     [
@@ -195,7 +393,7 @@ describe("submit-service", () => {
         error: { code: "unknown_error", message, recoveryReason },
         ok: false,
       });
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
       expect(result).toMatchObject({
         error: {
           message,
@@ -225,7 +423,7 @@ describe("submit-service", () => {
           ? { error: { code: "state_unavailable" }, ok: false }
           : { ok: true, value: { bindingGeneration: 7, state } }
       );
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
       expect(result).toMatchObject({ error: { message }, ok: false });
       expect(mocks.resolveXeroEmployeeId).not.toHaveBeenCalled();
       expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
@@ -233,12 +431,12 @@ describe("submit-service", () => {
     }
   );
 
-  it("submits a draft record and writes notification plus audit rows", async () => {
+  it("approves a local submitted record and writes notification plus audit rows", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
       .mockResolvedValueOnce({
         ...record,
-        approval_status: "submitted",
+        approval_status: "approved",
         source_remote_id: "xero-leave-1",
       });
     mocks.submitLeaveApplicationForRegion.mockResolvedValue({
@@ -251,13 +449,13 @@ describe("submit-service", () => {
       },
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          approval_status: "submitted",
+          approval_status: "approved",
           failed_action: null,
           source_remote_id: "xero-leave-1",
         }),
@@ -270,24 +468,24 @@ describe("submit-service", () => {
     expect(mocks.completeSideEffects).toHaveBeenCalledWith(
       expect.objectContaining({
         manager: expect.objectContaining({ clerkUserId: "manager_1" }),
-        notifyManager: true,
+        notifyManager: false,
       })
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          action: "availability_records.submitted",
+          action: "availability_records.approved",
         }),
       })
     );
   });
 
-  it("keeps a submitted transition when manager notification dispatch fails", async () => {
+  it("keeps an approved transition when notification dispatch fails", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
       .mockResolvedValueOnce({
         ...record,
-        approval_status: "submitted",
+        approval_status: "approved",
         source_remote_id: "xero-leave-1",
       });
     mocks.submitLeaveApplicationForRegion.mockResolvedValue({
@@ -299,13 +497,13 @@ describe("submit-service", () => {
       ok: false,
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          approval_status: "submitted",
+          approval_status: "approved",
           source_remote_id: "xero-leave-1",
         }),
       })
@@ -321,7 +519,7 @@ describe("submit-service", () => {
       value: { rawResponse: {}, remoteId: "xero-leave-1" },
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result).toMatchObject({
       error: { code: "invalid_state_for_submit" },
@@ -349,14 +547,14 @@ describe("submit-service", () => {
       ok: false,
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           approval_status: "xero_sync_failed",
-          failed_action: "submit",
+          failed_action: "approve",
           xero_write_error:
             "This leave overlaps an existing record in Xero. Review the dates and try again.",
         }),
@@ -366,7 +564,7 @@ describe("submit-service", () => {
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          action: "availability_records.submission_failed",
+          action: "availability_records.approval_failed",
           payload: expect.objectContaining({ errorCode: "conflict_error" }),
         }),
       })
@@ -398,14 +596,14 @@ describe("submit-service", () => {
       ok: false,
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           approval_status: "xero_sync_failed",
-          failed_action: "submit",
+          failed_action: "approve",
           xero_write_error: "This leave overlaps an existing record in Xero.",
         }),
       })
@@ -440,7 +638,7 @@ describe("submit-service", () => {
       return Promise.resolve({ ok: true, value: undefined });
     });
 
-    await submitDraftRecord(input, mockPort);
+    await createLeaveOnApproval(input, mockPort);
     expect(mocks.dispatchNotification).toHaveBeenCalled();
   });
 
@@ -451,7 +649,7 @@ describe("submit-service", () => {
       value: { bindingGeneration: null, state: "not_connected" },
     });
 
-    const result = await submitDraftRecord(input, mockPort);
+    const result = await createLeaveOnApproval(input, mockPort);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -523,7 +721,8 @@ describe("submit-service", () => {
       expect.objectContaining({
         type: "leave_withdrawn",
       }),
-      expect.anything()
+      expect.anything(),
+      { publishRealtime: undefined }
     );
   });
 
@@ -598,8 +797,32 @@ describe("submit-service", () => {
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          approval_status: { in: ["submitted", "approved"] },
+          approval_status: "approved",
         }),
+      })
+    );
+  });
+
+  it("explicitly retries a failed remote withdrawal without creating leave", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "xero_sync_failed",
+      failed_action: "withdraw",
+      source_remote_id: "existing_leave",
+    });
+    mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: { rawResponse: {} },
+    });
+    expect((await withdrawSubmission(input, mockPort)).ok).toBe(true);
+    expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledWith(
+      expect.objectContaining({ remoteId: "existing_leave" })
+    );
+    expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approval_status: "withdrawn" }),
+        where: expect.objectContaining({ approval_status: "xero_sync_failed" }),
       })
     );
   });
@@ -696,11 +919,11 @@ describe("submit-service", () => {
       .mockResolvedValueOnce({
         ...record,
         approval_status: "xero_sync_failed",
-        failed_action: "submit",
+        failed_action: "approve",
       })
       .mockResolvedValueOnce({
         ...record,
-        approval_status: "submitted",
+        approval_status: "approved",
         failed_action: null,
         source_remote_id: "xero-leave-1",
       });
@@ -734,13 +957,13 @@ describe("submit-service", () => {
       },
     });
 
-    const retried = await retrySubmission(input, mockPort);
+    const retried = await createLeaveOnApproval(input, mockPort, true);
 
     expect(retried.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          approval_status: "submitted",
+          approval_status: "approved",
           failed_action: null,
         }),
       })
@@ -753,7 +976,7 @@ describe("submit-service", () => {
         .mockResolvedValueOnce(record)
         .mockResolvedValueOnce({
           ...record,
-          approval_status: "submitted",
+          approval_status: "approved",
           source_remote_id: "xero-leave-1",
         });
       mocks.submitLeaveApplicationForRegion.mockResolvedValue({
@@ -766,21 +989,21 @@ describe("submit-service", () => {
         },
       });
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result.ok).toBe(true);
       expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
         expect.objectContaining({
           availabilityRecordId: record.id,
           expectedSequence: record.derived_sequence,
-          expectedStatus: "draft",
+          expectedStatus: "submitted",
         })
       );
       expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledTimes(1);
       expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            approval_status: "submitted",
+            approval_status: "approved",
             xero_write_claimed_at: null,
           }),
         })
@@ -793,7 +1016,7 @@ describe("submit-service", () => {
         .mockResolvedValueOnce(untitled)
         .mockResolvedValueOnce({
           ...untitled,
-          approval_status: "submitted",
+          approval_status: "approved",
           source_remote_id: "xero-leave-1",
         });
       mocks.submitLeaveApplicationForRegion.mockResolvedValue({
@@ -801,7 +1024,7 @@ describe("submit-service", () => {
         value: { rawResponse: {}, remoteId: "xero-leave-1" },
       });
 
-      await submitDraftRecord(input, mockPort);
+      await createLeaveOnApproval(input, mockPort);
 
       expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
         expect.objectContaining({ requestTitle: "Leave request" })
@@ -822,7 +1045,7 @@ describe("submit-service", () => {
         ok: false,
       });
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },
@@ -836,7 +1059,7 @@ describe("submit-service", () => {
       mocks.availabilityFindFirst.mockResolvedValueOnce(record);
       mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },
@@ -849,7 +1072,7 @@ describe("submit-service", () => {
       mocks.availabilityFindFirst.mockResolvedValueOnce(record);
       mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },
@@ -862,7 +1085,7 @@ describe("submit-service", () => {
       mocks.availabilityFindFirst.mockResolvedValueOnce(record);
       mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },
@@ -890,7 +1113,7 @@ describe("submit-service", () => {
         ok: false,
       });
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result.ok).toBe(true);
       expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
@@ -909,7 +1132,7 @@ describe("submit-service", () => {
         new Error("socket reset")
       );
 
-      const result = await submitDraftRecord(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },
@@ -932,12 +1155,12 @@ describe("submit-service", () => {
       const failedRecord = {
         ...record,
         approval_status: "xero_sync_failed",
-        failed_action: "submit",
+        failed_action: "approve",
       };
       mocks.availabilityFindFirst.mockResolvedValueOnce(failedRecord);
       mocks.prepareAndClaimSubmitOperation.mockResolvedValueOnce(null);
 
-      const result = await retrySubmission(input, mockPort);
+      const result = await createLeaveOnApproval(input, mockPort, true);
 
       expect(result).toMatchObject({
         error: { code: "submission_outcome_unknown" },

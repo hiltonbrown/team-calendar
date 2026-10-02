@@ -1,3 +1,4 @@
+import { ok as assert } from "node:assert/strict";
 import { createHmac, hkdfSync } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { encryptXeroToken } from "../crypto/tokens";
@@ -83,6 +84,7 @@ vi.mock("@repo/availability", () => availabilityMock);
 const {
   buildXeroOAuthStartUrl,
   completeXeroOAuth,
+  cancelXeroOAuth,
   completeXeroTenantSelection,
   disconnectXeroOAuthConnection,
   ensureFreshXeroConnection,
@@ -94,9 +96,18 @@ const {
   xeroConnectionRefreshDecision,
 } = await import("./service");
 
+const campaignMock = vi.hoisted(() => ({
+  action: vi.fn(
+    (_id: unknown, _scope: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+  continuation: vi.fn(),
+}));
+
 const ORIGINAL_ENV = { ...process.env };
 
 interface OAuthTestStatePayload {
+  campaign?: { dispatchId: string; runId: string; epoch: number };
   clerkOrgId: string;
   issuedAt: number;
   nonce: string;
@@ -2285,5 +2296,234 @@ describe("resolver-only stale legacy readiness", () => {
         }),
       })
     );
+  });
+});
+
+// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  reserveXeroCampaignActionContinuation: campaignMock.continuation,
+  withXeroCampaignAction: campaignMock.action,
+  withXeroCampaignCredentialScope: (
+    _scope: unknown,
+    _tenant: string,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignProviderEffect: (
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));
+
+describe("campaign OAuth signed continuation", () => {
+  const organisationId = "00000000-0000-4000-8000-000000000001";
+  const campaign = {
+    dispatchId: "00000000-0000-4000-8000-000000000002",
+    epoch: 1,
+    runId: "00000000-0000-4000-8000-000000000003",
+  };
+  const continuation = {
+    ...campaign,
+    dispatchId: "00000000-0000-4000-8000-000000000004",
+  };
+  beforeEach(() => {
+    campaignMock.action.mockClear();
+    campaignMock.continuation.mockReset();
+    campaignMock.continuation.mockResolvedValue(continuation);
+  });
+  it("signs a distinct callback ticket tied to the session and authenticated actor", async () => {
+    const start = await buildXeroOAuthStartUrl({
+      campaign,
+      clerkOrgId: "org_1",
+      organisationId,
+      userId: "user_1",
+    });
+    expect(start.ok).toBe(true);
+    if (!start.ok) {
+      return;
+    }
+    expect(readStatePayload(start.value.redirectUrl).campaign).toEqual(
+      continuation
+    );
+    expect(campaignMock.continuation).toHaveBeenCalledWith(
+      "xero.oauth.callback",
+      { target: { organisationId, sessionId: "session_1" }, userId: "user_1" }
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          Response.json({
+            access_token: "access-token",
+            expires_in: 1800,
+            refresh_token: "refresh-token",
+          })
+        )
+        .mockResolvedValueOnce(Response.json([]))
+    );
+    const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      code: "code",
+      nonce: start.value.nonce,
+      state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
+    });
+    expect(result.ok).toBe(true);
+    expect(campaignMock.action).toHaveBeenLastCalledWith(
+      "xero.oauth.callback",
+      {
+        campaign: continuation,
+        clerkOrgId: "org_1",
+        organisationId,
+        target: { organisationId, sessionId: "session_1" },
+        userId: "user_1",
+      },
+      expect.any(Function)
+    );
+  });
+  it.each([
+    { authenticatedClerkOrgId: "org_other", authenticatedUserId: "user_1" },
+    { authenticatedClerkOrgId: "org_1", authenticatedUserId: "other" },
+    {},
+  ])("rejects callback actor mismatch before token exchange", async (actor) => {
+    const start = await buildXeroOAuthStartUrl({
+      campaign,
+      clerkOrgId: "org_1",
+      organisationId,
+      userId: "user_1",
+    });
+    assert(start.ok, "OAuth fixture must start successfully");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    campaignMock.action.mockClear();
+    expect(
+      await completeXeroOAuth({
+        ...actor,
+        code: "code",
+        nonce: start.value.nonce,
+        state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
+      })
+    ).toMatchObject({ error: { code: "invalid_state" }, ok: false });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(campaignMock.action).not.toHaveBeenCalled();
+  });
+  it("rejects equal-code-unit Unicode signatures and cancellation nonces without throwing or dispatch", async () => {
+    const start = await buildXeroOAuthStartUrl({
+      campaign,
+      clerkOrgId: "org_1",
+      organisationId,
+      userId: "user_1",
+    });
+    assert(start.ok, "OAuth fixture must start successfully");
+    const state =
+      new URL(start.value.redirectUrl).searchParams.get("state") ?? "";
+    const [payload, signature] = state.split(".");
+    const malformed = `${payload}.${"é".repeat(signature?.length ?? 0)}`;
+    const input = {
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      nonce: start.value.nonce,
+      state: malformed,
+    };
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    campaignMock.action.mockClear();
+    await expect(
+      completeXeroOAuth({ ...input, code: "code" })
+    ).resolves.toMatchObject({ error: { code: "invalid_state" }, ok: false });
+    await expect(cancelXeroOAuth(input)).resolves.toMatchObject({
+      error: { code: "invalid_state" },
+      ok: false,
+    });
+    await expect(
+      cancelXeroOAuth({
+        ...input,
+        nonce: "é".repeat(start.value.nonce.length),
+        state,
+      })
+    ).resolves.toMatchObject({ error: { code: "invalid_state" }, ok: false });
+    expect(campaignMock.action).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("closes a signed cancelled consent session and callback ticket without exchanging a token", async () => {
+    const start = await buildXeroOAuthStartUrl({
+      campaign,
+      clerkOrgId: "org_1",
+      organisationId,
+      userId: "user_1",
+    });
+    assert(start.ok, "OAuth fixture must start successfully");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    campaignMock.action.mockClear();
+    const input = {
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      nonce: start.value.nonce,
+      state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
+    };
+    expect(await cancelXeroOAuth(input)).toMatchObject({
+      ok: true,
+      value: { redirectTo: "/settings/integrations/xero?xero=cancelled" },
+    });
+    expect(campaignMock.action).toHaveBeenCalledWith(
+      "xero.oauth.callback",
+      expect.objectContaining({
+        campaign: continuation,
+        target: { organisationId, sessionId: "session_1" },
+        userId: "user_1",
+      }),
+      expect.any(Function)
+    );
+    expect(dbMock.xeroOAuthSession.updateMany).toHaveBeenLastCalledWith({
+      data: { status: "cancelled" },
+      where: expect.objectContaining({
+        clerk_org_id: "org_1",
+        created_by_user_id: "user_1",
+        organisation_id: organisationId,
+        status: "pending",
+        token_exchange_status: "not_started",
+      }),
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    campaignMock.action.mockClear();
+    expect((await cancelXeroOAuth({ ...input, nonce: "wrong" })).ok).toBe(
+      false
+    );
+    expect(campaignMock.action).not.toHaveBeenCalled();
+  });
+  it("rejects tampered campaign state and replayed completed sessions", async () => {
+    const start = await buildXeroOAuthStartUrl({
+      campaign,
+      clerkOrgId: "org_1",
+      organisationId,
+      userId: "user_1",
+    });
+    assert(start.ok, "OAuth fixture must start successfully");
+    const signed =
+      new URL(start.value.redirectUrl).searchParams.get("state") ?? "";
+    const payload = readStatePayload(start.value.redirectUrl);
+    payload.campaign = campaign;
+    const tampered =
+      Buffer.from(JSON.stringify(payload)).toString("base64url") +
+      "." +
+      signed.split(".")[1];
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const input = {
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      code: "code",
+      nonce: start.value.nonce,
+    };
+    expect((await completeXeroOAuth({ ...input, state: tampered })).ok).toBe(
+      false
+    );
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue(null);
+    expect((await completeXeroOAuth({ ...input, state: signed })).ok).toBe(
+      false
+    );
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

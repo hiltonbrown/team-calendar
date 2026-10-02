@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { withXeroCampaignProviderEffect } from "@repo/database/xero-campaign-access";
+import { XeroCampaignDeniedError } from "@repo/database/xero-campaign-contract";
 import { keys } from "../../keys";
 import { emitXeroMetric } from "../metrics";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
@@ -139,8 +142,11 @@ function canRetryError(
   retryOnAmbiguousFailure: boolean
 ): boolean {
   return (
-    !(error instanceof XeroFetchError || input.init?.signal?.aborted) &&
-    shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
+    !(
+      error instanceof XeroFetchError ||
+      error instanceof XeroCampaignDeniedError ||
+      input.init?.signal?.aborted
+    ) && shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
   );
 }
 
@@ -150,10 +156,21 @@ async function performAttempt(
   limiter: XeroRateLimiter,
   fetchImpl: typeof fetch
 ): Promise<Response> {
+  const request = {
+    init: {
+      ...input.init,
+      body:
+        input.init?.body instanceof URLSearchParams
+          ? new URLSearchParams(input.init.body)
+          : input.init?.body,
+      headers: new Headers(input.init?.headers),
+    },
+    url: input.url,
+  };
   if (remainingMs(deadline) === 0) {
     throw new XeroFetchError("deadline_exceeded", false);
   }
-  if (input.init?.signal?.aborted) {
+  if (request.init.signal?.aborted) {
     throw new XeroFetchError("deadline_exceeded", false);
   }
   const gate = await limiter.acquire(input.rateClass, {
@@ -175,8 +192,8 @@ async function performAttempt(
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), remainingMs(deadline));
-  const signal = input.init?.signal
-    ? AbortSignal.any([controller.signal, input.init.signal])
+  const signal = request.init.signal
+    ? AbortSignal.any([controller.signal, request.init.signal])
     : controller.signal;
   let dispatched = false;
   try {
@@ -185,29 +202,48 @@ async function performAttempt(
     }
     signal.throwIfAborted();
     dispatched = true;
-    const fetched = await raceAbort(
-      fetchImpl(input.url, { ...input.init, redirect: "manual", signal }),
-      signal
+    return await withXeroCampaignProviderEffect(
+      {
+        ...input.rateClass,
+        bodyHash: campaignRequestBodyHash(request.init.body),
+        method: request.init.method ?? "GET",
+        tenantHeader: new Headers(request.init.headers).get("Xero-Tenant-Id"),
+        tokenGrantType:
+          request.init.body instanceof URLSearchParams
+            ? request.init.body.get("grant_type")
+            : null,
+        url: request.url,
+      },
+      async () => {
+        const fetched = await raceAbort(
+          fetchImpl(request.url, {
+            ...request.init,
+            redirect: "manual",
+            signal,
+          }),
+          signal
+        );
+        if (fetched.status >= 300 && fetched.status < 400) {
+          fetched.body?.cancel().catch(() => {
+            /* The body may already be closed. */
+          });
+          throw new XeroFetchError("redirect_rejected", true);
+        }
+        const buffered = await bufferWithRejectionEvidence(
+          fetched,
+          signal,
+          input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
+        );
+        const headers = new Headers(buffered.headers);
+        if (buffered.status !== 429) {
+          headers.delete("Retry-After");
+        }
+        if (remainingMs(deadline) > 0) {
+          await limiter.observe(input.rateClass, headers, deadline);
+        }
+        return buffered;
+      }
     );
-    if (fetched.status >= 300 && fetched.status < 400) {
-      fetched.body?.cancel().catch(() => {
-        /* The body may already be closed. */
-      });
-      throw new XeroFetchError("redirect_rejected", true);
-    }
-    const buffered = await bufferWithRejectionEvidence(
-      fetched,
-      signal,
-      input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
-    );
-    const headers = new Headers(buffered.headers);
-    if (buffered.status !== 429) {
-      headers.delete("Retry-After");
-    }
-    if (remainingMs(deadline) > 0) {
-      await limiter.observe(input.rateClass, headers, deadline);
-    }
-    return buffered;
   } catch (error) {
     if (signal.aborted) {
       // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
@@ -412,4 +448,16 @@ function rateLimitedResponse(reason: string): Response {
       statusText: "Too Many Requests",
     }
   );
+}
+
+function campaignRequestBodyHash(
+  body: BodyInit | null | undefined
+): string | null | undefined {
+  if (body === null || body === undefined) {
+    return null;
+  }
+  if (typeof body !== "string" && !(body instanceof URLSearchParams)) {
+    return undefined;
+  }
+  return `sha256:${createHash("sha256").update(String(body)).digest("hex")}`;
 }

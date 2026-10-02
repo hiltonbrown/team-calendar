@@ -113,4 +113,34 @@ describe("Xero OAuth start route", () => {
       userId: "user_123",
     });
   });
+  it("propagates a validated campaign event with the authenticated actor", async () => {
+    mocks.requireRole.mockResolvedValue(true);
+    mocks.buildXeroOAuthStartUrl.mockResolvedValue({
+      ok: true,
+      value: {
+        nonce: "nonce",
+        redirectUrl: "https://login.xero.com/identity/connect/authorize",
+      },
+    });
+    const campaign = {
+      dispatchId: "00000000-0000-4000-8000-000000000002",
+      epoch: 1,
+      runId: "00000000-0000-4000-8000-000000000003",
+    };
+    const url = new URL(
+      "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=00000000-0000-4000-8000-000000000001&userId=forged"
+    );
+    url.searchParams.set("campaign", JSON.stringify(campaign));
+    expect((await GET(new Request(url))).status).toBe(307);
+    expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ campaign, userId: "user_123" })
+    );
+    url.searchParams.set(
+      "campaign",
+      JSON.stringify({ ...campaign, actor: "forged" })
+    );
+    mocks.buildXeroOAuthStartUrl.mockClear();
+    expect((await GET(new Request(url))).status).toBe(400);
+    expect(mocks.buildXeroOAuthStartUrl).not.toHaveBeenCalled();
+  });
 });

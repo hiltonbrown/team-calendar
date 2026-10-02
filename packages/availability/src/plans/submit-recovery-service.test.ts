@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   materialise: vi.fn(),
   notify: vi.fn(),
   persistMerge: vi.fn(),
+  personFindFirst: vi.fn(),
   releaseSideEffects: vi.fn(),
 }));
 
@@ -38,6 +39,7 @@ vi.mock("@repo/database", () => ({
       }),
     auditEvent: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
     availabilityRecord: { findFirst: mocks.availabilityFindFirst },
+    person: { findFirst: mocks.personFindFirst },
   },
   fenceSubmitRecoverySideEffectClaim: mocks.hasSideEffectClaim,
   getSubmitOperation: mocks.getSubmitOperation,
@@ -138,7 +140,10 @@ describe("submit recovery service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
-    mocks.getSubmitOperation.mockResolvedValue(operation);
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve" ? null : operation
+    );
+    mocks.personFindFirst.mockResolvedValue({ id: "original_person" });
     mocks.hasSideEffectClaim.mockResolvedValue(true);
     mocks.acquireSideEffects.mockResolvedValue(new Date());
     mocks.persistMerge.mockResolvedValue(true);
@@ -170,6 +175,116 @@ describe("submit recovery service", () => {
     });
     expect(mocks.availabilityFindFirst).not.toHaveBeenCalled();
     expect(port.findLeaveApplicationCandidates).not.toHaveBeenCalled();
+  });
+
+  it("recovers an accepted approval create without replay and notifies the employee", async () => {
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? { ...operation, action: "approve", actor_user_id: "original_manager" }
+        : null
+    );
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce({
+        ...record,
+        person: {
+          ...record.person,
+          clerk_user_id: "employee_1",
+          id: "person_1",
+        },
+      })
+      .mockResolvedValueOnce(null);
+    port.findLeaveApplicationCandidates.mockResolvedValue({
+      ok: true,
+      value: {
+        candidates: [{ ...candidate, approvalStatus: "approved" }],
+        complete: true,
+      },
+    });
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...input,
+        reason: "Verified original approval in Xero",
+        remoteId: "remote_1",
+      },
+      port
+    );
+    expect(result.ok).toBe(true);
+    expect(mocks.markSubmitCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "approve" }),
+      expect.anything()
+    );
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          approval_status: "approved",
+          approved_at: expect.any(Date),
+          approved_by_person_id: "original_person",
+        }),
+      })
+    );
+    expect(mocks.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientUserId: "employee_1",
+        type: "leave_approved",
+      }),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(mocks.auditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "availability_records.approval_recovery_attached",
+        payload: expect.objectContaining({
+          originalActorUserId: "original_manager",
+        }),
+      }),
+    });
+    expect(port.submitLeaveApplication).not.toHaveBeenCalled();
+    expect(port.approveLeaveApplication).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when two unresolved create actions exist", async () => {
+    mocks.getSubmitOperation.mockResolvedValue(operation);
+    expect(await listSubmitRecoveryCandidates(input, port)).toMatchObject({
+      error: { code: "not_recoverable" },
+      ok: false,
+    });
+    expect(port.findLeaveApplicationCandidates).not.toHaveBeenCalled();
+  });
+
+  it("keeps the original approver explicitly unknown if that person no longer exists", async () => {
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? { ...operation, action: "approve", actor_user_id: "removed_manager" }
+        : null
+    );
+    mocks.personFindFirst.mockResolvedValue(null);
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(null);
+    port.findLeaveApplicationCandidates.mockResolvedValue({
+      ok: true,
+      value: {
+        candidates: [{ ...candidate, approvalStatus: "approved" }],
+        complete: true,
+      },
+    });
+    expect(
+      (
+        await attachSubmitRecoveryCandidate(
+          {
+            ...input,
+            reason: "Verified original approval in Xero",
+            remoteId: "remote_1",
+          },
+          port
+        )
+      ).ok
+    ).toBe(true);
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ approved_by_person_id: null }),
+      })
+    );
   });
 
   it("attaches only an exact verified candidate and completes the fenced attempt", async () => {
@@ -281,12 +396,16 @@ describe("submit recovery service", () => {
   });
 
   it("cannot attach a different candidate after Xero accepted a known remote ID", async () => {
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      attempt_generation: 1,
-      known_remote_id: "remote_accepted",
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            attempt_generation: 1,
+            known_remote_id: "remote_accepted",
+            status: "provider_accepted",
+          }
+    );
 
     const result = await attachSubmitRecoveryCandidate(
       {
@@ -361,12 +480,16 @@ describe("submit recovery service", () => {
       expect.anything()
     );
 
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      known_remote_id: "remote_1",
-      merged_record_id: duplicate.id,
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            known_remote_id: "remote_1",
+            merged_record_id: duplicate.id,
+            status: "provider_accepted",
+          }
+    );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       source_remote_id: "remote_1",
@@ -410,11 +533,15 @@ describe("submit recovery service", () => {
   });
 
   it("does not run notification effects when another recovery owns the lease", async () => {
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      known_remote_id: "remote_1",
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            known_remote_id: "remote_1",
+            status: "provider_accepted",
+          }
+    );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       source_remote_id: "remote_1",
@@ -439,11 +566,15 @@ describe("submit recovery service", () => {
   });
 
   it("prevents an expired claimant from notifying after a takeover", async () => {
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      known_remote_id: "remote_1",
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            known_remote_id: "remote_1",
+            status: "provider_accepted",
+          }
+    );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       source_remote_id: "remote_1",
@@ -491,12 +622,16 @@ describe("submit recovery service", () => {
     });
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
 
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      attempt_generation: 1,
-      known_remote_id: "remote_1",
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            attempt_generation: 1,
+            known_remote_id: "remote_1",
+            status: "provider_accepted",
+          }
+    );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       source_remote_id: "remote_1",
@@ -538,12 +673,16 @@ describe("submit recovery service", () => {
     });
     expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
 
-    mocks.getSubmitOperation.mockResolvedValueOnce({
-      ...operation,
-      attempt_generation: 1,
-      known_remote_id: "remote_1",
-      status: "provider_accepted",
-    });
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? null
+        : {
+            ...operation,
+            attempt_generation: 1,
+            known_remote_id: "remote_1",
+            status: "provider_accepted",
+          }
+    );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       source_remote_id: "remote_1",

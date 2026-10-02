@@ -7,6 +7,7 @@ import type {
   XeroCredentialOwner,
   XeroRefreshAttempt,
 } from "@repo/database/generated/client";
+import { withXeroCampaignCredentialScope } from "@repo/database/xero-campaign-access";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import { emitXeroMetric } from "../metrics";
@@ -429,97 +430,111 @@ export async function resolveXeroAccess(input: {
     if (!tenant) {
       return error("not_connected");
     }
-    const connection = tenant.xero_connection;
-    if (
-      tenant.retired_at ||
-      tenant.active_slot !== 1 ||
-      connection.disconnected_at ||
-      connection.revoked_at ||
-      !["active", "stale"].includes(connection.status)
-    ) {
-      return error("disconnected");
-    }
-    if (
-      input.expectedBindingGeneration !== undefined &&
-      input.expectedBindingGeneration !== tenant.binding_generation
-    ) {
-      return error("generation_changed");
-    }
-    let owner = tenant.credential_owner;
-    let accessToken: string;
-    if (owner) {
-      const resolved = await resolveOwnerToken(owner, input);
-      if (!resolved.ok) {
-        return resolved;
-      }
-      ({ owner, accessToken } = resolved.value);
-    } else {
-      if (
-        connection.status === "stale" &&
-        isRecordedXeroRefreshGrantInvalid(connection.last_error_code)
-      ) {
-        return error("reauthorisation_required");
-      }
-      // Compare the rejected token inside the resolver; no credential column escapes it.
-      const fresh = await ensureFreshXeroConnection({
-        allowStaleLegacyRefresh: true,
-        clerkOrgId: input.clerkOrgId,
-        connectionId: connection.id,
-        deadline: input.deadline,
-        forceRefresh: shouldForceLegacyRefresh(connection, input),
-        organisationId: input.organisationId,
-        previousAccessTokenEncrypted: input.forceRefresh
-          ? connection.access_token_encrypted
-          : undefined,
-      });
-      if (!fresh.ok) {
-        return accessRefreshFailure(fresh.error);
-      }
-      const current = await database.xeroConnection.findUniqueOrThrow({
-        where: {
-          clerk_org_id: input.clerkOrgId,
-          id: connection.id,
-          organisation_id: input.organisationId,
-        },
-      });
-      accessToken = decryptXeroToken({
-        authTag: current.access_token_auth_tag,
-        encrypted: current.access_token_encrypted,
-        iv: current.access_token_iv,
-        keyVersion: current.token_key_version,
-      });
-    }
-    // Re-check the binding after refresh, including disconnects racing the owner operation.
-    const live = await database.xeroTenant.findFirst({
-      where: {
-        active_slot: 1,
-        binding_generation: tenant.binding_generation,
-        clerk_org_id: input.clerkOrgId,
-        id: tenant.id,
-        organisation_id: input.organisationId,
-        retired_at: null,
-        xero_connection: {
-          disconnected_at: null,
-          revoked_at: null,
-          status: { in: ["active", "stale"] },
-        },
-      },
-    });
-    if (!live) {
-      return error("generation_changed");
-    }
-    return {
-      ok: true,
-      value: {
-        accessToken,
+    return await withXeroCampaignCredentialScope<
+      Awaited<ReturnType<typeof resolveXeroAccess>>
+    >(
+      {
         bindingGeneration: tenant.binding_generation,
-        deadline: input.deadline,
-        payrollRegion: tenant.payroll_region,
-        tokenVersion: owner?.token_version ?? null,
-        xeroTenantDatabaseId: tenant.id,
-        xeroTenantId: tenant.xero_tenant_id,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+        xeroTenantId: tenant.id,
       },
-    };
+      tenant.xero_tenant_id,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve canonical and legacy credential resolution inside exact campaign scope.
+      async () => {
+        const connection = tenant.xero_connection;
+        if (
+          tenant.retired_at ||
+          tenant.active_slot !== 1 ||
+          connection.disconnected_at ||
+          connection.revoked_at ||
+          !["active", "stale"].includes(connection.status)
+        ) {
+          return error("disconnected");
+        }
+        if (
+          input.expectedBindingGeneration !== undefined &&
+          input.expectedBindingGeneration !== tenant.binding_generation
+        ) {
+          return error("generation_changed");
+        }
+        let owner = tenant.credential_owner;
+        let accessToken: string;
+        if (owner) {
+          const resolved = await resolveOwnerToken(owner, input);
+          if (!resolved.ok) {
+            return resolved;
+          }
+          ({ owner, accessToken } = resolved.value);
+        } else {
+          if (
+            connection.status === "stale" &&
+            isRecordedXeroRefreshGrantInvalid(connection.last_error_code)
+          ) {
+            return error("reauthorisation_required");
+          }
+          // Compare the rejected token inside the resolver; no credential column escapes it.
+          const fresh = await ensureFreshXeroConnection({
+            allowStaleLegacyRefresh: true,
+            clerkOrgId: input.clerkOrgId,
+            connectionId: connection.id,
+            deadline: input.deadline,
+            forceRefresh: shouldForceLegacyRefresh(connection, input),
+            organisationId: input.organisationId,
+            previousAccessTokenEncrypted: input.forceRefresh
+              ? connection.access_token_encrypted
+              : undefined,
+          });
+          if (!fresh.ok) {
+            return accessRefreshFailure(fresh.error);
+          }
+          const current = await database.xeroConnection.findUniqueOrThrow({
+            where: {
+              clerk_org_id: input.clerkOrgId,
+              id: connection.id,
+              organisation_id: input.organisationId,
+            },
+          });
+          accessToken = decryptXeroToken({
+            authTag: current.access_token_auth_tag,
+            encrypted: current.access_token_encrypted,
+            iv: current.access_token_iv,
+            keyVersion: current.token_key_version,
+          });
+        }
+        // Re-check the binding after refresh, including disconnects racing the owner operation.
+        const live = await database.xeroTenant.findFirst({
+          where: {
+            active_slot: 1,
+            binding_generation: tenant.binding_generation,
+            clerk_org_id: input.clerkOrgId,
+            id: tenant.id,
+            organisation_id: input.organisationId,
+            retired_at: null,
+            xero_connection: {
+              disconnected_at: null,
+              revoked_at: null,
+              status: { in: ["active", "stale"] },
+            },
+          },
+        });
+        if (!live) {
+          return error("generation_changed");
+        }
+        return {
+          ok: true,
+          value: {
+            accessToken,
+            bindingGeneration: tenant.binding_generation,
+            deadline: input.deadline,
+            payrollRegion: tenant.payroll_region,
+            tokenVersion: owner?.token_version ?? null,
+            xeroTenantDatabaseId: tenant.id,
+            xeroTenantId: tenant.xero_tenant_id,
+          },
+        };
+      }
+    );
   } catch {
     return error("configuration_error");
   }

@@ -2,7 +2,59 @@
 
 Status: IN PROGRESS. This handoff records concrete runtime contracts absent from the reviewed candidate. It grants no deployment, worker activation, provider deletion or payroll operation.
 
+## Current source merge boundary, 2 October 2026
+
+The AU policy is approved and implemented: submission stays locally pending;
+manager approval creates scheduled leave synchronously in Xero. The user approved
+the bounded demo-company and development-role fixtures, which remain unexecuted.
+The fixed 24-hour hold is removed through the explicit immediate namespace operator.
+The live additive migration passed; protected integration found 12 test failures
+and restored all owned state. Reviewed test repairs await protected replay.
+
+The user authorised merging the reviewed source and evidence records. Unfinished
+campaign tooling is excluded. Synchronous AU verification can use a candidate
+development app with the existing binding, runtime and rate-limit controls.
+Deployment and registered workers are prerequisites for the corresponding deployed
+and scheduled claims. Actual browser/provider execution, final live regression,
+broader campaign and restore evidence remain outstanding. Dated observations below
+retain their original evidence boundaries.
+
 Current plan-verification baseline: main `514efb5`, 27 September 2026. Corrected harness/source candidate `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f` is merged at `f3dd965`; the entire tree outside plans, tasks and reports is unchanged from that verified candidate. The application-source review began at `d6da4e8`, with initial harness candidate `76a5dfb`; those dated results are retained below as history. Operational metadata in [execution review](160-execution-review.md) is dated evidence and must be refreshed before dependent admission.
+
+## Resumed continuation, 30 September 2026
+
+The source candidate `3b7c511d0c96b26de067e8b36b78f6d45e427c70`
+adds atomic pre-dispatch ordinary provider-attempt registration and guarded
+pause/resume writes. It passed the fresh source gates listed in the completion
+review. Accepted provider responses can still precede later local persistence,
+and uncertain attempts lack adjudication, so this is partial prior-writer
+accounting, not a complete campaign lease. The protected online integration
+suite and operational browser/provider campaign remain pending. The missing AU
+policy, private fixtures/sessions, deployment/configuration and PITR prerequisites
+below still apply.
+
+## Continuation, 29 September 2026
+
+The isolated `codex/xero-e2e-completion` branch now implements shared campaign control,
+worker dispatch/execution admission, persistence fencing and provider effect accounting.
+Observer coexistence and three real causal producer functions are implemented with
+regressions. This supersedes the corresponding source-absence observations below only
+for that isolated candidate. Full final verification is recorded in
+[the continuation review](160-completion-review.md).
+
+The default campaign remains unavailable. A later isolated source slice records ordinary provider attempts before dispatch and keeps uncertain outcomes durable, so a reservation cannot overtake a provider request while its response is still being consumed. It does not cover the caller's subsequent local persistence after an accepted provider response. Direct pause/resume writes now use a guarded transaction; other synchronous action/OAuth entrypoints, intentional binding-generation changes, exact mutation targets, real registered-worker evidence, partial acquisition, independent writer closure/drain/restoration and complete scenario drivers remain unresolved. The AU policy and sanctioned fixture/session questions remain pending.
+Production app/API/web are still at `42bb840`, not the continuation source; app/API
+metadata confirms missing tier/namespace/domain configuration. Full browser/provider
+execution and current PITR proof remain NOT VERIFIED. Historical evidence below retains
+its original source/date and must not be presented as this candidate's result.
+
+## Initialisation timing correction, 2 October 2026
+
+The user removed the fixed 24-hour namespace initialisation waiting period from
+Plan 160. Namespace configuration, authority verification and actual Xero quota
+admission remain required; initialisation introduces no fixed scheduling delay.
+Earlier referenced conservative waiting instructions are superseded for this
+campaign.
 
 ## Enforced execution lease
 

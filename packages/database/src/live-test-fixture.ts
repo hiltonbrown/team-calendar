@@ -32,6 +32,10 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: { plan_id: 3, plan_key: 3 },
     tenants: 2,
   },
+  "packages/database/xero-campaign.integration.test.ts": {
+    globalKeys: { campaign_domain: 1, provider_app: 1 },
+    tenants: 2,
+  },
   "packages/database/xero-lifecycle-migration.integration.test.ts": {
     globalKeys: {
       cleanup_attempt: 12,
@@ -48,9 +52,10 @@ export const LIVE_FIXTURE_SUITES = {
   "packages/database/xero-tenancy.integration.test.ts": { tenants: 2 },
   "packages/feeds/index.integration.test.ts": { tenants: 3 },
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts":
-    { tenants: 2 },
+    { globalKeys: { campaign_domain: 1 }, tenants: 2 },
   "packages/jobs/src/handlers/reconcile-xero-connections.integration.test.ts": {
     globalKeys: {
+      campaign_domain: 1,
       cleanup_attempt: 12,
       cleanup_request: 12,
       credential_owner: 2,
@@ -61,19 +66,24 @@ export const LIVE_FIXTURE_SUITES = {
     tenants: 2,
   },
   "packages/jobs/src/handlers/schedule-xero-syncs.integration.test.ts": {
+    globalKeys: { campaign_domain: 1 },
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-leave-balances.integration.test.ts": {
+    globalKeys: { campaign_domain: 1 },
     tenants: 4,
   },
   "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts": {
+    globalKeys: { campaign_domain: 1 },
     tenants: 2,
   },
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts": {
+    globalKeys: { campaign_domain: 1 },
     tenants: 2,
   },
   "packages/xero/src/oauth/connection-cleanup.integration.test.ts": {
     globalKeys: {
+      campaign_domain: 1,
       cleanup_attempt: 12,
       cleanup_request: 12,
       credential_owner: 2,
@@ -84,23 +94,28 @@ export const LIVE_FIXTURE_SUITES = {
     tenants: 2,
   },
   "packages/xero/src/oauth/credential-owner.integration.test.ts": {
-    globalKeys: { credential_owner: 1, oauth_attempt: 1, provider_app: 1 },
+    globalKeys: {
+      campaign_domain: 1,
+      credential_owner: 1,
+      oauth_attempt: 1,
+      provider_app: 1,
+    },
     tenants: 2,
   },
   "packages/xero/src/oauth/disconnect.integration.test.ts": {
-    globalKeys: { cleanup_attempt: 4, cleanup_request: 4 },
+    globalKeys: { campaign_domain: 1, cleanup_attempt: 4, cleanup_request: 4 },
     tenants: 2,
   },
   "packages/xero/src/oauth/inactivity-report.integration.test.ts": {
-    globalKeys: { provider_app: 1 },
+    globalKeys: { campaign_domain: 1, provider_app: 1 },
     tenants: 2,
   },
   "packages/xero/src/oauth/service.integration.test.ts": {
-    globalKeys: { provider_app: 1 },
+    globalKeys: { campaign_domain: 1, provider_app: 1 },
     tenants: 2,
   },
   "packages/xero/src/rate-limit/shared-store.integration.test.ts": {
-    globalKeys: { shared_store_namespace: 1 },
+    globalKeys: { campaign_domain: 1, shared_store_namespace: 1 },
     tenants: 2,
   },
 } as const;
@@ -132,6 +147,7 @@ export const LIVE_FIXTURE_GLOBAL_KEY_KINDS = [
   "cleanup_request",
   "cleanup_attempt",
   "shared_store_namespace",
+  "campaign_domain",
 ] as const;
 
 export type GlobalKeyKind = (typeof LIVE_FIXTURE_GLOBAL_KEY_KINDS)[number];
@@ -221,7 +237,8 @@ const allocateLocalTestFixture = (suite: LiveFixtureSuite): LiveTestFixture => {
         kind === "tenant_binding" ||
         kind === "oauth_attempt" ||
         kind === "cleanup_request" ||
-        kind === "cleanup_attempt"
+        kind === "cleanup_attempt" ||
+        kind === "campaign_domain"
       ) {
         return uuidFrom(`local-${kind}:${slot}`);
       }

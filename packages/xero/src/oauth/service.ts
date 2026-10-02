@@ -13,6 +13,15 @@ import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database } from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
+import {
+  reserveXeroCampaignActionContinuation,
+  withXeroCampaignAction,
+} from "@repo/database/xero-campaign-access";
+import {
+  XeroCampaignDeniedError,
+  type XeroCampaignEvent,
+  XeroCampaignEventSchema,
+} from "@repo/database/xero-campaign-contract";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -62,6 +71,7 @@ const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const DEFAULT_XERO_RETURN_TO = "/settings/integrations/xero";
 
 interface OAuthStatePayload {
+  campaign?: XeroCampaignEvent;
   clerkOrgId: string;
   issuedAt: number;
   nonce: string;
@@ -169,7 +179,8 @@ class TenantSelectionRejectedError extends Error {
   }
 }
 
-export async function buildXeroOAuthStartUrl(input: {
+async function buildXeroOAuthStartUrlInternal(input: {
+  campaign?: XeroCampaignEvent;
   clerkOrgId: string;
   organisationId?: null | string;
   returnTo?: string;
@@ -223,10 +234,21 @@ export async function buildXeroOAuthStartUrl(input: {
       },
       select: { id: true },
     });
+    const callbackCampaign =
+      input.campaign && input.userId && input.organisationId
+        ? await reserveXeroCampaignActionContinuation("xero.oauth.callback", {
+            target: {
+              organisationId: input.organisationId,
+              sessionId: session.id,
+            },
+            userId: input.userId,
+          })
+        : undefined;
     url.searchParams.set(
       "state",
       signState(
         {
+          ...(callbackCampaign ? { campaign: callbackCampaign } : {}),
           clerkOrgId: input.clerkOrgId,
           issuedAt: Date.now(),
           nonce,
@@ -251,7 +273,7 @@ export async function buildXeroOAuthStartUrl(input: {
   }
 }
 
-export async function completeXeroOAuth(input: {
+async function completeXeroOAuthInternal(input: {
   code: string;
   nonce: null | string;
   state: string;
@@ -263,8 +285,7 @@ export async function completeXeroOAuth(input: {
     }
     const nonceMatches =
       input.nonce !== null &&
-      state.value.nonce.length === input.nonce.length &&
-      timingSafeEqual(Buffer.from(state.value.nonce), Buffer.from(input.nonce));
+      constantTimeStringEqual(state.value.nonce, input.nonce);
     if (!nonceMatches) {
       return invalidState();
     }
@@ -286,9 +307,10 @@ export async function completeXeroOAuth(input: {
       .update(input.nonce ?? "")
       .digest("hex");
     if (
-      !session?.nonce_hash ||
-      session.nonce_hash.length !== nonceHash.length ||
-      !timingSafeEqual(Buffer.from(session.nonce_hash), Buffer.from(nonceHash))
+      !(
+        session?.nonce_hash &&
+        constantTimeStringEqual(session.nonce_hash, nonceHash)
+      )
     ) {
       return invalidState();
     }
@@ -2605,6 +2627,9 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     return oauthNotConfigured();
   }
 
+  if (value.split(".").length !== 2) {
+    return invalidState();
+  }
   const [encoded, signature] = value.split(".");
   if (!(encoded && signature)) {
     return invalidState();
@@ -2614,9 +2639,7 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
   const expected = createHmac("sha256", signingKey)
     .update(encoded)
     .digest("base64url");
-  const matches =
-    expected.length === signature.length &&
-    timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+  const matches = constantTimeStringEqual(expected, signature);
   if (!matches) {
     return invalidState();
   }
@@ -2635,9 +2658,20 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
     ) {
       return invalidState();
     }
+    const campaign =
+      payload.campaign === undefined
+        ? undefined
+        : XeroCampaignEventSchema.safeParse(payload.campaign);
+    if (campaign && !campaign.success) {
+      return invalidState();
+    }
+    if (payload.issuedAt > Date.now() + 30_000) {
+      return invalidState();
+    }
     return {
       ok: true,
       value: {
+        ...(campaign?.success ? { campaign: campaign.data } : {}),
         clerkOrgId: payload.clerkOrgId,
         issuedAt: payload.issuedAt,
         nonce: payload.nonce,
@@ -2996,4 +3030,177 @@ function recordedGrantError(): Result<never, XeroOAuthError> {
     },
     ok: false,
   };
+}
+
+export async function buildXeroOAuthStartUrl(input: {
+  campaign?: XeroCampaignEvent;
+  clerkOrgId: string;
+  organisationId?: string | null;
+  returnTo?: string;
+  userId?: string | null;
+}): Promise<Result<{ nonce: string; redirectUrl: string }, XeroOAuthError>> {
+  if (isPreviewDeployment()) {
+    return xeroConnectDisabled();
+  }
+  if (!(input.organisationId && input.userId)) {
+    if (input.campaign) {
+      return invalidState();
+    }
+    return await buildXeroOAuthStartUrlInternal(input);
+  }
+  try {
+    return await withXeroCampaignAction(
+      "xero.oauth.start",
+      {
+        campaign: input.campaign,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+        target: {
+          organisationId: input.organisationId,
+          returnTo: input.returnTo ?? DEFAULT_XERO_RETURN_TO,
+        },
+        userId: input.userId,
+      },
+      () => buildXeroOAuthStartUrlInternal(input)
+    );
+  } catch (error) {
+    if (!(error instanceof XeroCampaignDeniedError)) {
+      throw error;
+    }
+    return invalidState();
+  }
+}
+
+export async function completeXeroOAuth(input: {
+  authenticatedClerkOrgId?: string | null;
+  authenticatedUserId?: string | null;
+  code: string;
+  nonce: string | null;
+  state: string;
+}): Promise<Result<{ redirectTo: string; sessionId: string }, XeroOAuthError>> {
+  const state = verifyState(input.state);
+  if (!state.ok) {
+    return state;
+  }
+  const signed = state.value;
+  if (
+    signed.campaign &&
+    (!(signed.organisationId && signed.userId) ||
+      input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+      input.authenticatedUserId !== signed.userId)
+  ) {
+    return invalidState();
+  }
+  if (!(signed.organisationId && signed.userId)) {
+    return await completeXeroOAuthInternal(input);
+  }
+  try {
+    return await withXeroCampaignAction(
+      "xero.oauth.callback",
+      {
+        campaign: signed.campaign,
+        clerkOrgId: signed.clerkOrgId,
+        organisationId: signed.organisationId,
+        target: {
+          organisationId: signed.organisationId,
+          sessionId: signed.sessionId,
+        },
+        userId: signed.userId,
+      },
+      () => completeXeroOAuthInternal(input)
+    );
+  } catch (error) {
+    if (!(error instanceof XeroCampaignDeniedError)) {
+      throw error;
+    }
+    return invalidState();
+  }
+}
+
+export async function cancelXeroOAuth(input: {
+  authenticatedClerkOrgId?: string | null;
+  authenticatedUserId?: string | null;
+  nonce: string | null;
+  state: string;
+}): Promise<Result<{ redirectTo: string; sessionId: string }, XeroOAuthError>> {
+  const state = verifyState(input.state);
+  if (!state.ok) {
+    return state;
+  }
+  const signed = state.value;
+  if (!(input.nonce && constantTimeStringEqual(input.nonce, signed.nonce))) {
+    return invalidState();
+  }
+  if (
+    signed.campaign &&
+    (!(signed.organisationId && signed.userId) ||
+      input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+      input.authenticatedUserId !== signed.userId)
+  ) {
+    return invalidState();
+  }
+  const cancel = async (): Promise<
+    Result<{ redirectTo: string; sessionId: string }, XeroOAuthError>
+  > => {
+    const cancelled = await database.xeroOAuthSession.updateMany({
+      data: { status: "cancelled" },
+      where: {
+        clerk_org_id: signed.clerkOrgId,
+        created_by_user_id: signed.userId,
+        expires_at: { gt: new Date() },
+        id: signed.sessionId,
+        nonce_hash: createHash("sha256")
+          .update(input.nonce ?? "")
+          .digest("hex"),
+        organisation_id: signed.organisationId,
+        status: "pending",
+        token_exchange_status: "not_started",
+      },
+    });
+    if (cancelled.count !== 1) {
+      return invalidState();
+    }
+    const redirect = new URL(signed.returnTo, "https://teamcalendar.local");
+    redirect.searchParams.set("xero", "cancelled");
+    return {
+      ok: true,
+      value: {
+        redirectTo: redirect.pathname + redirect.search + redirect.hash,
+        sessionId: signed.sessionId,
+      },
+    };
+  };
+  try {
+    if (!(signed.organisationId && signed.userId)) {
+      return await cancel();
+    }
+    return await withXeroCampaignAction(
+      "xero.oauth.callback",
+      {
+        campaign: signed.campaign,
+        clerkOrgId: signed.clerkOrgId,
+        organisationId: signed.organisationId,
+        target: {
+          organisationId: signed.organisationId,
+          sessionId: signed.sessionId,
+        },
+        userId: signed.userId,
+      },
+      cancel
+    );
+  } catch (error) {
+    if (!(error instanceof XeroCampaignDeniedError)) {
+      throw error;
+    }
+    return invalidState();
+  }
+}
+
+function constantTimeStringEqual(left: string, right: string): boolean {
+  const leftBytes = Buffer.from(left);
+  const rightBytes = Buffer.from(right);
+  return (
+    leftBytes.length === rightBytes.length &&
+    timingSafeEqual(leftBytes, rightBytes)
+  );
 }

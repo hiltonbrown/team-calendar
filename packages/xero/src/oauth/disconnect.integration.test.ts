@@ -1,4 +1,5 @@
 // biome-ignore-all lint/style/useFilenamingConvention: The requested test file is disconnect.integration.test.ts.
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import {
@@ -426,3 +427,6 @@ async function expectTargetTenantDestroyed(tenant: typeof tenantA) {
   expect(record.archived_at).toBeInstanceOf(Date);
   expect(record.publish_status).toBe("archived");
 }
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

@@ -11,6 +11,7 @@ export const SUPPORTED_GLOBAL_KEY_PREFIXES = [
   "cleanup_request:",
   "cleanup_attempt:",
   "shared_store_namespace:",
+  "campaign_domain:",
 ] as const;
 
 export const isSupportedGlobalFixtureKey = (key: string): boolean =>

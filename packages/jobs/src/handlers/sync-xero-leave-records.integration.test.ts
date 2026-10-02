@@ -1,9 +1,19 @@
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+const afterSnapshotRead = vi.fn<() => Promise<void>>();
 const mockFetchLeaveForEmployeeForRegion = vi.fn();
 const mockFetchLeaveRecordsForRegion = vi.fn();
 const mockInngestSend = vi.fn(async () => ({ ids: ["event_1"] }));
@@ -16,6 +26,38 @@ vi.mock("../client", () => ({
     send: mockInngestSend,
   },
 }));
+
+// Prisma delegates expose methods through a proxy rather than own descriptors.
+// Forward the real read and inject the competing write after its snapshot resolves.
+vi.mock("@repo/database", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@repo/database")>();
+  return {
+    ...original,
+    database: new Proxy(original.database, {
+      get(target, property, receiver) {
+        if (property !== "availabilityRecord") {
+          return Reflect.get(target, property, receiver);
+        }
+        return new Proxy(target.availabilityRecord, {
+          get(delegate, method, delegateReceiver) {
+            if (method !== "findMany") {
+              return Reflect.get(delegate, method, delegateReceiver);
+            }
+            return async (
+              args: import("@repo/database").Prisma.AvailabilityRecordFindManyArgs
+            ) => {
+              const rows = await delegate.findMany(args);
+              if (args.select?.source_last_modified_at === true) {
+                await afterSnapshotRead();
+              }
+              return rows;
+            };
+          },
+        });
+      },
+    }),
+  };
+});
 
 vi.mock("@repo/xero", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/xero")>();
@@ -69,6 +111,7 @@ describe("sync-xero-leave-records handler", () => {
 describe("sync-xero-leave-records database flow", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    afterSnapshotRead.mockReset();
     await cleanTestData();
   });
 
@@ -346,42 +389,25 @@ describe("sync-xero-leave-records database flow", () => {
       },
     });
 
-    const originalFindMany = database.availabilityRecord.findMany;
-    let injected = false;
-    const findManySpy = vi
-      .spyOn(database.availabilityRecord, "findMany")
-      .mockImplementation((args) => {
-        const result = (async () => {
-          const rows = await originalFindMany.call(
-            database.availabilityRecord,
-            args
-          );
-          if (args?.select?.source_last_modified_at === true && !injected) {
-            injected = true;
-            await database.availabilityRecord.update({
-              data: {
-                approval_status: "declined",
-                derived_sequence: 7,
-                updated_at: new Date(),
-              },
-              where: { id: existing.id },
-            });
-          }
-          return rows;
-        })();
-        // Bind the awaited injection to a structural thenable without assigning the native promise's read-only marker.
-        return {
-          catch: result.catch.bind(result),
-          finally: result.finally.bind(result),
-          // biome-ignore lint/suspicious/noThenProperty: The PrismaPromise-compatible spy intentionally preserves await semantics.
-          then: result.then.bind(result),
-          [Symbol.toStringTag]: "PrismaPromise" as const,
-        };
+    afterSnapshotRead.mockImplementationOnce(async () => {
+      await database.availabilityRecord.update({
+        data: {
+          approval_status: "declined",
+          derived_sequence: 7,
+          updated_at: new Date(),
+        },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          id: existing.id,
+          organisation_id: tenantA.organisationId,
+        },
       });
+    });
 
     try {
       const result = await syncXeroLeaveRecords(syncInput(tenantA));
 
+      expect(afterSnapshotRead).toHaveBeenCalledOnce();
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value).toMatchObject({
@@ -399,7 +425,7 @@ describe("sync-xero-leave-records database flow", () => {
         derived_sequence: 7,
       });
     } finally {
-      findManySpy.mockRestore();
+      afterSnapshotRead.mockReset();
     }
   });
 
@@ -640,32 +666,12 @@ describe("sync-xero-leave-records database flow", () => {
     }));
     await database.person.createMany({ data: peopleData });
 
-    mockFetchLeaveForEmployeeForRegion.mockImplementation(
-      async (_region, empInput: { xeroEmployeeId: string }) => ({
-        ok: true,
-        value: {
-          complete: true,
-          leaveRecords: [
-            {
-              employeeId: empInput.xeroEmployeeId,
-              endDate: "2026-05-08",
-              leaveApplicationId: `50000000-0000-4000-8000-${empInput.xeroEmployeeId.slice(-12)}`,
-              leaveTypeId: "annual",
-              leaveTypeName: "Annual Leave",
-              rawPayload: {
-                LeaveApplicationID: `50000000-0000-4000-8000-${empInput.xeroEmployeeId.slice(-12)}`,
-              },
-              startDate: "2026-05-07",
-              status: "APPROVED" as const,
-              title: "Annual leave",
-              units: 8,
-              updatedDateUtc: "2026-05-01T00:00:00.000Z",
-            },
-          ],
-          rawResponse: {},
-        },
-      })
-    );
+    // This case exercises employee pagination. Record persistence has separate
+    // integration coverage, so avoid materialising 21 unrelated publications.
+    mockFetchLeaveForEmployeeForRegion.mockResolvedValue({
+      ok: true,
+      value: { complete: true, leaveRecords: [], rawResponse: {} },
+    });
 
     const input = syncInput(tenantA);
 
@@ -675,12 +681,17 @@ describe("sync-xero-leave-records database flow", () => {
     if (firstRun.ok) {
       expect(firstRun.value).toMatchObject({
         failed: 0,
-        fetched: 20,
+        fetched: 0,
         status: "succeeded",
-        upserted: 20,
+        upserted: 0,
       });
     }
 
+    expect(
+      mockFetchLeaveForEmployeeForRegion.mock.calls.map(
+        (call) => call[1].xeroEmployeeId
+      )
+    ).toEqual(peopleData.slice(0, 20).map((person) => person.xero_employee_id));
     const cursor1 = await database.xeroSyncCursor.findFirst({
       where: {
         clerk_org_id: tenantA.clerkOrgId,
@@ -702,12 +713,23 @@ describe("sync-xero-leave-records database flow", () => {
     if (secondRun.ok) {
       expect(secondRun.value).toMatchObject({
         failed: 0,
-        fetched: 1,
+        fetched: 0,
         status: "succeeded",
-        upserted: 1,
+        upserted: 0,
       });
     }
 
+    expect(
+      mockFetchLeaveForEmployeeForRegion.mock.calls.map(
+        (call) => call[1].xeroEmployeeId
+      )
+    ).toEqual(peopleData.map((person) => person.xero_employee_id));
+    expect(
+      mockFetchLeaveForEmployeeForRegion.mock.calls.every(
+        (call) =>
+          call[0] === "NZ" && call[1].xeroTenant.id === tenantA.xeroTenantId
+      )
+    ).toBe(true);
     const cursor2 = await database.xeroSyncCursor.findFirst({
       where: {
         clerk_org_id: tenantA.clerkOrgId,
@@ -1125,3 +1147,6 @@ function leaveId() {
 function staleLeaveId() {
   return "50000000-0000-4000-8000-000000000009";
 }
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

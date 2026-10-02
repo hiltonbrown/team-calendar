@@ -21,6 +21,7 @@ export {
 } from "./src/oauth/credential-owner";
 export {
   buildXeroOAuthStartUrl,
+  cancelXeroOAuth,
   completeXeroOAuth,
   completeXeroTenantSelection,
   disconnectXeroOAuthConnection,

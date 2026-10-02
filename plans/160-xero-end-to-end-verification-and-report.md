@@ -1,15 +1,61 @@
 # Plan 160: Verify the complete Xero integration and publish an evidence report
 
+## Authorised source merge, 2 October 2026
+
+The user authorised commit and merge to main. The reviewed source includes the
+approved AU local submission/create-on-approval workflow, runtime admission
+corrections, immediate namespace operator and scoped integration test repairs.
+The AU policy and fixture authority questions below are historical and resolved.
+Unfinished campaign runner and browser tooling are excluded from this merge.
+
+The live additive `approve` migration passed. Protected regression observed
+137 passing and 12 failing tests; cleanup, both preservation checks and development
+restoration passed. The test repairs have focused checks but have not been replayed
+against the live database. Actual authenticated browser/provider outcomes, final
+live integration and the wider campaign remain NOT VERIFIED. Full Plan 160 remains
+IN PROGRESS. See [the execution review](160-execution-review.md) for exact evidence.
+
+## Execution policy correction, 2 October 2026
+
+The user removed the fixed 24-hour namespace initialisation waiting period.
+It is not a Plan 160 prerequisite or a reason to defer verification. Configure
+the namespace and proceed when the required authority and actual Xero quota
+admission checks pass. This instruction supersedes earlier conservative
+initialisation waiting instructions referenced by this plan.
+
+## Resumed execution, 30 September 2026
+
+Work now lives in the persistent isolated branch `codex/xero-e2e-completion` at
+`.codex/worktrees/plan160-completion`. The final source correction is
+`3b7c511d0c96b26de067e8b36b78f6d45e427c70`. It adds atomic ordinary
+provider-attempt accounting across campaign acquisition, and guarded Xero tenant
+pause/resume with one scoped update/audit transaction. Source gates pass: lint,
+19 type tasks, 18 repository test tasks, 594 release-tool tests, release types,
+package boundaries and four uncached builds. The protected online integration
+suite for this candidate remains pending, so no provider/browser case is certified.
+
+A fresh [diagnostic report](../reports/xero-e2e/2026-09-30-7d393fee-409b-4dc1-8162-833eebe67944.md)
+and JSON were emitted by the actual no-manifest CLI with exit 2 and reproduced
+byte-for-byte by the offline renderer. All 26 cases are NOT VERIFIED, with zero
+LIVE/CONTROLLED execution and null admitted candidate identity. This diagnostic
+is a truthful absence report, not evidence of an attempted campaign. The default
+worker capability remains unavailable. The AU transition decision, sanctioned
+private fixtures and Clerk role sessions, compatible deployed candidate,
+production tier/namespace/domain configuration, operational lease, complete case
+drivers and PITR exercise remain outstanding. Source/domain verification cannot
+close these case-level prerequisites. Details and historic failed-run boundaries
+are in the [completion review](160-completion-review.md).
+
 ## Completion continuation, 29 September 2026
 
 User instruction: complete execution and read all lessons. Current baseline is main
 `42bb840`; all of `tasks/lessons.md` has been read. Existing Steps 1-2 fixes are
-preservation gates. Implementation runs in `/tmp/tc-plan160-complete-20260929`, branch
+preservation gates. Implementation began in a temporary worktree that was lost on disconnect; it now runs in `.codex/worktrees/plan160-completion`, branch
 `codex/xero-e2e-completion`, with independent review and candidate-specific verification.
 The existing protected online Neon target is authorised; no local or new database fallback.
 
 - [x] Read lessons, current plan, prior execution and runtime prerequisite handoff.
-- [ ] Refresh real deployment/configuration, worker, fixture and database prerequisites.
+- [x] Refresh real deployment/configuration, worker, fixture and database prerequisites; record missing handoffs.
 - [ ] Implement remaining operational receipt producers and admission/lease contracts.
 - [ ] Resolve the concrete application worker-fencing prerequisite with tests, preserving ordinary isolation.
 - [ ] Verify the frozen candidate through source gates and the protected online inventory.
@@ -21,7 +67,7 @@ The initial independent source unit is `tooling/release/xero-observation-produce
 and its co-located tests, plus existing observer/collector files only where integration
 requires them. It must produce causal observations from actual queries/handler outcomes,
 never fill missing proof with labels. Source review identified a prerequisite runtime slice:
-`packages/xero/src/campaign/**`, the database campaign advisory-lock helper, both
+`packages/database/src/xero-campaign-*`, the database campaign advisory-lock helper, both
 Inngest dispatchers, the four Xero handlers and their binding-access helper, scheduler
 and credential maintenance, plus affected downstream guards. The observer slice owns
 `tooling/release/xero-observer-authority.ts`, the three observer/scope CLIs and awaited
@@ -51,7 +97,7 @@ with status `running`, started and last updated at 27 September 2026 00:04 UTC.
 It has not been altered or adopted as a campaign fixture. Fresh production Inngest
 reads return HTTP 200, one environment, and app/run envelopes with no data collection;
 this establishes neither candidate registration nor a terminal result for that SQL row.
-No live integration mutation or Xero operation has been performed by this continuation.
+At the read-only prerequisite assessment, no live integration mutation or Xero operation had been performed. Subsequent exact-candidate integration evidence is recorded in the continuation review.
 
 The generic campaign infrastructure belongs in `packages/database/src/xero-campaign-*`
 to avoid an availability-to-Xero dependency cycle; provider request enforcement stays in
@@ -62,6 +108,12 @@ remote operation with a database transaction. Application action ticket targets 
 intentional connect/disconnect generation changes remain to be resolved before browser
 mutation admission is enabled.
 
+
+The continuation implements worker/provider admission, guarded persistence, observer
+authority, three causal observation producers and manifest-owned integration fixtures.
+The real browser/OAuth admission and deployment/drain prerequisites remain unresolved;
+`currentXeroWorkerCapability()` deliberately remains unavailable. See the
+[continuation review](160-completion-review.md) for exact verification and remaining work.
 
 ## Follow-up verification and authorised integration, 27 September 2026
 

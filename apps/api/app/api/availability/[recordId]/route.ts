@@ -12,6 +12,7 @@ import { getAvailabilityRecordById } from "@repo/database/queries/availability-r
 import { getOrganisationById } from "@repo/database/queries/organisations";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
+import { withAvailabilityRequestAction } from "@/lib/xero-campaign-action";
 
 const RouteParamsSchema = z.object({
   recordId: z.string().uuid(),
@@ -124,14 +125,25 @@ export async function PATCH(
     const authResult = await auth();
 
     // Call availability service to update record
-    const updateResult = await updateManualAvailability(
+    const updateResult = await withAvailabilityRequestAction(
+      request,
+      "availability.update",
       {
         clerkOrgId: scopedClerkOrgId,
         organisationId: scopedOrgId,
+        userId: user.id,
       },
-      scopedRecordId,
-      patch,
-      { orgRole: authResult.orgRole, userId: user.id }
+      { ...parseResult.data, recordId: scopedRecordId },
+      () =>
+        updateManualAvailability(
+          {
+            clerkOrgId: scopedClerkOrgId,
+            organisationId: scopedOrgId,
+          },
+          scopedRecordId,
+          patch,
+          { orgRole: authResult.orgRole, userId: user.id }
+        )
     );
 
     if (!updateResult.ok) {
@@ -305,13 +317,24 @@ export async function DELETE(
     }
 
     // Call availability service to archive record (soft delete)
-    const deleteResult = await archiveManualAvailability(
+    const deleteResult = await withAvailabilityRequestAction(
+      request,
+      "availability.archive",
       {
         clerkOrgId: scopedClerkOrgId,
         organisationId: scopedOrgId,
+        userId: user.id,
       },
-      scopedRecordId,
-      { orgRole: authResult.orgRole, userId: user.id }
+      { ...data, recordId: scopedRecordId },
+      () =>
+        archiveManualAvailability(
+          {
+            clerkOrgId: scopedClerkOrgId,
+            organisationId: scopedOrgId,
+          },
+          scopedRecordId,
+          { orgRole: authResult.orgRole, userId: user.id }
+        )
     );
 
     if (!deleteResult.ok) {

@@ -1021,7 +1021,7 @@ const recordInclude = {
   outbound_operations: {
     select: { status: true },
     where: {
-      action: "submit",
+      action: { in: ["submit", "approve"] },
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },
   },
@@ -1509,12 +1509,12 @@ function deriveActions(
     case "submitted":
       return ["view", "withdraw"];
     case "approved":
-      return hasXero ? ["view", "archive"] : ["edit", "archive"];
+      return approvedPlanActions(record, hasXero);
     case "declined":
     case "withdrawn":
       return ["view", "archive"];
     case "xero_sync_failed":
-      return ["edit", "retry_submission", "revert_to_draft"];
+      return failedPlanActions(record.failed_action);
     case "cancelled":
       return ["view"];
     default:
@@ -1551,8 +1551,11 @@ function canEdit(
 
   if (
     record.approval_status === "draft" ||
-    record.approval_status === "xero_sync_failed" ||
-    (record.approval_status === "approved" && !hasXero)
+    (record.approval_status === "xero_sync_failed" &&
+      record.failed_action === "submit") ||
+    (record.approval_status === "approved" &&
+      !hasXero &&
+      !record.source_remote_id)
   ) {
     return { ok: true, value: undefined };
   }
@@ -1762,4 +1765,26 @@ function isLocalOnlyEdit(
     return false;
   }
   return isLocalOnlyType(recordType ?? record.record_type);
+}
+
+function failedPlanActions(
+  action: availability_failed_action | null
+): EditableAction[] {
+  if (action === "submit") {
+    return ["edit", "retry_submission", "revert_to_draft"];
+  }
+  if (action === "withdraw") {
+    return ["view", "withdraw"];
+  }
+  return ["view"];
+}
+
+function approvedPlanActions(
+  record: ScopedRecord,
+  hasXero: boolean | null
+): EditableAction[] {
+  if (record.source_remote_id) {
+    return ["view", "withdraw", "archive"];
+  }
+  return hasXero ? ["view", "archive"] : ["edit", "archive"];
 }

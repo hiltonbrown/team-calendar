@@ -1,6 +1,15 @@
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import "./setup-env";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import {
   getScheduledSyncEventId,
   type RegisteredSyncRunType,
@@ -194,3 +203,6 @@ describe("scheduleXeroSyncs Integration", () => {
     }
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

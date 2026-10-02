@@ -3,6 +3,7 @@ export {
   type DispatchNotificationResult,
   dispatchNotification,
   type NotificationDispatchDatabase,
+  publishPersistedNotification,
 } from "./src/dispatch";
 export {
   type EmailQueueServiceError,

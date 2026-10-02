@@ -194,7 +194,7 @@ pause only the affected step when its assumptions no longer hold.
   publication reconciliation and cache rebuilds run in jobs. Xero remains the
   authority for balances and accruals.
 - This plan cannot silently change PRODUCT.md's submit/write-back contract.
-  The explicit AU decision in Step 1 is required for that behavioural change.
+  The user approved au-contract-v1 on 2 October 2026; see plans/160-au-transition-contract-v1.md.
 
 ### Permitted implementation paths
 
@@ -298,7 +298,7 @@ appropriate migration authority. Do not hand-edit generated migrations.
 
 | Step | Outcome | Depends on | Initial status |
 | --- | --- | --- | --- |
-| 1 | AU provider transition contract and regression fixtures | None | TODO, decision required for changed submission semantics |
+| 1 | AU provider transition contract and regression fixtures | None | APPROVED au-contract-v1; implementation in Plan 160 continuation, verification pending |
 | 2 | Truthful read completeness and retry-safe run lifecycle | None | TODO |
 | 3 | Safe reconnect and shared authorisation lifecycle | None | TODO |
 | 4 | Canonical employee and member reconciliation | None; coordinate schema with 2/3 | TODO |
@@ -336,6 +336,8 @@ marking sent; redelivery must join the original operation even outside the event
 provider's deduplication window. Never reset an already completed operation.
 
 ## Step 1: Resolve AU submission and approval semantics
+
+Decision recorded 2 October 2026: the user approved local submission with Xero creation on manager approval. Contract `au-contract-v1` and its transition/recovery table are in `plans/160-au-transition-contract-v1.md` and PRODUCT.md. This resolves the decision dependency only; provider execution evidence and unrelated Plan 159 steps keep their own status. The numbered proposal below is retained as the implementation acceptance criteria.
 
 The official [AU leave contract](https://developer.xero.com/documentation/api/payrollau/leaveapplications)
 says API creation produces scheduled leave; approve applies to requested leave.

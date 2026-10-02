@@ -156,6 +156,7 @@ enum availability_failed_action {
 
 enum outbound_operation_action {
   submit
+  approve
 }
 
 enum outbound_operation_status {

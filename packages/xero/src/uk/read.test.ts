@@ -105,15 +105,17 @@ describe("UK employee reads", () => {
     expect(result.value.failures).toHaveLength(1);
     expect(result.value.rawItemCount).toBe(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/payroll.xro/2.0/employees?page=1"),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer access-token",
-          "Xero-Tenant-Id": "xero-tenant-uk-1",
-        }),
-      })
-    );
+    expect(
+      fetchMock.mock.calls.map(([url, request]) => ({
+        authorization: new Headers(request?.headers).get("Authorization"),
+        tenant: new Headers(request?.headers).get("Xero-Tenant-Id"),
+        url: String(url),
+      }))
+    ).toContainEqual({
+      authorization: "Bearer access-token",
+      tenant: "xero-tenant-uk-1",
+      url: expect.stringContaining("/payroll.xro/2.0/employees?page=1"),
+    });
   });
 
   it("uses raw page length, not valid employee count, to continue pagination", async () => {
@@ -321,15 +323,17 @@ describe("UK leave record reads", () => {
       units: 11.25,
       updatedDateUtc: "2026-07-01T04:00:00.000Z",
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/payroll.xro/2.0/employees/emp-uk-1/leave"),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: "Bearer access-token",
-          "Xero-Tenant-Id": "xero-tenant-uk-1",
-        }),
-      })
-    );
+    expect(
+      fetchMock.mock.calls.map(([url, request]) => ({
+        authorization: new Headers(request?.headers).get("Authorization"),
+        tenant: new Headers(request?.headers).get("Xero-Tenant-Id"),
+        url: String(url),
+      }))
+    ).toContainEqual({
+      authorization: "Bearer access-token",
+      tenant: "xero-tenant-uk-1",
+      url: expect.stringContaining("/payroll.xro/2.0/employees/emp-uk-1/leave"),
+    });
   });
 
   it("maps Completed and Estimated period statuses to APPROVED and maps other statuses correctly", () => {
@@ -941,3 +945,16 @@ describe("UK leave application status reads", () => {
     }
   });
 });
+
+// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignCredentialScope: (
+    _scope: unknown,
+    _tenant: string,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignProviderEffect: (
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));

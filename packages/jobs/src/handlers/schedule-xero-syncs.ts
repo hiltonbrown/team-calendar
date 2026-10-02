@@ -1,3 +1,8 @@
+import {
+  claimXeroCampaignScheduledDispatch,
+  xeroCampaignAllowsOrdinaryMaintenance,
+} from "@repo/database/xero-campaign-access";
+import type { XeroCampaignEvent } from "@repo/database/xero-campaign-contract";
 import { recoverXeroRefreshAttempts } from "@repo/xero";
 import "server-only";
 
@@ -17,7 +22,9 @@ import { inngest } from "../client";
 import {
   dispatchSyncEvent,
   getScheduledSyncEventId,
+  getUtcCadenceSlot,
   type RegisteredSyncRunType,
+  syncEventNames,
 } from "../events";
 
 export function isValidTimezone(tz: string | null | undefined): boolean {
@@ -194,6 +201,7 @@ export function dueRunTypes(
 export interface ScheduleXeroSyncsPageOptions {
   cursor?: string;
   now?: Date;
+  schedulerRunId?: string;
 }
 
 export interface ScheduleXeroSyncsPageResult {
@@ -224,6 +232,9 @@ export async function rotateDormantXeroConnections(
   let rotated = 0;
   const seenOwners = new Set<string>();
   for (const connection of connectionsResult.value) {
+    if (!(await xeroCampaignAllowsOrdinaryMaintenance(connection))) {
+      continue;
+    }
     if (connection.ownerId && seenOwners.has(connection.ownerId)) {
       continue;
     }
@@ -262,6 +273,7 @@ export async function rotateDormantXeroConnections(
   };
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Each due job independently checks cadence, campaign ticket and dispatch result.
 export async function scheduleXeroSyncsPage(
   options: ScheduleXeroSyncsPageOptions = {}
 ): Promise<Result<ScheduleXeroSyncsPageResult>> {
@@ -291,7 +303,7 @@ export async function scheduleXeroSyncsPage(
   let invalidTimezone = 0;
 
   for (const tenant of tenants) {
-    if (!(tenant.timezone && isValidTimezone(tenant.timezone))) {
+    if (!isValidTimezone(tenant.timezone)) {
       invalidTimezone += 1;
       log.warn("Skipping Xero tenant with invalid timezone", {
         clerkOrgId: tenant.clerkOrgId,
@@ -308,13 +320,34 @@ export async function scheduleXeroSyncsPage(
     }
 
     for (const runType of due) {
-      const eventId = getScheduledSyncEventId(
-        tenant.databaseTenantId,
-        runType,
-        now
-      );
+      let campaign: XeroCampaignEvent | undefined;
+      try {
+        campaign = await claimXeroCampaignScheduledDispatch(
+          {
+            bindingGeneration: tenant.bindingGeneration,
+            clerkOrgId: tenant.clerkOrgId,
+            organisationId: tenant.organisationId,
+            xeroTenantId: tenant.databaseTenantId,
+          },
+          syncEventNames[runType],
+          getUtcCadenceSlot(runType, now),
+          options.schedulerRunId
+        );
+      } catch {
+        skipped += 1;
+        continue;
+      }
+      const eventId = campaign
+        ? "campaign:" +
+          campaign.runId +
+          ":" +
+          campaign.epoch +
+          ":" +
+          campaign.dispatchId
+        : getScheduledSyncEventId(tenant.databaseTenantId, runType, now);
       const dispatchRes = await dispatchSyncEvent(
         {
+          ...(campaign ? { campaign } : {}),
           bindingGeneration: tenant.bindingGeneration,
           clerkOrgId: tenant.clerkOrgId,
           organisationId: tenant.organisationId,
@@ -360,7 +393,7 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
       id: "schedule-xero-syncs",
       triggers: { cron: "*/15 * * * *" },
     },
-    async ({ step }) => {
+    async ({ step, runId: schedulerRunId }) => {
       let cursor: string | undefined;
       let pageIndex = 0;
       let totalScanned = 0;
@@ -369,42 +402,44 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
       let totalInvalidTimezone = 0;
       let hasMorePages = true;
 
-      const cleanupResult = await step.run(
-        "cleanup-xero-oauth-sessions",
-        async () => scrubInactiveXeroOAuthSessionCredentials()
-      );
-      if (!cleanupResult.ok) {
-        log.error("Failed to clean up inactive Xero OAuth sessions", {
-          error: cleanupResult.error,
-        });
-      }
-
-      await step.run("recover-xero-refresh-attempts", async () =>
-        recoverXeroRefreshAttempts({ now: new Date() })
-      );
-      const rotationResult = await step.run(
-        "rotate-dormant-connections",
-        async () => rotateDormantXeroConnections()
-      );
-      if (rotationResult.ok) {
-        log.info("Completed dormant Xero token rotation pass", {
-          failed: rotationResult.value.failed,
-          rotated: rotationResult.value.rotated,
-          scanned: rotationResult.value.scanned,
-        });
-      } else {
-        log.error(
-          "Failed to find dormant Xero connections for token rotation",
-          {
-            error: rotationResult.error,
-          }
+      const ordinaryMaintenance = await xeroCampaignAllowsOrdinaryMaintenance();
+      if (ordinaryMaintenance) {
+        const cleanupResult = await step.run(
+          "cleanup-xero-oauth-sessions",
+          async () => scrubInactiveXeroOAuthSessionCredentials()
         );
-      }
+        if (!cleanupResult.ok) {
+          log.error("Failed to clean up inactive Xero OAuth sessions", {
+            error: cleanupResult.error,
+          });
+        }
 
+        await step.run("recover-xero-refresh-attempts", async () =>
+          recoverXeroRefreshAttempts({ now: new Date() })
+        );
+        const rotationResult = await step.run(
+          "rotate-dormant-connections",
+          async () => rotateDormantXeroConnections()
+        );
+        if (rotationResult.ok) {
+          log.info("Completed dormant Xero token rotation pass", {
+            failed: rotationResult.value.failed,
+            rotated: rotationResult.value.rotated,
+            scanned: rotationResult.value.scanned,
+          });
+        } else {
+          log.error(
+            "Failed to find dormant Xero connections for token rotation",
+            {
+              error: rotationResult.error,
+            }
+          );
+        }
+      }
       while (hasMorePages) {
         const pageResult = await step.run(
           `process-page-${pageIndex}`,
-          async () => scheduleXeroSyncsPage({ cursor })
+          async () => scheduleXeroSyncsPage({ cursor, schedulerRunId })
         );
 
         if (!pageResult.ok) {

@@ -850,6 +850,44 @@ describe("leave records stale archival", () => {
     });
   });
 
+  it("preserves completed local withdrawal when Xero reports rejection", async () => {
+    mocks.normaliseInboundLeaveRecord.mockImplementation((record) => ({
+      ...normalisedLeaveRecord({
+        hash: `hash-${record.sourceRemoteId}`,
+        personId: record.personId,
+        sourceRemoteId: record.sourceRemoteId,
+      }),
+      approvalStatus: "declined",
+    }));
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        leaveRecords: [{ ...xeroLeaveRecord(), status: "REJECTED" }],
+        rawResponse: {},
+      },
+    });
+    mocks.personFindMany.mockResolvedValue([
+      person(PERSON_ID, XERO_EMPLOYEE_ID),
+    ]);
+    mocks.availabilityRecordFindMany
+      .mockResolvedValueOnce([
+        {
+          approval_status: "withdrawn",
+          failed_action: null,
+          id: "80000000-0000-4000-8000-000000000001",
+          source_remote_hash: "before",
+          source_remote_id: LEAVE_APPLICATION_ID,
+          source_type: "team_calendar_leave",
+        },
+      ])
+      .mockResolvedValueOnce([]);
+    expect((await syncXeroLeaveRecords(input())).ok).toBe(true);
+    expect(
+      mocks.availabilityRecordUpdateMany.mock.calls[0]?.[0]?.data
+    ).toMatchObject({ approval_status: "withdrawn" });
+  });
+
   it("keeps the write-error fields untouched for the failed-withdraw exception", async () => {
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
@@ -1848,3 +1886,26 @@ function xeroLeaveRecord(
     updatedDateUtc: "2026-05-01T01:02:03.000Z",
   };
 }
+
+// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
+  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
+  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
+  currentXeroCampaignInvocation: vi.fn(() => undefined),
+  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
+  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
+  withXeroCampaignInvocation: vi.fn(
+    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+  withXeroCampaignScopedEffect: (
+    _scope: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignScopedInvocation: vi.fn(
+    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
+}));

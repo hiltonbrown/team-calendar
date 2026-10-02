@@ -32,14 +32,12 @@ function buildXeroTenant() {
 }
 
 function expectBearerAccessToken(fetchMock: ReturnType<typeof vi.fn>) {
-  expect(fetchMock).toHaveBeenCalledWith(
-    expect.any(String),
-    expect.objectContaining({
-      headers: expect.objectContaining({
-        Authorization: "Bearer access-token",
-      }),
-    })
-  );
+  expect(fetchMock.mock.calls.length).toBeGreaterThan(0);
+  for (const [, request] of fetchMock.mock.calls) {
+    expect(new Headers(request?.headers).get("Authorization")).toBe(
+      "Bearer access-token"
+    );
+  }
 }
 
 describe("AU payroll write path", () => {
@@ -52,11 +50,16 @@ describe("AU payroll write path", () => {
     restoreEncryptionKey();
   });
 
-  it("submits leave and returns the Xero leave application ID", async () => {
+  it("creates scheduled leave on manager approval without an invented requested status", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          LeaveApplications: [{ LeaveApplicationID: "leave-1" }],
+          LeaveApplications: [
+            {
+              LeaveApplicationID: "leave-1",
+              LeavePeriods: [{ LeavePeriodStatus: "SCHEDULED" }],
+            },
+          ],
         }),
         { status: 200 }
       )
@@ -73,9 +76,7 @@ describe("AU payroll write path", () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.xeroLeaveApplicationId).toBe("leave-1");
-    }
+    expect(result.value.xeroLeaveApplicationId).toBe("leave-1");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
       expect.objectContaining({ method: "POST" })
@@ -450,3 +451,16 @@ it.each([
     vi.unstubAllGlobals();
   }
 });
+
+// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignCredentialScope: (
+    _scope: unknown,
+    _tenant: string,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignProviderEffect: (
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));

@@ -318,6 +318,15 @@ export async function initialiseXeroRateNamespace(input: {
   ) {
     throw new Error("Xero rate namespace configuration is incomplete");
   }
+  if (
+    !input.assumeSpentDaily &&
+    (environment.XERO_RATE_NAMESPACE_EPOCH !== input.epoch ||
+      environment.XERO_CREDENTIAL_DOMAIN_ID !== input.credentialDomainId)
+  ) {
+    throw new Error(
+      "Immediate admission requires the configured namespace and credential domain"
+    );
+  }
   const store = new RedisSharedXeroRateStore({
     credentialDomainId: input.credentialDomainId,
     epoch: input.epoch,

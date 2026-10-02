@@ -85,7 +85,7 @@ The architecture is:
 | Direction | Mechanism | Scope |
 |---|---|---|
 | Inbound | Pull-first, scheduled Inngest jobs | Employees, leave records, leave balances. Xero provides no leave webhooks. |
-| Outbound | Synchronous, user-triggered API write | Submit, approve, decline, withdraw. No background queue. Failures surfaced inline. |
+| Outbound | Synchronous, user-triggered API write | AU submission stays pending locally. Approval creates scheduled leave; imported requested leave uses approve/reject. No background queue. Failures surfaced inline. |
 
 Bidirectional leave management is a shipped capability of the initial build, not a future item. The build order (steps 6 and 7) implements submission and approval write-back as core slices.
 
@@ -290,7 +290,7 @@ Responsibilities: Xero OAuth token management (acquire, refresh, encrypt at rest
 
 #### Write operations
 
-Submit, approve, decline, and withdraw leave applications to Xero Payroll. All write operations return `Result<T, XeroWriteError>`.
+Create leave on manager approval, approve or decline imported requested leave, and withdraw remote leave through Xero Payroll. Local submission and pre-creation decline/withdraw make no payroll write. All write operations return `Result<T, XeroWriteError>`.
 
 `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `permission_error`, `rate_limit_error`, `network_error`, `not_found_error`, `region_not_supported_error`, `unknown_error`.
 
@@ -572,14 +572,22 @@ All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Nev
 
 ### Outbound write operations
 
-| Operation | Trigger | State transition |
-|---|---|---|
-| Submit | Employee submits draft leave | `draft → submitted` |
-| Approve | Manager approves submitted leave | `submitted → approved` |
-| Decline | Manager declines with required reason | `submitted → declined` |
-| Withdraw | Employee or admin withdraws leave | `submitted/approved → withdrawn` |
+Approved AU contract: `au-contract-v1` (2 October 2026). Xero AU API creation schedules leave immediately, so Team Calendar keeps employee submission local until manager approval.
 
-All write operations are synchronous. Failures are surfaced inline to the acting user. No automatic background retry for outbound writes.
+| Operation | Provider action | Local transition |
+|---|---|---|
+| Submit app leave | Validate AU eligibility, connection, employee and leave-type mapping; no payroll creation | `draft → submitted` |
+| Approve app leave without remote ID | Synchronously create scheduled leave in Xero | `submitted → approved` |
+| Decline app leave without remote ID | No provider call; require decline reason | `submitted → declined` |
+| Withdraw app leave without remote ID | No provider call | `submitted → withdrawn` |
+| Approve/decline imported requested leave | Documented Xero approve/reject operation | `submitted → approved/declined` |
+| Withdraw remote leave | Documented Xero reject operation where supported | `submitted/approved → withdrawn` |
+
+The create on approval uses a durable `approve` outbound operation, immutable request fingerprint and fenced attempt generation. An uncertain outcome blocks further edits, retries and withdrawal until an administrator attaches verified provider evidence or independently confirms no creation. Recovery retains the original approving actor; a removed person leaves the approver link explicitly unknown. Inbound sync preserves completed withdrawal when Xero reports rejection.
+
+Legacy app-submitted records already present in Xero require scoped administrator review of remote state. They are never recreated, automatically rejected or deleted, or assigned fabricated manager approval history. Existing `submit` operations remain recoverable. No data backfill accompanies this contract.
+
+All provider mutations are synchronous and user-triggered. Failures are surfaced inline; outbound writes have no automatic background retry. NZ and UK submission remain unavailable.
 
 ### Inbound sync flow
 

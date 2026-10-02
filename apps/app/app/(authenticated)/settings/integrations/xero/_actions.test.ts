@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
+  CampaignDeniedError: class extends Error {
+    constructor() {
+      super("xero_campaign_admission_denied");
+    }
+  },
   coreKeys: vi.fn(),
   currentUser: vi.fn(),
   database: {
+    $transaction: vi.fn(),
     auditEvent: { create: vi.fn() },
     organisation: { findFirst: vi.fn() },
     xeroTenant: { updateMany: vi.fn() },
@@ -14,6 +20,11 @@ const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
   refreshXeroOAuthConnection: vi.fn(),
   revalidatePath: vi.fn(),
+  transaction: {
+    auditEvent: { create: vi.fn() },
+    xeroTenant: { updateMany: vi.fn() },
+  },
+  withXeroCampaignAction: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
@@ -22,6 +33,13 @@ vi.mock("@repo/auth/server", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: mocks.database,
+}));
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignAction: mocks.withXeroCampaignAction,
+}));
+vi.mock("@repo/database/xero-campaign-contract", async (importOriginal) => ({
+  ...(await importOriginal()),
+  XeroCampaignDeniedError: mocks.CampaignDeniedError,
 }));
 vi.mock("@repo/next-config/keys", () => ({
   keys: mocks.coreKeys,
@@ -75,7 +93,14 @@ describe("xero settings integration server actions", () => {
     });
     mocks.database.organisation.findFirst.mockResolvedValue({ name: orgName });
     mocks.database.auditEvent.create.mockResolvedValue({});
-    mocks.database.xeroTenant.updateMany.mockResolvedValue({ count: 1 });
+    mocks.transaction.auditEvent.create.mockResolvedValue({});
+    mocks.transaction.xeroTenant.updateMany.mockResolvedValue({ count: 1 });
+    mocks.database.$transaction.mockImplementation((operation) =>
+      operation(mocks.transaction)
+    );
+    mocks.withXeroCampaignAction.mockImplementation(
+      (_functionId, _scope, operation) => operation()
+    );
     mocks.refreshXeroOAuthConnection.mockResolvedValue({
       ok: true,
       value: { refreshedAt: new Date("2026-01-01T00:00:00Z") },
@@ -294,7 +319,7 @@ describe("xero settings integration server actions", () => {
         xeroTenantId,
       });
       expect(resPause.ok).toBe(true);
-      expect(mocks.database.xeroTenant.updateMany).toHaveBeenCalledWith({
+      expect(mocks.transaction.xeroTenant.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: expect.any(Date) },
         where: {
           clerk_org_id: clerkOrgId,
@@ -308,7 +333,7 @@ describe("xero settings integration server actions", () => {
         xeroTenantId,
       });
       expect(resResume.ok).toBe(true);
-      expect(mocks.database.xeroTenant.updateMany).toHaveBeenCalledWith({
+      expect(mocks.transaction.xeroTenant.updateMany).toHaveBeenCalledWith({
         data: { sync_paused_at: null },
         where: {
           clerk_org_id: clerkOrgId,
@@ -316,6 +341,81 @@ describe("xero settings integration server actions", () => {
           organisation_id: organisationId,
         },
       });
+      expect(mocks.database.$transaction).toHaveBeenCalledTimes(2);
+      expect(mocks.transaction.auditEvent.create).toHaveBeenCalledTimes(2);
+      expect(mocks.database.xeroTenant.updateMany).not.toHaveBeenCalled();
+      expect(mocks.withXeroCampaignAction).toHaveBeenCalledWith(
+        "xero.settings.tenant-sync-state",
+        {
+          campaign: undefined,
+          clerkOrgId,
+          organisationId,
+          target: { organisationId, paused: expect.any(Boolean), xeroTenantId },
+          userId,
+        },
+        expect.any(Function)
+      );
     });
+
+    it.each([
+      ["pause", pauseTenantSyncAction],
+      ["resume", resumeTenantSyncAction],
+    ])(
+      "denies %s during a reserved campaign without changing tenant or audit",
+      async (_name, action) => {
+        mocks.withXeroCampaignAction.mockRejectedValue(
+          new mocks.CampaignDeniedError()
+        );
+
+        const result = await action({ organisationId, xeroTenantId });
+
+        expect(result).toEqual({
+          error: {
+            code: "not_authorised",
+            message: "This action is temporarily unavailable. Try again later.",
+          },
+          ok: false,
+        });
+        expect(mocks.database.$transaction).not.toHaveBeenCalled();
+        expect(mocks.database.xeroTenant.updateMany).not.toHaveBeenCalled();
+        expect(mocks.transaction.auditEvent.create).not.toHaveBeenCalled();
+        expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
+        expect(mocks.revalidatePath).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ["pause", pauseTenantSyncAction],
+      ["resume", resumeTenantSyncAction],
+    ])(
+      "does not audit or claim success when %s targets another tenant",
+      async (_name, action) => {
+        mocks.transaction.xeroTenant.updateMany.mockResolvedValue({ count: 0 });
+
+        const result = await action({ organisationId, xeroTenantId });
+
+        expect(result).toEqual({
+          error: {
+            code: "validation_error",
+            message: "Xero tenant was not found in this organisation.",
+          },
+          ok: false,
+        });
+        expect(mocks.transaction.xeroTenant.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: {
+              clerk_org_id: clerkOrgId,
+              id: xeroTenantId,
+              organisation_id: organisationId,
+            },
+          })
+        );
+        expect(mocks.transaction.auditEvent.create).not.toHaveBeenCalled();
+        expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
+        expect(mocks.revalidatePath).not.toHaveBeenCalled();
+      }
+    );
   });
 });
+
+vi.mock("server-only", () => ({}));

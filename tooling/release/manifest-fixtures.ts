@@ -14,6 +14,7 @@ const UUID_GLOBAL_KEY_KINDS = new Set<GlobalKeyKind>([
   "oauth_attempt",
   "cleanup_request",
   "cleanup_attempt",
+  "campaign_domain",
 ]);
 
 export const REQUIRED_GLOBAL_KEY_COUNTS = Object.freeze(

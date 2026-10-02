@@ -1,4 +1,12 @@
 import type { Result } from "@repo/core";
+import {
+  assertXeroCampaignDispatch,
+  recordXeroCampaignDispatch,
+} from "@repo/database/xero-campaign-access";
+import {
+  type XeroCampaignEvent,
+  XeroCampaignEventSchema,
+} from "@repo/database/xero-campaign-contract";
 import { z } from "zod";
 import { inngest } from "./client";
 
@@ -20,6 +28,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
 
 const SyncEventSchema = z.object({
   bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
@@ -114,10 +123,16 @@ export async function dispatchSyncEvent(
   }
 
   try {
+    await assertXeroCampaignDispatch(
+      parsed.data,
+      eventName,
+      parsed.data.campaign
+    );
     const payload: {
       name: string;
       data: {
         bindingGeneration: number;
+        campaign?: XeroCampaignEvent;
         clerkOrgId: string;
         organisationId: string;
         personId?: string;
@@ -129,6 +144,7 @@ export async function dispatchSyncEvent(
     } = {
       data: {
         bindingGeneration: parsed.data.bindingGeneration,
+        ...(parsed.data.campaign ? { campaign: parsed.data.campaign } : {}),
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,
@@ -144,6 +160,12 @@ export async function dispatchSyncEvent(
     }
 
     const sent = await inngest.send(payload);
+    await recordXeroCampaignDispatch(
+      parsed.data,
+      eventName,
+      parsed.data.campaign,
+      sent.ids
+    );
     return { ok: true, value: { eventName, ids: sent.ids, queued: true } };
   } catch {
     return {

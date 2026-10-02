@@ -571,6 +571,50 @@ describe("plan-service", () => {
     });
   });
 
+  it.each([
+    ["submit", ["edit", "retry_submission", "revert_to_draft"]],
+    ["withdraw", ["view", "withdraw"]],
+    ["approve", ["view"]],
+    ["decline", ["view"]],
+    [null, ["view"]],
+  ])(
+    "exposes correct employee actions for a failed %s action",
+    async (failed_action, editableActions) => {
+      mocks.getXeroConnectionStateForScope.mockResolvedValue({
+        ok: true,
+        value: { bindingGeneration: 1, state: "connected" },
+      });
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...scopedRecordFixture({ managerPersonId: null }),
+        approval_status: "xero_sync_failed",
+        failed_action,
+        source_type: "team_calendar_leave",
+      });
+      expect(
+        await getRecord({ ...actionInput, actingOrgRole: "org:admin" })
+      ).toMatchObject({ ok: true, value: { editableActions } });
+    }
+  );
+
+  it("offers withdrawal for approved payroll leave without making it editable", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: 1, state: "connected" },
+    });
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...scopedRecordFixture({ managerPersonId: null }),
+      approval_status: "approved",
+      source_remote_id: "remote_leave",
+      source_type: "team_calendar_leave",
+    });
+    expect(
+      await getRecord({ ...actionInput, actingOrgRole: "org:admin" })
+    ).toMatchObject({
+      ok: true,
+      value: { editableActions: ["view", "withdraw", "archive"] },
+    });
+  });
+
   it("projects unit, currencyCode, and balance amount on balanceChip", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,

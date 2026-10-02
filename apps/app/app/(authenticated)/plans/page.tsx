@@ -191,7 +191,7 @@ const PlansPage = async ({ searchParams }: PlansPageProps) => {
               <p>
                 Xero is not connected. Leave saves in Team Calendar only, so it
                 appears on calendars but does not create payroll leave or enter
-                the Xero approval queue.
+                the Leave approval queue.
               </p>
               {isAdminOrOwner(orgRole) && (
                 <a
@@ -279,7 +279,10 @@ function toClientRecord(
     editableActions: record.editableActions,
     endsAt: record.endsAt.toISOString(),
     failedAction:
-      record.failedAction === "submit" || record.failedAction === "withdraw"
+      record.failedAction === "submit" ||
+      record.failedAction === "withdraw" ||
+      record.failedAction === "approve" ||
+      record.failedAction === "decline"
         ? record.failedAction
         : null,
     id: record.id,

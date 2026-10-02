@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { withXeroCampaignProviderEffect } from "@repo/database/xero-campaign-access";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const metricLog = vi.hoisted(() => vi.fn());
@@ -686,4 +688,89 @@ describe("transport lifecycle metrics", () => {
       );
     }
   );
+});
+
+// Transport policy tests isolate the limiter; campaign effects have dedicated protocol coverage.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignProviderEffect: vi.fn(
+    (_rateClass: unknown, operation: () => Promise<unknown>) => operation()
+  ),
+}));
+
+it("keeps the campaign effect open until a successful response body is readable", async () => {
+  const outcomes: string[] = [];
+  vi.mocked(withXeroCampaignProviderEffect).mockImplementationOnce(
+    async (_target, operation) => {
+      try {
+        const result = await operation();
+        outcomes.push("completed");
+        return result;
+      } catch (error) {
+        outcomes.push("uncertain");
+        throw error;
+      }
+    }
+  );
+  const response = new Response(
+    new ReadableStream({
+      start(controller) {
+        controller.error(new Error("body transport failed"));
+      },
+    }),
+    { status: 200 }
+  );
+  await expect(
+    xeroFetch(
+      { maxAttempts: 1, rateClass, url: "https://api.xero.com/x" },
+      {
+        fetchImpl: vi.fn().mockResolvedValue(response),
+        limiter: permissiveLimiter(),
+      }
+    )
+  ).rejects.toThrow();
+  expect(outcomes).toEqual(["uncertain"]);
+});
+
+it("dispatches the same private body and header snapshot admitted by the campaign", async () => {
+  const body = new URLSearchParams({
+    code: "owned-code",
+    grant_type: "authorization_code",
+  });
+  const headers = new Headers({ "Xero-Tenant-Id": "owned-tenant" });
+  const expectedBody = body.toString();
+  const init = { body, headers, method: "POST" };
+  vi.mocked(withXeroCampaignProviderEffect).mockImplementationOnce(
+    (target, operation) => {
+      body.set("code", "foreign-code");
+      headers.set("Xero-Tenant-Id", "foreign-tenant");
+      init.method = "DELETE";
+      expect(target).toMatchObject({
+        bodyHash: `sha256:${createHash("sha256").update(expectedBody).digest("hex")}`,
+        method: "POST",
+        tenantHeader: "owned-tenant",
+        tokenGrantType: "authorization_code",
+      });
+      return operation();
+    }
+  );
+  const fetchImpl = vi.fn<typeof fetch>(async (url, requestInit) => {
+    const request = new Request(url, requestInit);
+    expect(request.method).toBe("POST");
+    expect(request.headers.get("Xero-Tenant-Id")).toBe("owned-tenant");
+    expect(request.headers.get("Content-Type")).toBe(
+      "application/x-www-form-urlencoded;charset=UTF-8"
+    );
+    expect(await request.text()).toBe(expectedBody);
+    return new Response("ok");
+  });
+  await xeroFetch(
+    {
+      init,
+      maxAttempts: 1,
+      rateClass,
+      url: "https://identity.xero.com/connect/token",
+    },
+    { fetchImpl, limiter: permissiveLimiter() }
+  );
+  expect(fetchImpl).toHaveBeenCalledOnce();
 });

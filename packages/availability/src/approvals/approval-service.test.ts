@@ -10,11 +10,13 @@ const mocks = vi.hoisted(() => ({
   availabilityUpdateMany: vi.fn(),
   computeWorkingDays: vi.fn(),
   computeWorkingDaysFromReferenceData: vi.fn(),
+  createLeaveOnApproval: vi.fn(),
   declineLeaveApplicationForRegion: vi.fn(),
   dispatchNotification: vi.fn(),
   dispatchSyncEvent: vi.fn(),
   getSettings: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
+  hasUnresolved: vi.fn().mockResolvedValue(false),
   leaveBalanceFindFirst: vi.fn(),
   leaveBalanceFindMany: vi.fn(),
   listForOrganisation: vi.fn(),
@@ -62,6 +64,7 @@ vi.mock("@repo/database", () => ({
     },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
+  hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../duration/working-days", () => ({
@@ -157,7 +160,7 @@ const record = {
   person_id: "00000000-0000-4000-8000-000000000011",
   record_type: "annual_leave",
   source_remote_id: "xero-leave-1",
-  source_type: "team_calendar_leave",
+  source_type: "xero_leave",
   starts_at: new Date("2026-05-04T00:00:00.000Z"),
   submitted_at: new Date("2026-04-01T00:00:00.000Z"),
   xero_write_error: null,
@@ -187,6 +190,7 @@ describe("approval-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.availabilityClaimUpdateMany.mockReset();
     mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.computeWorkingDaysFromReferenceData.mockReturnValue({
@@ -373,7 +377,11 @@ describe("approval-service", () => {
 
   it("allows only one duplicate withdrawal to call Xero", async () => {
     const withdrawal = deferred<{ ok: true; value: { rawResponse: object } }>();
-    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "approved",
+      source_type: "team_calendar_leave",
+    });
     mocks.availabilityClaimUpdateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
@@ -595,6 +603,54 @@ describe("approval-service", () => {
       })
     );
   });
+
+  it("declines local pending leave without any Xero resolution or write", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      source_remote_id: null,
+      source_type: "team_calendar_leave",
+    });
+    expect(
+      (
+        await decline(
+          { ...input, reason: "Insufficient team coverage" },
+          mockPort
+        )
+      ).ok
+    ).toBe(true);
+    expect(mocks.resolveXeroEmployeeId).not.toHaveBeenCalled();
+    expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          approval_note: "Insufficient team coverage",
+          approval_status: "declined",
+        }),
+      })
+    );
+  });
+
+  it.each(["approve", "decline"])(
+    "requires scoped review of legacy remote-created submissions before %s",
+    async (action) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        source_type: "team_calendar_leave",
+      });
+      const result =
+        action === "approve"
+          ? await approve(input, mockPort)
+          : await decline(
+              { ...input, reason: "Insufficient coverage" },
+              mockPort
+            );
+      expect(result).toMatchObject({ ok: false });
+      expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.auditCreate).not.toHaveBeenCalled();
+      expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+    }
+  );
 
   it("approves submitted leave, clears failed_action, notifies owner and audits", async () => {
     mocks.availabilityFindFirst
@@ -1749,4 +1805,66 @@ describe("approval-service", () => {
       })
     );
   });
+});
+
+vi.mock("../plans/submit-service", async (importOriginal) => ({
+  ...(await importOriginal()),
+  createLeaveOnApproval: mocks.createLeaveOnApproval,
+}));
+
+describe("undispatched approval recovery", () => {
+  beforeEach(() => {
+    mocks.hasUnresolved.mockResolvedValue(true);
+    mocks.createLeaveOnApproval.mockReset();
+    mocks.createLeaveOnApproval.mockResolvedValue({
+      error: { code: "xero_not_connected", message: "Reconnect payroll." },
+      ok: false,
+    });
+  });
+  it("allows an expired prepared approval through the public approval path to the fenced create", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      outbound_operations: [
+        { action: "approve", dispatch_started_at: null, status: "prepared" },
+      ],
+      source_remote_id: null,
+      source_type: "team_calendar_leave",
+      xero_write_claimed_at: new Date(0),
+    });
+    await approve(input, mockPort);
+    expect(mocks.createLeaveOnApproval).toHaveBeenCalledOnce();
+  });
+  it.each([
+    { claim: new Date(0), dispatch_started_at: new Date(), status: "prepared" },
+    {
+      claim: new Date(0),
+      dispatch_started_at: new Date(),
+      status: "outcome_unknown",
+    },
+    {
+      claim: new Date(0),
+      dispatch_started_at: new Date(),
+      status: "provider_accepted",
+    },
+    { claim: new Date(), dispatch_started_at: null, status: "prepared" },
+  ])(
+    "keeps dispatched, uncertain, accepted and live prepared attempts blocked",
+    async (operation) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        outbound_operations: [
+          {
+            action: "approve",
+            dispatch_started_at: operation.dispatch_started_at,
+            status: operation.status,
+          },
+        ],
+        source_remote_id: null,
+        source_type: "team_calendar_leave",
+        xero_write_claimed_at: operation.claim,
+      });
+      expect((await approve(input, mockPort)).ok).toBe(false);
+      expect(mocks.createLeaveOnApproval).not.toHaveBeenCalled();
+    }
+  );
 });

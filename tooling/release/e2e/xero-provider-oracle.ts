@@ -80,9 +80,9 @@ export async function readIndependentAuLeave(input: {
   expectedTenantId: string;
   providerAppId: string;
   remoteId: string | null;
-  assertAuthority: () => void;
+  assertAuthority: () => void | Promise<void>;
 }) {
-  input.assertAuthority();
+  await input.assertAuthority();
   if (
     !(
       process.env.KV_REST_API_URL &&
@@ -113,6 +113,7 @@ export async function readIndependentAuLeave(input: {
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
   const deadline = createXeroDeadline(90_000);
+  await input.assertAuthority();
   const access = await resolveXeroAccess({
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
@@ -134,6 +135,7 @@ export async function readIndependentAuLeave(input: {
     const url = input.remoteId
       ? `https://api.xero.com/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.remoteId)}`
       : `https://api.xero.com/payroll.xro/1.0/LeaveApplications/v2?page=${page}`;
+    await input.assertAuthority();
     const response = await xeroFetch({
       deadline,
       init: {
@@ -171,6 +173,7 @@ export async function readIndependentAuLeave(input: {
       "Independent provider enumeration is incomplete or duplicated"
     );
   }
+  await input.assertAuthority();
   return {
     complete,
     intercepted: false as const,
@@ -188,7 +191,7 @@ export async function readIndependentAuImport(input: {
   expectedTenantId: string;
   providerAppId: string;
   ownedEmployeeIds: readonly string[];
-  assertAuthority: () => void;
+  assertAuthority: () => void | Promise<void>;
 }) {
   // Reuses exactly the guarded LIVE transport and access contract of the leave
   // oracle. Production response mappers are deliberately never imported.
@@ -200,6 +203,7 @@ export async function readIndependentAuImport(input: {
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
   const deadline = createXeroDeadline(90_000);
+  await input.assertAuthority();
   const access = await resolveXeroAccess({
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
@@ -215,7 +219,7 @@ export async function readIndependentAuImport(input: {
     throw new Error("Independent import access is unavailable");
   }
   const request = async (path: string) => {
-    input.assertAuthority();
+    await input.assertAuthority();
     const response = await xeroFetch({
       deadline,
       init: {
@@ -297,6 +301,7 @@ export async function readIndependentAuImport(input: {
     }
     balances.push(...payload.Employees);
   }
+  await input.assertAuthority();
   return {
     balances,
     complete: true as const,

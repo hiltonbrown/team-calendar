@@ -832,3 +832,14 @@ describe("refresh metric outcome safety", () => {
     );
   });
 });
+
+// Credential tests isolate token ownership; campaign checks have dedicated protocol coverage.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignCredentialScope: vi.fn(
+    (
+      _scope: unknown,
+      _externalTenantId: string,
+      operation: () => Promise<unknown>
+    ) => operation()
+  ),
+}));

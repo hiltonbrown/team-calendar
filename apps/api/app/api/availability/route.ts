@@ -5,6 +5,7 @@ import { getOrganisationById } from "@repo/database/queries/organisations";
 import { listPeopleForOrganisation } from "@repo/database/queries/people";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
+import { withAvailabilityRequestAction } from "@/lib/xero-campaign-action";
 
 const CreateAvailabilitySchema = z.object({
   allDay: z.boolean().optional().default(true),
@@ -121,24 +122,35 @@ export async function POST(request: Request): Promise<Response> {
     const authResult = await auth();
 
     // Call availability service to create record
-    const createResult = await createManualAvailability(
+    const createResult = await withAvailabilityRequestAction(
+      request,
+      "availability.create",
       {
         clerkOrgId: scopedClerkOrgId,
         organisationId: scopedOrgId,
+        userId: user.id,
       },
-      {
-        allDay: data.allDay,
-        contactability: data.contactability,
-        endsAt: new Date(data.endsAt),
-        notesInternal: data.notesInternal,
-        personId: data.personId,
-        preferredContactMethod: data.preferredContactMethod,
-        recordType: data.recordType,
-        startsAt: new Date(data.startsAt),
-        title: data.title,
-        workingLocation: data.workingLocation,
-      },
-      { orgRole: authResult.orgRole, userId: user.id }
+      data,
+      () =>
+        createManualAvailability(
+          {
+            clerkOrgId: scopedClerkOrgId,
+            organisationId: scopedOrgId,
+          },
+          {
+            allDay: data.allDay,
+            contactability: data.contactability,
+            endsAt: new Date(data.endsAt),
+            notesInternal: data.notesInternal,
+            personId: data.personId,
+            preferredContactMethod: data.preferredContactMethod,
+            recordType: data.recordType,
+            startsAt: new Date(data.startsAt),
+            title: data.title,
+            workingLocation: data.workingLocation,
+          },
+          { orgRole: authResult.orgRole, userId: user.id }
+        )
     );
 
     if (!createResult.ok) {

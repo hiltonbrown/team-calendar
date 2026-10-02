@@ -1,3 +1,9 @@
+import {
+  assertXeroCampaignAccess,
+  withXeroCampaignInvocation,
+  withXeroCampaignScopedEffect,
+} from "@repo/database/xero-campaign-access";
+import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
 
 import { clerkClient } from "@repo/auth/server";
@@ -34,7 +40,7 @@ const noUnresolvedSubmitOperationWhere =
   (): Prisma.AvailabilityRecordWhereInput => ({
     outbound_operations: {
       none: {
-        action: "submit" as const,
+        action: { in: ["submit", "approve"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },
@@ -44,6 +50,7 @@ const noUnresolvedSubmitOperationWhere =
 
 const ReconcileInputSchema = z.object({
   bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
@@ -141,14 +148,32 @@ export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
       id: "reconcile-xero-approval-state",
       triggers: { event: "reconcile-xero-approval-state" },
     },
-    async ({ event, step }) =>
+    async ({ event, step, runId: workerRunId }) =>
       await step.run("reconcile-approval-state", async () =>
-        rejectRetryableSyncResult(reconcileXeroApprovalState(event.data))
+        rejectRetryableSyncResult(
+          reconcileXeroApprovalState(event.data, workerRunId)
+        )
       )
   );
 
+export function reconcileXeroApprovalState(
+  input: unknown,
+  workerRunId: string | null = null
+) {
+  const parsed = ReconcileInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return Promise.resolve(validationError(parsed.error));
+  }
+  return withXeroCampaignInvocation(
+    "reconcile-xero-approval-state",
+    input,
+    () => reconcileXeroApprovalStateUnderCampaign(input),
+    workerRunId
+  );
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, batching, per-record outcomes and finalisation.
-export async function reconcileXeroApprovalState(input: unknown): Promise<
+async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
   Result<
     {
       archivedMissing: number;
@@ -812,21 +837,24 @@ async function publishRunStatusChanged(
   status: string
 ) {
   try {
-    await publishOrganisationNotificationEvent(
-      {
-        clerkOrgId: context.clerkOrgId,
-        organisationId: context.organisationId,
-      },
-      {
-        payload: {
+    await assertXeroCampaignAccess(context);
+    await withXeroCampaignScopedEffect(context, () =>
+      publishOrganisationNotificationEvent(
+        {
+          clerkOrgId: context.clerkOrgId,
           organisationId: context.organisationId,
-          runId,
-          runType: "approval_state_reconciliation",
-          status,
-          xeroTenantId: context.xeroTenantId,
         },
-        type: "sync.run_status_changed",
-      }
+        {
+          payload: {
+            organisationId: context.organisationId,
+            runId,
+            runType: "approval_state_reconciliation",
+            status,
+            xeroTenantId: context.xeroTenantId,
+          },
+          type: "sync.run_status_changed",
+        }
+      )
     );
   } catch (error) {
     if (

@@ -1,6 +1,15 @@
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { encryptXeroToken } from "@repo/xero/src/crypto/tokens";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 /*
  * Contract pinned from reconcile-xero-approval-state.ts:
@@ -71,6 +80,11 @@ const tenantB = {
 } as const;
 
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+// Keep leave in the real reconciliation window without replacing clocks used by live guards.
+const fixtureDayStart = Math.floor(Date.now() / 86_400_000) * 86_400_000;
+function fixtureDate(offsetDays: number) {
+  return new Date(fixtureDayStart + offsetDays * 86_400_000);
+}
 
 describe("reconcile-xero-approval-state database flow", () => {
   beforeEach(async () => {
@@ -116,7 +130,7 @@ describe("reconcile-xero-approval-state database flow", () => {
       derived_sequence: 1,
       xero_write_error: null,
     });
-    expect(updated?.approved_at).toEqual(new Date("2026-06-10T00:00:00.000Z"));
+    expect(updated?.approved_at).toEqual(fixtureDate(-14));
 
     const auditEvents = await database.auditEvent.findMany({
       where: {
@@ -311,10 +325,10 @@ describe("reconcile-xero-approval-state database flow", () => {
       sourceRemoteId: leaveApplicationId("network"),
     });
     const approved = await createAvailabilityRecord(tenantA, {
-      endsAt: new Date("2026-07-04T00:00:00.000Z"),
+      endsAt: fixtureDate(10),
       id: recordId("005"),
       sourceRemoteId: leaveApplicationId("after-failure"),
-      startsAt: new Date("2026-07-03T00:00:00.000Z"),
+      startsAt: fixtureDate(9),
     });
 
     mockFetchLeaveApplicationStatusForRegion
@@ -369,10 +383,10 @@ describe("reconcile-xero-approval-state database flow", () => {
       sourceRemoteId: leaveApplicationId("auth"),
     });
     const second = await createAvailabilityRecord(tenantA, {
-      endsAt: new Date("2026-07-06T00:00:00.000Z"),
+      endsAt: fixtureDate(12),
       id: recordId("007"),
       sourceRemoteId: leaveApplicationId("after-auth"),
-      startsAt: new Date("2026-07-05T00:00:00.000Z"),
+      startsAt: fixtureDate(11),
     });
 
     mockFetchLeaveApplicationStatusForRegion.mockResolvedValue(
@@ -460,6 +474,60 @@ describe("reconcile-xero-approval-state database flow", () => {
     });
   });
 
+  it("excludes remote leave outside the lookback and locally pending AU leave without a provider identity", async () => {
+    await setupTenant(tenantA);
+    await setupPerson(tenantA);
+    const historical = await createAvailabilityRecord(tenantA, {
+      endsAt: fixtureDate(-91),
+      id: recordId("016"),
+      sourceRemoteId: leaveApplicationId("historical"),
+      startsAt: fixtureDate(-92),
+    });
+    const local = await createAvailabilityRecord(tenantA, {
+      id: recordId("017"),
+      sourceRemoteId: null,
+      sourceType: "team_calendar_leave",
+    });
+    const result = await reconcileXeroApprovalState(reconcileInput(tenantA));
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        approved: 0,
+        declined: 0,
+        failed: 0,
+        matched: 0,
+        status: "succeeded",
+        withdrawn: 0,
+      },
+    });
+    expect(mockFetchLeaveApplicationStatusForRegion).not.toHaveBeenCalled();
+    const records = await database.availabilityRecord.findMany({
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: { in: [historical.id, local.id] },
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(records).toHaveLength(2);
+    for (const record of records) {
+      expect(record).toMatchObject({
+        approval_status: "submitted",
+        archived_at: null,
+        derived_sequence: 0,
+        xero_approval_checked_at: null,
+      });
+    }
+    expect(
+      await database.auditEvent.count({
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+          resource_id: { in: [historical.id, local.id] },
+        },
+      })
+    ).toBe(0);
+  });
+
   it("orders null markers first and advances beyond the first 500 rows across runs without starving remaining candidates", async () => {
     await setupTenant(tenantA);
     await setupPerson(tenantA);
@@ -543,10 +611,10 @@ describe("reconcile-xero-approval-state database flow", () => {
       sourceRemoteId: leaveApplicationId("perm-first"),
     });
     const second = await createAvailabilityRecord(tenantA, {
-      endsAt: new Date("2026-07-06T00:00:00.000Z"),
+      endsAt: fixtureDate(12),
       id: recordId("013"),
       sourceRemoteId: leaveApplicationId("perm-second"),
-      startsAt: new Date("2026-07-05T00:00:00.000Z"),
+      startsAt: fixtureDate(11),
     });
 
     mockFetchLeaveApplicationStatusForRegion.mockResolvedValue(
@@ -835,7 +903,8 @@ async function createAvailabilityRecord(
     endsAt?: Date;
     failedAction?: "approve" | "withdraw";
     id: string;
-    sourceRemoteId: string;
+    sourceRemoteId: string | null;
+    sourceType?: "xero_leave" | "team_calendar_leave";
     startsAt?: Date;
   }
 ) {
@@ -845,8 +914,8 @@ async function createAvailabilityRecord(
       approval_status: input.approvalStatus ?? "submitted",
       clerk_org_id: tenant.clerkOrgId,
       contactability: "unavailable",
-      derived_uid_key: `${tenant.clerkOrgId}-${input.sourceRemoteId}`,
-      ends_at: input.endsAt ?? new Date("2026-07-02T00:00:00.000Z"),
+      derived_uid_key: `${tenant.clerkOrgId}-${input.sourceRemoteId ?? input.id}`,
+      ends_at: input.endsAt ?? fixtureDate(8),
       failed_action: input.failedAction ?? null,
       id: input.id,
       organisation_id: tenant.organisationId,
@@ -855,8 +924,8 @@ async function createAvailabilityRecord(
       publish_status: "eligible",
       record_type: "annual_leave",
       source_remote_id: input.sourceRemoteId,
-      source_type: "xero_leave",
-      starts_at: input.startsAt ?? new Date("2026-07-01T00:00:00.000Z"),
+      source_type: input.sourceType ?? "xero_leave",
+      starts_at: input.startsAt ?? fixtureDate(7),
     },
   });
 }
@@ -893,8 +962,7 @@ function xeroStatus(status: XeroStatus) {
   return {
     ok: true,
     value: {
-      approvedAt:
-        status === "APPROVED" ? new Date("2026-06-10T00:00:00.000Z") : null,
+      approvedAt: status === "APPROVED" ? fixtureDate(-14) : null,
       rawResponse: { Status: status },
       status,
     },
@@ -963,3 +1031,6 @@ async function cleanTestData() {
   await database.xeroConnection.deleteMany({ where: scope });
   await database.organisation.deleteMany({ where: scope });
 }
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

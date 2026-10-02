@@ -241,3 +241,11 @@ actionable; keep one-off task evidence in the review for that task.
   isolation, cleanup and exact-candidate evidence. Stale plan instructions for a
   local or disposable database are superseded; incomplete tooling is implementation
   work, not a reason to request the same database permission again.
+
+## 2026-10-02: approved campaign namespace admission
+
+The user explicitly removed a fixed 24-hour testing or new-namespace hold for this approved Xero campaign. Honour that authorisation through an explicit immediate-admission operator policy with acknowledgement that prior provider usage is unknown. Preserve the configured credential domain and epoch, all existing counters/cooldowns, Starter 1,000/day, minute/concurrency controls and provider Retry-After. Do not interpret this campaign approval as a general exemption from rate limits, or report unknown prior usage as zero.
+
+## 2026-10-02: prove the approved flow before expanding the harness
+
+The user corrected work that expanded campaign infrastructure without reaching the approved AU browser/provider flow. Separate controls required for the next authorised operation from reusable tooling that can wait. Use existing reviewed guards and a bounded, concrete execution procedure to prove the user flow first. Do not let a general runner, every catalogue driver, repeated host inventory or repeated already-passing tests become substitutes for execution. Add infrastructure only when a specific unresolved safety or evidence requirement makes it necessary for that next operation, and state that dependency explicitly.

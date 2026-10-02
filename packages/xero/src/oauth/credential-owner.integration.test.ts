@@ -1,6 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
 
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
+import { xeroCampaignStoreCredentials } from "@repo/database/xero-campaign-store";
 import {
   afterAll,
   beforeAll,
@@ -178,7 +180,7 @@ function stubToken() {
       )
     );
   });
-  vi.stubGlobal("fetch", fetch);
+  vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
   return fetch;
 }
 function refresh(expectedTokenVersion = 1, recoveryAttemptId?: string) {
@@ -274,7 +276,7 @@ describe("canonical credential owner integration", () => {
       value: { bindingGeneration: 1, state: "connected" },
     });
     const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
     expect(
       await api.resolveXeroAccess({
         capability: "payroll.employees.read",
@@ -420,7 +422,7 @@ describe("canonical credential owner integration", () => {
         Response.json({ error: "invalid_client" }, { status: 401 })
       );
     });
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
     const result = await api.resolveXeroAccess({
       capability: "payroll.employees.read",
       clerkOrgId: slot.clerkOrgId,
@@ -618,7 +620,7 @@ describe("canonical credential owner integration", () => {
         Response.json({ error: "invalid_client" }, { status: 401 })
       );
     });
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
     const result = await api.resolveXeroAccess({
       capability: "payroll.employees.read",
       clerkOrgId: slot.clerkOrgId,
@@ -937,33 +939,35 @@ describe("canonical credential owner integration", () => {
     }
     vi.stubGlobal(
       "fetch",
-      vi.fn((url: string | URL | Request) => {
-        if (String(url) === "https://identity.xero.com/connect/token") {
+      fixtureProviderFetch(
+        vi.fn((url: string | URL | Request) => {
+          if (String(url) === "https://identity.xero.com/connect/token") {
+            return Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  access_token: access(later() + 120_000),
+                  expires_in: 3600,
+                  refresh_token: "abandoned-selection-candidate",
+                }),
+                { status: 200 }
+              )
+            );
+          }
+          expect(String(url)).toBe("https://api.xero.com/connections");
           return Promise.resolve(
             new Response(
-              JSON.stringify({
-                access_token: access(later() + 120_000),
-                expires_in: 3600,
-                refresh_token: "abandoned-selection-candidate",
-              }),
+              JSON.stringify([
+                {
+                  id: fixture.id("provider-connection"),
+                  tenantId: slots[1].providerTenantId,
+                  tenantName: "Abandoned file fixture",
+                },
+              ]),
               { status: 200 }
             )
           );
-        }
-        expect(String(url)).toBe("https://api.xero.com/connections");
-        return Promise.resolve(
-          new Response(
-            JSON.stringify([
-              {
-                id: fixture.id("provider-connection"),
-                tenantId: slots[1].providerTenantId,
-                tenantName: "Abandoned file fixture",
-              },
-            ]),
-            { status: 200 }
-          )
-        );
-      })
+        })
+      )
     );
     const callback = await service.completeXeroOAuth({
       code: "synthetic-code",
@@ -1038,7 +1042,7 @@ describe("canonical credential owner integration", () => {
         )
       );
     });
-    vi.stubGlobal("fetch", fetch);
+    vi.stubGlobal("fetch", fixtureProviderFetch(fetch));
     const input = { code: "synthetic-code", nonce: start.value.nonce, state };
     const persistence = vi
       .spyOn(database.xeroProviderConnection, "upsert")
@@ -1086,3 +1090,17 @@ describe("canonical credential owner integration", () => {
     ).toMatchObject({ last_refresh_attempt_id: attemptId, token_version: 2 });
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));
+
+const nativeFixtureFetch = globalThis.fetch;
+function fixtureProviderFetch(provider: typeof fetch): typeof fetch {
+  return (url, init) =>
+    String(url) ===
+    xeroCampaignStoreCredentials().url.replace(FIXTURE_TRAILING_SLASHES, "")
+      ? nativeFixtureFetch(url, init)
+      : provider(url, init);
+}
+
+const FIXTURE_TRAILING_SLASHES = /\/+$/;

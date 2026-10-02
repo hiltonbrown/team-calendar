@@ -2,19 +2,22 @@
 
 import { randomUUID } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
+import { initialiseLiveCampaignFixture } from "@repo/database/live-campaign-fixture";
 import {
   deleteSharedStoreFixtureKeys,
   sharedStoreFixtureEpoch,
 } from "@repo/database/live-shared-store-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
 import { assertTestDatabaseConnectionAllowed } from "@repo/database/live-test-guard";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   RedisSharedXeroRateStore,
   type SharedRateLimits,
   type XeroRateClass,
   xeroRateKeys,
 } from "./shared-store";
+
+vi.mock("server-only", () => ({}));
 
 const fixture = allocateLiveTestFixture(
   "packages/xero/src/rate-limit/shared-store.integration.test.ts"
@@ -382,3 +385,6 @@ describe("owned Redis sentinel integrity", () => {
     });
   });
 });
+
+// The protected runner owns this real isolated campaign control namespace.
+beforeAll(() => initialiseLiveCampaignFixture(fixture));

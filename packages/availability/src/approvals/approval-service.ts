@@ -9,7 +9,11 @@ import type {
   Result,
 } from "@repo/core";
 import { xeroRecoveryMessage } from "@repo/core";
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  database,
+  hasUnresolvedSubmitOperation,
+  scopedTo as scoped,
+} from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
@@ -31,6 +35,10 @@ import {
   workingDayYearsForInput,
 } from "../duration/working-days";
 import { listForOrganisation } from "../holidays/holiday-service";
+import {
+  createLeaveOnApproval,
+  type SubmitServiceError,
+} from "../plans/submit-service";
 import { isXeroLeaveType } from "../records/record-type-categories";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
@@ -41,6 +49,7 @@ import {
   noUnresolvedSubmitOperationWhere,
   releaseXeroWriteClaim,
   unclaimedOrExpiredXeroWriteWhere,
+  XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
 
 export type ApprovalRole = "admin" | "manager" | "owner";
@@ -60,6 +69,7 @@ export type ApprovalServiceError =
       message: string;
       resolutionError: ProviderResolutionError;
     }
+  | { code: "approval_outcome_unknown"; message: string }
   | { code: "dispatch_failed"; message: string }
   | { code: "invalid_state_for_approve"; message: string }
   | { code: "invalid_state_for_decline"; message: string }
@@ -897,10 +907,11 @@ async function performApproval(
     const { record, xeroEmployeeId } = prepared.value;
     const xeroLeaveApplicationId = record.source_remote_id;
     if (!xeroLeaveApplicationId) {
-      return resolutionBlocked({
-        code: "missing_mapping",
-        message: "This record does not have a Xero leave application ID.",
-      });
+      return await approveLocalRequest(
+        parsed.data,
+        externalWritePort,
+        options.retry
+      );
     }
 
     claimedAt = await acquireXeroWriteClaim({
@@ -1019,13 +1030,17 @@ async function performDecline(
       invalidStateCode: options.retry
         ? "invalid_state_for_retry"
         : "invalid_state_for_decline",
+      localDecline: true,
     });
     if (!prepared.ok) {
       return prepared;
     }
     const { record, xeroEmployeeId } = prepared.value;
     const xeroLeaveApplicationId = record.source_remote_id;
-    if (!xeroLeaveApplicationId) {
+    if (
+      !xeroLeaveApplicationId &&
+      record.source_type !== "team_calendar_leave"
+    ) {
       return resolutionBlocked({
         code: "missing_mapping",
         message: "This record does not have a Xero leave application ID.",
@@ -1046,13 +1061,13 @@ async function performDecline(
     const ownerClaim = claimedAt;
 
     failureStage = "xero_write";
-    const response = await externalWritePort.declineLeaveApplication({
-      clerkOrgId: input.clerkOrgId,
-      employeeId: xeroEmployeeId,
-      organisationId: input.organisationId,
-      reason: options.reason,
-      remoteId: xeroLeaveApplicationId,
-    });
+    const response = await declineRemoteIfPresent(
+      input,
+      externalWritePort,
+      xeroEmployeeId,
+      xeroLeaveApplicationId,
+      options.reason
+    );
     if (!response.ok) {
       failureStage = "local_transaction";
       return await persistApprovalFailure({
@@ -1065,7 +1080,7 @@ async function performDecline(
         record,
       });
     }
-    xeroWriteSucceeded = true;
+    xeroWriteSucceeded = xeroLeaveApplicationId !== null;
 
     failureStage = "local_transaction";
     const now = new Date();
@@ -1137,6 +1152,7 @@ async function prepareApprovalWrite(
   input: CommandInput,
   externalWritePort: ExternalWritePort,
   options: {
+    localDecline?: boolean;
     expectedFailedAction: availability_failed_action | null;
     expectedStatus: availability_approval_status;
     invalidStateCode:
@@ -1175,6 +1191,53 @@ async function prepareApprovalWrite(
     };
   }
 
+  if (
+    (await hasUnresolvedSubmitOperation({
+      availabilityRecordId: record.id,
+      clerkOrgId: input.clerkOrgId,
+      organisationId: input.organisationId,
+    })) &&
+    (options.localDecline || !canResumeUndispatchedApproval(record))
+  ) {
+    return {
+      error: {
+        code: "unknown_error",
+        message:
+          "An administrator must resolve the uncertain Xero action before this leave can change.",
+      },
+      ok: false,
+    };
+  }
+  if (
+    options.localDecline &&
+    record.source_type === "team_calendar_leave" &&
+    !record.source_remote_id
+  ) {
+    return { ok: true, value: { record, xeroEmployeeId: "" } };
+  }
+  if (
+    record.source_type === "team_calendar_leave" &&
+    record.source_remote_id &&
+    record.approval_status === "submitted"
+  ) {
+    return {
+      error: {
+        code: "invalid_state_for_approve",
+        message:
+          "This earlier submission already exists in Xero. An administrator must review its current payroll status before another approval action.",
+      },
+      ok: false,
+    };
+  }
+  if (
+    !record.source_remote_id &&
+    record.source_type !== "team_calendar_leave"
+  ) {
+    return resolutionBlocked({
+      code: "missing_mapping",
+      message: "This record does not have a Xero leave application ID.",
+    });
+  }
   const xeroStateResult = await getXeroConnectionStateForScope(input);
   if (!xeroStateResult.ok) {
     return {
@@ -1613,7 +1676,43 @@ async function loadBalanceSnapshot(
   };
 }
 
+function canResumeUndispatchedApproval(record: LoadedApprovalRecord): boolean {
+  const operations = record.outbound_operations;
+  const operation = operations?.[0];
+  return (
+    record.source_type === "team_calendar_leave" &&
+    !record.source_remote_id &&
+    operations?.length === 1 &&
+    operation?.action === "approve" &&
+    operation.status === "prepared" &&
+    operation.dispatch_started_at === null &&
+    (!record.xero_write_claimed_at ||
+      record.xero_write_claimed_at.getTime() <
+        Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
+  );
+}
+
 function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
+  if (canResumeUndispatchedApproval(record)) {
+    if (record.approval_status === "submitted") {
+      return ["approve"];
+    }
+    if (
+      record.approval_status === "xero_sync_failed" &&
+      record.failed_action === "approve"
+    ) {
+      return ["retry_approval"];
+    }
+    return ["view_only"];
+  }
+  if (
+    record.outbound_operations?.length ||
+    (record.source_type === "team_calendar_leave" &&
+      record.source_remote_id &&
+      record.approval_status === "submitted")
+  ) {
+    return ["view_only"];
+  }
   switch (record.approval_status) {
     case "submitted":
       return ["approve", "decline", "request_more_info"];
@@ -1635,6 +1734,19 @@ function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
 }
 
 function mutedNoteForRecord(record: LoadedApprovalRecord): string | null {
+  if (canResumeUndispatchedApproval(record)) {
+    return "The previous approval stopped before contacting Xero. A manager can retry approval.";
+  }
+  if (record.outbound_operations?.length) {
+    return "An administrator must resolve the uncertain Xero action in Plans before another action can be attempted.";
+  }
+  if (
+    record.source_type === "team_calendar_leave" &&
+    record.source_remote_id &&
+    record.approval_status === "submitted"
+  ) {
+    return "This earlier submission requires administrator review of its current Xero status.";
+  }
   if (
     record.approval_status === "xero_sync_failed" &&
     (record.failed_action === "submit" || record.failed_action === "withdraw")
@@ -2116,6 +2228,13 @@ function toJsonValue(value: unknown): JsonValue {
 }
 
 const recordInclude = {
+  outbound_operations: {
+    select: { action: true, dispatch_started_at: true, status: true },
+    where: {
+      action: { in: ["submit", "approve"] },
+      status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
+    },
+  },
   person: {
     select: {
       clerk_user_id: true,
@@ -2138,7 +2257,7 @@ const recordInclude = {
       },
     },
   },
-} as const;
+} satisfies Prisma.AvailabilityRecordInclude;
 
 // Explicit projection: source_payload_json and xero_write_error_raw are audit
 // data and must never cross the RSC boundary to a client component.
@@ -2156,6 +2275,13 @@ const approvalRecordSelect = {
   id: true,
   notes_internal: true,
   organisation_id: true,
+  outbound_operations: {
+    select: { action: true, dispatch_started_at: true, status: true },
+    where: {
+      action: { in: ["submit", "approve"] },
+      status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
+    },
+  },
   person: recordInclude.person,
   person_id: true,
   record_type: true,
@@ -2163,8 +2289,9 @@ const approvalRecordSelect = {
   source_type: true,
   starts_at: true,
   submitted_at: true,
+  xero_write_claimed_at: true,
   xero_write_error: true,
-} as const;
+} satisfies Prisma.AvailabilityRecordSelect;
 
 class OptimisticConflictError extends Error {
   constructor() {
@@ -2176,4 +2303,66 @@ class NotificationCreateError extends Error {
   constructor() {
     super("Notification could not be created.");
   }
+}
+
+function approvalCreateError(error: SubmitServiceError): ApprovalServiceError {
+  switch (error.code) {
+    case "submission_outcome_unknown":
+      return { code: "approval_outcome_unknown", message: error.message };
+    case "submission_blocked_resolution":
+      return {
+        code: "approval_blocked_resolution",
+        message: error.message,
+        resolutionError: error.resolutionError,
+      };
+    case "invalid_state_for_submit":
+      return {
+        code: "invalid_state_for_approve",
+        message: "Only pending local leave can be approved.",
+      };
+    case "invalid_state_for_revert":
+    case "invalid_state_for_withdraw":
+      return { code: "invalid_state_for_approve", message: error.message };
+    default:
+      return error;
+  }
+}
+
+async function approveLocalRequest(
+  input: CommandInput,
+  externalWritePort: ExternalWritePort,
+  retry: boolean | undefined
+): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
+  const created = await createLeaveOnApproval(
+    { ...input, actingOrgRole: `org:${input.role}` },
+    externalWritePort,
+    retry
+  );
+  if (!created.ok) {
+    return { error: approvalCreateError(created.error), ok: false };
+  }
+  const updated = await loadRecord(input);
+  if (!updated) {
+    return recordNotFound();
+  }
+  return { ok: true, value: await toApprovalListItem(updated) };
+}
+
+async function declineRemoteIfPresent(
+  input: CommandInput,
+  port: ExternalWritePort,
+  employeeId: string,
+  remoteId: string | null,
+  reason: string
+) {
+  if (!remoteId) {
+    return { ok: true as const, value: undefined };
+  }
+  return await port.declineLeaveApplication({
+    clerkOrgId: input.clerkOrgId,
+    employeeId,
+    organisationId: input.organisationId,
+    reason,
+    remoteId,
+  });
 }

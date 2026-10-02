@@ -165,20 +165,35 @@ describe("app management client", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
   it("bounds the first hung token request and sends no DELETE", async () => {
-    const { input, limiter } = setup();
-    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(
-      () =>
-        new Promise(() => {
-          /* Simulate a hung token request. */
-        })
-    );
-    expect(
-      await deleteXeroConnection(
+    vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+    try {
+      const { input, limiter } = setup();
+      let dispatched: () => void = () => {
+        throw new Error("Dispatch barrier not initialised");
+      };
+      const started = new Promise<void>((resolve) => {
+        dispatched = resolve;
+      });
+      const fetchImpl = vi.fn<typeof fetch>().mockImplementation(() => {
+        dispatched();
+        return new Promise(() => {
+          /* Simulate a hung token request after proven dispatch. */
+        });
+      });
+      const result = deleteXeroConnection(
         { ...input, deadline: createXeroDeadline(10) },
         { fetchImpl, limiter }
-      )
-    ).toEqual({ kind: "not_sent" });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
+      );
+      await started;
+      await vi.advanceTimersByTimeAsync(10);
+      expect(await result).toEqual({ kind: "not_sent" });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl.mock.calls[0]?.[0]).toBe(
+        "https://identity.xero.com/connect/token"
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it("marks an uncertain DELETE unknown and never retries", async () => {
     const { input, limiter } = setup();
@@ -219,3 +234,16 @@ describe("app management client", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
+
+// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignCredentialScope: (
+    _scope: unknown,
+    _tenant: string,
+    operation: () => Promise<unknown>
+  ) => operation(),
+  withXeroCampaignProviderEffect: (
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));

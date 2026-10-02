@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assertXeroBrowserBinding,
   assertXeroBrowserMutationPage,
   assertXeroBrowserMutationRequest,
   type XeroBrowserMutationScope,
@@ -187,6 +188,57 @@ describe("connection mutation wire contracts", () => {
       assertXeroBrowserMutationRequest(
         [{ organisationId: scope.organisationId, recordId: scope.recordId }],
         { ...scope, recordId: null }
+      )
+    ).toThrow();
+  });
+});
+
+describe("browser current binding observation", () => {
+  const external = "00000000-0000-4000-8000-000000000003";
+  const current = {
+    active_slot: 1,
+    binding_generation: 2,
+    retired_at: null,
+    xero_tenant_id: external,
+  };
+  const resource = { bindingGeneration: 2, xeroTenantId: external };
+  it("accepts the exact current binding alongside retained retired history", () => {
+    expect(() =>
+      assertXeroBrowserBinding(
+        [
+          {
+            ...current,
+            active_slot: null,
+            binding_generation: 1,
+            retired_at: "2026-09-30",
+          },
+          current,
+        ],
+        resource
+      )
+    ).not.toThrow();
+  });
+  it.each([
+    [],
+    [{ ...current, active_slot: null }],
+    [{ ...current, retired_at: "2026-09-30" }],
+    [current, current],
+    [{ ...current, binding_generation: 1 }],
+    [{ ...current, xero_tenant_id: "00000000-0000-4000-8000-000000000004" }],
+  ])(
+    "rejects absent, duplicate, retired or foreign current bindings: %j",
+    (...rows) => {
+      expect(() => assertXeroBrowserBinding(rows, resource)).toThrow();
+    }
+  );
+  it("requires truly unconnected fresh fixtures for generation zero", () => {
+    expect(() =>
+      assertXeroBrowserBinding([], { bindingGeneration: 0, xeroTenantId: null })
+    ).not.toThrow();
+    expect(() =>
+      assertXeroBrowserBinding(
+        [{ ...current, active_slot: null, retired_at: "2026-09-30" }],
+        { bindingGeneration: 0, xeroTenantId: null }
       )
     ).toThrow();
   });

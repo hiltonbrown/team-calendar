@@ -520,3 +520,12 @@ describe("plans actions", () => {
     }
   });
 });
+
+vi.mock("@/lib/server/xero-campaign-action", () => ({
+  withAuthenticatedXeroCampaignAction: (
+    _id: unknown,
+    _scope: unknown,
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));
