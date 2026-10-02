@@ -33,6 +33,7 @@ export async function acquireXeroWriteClaim(
     data: { xero_write_claimed_at: claimedAt },
     where: {
       ...scoped(input),
+      ...noUnresolvedSubmitOperationWhere(),
       approval_status: input.expectedStatus,
       archived_at: null,
       derived_sequence: input.expectedSequence,
@@ -80,7 +81,7 @@ export function noUnresolvedSubmitOperationWhere() {
   return {
     outbound_operations: {
       none: {
-        action: "submit",
+        action: { in: ["submit", "approve"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },

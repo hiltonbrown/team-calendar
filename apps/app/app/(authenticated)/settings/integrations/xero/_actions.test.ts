@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => ({
     auditEvent: { create: vi.fn() },
     xeroTenant: { updateMany: vi.fn() },
   },
-  withXeroCampaignScopedInvocation: vi.fn(),
+  withXeroCampaignAction: vi.fn(),
 }));
 
 vi.mock("@repo/auth/server", () => ({
@@ -35,9 +35,10 @@ vi.mock("@repo/database", () => ({
   database: mocks.database,
 }));
 vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignScopedInvocation: mocks.withXeroCampaignScopedInvocation,
+  withXeroCampaignAction: mocks.withXeroCampaignAction,
 }));
-vi.mock("@repo/database/xero-campaign-contract", () => ({
+vi.mock("@repo/database/xero-campaign-contract", async (importOriginal) => ({
+  ...(await importOriginal()),
   XeroCampaignDeniedError: mocks.CampaignDeniedError,
 }));
 vi.mock("@repo/next-config/keys", () => ({
@@ -97,7 +98,7 @@ describe("xero settings integration server actions", () => {
     mocks.database.$transaction.mockImplementation((operation) =>
       operation(mocks.transaction)
     );
-    mocks.withXeroCampaignScopedInvocation.mockImplementation(
+    mocks.withXeroCampaignAction.mockImplementation(
       (_functionId, _scope, operation) => operation()
     );
     mocks.refreshXeroOAuthConnection.mockResolvedValue({
@@ -343,9 +344,15 @@ describe("xero settings integration server actions", () => {
       expect(mocks.database.$transaction).toHaveBeenCalledTimes(2);
       expect(mocks.transaction.auditEvent.create).toHaveBeenCalledTimes(2);
       expect(mocks.database.xeroTenant.updateMany).not.toHaveBeenCalled();
-      expect(mocks.withXeroCampaignScopedInvocation).toHaveBeenCalledWith(
+      expect(mocks.withXeroCampaignAction).toHaveBeenCalledWith(
         "xero.settings.tenant-sync-state",
-        { clerkOrgId, organisationId, xeroTenantId },
+        {
+          campaign: undefined,
+          clerkOrgId,
+          organisationId,
+          target: { organisationId, paused: expect.any(Boolean), xeroTenantId },
+          userId,
+        },
         expect.any(Function)
       );
     });
@@ -356,7 +363,7 @@ describe("xero settings integration server actions", () => {
     ])(
       "denies %s during a reserved campaign without changing tenant or audit",
       async (_name, action) => {
-        mocks.withXeroCampaignScopedInvocation.mockRejectedValue(
+        mocks.withXeroCampaignAction.mockRejectedValue(
           new mocks.CampaignDeniedError()
         );
 
@@ -364,9 +371,8 @@ describe("xero settings integration server actions", () => {
 
         expect(result).toEqual({
           error: {
-            code: "unknown_error",
-            message:
-              "Xero settings are temporarily unavailable. Please try again later.",
+            code: "not_authorised",
+            message: "This action is temporarily unavailable. Try again later.",
           },
           ok: false,
         });
@@ -411,3 +417,5 @@ describe("xero settings integration server actions", () => {
     );
   });
 });
+
+vi.mock("server-only", () => ({}));

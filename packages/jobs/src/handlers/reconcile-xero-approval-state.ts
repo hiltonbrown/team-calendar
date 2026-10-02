@@ -40,7 +40,7 @@ const noUnresolvedSubmitOperationWhere =
   (): Prisma.AvailabilityRecordWhereInput => ({
     outbound_operations: {
       none: {
-        action: "submit" as const,
+        action: { in: ["submit", "approve"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },

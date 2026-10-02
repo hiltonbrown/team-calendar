@@ -81,6 +81,65 @@ describe("outbound operation repository", () => {
     });
   });
 
+  it("fences approval creates separately from legacy submissions", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.create.mockResolvedValue({ id: "approval_1" });
+    mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+    expect(
+      await prepareAndClaimSubmitOperation({
+        ...scope,
+        action: "approve",
+        actorUserId: "manager_1",
+        claimableBefore: new Date(),
+        expectedFailedAction: null,
+        expectedSequence: 2,
+        expectedStatus: "submitted",
+        requestEmployeeId: "employee_1",
+        requestEndsAt: new Date(),
+        requestFingerprint: "immutable",
+        requestLeaveTypeId: "leave_type_1",
+        requestStartsAt: new Date(),
+        requestTitle: "Annual leave",
+        requestUnits: 2,
+      })
+    ).not.toBeNull();
+    expect(mocks.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "approve",
+        actor_user_id: "manager_1",
+      }),
+    });
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          outbound_operations: {
+            none: {
+              action: { not: "approve" },
+              status: {
+                in: ["prepared", "outcome_unknown", "provider_accepted"],
+              },
+            },
+          },
+          source_remote_id: null,
+        }),
+      })
+    );
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    await markSubmitDispatchStarted({
+      ...scope,
+      action: "approve",
+      attemptGeneration: 1,
+    });
+    expect(mocks.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          action: "approve",
+          attempt_generation: 1,
+        }),
+      })
+    );
+  });
+
   it("blocks a second create while the existing outcome is unresolved", async () => {
     mocks.findFirst.mockResolvedValue({
       id: "operation_1",
@@ -143,6 +202,7 @@ describe("outbound operation repository", () => {
         data: expect.objectContaining({ attempt_generation: 2 }),
         where: expect.objectContaining({
           attempt_generation: 1,
+          dispatch_started_at: null,
           status: "prepared",
         }),
       })

@@ -105,7 +105,7 @@ export interface PlansClientRecord {
   balanceChip: BalanceChip | null;
   editableActions: EditableAction[];
   endsAt: string;
-  failedAction: "submit" | "withdraw" | null;
+  failedAction: "submit" | "withdraw" | "approve" | "decline" | null;
   id: string;
   personName: string;
   recordType: string;
@@ -614,7 +614,7 @@ export function PlansClient({
           onClose={() => setSubmissionModal(null)}
           onSuccess={() => {
             setSubmissionModal(null);
-            toast.success("Leave sent to Xero for approval.");
+            toast.success("Leave submitted for manager approval.");
             router.refresh();
           }}
           record={{
@@ -722,7 +722,7 @@ function SubmitRecoveryControls({
   return (
     <details className="mt-2 rounded-xl bg-muted p-3 text-label-md">
       <summary className="cursor-pointer font-medium">
-        Resolve Xero submission
+        Resolve Xero leave action
       </summary>
       <div className="mt-3 grid gap-3">
         <Label htmlFor={`recovery-reason-${recordId}`}>Recovery reason</Label>
@@ -1206,7 +1206,12 @@ function activeFilterLabels(filters: PlansFilterInput): string[] {
 function normalisePlanFailedAction(
   value: PlansClientRecord["failedAction"]
 ): XeroFailedAction | null {
-  return value === "submit" || value === "withdraw" ? value : null;
+  return value === "submit" ||
+    value === "withdraw" ||
+    value === "approve" ||
+    value === "decline"
+    ? value
+    : null;
 }
 
 function actionLabel(action: EditableAction): string {
@@ -1292,11 +1297,11 @@ function StatusCue({
 function statusCueForTone(tone: PlanStatusTone): string | null {
   switch (tone) {
     case "pending":
-      return "Sent to Xero, waiting on approval";
+      return "Waiting for manager approval";
     case "declined":
-      return "Declined in Xero, edit before retrying";
+      return "This leave request was declined";
     case "xero_sync_failed":
-      return "Xero did not accept it, retry or revert";
+      return "This leave action needs attention";
     default:
       return null;
   }
@@ -1349,10 +1354,10 @@ function ConfirmActionDialog({
   const isWithdraw = action === "withdraw";
   const title = isWithdraw ? "Withdraw submission?" : "Revert to draft?";
   const description = isWithdraw
-    ? "This removes the pending request from Xero. Team Calendar will keep the local record as withdrawn."
+    ? "This withdraws the leave request. If it already exists in Xero, Team Calendar will send the withdrawal to payroll first."
     : "This clears the failed Xero sync state and keeps the record editable. It will not be sent again until you submit.";
   const cancelLabel = isWithdraw ? "Keep submitted" : "Keep failed state";
-  const confirmLabel = isWithdraw ? "Withdraw from Xero" : "Revert to draft";
+  const confirmLabel = isWithdraw ? "Withdraw leave" : "Revert to draft";
 
   const handleOpenChange = (open: boolean) => {
     if (!(open || disabled)) {

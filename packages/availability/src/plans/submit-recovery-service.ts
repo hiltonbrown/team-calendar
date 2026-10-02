@@ -139,7 +139,11 @@ export async function attachSubmitRecoveryCandidate(
   }
 
   const accepted = await markSubmitProviderAccepted(
-    operationAttempt(parsed.data, context.value.operation.attempt_generation),
+    operationAttempt(
+      parsed.data,
+      context.value.operation.attempt_generation,
+      context.value.operation.action
+    ),
     candidate.remoteId
   );
   if (!accepted && context.value.operation.status !== "provider_accepted") {
@@ -152,6 +156,17 @@ export async function attachSubmitRecoveryCandidate(
   let mergedRecordId: string | null = context.value.operation.merged_record_id;
   const alreadyAttached =
     context.value.record.source_remote_id === candidate.remoteId;
+  const originalApprover =
+    context.value.operation.action === "approve"
+      ? await database.person.findFirst({
+          select: { id: true },
+          where: {
+            ...scopedTo(parsed.data),
+            archived_at: null,
+            clerk_user_id: context.value.operation.actor_user_id,
+          },
+        })
+      : null;
   if (!alreadyAttached) {
     await database.$transaction(async (tx) => {
       const duplicate = await tx.availabilityRecord.findFirst({
@@ -169,7 +184,7 @@ export async function attachSubmitRecoveryCandidate(
             publish_status: "archived",
             source_remote_id: null,
           },
-          where: { id: duplicate.id },
+          where: { ...scopedTo(parsed.data), id: duplicate.id },
         });
       }
 
@@ -180,7 +195,13 @@ export async function attachSubmitRecoveryCandidate(
           failed_action: null,
           source_payload_json: candidate.rawResponse as Prisma.InputJsonValue,
           source_remote_id: candidate.remoteId,
-          submitted_at: new Date(),
+          ...(context.value.operation.action === "approve"
+            ? {
+                approved_at:
+                  context.value.operation.provider_accepted_at ?? new Date(),
+                approved_by_person_id: originalApprover?.id ?? null,
+              }
+            : { submitted_at: new Date() }),
           updated_by_user_id: parsed.data.actingUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
@@ -199,7 +220,8 @@ export async function attachSubmitRecoveryCandidate(
         !(await persistSubmitRecoveryMerge(
           operationAttempt(
             parsed.data,
-            context.value.operation.attempt_generation
+            context.value.operation.attempt_generation,
+            context.value.operation.action
           ),
           mergedRecordId,
           tx
@@ -209,12 +231,16 @@ export async function attachSubmitRecoveryCandidate(
       }
       await tx.auditEvent.create({
         data: {
-          action: "availability_records.submit_recovery_attached",
+          action:
+            context.value.operation.action === "approve"
+              ? "availability_records.approval_recovery_attached"
+              : "availability_records.submit_recovery_attached",
           actor_user_id: parsed.data.actingUserId,
           clerk_org_id: parsed.data.clerkOrgId,
           organisation_id: parsed.data.organisationId,
           payload: {
             mergedRecordId,
+            originalActorUserId: context.value.operation.actor_user_id,
             reason: parsed.data.reason,
             remoteId: candidate.remoteId,
           },
@@ -227,7 +253,8 @@ export async function attachSubmitRecoveryCandidate(
 
   const attempt = operationAttempt(
     parsed.data,
-    context.value.operation.attempt_generation
+    context.value.operation.attempt_generation,
+    context.value.operation.action
   );
   const sideEffectClaimedAt = await acquireSubmitRecoverySideEffects(
     attempt,
@@ -277,13 +304,24 @@ async function completeRecoverySideEffects(input: {
   const { manager } = input.context.record.person;
   const primary = await completeSubmitSideEffects({
     actorUserId: input.input.actingUserId,
+    approvalRecipient:
+      input.context.operation.action === "approve" &&
+      input.candidate.approvalStatus === "approved" &&
+      input.context.record.person.clerk_user_id
+        ? {
+            clerkUserId: input.context.record.person.clerk_user_id,
+            personId: input.context.record.person.id,
+          }
+        : null,
     attempt: input.attempt,
     claimedAt: input.claimedAt,
     clerkOrgId: input.input.clerkOrgId,
     manager: manager?.clerk_user_id
       ? { clerkUserId: manager.clerk_user_id, personId: manager.id }
       : null,
-    notifyManager: input.candidate.approvalStatus === "submitted",
+    notifyManager:
+      input.context.operation.action !== "approve" &&
+      input.candidate.approvalStatus === "submitted",
     organisationId: input.input.organisationId,
     recordId: input.input.recordId,
   });
@@ -314,16 +352,20 @@ export async function resolveSubmitAsNotCreated(
   if (!parsed.success) {
     return recoveryError("invalid_input", "Invalid recovery request.");
   }
-  const operation = await getSubmitOperation(operationScope(parsed.data));
+  const operation = await getRecoveryOperation(parsed.data);
   if (operation?.status !== "outcome_unknown") {
     return recoveryError(
       "not_recoverable",
-      "No unknown submission is awaiting resolution."
+      "No uncertain leave action is awaiting resolution."
     );
   }
   const resolved = await database.$transaction(async (tx) => {
     const marked = await markSubmitDefinitiveFailure(
-      operationAttempt(parsed.data, operation.attempt_generation),
+      operationAttempt(
+        parsed.data,
+        operation.attempt_generation,
+        operation.action
+      ),
       "verified_not_created",
       tx
     );
@@ -332,7 +374,10 @@ export async function resolveSubmitAsNotCreated(
     }
     await tx.auditEvent.create({
       data: {
-        action: "availability_records.submit_recovery_not_created",
+        action:
+          operation.action === "approve"
+            ? "availability_records.approval_recovery_not_created"
+            : "availability_records.submit_recovery_not_created",
         actor_user_id: parsed.data.actingUserId,
         clerk_org_id: parsed.data.clerkOrgId,
         organisation_id: parsed.data.organisationId,
@@ -366,6 +411,8 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
       include: {
         person: {
           select: {
+            clerk_user_id: true,
+            id: true,
             location_id: true,
             manager: { select: { clerk_user_id: true, id: true } },
           },
@@ -373,7 +420,7 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
       },
       where: { ...scopedTo(parsed.data), id: parsed.data.recordId },
     }),
-    getSubmitOperation(operationScope(parsed.data)),
+    getRecoveryOperation(parsed.data),
   ]);
   if (!record) {
     return recoveryError("record_not_found", "Leave record not found.");
@@ -386,7 +433,7 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
   ) {
     return recoveryError(
       "not_recoverable",
-      "This submission does not require recovery."
+      "This leave action does not require recovery."
     );
   }
   if (
@@ -443,6 +490,7 @@ const candidateMatches = (
     employeeId: string;
     leaveTypeId: string;
     operation: {
+      action?: "submit" | "approve";
       request_ends_at: Date;
       request_fingerprint: string;
       request_starts_at: Date;
@@ -451,6 +499,10 @@ const candidateMatches = (
   },
   candidate: ProviderLeaveCandidate
 ): boolean =>
+  !(
+    context.operation.action === "approve" &&
+    candidate.approvalStatus === "submitted"
+  ) &&
   candidate.employeeId === context.employeeId &&
   candidate.leaveTypeId === context.leaveTypeId &&
   candidate.startsAt ===
@@ -480,8 +532,9 @@ const operationScope = (input: {
 
 const operationAttempt = (
   input: { clerkOrgId: string; organisationId: string; recordId: string },
-  attemptGeneration: number
-) => ({ ...operationScope(input), attemptGeneration });
+  attemptGeneration: number,
+  action: "submit" | "approve" = "submit"
+) => ({ ...operationScope(input), action, attemptGeneration });
 
 const recoveryError = (
   code: SubmitRecoveryError["code"],
@@ -490,3 +543,22 @@ const recoveryError = (
   error: { code, message },
   ok: false,
 });
+
+async function getRecoveryOperation(input: {
+  clerkOrgId: string;
+  organisationId: string;
+  recordId: string;
+}) {
+  const operations = await Promise.all([
+    getSubmitOperation({ ...operationScope(input), action: "approve" }),
+    getSubmitOperation(operationScope(input)),
+  ]);
+  const unresolved = operations.filter(
+    (operation) =>
+      operation &&
+      ["outcome_unknown", "provider_accepted"].includes(operation.status)
+  );
+  // Multiple unresolved create operations violate the record invariant. Fail
+  // closed rather than choosing an actor or payroll request arbitrarily.
+  return unresolved.length === 1 ? unresolved[0] : null;
+}

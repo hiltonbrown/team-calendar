@@ -1,4 +1,6 @@
+import { auth } from "@repo/auth/server";
 import {
+  cancelXeroOAuth,
   completeXeroOAuth,
   isLocalApplicationPath,
   isPreviewDeployment,
@@ -24,7 +26,8 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
-  if (!(code && state)) {
+  const cancelled = url.searchParams.get("error") === "access_denied";
+  if (!(state && (code || cancelled))) {
     return NextResponse.json(
       { error: "Missing Xero OAuth callback parameters." },
       { status: 400 }
@@ -36,7 +39,16 @@ export async function GET(request: Request) {
     ?.split(";")
     .map((cookie) => cookie.trim().split("=", 2))
     .find(([name]) => name === "xero_oauth_nonce")?.[1];
-  const result = await completeXeroOAuth({ code, nonce: nonce ?? null, state });
+  const session = await auth();
+  const callback = {
+    authenticatedClerkOrgId: session.orgId,
+    authenticatedUserId: session.userId,
+    nonce: nonce ?? null,
+    state,
+  };
+  const result = cancelled
+    ? await cancelXeroOAuth(callback)
+    : await completeXeroOAuth({ ...callback, code: code ?? "" });
   if (!result.ok) {
     return NextResponse.json({ error: result.error.message }, { status: 400 });
   }

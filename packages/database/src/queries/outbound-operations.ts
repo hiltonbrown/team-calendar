@@ -5,6 +5,7 @@ import { scopedTo } from "../tenant-query";
 type OperationClient = Database | Prisma.TransactionClient;
 
 export interface OutboundOperationScope {
+  action?: "submit" | "approve";
   availabilityRecordId: string;
   clerkOrgId: string;
   organisationId: string;
@@ -13,9 +14,9 @@ export interface OutboundOperationScope {
 export interface PrepareSubmitOperationInput extends OutboundOperationScope {
   actorUserId: string;
   claimableBefore: Date;
-  expectedFailedAction: "submit" | null;
+  expectedFailedAction: "submit" | "approve" | null;
   expectedSequence: number;
-  expectedStatus: "draft" | "xero_sync_failed";
+  expectedStatus: "draft" | "submitted" | "xero_sync_failed";
   requestEmployeeId: string;
   requestEndsAt: Date;
   requestFingerprint: string;
@@ -43,7 +44,7 @@ export const getSubmitOperation = async (
   client.outboundOperation.findFirst({
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       availability_record_id: scope.availabilityRecordId,
     },
   });
@@ -89,6 +90,7 @@ export const prepareAndClaimSubmitOperation = async (
             attempt_generation: existing.attempt_generation,
             id: existing.id,
             status: safelyRetryablePrepared ? "prepared" : "definitive_failure",
+            ...(safelyRetryablePrepared ? { dispatch_started_at: null } : {}),
             ...scopedTo(input),
           },
         });
@@ -98,7 +100,7 @@ export const prepareAndClaimSubmitOperation = async (
       } else {
         await tx.outboundOperation.create({
           data: {
-            action: "submit",
+            action: input.action ?? "submit",
             actor_user_id: input.actorUserId,
             attempt_generation: attemptGeneration,
             availability_record_id: input.availabilityRecordId,
@@ -122,6 +124,7 @@ export const prepareAndClaimSubmitOperation = async (
         where: {
           ...scopedTo(input),
           approval_status: input.expectedStatus,
+          archived_at: null,
           derived_sequence: input.expectedSequence,
           failed_action: input.expectedFailedAction,
           id: input.availabilityRecordId,
@@ -129,6 +132,15 @@ export const prepareAndClaimSubmitOperation = async (
             { xero_write_claimed_at: null },
             { xero_write_claimed_at: { lt: input.claimableBefore } },
           ],
+          outbound_operations: {
+            none: {
+              action: { not: input.action ?? "submit" },
+              status: {
+                in: ["prepared", "outcome_unknown", "provider_accepted"],
+              },
+            },
+          },
+          source_remote_id: null,
         },
       });
       if (claimed.count !== 1) {
@@ -159,7 +171,7 @@ export const markSubmitDispatchStarted = async (
     data: { dispatch_started_at: new Date(), status: "outcome_unknown" },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: "prepared",
@@ -177,7 +189,7 @@ export const markSubmitDefinitiveFailure = async (
     data: { safe_error_code: safeErrorCode, status: "definitive_failure" },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: { in: ["prepared", "outcome_unknown"] },
@@ -194,7 +206,7 @@ export const markSubmitOutcomeUnknown = async (
     data: { safe_error_code: safeErrorCode, status: "outcome_unknown" },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: "outcome_unknown",
@@ -216,7 +228,7 @@ export const markSubmitProviderAccepted = async (
     },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: "outcome_unknown",
@@ -233,7 +245,7 @@ export const markSubmitCompleted = async (
     data: { completed_at: new Date(), status: "completed" },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: "provider_accepted",
@@ -251,7 +263,7 @@ export const persistSubmitRecoveryMerge = async (
     data: { merged_record_id: mergedRecordId },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       status: "provider_accepted",
@@ -269,7 +281,7 @@ export const acquireSubmitRecoverySideEffects = async (
     data: { side_effect_claimed_at: claimedAt },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       OR: [
@@ -290,6 +302,7 @@ export const releaseSubmitRecoverySideEffects = async (
     data: { side_effect_claimed_at: null },
     where: {
       ...scopedTo(scope),
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       side_effect_claimed_at: claimedAt,
@@ -307,7 +320,7 @@ export const fenceSubmitRecoverySideEffectClaim = async (
     data: { side_effect_claimed_at: claimedAt },
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? "submit",
       attempt_generation: scope.attemptGeneration,
       availability_record_id: scope.availabilityRecordId,
       side_effect_claimed_at: claimedAt,
@@ -324,7 +337,7 @@ export const hasUnresolvedSubmitOperation = async (
   const count = await client.outboundOperation.count({
     where: {
       ...scopedTo(scope),
-      action: "submit",
+      action: scope.action ?? { in: ["submit", "approve"] },
       availability_record_id: scope.availabilityRecordId,
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },

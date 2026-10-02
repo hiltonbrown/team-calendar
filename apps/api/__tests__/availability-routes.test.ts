@@ -1061,3 +1061,83 @@ describe("Availability Single Record Route (DELETE)", () => {
     expect(response.status).toBe(403);
   });
 });
+
+const campaignMock = vi.hoisted(() => ({
+  action: vi.fn(
+    (_id: unknown, _scope: unknown, operation: () => Promise<unknown>) =>
+      operation()
+  ),
+}));
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  withXeroCampaignAction: campaignMock.action,
+}));
+
+describe("availability mutation campaign admission", () => {
+  beforeEach(async () => {
+    vi.resetAllMocks();
+    vi.mocked(requireOrg).mockResolvedValue("org_clerk_123");
+    vi.mocked(currentUser).mockResolvedValue({ id: "user_123" } as Awaited<
+      ReturnType<typeof currentUser>
+    >);
+    vi.mocked(auth).mockResolvedValue({ orgRole: "org:viewer" } as Awaited<
+      ReturnType<typeof auth>
+    >);
+    vi.mocked(getOrganisationById).mockResolvedValue({
+      ok: true,
+      value: { id: validPostPayload.organisationId },
+    } as Awaited<ReturnType<typeof getOrganisationById>>);
+    vi.mocked(listPeopleForOrganisation).mockResolvedValue({
+      ok: true,
+      value: [{ id: validPostPayload.personId }],
+    } as Awaited<ReturnType<typeof listPeopleForOrganisation>>);
+    vi.mocked(getAvailabilityRecordById).mockResolvedValue({
+      ok: true,
+      value: { sourceType: "manual" },
+    } as Awaited<ReturnType<typeof getAvailabilityRecordById>>);
+    const { XeroCampaignDeniedError } = await import(
+      "@repo/database/xero-campaign-contract"
+    );
+    campaignMock.action.mockRejectedValue(new XeroCampaignDeniedError());
+  });
+  it.each(["POST", "PATCH", "DELETE"])(
+    "denies reserved scope %s before service writes",
+    async (method) => {
+      const recordId = "33333333-3333-4333-8333-333333333333";
+      const request = new Request(
+        `https://api.example.com/api/availability/${recordId}`,
+        {
+          body: JSON.stringify(
+            method === "POST" ? validPostPayload : validPatchPayload
+          ),
+          headers: { "content-type": "application/json" },
+          method,
+        }
+      );
+      let response: Response;
+      if (method === "POST") {
+        response = await POST(request);
+      } else if (method === "PATCH") {
+        response = await PATCH(request, {
+          params: Promise.resolve({ recordId }),
+        });
+      } else {
+        response = await DELETE(request, {
+          params: Promise.resolve({ recordId }),
+        });
+      }
+      expect(response.status).toBe(403);
+      expect(createManualAvailability).not.toHaveBeenCalled();
+      expect(updateManualAvailability).not.toHaveBeenCalled();
+      expect(archiveManualAvailability).not.toHaveBeenCalled();
+      expect(campaignMock.action).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          clerkOrgId: "org_clerk_123",
+          organisationId: validPostPayload.organisationId,
+          userId: "user_123",
+        }),
+        expect.any(Function)
+      );
+    }
+  );
+});

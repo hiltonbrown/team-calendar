@@ -52,7 +52,7 @@ const noUnresolvedSubmitOperationWhere =
   (): Prisma.AvailabilityRecordWhereInput => ({
     outbound_operations: {
       none: {
-        action: "submit" as const,
+        action: { in: ["submit", "approve"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },
@@ -972,6 +972,14 @@ async function processLeaveRecord(
       };
     }
     let approvalStatusToPersist = normalised.approvalStatus;
+    // Xero rejection represents both decline and withdrawal. Preserve the
+    // completed local withdrawal intent when the provider confirms rejection.
+    if (
+      existing?.approval_status === "withdrawn" &&
+      normalised.approvalStatus === "declined"
+    ) {
+      approvalStatusToPersist = "withdrawn";
+    }
     if (
       existing?.approval_status === "xero_sync_failed" &&
       existing.failed_action === "withdraw" &&

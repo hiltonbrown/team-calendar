@@ -21,6 +21,7 @@ export type DispatchNotificationError =
 export interface DispatchNotificationResult {
   emailQueued: boolean;
   inAppDelivered: boolean;
+  notificationId: string | null;
 }
 
 export interface NotificationDispatchDatabase {
@@ -117,7 +118,7 @@ export async function dispatchNotification(
         },
       });
       if (options.publishRealtime !== false) {
-        publishNotificationEvent(
+        await publishNotificationEvent(
           {
             organisationId: parsed.data.organisationId,
             userId: parsed.data.recipientUserId,
@@ -172,7 +173,7 @@ export async function dispatchNotification(
       }
     }
 
-    return { ok: true, value: { emailQueued, inAppDelivered } };
+    return { ok: true, value: { emailQueued, inAppDelivered, notificationId } };
   } catch {
     return {
       error: {
@@ -246,4 +247,52 @@ function validationError(
     },
     ok: false,
   };
+}
+
+/** Publish an existing committed row without creating another notification or email. */
+export async function publishPersistedNotification(
+  input: { clerkOrgId: string; organisationId: string; notificationId: string },
+  client: {
+    notification: Pick<Database["notification"], "findFirst" | "count">;
+  } = database
+): Promise<void> {
+  const row = await client.notification.findFirst({
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      id: input.notificationId,
+      organisation_id: input.organisationId,
+    },
+  });
+  if (!row) {
+    return;
+  }
+  invalidateUnreadCount({
+    clerkOrgId: input.clerkOrgId,
+    organisationId: input.organisationId,
+    userId: row.recipient_user_id,
+  });
+  const unreadCount = await client.notification.count({
+    where: {
+      clerk_org_id: input.clerkOrgId,
+      organisation_id: input.organisationId,
+      read_at: null,
+      recipient_user_id: row.recipient_user_id,
+    },
+  });
+  await publishNotificationEvent(
+    { organisationId: input.organisationId, userId: row.recipient_user_id },
+    {
+      payload: {
+        actionUrl: row.action_url,
+        body: row.body,
+        category: getTypeConfig(row.type).userFacingCategory,
+        createdAt: row.created_at.toISOString(),
+        notificationId: row.id,
+        title: row.title,
+        type: row.type,
+        unreadCount,
+      },
+      type: "notification.created",
+    }
+  );
 }

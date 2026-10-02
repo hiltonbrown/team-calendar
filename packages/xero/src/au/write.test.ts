@@ -52,11 +52,16 @@ describe("AU payroll write path", () => {
     restoreEncryptionKey();
   });
 
-  it("submits leave and returns the Xero leave application ID", async () => {
+  it("creates scheduled leave on manager approval without an invented requested status", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
-          LeaveApplications: [{ LeaveApplicationID: "leave-1" }],
+          LeaveApplications: [
+            {
+              LeaveApplicationID: "leave-1",
+              LeavePeriods: [{ LeavePeriodStatus: "SCHEDULED" }],
+            },
+          ],
         }),
         { status: 200 }
       )
@@ -73,9 +78,7 @@ describe("AU payroll write path", () => {
     });
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.xeroLeaveApplicationId).toBe("leave-1");
-    }
+    expect(result.value.xeroLeaveApplicationId).toBe("leave-1");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
       expect.objectContaining({ method: "POST" })

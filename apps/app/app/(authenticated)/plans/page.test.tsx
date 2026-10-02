@@ -182,6 +182,41 @@ describe("Plans page client surface", () => {
     ).toHaveLength(1);
   });
 
+  it.each(["approve", "decline"] as const)(
+    "keeps %s failures out of employee retry and edit controls",
+    (failedAction) => {
+      render(
+        <PlansClient
+          canViewTeam={false}
+          filters={baseFilters}
+          organisationId="00000000-0000-4000-8000-000000000001"
+          orgQueryValue={null}
+          records={[
+            planRecord({
+              approvalStatus: "xero_sync_failed",
+              editableActions: ["view"],
+              failedAction,
+              xeroWriteError: "The manager action needs attention.",
+            }),
+          ]}
+          xeroConnectionState="connected"
+        />
+      );
+      expect(
+        screen.queryByRole("button", { name: "Retry submission" })
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: "Revert to draft" })
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+      expect(
+        screen.getByText("The manager action needs attention.", {
+          exact: false,
+        })
+      ).toBeDefined();
+    }
+  );
+
   it("clears filters while preserving the selected tab and organisation", () => {
     render(
       <PlansClient
@@ -238,10 +273,10 @@ describe("Plans page client surface", () => {
     expect(screen.getAllByText("Xero sync failed").length).toBeGreaterThan(1);
     expect(screen.getByText("Failed or declined")).toBeDefined();
     expect(
-      screen.getAllByText("Declined in Xero, edit before retrying").length
+      screen.getAllByText("This leave request was declined").length
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByText("Xero did not accept it, retry or revert").length
+      screen.getAllByText("This leave action needs attention").length
     ).toBeGreaterThan(0);
     expect(screen.getAllByText("2").length).toBeGreaterThan(0);
   });

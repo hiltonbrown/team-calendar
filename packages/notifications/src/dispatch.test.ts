@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   count: vi.fn(),
   emailCreate: vi.fn(),
   notificationCreate: vi.fn(),
+  notificationFindFirst: vi.fn(),
   personFindFirst: vi.fn(),
   preferenceFindUnique: vi.fn(),
   publish: vi.fn(),
@@ -20,6 +21,7 @@ const client = {
   notification: {
     count: mocks.count,
     create: mocks.notificationCreate,
+    findFirst: mocks.notificationFindFirst,
   },
   notificationEmailQueue: {
     create: mocks.emailCreate,
@@ -32,7 +34,9 @@ const client = {
   },
 };
 
-const { dispatchNotification } = await import("./dispatch");
+const { dispatchNotification, publishPersistedNotification } = await import(
+  "./dispatch"
+);
 
 const input = {
   actionUrl: "/leave-approvals?recordId=00000000-0000-4000-8000-000000000099",
@@ -69,7 +73,11 @@ describe("dispatchNotification", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { emailQueued: true, inAppDelivered: true },
+      value: {
+        emailQueued: true,
+        inAppDelivered: true,
+        notificationId: "00000000-0000-4000-8000-000000000101",
+      },
     });
     expect(mocks.notificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -114,7 +122,11 @@ describe("dispatchNotification", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { emailQueued: false, inAppDelivered: true },
+      value: {
+        emailQueued: false,
+        inAppDelivered: true,
+        notificationId: "00000000-0000-4000-8000-000000000101",
+      },
     });
     expect(mocks.emailCreate).not.toHaveBeenCalled();
   });
@@ -131,7 +143,11 @@ describe("dispatchNotification", () => {
 
     expect(result).toEqual({
       ok: true,
-      value: { emailQueued: false, inAppDelivered: true },
+      value: {
+        emailQueued: false,
+        inAppDelivered: true,
+        notificationId: "00000000-0000-4000-8000-000000000101",
+      },
     });
     expect(mocks.notificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -141,5 +157,64 @@ describe("dispatchNotification", () => {
       })
     );
     expect(mocks.emailCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("publishPersistedNotification", () => {
+  it("reads the committed scoped row and publishes without creating rows", async () => {
+    vi.clearAllMocks();
+    mocks.notificationFindFirst.mockResolvedValue({
+      action_url: input.actionUrl,
+      body: input.body,
+      clerk_org_id: input.clerkOrgId,
+      created_at: new Date("2026-04-18T00:00:00Z"),
+      id: "notification_1",
+      organisation_id: input.organisationId,
+      recipient_user_id: input.recipientUserId,
+      title: input.title,
+      type: "leave_submitted",
+    });
+    mocks.count.mockResolvedValue(2);
+    mocks.publish.mockResolvedValue(undefined);
+    await publishPersistedNotification(
+      {
+        clerkOrgId: input.clerkOrgId,
+        notificationId: "notification_1",
+        organisationId: input.organisationId,
+      },
+      client
+    );
+    expect(mocks.notificationFindFirst).toHaveBeenCalledWith({
+      where: {
+        clerk_org_id: input.clerkOrgId,
+        id: "notification_1",
+        organisation_id: input.organisationId,
+      },
+    });
+    expect(mocks.publish).toHaveBeenCalledWith(
+      { organisationId: input.organisationId, userId: input.recipientUserId },
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          notificationId: "notification_1",
+          unreadCount: 2,
+        }),
+        type: "notification.created",
+      })
+    );
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+    expect(mocks.emailCreate).not.toHaveBeenCalled();
+  });
+  it("does not publish a row absent from the committed scope", async () => {
+    vi.clearAllMocks();
+    mocks.notificationFindFirst.mockResolvedValue(null);
+    await publishPersistedNotification(
+      {
+        clerkOrgId: input.clerkOrgId,
+        notificationId: "rolled_back",
+        organisationId: input.organisationId,
+      },
+      client
+    );
+    expect(mocks.publish).not.toHaveBeenCalled();
   });
 });

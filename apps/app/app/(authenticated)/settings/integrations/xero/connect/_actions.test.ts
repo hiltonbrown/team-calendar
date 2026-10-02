@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   dispatchManualSync: vi.fn(),
   getXeroConnectionState: vi.fn(),
   revalidatePath: vi.fn(),
+  sessionFind: vi.fn().mockResolvedValue(null),
   syncXeroLeaveBalances: vi.fn(),
   syncXeroLeaveRecords: vi.fn(),
   syncXeroPeople: vi.fn(),
@@ -57,6 +58,7 @@ vi.mock("@repo/database", () => ({
   database: {
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
+    xeroOAuthSession: { findFirst: mocks.sessionFind },
     xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
 }));
@@ -225,3 +227,21 @@ describe("completeTenantSelectionAction", () => {
     );
   });
 });
+
+vi.mock("@/lib/server/xero-campaign-action", () => ({
+  readXeroCampaignActionHeader: async () => undefined,
+  withAuthenticatedXeroCampaignAction: (
+    _id: unknown,
+    _scope: unknown,
+    _target: unknown,
+    operation: () => Promise<unknown>
+  ) => operation(),
+}));
+vi.mock("@repo/database/xero-campaign-access", () => ({
+  reconcileXeroCampaignActionBinding: async () => undefined,
+  withXeroCampaignChildInvocation: (
+    _id: unknown,
+    data: unknown,
+    handler: (value: unknown) => Promise<unknown>
+  ) => handler(data),
+}));

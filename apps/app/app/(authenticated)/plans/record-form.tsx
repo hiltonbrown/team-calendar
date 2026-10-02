@@ -286,7 +286,7 @@ export function RecordForm({
             <span className="flex flex-col items-start gap-1">
               <span>Leave</span>
               <span className="font-normal text-current/75 text-label-md">
-                Payroll leave sent to Xero
+                Payroll leave created in Xero after approval
               </span>
             </span>
           </ToggleGroupItem>
@@ -498,7 +498,7 @@ export function RecordForm({
           onClose={() => setConfirmationRecord(null)}
           onSuccess={() => {
             setConfirmationRecord(null);
-            toast.success("Leave sent to Xero for approval.");
+            toast.success("Leave submitted for manager approval.");
             router.push(closeHref);
             router.refresh();
           }}
@@ -597,7 +597,7 @@ function dynamicPanelForIntent(
   if (xeroConnectionState === "not_connected") {
     return "Saves as approved in Team Calendar only. It appears on calendars, but it will not create payroll leave or go to Xero for approval.";
   }
-  return "Saves as a draft first. Use Save and submit when you are ready to send it to Xero for manager approval.";
+  return "Saves as a draft first. Use Save and submit when you are ready to submit it for manager approval.";
 }
 
 function isOneOf<T extends string>(

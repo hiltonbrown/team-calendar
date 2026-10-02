@@ -7,12 +7,18 @@ import {
   type OutboundOperationAttemptScope,
 } from "@repo/database";
 import { materialiseAvailabilityPublication } from "@repo/feeds";
-import { dispatchNotification } from "@repo/notifications";
+import {
+  dispatchNotification,
+  publishPersistedNotification,
+} from "@repo/notifications";
+
+import { z } from "zod";
 
 class NotificationDispatchRollback extends Error {}
 
 export async function completeSubmitSideEffects(input: {
   actorUserId: string;
+  approvalRecipient?: { clerkUserId: string; personId: string } | null;
   attempt: OutboundOperationAttemptScope;
   claimedAt: Date;
   clerkOrgId: string;
@@ -45,9 +51,25 @@ export async function completeSubmitSideEffects(input: {
     });
   }
 
-  if (input.notifyManager && input.manager) {
-    const { manager } = input;
-    let notified = false;
+  const notification =
+    input.attempt.action === "approve"
+      ? {
+          actionUrl: `/plans?recordId=${input.recordId}`,
+          body: "Your leave request has been approved.",
+          title: "Leave approved",
+          type: "leave_approved" as const,
+        }
+      : {
+          actionUrl: `/leave-approvals?recordId=${input.recordId}`,
+          body: "A leave request is ready for review.",
+          title: "Leave submitted for approval",
+          type: "leave_submitted" as const,
+        };
+  const recipient =
+    input.approvalRecipient ?? (input.notifyManager ? input.manager : null);
+  if (recipient) {
+    const manager = recipient;
+    let notified: false | { notificationId: string | null } = false;
     try {
       notified = await database.$transaction(async (tx) => {
         if (
@@ -60,28 +82,32 @@ export async function completeSubmitSideEffects(input: {
           return false;
         }
         const checkpoint = await tx.auditEvent.findFirst({
-          select: { id: true },
+          select: { id: true, metadata: true },
           where: checkpointWhere(
             input,
             "availability_records.submit_notification_completed"
           ),
         });
         if (checkpoint) {
-          return true;
+          const metadata = z
+            .object({ notificationId: z.string().nullable().optional() })
+            .safeParse(checkpoint.metadata);
+          return {
+            notificationId: metadata.success
+              ? (metadata.data.notificationId ?? null)
+              : null,
+          };
         }
         const result = await dispatchNotification(
           {
-            actionUrl: `/leave-approvals?recordId=${input.recordId}`,
+            ...notification,
             actorUserId: input.actorUserId,
-            body: "A leave request is ready for review.",
             clerkOrgId: input.clerkOrgId,
             objectId: input.recordId,
             objectType: "availability_record",
             organisationId: input.organisationId,
             recipientPersonId: manager.personId,
             recipientUserId: manager.clerkUserId,
-            title: "Leave submitted for approval",
-            type: "leave_submitted",
           },
           tx,
           { publishRealtime: false }
@@ -90,12 +116,15 @@ export async function completeSubmitSideEffects(input: {
           throw new NotificationDispatchRollback();
         }
         await tx.auditEvent.create({
-          data: checkpointData(
-            input,
-            "availability_records.submit_notification_completed"
-          ),
+          data: {
+            ...checkpointData(
+              input,
+              "availability_records.submit_notification_completed"
+            ),
+            metadata: { notificationId: result.value.notificationId },
+          },
         });
-        return true;
+        return { notificationId: result.value.notificationId };
       });
     } catch (error) {
       if (!(error instanceof NotificationDispatchRollback)) {
@@ -103,18 +132,37 @@ export async function completeSubmitSideEffects(input: {
       }
     }
     if (!notified) {
-      return failure("Manager notification is awaiting retry.");
+      return failure("Leave notification is awaiting retry.");
+    }
+    if (notified.notificationId) {
+      try {
+        await publishPersistedNotification({
+          clerkOrgId: input.clerkOrgId,
+          notificationId: notified.notificationId,
+          organisationId: input.organisationId,
+        });
+      } catch {
+        return failure("Leave notification delivery is awaiting retry.");
+      }
     }
   }
   return { ok: true, value: undefined };
 }
 
 function checkpointWhere(
-  input: { clerkOrgId: string; organisationId: string; recordId: string },
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+    recordId: string;
+    attempt?: OutboundOperationAttemptScope;
+  },
   action: string
 ) {
   return {
-    action,
+    action:
+      input.attempt?.action === "approve"
+        ? action.replace("submit_", "approval_")
+        : action,
     clerk_org_id: input.clerkOrgId,
     organisation_id: input.organisationId,
     resource_id: input.recordId,
@@ -124,6 +172,7 @@ function checkpointWhere(
 function checkpointData(
   input: {
     actorUserId: string;
+    attempt?: OutboundOperationAttemptScope;
     clerkOrgId: string;
     organisationId: string;
     recordId: string;

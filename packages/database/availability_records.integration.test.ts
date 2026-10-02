@@ -16,6 +16,9 @@ const {
   availability_record_type,
   availability_source_type,
   database,
+  getSubmitOperation,
+  prepareAndClaimSubmitOperation,
+  markSubmitDispatchStarted,
   employment_type,
   source_system,
 } = await import("./index.js");
@@ -140,6 +143,7 @@ const cleanTestData = async () => {
   await database.failedRecord.deleteMany({ where: scope });
   await database.availabilityPublication.deleteMany({ where: scope });
   await database.auditEvent.deleteMany({ where: scope });
+  await database.outboundOperation.deleteMany({ where: scope });
   await database.availabilityRecord.deleteMany({ where: scope });
   await database.leaveBalance.deleteMany({ where: scope });
   await database.alternativeContact.deleteMany({ where: scope });
@@ -242,6 +246,81 @@ describe("availability_records", () => {
       organisation_id: tenantA.organisationId,
       person_id: tenantA.personId,
       source_type: availability_source_type.manual,
+    });
+  });
+
+  test("fences concurrent approval creates and preserves uncertainty after the worker lease expires", async () => {
+    await createTenant(tenantA);
+    const record = await createAvailabilityRecord({
+      id: availabilityRecordIds.scoped,
+      tenant: tenantA,
+    });
+    await database.availabilityRecord.updateMany({
+      data: {
+        approval_status: "submitted",
+        source_type: "team_calendar_leave",
+      },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: record.id,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    const scope = {
+      action: "approve" as const,
+      availabilityRecordId: record.id,
+      clerkOrgId: tenantA.clerkOrgId,
+      organisationId: tenantA.organisationId,
+    };
+    const request = {
+      ...scope,
+      actorUserId: "fixture_manager",
+      claimableBefore: new Date(Date.now() - 300_000),
+      expectedFailedAction: null,
+      expectedSequence: record.derived_sequence,
+      expectedStatus: "submitted" as const,
+      requestEmployeeId: "fixture_employee",
+      requestEndsAt: record.ends_at,
+      requestFingerprint: "fixture_immutable_request",
+      requestLeaveTypeId: "fixture_leave_type",
+      requestStartsAt: record.starts_at,
+      requestTitle: "Annual leave",
+      requestUnits: 2,
+    };
+    const results = await Promise.all([
+      prepareAndClaimSubmitOperation(request),
+      prepareAndClaimSubmitOperation(request),
+    ]);
+    expect(results.filter(Boolean)).toHaveLength(1);
+    const operation = await getSubmitOperation(scope);
+    expect(operation).toMatchObject({
+      action: "approve",
+      actor_user_id: "fixture_manager",
+      attempt_generation: 1,
+      status: "prepared",
+    });
+    expect(
+      await getSubmitOperation({
+        ...scope,
+        clerkOrgId: tenantB.clerkOrgId,
+        organisationId: tenantB.organisationId,
+      })
+    ).toBeNull();
+    expect(
+      await markSubmitDispatchStarted({ ...scope, attemptGeneration: 1 })
+    ).toBe(true);
+    await database.availabilityRecord.updateMany({
+      data: { xero_write_claimed_at: new Date(0) },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: record.id,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(await prepareAndClaimSubmitOperation(request)).toBeNull();
+    expect(await getSubmitOperation(scope)).toMatchObject({
+      attempt_generation: 1,
+      status: "outcome_unknown",
     });
   });
 

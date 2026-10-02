@@ -3,8 +3,6 @@
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
-import { withXeroCampaignScopedInvocation } from "@repo/database/xero-campaign-access";
-import { XeroCampaignDeniedError } from "@repo/database/xero-campaign-contract";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
@@ -15,6 +13,10 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
+import {
+  readXeroCampaignActionHeader,
+  withAuthenticatedXeroCampaignAction,
+} from "@/lib/server/xero-campaign-action";
 
 const ConnectSchema = z.object({
   organisationId: z.string().uuid(),
@@ -63,6 +65,21 @@ export async function connectXeroAction(input: {
   redirectUrl.searchParams.set("returnTo", "/settings/integrations/xero");
   redirectUrl.searchParams.set("userId", context.value.actingUserId);
 
+  try {
+    const campaign = await readXeroCampaignActionHeader();
+    if (campaign) {
+      redirectUrl.searchParams.set("campaign", JSON.stringify(campaign));
+    }
+  } catch {
+    return {
+      error: {
+        code: "not_authorised",
+        message: "Invalid verification authority.",
+      },
+      ok: false,
+    };
+  }
+
   return { ok: true, value: { redirectUrl: redirectUrl.toString() } };
 }
 
@@ -79,29 +96,40 @@ export async function refreshXeroConnectionAction(input: {
     return context;
   }
 
-  const result = await refreshXeroOAuthConnection({
-    clerkOrgId: context.value.clerkOrgId,
-    connectionId: parsed.data.connectionId,
-    organisationId: context.value.organisationId,
-  });
-  if (!result.ok) {
-    return unknownError(result.error.message);
-  }
-
-  await database.auditEvent.create({
-    data: {
-      ...auditBase(context.value),
-      action: "xero.connection_refreshed",
-      entity_id: parsed.data.connectionId,
-      entity_type: "xero_connection",
-      metadata: { refreshedAt: result.value.refreshedAt.toISOString() },
-      resource_id: parsed.data.connectionId,
-      resource_type: "xero_connection",
+  return await withAuthenticatedXeroCampaignAction(
+    "xero.refresh",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
     },
-  });
+    parsed.data,
+    async () => {
+      const result = await refreshXeroOAuthConnection({
+        clerkOrgId: context.value.clerkOrgId,
+        connectionId: parsed.data.connectionId,
+        organisationId: context.value.organisationId,
+      });
+      if (!result.ok) {
+        return unknownError(result.error.message);
+      }
 
-  revalidate();
-  return { ok: true, value: { refreshed: true } };
+      await database.auditEvent.create({
+        data: {
+          ...auditBase(context.value),
+          action: "xero.connection_refreshed",
+          entity_id: parsed.data.connectionId,
+          entity_type: "xero_connection",
+          metadata: { refreshedAt: result.value.refreshedAt.toISOString() },
+          resource_id: parsed.data.connectionId,
+          resource_type: "xero_connection",
+        },
+      });
+
+      revalidate();
+      return { ok: true, value: { refreshed: true } };
+    }
+  );
 }
 
 export async function disconnectXeroAction(input: {
@@ -132,48 +160,59 @@ export async function disconnectXeroAction(input: {
     return validationError("Type the organisation name to confirm disconnect.");
   }
 
-  const result = await disconnectXeroOAuthConnection({
-    clerkOrgId: context.value.clerkOrgId,
-    connectionId: parsed.data.connectionId,
-    destructive: parsed.data.mode === "destructive",
-    organisationId: context.value.organisationId,
-    performedByUserId: context.value.actingUserId,
-  });
-  if (!result.ok) {
-    return unknownError(result.error.message);
-  }
-
-  await database.auditEvent.create({
-    data: {
-      ...auditBase(context.value),
-      action:
-        parsed.data.mode === "destructive"
-          ? "xero.connection_disconnected_destructive"
-          : "xero.connection_disconnected_soft",
-      entity_id: parsed.data.connectionId,
-      entity_type: "xero_connection",
-      metadata: {
-        mode: parsed.data.mode,
-        remoteStatus: result.value.remoteStatus,
-      },
-      resource_id: parsed.data.connectionId,
-      resource_type: "xero_connection",
+  return await withAuthenticatedXeroCampaignAction(
+    "xero.disconnect",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
     },
-  });
+    parsed.data,
+    async () => {
+      const result = await disconnectXeroOAuthConnection({
+        clerkOrgId: context.value.clerkOrgId,
+        connectionId: parsed.data.connectionId,
+        destructive: parsed.data.mode === "destructive",
+        organisationId: context.value.organisationId,
+        performedByUserId: context.value.actingUserId,
+      });
+      if (!result.ok) {
+        return unknownError(result.error.message);
+      }
 
-  revalidate();
-  return {
-    ok: true,
-    value: {
-      disconnected: true,
-      receipt: {
-        cleanupRequestId: result.value.cleanupRequestId,
-        dataActionStatus: result.value.dataActionStatus,
-        localDisabled: true,
-        remoteStatus: result.value.remoteStatus,
-      },
-    },
-  };
+      await database.auditEvent.create({
+        data: {
+          ...auditBase(context.value),
+          action:
+            parsed.data.mode === "destructive"
+              ? "xero.connection_disconnected_destructive"
+              : "xero.connection_disconnected_soft",
+          entity_id: parsed.data.connectionId,
+          entity_type: "xero_connection",
+          metadata: {
+            mode: parsed.data.mode,
+            remoteStatus: result.value.remoteStatus,
+          },
+          resource_id: parsed.data.connectionId,
+          resource_type: "xero_connection",
+        },
+      });
+
+      revalidate();
+      return {
+        ok: true,
+        value: {
+          disconnected: true,
+          receipt: {
+            cleanupRequestId: result.value.cleanupRequestId,
+            dataActionStatus: result.value.dataActionStatus,
+            localDisabled: true,
+            remoteStatus: result.value.remoteStatus,
+          },
+        },
+      };
+    }
+  );
 }
 
 export async function pauseTenantSyncAction(input: {
@@ -207,58 +246,51 @@ async function updateTenantPauseState(
     return context;
   }
 
-  let updated: boolean;
-  try {
-    updated = await withXeroCampaignScopedInvocation(
-      "xero.settings.tenant-sync-state",
-      {
-        clerkOrgId: context.value.clerkOrgId,
-        organisationId: context.value.organisationId,
-        xeroTenantId: parsed.data.xeroTenantId,
-      },
-      () =>
-        database.$transaction(async (tx) => {
-          const result = await tx.xeroTenant.updateMany({
-            data: { sync_paused_at: paused ? new Date() : null },
-            where: {
-              clerk_org_id: context.value.clerkOrgId,
-              id: parsed.data.xeroTenantId,
-              organisation_id: context.value.organisationId,
-            },
-          });
-          if (result.count === 0) {
-            return false;
-          }
-          await tx.auditEvent.create({
-            data: {
-              ...auditBase(context.value),
-              action: paused
-                ? "xero.tenant_sync_paused"
-                : "xero.tenant_sync_resumed",
-              entity_id: parsed.data.xeroTenantId,
-              entity_type: "xero_tenant",
-              metadata: {},
-              resource_id: parsed.data.xeroTenantId,
-              resource_type: "xero_tenant",
-            },
-          });
-          return true;
-        })
-    );
-  } catch (error) {
-    if (error instanceof XeroCampaignDeniedError) {
-      return unknownError(
-        "Xero settings are temporarily unavailable. Please try again later."
-      );
+  return await withAuthenticatedXeroCampaignAction(
+    "xero.settings.tenant-sync-state",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    { ...parsed.data, paused },
+    async () => {
+      const updated = await database.$transaction(async (tx) => {
+        const result = await tx.xeroTenant.updateMany({
+          data: { sync_paused_at: paused ? new Date() : null },
+          where: {
+            clerk_org_id: context.value.clerkOrgId,
+            id: parsed.data.xeroTenantId,
+            organisation_id: context.value.organisationId,
+          },
+        });
+        if (result.count === 0) {
+          return false;
+        }
+        await tx.auditEvent.create({
+          data: {
+            ...auditBase(context.value),
+            action: paused
+              ? "xero.tenant_sync_paused"
+              : "xero.tenant_sync_resumed",
+            entity_id: parsed.data.xeroTenantId,
+            entity_type: "xero_tenant",
+            metadata: {},
+            resource_id: parsed.data.xeroTenantId,
+            resource_type: "xero_tenant",
+          },
+        });
+        return true;
+      });
+      if (!updated) {
+        return validationError(
+          "Xero tenant was not found in this organisation."
+        );
+      }
+      revalidate();
+      return { ok: true, value: { paused: true } };
     }
-    throw error;
-  }
-  if (!updated) {
-    return validationError("Xero tenant was not found in this organisation.");
-  }
-
-  revalidate();
-  return { ok: true, value: { paused: true } };
+  );
 }
 
 async function resolveAdminContext(organisationId: string): Promise<

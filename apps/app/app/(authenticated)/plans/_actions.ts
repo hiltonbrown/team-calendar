@@ -26,6 +26,7 @@ import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
+import { withAuthenticatedXeroCampaignAction } from "@/lib/server/xero-campaign-action";
 import {
   buildFormDate,
   type PlanRecordActionInput,
@@ -56,19 +57,30 @@ export async function attachSubmitRecoveryCandidateAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await attachSubmitRecoveryCandidate(
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.recovery-attach",
     {
-      ...context.value,
-      reason: input.reason,
-      recordId: input.recordId,
-      remoteId: input.remoteId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
     },
-    XeroWriteAdapter
+    input,
+    async () => {
+      const result = await attachSubmitRecoveryCandidate(
+        {
+          ...context.value,
+          reason: input.reason,
+          recordId: input.recordId,
+          remoteId: input.remoteId,
+        },
+        XeroWriteAdapter
+      );
+      if (result.ok) {
+        revalidateSubmissionPaths();
+      }
+      return result;
+    }
   );
-  if (result.ok) {
-    revalidateSubmissionPaths();
-  }
-  return result;
 }
 
 export async function listSubmitRecoveryCandidatesAction(input: {
@@ -79,9 +91,19 @@ export async function listSubmitRecoveryCandidatesAction(input: {
   if (!context.ok) {
     return context;
   }
-  return await listSubmitRecoveryCandidates(
-    { ...context.value, recordId: input.recordId },
-    XeroWriteAdapter
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.recovery-candidates",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    input,
+    async () =>
+      await listSubmitRecoveryCandidates(
+        { ...context.value, recordId: input.recordId },
+        XeroWriteAdapter
+      )
   );
 }
 
@@ -101,17 +123,28 @@ export async function resolveSubmitAsNotCreatedAction(input: {
       "Independent provider verification must be confirmed."
     );
   }
-  const result = await resolveSubmitAsNotCreated({
-    ...context.value,
-    evidenceReference: input.evidenceReference,
-    independentlyVerified: true,
-    reason: input.reason,
-    recordId: input.recordId,
-  });
-  if (result.ok) {
-    revalidateSubmissionPaths();
-  }
-  return result;
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.recovery-not-created",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    input,
+    async () => {
+      const result = await resolveSubmitAsNotCreated({
+        ...context.value,
+        evidenceReference: input.evidenceReference,
+        independentlyVerified: true,
+        reason: input.reason,
+        recordId: input.recordId,
+      });
+      if (result.ok) {
+        revalidateSubmissionPaths();
+      }
+      return result;
+    }
+  );
 }
 
 export async function createRecordAction(
@@ -132,29 +165,40 @@ export async function createRecordAction(
     return dates;
   }
 
-  const result = await createRecord({
-    actingOrgRole: context.value.orgRole,
-    allDay: parsed.data.allDay,
-    clerkOrgId: context.value.clerkOrgId,
-    contactabilityStatus: parsed.data.contactabilityStatus,
-    createdByUserId: context.value.userId,
-    endsAt: dates.value.endsAt,
-    notesInternal: parsed.data.notesInternal,
-    organisationId: context.value.organisationId,
-    personId: parsed.data.personId,
-    privacyMode: parsed.data.privacyMode,
-    recordType: parsed.data.recordType,
-    startsAt: dates.value.startsAt,
-  });
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.create-local",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.userId,
+    },
+    parsed.data,
+    async () => {
+      const result = await createRecord({
+        actingOrgRole: context.value.orgRole,
+        allDay: parsed.data.allDay,
+        clerkOrgId: context.value.clerkOrgId,
+        contactabilityStatus: parsed.data.contactabilityStatus,
+        createdByUserId: context.value.userId,
+        endsAt: dates.value.endsAt,
+        notesInternal: parsed.data.notesInternal,
+        organisationId: context.value.organisationId,
+        personId: parsed.data.personId,
+        privacyMode: parsed.data.privacyMode,
+        recordType: parsed.data.recordType,
+        startsAt: dates.value.startsAt,
+      });
 
-  if (!result.ok) {
-    return result;
-  }
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  revalidatePath("/");
-  return { ok: true, value: { id: result.value.id } };
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      revalidatePath("/");
+      return { ok: true, value: { id: result.value.id } };
+    }
+  );
 }
 
 export async function updateRecordAction(
@@ -179,30 +223,41 @@ export async function updateRecordAction(
     return dates;
   }
 
-  const result = await updateRecord({
-    actingOrgRole: context.value.orgRole,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    patch: {
-      allDay: parsed.data.allDay,
-      contactabilityStatus: parsed.data.contactabilityStatus,
-      endsAt: dates.value.endsAt,
-      notesInternal: parsed.data.notesInternal,
-      privacyMode: parsed.data.privacyMode,
-      recordType: parsed.data.recordType,
-      startsAt: dates.value.startsAt,
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.update-local",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.userId,
     },
-    recordId: parsed.data.recordId,
-  });
+    parsed.data,
+    async () => {
+      const result = await updateRecord({
+        actingOrgRole: context.value.orgRole,
+        actingUserId: context.value.userId,
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        patch: {
+          allDay: parsed.data.allDay,
+          contactabilityStatus: parsed.data.contactabilityStatus,
+          endsAt: dates.value.endsAt,
+          notesInternal: parsed.data.notesInternal,
+          privacyMode: parsed.data.privacyMode,
+          recordType: parsed.data.recordType,
+          startsAt: dates.value.startsAt,
+        },
+        recordId: parsed.data.recordId,
+      });
 
-  if (!result.ok) {
-    return result;
-  }
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  return { ok: true, value: { id: result.value.id } };
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      return { ok: true, value: { id: result.value.id } };
+    }
+  );
 }
 
 async function captureSubmissionActivation(input: {
@@ -254,20 +309,31 @@ export async function deleteDraftAction(
     return context;
   }
 
-  const result = await deleteDraftRecord({
-    actingOrgRole: context.value.orgRole,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    recordId: parsed.data.recordId,
-  });
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.delete-draft",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.userId,
+    },
+    parsed.data,
+    async () => {
+      const result = await deleteDraftRecord({
+        actingOrgRole: context.value.orgRole,
+        actingUserId: context.value.userId,
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        recordId: parsed.data.recordId,
+      });
 
-  if (!result.ok) {
-    return result;
-  }
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  return { ok: true, value: undefined };
+      revalidatePath("/plans");
+      return { ok: true, value: undefined };
+    }
+  );
 }
 
 export async function archiveRecordAction(
@@ -283,21 +349,32 @@ export async function archiveRecordAction(
     return context;
   }
 
-  const result = await archiveRecord({
-    actingOrgRole: context.value.orgRole,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    recordId: parsed.data.recordId,
-  });
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.archive",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.userId,
+    },
+    parsed.data,
+    async () => {
+      const result = await archiveRecord({
+        actingOrgRole: context.value.orgRole,
+        actingUserId: context.value.userId,
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        recordId: parsed.data.recordId,
+      });
 
-  if (!result.ok) {
-    return result;
-  }
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  return { ok: true, value: undefined };
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      return { ok: true, value: undefined };
+    }
+  );
 }
 
 export async function restoreRecordAction(
@@ -313,21 +390,32 @@ export async function restoreRecordAction(
     return context;
   }
 
-  const result = await restoreRecord({
-    actingOrgRole: context.value.orgRole,
-    actingUserId: context.value.userId,
-    clerkOrgId: context.value.clerkOrgId,
-    organisationId: context.value.organisationId,
-    recordId: parsed.data.recordId,
-  });
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.restore",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.userId,
+    },
+    parsed.data,
+    async () => {
+      const result = await restoreRecord({
+        actingOrgRole: context.value.orgRole,
+        actingUserId: context.value.userId,
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        recordId: parsed.data.recordId,
+      });
 
-  if (!result.ok) {
-    return result;
-  }
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  return { ok: true, value: undefined };
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      return { ok: true, value: undefined };
+    }
+  );
 }
 
 export async function submitForApprovalAction(
@@ -338,23 +426,37 @@ export async function submitForApprovalAction(
     return context;
   }
 
-  const result = await submitDraftRecord(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
-
-  try {
-    await captureSubmissionActivation({
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.submit",
+    {
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      submittedAt: result.value.submitted_at,
-    });
-  } catch (error) {
-    log.warn("Leave submission activation capture failed", { error });
-  }
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await submitDraftRecord(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidateSubmissionPaths();
-  return submissionValue(result.value);
+      try {
+        await captureSubmissionActivation({
+          clerkOrgId: context.value.clerkOrgId,
+          organisationId: context.value.organisationId,
+          submittedAt: result.value.submitted_at,
+        });
+      } catch (error) {
+        log.warn("Leave submission activation capture failed", { error });
+      }
+
+      revalidateSubmissionPaths();
+      return submissionValue(result.value);
+    }
+  );
 }
 
 export async function withdrawSubmissionAction(
@@ -365,16 +467,30 @@ export async function withdrawSubmissionAction(
     return context;
   }
 
-  const result = await withdrawSubmission(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.withdraw",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await withdrawSubmission(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  revalidatePath("/leave-approvals");
-  revalidatePath("/notifications");
-  return submissionValue(result.value);
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      revalidatePath("/leave-approvals");
+      revalidatePath("/notifications");
+      return submissionValue(result.value);
+    }
+  );
 }
 
 export async function retrySubmissionAction(
@@ -385,23 +501,37 @@ export async function retrySubmissionAction(
     return context;
   }
 
-  const result = await retrySubmission(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
-
-  try {
-    await captureSubmissionActivation({
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.retry-submit",
+    {
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      submittedAt: result.value.submitted_at,
-    });
-  } catch (error) {
-    log.warn("Leave submission activation capture failed", { error });
-  }
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await retrySubmission(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidateSubmissionPaths();
-  return submissionValue(result.value);
+      try {
+        await captureSubmissionActivation({
+          clerkOrgId: context.value.clerkOrgId,
+          organisationId: context.value.organisationId,
+          submittedAt: result.value.submitted_at,
+        });
+      } catch (error) {
+        log.warn("Leave submission activation capture failed", { error });
+      }
+
+      revalidateSubmissionPaths();
+      return submissionValue(result.value);
+    }
+  );
 }
 
 export async function revertToDraftAction(
@@ -412,14 +542,28 @@ export async function revertToDraftAction(
     return context;
   }
 
-  const result = await revertToDraft(context.value);
-  if (!result.ok) {
-    return result;
-  }
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.revert-draft",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await revertToDraft(context.value);
+      if (!result.ok) {
+        return result;
+      }
 
-  revalidatePath("/plans");
-  revalidatePath("/calendar");
-  return submissionValue(result.value);
+      revalidatePath("/plans");
+      revalidatePath("/calendar");
+      return submissionValue(result.value);
+    }
+  );
 }
 
 interface SubmissionActionValue {

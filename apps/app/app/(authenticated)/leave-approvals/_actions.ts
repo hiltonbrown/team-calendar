@@ -23,6 +23,7 @@ import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
+import { withAuthenticatedXeroCampaignAction } from "@/lib/server/xero-campaign-action";
 
 const RecordActionSchema = z.object({
   organisationId: z.string().uuid(),
@@ -66,45 +67,59 @@ export async function approveAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await approve(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
-  if (result.value.approvedAt) {
-    try {
-      const first = await database.availabilityRecord.findFirst({
-        orderBy: { approved_at: "asc" },
-        select: { approved_at: true },
-        where: {
-          approved_at: { not: null },
-          clerk_org_id: context.value.clerkOrgId,
-          organisation_id: context.value.organisationId,
-        },
-      });
-      if (!first?.approved_at) {
-        revalidateApprovalWritePaths();
-        return approvalValue(result.value);
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.approve",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await approve(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
       }
-      const event = createActivationEvent({
-        deduplicationKey: `${context.value.clerkOrgId}:${context.value.organisationId}`,
-        name: "First Leave Approved",
-        occurredAt: first.approved_at,
-        subjectId: context.value.clerkOrgId,
-      });
-      analytics?.capture({
-        distinctId: event.distinctId,
-        event: event.event,
-        properties: event.properties,
-        timestamp: event.timestamp,
-        uuid: event.uuid,
-      });
-      await analytics?.flush();
-    } catch (error) {
-      log.warn("Leave approval activation capture failed", { error });
+      if (result.value.approvedAt) {
+        try {
+          const first = await database.availabilityRecord.findFirst({
+            orderBy: { approved_at: "asc" },
+            select: { approved_at: true },
+            where: {
+              approved_at: { not: null },
+              clerk_org_id: context.value.clerkOrgId,
+              organisation_id: context.value.organisationId,
+            },
+          });
+          if (!first?.approved_at) {
+            revalidateApprovalWritePaths();
+            return approvalValue(result.value);
+          }
+          const event = createActivationEvent({
+            deduplicationKey: `${context.value.clerkOrgId}:${context.value.organisationId}`,
+            name: "First Leave Approved",
+            occurredAt: first.approved_at,
+            subjectId: context.value.clerkOrgId,
+          });
+          analytics?.capture({
+            distinctId: event.distinctId,
+            event: event.event,
+            properties: event.properties,
+            timestamp: event.timestamp,
+            uuid: event.uuid,
+          });
+          await analytics?.flush();
+        } catch (error) {
+          log.warn("Leave approval activation capture failed", { error });
+        }
+      }
+      revalidateApprovalWritePaths();
+      return approvalValue(result.value);
     }
-  }
-  revalidateApprovalWritePaths();
-  return approvalValue(result.value);
+  );
 }
 
 export async function declineAction(input: {
@@ -120,19 +135,30 @@ export async function declineAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await decline(
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.decline",
     {
-      ...context.value,
-      reason: parsed.data.reason,
-      recordId: parsed.data.recordId,
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
     },
-    XeroWriteAdapter
+    parsed.data,
+    async () => {
+      const result = await decline(
+        {
+          ...context.value,
+          reason: parsed.data.reason,
+          recordId: parsed.data.recordId,
+        },
+        XeroWriteAdapter
+      );
+      if (!result.ok) {
+        return result;
+      }
+      revalidateApprovalWritePaths();
+      return approvalValue(result.value);
+    }
   );
-  if (!result.ok) {
-    return result;
-  }
-  revalidateApprovalWritePaths();
-  return approvalValue(result.value);
 }
 
 export async function requestMoreInfoAction(input: {
@@ -148,17 +174,28 @@ export async function requestMoreInfoAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await requestMoreInfo({
-    ...context.value,
-    question: parsed.data.question,
-    recordId: parsed.data.recordId,
-  });
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/leave-approvals");
-  revalidatePath("/notifications");
-  return approvalValue(result.value);
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.request-info",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    parsed.data,
+    async () => {
+      const result = await requestMoreInfo({
+        ...context.value,
+        question: parsed.data.question,
+        recordId: parsed.data.recordId,
+      });
+      if (!result.ok) {
+        return result;
+      }
+      revalidatePath("/leave-approvals");
+      revalidatePath("/notifications");
+      return approvalValue(result.value);
+    }
+  );
 }
 
 export async function retryApprovalAction(input: {
@@ -169,12 +206,26 @@ export async function retryApprovalAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await retryApproval(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
-  revalidateApprovalWritePaths();
-  return approvalValue(result.value);
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.retry-approve",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await retryApproval(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
+      }
+      revalidateApprovalWritePaths();
+      return approvalValue(result.value);
+    }
+  );
 }
 
 export async function retryDeclineAction(input: {
@@ -185,12 +236,26 @@ export async function retryDeclineAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await retryDecline(context.value, XeroWriteAdapter);
-  if (!result.ok) {
-    return result;
-  }
-  revalidateApprovalWritePaths();
-  return approvalValue(result.value);
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.retry-decline",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await retryDecline(context.value, XeroWriteAdapter);
+      if (!result.ok) {
+        return result;
+      }
+      revalidateApprovalWritePaths();
+      return approvalValue(result.value);
+    }
+  );
 }
 
 export async function revertApprovalAttemptAction(input: {
@@ -201,13 +266,27 @@ export async function revertApprovalAttemptAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await revertApprovalAttempt(context.value);
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/leave-approvals");
-  revalidatePath("/plans");
-  return approvalValue(result.value);
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.revert-approval",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    {
+      organisationId: context.value.organisationId,
+      recordId: context.value.recordId,
+    },
+    async () => {
+      const result = await revertApprovalAttempt(context.value);
+      if (!result.ok) {
+        return result;
+      }
+      revalidatePath("/leave-approvals");
+      revalidatePath("/plans");
+      return approvalValue(result.value);
+    }
+  );
 }
 
 export async function dispatchApprovalReconciliationAction(input: {
@@ -223,12 +302,23 @@ export async function dispatchApprovalReconciliationAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await dispatchApprovalReconciliation(context.value);
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/leave-approvals");
-  return result;
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.reconcile",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    parsed.data,
+    async () => {
+      const result = await dispatchApprovalReconciliation(context.value);
+      if (!result.ok) {
+        return result;
+      }
+      revalidatePath("/leave-approvals");
+      return result;
+    }
+  );
 }
 
 export async function dispatchXeroLeaveSyncAction(input: {
@@ -244,13 +334,24 @@ export async function dispatchXeroLeaveSyncAction(input: {
   if (!context.ok) {
     return context;
   }
-  const result = await dispatchXeroLeaveSync(context.value);
-  if (!result.ok) {
-    return result;
-  }
-  revalidatePath("/leave-approvals");
-  revalidatePath("/");
-  return result;
+  return await withAuthenticatedXeroCampaignAction(
+    "leave.sync",
+    {
+      clerkOrgId: context.value.clerkOrgId,
+      organisationId: context.value.organisationId,
+      userId: context.value.actingUserId,
+    },
+    parsed.data,
+    async () => {
+      const result = await dispatchXeroLeaveSync(context.value);
+      if (!result.ok) {
+        return result;
+      }
+      revalidatePath("/leave-approvals");
+      revalidatePath("/");
+      return result;
+    }
+  );
 }
 
 async function resolveRecordActionContext(input: {

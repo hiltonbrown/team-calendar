@@ -288,10 +288,12 @@ The primary domain object is `AvailabilityRecord`. It holds both Xero-synced lea
 
 Outbound writes are synchronous and user-triggered. The four write operations are:
 
-- **Submit**: employee submits a leave request; write to Xero, transition to `submitted`
-- **Approve**: manager approves; write to Xero, transition to `approved`
-- **Decline**: manager declines with a required reason; write to Xero, transition to `declined`
-- **Withdraw**: employee or admin withdraws; write to Xero, transition to `withdrawn`
+- **Submit (AU)**: validate eligibility and mappings; keep the request local and transition to `submitted`. No payroll creation.
+- **Approve (AU)**: manager approval synchronously creates scheduled Xero leave for a local request. Imported requested leave uses the documented approve operation. Transition to `approved`.
+- **Decline**: manager declines with a required reason; local requests without a remote ID make no provider call, imported requested leave uses reject. Transition to `declined`.
+- **Withdraw**: employee or admin withdraws; local requests without a remote ID make no provider call, remote leave uses the supported provider operation. Transition to `withdrawn`.
+
+The approved AU transition contract is `au-contract-v1` in `plans/160-au-transition-contract-v1.md`. Approval creation has its own durable `approve` operation; uncertain creates require administrator recovery before retry. Preserve legacy remote-created submissions for scoped review without duplicate creation or fabricated approval history.
 
 Do not queue outbound writes as background jobs. Failures are surfaced inline to the user.
 
