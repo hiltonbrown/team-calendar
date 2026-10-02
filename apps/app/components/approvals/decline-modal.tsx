@@ -57,7 +57,7 @@ export function DeclineModal({
         );
         return;
       }
-      toast.success("Leave declined in Xero");
+      toast.success("Leave declined");
       onSuccess();
     } finally {
       setIsPending(false);
@@ -86,7 +86,7 @@ export function DeclineModal({
         );
         return;
       }
-      toast.success("Leave declined in Xero");
+      toast.success("Leave declined");
       onSuccess();
     } finally {
       setIsPending(false);
@@ -137,7 +137,7 @@ export function DeclineModal({
           </p>
         </div>
         <p className="text-body-sm text-muted-foreground">
-          The reason will be visible to the employee and sent to Xero Payroll.
+          The reason will be visible to the employee.
         </p>
         {message ? (
           <XeroSyncFailedState
