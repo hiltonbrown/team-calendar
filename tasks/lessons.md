@@ -249,3 +249,29 @@ The user explicitly removed a fixed 24-hour testing or new-namespace hold for th
 ## 2026-10-02: prove the approved flow before expanding the harness
 
 The user corrected work that expanded campaign infrastructure without reaching the approved AU browser/provider flow. Separate controls required for the next authorised operation from reusable tooling that can wait. Use existing reviewed guards and a bounded, concrete execution procedure to prove the user flow first. Do not let a general runner, every catalogue driver, repeated host inventory or repeated already-passing tests become substitutes for execution. Add infrastructure only when a specific unresolved safety or evidence requirement makes it necessary for that next operation, and state that dependency explicitly.
+
+## 2026-10-02: enforce user instructions before acting
+
+Failure: explicit instructions to work efficiently, avoid busy work and finish the
+authorised task were acknowledged without promptly changing execution. Inferred
+completeness and production-quality goals drove unnecessary framework work and
+repeated verification. A new broad test run after the user requested commit and
+merge repeated the scope failure. The guidance was already available; the failure
+was not enforcing it when choosing actions.
+
+- Before each tool call or delegation, identify the current deliverable and its
+  stopping condition. Proceed only when the action delivers required work, fixes
+  an observed defect or removes a demonstrated blocker.
+- Apply explicit user constraints before inferred improvements, skill workflows
+  and plan extensions. Production quality does not authorise scope expansion.
+- Reuse valid evidence. Repeat verification only when relevant changes invalidate
+  it, an observed failure needs investigation or an explicit gate requires it.
+- Give subagents the same scope, constraints and stopping condition. On a user
+  correction, immediately stop conflicting delegated work and revise remaining
+  assignments before further execution.
+- Treat "commit and merge" as the current operation. Preserve unfinished work,
+  record verification gaps and complete the authorised operation; do not silently
+  add another implementation or verification phase.
+- Stop when the requested outcome is achieved and report its evidence and limits.
+  Acknowledging a correction or recording a lesson does not replace changing the
+  next action. The user should not need to repeat the instruction.
