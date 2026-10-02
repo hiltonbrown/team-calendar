@@ -118,7 +118,9 @@ describe("new record modal form", () => {
         .getByRole("radio", { name: LEAVE_INTENT_NAME })
         .getAttribute("data-state")
     ).toBe("on");
-    expect(screen.getByText("Payroll leave sent to Xero")).toBeDefined();
+    expect(
+      screen.getByText("Payroll leave created in Xero after approval")
+    ).toBeDefined();
     expect(screen.getByRole("button", { name: "Save draft" })).toBeDefined();
     expect(
       screen.getByRole("button", { name: "Save and submit" })
