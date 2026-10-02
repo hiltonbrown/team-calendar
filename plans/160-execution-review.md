@@ -1,5 +1,347 @@
 # Plan 160 execution review, 27 September 2026
 
+## Resumed reconciliation, 2 October 2026
+
+Execution resumes from `3b7c511d0c96b26de067e8b36b78f6d45e427c70` in
+`codex/xero-e2e-completion`. The original `codex/xero-e2e-verification`
+worktree ends at already merged documentation commit `d27b0f1`; the later
+continuation and its uncommitted evidence records are preserved. Historical
+source and online results below are not attributed to new changes.
+
+The user explicitly approved AU submissions remaining local and pending, with
+manager approval synchronously creating scheduled leave in Xero. The AU
+executor owns the versioned transition contract, implementation and regression
+tests, including imported requested leave and legacy already-scheduled rows.
+This resolves the policy question; it does not establish provider execution.
+
+The user authorised investigation of the unknown private fixture/session handoff
+location. Existing credential access alone does not identify sanctioned payroll
+fixtures. Live Neon authority is settled and the protected runner remains the
+required route, with fresh target, ownership, isolation and cleanup evidence.
+
+- [x] Reconcile original and continuation worktrees and preserve dirty records.
+- [x] Read improve reconciliation/execution instructions and database lessons.
+- [x] Resolve the AU product decision with the user.
+- [ ] Complete remaining application admission, lease and actual scenario producers.
+- [ ] Implement and verify the approved AU transition contract.
+- [ ] Refresh operational inventory and locate private fixture/session authority.
+- [ ] Run the protected online inventory against the frozen candidate.
+- [ ] Independently review the source diff and required verification results.
+- [ ] Publish actual campaign reports and reconcile every remaining criterion.
+
+The reviewer owns this review and the plan index. Executors own source changes
+and task tracking in the isolated continuation worktree. No merge, push or
+deployment is inferred from this instruction.
+
+### Execution priority after the efficiency correction
+
+The user requested a clear distinction between required delivery and busy work.
+The next executable objective is the authorised AU lifecycle through the real UI:
+draft, local submission, manager approval creating Xero leave, local decline and
+withdrawal, with independent local/provider readbacks and scoped fixture cleanup.
+Use the reviewed candidate and existing mandatory database, binding, rate-limit
+and action controls. A development candidate can establish this synchronous flow;
+it does not establish deployed revision or scheduled-worker behaviour.
+
+Stop expanding generic runner composition, catalogue-wide driver factories and
+new recovery frameworks before this flow is proved. Reuse the approved fixture
+inventory and unchanged gate evidence. Batch remaining fixes before the final
+required gates. Do not rerun successful packages just to repeat evidence or repeat
+operational discovery without a concrete changed prerequisite. Broader lifecycle,
+deployment, scheduled-job and restore criteria remain explicit outstanding work;
+this prioritisation does not convert them to PASS or complete Plan 160.
+
+### Reviewed AU implementation
+
+Commit `37b481812bd943115f9081a0561e6ecfd8c0f789` contains the 57 reviewed AU
+workflow and application-admission files. The committed file list exactly
+matches the executor's scoped manifest; root review documents, task tracking
+and subsequent harness changes remain separate. The checkpoint adds the
+approved local-submit/create-on-approval contract, fenced approval recovery,
+post-commit notification publication, authenticated action admission, signed
+OAuth cancellation and byte-length-safe OAuth comparisons.
+
+Focused results: 127 AU workflow tests, 35 plan tests, 16 recovery tests,
+7 notification tests, 6 ledger tests, 88 OAuth tests, 73 app tests and 51 API
+tests passed. The unchanged AU handlers and adapter retained their earlier
+67 and 43 passing tests. App, API and availability type checks, scoped lint
+and `git diff --check` passed. Review verdict: APPROVE this source checkpoint
+for clean-checkout repository gates and protected database regression.
+No live migration, provider call, deployment or full campaign pass is claimed.
+
+Independent repository gates at this checkpoint passed lint (1,188 files,
+eight existing unused-suppression warnings), 19 uncached type-check tasks,
+four uncached build tasks, 604 release-tool tests across 35 files, release-tool
+type checking and boundary checks (1,098 files in 21 packages). The build used
+the repository's synthetic settings and network-denial hook. Type checking
+initially hit a sandbox Prisma-cache denial; release tests initially hit
+subprocess/IPC denials. Their host reruns passed with live credentials cleared.
+
+The first full unit gate failed nine AU/NZ/UK adapter assertions after the
+transport snapshot change passed URL and Headers instances to fetch. Commit
+`85774f4e12e9e23848c5f39ab84b20a01f92ae32` corrects those four test files to
+check request semantics, including exact endpoint and authentication headers.
+Independent diff review confirmed production code was unchanged; all 104
+focused tests passed. The next full unit run passed all 610 Xero tests but
+found one old modal-copy expectation among 690 app tests. Test-only commit
+`b89bd36cfd013726721b449d1efafb0d38968c40` updates that assertion to the approved
+create-on-approval wording; its five modal tests and scoped lint passed.
+Both test-only corrections are approved. The final full unit gate at `b89bd36`
+passed all 18 uncached tasks in 26.495 seconds; lint again passed 1,188 files
+with the same eight warnings. The frozen checkout is clean and its production
+source is byte-identical to `37b4818`, so the earlier build, type and release-tool
+results apply. The protected database result is recorded below. Neither earlier
+failed unit run is reported as a pass.
+
+Runtime correction `0daa463` adds the shipped tenant-selection action identity,
+permits an already admitted invocation to finish its local writes during drain,
+and atomically refuses new provider dispatch after revocation. Independent review
+of the four files and 163 focused tests passed. This is source evidence only.
+
+Operator commit `a4cab6b` implements the authorised immediate namespace policy.
+The explicit immediate-admission flags require the configured epoch and credential
+domain; an existing namespace is preserved without resetting counters or holds.
+The unchanged atomic limiter still enforces quota, concurrency and cooldowns.
+Review, 72 focused tests, package type checking and scoped lint passed. No live
+namespace was initialised by these checks.
+
+### Fresh operational evidence
+
+On 2 October, 01:06:06 to 01:06:18 UTC, all nine Vercel environment
+pulls completed. API and app Development, Preview and Production resolve to
+the same password-free database target fingerprint; web has no database URL.
+Production deployments are READY at `42bb840`, not the continuation candidate.
+Current project metadata lacks `XERO_APP_TIER`, `XERO_RATE_NAMESPACE_EPOCH`
+and `XERO_CREDENTIAL_DOMAIN_ID`. No campaign configuration was found in the
+pulls. Downloaded values were kept private and deleted after inspection.
+
+The user subsequently identified the app as using the basic plan, with an
+upgrade intended at release. Verification will use the conservative Starter
+allowance of 1,000 calls per day per organisation, consistent with Xero's
+published [rate limits](https://developer.xero.com/documentation/best-practices/api-call-efficiencies/rate-limits/).
+This records the configuration interpretation, not a developer-portal tier
+observation or evidence that the planned upgrade has occurred. The shared
+credential-domain and namespace initialisation still require their reviewed
+checkpoint; an empty namespace does not establish unused daily quota.
+
+The user subsequently removed the fixed 24-hour initialisation waiting period
+from Plan 160 and its task list. It is no longer an execution prerequisite or
+part of the completion estimate. Namespace authority and actual quota admission
+checks remain required. Earlier referenced conservative waiting instructions
+are superseded for this campaign.
+
+The Neon Vercel resource is available, but its metadata does not expose PITR
+retention or establish restore capability. SQL timeline and LSN observations
+must not be presented as a restore exercise. PITR remains NOT VERIFIED.
+
+The reviewed database checkpoint requires a fresh full logical archive,
+verified by archive listing and complete decode, before the additive `approve`
+enum migration. A dedicated maintenance receipt and atomic release-owner fence
+must cover the paused consumers, exact source and migration checksums, archive,
+DDL and independent preservation checks. This is separate from integration-test
+admission. Source rollback retains the unused enum value; it does not restore
+old credential rows. A readable archive is backup evidence, not a performed
+restore or proof of provider PITR availability.
+
+A bounded scan of recovered worktrees and the canonical checkout found no
+sanctioned payroll fixture manifest or Clerk role storage state. The recovered
+private manifest owns synthetic database regression fixtures only. The user
+has been asked for the exact AU test company, employees, dates and role users;
+existing credentials do not establish that scope.
+
+The first resumed preparation attempts were blocked by the protected `.codex`
+directory. No database writer, manifest acquisition or live test ran during
+those approval waits. Verification now uses a frozen `3b7c511` checkout under
+the repository's ignored `.cache/plan160-live-baseline` directory. Source
+changes remain in the continuation worktree under scoped write approval.
+
+### Resumed live admission and recovery
+
+The frozen baseline attempted two protected runs on 2 October:
+`decb201b-b294-4fae-89c8-76371d5b698f` and
+`19d39050-5e20-4dc7-be6b-53404d0ce995`. Both acquired a release fence but
+refused admission before creating the test process when the host runtime
+inventory changed. No integration test or fixture write was admitted. These
+attempts are NOT RUN, not failed test suites or database verification passes.
+
+Independent cleanup-only recovery released both fences. The second recovery
+verified 41 empty owned selectors, unchanged contents of 40 tables, unchanged
+schema and the preserved historical SyncRun marker, with two independent
+postchecks. A recovery observer invocation also failed before release; its
+stderr was not retained by that helper, so its cause remains unclassified.
+The subsequent instrumented recovery succeeded. Original admission receipts
+and helper hashes remain preserved separately from the reviewed recovery tools.
+
+The user-authorised dev pause captured the exact original process cohort,
+command, environment and environment-file hashes privately. After fence
+release, the original command and environment were restored. Fresh listeners
+were confirmed on app 3000, web 3001, API 3002, email 3003 and Inngest 8288/8289.
+New source work resumed after this restoration; none inherits a baseline test
+pass from the refused attempts.
+
+The next frozen AU attempt, `bbc1119f-065f-40a1-8478-644257e2f399` at
+`b89bd36`, also refused host admission when a new runtime appeared after the
+reviewed inventory. This refusal occurred before maintenance ownership,
+backup, migration or integration dispatch. An independent readback found no
+active release owner and no acquisition, DDL, manifest or preparation receipts.
+Backup, migration and integration remain NOT RUN. The transient process had
+exited before inspection, so its cause is unclassified. The captured original
+development environment was restored before source work resumed. A further
+attempt requires diagnosis from captured refusal metadata, not an assumed
+benign classification or a weaker admission check.
+
+A subsequent read-only diagnostic, with development still running, reproduced
+a transient Vercel telemetry child immediately after signing-metadata reads:
+30 reviewed runtimes became 31, then returned to 30 after one second. Captured
+arguments identified `vercel telemetry flush`; installed CLI source confirms
+detached spawning and support for `VERCEL_TELEMETRY_DISABLED`. The reviewer
+approved disabling telemetry only in those metadata subprocess environments,
+with a fresh diagnostic required before another run. This identifies a
+reproducible mechanism, not the identity of the vanished process in the
+earlier refusal. Existing sealed helpers and receipts remain unchanged.
+The negative diagnostic then passed all eight snapshots with the same 30
+runtimes and zero unreviewed processes. Signing keys, event-key and shared-store
+fingerprints matched the reproduction run; the database URL fingerprint differed
+only because each diagnostic records its own run ID in `application_name`.
+The reviewer read the scoped environment change and private refusal-capture
+diff. No database or shared-store writes occurred during either diagnostic.
+
+Run `30c4c4de-4cd5-4b0c-9715-19ef56cd5b3f` passed host freeze but stopped in
+the maintenance acquisition supervisor when its wider marker scan could not
+read a pre-existing user daemon's environment. The original supervisor recorded
+closed acquisition/probe children and UNKNOWN remaining markers. Independent
+recovery found an empty release owner, no maintenance authority or DDL receipts,
+and two observations with zero accessible run-marked processes. Three exact
+inaccessible identities were independently reviewed as pre-existing systemd,
+PAM and document-portal daemons. Their environments remain uninspected. The
+original uncertainty receipt is preserved alongside the independent resolution.
+Development was restored and all six HTTP readiness checks passed. Backup,
+migration and integration remain NOT RUN for this attempt.
+
+The next helper binds those three daemon identities to the kernel boot ID,
+start ticks, capabilities and cgroups, rejecting new or changed inaccessible
+processes. Three actual read-only DDL identity scans passed before any further
+dev pause. The reviewer approved this finite classification and preserved the
+strict runtime inventory and ownership controls.
+
+Run `7a9d0843-5e07-43bf-8082-1325a3489573` then completed the maintenance
+checkpoint: fresh full archive, readable archive verification, additive `approve`
+enum migration, two independent preservation checks and owner release. Both
+postchecks independently confirm 23 migrations, unchanged contents of the 39
+non-migration tables, unchanged prior migration rows and exactly the authorised
+enum value. Integration preparation subsequently rejected the archive timestamp's
+`+00:00` form before test admission. Development was restored. The migration is
+PASS; integration was NOT RUN in this attempt. Restore/PITR remains NOT VERIFIED.
+
+Regression-only run `4740964c-1674-429f-866b-058d02a3d6b1` used candidate
+`b89bd36`, a fresh 23-migration archive and normalised the same timestamp instant
+to ISO `Z` notation. It did not replay DDL. The full protected runner admitted
+41 initially empty owned selectors. App integration passed 2 tests and database
+integration passed 63. Jobs passed 72 tests and failed 12; the remaining package
+tasks are not certified by this failed run. The suite took 13 minutes 15 seconds.
+Cleanup and two independent postchecks passed, all 31 tracked writers closed and
+the lease was released. All 40 table contents, schema and the historical running
+SyncRun marker were preserved. Original development services were restored and
+all six readiness endpoints returned HTTP 200. The failed test evidence is retained without relabelling
+it as a pass. Its private runner log is under
+`.cache/plan160-live-au-37b4818/.cache/160-live-au-regression/runner.log` in the
+canonical repository.
+
+The observed failures are assigned for scoped repair: the leave-records race
+test cannot spy on a Prisma delegate property, NZ pagination reaches its explicit
+20-second limit, and ten approval-reconciliation assertions fail because their
+fixed July fixtures have aged outside the real 90-day selection window. Reviewed
+test corrections preserve the production query window, inject the concurrent
+write through a forwarding proxy and remove unrelated publication writes from
+the employee-pagination case. Focused leave-records tests (42), reconciliation
+tests (25), jobs type checking and scoped lint pass. Protected replay remains
+pending; these checks do not replace it. No successful
+package is repeated solely to gather duplicate evidence. Final candidate gates
+and the actual provider/browser campaign remain outstanding. Independent review
+of the final receipt confirms 149 observed tests: 137 passed and 12 failed across
+18 files. Feeds, Xero and availability integration tasks remain NOT VERIFIED.
+
+### Fixture investigation
+
+Read-only Clerk inventories found three development organisations with two
+users, and a distinct production instance with one organisation and one user.
+Existing memberships are administrators; no employee/manager test roles,
+test-labelled users or fixture metadata were identified. No Clerk session or
+identity was created or changed. Live database inventory found seven linked
+people in one AU organisation and one unlinked person in another, without
+test-fixture markers. Those existing records are not sanctioned payroll test
+fixtures. The user's response was to investigate; fixture authority remains
+unestablished rather than assumed from credential access.
+
+A later read-only role-catalogue check found only `org:member` and `org:admin`
+in both Clerk instances. `org:manager` and `org:viewer` are absent. Private ID
+correlation places the approved demo binding in the development Clerk instance;
+its Clerk organisation does not exist in production. The fixture campaign
+therefore needs a candidate environment using development Clerk identities.
+Production sessions cannot represent this existing tenant boundary.
+
+The user approved four dedicated development test users (admin, manager,
+employee and viewer), the missing manager/viewer roles, and exactly three
+temporary fields on two approved demo people: two Clerk user links and one
+reporting relationship. The approval includes new sessions and scoped cleanup
+of only the new identities, memberships and unused roles, plus comparison and
+restoration of those fields. It excludes invitations, email, existing users,
+production Clerk changes and existing leave. Exact IDs and before-values are
+held in the private role-fixture proposal. Person writes require a separate
+maintenance checkpoint after domain regression cleanup; existing people must
+not enter synthetic integration cleanup selectors.
+
+The one stored legacy connection has an access-token expiry of 25 September
+2026, 18:30 UTC. It has no canonical credential-owner row; the legacy schema
+does not retain granted scopes or a provider organisation/demo-company snapshot.
+No token was decrypted and no refresh or provider request was performed during
+this metadata inspection. A usable provider bearer and demo-company status
+remain NOT VERIFIED. Provider discovery must use the normal configured limiter
+and credential path, not bypass the missing namespace/domain configuration.
+
+The subsequent provider-tenant metadata inspection found the stored name
+`Demo Company (AU)`. The earlier marker scan covered local organisation and
+person names, not this provider label. A private proposal records the exact
+binding, seven employee IDs and eleven leave-type mappings. The proposed
+2 to 6 November 2026 Brisbane window has no local overlap; remote leave and
+pay-period constraints have not been checked.
+
+The user then explicitly approved up to 20 new leave requests for those seven
+employees in that date window, including approval, decline and withdrawal of
+the new requests. Live confirmation of demo-company status remains a condition
+before any payroll write. Existing leave and connection deletion are excluded.
+The authority is recorded privately alongside the exact IDs; it does not supply
+the missing multi-entity/lifecycle cohorts or Clerk role sessions. Provider
+mutations performed in this resumed session remain zero.
+
+Read-only HTTP readiness after dev restoration returned 200 for web, app sign-in,
+email, API health, API Inngest and local Inngest. Restored ordinary jobs still
+logged missing notification email transport and Xero retry/operational errors.
+No configuration was changed to suppress those errors. HTTP readiness is not a
+worker-health pass.
+
+### Reviewed runtime checkpoint
+
+`40e794d` commits the isolated campaign runtime, transport and observer correction
+slice (15 files). Executor checks passed 141 database runtime tests, 39 transport
+tests and 111 observer/browser-contract tests, plus scoped lint and database/Xero
+types. The reviewer independently reran 128 campaign-access and 16 write-guard
+tests with service credentials cleared: all 144 passed.
+
+Own source review covered atomic sentinel/owner comparison, immutable worker
+identity, ordinary invocation lifetime, actor and target admission, distinct OAuth
+continuation tickets, provider request budgets, binding-generation transitions,
+uncertain SQL/Redis outcomes, retired-binding reconnect and inline child handlers.
+Transport now hashes and dispatches the same private request snapshot. A
+regression mutates the caller's original request during admission and verifies
+that the dispatched body, method and headers remain unchanged.
+
+This approves that source slice, not the whole Plan 160 candidate. AU workflow,
+application entrypoints and their final gates remain uncommitted at this
+checkpoint. The real operational lease, full case drivers, required repository
+gates and exact-candidate protected live run still need completion. No current
+database/provider/browser campaign pass follows from these unit results.
+
 Status: IN PROGRESS. Current documentation-verification baseline: main `514efb5`,
 with merged/tested runtime `5d5889c` and local merge `f3dd965`. Initial reviewer
 baseline: `d6da4e8fbab70e3135e3a7a33fd49cb0c24a91a2`. The dated initial sections

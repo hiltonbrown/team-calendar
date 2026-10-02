@@ -1737,3 +1737,102 @@ Review: user-authorised local merge is complete. Main post-merge command receipt
 - [ ] Independent review and final evidence reconciliation.
 
 Review: in progress; live/browser/provider results require actual admitted execution.
+
+### Plan 160 resumed continuation, 30 September 2026
+
+- [x] Recover interrupted protected run and independently prove fixture cleanup, unchanged database content/schema and released ownership.
+- [x] Repair and offline-verify monitor startup, Turbo ancestry and identity-safe shutdown, then re-review restarted editor/MCP identities.
+- [x] Run fresh protected source-candidate regression and independently verify cleanup after its setup failure.
+- [x] Correct Prisma identity text conversion and the shared-store server-only marker mock.
+- [x] Close ordinary provider attempts racing reservation and protect direct pause/resume writes (subsequently committed in `3b7c511` and `40e794d`).
+- [ ] Rebuild protected monitor artefacts lost with the temporary worktree, freeze the corrected candidate and repeat required gates and online verification.
+- [ ] Reconcile final source, evidence and remaining full-campaign requirements independently.
+
+Review: `72a7115` passed offline gates, but its online attempts were interrupted and failed respectively. Both cleaned up and preserved the database, but their private receipts were lost when `/tmp` was cleared by the disconnect. The persistent isolated worktree now holds the next corrections. Neither attempt proves the browser/provider campaign or a passing domain regression for the changed source.
+
+
+### Plan 160 source verification after disconnect, 30 September 2026
+
+- [x] Restore the committed branch into a persistent isolated worktree and read all lessons.
+- [x] Correct the fixture identity type, missing test marker, ordinary provider-attempt acquisition race and direct Xero tenant pause/resume write boundary; commit source as `3b7c511`.
+- [x] Pass final lint, 19 type tasks, 18 repository test tasks (3,067 tests), 594 release-tool tests, release-tool types, 1,094-file boundaries and four uncached builds.
+- [x] Emit and byte-reproduce the actual 30 September absence diagnostic (exit 2, all 26 NOT VERIFIED).
+- [ ] Complete protected exact-candidate online integration and independent postcheck.
+- [x] Obtain the AU policy decision and implement scoped action/OAuth admission.
+- [ ] Complete actual approved fixture/session and browser/provider verification. Full campaign drivers/recovery remain deferred outside the merge scope.
+
+Review: source result is PASS within the stated gates; protected online, actual browser/provider and PITR evidence remain NOT VERIFIED. Historical failed online attempts are not promoted to this source candidate.
+
+## Plan 160 campaign continuation, 2 October 2026
+
+Execution policy: the user removed the fixed 24-hour namespace initialisation
+waiting period. It is excluded from remaining tasks and completion estimates.
+Proceed when namespace authority and actual Xero quota admission checks pass.
+
+- [x] Repair atomic sentinel update authority, retained worker identity, UTC observations and action-specific approval observation. Focused tests: 117 database and 86 observer tests passed.
+- [x] Retain durable ordinary invocation ownership through guarded local persistence, including existing worker, maintenance and credential wrappers.
+- [ ] Verify new source against focused and complete source gates; freeze for protected live verification.
+- [x] Complete authenticated action/OAuth admission under the approved prerequisite contract.
+- [ ] Complete lease and scenario drivers if the full campaign is resumed; preserve unfinished tooling outside this merge.
+- [ ] Record actual remaining operational requirements and final evidence without promoting unit tests to campaign proof.
+
+### Remaining runtime and campaign work, execution order
+
+- [x] Complete actor/input admission and signed OAuth continuation propagation with exact actor, target, actual binding, one-use callback and specific provider request grants (`40e794d`, `37b4818`).
+- [x] Verify intentional binding generation advancement against scoped SQL after service commit, before child dispatch; retain exact transition history and uncertainty on SQL/Redis disagreement.
+- [ ] Implement operational lease acquisition/recovery: exact deployment and registered worker revision, partial ownership retention, independent writer closure, worker drain and settings restoration.
+- [ ] Wire actual producer execution to browser subcases, including independent provider/local observations and causal no-call receipts.
+- [ ] Implement scheduled X08 driver with real tick/run join and controlled X03/X05/X14/X22 handler drivers, then complete remaining multi-step catalogue cases.
+- [ ] Freeze candidate, pass source gates and protected live inventory; execute only scenarios whose sanctioned fixtures, sessions, deployed revision and operation authority are present.
+- [ ] Reconcile effects and emit exact-candidate sanitised reports. Missing operational facts and PITR remain NOT VERIFIED.
+
+
+### Plan 160 AU policy and action admission completion
+
+- [x] Verify failed-action controls, approved withdrawal and postcommit manager realtime delivery.
+- [x] Project validated action inputs into canonical JSON targets and test actor/target admission.
+- [x] Complete signed OAuth propagation, selection and generation reconciliation with child invocations.
+- [x] Protect confirmed alternate reserved-organisation mutation routes without changing ordinary manual entry eligibility.
+- [x] Run scoped lint, typechecks and regression tests.
+- [x] Root-reviewed source checkpoint and coordinated protected live attempt. Result: 137 PASS, 12 FAIL; corrected tests await replay, so the integration gate remains failed.
+
+AU checkpoint review: approved local pending policy, approval-create recovery and safe prepared retry, scoped actor attribution, postcommit realtime, signed OAuth cancellation/actor checks, canonical action targets, and manual API mutation admission implemented. Focused source gates passed; full clean-checkout CI gates and protected live integration remain separate evidence. No provider calls or migration application performed by this executor.
+
+
+### Plan 160 runtime checkpoint review, 2 October 2026
+
+Runtime regressions: 141 PASS. Transport regressions: 39 PASS. Release observer/browser-scope regressions: 111 PASS. Scoped 15-file Biome and database/Xero typechecks pass. These are source checks, not live provider or database campaign evidence. The exact committed candidate still requires the protected live gate.
+
+Ordinary invocation ownership includes the exact organisation scope, invocation ID, function ID, runtime revision and start time. Entries persist without expiry when completion is uncertain. Recovery must independently close the identified writer and reconcile its exact SQL/provider effects under retained release ownership before removing that exact entry; no age-based or namespace-wide deletion is authorised. The operational recovery adapter and independent recovery evidence remain unchecked work above.
+
+Retired binding state permits only scoped reconnect actions; the already-running disconnect may finish only through its recorded transition. SQL/Redis reconciliation failure retains uncertainty and the organisation fence. Immutable fixture manifests still require a transition-aware observer handoff in the subsequent harness slice before post-disconnect scenario assertions can run.
+
+### Plan 160 deferred native execution work, excluded from merge (2026-10-02)
+
+- [x] Implement independent serving-deployment and actual Inngest registration read-back, environment binding and deterministic function inventory.
+- [x] Implement durable exact-owner lease acquisition and cleanup-only partial-acquisition recovery. Preserve bounded failure phase/code; never replay reservation or activation after interruption.
+- [x] Implement scoped SQL binding/employee/leave-type resolver, retaining history in fingerprints. This does not prove a demo provider company.
+- [x] Implement runtime reservation, revocation, unresolved-writer drain and terminal closure through the existing shared-store contract.
+- [ ] Verify the runtime controller uses the existing SQL advisory transition barrier and complete its focused regression checkpoint.
+- [ ] Implement campaign-fenced consumer admission distinct from the ordinary paused/unregistered database-fixture contract.
+- [ ] Implement durable native browser supervisor identity and independent cross-process recovery closure.
+- [ ] Implement narrowly scoped post-drain cleanup action authority for new-request withdrawal, with no create replay or generic provider deletion.
+- [ ] Compose the actual lease members and default CLI path with the native scenario operation factory; bind private actors/session files and reobserve deployment/registration throughout execution.
+- [ ] Complete outside-owned baseline/restoration/release evidence, final source gates, exact candidate freeze and coordinated protected live verification.
+
+Checkpoint evidence: 35 credential-free tests passed across native admission, lease recovery, fixture resolution and runtime control; release-tool typecheck passed. Subsequent advisory-barrier and cleanup-only journal-transition corrections remain under focused verification. The default execution adapter is not yet wired and no end-to-end campaign is claimed.
+
+
+### Plan 160 commit and merge reconciliation, 2 October 2026
+
+- [x] Commit reviewed production/runtime/AU/operator changes through `7431c27`; retain the separately reviewed AU wording follow-up in the merge scope.
+- [x] Remove the fixed 24-hour execution wait through explicit immediate namespace admission (`a4cab6b`), preserving shared limits, existing counters/cooldowns and unknown prior-usage acknowledgement.
+- [x] Run the guarded live domain attempt: backup and migration to schema 23 passed; integration results were 137 PASS and 12 FAIL; cleanup, release and two independent postchecks passed.
+- [x] Repair the two leave-records tests (`9ed5f12`) and dated approval-reconciliation fixtures (`7431c27`), with focused source checks. These repairs have not been replayed live.
+- [x] Stop generic harness expansion and candidate/fixture preparation on the user's correction. No sentinel/rate, Clerk/person or provider changes, and no candidate app launch occurred during focused-flow preparation.
+- [x] Preserve unfinished native lease/CLI, registration, observer and browser-driver files outside the merge. Checked items in their historical checkpoint describe local implementation only, not merged or operational capability.
+- [x] Record both current corrections in lessons: honour approved immediate admission without bypassing limits; prove the bounded user flow before adding general infrastructure.
+- [ ] Complete the requested reviewed commits and merge to main (reviewer owns staging and merge).
+- [ ] If verification resumes, replay corrected live integration and execute the approved bounded AU browser/provider flow with existing mandatory controls and independent readbacks.
+
+Review: source delivery and live verification are distinct. The full Plan 160 catalogue is incomplete. Browser/provider actions, deployed candidate and scheduled-job claims, PITR availability and restore exercise remain NOT VERIFIED. A candidate development app/API can exercise the ordinary synchronous AU flow without deployment; it must still satisfy shared sentinel/rate/binding/database guards, exact fixture authority, fresh demo confirmation and authenticated user sessions. No additional framework is required merely to claim a focused flow, and no focused flow result may be promoted to full campaign completion.
