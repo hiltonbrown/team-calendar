@@ -310,6 +310,27 @@ Plan 161 charter and in Plan 159's own rejected list.
   work and record the precise remaining requirement. Never substitute a waiver for a passing
   product or security gate.
 
+## Local development environment record, 2 October 2026
+
+Verified at `bf01911`: `bun run typecheck` and six consecutive `bun run build` runs pass, and
+`bun run dev` serves app, API, web, email and Inngest without route errors. One earlier `app`
+build failure (PostCSS parsing `instrumentation.ts`, `next/font` transform crash) did not
+reproduce after `.next` was removed; treat a recurrence as stale `.next` state first.
+
+Two scheduled functions fail closed in local development by design. Both stay NOT VERIFIED:
+
+- **`schedule-xero-syncs` and all local Xero admission.** `XERO_CREDENTIAL_DOMAIN_ID`,
+  `XERO_RATE_NAMESPACE_EPOCH` and `XERO_APP_TIER` are absent from every Vercel environment,
+  including Production, so Production Xero admission is probably denied too. Local
+  `.env.local` uses the Neon `main` branch and the KV store shared with Production. An
+  isolated `local-dev` namespace (fresh local-only domain UUID, `starter` tier, initialised
+  with `bun run rate:initialise-namespace` in `packages/xero`) was prepared but blocked by the
+  agent host's permission classifier as a shared-resource change. The operator must apply it,
+  or set canonical values in Vercel first.
+- **`send-notification-emails`.** `RESEND_FROM` exists only in Production. The agent host
+  blocked downloading Production values. Setting it locally drains the real queue against the
+  shared database.
+
 ## Go-live programme record
 
 Current release queue and reviewed evidence boundaries are in [go-live.md Sections 1–2 and 11](go-live.md). Its 27 September review supersedes the pending-work descriptions below; it does not certify production readiness.
