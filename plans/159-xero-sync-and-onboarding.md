@@ -1,29 +1,24 @@
 # Plan 159: Make Xero connection, leave sync and onboarding reliable
 
-> **Lifecycle scope superseded, 22 September 2026:**
-> Plan 161 replaces **the whole of Step 3, and findings X5 and X6**, together with their
-> grant and mapping verification requirements. Plan 161 is no longer one document:
+> **Lifecycle scope superseded, 22 September 2026 (Implemented in main):**
+> Plan 161 replaced **the whole of Step 3, and findings X5 and X6**, together with their
+> grant and mapping verification requirements. Plan 161's architecture and 40-case evidence matrix
+> are maintained in the charter [`plans/161-harden-xero-connection-lifecycle.md`](161-harden-xero-connection-lifecycle.md).
+> Its implementation sub-plans (161-pre through 161h) are complete and merged into main (archived in git history):
 >
-> - [`plans/161-harden-xero-connection-lifecycle.md`](161-harden-xero-connection-lifecycle.md)
->   is the charter (shared boundaries, architecture, and the 40-case evidence matrix in
->   its Section 8.3). It contains no unit bodies and is not an implementation spec.
-> - [`plans/161-pre-executor-gate-corrections.md`](161-pre-executor-gate-corrections.md)
->   runs first, then sub-plans **161a** through **161h**.
-> - **X5** (reconnect replaces the tenant ID, `packages/xero/src/oauth/service.ts`) is
->   implemented by [`161b`](161b-xero-immutable-tenant-binding.md).
-> - **X6** (per-connection tokens and locks) is implemented by
->   [`161d`](161d-xero-canonical-credentials.md).
+> - **X5** (reconnect replaces the tenant ID, `packages/xero/src/oauth/service.ts`) was
+>   implemented by sub-plan 161b (enforced by DB constraint and trigger).
+> - **X6** (per-connection tokens and locks) was implemented by sub-plan 161d
+>   (canonical credential owner model).
 >
 > **Do not implement Step 3.** Its text below is historical context only. Two points in it
 > are now actively contradicted and must not be followed:
 >
-> 1. Step 3.1's wrong-file reconnect guard is 161b's Step 3. Implementing both produces
->    two competing guards in one transaction.
+> 1. Step 3.1's wrong-file reconnect guard is 161b's Step 3 (already implemented).
 > 2. Step 3.2 says "do not assume that global tenant uniqueness is the product policy
->    across separate accounts". **Plan 161 has since selected exactly that policy**: at
+>    across separate accounts". **Plan 161 has selected exactly that policy**: at
 >    most one reserved internal binding per configured Xero app and external payroll
->    tenant, including across Clerk accounts (charter Section 3, enforced by 161b's
->    database constraint). Follow 161, not this paragraph.
+>    tenant, including across Clerk accounts (charter Section 3, enforced by database constraint).
 >
 > All other findings and steps in this plan remain active and unaffected.
 
@@ -43,9 +38,7 @@
   MED for orchestration; LOW for isolated presentation changes.
 - Categories: correctness, security, architecture, tests, performance and UX.
 - Planned at: `246ba27`, 20 September 2026.
-- **Re-verified at `8652c31`, 22 September 2026.** 97 files changed between the two
-  commits (1,554 insertions). Every `file:line` anchor in the evidence table below was
-  re-checked at `8652c31` and still resolves. See "Drift check" before starting.
+- **Re-verified at `6005a5a`, 2 October 2026.** Every `file:line` anchor in the evidence table below was re-checked at `6005a5a` and resolves against live code. See "Drift check" before starting.
 - Depends on: no new numbered plan. Reuse the fixture ownership, outbound
   operation recovery and release verification infrastructure already implemented
   under `plans/go-live.md`; validate its current state rather than repeat it.
@@ -64,20 +57,14 @@ the release plan still owns release-wide gates and production rollout evidence.
 ```bash
 git rev-parse --short HEAD
 git status --short
-git diff --stat 8652c31..HEAD -- apps/app apps/api packages/xero packages/jobs \
+git diff --stat 6005a5a..HEAD -- apps/app apps/api packages/xero packages/jobs \
   packages/availability packages/database packages/notifications packages/feeds \
   tooling/release PRODUCT.md
 ```
 
-At the last review that diff was **empty against `8652c31`**, and every anchor in the
-evidence table resolved. If it is now non-empty, open each cited file and confirm the
-excerpt before proceeding; a mismatch is a STOP condition for that step only.
-
-This plan was originally written against `246ba27`. The tree moved substantially between
-the two commits, including new files in `tooling/release/` that did not exist at the
-original baseline (`consumer-isolation.ts`, `consumer-isolation.test.ts`). Read
-`tooling/release/consumer-isolation.ts` before touching release verification tooling in
-Step 8; extend it rather than building a parallel mechanism.
+On main `6005a5a`, that diff is empty and every anchor in the evidence table resolves.
+If it is now non-empty, open each cited file and confirm the excerpt before proceeding;
+a mismatch is a STOP condition for that step only.
 
 ## Why this matters
 
@@ -114,14 +101,14 @@ claimed. X7 is supported by the provider contract, not a completed live test.
 
 ### Current-state excerpts for drift checking
 
-All anchors below were re-verified at `8652c31`. Where the evidence table cites the
+All anchors below were re-verified at `6005a5a`. Where the evidence table cites the
 guard and this block cites the return, both are correct and point at the two ends of the
 same construct. Excerpts are copied verbatim; if a comparison fails on whitespace alone,
 that is a formatting change, not drift.
 
 ```typescript
 // packages/xero/src/au/read.ts:245-254, parse failure.
-// Table cites :245 (the guard); this excerpt starts at :251 (the return).
+// Table cites :245 (the guard); this excerpt starts at :245 (the guard and return).
       if (!mappedPage.ok) {
         log.warn("Xero leave record page could not be parsed", {
           clerkOrgId: input.xeroTenant.clerk_org_id,
@@ -134,40 +121,51 @@ that is a formatting change, not drift.
         };
       }
 
-// packages/jobs/src/handlers/sync-xero-leave-records.ts:314, :317, :322.
+// packages/jobs/src/handlers/sync-xero-leave-records.ts:351, :354, :360.
 // An incomplete read still clears staleness and reports success.
-// The same shape repeats at :577, :605, :612 and :621; fix both sites.
 last_leave_records_sync_at: new Date(),
 leave_records_stale_since: null,
 const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
 
-// apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts:138
-try {
-  await syncXeroPeople(syncContext);
-  await syncXeroLeaveRecords(syncContext);
-  await syncXeroLeaveBalances(syncContext);
-} catch {
-  // Best-effort initial execution; scheduled runs or manual syncs will retry.
-}
+// apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts:160-172
+await withXeroCampaignChildInvocation(
+  "sync-xero-people",
+  syncContext,
+  syncXeroPeople
+);
+await withXeroCampaignChildInvocation(
+  "sync-xero-leave-records",
+  syncContext,
+  syncXeroLeaveRecords
+);
+await withXeroCampaignChildInvocation(
+  "sync-xero-leave-balances",
+  syncContext,
+  syncXeroLeaveBalances
+);
 
-// packages/xero/src/oauth/service.ts:573, existing tenant update
+// packages/xero/src/oauth/service.ts:859-869, existing tenant upsert update block
+// (Note: Plan 161b enforced that xero_tenant_id is immutable on update).
 update: {
+  active_slot: 1,
+  binding_generation: { increment: 1 },
   payroll_region: payrollRegion,
+  provider_app_id: providerAppId,
+  retired_at: null,
+  retirement_reason: null,
   tenant_name: selectedTenant.tenantName,
-  xero_tenant_id: selectedTenant.tenantId,
+  xero_credential_owner_id: currentOwner?.id ?? null,
+  xero_provider_connection_id: providerConnection?.id ?? null,
 },
 
-// packages/availability/src/people/current-user-service.ts:184
+// packages/availability/src/people/current-user-service.ts:184-186
 if (existingLinkedPerson) {
   return { ok: true, value: mapPerson(existingLinkedPerson) };
 }
 ```
 
-Run `git diff --stat 246ba27..HEAD -- apps/app apps/api packages/xero packages/jobs packages/availability packages/database packages/notifications packages/feeds tooling/release PRODUCT.md`.
+Run `git diff --stat 6005a5a..HEAD -- apps/app apps/api packages/xero packages/jobs packages/availability packages/database packages/notifications packages/feeds tooling/release PRODUCT.md`.
 Also inspect uncommitted changes with `git status --short` and `git diff --stat`.
-At planning time pricing, `tasks/todo.md` and `tasks/lessons.md` already had
-unrelated changes. Preserve them. Resolve ordinary drift against live source;
-pause only the affected step when its assumptions no longer hold.
 
 ## Product and engineering constraints
 
@@ -196,7 +194,9 @@ pause only the affected step when its assumptions no longer hold.
 - This plan cannot silently change PRODUCT.md's submit/write-back contract.
   The user approved au-contract-v1 on 2 October 2026; see plans/160-au-transition-contract-v1.md.
 
-### Permitted implementation paths
+## Scope
+
+### In scope
 
 Only change the following paths, their co-located tests, required root package
 exports and generated database artefacts directly needed for these changes:
@@ -227,6 +227,8 @@ exports and generated database artefacts directly needed for these changes:
   only after the AU contract decision, limited to factual behaviour corrections.
 - This plan, `plans/README.md`, executor task progress entries when implementation
   is authorised. The advisor itself edits only `plans/`.
+
+### Out of scope
 
 No unrelated redesign, billing changes, auth-provider replacement, membership
 tables, dependency upgrade, customer data purge, payroll-file migration or NZ/UK
@@ -335,44 +337,26 @@ reconnect-required outcomes as visible states. Test crash after send but before
 marking sent; redelivery must join the original operation even outside the event
 provider's deduplication window. Never reset an already completed operation.
 
-## Step 1: Resolve AU submission and approval semantics
+## Step 1: Resolve AU submission and approval semantics (Approved: au-contract-v1)
 
-Decision recorded 2 October 2026: the user approved local submission with Xero creation on manager approval. Contract `au-contract-v1` and its transition/recovery table are in `plans/160-au-transition-contract-v1.md` and PRODUCT.md. This resolves the decision dependency only; provider execution evidence and unrelated Plan 159 steps keep their own status. The numbered proposal below is retained as the implementation acceptance criteria.
+> **Contract decision approved, 2 October 2026**: The user approved local submission with Xero creation on manager approval (`au-contract-v1`). The transition and recovery specification is defined in [`plans/160-au-transition-contract-v1.md`](160-au-transition-contract-v1.md), `PRODUCT.md` and `AGENTS.md`.
 
 The official [AU leave contract](https://developer.xero.com/documentation/api/payrollau/leaveapplications)
-says API creation produces scheduled leave; approve applies to requested leave.
-The current local `submitted` transition therefore misrepresents remote state.
-Do not invent an endpoint, send an undocumented requested status or hide the
-problem by changing the inbound mapping of all scheduled leave.
+specifies that API creation produces scheduled leave immediately; approve applies to requested leave.
+The approved transition contract resolves this as follows:
 
-1. Add contract fixtures and tests in `packages/xero/src/au/write.test.ts`,
-   `src/read/leave-records.test.ts` and existing availability submit/approval
-   tests, distinguishing Xero-created requested leave from app-created leave.
-2. Record a transition table here and in PRODUCT.md only when the user approves
-   it. Recommended decision: app submission stays local pending approval;
-   manager approval synchronously creates scheduled leave in Xero. App-local
-   decline/withdraw before remote creation makes no Xero call. Imported requested
-   leave uses the documented approve/reject operations. This is a proposed product
-   change, not current authorisation to alter the four-write contract.
-3. If the user instead requires remote creation on submit, obtain a supported
-   provider capability and prove its pending semantics. Otherwise explicitly
-   decline that promise; do not implement automatic payroll approval disguised
-   as a pending request. Pause only this transition change pending the decision.
-4. Under the approved contract, preserve claims and uncertainty recovery for
-   the action that actually creates remote leave. Update operation metadata,
-   recovery UI, audit, notifications and inbound deduplication to support create
-   on approval if chosen. Preserve local withdrawal intent when Xero represents
-   rejection; do not rewrite a successful withdrawal as declined on the next pull.
-5. Define handling for legacy app-submitted rows already scheduled in Xero:
-   scoped administrator review with remote evidence, never automatic rejection,
-   deletion, duplicate creation or fabricated local approval audit history.
+1. **AU Leave Application Lifecycle (`au-contract-v1`)**:
+   - AU employee submission remains local pending manager approval. No remote payroll creation occurs on submit; record transitions to `submitted`.
+   - Manager approval synchronously creates scheduled leave in Xero via an additive `approve` operation with its own durable claim (`au-contract-v1`). Once created, record transitions to `approved`.
+   - App-local decline or withdrawal before remote creation makes no Xero call and transitions locally with a required reason.
+   - Imported requested leave from Xero uses the documented approve/reject provider endpoints.
+   - Legacy app-submitted rows already scheduled in Xero require scoped administrator review with remote evidence; never automatic rejection, deletion, duplicate creation or fabricated local approval audit history.
+2. Under this approved contract, preserve claims and uncertainty recovery for the action that creates remote leave. Preserve local withdrawal intent when Xero represents rejection.
+3. Keep contract fixtures and tests in `packages/xero/src/au/write.test.ts`, `src/read/leave-records.test.ts`, and availability submit/approval suites.
 
-**Verify:** `bun run --cwd packages/xero test src/au/write.test.ts src/read/leave-records.test.ts`
-and `bun run --cwd packages/availability test src/plans/submit-service.test.ts src/plans/submit-recovery-service.test.ts src/approvals/approval-service.test.ts`
-exit 0 after the approved implementation. Add cases for duplicate clicks, remote
-acceptance followed by timeout, concurrent inbound sync, already processed leave,
-decline reason enforcement and legacy scheduled rows. Record the explicit decision
-before marking Step 1 complete; passing mock tests alone does not settle it.
+**Verify:**
+`bun run --cwd packages/xero test src/au/write.test.ts src/read/leave-records.test.ts` exits 0 (43 tests).
+`bun run --cwd packages/availability test src/plans/submit-service.test.ts src/plans/submit-recovery-service.test.ts src/approvals/approval-service.test.ts` exits 0 (140 tests).
 
 ## Step 2: Make completeness, retries and run ownership truthful
 
@@ -437,68 +421,17 @@ Include delayed old-worker writes after lease replacement and insertion/deletion
 between interrupted pages. Run the Step 2 integration command in the guarded
 verification table below before marking this step verified.
 
-## Step 3: Protect payroll mappings and the shared OAuth lifecycle
+## Step 3: Protect payroll mappings and the shared OAuth lifecycle (Implemented via Plan 161)
 
-1. Ordinary reconnect must match the existing remote Xero tenant ID. Reject a
-   different file before modifying tokens, tenant mapping or importing. Explain
-   which business is already attached. Payroll-file replacement is out of scope.
-2. Reject attaching the same remote file twice within an account. Before adding
-   constraints, inventory duplicates read-only; surface conflicts for explicit
-   resolution, never delete/merge customer data automatically. Do not assume that
-   global tenant uniqueness is the product policy across separate accounts.
-3. Follow [Xero's token guidance](https://developer.xero.com/documentation/best-practices/data-integrity/managing-tokens):
-   authorisation belongs to a Xero user/application grant; remote tenant and
-   connection IDs have different roles. Add a server-only authorisation record
-   for the credential lifecycle, referenced by scoped local XeroConnections.
-   Retain one local connection per payroll entity. Rotate/lock credentials at
-   authorisation level so reauthorising or refreshing one mapping cannot leave
-   another using superseded credentials. The grouping identity is validated
-   `(issuer, configured client_id, xero_userid)` from the access token, not an
-   authentication-event ID (which changes on authorisation). Validate signature
-   against Xero's fixed trusted JWKS/discovery origin, allowed algorithm, issuer,
-   expiry/not-before, documented access-token audience and configured client ID
-   before using any claims. Use a maintained verifier, declared directly by the
-   Xero package. The current scopes do not request an ID token: do not assume
-   one exists. Follow [Xero token verification](https://developer.xero.com/documentation/guides/oauth2/token-types)
-   and prove the claim contract with validated fixtures before creating shared
-   grant rows. If the required user claim or validation contract is unavailable,
-   stop grant grouping and keep legacy isolation/reconnect recovery; never group
-   by Clerk user ID, email, decoded-but-unverified claims or guessed subject aliases.
-4. Explicitly document the schema exception: an OAuth grant can be provider-wide
-   infrastructure if the same provider user connects multiple Clerk accounts.
-   Tenant data and access remain on scoped connection mappings. Grant access
-   must only follow an authorised mapping; never offer an unscoped grant lookup
-   API. If this model cannot meet the repository tenancy rules, pause this schema
-   choice for review; do not silently duplicate one rotating grant per account.
-5. Backfill only verified grant identities. Keep legacy connections readable
-   during rollout and request administrator reconnect when identity cannot be
-   established safely. Use an expand/backfill/switch migration; retain old
-   ciphertext until reviewed cutover succeeds. Never log/decode tokens to output.
-6. Respect current OAuth state/session ownership, safe return destinations and
-   AU capability checks. Prefer connections from the current authentication
-   event when identifying the newly chosen file, with explicit selection when
-   ambiguous. Do not automatically attach every file returned by /connections.
-7. Disconnect only the chosen local mapping. Where multiple authorised account
-   mappings reference the same provider connection ID, detach locally while
-   references remain; delete that provider connection only after the last live
-   mapping is removed. Serialise this check with mapping attach/detach under the
-   authorisation lock. Persist/retry remote disconnect intent safely without
-   reactivating the detached local mapping. Do not reveal other accounts' names
-   or memberships in the receipt. Test two accounts sharing the exact same
-   provider connection, not just different tenants on one grant.
-   Whole-grant revocation
-   must never disconnect other entities as a side effect. Reauthorisation by
-   another administrator and loss of the original authoriser's Xero permissions
-   need clear recovery without deleting historical records.
+> **Status: COMPLETE in main.** The whole of Step 3 and findings X5 and X6 were superseded and implemented by Plan 161 (sub-plans 161a–h merged, all 21 migrations applied).
 
-**Verify:** `bun run --cwd packages/xero test src/oauth/service.test.ts src/adapter/auth-recovery.test.ts`
-exits 0. Extend existing OAuth/disconnect integration tests for same-file
-reconnect, wrong-file rejection with no data mutation, duplicate mapping,
-simultaneous refresh, same Xero authoriser across two entities/accounts, a second
-administrator, legacy migration and disconnect-one-preserve-other behaviour.
-Verify credentials never appear in UI DTOs, job events, logs or test snapshots.
-Run the Step 3 guarded integration command below for mapping locks, grant rotation
-and migration compatibility; unit-only success is not sufficient.
+1. **Immutable tenant binding (X5)**: implemented by sub-plan 161b. Enforced by database constraint and trigger `prevent_xero_tenant_rebinding`. Reconnecting a different remote file is rejected before modifying tokens.
+2. **Canonical credential owner model (X6)**: implemented by sub-plan 161d. Shared OAuth grant lifecycle coordinated at provider level (`XeroCredentialOwner`, `XeroProviderConnection`), referenced by scoped local connections without cross-account token duplication.
+3. **Fail-closed rate limiting and deadlines**: implemented by sub-plans 161c, 161e. Key-versioned encryption ring implemented by 161c. Management cleanup implemented by 161f. Permission recovery implemented by 161g. Inactivity classifications implemented by 161h.
+
+**Verify preservation:**
+`bun run --cwd packages/xero test src/oauth/service.test.ts src/oauth/management-client.test.ts src/oauth/connection-cleanup.test.ts keys.test.ts` exits 0 (144 tests).
+`bun run --cwd packages/database test src/queries/xero-cleanup.test.ts` exits 0 (3 tests).
 
 ## Step 4: Reconcile imported people with existing member identities
 
@@ -773,10 +706,7 @@ count **twice**, at lines 92 and 224. Adding suites breaks both. Update both num
 same change. **Do not delete the assertion or loosen it to a range**: that count is precisely
 what stops an unregistered suite from allocating an unprotected slot.
 
-**Derive the number; do not assume it.** The baseline is 21 and this plan adds four, so 25 is
-correct *only if nothing else has landed first*. `plans/161a-xero-baseline-and-fixture-ownership.md`
-registers five further suites and bumps the same two assertions; if 161a landed first the
-baseline is 26 and the answer is 30. Read the real count out of the file:
+**Derive the number; do not assume it.** Plan 161a registered five further suites in main and bumped the count. Read the real count out of the file:
 
 ```bash
 grep -n "toHaveLength(" packages/database/src/live-test-fixture.test.ts
@@ -785,11 +715,9 @@ grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts
 
 The second command is authoritative. Both assertions must equal it.
 
-**Coordinate with Plan 161.** `plans/161a-xero-baseline-and-fixture-ownership.md` registers
-five further suites and bumps the same count. The four this plan adds
+**Coordinate with Plan 161.** Plan 161's suites are already registered in main. The four suites this plan adds
 (`sync-run-lifecycle`, `xero-person-reconciliation`, `initial-xero-sync`,
-`xero-sync-migration`) do not overlap 161a's five, but whichever lands second must
-recount rather than assume. If you hit a merge conflict on that assertion, the correct
+`xero-sync-migration`) bump the count further. The correct
 resolution is always `Object.keys(LIVE_FIXTURE_SUITES).length` as it actually is after
 the merge, verified by running `bun run --cwd packages/database test`.
 After deploying additive migrations to the approved test target, run the existing
@@ -833,12 +761,12 @@ Machine-checkable gates, all required:
 - [ ] `bun run --cwd apps/app test 'app/(authenticated)/settings/integrations/xero'` exits 0
 - [ ] The two baseline commands still pass and their counts have only grown, never shrunk:
       `bunx vitest run src/handlers/sync-xero-leave-records.test.ts src/handlers/sync-xero-people.test.ts src/handlers/schedule-xero-syncs.test.ts`
-      from `packages/jobs` reported **57 passed** at `8652c31`, and
+      from `packages/jobs` reported **62 passed** at `6005a5a` (57 at `8652c31`), and
       `bunx vitest run lib/server/load-onboarding-state.test.ts 'app/(authenticated)/settings/integrations/xero/connect/_actions.test.ts' 'app/(authenticated)/calendar/page.test.tsx'`
-      from `apps/app` reported **17 passed**. A drop in either count means a regression
+      from `apps/app` reported **21 passed** at `6005a5a` (17 at `8652c31`). A drop in either count means a regression
       was deleted rather than fixed.
 - [ ] Both `toHaveLength(...)` assertions in `packages/database/src/live-test-fixture.test.ts`
-      equal the output of `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts`,
+      equal the output of `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts` (currently 28 suites at lines 131 and 360),
       every new `.integration.test.ts` file appears in `LIVE_FIXTURE_SUITES`, and
       `bun run --cwd packages/database test` exits 0
 - [ ] `grep -nE "bun run test:release([^-]|$)" plans/159-xero-sync-and-onboarding.md` shows no
@@ -846,22 +774,20 @@ Machine-checkable gates, all required:
       would also match the legitimate `bun run test:release-tools` gate, which this plan uses
 - [ ] `git status --short` shows no file changed outside the permitted paths list
 
-## Stop conditions and maintenance
+## STOP conditions
 
-Pause the affected action and record the concrete reason if the AU write contract
-has no approved resolution; a migration requires ambiguous customer-data merges;
-grant identity cannot be verified; cross-account grant storage lacks a reviewed
-access boundary; or a live fixture/authority guard rejects the target. Continue
-independent work. Re-plan a slice if drift contradicts its evidence or it needs
-out-of-scope changes; do not repeatedly retry an unsafe assumption.
+Stop and report if:
+1. The drift check is non-empty against `6005a5a` and an excerpt does not match live code.
+2. The AU write contract is altered without an approved amendment to `au-contract-v1`.
+3. A database migration requires ambiguous customer-data merges or unhedged destructive schema operations.
+4. An OAuth grant identity cannot be verified through trusted provider JWKS claims.
+5. A live fixture or authority guard rejects the target environment.
+6. Any step attempts to re-implement Step 3 (already complete via Plan 161).
+7. Baseline test counts drop below 62 (jobs) or 21 (app), indicating deleted regression coverage.
 
-**Step 3 is dead text.** If you find yourself implementing a wrong-file reconnect guard or
-a credential-owner record from this plan, stop: those are 161b and 161d. Two guards in one
-transaction is worse than none, because each will look correct in isolation.
+## Maintenance notes
 
-**The baseline test counts in the Done criteria are a regression tripwire.** 57 and 17 were
-measured at `8652c31`. A future change that makes either number fall has removed coverage;
-a reviewer should ask which test went and why before approving.
+The baseline test counts in the Done criteria are a regression tripwire: 62 in jobs and 21 in app were measured at `6005a5a`. A future change that makes either number fall has removed coverage; a reviewer should ask which test went and why before approving.
 
 Future status-mapping changes must update create, approval, withdrawal, inbound
 normalisation, publication and uncertainty recovery together. Person reconciliation

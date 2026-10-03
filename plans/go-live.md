@@ -1,14 +1,35 @@
-# Ship Team Calendar's Australian release
+# Plan 000: Ship Team Calendar's Australian release
 
-## 1. Execution contract
+> **Executor instructions**: Read this document completely before starting. Use `codex/` branches or worktrees. Follow the exact step sequence. Run every verification command. Never skip assertions or leave unresolved questions. Maintain this document as execution progresses.
+
+## Drift check
+
+Baseline commit: `6005a5a`
+Command to verify tree is clean of unexpected changes:
+
+```bash
+git diff --stat 6005a5a..HEAD -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
+```
+
+If scoped diff is non-empty, STOP and reconcile before proceeding.
+
+## Status
 
 - **Status**: IN PROGRESS. Production readiness remains NOT VERIFIED.
-- **Reviewed at**: `92d67c5`, 27 September 2026, clean working tree before this plan review.
+- **Reviewed at**: `6005a5a`, 2 October 2026, clean working tree before this plan review.
 - **Priority / effort / risk**: P0 release programme, L, HIGH for payroll and live operations.
 - **Default**: Australian, invitation-only `early_access`, configured explicitly in each deployed project. Paid mode adds the billing journey; NZ/UK activation and new connectors are out of scope.
 - **Result**: app, API and web serve one reviewed candidate; admitted customers complete onboarding, leave decisions, Xero reconciliation and calendar subscription; every mandatory gate has attributable passing evidence.
 - **Database policy**: authorised online Neon only through the protected runner. No localhost/Docker database, reset, development seed, `db push`, rebaseline or `migrate dev`. Synthetic build URLs are validation inputs, never test databases.
-- **Plan ownership**: this file owns release closure; Plan 159 owns remaining Xero import/onboarding/AU semantics; Plan 160 owns the provider/browser campaign; Plan 161 owns lifecycle contracts and rollout sign-off. Do not reimplement completed 161 sub-plans or Plan 159's superseded Step 3.
+- **Plan ownership**: this file owns release closure; [Plan 159](159-xero-sync-and-onboarding.md) owns remaining Xero import/onboarding/AU semantics; [Plan 160](160-xero-end-to-end-verification-and-report.md) owns the provider/browser campaign; [Plan 161](161-harden-xero-connection-lifecycle.md) owns lifecycle contracts and rollout sign-off. Do not reimplement completed 161 sub-plans or Plan 159's superseded Step 3.
+
+## Why this matters
+
+Team Calendar's Australian release programme coordinates the final verification, hardening, and deployment gates required to ship the Australian edition safely into production. It orchestrates across seven distinct workstreams: source isolation and protected runner governance (D1-D3), concurrency control and durable write recovery (C1-C6), performance and query bounding (P1-P5), customer onboarding and public truth (G1-G3), browser journey suites (T1-T3), bidirectional Xero payroll sync and lifecycle enforcement (X1-X3), and production deployment verification (O1).
+
+Rigorous gate enforcement ensures payroll safety, Clerk organisation isolation, reliable ICS calendar feeds, and zero-residue test fixtures, ensuring that customer data and live payroll state in Xero remain strictly protected.
+
+## 1. Execution contract
 
 This review updates planning files only. It does not authorise deployment, payroll writes, customer backfills, provider messages, destructive remote cleanup or permanent production CI access. Reuse applicable existing authority during execution; prepare any still-unauthorised action completely before requesting its specific approval. Continue independent work while an external action is unavailable.
 
@@ -37,7 +58,7 @@ Run first:
 ```bash
 git rev-parse HEAD
 git status --short
-git diff --stat 92d67c5..HEAD -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
+git diff --stat 6005a5a..HEAD -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
 git diff --stat -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md
 ```
 
@@ -45,9 +66,9 @@ Compare affected excerpts and test contracts if these paths changed. Resolve ord
 
 ### Evidence established by this review
 
-This was a source and plan review, not a fresh release test run. The implementation paths named below were inspected. The command `git diff --stat 5d2e57b..92d67c5 -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md` returned no changes, confirming those inputs still match the latest recorded candidate. This is evidence reuse with a checked boundary, not a new PASS.
+This was a source and plan review, not a fresh release test run. The implementation paths named below were inspected. The command `git diff --stat 6005a5a..HEAD -- apps packages scripts tooling .github package.json bun.lock turbo.json PRODUCT.md` returned no changes, confirming those inputs still match the latest recorded candidate. This is evidence reuse with a checked boundary, not a new PASS.
 
-The checked-in [160–161 reconciliation record](160-161-reconciliation.md) reports source candidate `5d2e57b`: 2,810 repository tests, 395 release-tool tests, build/type/lint/boundary gates, and protected online Neon/Redis run `21e2bdb1-ea5b-4acd-ac8f-f484130731ce` with 27 files / 246 tests. It records all 21 migrations applied, zero drift, 39 zero-residue selectors, released fence and unchanged outside-owned row content. Do not recreate or reapply the three migrations still described as pending in the September 19 history.
+The historical 160–161 reconciliation record (preserved in git history; see `plans/README.md`) reports source candidate `5d2e57b`: 2,810 repository tests, 395 release-tool tests, build/type/lint/boundary gates, and protected online Neon/Redis run `21e2bdb1-ea5b-4acd-ac8f-f484130731ce` with 27 files / 246 tests. It records all 23 migrations applied, zero drift, 39 zero-residue selectors, released fence and unchanged outside-owned row content. Do not recreate or reapply historical migrations.
 
 That same record reports production app/API/web READY at older commit `11ce7e7`, missing lifecycle configuration names, and zero registered Inngest apps at its last read. These are dated provider observations, not live facts refreshed by this review. The [published Xero diagnostic](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) explicitly records zero LIVE/CONTROLLED execution, 26 scenarios / 92 subcases NOT VERIFIED and 40 lifecycle cases / 93 required evidence levels NOT VERIFIED. No production or provider PASS is inferred from the database inventory.
 
@@ -57,13 +78,13 @@ All entries below have HIGH confidence from current source reads. Effort include
 
 | Finding | Impact | Effort / risk | Evidence and disposition |
 | --- | --- | --- | --- |
-| Historical defects and pending migrations read as current work | Repeats completed changes and obscures remaining gates | S / LOW | Current implementations in Sections 4–7 and `160-161-reconciliation.md`; replace defect claims with preservation and closure criteria |
+| Historical defects and pending migrations read as current work | Repeats completed changes and obscures remaining gates | S / LOW | Current implementations in Sections 4–7 and reconciled plans; replace defect claims with preservation and closure criteria |
 | C1 lacks a registered real-database uncertainty/concurrency regression | Aggregate integration PASS cannot prove no duplicate submit after expiry/crash | M / HIGH | `packages/database/src/queries/outbound-operations.test.ts:11` mocks transactions; current integration inventory has no durable-submit scenario; add owned coverage under C1 |
 | Ordinary CI still mutates disposable Postgres; protected workflow is absent | Release's online-only verification policy remains unenforced in CI | M / HIGH | `.github/workflows/ci.yml:28,79,119`; finish D1 CI separation, retain existing local-runner evidence |
 | CSV export still caps/materialises 50,000 rows and points to no full-export API | P3's complete bounded export criterion is not implemented | M / MED | `packages/availability/src/sync/sync-monitor-service.ts:913-945`; complete P3, do not close it as deployed-proof-only |
 | Acquisition and browser assertions target obsolete behaviour | Tests miss the actual public form and expect a removed sign-up redirect | M / MED | Contact client posts `/api/contact` at `apps/web/app/contact/components/contact-page-content.tsx:116`; `tooling/release/e2e/admission.spec.ts:8` expects redirect; fix G1/T1 |
 | Generic browser suite also discovers dedicated Xero specs and accepts queued sync | Wrong runner context and false terminal-success evidence | M / MED | `tooling/release/playwright.config.ts:18-21`, `tooling/release/e2e/admin-and-roles.spec.ts:24`; separate inventory and observe terminal runs |
-| AU contract and worker execution remain unresolved dependencies | Credentials alone cannot make the provider campaign executable | L / HIGH | `packages/xero/src/au/write.ts:40`, `tooling/release/xero-execution-guard.ts:216`, `tooling/release/run-xero-e2e.ts:102`; complete X1/X2 before dependent live cases |
+| Worker execution and campaign admission remain pending dependencies | Credentials alone cannot make the provider campaign executable; AU contract resolved in main (`bf01911`, `au-contract-v1`) | L / HIGH | `tooling/release/xero-execution-guard.ts:216`, `tooling/release/run-xero-e2e.ts:102`; complete X2 worker enforcement before dependent live cases |
 
 ## 2. Current queue, priorities and dependencies
 
@@ -85,7 +106,7 @@ All entries below have HIGH confidence from current source reads. Effort include
 | G2/G3 | Trust-copy cleanup SOURCE PRESENT | Current public copy, support receipt/response and rollback | O1/T1 |
 | T1 | Browser harness SOURCE PRESENT, incomplete/stale assertions | Correct inventory/admission/terminal assertions and complete journey matrix | X2 before live worker cases; O1 |
 | T2/T3 | Docs/email CI gates and Node 22 types SOURCE PRESENT | Preserve gates, actual runtime/remote CI and email render evidence | D1 |
-| X1 | Plan 159 remaining scope TODO | Import completeness, retry safety, identity reconciliation, AU decision, onboarding/freshness | Preserve completed 161 controls |
+| X1 | Plan 159 remaining scope TODO | Import completeness, retry safety, identity reconciliation, onboarding/freshness; AU contract approved in au-contract-v1 | Preserve completed 161 controls |
 | X2 | Guard/report foundation SOURCE PRESENT; acquisition refused and Plan 160 corrections remain | Enforce worker fence; complete Plan 160 ledger, driver, receipt/lifecycle collector and execution/cleanup adapters | X1 for campaign expectations; D1 safety primitives; Plan 160 harness corrections before admission |
 | X3 | 161 sub-plans DONE at source/fixture level | Lifecycle configuration, safe namespace rollout, case-level and charter sign-off | Prepare config/namespace before O1 deployment; sign-off after O1 deployment and X2/Plan 160 execution |
 | O1 | Production proof NOT VERIFIED | Refresh metadata, configure, migrate only if pending, deploy one SHA, execute/reconcile journeys | Deployment: source/candidate gates, X1 contract, X2 source enforcement and X3 preparation; closure: subsequent campaign |
@@ -93,7 +114,7 @@ All entries below have HIGH confidence from current source reads. Effort include
 Execution order:
 
 1. Reconcile drift and current evidence. Start D1 CI work, C1 database regressions, P3 export, G1/T1 fixes and X1/X2 source work. Refresh read-only provider metadata in parallel when authorised.
-2. Resolve the AU contract before changing payroll transitions or expected remote states. Complete worker isolation before any worker-dependent provider/browser action. Keep routine source and protected database testing independent of unavailable provider fixtures.
+2. Preserve the approved AU transition contract (`au-contract-v1`, local submit, manager approve creates in Xero). Complete worker isolation before any worker-dependent provider/browser action. Keep routine source and protected database testing independent of unavailable provider fixtures.
 3. Freeze one candidate, run uncached source gates, compare applied schema, apply only genuinely pending reviewed migrations, then run the complete registered online inventory with fresh ownership and cleanup proof.
 4. Prepare lifecycle settings/namespace and project preflights, deploy the exact candidate under closed admission, verify registered worker revisions, then run distinct owned browser/provider campaigns. Finish support, telemetry, security and rollback evidence.
 
@@ -107,7 +128,7 @@ Execution order:
 
 1. Convert ordinary CI to database-free source checks; remove its disposable Postgres service, migrate/deploy/drift/integration steps. Preserve docs/email, package-boundary and tooling checks. Ordinary PR code receives no live secrets or database access. Keep database verification as a separate required protected candidate check, never silently drop it.
 2. Harden the existing source wrapper's environment before relying on that claim. It currently filters database/Neon/release variables but retains other inherited provider values (`run-source-gates.ts:17-30`). Run from a clean checkout without live `.env*`, use an allowlisted synthetic environment including build-valid Xero client ID/secret and encryption material, and deny TCP plus Neon HTTP/WebSocket connections. Preserve only documented compiler IPC. Test secret inheritance/env-file loading/network denial; do not weaken production env validation.
-3. Reconcile the existing unapplied `plans/proposed-release-workflow.patch` against current CI and inventory; do not apply its old hunks blindly. Prepare a protected exact-SHA workflow using trusted workflow code, reviewed candidate checkout, private manifest, scoped secrets and one active run. A prior persistent-workflow approval rejection is recorded in Section 11; it is not proof of approval now. Finish the concrete workflow and tests first, then obtain any still-required authority for persistent production access. Local protected runs can continue under applicable authority while publication is pending.
+3. Reconcile proposed CI restructuring (archived in git history) against current CI and inventory; do not apply old hunks blindly. Prepare a protected exact-SHA workflow using trusted workflow code, reviewed candidate checkout, private manifest, scoped secrets and one active run. A prior persistent-workflow approval rejection is recorded in Section 11; it is not proof of approval now. Finish the concrete workflow and tests first, then obtain any still-required authority for persistent production access. Local protected runs can continue under applicable authority while publication is pending.
 4. Keep the existing manifest/allocator: reserve exact tenant IDs and kind-qualified global keys before writes, verify durable read-back, prevent adoption of existing keys, preserve outside-owned catalogue/content baselines, and resume only consumer states paused by that run. Ordinary database-fixture mode remains all-consumers-paused/drained or verified strict-empty. The current provider read-back in `consumer-isolation.ts:36-98` implements only the never-registered, strict-empty case; a `pausedConsumers` map alone is not observed pause/drain proof. Before a database campaign after worker registration, implement and test fresh provider-backed pause/drain and exact restoration read-back for all affected consumers, using current Context7/provider contracts. Reject stale/missing evidence, active/queued/retrying work and unverified restoration. Do not unregister workers to manufacture the old empty-environment condition. If the provider cannot enforce the window, keep that campaign unavailable while completing independent work. X2's E2E mode is separate and must be rejected by this runner.
 5. On interruption use the protected runner's recovery mode, not a new run ID. Cleanup uses only manifest-owned resources in dependency order. An unresolved provider effect or stale consumer proof keeps the fence held and evidence incomplete. After normal release, do not reacquire a fence just to run `--assert-clean`: use `--dry-run` plus independent zero-residue, unchanged-content and released-fence checks.
 
@@ -266,11 +287,11 @@ All exit 0; T1/O1 records one privately received controlled application through 
 
 **Owner**: [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md), all active steps except superseded Step 3/X5/X6. Preserve Plan 161's immutable global binding and canonical credential controls.
 
-**Current evidence**: `packages/jobs/src/handlers/sync-xero-leave-records.ts:304-329` detects an incomplete fetch but still clears staleness; connection actions at `apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts:128` still begin immediate best-effort sync. AU `packages/xero/src/au/write.ts:40-54` creates remote leave on submit while local submit persists `submitted`; `packages/xero/src/read/leave-records.ts:152-157` maps SCHEDULED to APPROVED. This review verifies source shape, not the current remote AU contract.
+**Current evidence**: `packages/jobs/src/handlers/sync-xero-leave-records.ts:304-329` detects an incomplete fetch but still clears staleness; connection actions at `apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts:128` still begin immediate best-effort sync. The AU transition contract (`au-contract-v1`) was approved on 2 October 2026 and integrated at `bf01911`: employee submission remains local (`submitted`), and manager approval synchronously creates scheduled leave in Xero via an additive `approve` operation before transitioning to `approved`. Remote-created submissions remain read-only for review.
 
-Finish import completeness, retry-safe job ownership, initial people-before-leave orchestration, person/account reconciliation, truthful onboarding and calendar refresh using Plan 159's exact paths and regressions. Before changing outbound transitions, verify current official provider documentation and sanctioned provider evidence, then record the explicitly approved AU transition table in Plan 159. Preserve today's synchronous user-triggered contract and C1 uncertainty controls until that decision. Never silently move remote creation to approval to make a browser test pass.
+Finish import completeness, retry-safe job ownership, initial people-before-leave orchestration, person/account reconciliation, truthful onboarding and calendar refresh using Plan 159's exact paths and regressions. Preserve the approved `au-contract-v1` synchronous user-triggered contract and C1 uncertainty controls.
 
-**Verify**: run Plan 159's named unit/type gates under Section 8 source isolation, register new integration coverage through D1, and require Plan 160's exact scenario/subcase evidence for the chosen contract. An unresolved AU decision blocks its dependent write cases and READY, not independent source fixes.
+**Verify**: run Plan 159's named unit/type gates under Section 8 source isolation, register new integration coverage through D1, and require Plan 160's exact scenario/subcase evidence for the approved contract. Remaining import, identity, onboarding, and calendar work blocks dependent write cases and READY, not independent source fixes.
 
 ### X2: Implement enforced worker isolation and production campaign acquisition
 
@@ -287,9 +308,9 @@ Finish import completeness, retry-safe job ownership, initial people-before-leav
 
 ### X3: Finish lifecycle rollout with existing mandatory controls
 
-Use [161h](161h-xero-rollout-and-inactivity.md) for exact rollout contracts and the [161 charter](161-harden-xero-connection-lifecycle.md) Sections 8.3/9.3 for case-level/sign-off evidence. Sub-plan DONE does not close this release row.
+Use the [161 charter](161-harden-xero-connection-lifecycle.md) Sections 8.3/9.3 for case-level/sign-off evidence and rollout contracts (sub-plan 161h implemented in main, archived in git history). Sub-plan DONE does not close this release row.
 
-Refresh app/API environment inventories privately. Configure the verified commercial `XERO_APP_TIER`, immutable `XERO_CREDENTIAL_DOMAIN_ID`, matching `XERO_RATE_NAMESPACE_EPOCH`, KV pair, encryption key/version ring and registered callback before candidate admission. Preserve referenced legacy keys. Privately review namespace state and initialise conservatively using the existing `packages/xero/scripts/initialise-xero-rate-namespace.ts` only under applicable authority; never reset allowance or rotate an epoch to hide a domain conflict. Missing/mismatched sentinel must still deny admission. Drain every deployment still using the previous limiter before cutover. Conservative initialisation may reserve the current daily allowance as spent; schedule live verification after the store-reported reset/admission window rather than resetting the epoch or manufacturing allowance.
+Refresh app/API environment inventories privately. Configure the verified commercial `XERO_APP_TIER`, immutable `XERO_CREDENTIAL_DOMAIN_ID`, matching `XERO_RATE_NAMESPACE_EPOCH`, KV pair, encryption key/version ring and registered callback before candidate admission. Preserve referenced legacy keys. Privately review namespace state and initialise conservatively using the existing `packages/xero/scripts/initialise-xero-rate-namespace.ts` only under applicable authority; never reset allowance or rotate an epoch to hide a domain conflict. The fixed 24-hour rate limit namespace waiting period was abolished on 2 October 2026 (`a4cab6b`), allowing immediate quota admission upon valid sentinel initialisation. Missing/mismatched sentinel must still deny admission. Drain every deployment still using the previous limiter before cutover.
 
 Migrations are already recorded applied; apply only new pending reviewed migrations. Canonical owner cutover is per binding: prepare current snapshot-bound verified identity artefacts and dry-run any genuinely required backfill before an authorised apply; leave supported null-owner legacy bindings intact unless a reviewed cutover requires changing them. Do not bulk-backfill customers just to close a checklist. Keep `XERO_REMOTE_CLEANUP_MODE=report_only` and inactivity report-only; enabling destructive cleanup requires reviewed provider deletion/recovery evidence and a staffed operator procedure.
 
@@ -299,7 +320,7 @@ Migrations are already recorded applied; apply only new pending reviewed migrati
 
 ### A. Run database-free candidate gates
 
-The current Plan 160 review records a release-tool typecheck failure from unresolved installed `jose`, despite its declaration in `packages/xero/package.json` and `bun.lock`. This review did not rerun that command. Repair dependency installation in the verification checkout and rerun the actual type gate; do not treat the historical PASS as current or add a source workaround.
+Dependency installation in the verification checkout has been verified (`jose` resolves cleanly in `@repo/xero`). Run the actual type gate; do not treat the historical PASS as current or add a source workaround.
 
 Use Bun 1.4.0, a recorded supported Node runtime, a clean verification checkout without live `.env*`, and D1's allowlisted synthetic environment. Install with `bun install --frozen-lockfile` before the network-denied phase; verify no manifest/lockfile drift. Do not borrow provider credentials to satisfy a source build. Record actual SHA/tree, command, exit, test counts/skips, runtime, duration and cache disposition.
 
@@ -325,7 +346,7 @@ All exit 0; email assertions inspect rendered content, not just the preview buil
 
 ### B. Compare applied schema, then apply only pending additive migrations
 
-The latest checked-in campaign records 21/21 migrations applied and no drift. Refresh this read-only evidence against the chosen candidate and target; do not generate replacements or reapply historical migrations. The generation steps below apply only if new source changes genuinely require a migration. Preserve existing custom SQL trigger/constraint behaviour and verify it independently because Prisma schema diff does not prove unsupported database objects.
+The latest checked-in campaign records 23/23 migrations applied and no drift. Refresh this read-only evidence against the chosen candidate and target; do not generate replacements or reapply historical migrations. The generation steps below apply only if new source changes genuinely require a migration. Preserve existing custom SQL trigger/constraint behaviour and verify it independently because Prisma schema diff does not prove unsupported database objects.
 
 1. Generate each schema change from the prior reviewed schema and new schema
    using **schema-to-schema** `prisma migrate diff --from-schema ... --to-schema
@@ -537,40 +558,44 @@ truthful READY decision. It must not prevent completing the other work. Report
 the precise uncompleted action and continue it when authority/access exists;
 never replace missing proof with a waiver or a fabricated result.
 
-### STOP conditions and maintenance
+### STOP conditions
 
 Stop only the affected action and report the exact evidence needed when:
 
-- The approved AU transition contract is absent or conflicts with current provider evidence. Do not invent payroll semantics.
+- The approved AU transition contract (`au-contract-v1`) conflicts with current provider evidence. Do not invent payroll semantics.
 - A target, tenant/run/generation, namespace domain, credential snapshot, migration checksum or deployed/worker revision differs from its reviewed manifest. Do not alter a guard, token, epoch or manifest to make a check green.
 - Fixtures are unowned, durable recovery evidence is missing, or a remote outcome/consumer state is unresolved. Preserve the fence/ledger and reconcile through the existing recovery path before new mutations.
 - A required code change exceeds the stated item scope, or verification fails twice after a bounded fix attempt. Reconcile the affected plan/contract; continue unrelated authorised work.
 - A concrete external action lacks authority. Finish its reviewable preparation and request only the missing action, identifying any actual approval-review rejection. Historical rejections are not fresh rejections.
 
+### Maintenance notes
+
 Future submit changes must preserve durable uncertainty across every writer and inbound sync. Billing state, health and replay tests change together. Holiday/status changes update predicate/oracle tests. New integration suites update inventory, allocator and cleanup in the same commit. New worker consumers update X2 enforcement and terminal-drain proof. Launch variables/public CTAs/analytics update runtime, preflight and deployed checks together. A docs-only merge may reuse source proof only after recording exact input equivalence; it never refreshes deployment or provider state.
 
 ## 11. Current execution ledger and historical evidence
 
-### Review completed, 27 September 2026
+### Review completed, 2 October 2026
 
-- [x] Reconcile source claims and commands against `92d67c5`.
+- [x] Reconcile source claims and commands against `6005a5a`.
 - [x] Confirm runtime/test/config inputs match recorded `5d2e57b` evidence.
 - [x] Separate source presence, recorded tests and unexecuted production proof.
 - [x] Retain C1 database coverage, P3 export, D1 CI and G1/T1 gaps as executable work.
+- [x] Reconcile AU transition contract (`au-contract-v1` approved on 2 October 2026, merged at `bf01911`).
+- [x] Update migration count to 23 applied migrations across all evidence tracks.
+- [x] Record abolition of the fixed 24-hour rate limit namespace waiting period (`a4cab6b`).
 - [x] Add Plan 159/160/161 ownership, AU decision and actual worker-acquisition dependencies.
 - [x] Preserve historical evidence below without treating it as the current queue.
 - [x] Complete cold plan review; remove cyclic completion dependencies by separating preparation, deployment and campaign sign-off.
 - [x] Check all local Markdown links, existing/new path references, balanced structure and `git diff --check`; no application/live gate was rerun by this review.
-- [x] Preserve concurrent Plan 160/index edits and reconcile their adapter/correctness ownership and reported dependency/typecheck failure.
 
 Update the Section 2 rows and the table below during execution. A row becomes DONE only when source, relevant regressions and required live evidence pass. Evidence status is PASS, FAIL or NOT VERIFIED; paid-only NOT APPLICABLE requires actual early-access mode. Record exact SHA, command/counts, timestamp, private evidence reference and next action. Never copy secret values, auth state, applicant details or raw provider payloads here.
 
 | Evidence track | Current disposition | Next required result |
 | --- | --- | --- |
-| Source gates | RECORDED PASS at `5d2e57b`; scoped source equivalence checked; concurrent Plan 160 review records current unresolved-dependency typecheck FAIL | Repair installed dependencies and rerun types; fresh uncached gates after remaining source changes |
-| Guarded online database/Redis | RECORDED PASS, 27 files / 246 tests, 21 migrations applied, zero residue; see reconciliation record | New C1/other registered cases and final-candidate full campaign with fresh identity/restore/consumer evidence |
+| Source gates | RECORDED PASS at `5d2e57b`; scoped source equivalence checked; `jose` dependency resolved | Fresh uncached gates after remaining source changes |
+| Guarded online database/Redis | RECORDED PASS, 27 files / 246 tests, 23 migrations applied, zero residue; see reconciliation record | New C1/other registered cases and final-candidate full campaign with fresh identity/restore/consumer evidence |
 | Production inventory | Last recorded READY deploys are older `11ce7e7`; no fresh provider inspection in this review | Actual metadata/preflights, X3 activation and same-candidate deployments |
-| Provider/browser/charter | NOT VERIFIED; diagnostic has no real campaign execution | X1 decision, X2 enforcement, sanctioned fixtures/roles, complete Plan 160 and 161 case evidence |
+| Provider/browser/charter | NOT VERIFIED; diagnostic has no real campaign execution | X2 enforcement, sanctioned fixtures/roles, complete Plan 160 and 161 case evidence |
 | Release CI | IN PROGRESS; source workflow still uses disposable database, protected workflow absent | Reviewed current patch, applicable persistent-action authority and remote execution |
 | Support/security/rollback | NOT VERIFIED; September 19 records are leads | Current receipts, credential-remediation proof, final-lockfile reachability audit and compatible rollback rehearsal |
 | Final release | TODO | Exact deployed candidate, completed mandatory gates, actual release date and READY report |

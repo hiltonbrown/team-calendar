@@ -1,6 +1,101 @@
 # Current work
 
-Last reviewed: 2026-09-27
+Last reviewed: 2026-10-02
+
+## Task: Review all active plans against template standards, 2 October 2026
+
+- [x] Review `plans/159-xero-sync-and-onboarding.md` against template quality bar (self-contained, verification gates, boundaries, drift)
+- [x] Review `plans/160-xero-end-to-end-verification-and-report.md` against template quality bar
+- [x] Review `plans/161-harden-xero-connection-lifecycle.md` (charter) against template quality bar
+- [x] Review `plans/go-live.md` against template quality bar
+- [x] Tighten identified ambiguities, drift, and missing gate commands across the plan files
+- [x] Verify link integrity and repo gates (`bun run check`, `bun run typecheck`, `bun run boundaries`, `bun run test:release-tools`)
+- [x] Document findings and review results in `tasks/todo.md`
+
+### Review
+
+All four active implementation plans were audited against the quality standards in `.agents/skills/improve/references/plan-template.md`, reconciled against current HEAD (`6005a5a`), and tightened to ensure each plan is self-contained and directly executable:
+
+1. **[`plans/159-xero-sync-and-onboarding.md`](file:///home/hilton/Documents/teamcalendar/plans/159-xero-sync-and-onboarding.md)**:
+   - Added standard executor blockquote instructions and drift check against HEAD `6005a5a`.
+   - Updated current-state code excerpts with verified live line numbers: `au/read.ts:245-254`, `sync-xero-leave-records.ts:351, 354, 360`, `connect/_actions.ts:160-172`, `oauth/service.ts:859-869`, `current-user-service.ts:184-186`.
+   - Standardised Step 1 on the approved `au-contract-v1` workflow (local submit, synchronous manager approve creates in Xero, separate additive `approve` operation).
+   - Replaced superseded Step 3 text with a concise summary confirming implementation via Plan 161 (161a–h merged in main).
+   - Added formal `## Scope` section with explicit `### In scope` and `### Out of scope` file lists.
+   - Updated baseline test counts in Done criteria to live counts: `packages/jobs` baseline is 62 passed tests; `apps/app` baseline is 21 passed tests; `packages/database` fixture suite count is 28 suites.
+   - Separated `## STOP conditions` and `## Maintenance notes` into distinct sections.
+
+2. **[`plans/161-harden-xero-connection-lifecycle.md`](file:///home/hilton/Documents/teamcalendar/plans/161-harden-xero-connection-lifecycle.md)**:
+   - Re-framed document identity as the overarching architectural and release charter for the Xero lifecycle (implementation sub-plans 161a–h are complete in main; charter is active for Section 8.3 40-case matrix and Section 9.3 production sign-off).
+   - Added standard executor blockquote and drift check against HEAD `6005a5a`.
+   - Clarified Section 2.0 defect excerpts as historical bugs resolved by sub-plans 161a–h.
+   - Checked off all items in Section 9.2 (`### 9.2 Source implementation complete (Verified in main)`) with commit and sub-plan references.
+   - Separated `## STOP conditions` and `## Maintenance notes` into distinct sections.
+
+3. **[`plans/160-xero-end-to-end-verification-and-report.md`](file:///home/hilton/Documents/teamcalendar/plans/160-xero-end-to-end-verification-and-report.md)**:
+   - Purged 214 lines of historical chronological preambles from lines 1–285; added standard template header with Executor instructions blockquote, Drift check against `6005a5a`, `## Status`, `## Why this matters`, and consolidated `## Current state and baseline`.
+   - Reconciled AU contract references: updated Step 3 handoff row to state `au-contract-v1` is approved and integrated at `bf01911`. Checked off AU decision in completion criteria.
+   - Updated database migration count to 23 across all sections.
+   - Documented abolition of the fixed 24-hour rate limit namespace waiting period (`a4cab6b`).
+   - Confirmed harness and observer producers (`tooling/release/xero-observation-producers.ts` and `xero-observer-authority.ts`) are fully implemented and passing in main.
+   - Separated `## STOP conditions` and `## Maintenance notes`, and removed redundant historical review appendices (preserved in `plans/160-execution-review.md`).
+
+4. **[`plans/go-live.md`](file:///home/hilton/Documents/teamcalendar/plans/go-live.md)**:
+   - Updated title to `# Plan 000: Ship Team Calendar's Australian release` for naming consistency.
+   - Added standard executor instructions blockquote, drift check against `6005a5a`, `## Status`, and `## Why this matters`.
+   - Updated migration counts from 21 to 23 across all sections and tables.
+   - Reconciled AU transition contract across Section 2, Section 7 (X1), and STOP conditions to state `au-contract-v1` was approved and integrated at `bf01911`.
+   - Updated rate namespace rollout in Section 7 (X3) to record abolition of the 24-hour waiting period (`a4cab6b`).
+   - Updated Section 8 A to record verified `jose` resolution.
+   - Separated `### STOP conditions` and `### Maintenance notes` into distinct sections.
+   - Updated review ledger to 2 October 2026.
+
+5. **[`plans/README.md`](file:///home/hilton/Documents/teamcalendar/plans/README.md)**:
+   - Updated Plan 000 entry and migration count to 23.
+
+6. **Repository Verification**:
+   - Automated link integrity check: 0 broken relative markdown links across all files in `plans/`.
+   - `bun run check`: 1,190 files checked, 0 issues.
+   - `bun run typecheck`: 19/19 workspaces passed in 6.1s.
+   - `bun run typecheck:release-tools`: passed with 0 errors.
+   - `bun run test:release-tools`: 35 test files passed, 604 tests passed, 0 failures.
+   - `bun run boundaries`: 1,101 files in 21 packages clean.
+   - Working tree: clean of changes outside `plans/` and `tasks/todo.md`.
+
+
+## Task: Reconcile all plans and remove outdated and done plans, 2 October 2026
+
+- [x] Audit all 28 files currently in plans/ and classify each into active, done, or outdated/superseded
+- [x] Remove completed Plan 162 files (162-execution-design, 162-execution-plan, 162-execution-review, 162-executor-evidence, 162-ics-calendar-review)
+- [x] Remove completed Plan 161 sub-plans (161-pre, 161a, 161b, 161c, 161d, 161e, 161f, 161g, 161h)
+- [x] Remove outdated/superseded artifacts (160-161-reconciliation, 161-xero-execution-report, credential-purge-request, proposed-release-workflow.patch)
+- [x] Reconcile plans/README.md with the active plan inventory, retired plans summary, and current baseline
+- [x] Reconcile cross-references in remaining active plans (go-live.md, 159-xero-sync-and-onboarding.md, 161-harden-xero-connection-lifecycle.md)
+- [x] Verify integrity of all remaining markdown links and gate checks
+- [x] Document results in tasks/todo.md
+
+### Review
+
+Reconciliation and retirement of completed and outdated plans completed on 2 October 2026:
+- 18 completed, superseded, and scratch files were removed from `plans/` and retired to Git history:
+  - Plan 162 suite (5 files): `162-execution-design.md`, `162-execution-plan.md`, `162-execution-review.md`, `162-executor-evidence.md`, `162-ics-calendar-review.md` (all 12 findings and Sydney date edits merged to main at `142d128`).
+  - Plan 161 implementation sub-plans (9 files): `161-pre-executor-gate-corrections.md`, `161a-xero-baseline-and-fixture-ownership.md`, `161b-xero-immutable-tenant-binding.md`, `161c-xero-deadlines-and-key-versioning.md`, `161d-xero-canonical-credentials.md`, `161e-xero-shared-rate-limits.md`, `161f-xero-management-cleanup.md`, `161g-xero-permission-recovery.md`, `161h-xero-rollout-and-inactivity.md` (all 9 units implemented, merged, and all 21 migrations applied).
+  - Outdated reports and scratch files (4 files): `160-161-reconciliation.md`, `161-xero-execution-report.md`, `credential-purge-request.md`, `proposed-release-workflow.patch`.
+- Active plans retained (4 plans):
+  - `plans/go-live.md` (P0 Australian release programme)
+  - `plans/159-xero-sync-and-onboarding.md` (P1 sync & onboarding)
+  - `plans/160-xero-end-to-end-verification-and-report.md` (P1 verification campaign)
+  - `plans/161-harden-xero-connection-lifecycle.md` (P1 charter for 40-case matrix and Section 9.3 sign-off)
+- Canonical supporting specifications retained (5 documents):
+  - `plans/160-au-transition-contract-v1.md` (cited in `AGENTS.md`)
+  - `plans/160-completion-review.md` (Plan 160 completion continuation review, 2 Oct 2026)
+  - `plans/160-execution-prerequisites.md` (Plan 160 execution prerequisites)
+  - `plans/160-execution-review.md` (Plan 160 detailed candidate and test review)
+  - `plans/161-xero-provider-contract.md` (Xero provider contract ledger)
+- `plans/README.md` was updated with the reconciled active plan table, completed/retired plans summary, and updated dependency notes.
+- Cross-references across `plans/go-live.md`, `plans/159-xero-sync-and-onboarding.md`, `plans/160-xero-end-to-end-verification-and-report.md`, and `plans/161-harden-xero-connection-lifecycle.md` were reconciled.
+- Automated link integrity verification confirmed zero broken relative links across all 10 remaining markdown files in `plans/`.
+- Repository checks passed: `bun run check` (1,190 files clean), `bun run typecheck` (19/19 turbo tasks), `bun run boundaries` (1,101 files in 21 packages clean).
 
 ## Task: Verify Plan 161f against integrated main, 27 September 2026
 

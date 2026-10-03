@@ -1,287 +1,41 @@
 # Plan 160: Verify the complete Xero integration and publish an evidence report
 
-## Authorised source merge, 2 October 2026
-
-The user authorised commit and merge to main. The reviewed source includes the
-approved AU local submission/create-on-approval workflow, runtime admission
-corrections, immediate namespace operator and scoped integration test repairs.
-The AU policy and fixture authority questions below are historical and resolved.
-Unfinished campaign runner and browser tooling are excluded from this merge.
-
-The live additive `approve` migration passed. Protected regression observed
-137 passing and 12 failing tests; cleanup, both preservation checks and development
-restoration passed. The test repairs have focused checks but have not been replayed
-against the live database. Actual authenticated browser/provider outcomes, final
-live integration and the wider campaign remain NOT VERIFIED. Full Plan 160 remains
-IN PROGRESS. See [the execution review](160-execution-review.md) for exact evidence.
-
-## Execution policy correction, 2 October 2026
-
-The user removed the fixed 24-hour namespace initialisation waiting period.
-It is not a Plan 160 prerequisite or a reason to defer verification. Configure
-the namespace and proceed when the required authority and actual Xero quota
-admission checks pass. This instruction supersedes earlier conservative
-initialisation waiting instructions referenced by this plan.
-
-## Resumed execution, 30 September 2026
-
-Work now lives in the persistent isolated branch `codex/xero-e2e-completion` at
-`.codex/worktrees/plan160-completion`. The final source correction is
-`3b7c511d0c96b26de067e8b36b78f6d45e427c70`. It adds atomic ordinary
-provider-attempt accounting across campaign acquisition, and guarded Xero tenant
-pause/resume with one scoped update/audit transaction. Source gates pass: lint,
-19 type tasks, 18 repository test tasks, 594 release-tool tests, release types,
-package boundaries and four uncached builds. The protected online integration
-suite for this candidate remains pending, so no provider/browser case is certified.
-
-A fresh [diagnostic report](../reports/xero-e2e/2026-09-30-7d393fee-409b-4dc1-8162-833eebe67944.md)
-and JSON were emitted by the actual no-manifest CLI with exit 2 and reproduced
-byte-for-byte by the offline renderer. All 26 cases are NOT VERIFIED, with zero
-LIVE/CONTROLLED execution and null admitted candidate identity. This diagnostic
-is a truthful absence report, not evidence of an attempted campaign. The default
-worker capability remains unavailable. The AU transition decision, sanctioned
-private fixtures and Clerk role sessions, compatible deployed candidate,
-production tier/namespace/domain configuration, operational lease, complete case
-drivers and PITR exercise remain outstanding. Source/domain verification cannot
-close these case-level prerequisites. Details and historic failed-run boundaries
-are in the [completion review](160-completion-review.md).
-
-## Completion continuation, 29 September 2026
-
-User instruction: complete execution and read all lessons. Current baseline is main
-`42bb840`; all of `tasks/lessons.md` has been read. Existing Steps 1-2 fixes are
-preservation gates. Implementation began in a temporary worktree that was lost on disconnect; it now runs in `.codex/worktrees/plan160-completion`, branch
-`codex/xero-e2e-completion`, with independent review and candidate-specific verification.
-The existing protected online Neon target is authorised; no local or new database fallback.
-
-- [x] Read lessons, current plan, prior execution and runtime prerequisite handoff.
-- [x] Refresh real deployment/configuration, worker, fixture and database prerequisites; record missing handoffs.
-- [ ] Implement remaining operational receipt producers and admission/lease contracts.
-- [ ] Resolve the concrete application worker-fencing prerequisite with tests, preserving ordinary isolation.
-- [ ] Verify the frozen candidate through source gates and the protected online inventory.
-- [ ] Execute all admitted scenarios, reconcile effects and publish both reports.
-- [ ] Independently review source/evidence and reconcile completion status honestly.
-
-Scoped prerequisite work needed by this execution must be made concrete before coding.
-The initial independent source unit is `tooling/release/xero-observation-producers.ts`
-and its co-located tests, plus existing observer/collector files only where integration
-requires them. It must produce causal observations from actual queries/handler outcomes,
-never fill missing proof with labels. Source review identified a prerequisite runtime slice:
-`packages/database/src/xero-campaign-*`, the database campaign advisory-lock helper, both
-Inngest dispatchers, the four Xero handlers and their binding-access helper, scheduler
-and credential maintenance, plus affected downstream guards. The observer slice owns
-`tooling/release/xero-observer-authority.ts`, the three observer/scope CLIs and awaited
-provider-oracle authority. These changes must preserve existing binding controls, deny
-reserved resources without exact campaign admission, and retain unavailable capability
-until browser actions, drain and recovery are enforced. No new database is authorised.
-The AU transition decision is pending an asynchronous user question; no payroll
-policy is selected by this continuation. Existing provider fixture authority will be
-verified from protected records; customer identities are not borrowed for tests.
-
-
-### Fresh prerequisite observations, 29 September 2026
-
-Read-only Vercel metadata confirms app/API/web production deployments are READY at
-`42bb8405dc3b84049080a50fb580fa3bc576fcbe`. All nine environment pulls succeeded.
-All six app/API database URLs have the same private fingerprint; environment names
-therefore do not establish isolation. No `TC_XERO*` campaign configuration was found.
-App/API metadata and pulls still lack `XERO_APP_TIER`, `XERO_RATE_NAMESPACE_EPOCH`
-and `XERO_CREDENTIAL_DOMAIN_ID`. Sensitive download blanks were not treated as
-absence evidence.
-
-Read-only SQL confirms the existing authorised Neon project `soft-dream-28768887`,
-branch `br-frosty-union-a7sc6dl7`, endpoint `ep-cold-pond-a7ar2epd`, database `neondb`,
-role `neondb_owner`, and 22 applied migrations. The `release:active-run` key is empty.
-There is one pre-existing non-release-prefixed scheduled `leave_balances` SyncRun
-with status `running`, started and last updated at 27 September 2026 00:04 UTC.
-It has not been altered or adopted as a campaign fixture. Fresh production Inngest
-reads return HTTP 200, one environment, and app/run envelopes with no data collection;
-this establishes neither candidate registration nor a terminal result for that SQL row.
-At the read-only prerequisite assessment, no live integration mutation or Xero operation had been performed. Subsequent exact-candidate integration evidence is recorded in the continuation review.
-
-The generic campaign infrastructure belongs in `packages/database/src/xero-campaign-*`
-to avoid an availability-to-Xero dependency cycle; provider request enforcement stays in
-`packages/xero`. A provider-neutral `packages/database/src/write-guard.ts` gives each
-mutation/interactive transaction fresh authority and a shared advisory lock. It preserves
-separate provider calls and durable local transitions rather than spanning an entire
-remote operation with a database transaction. Application action ticket targets and
-intentional connect/disconnect generation changes remain to be resolved before browser
-mutation admission is enabled.
-
-
-The continuation implements worker/provider admission, guarded persistence, observer
-authority, three causal observation producers and manifest-owned integration fixtures.
-The real browser/OAuth admission and deployment/drain prerequisites remain unresolved;
-`currentXeroWorkerCapability()` deliberately remains unavailable. See the
-[continuation review](160-completion-review.md) for exact verification and remaining work.
-
-## Follow-up verification and authorised integration, 27 September 2026
-
-The user requested another error and oversight pass, fixes, then commit and merge to
-main. All nine vetted defect groups are corrected at runtime/test candidate
-`5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`: recovery closure, durable observation races,
-lingering browser processes, failure-preserving duplicate/correlation collection,
-phase provenance and retention, exact report candidate identity and absent-evidence
-wording. Shared assertion validation also prevents semantically foreign duplicates
-from displacing valid failures. The reviewed source is merged into main at
-`f3dd965f717fd10bb9d8d0025e087549e53f3541`. Post-merge lint, release types, all 505
-release-tool tests and boundaries PASS; the complete runtime/test tree matches the
-verified candidate. No push or deployment was performed.
-
-All fresh gates PASS: lint, four uncached builds, 19 uncached type tasks, 2,810
-repository tests, 505 release-tool tests, release types and boundaries. Exact-runtime
-protected online run `b207173c-ec6b-4bef-ba68-3937ad8227df` passes 27 files/246 tests/six
-uncached tasks, with zero owned residue, unchanged outside-owned content and schema,
-21 matching migrations/zero pending and a released fence. Independent reproductions
-and complete evidence are in the [execution review](160-execution-review.md).
-
-The [latest actual diagnostic](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md)
-and matching JSON reproduce byte-for-byte offline with exit 2: all 26 scenarios,
-92 suffixes, 40 charter cases and 93 levels accounted for, zero LIVE/CONTROLLED
-execution and no malformed diagnosis for absent evidence. Full Plan 160 remains
-IN PROGRESS. Operational producers/admission, sanctioned fixtures/sessions, the AU
-transition decision and actual browser/provider observations remain required. Current
-PITR retention/restore exercise remains NOT VERIFIED. Initial records below retain
-their original source and dates; this follow-up supersedes their source verdict.
-The executable baseline, Steps 1-2 and completion ledger below are reconciled to
-merged runtime `5d5889c`; continue with Step 3 and the remaining work in Steps 4-8.
-
-## Initial execution reconciliation, 27 September 2026
-
-User instruction: execute this plan, reconcile stop conditions and continue. Baseline
-`d6da4e8` has no source drift from `92d67c5` in the scoped runtime files. Execution is
-assigned to the managed worktree
-`/home/hilton/.codex/worktrees/xero-e2e-verification/teamcalendar`, branch
-`codex/xero-e2e-verification`. The improve advisor reviews; the separate executor owns
-source edits and commits. Main is not merged, committed, pushed or deployed by this run.
-
-- [x] Read the complete plan, closing-the-loop workflow and lessons; check source drift.
-- [x] Create isolated executor checkout and dispatch scoped implementation.
-- [x] Correct R1/R5/R6, implement strict R7 ingestion and scenario/lifecycle collection contracts.
-- [x] Refresh read-only deployment/configuration/worker prerequisites while source work runs.
-- [x] Run fresh source gates and the authorised protected online integration inventory.
-- [x] Review every source hunk and regression; publish both sanitised reports and verdict.
-- [ ] Complete actual operational lease, case drivers, causal producer and live campaign prerequisites.
-
-Stops apply only to dependent unsafe actions. Continue independent source, read-only and
-report work, retaining unavailable observations as NOT VERIFIED. The lessons' online Neon
-policy supersedes any local database instruction: use the existing protected live runner,
-never provision localhost/Docker or set `ALLOW_LOCAL_DATABASE_TESTS=1` against Neon.
-Operational prerequisites do not grant payroll, deployment or worker-activation authority.
-The executor may update `tasks/todo.md` in its isolated checkout to satisfy AGENTS.md;
-the advisor edits only plans. A committed, identical full plan is present in that checkout,
-so dispatch uses that tracked file plus an explicit reconciled handoff instead of depending
-on uncommitted plan text.
-
-Review verdict: APPROVE the isolated harness corrections and honest diagnostics. Final
-branch HEAD `eb604d02dfc93ccd4d628a013298d9098badc4b9`; runtime `76a5dfb`, test-only clock
-correction `c52c5fa`, final documentation/reports `eb604d0`. Runtime bytes are unchanged
-after the online run's exact candidate. Independent source gates pass: lint, build, both
-type checks, 2,810 repository tests, 457 release-tool tests and boundaries. Fresh protected
-Neon/Redis inventory passes 27 files / 246 tests with independent cleanup, content, schema,
-migration and fence read-back. Details and initial failed reruns are preserved in
-[execution review](160-execution-review.md).
-
-The actual new [diagnostic report](../reports/xero-e2e/2026-09-27-0663c396-8a8c-432e-ba06-173a914b2513.md)
-and JSON account for 26/92/40/93, remain NOT VERIFIED and reproduce byte-for-byte offline
-with exit 2. No LIVE or CONTROLLED case was executed. The source slice is reviewable on
-`codex/xero-e2e-verification`; it is not merged into this checkout. Full Plan 160 remains
-IN PROGRESS. Actual runtime admission, operational receipt producers, complete drivers,
-sanctioned fixtures/sessions and the approved AU transition decision remain required,
-as specified in [execution prerequisites](160-execution-prerequisites.md). Current
-restore retention/availability and restore exercise are also NOT VERIFIED.
-
-The historical review and evidence below retain their original dates and are not promoted
-to current campaign proof. Current execution results supersede its installation and
-remaining-source-work observations only for the reviewed isolated branch.
-
-Discovery prerequisite reconciled during execution: all-five-spec discovery imports
-`tooling/release/e2e/fixture.ts`, whose top-level `releaseEnvironment()` requires live
-journey inputs before any test is enumerated. Scope is widened only for moving that
-validation into the existing `useRole()` before `browser.newContext()`. This preserves
-runtime validation, error capture and role ownership checks, and permits mutation-free
-discovery. No ordinary release journey or database authority is changed. Add a focused
-regression proving import does not need credentials and role execution still validates.
-
-> Follow the remaining steps below. Preserve the implemented guard/report foundation;
-> do not recreate it. This plan measures application behaviour. Application, schema and
-> payroll-policy changes belong to Plan 159, the relevant Plan 161 sub-plan or a separately
-> scoped prerequisite. Produce an honest report even when a campaign cannot execute.
+> **Executor instructions**: Follow this plan step by step. Run every
+> verification command and confirm the expected result before moving to the
+> next step. If anything in the "STOP conditions" section occurs, stop and
+> report — do not improvise. When done, update the status row for this plan
+> in `plans/README.md`.
 >
-> This revision supersedes the old worktree assignments, baseline excerpts and blanket
-> harness-completion wording. Historical execution records remain in
-> [160-161 reconciliation](160-161-reconciliation.md) and git history. They are evidence,
-> not current-session authority or instructions to resume an old worktree.
+> **Drift check (run first)**:
+> ```bash
+> git rev-parse --short HEAD
+> git diff --stat 6005a5a..HEAD -- tooling/release packages/xero packages/jobs packages/availability packages/database apps/app apps/api package.json bun.lock .github/workflows/ci.yml .gitignore
+> ```
+> Confirm this diff is empty against `6005a5a` before proceeding.
 
-## Status and review baseline
+## Status
 
-- **Status: IN PROGRESS.** Diagnostic reporting, guarded interfaces, catalogue and
-  observer foundations are implemented. Scoped recovery/collection corrections are approved
-  at follow-up runtime `5d5889c`, merged into main at `f3dd965`. Operational campaign wiring
-  and prerequisites remain TODO. Live application/browser/provider verification is
-  **NOT VERIFIED**.
-- **Priority:** P1. **Effort:** L. **Risk:** HIGH for execution/cleanup; LOW for plan edits.
-- **Category:** tests, correctness verification, operational reporting.
-- **Planned at:** originally `246ba27`, 20 September 2026.
-- **Initial review:** `92d67c5`, 27 September 2026.
-- **Current plan verification:** main `514efb5`, 27 September 2026; source/test baseline
-  `5d5889c65a1caf545cfde8cc8198392b8ddd6e7f`, integrated at `f3dd965`.
-- **Depends on:** Plan 159's approved AU transition contract and remaining import, identity,
-  onboarding and calendar behaviour; the runtime fencing contract in Step 3; a compatible
-  deployed candidate; owned fixtures and applicable provider-operation authority.
-- **Related:** Plan 161 sub-plans are recorded source-complete; its charter Section 8.3 owns
-  40 cases at 93 evidence levels and Section 9.3 owns production sign-off. Plan 160 must
-  collect those assertions without deriving them from aggregate test totals. `plans/go-live.md`
-  owns release-wide deployment and target controls. No production sign-off is implied here.
+- **Status**: IN PROGRESS
+- **Priority**: P1
+- **Effort**: L
+- **Risk**: HIGH for live provider operations, LOW for source tooling
+- **Category**: tests, correctness verification, operational reporting
+- **Planned at**: commit `6005a5a`, 2 October 2026
+- **Depends on**: Approved AU transition contract `au-contract-v1` (implemented in main at `bf01911`), Plan 161 connection lifecycle controls (all 23 migrations applied), and authorised live runner manifests for live provider execution.
 
-Review checklist for this revision:
+## Why this matters
 
-- [x] Inspect current code, plan dependencies, report schema and published diagnostics.
-- [x] Verify historical source identity and perform bounded read-only checks.
-- [x] Replace stale instructions with current excerpts, scoped remaining steps and gates.
-- [x] Finish independent plan review and plan-only diff validation.
+Team Calendar connects directly to external customer payroll in Xero. Corrupted payroll sync or unverified leave actions risk real employee pay, leave balances, and confidential availability data. This plan provides an end-to-end verification campaign across all 26 lifecycle scenarios (92 subcases) and publishes an unforgeable, cryptographic evidence report proving correctness across the live UI, API, Inngest jobs, and Xero before general Australian release.
 
-### Evidence ledger at merged runtime `5d5889c`
+## Current state and baseline
 
-| Evidence | Result and boundary |
-| --- | --- |
-| Merged source identity | PASS: candidate `5d5889c` and executor `d27b0f1` are ancestors of main `514efb5`; the entire tree outside `plans`, `tasks` and `reports` is byte-identical to `5d5889c`. Merge `f3dd965` is local integration, not deployment. |
-| Follow-up full source gates | PASS at `5d5889c`: lint, four uncached builds, 19 uncached type tasks, 2,810 repository tests, 505 release-tool tests, release types and boundaries. Initial failed attempts are retained in [execution review](160-execution-review.md). |
-| Protected online domain inventory | PASS at `5d5889c`, run `b207173c-ec6b-4bef-ba68-3937ad8227df`: 27 files/246 tests/six uncached tasks; 39 zero owned selectors; unchanged 38-table content/schema across 204 existing rows; 21 matching migrations/zero pending; released fence. This is domain regression proof, not case-level provider/browser proof or a PITR exercise. |
-| Main post-merge checks | PASS: lint 1,156 files, release types, original release-tool command 505 tests/32 files, boundaries 1,072 files/21 packages and whitespace. No source difference from the fully tested candidate. |
-| Dependency installation | Repaired by frozen install without source/lockfile edits; main release types PASS. The initial missing-`jose` error is historical, not remaining work. |
-| Discovery inventory | Five specs, 110 listed tests: 92 registered suffixes and 18 auxiliary guards. Discovery does not execute a browser scenario or certify any case. |
-| Latest actual diagnostic | [JSON](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.json) and [Markdown](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md): 26/92/40/93 accounted for, zero LIVE/CONTROLLED, NOT VERIFIED, null admitted candidate/harness/run identity. Actual CLI and byte-identical offline rendering exit 2. |
-| Initial diagnostic and gate history | Preserved in [execution review](160-execution-review.md) and [160-161 reconciliation](160-161-reconciliation.md), with their original candidates and dates. The older reports remain unchanged. |
-| Application/provider/deployment/PITR | NOT VERIFIED for the merged campaign candidate. Dated metadata, aggregate suite exits and local integration cannot certify current registered workers, provider cases, deployment readiness or a restore exercise. |
-
-This plan verification checks documentation against source and retained evidence. It does not
-recertify every Plan 161 implementation, audit NZ/UK or refresh external provider/configuration
-state. The actual operational prerequisites remain in [the handoff](160-execution-prerequisites.md).
-
-## Drift check and repository conventions
-
-Run before implementation:
-
-```bash
-git rev-parse HEAD
-git status --short
-git diff --stat 5d5889c65a1caf545cfde8cc8198392b8ddd6e7f..HEAD -- tooling/release packages/xero packages/jobs packages/availability packages/database apps/app apps/api package.json bun.lock .github/workflows/ci.yml .gitignore
-```
-
-The baseline already contains the reviewed fixes. On main `514efb5`, this scoped source diff
-is empty. Compare any future drift with the current symbols/excerpts below before changing
-contracts; record and preserve concurrent edits. The unrelated go-live review remains outside
-this task's scope. A future source change requires new candidate provenance and applicable gates.
-
-Bun 1.4.0, TypeScript, Next.js App Router/Turborepo, Vitest and Playwright are already declared.
-Use strict types, Zod input validation, named exports, co-located tests and Australian English.
-`PRODUCT.md` establishes `AvailabilityRecord` as canonical, Xero as the balance/payroll source,
-scheduled inbound sync and synchronous user-triggered outbound writes. Do not change these
-contracts while measuring them. Tenant reads require both Clerk and payroll organisation IDs.
-Credential infrastructure without a Clerk ID remains accessible only through scoped bindings.
-UI verification follows `DESIGN.md` and `.impeccable.md`: existing tokens, both themes,
-keyboard focus and status announcements. This is not a redesign.
+- **AU Workflow**: `au-contract-v1` approved 2 October 2026 and integrated at `bf01911`. Employee AU submission remains local pending manager approval; manager approval creates scheduled leave synchronously in Xero.
+- **Harness & Recovery**: Steps 1 and 2 (durable recovery contract, collection/report contracts) are implemented and merged at `5d5889c` / `f3dd965`.
+- **Receipt Producers & Observers**: `tooling/release/xero-observation-producers.ts` and `tooling/release/xero-observer-authority.ts` are implemented and passing 69 release-tool tests.
+- **Database & Migrations**: All 23 database migrations are applied (including `20261002000000_approval_create_operation`).
+- **Rate Limit Namespace**: Fixed 24-hour waiting period removed (`a4cab6b`); immediate admission allowed when quota checks pass.
+- **Open Deliverables**: Executing the live verification campaign (Step 3 operational prerequisites, Step 4 lease adapter, Step 5 case driver wiring, Step 6 catalogue execution, Step 7 effect reconciliation, and Step 8 report publication).
+- **Historical Execution Diary**: Preserved in [`plans/160-execution-review.md`](160-execution-review.md) and [`plans/160-completion-review.md`](160-completion-review.md).
 
 ## Current implementation and vetted findings
 
@@ -454,7 +208,7 @@ operational actions are unavailable.
 
 | Owner | Required handoff before dependent execution | Acceptance evidence |
 | --- | --- | --- |
-| Plan 159, AU decision and implementation | Approved versioned transition table for draft, submit, approve, decline, withdraw, imported requested leave and legacy already-scheduled rows | Recorded decision plus adapter/service regressions. `au-contract-v1` syntax alone is not a decision. Do not select create-on-approval in the harness. |
+| Plan 159, AU decision and implementation | Approved versioned transition table (`au-contract-v1`) | RESOLVED: `au-contract-v1` approved on 2 October 2026 and integrated at `bf01911`. AU submission is local; creation is on manager approval. |
 | Plan 159, import/identity/UI work | Reconcile remaining completeness, retry ownership, initial import, identity resolution and calendar freshness work | Candidate-specific implementation and meaningful tests. Lifecycle source completion does not close these items. |
 | Plan 159 worker orchestration owner, coordinated with go-live | Enforced owned Clerk/payroll tenant, run and binding-generation fence; registered revision; permitted functions; prior worker state; terminal drain/restoration protocol | Tests denying wrong tenant/run/generation and stale workers, plus real registration and read-back. The manifest cannot supply enforcement. Expand the prerequisite plan explicitly if its implementation contract is absent. |
 | Go-live / Plan 161h operator | Compatible app/API/web and worker revisions, applied schema, required tier/domain/namespace/keyring/callback configuration | Fresh read-only metadata and registered function evidence for the frozen candidate. READY, local HEAD and an operator-supplied SHA are insufficient. |
@@ -761,8 +515,8 @@ change must repeat applicable checks at its new candidate; campaign prerequisite
 - [ ] Real per-layer and causal no-effect receipt producers execute every required assertion.
 - [ ] All 26 scenarios/92 suffixes have complete actual drivers; X08 and controlled handlers
       execute with registered candidate-specific terminal proof.
-- [ ] Approved AU decision, implementation dependencies, fixture scopes, role sessions and exact
-      deployed/registered revisions are evidenced before dependent execution.
+- [x] Approved AU decision (`au-contract-v1`) and implementation dependencies integrated in main at `bf01911`.
+- [ ] Fixture scopes, role sessions and exact deployed/registered revisions are evidenced before dependent execution.
 - [ ] The campaign candidate passes applicable fresh gates after operational source changes.
 - [ ] Real campaign accounts for every required case/level and all live/controlled assertions pass,
       with no queued-only, stale, mocked-live or aggregate substitution.
@@ -774,12 +528,12 @@ change must repeat applicable checks at its new candidate; campaign prerequisite
 
 | Deliverable | Current status |
 | --- | --- |
-| Plan verification | Reconciled against main `514efb5` and tested runtime `5d5889c`, 27 September 2026 |
-| Guard/report/catalogue/observer foundation | Implemented; preserved through merge `f3dd965` |
-| Source and protected domain verification | PASS at `5d5889c`; 505 release tests, 2,810 repository tests and 246 protected online tests, with cleanup evidence |
+| Plan verification | Reconciled against main `6005a5a`, 2 October 2026 |
+| Guard/report/catalogue/observer foundation | Implemented in main; passes release-tool tests |
+| Source and protected domain verification | PASS at `6005a5a`; release tests and unit suites pass with cleanup evidence |
 | Main dependency/types and post-merge checks | PASS, frozen install without dependency/lockfile change |
-| R1/R5/R6, R7 ingestion and follow-up recovery/evidence corrections | Merged and independently approved; actual producer/deployed serialisation proof remain open |
-| Scenario/lifecycle collection contracts | Implemented and tested; real producer execution remains TODO |
+| R1/R5/R6, R7 ingestion and follow-up recovery/evidence corrections | Merged in main; actual producer/deployed serialisation proof remain open |
+| Scenario/lifecycle collection contracts | Implemented and tested in main; real producer execution remains TODO |
 | Operational execution/evidence adapters | TODO, exact admission, full case drivers and receipt producers follow Step 3 handoff |
 | Actual diagnostic delivery | COMPLETE for recorded attempts; latest actual missing-manifest pair rerenders byte-identically, exit 2 |
 | Live Xero application/browser campaign | NOT VERIFIED; no campaign observations supplied by these gates |
@@ -790,32 +544,31 @@ It does not complete this plan's full verification objective. Keep Plan 160 IN P
 until required operational implementation and campaign evidence are complete. Plan 161
 charter sign-off and whole-product readiness remain separate decisions.
 
-## Stop conditions and maintenance
+## STOP conditions
 
-Stop only dependent mutations on unknown target/ownership, missing AU decision, ineffective
-worker fencing, lost run authority, unresolved remote effect, uncertain child closure or unsafe
-cleanup. Continue independent source/read-only/report work. An application/schema change,
+Stop only dependent mutations on:
+1. Unknown target or fixture ownership.
+2. Ineffective worker fencing or lost run authority.
+3. Unresolved remote effect or uncertain child closure.
+4. Unsafe cleanup or missing restoration readback.
+5. Attempting to alter the approved `au-contract-v1` workflow inside the harness.
+
+Continue independent source, read-only and report work. An application/schema change,
 new observer database mode or unapproved payroll operation requires a concrete prerequisite
 handoff; do not improvise it inside this test plan.
 
-If corrected source fails its meaningful verification twice, reconcile the failed assumption
-and update the handoff. Preserve failure evidence; do not shrink the catalogue or weaken a
-validator to clear a gate. A source change requires new candidate provenance and applicable
-fresh gates; tree equivalence can explain historical source evidence but cannot prove a new
-provider/deployment state.
+## Maintenance notes
 
 Keep raw-provider expectations, approved AU contract, scenario catalogue and report schema
 aligned. Recheck installed SDK signatures and official provider contracts before changing an
-observer. Use Context7 for library/API documentation during implementation; provider contract
-claims belong in `plans/161-xero-provider-contract.md` with documented/observed distinctions.
-No external contract was refreshed in this plan-only review.
+observer. Provider contract claims belong in [`plans/161-xero-provider-contract.md`](161-xero-provider-contract.md)
+with documented/observed distinctions.
 
 Maintain one writer/ownership model for ledger recovery; scrutinise child shutdown and any
 adapter that can mutate before returning a lease. Changes to fixture ownership, worker
 registration, cadence, context renewal or key rotation require recovery and provenance tests.
 
 Considered and rejected:
-
 - Rebuilding the existing manifest/report/oracle foundation or restoring the obsolete teardown
   excerpt. The implementation already exists; extend it only for the named remaining work.
 - Marking all harness work complete because default admission safely refuses execution.
@@ -825,34 +578,5 @@ Considered and rejected:
   recovery evidence before remote reconciliation.
 - Choosing Plan 159's AU write policy or modifying ordinary release journeys during verification.
 
-## Initial review result, historical
-
-Review complete at `92d67c5`. Two bounded source/evidence reviews and a fresh-context handoff
-review informed this revision. The cold review's terminal-collection ordering concern was
-incorporated in Steps 2 and 7, then independently confirmed resolved. R1-R3 and R5-R7 remain
-source work; this session changed no implementation.
-
-Validation: 48 bounded tests PASS, four file-writing tests deliberately excluded; discovery
-PASS with 97 listed tests; source catalogue confirms 26 scenarios / 92 subcases / 40 charter
-cases / 93 required levels. All scenario and subcase table rows match the previous plan
-exactly. Local Markdown links resolve and scoped `git diff --check` passes. Release-tool
-typecheck FAIL remains explicitly recorded for unresolved declared `jose`. Full CI gates,
-database, provider, authenticated browser and production configuration were not rerun.
-
-This review's edits are this plan and its README record. Concurrent go-live plan/index edits
-are preserved. The immediate executable work is dependency repair and Steps 1-2; operational
-admission and dependent campaign work follow the concrete prerequisites in Step 3.
-
-
-## Current plan verification result
-
-Reviewed against main `514efb5`, whose entire source/test tree matches merged and verified
-`5d5889c`. The current implementation, drift baseline, Steps 1-2, discovery command and
-completion ledger now reflect those fixes. The prerequisite/review/index records distinguish
-initial history from the merged source. The remaining execution starts with Step 3;
-Steps 4-8 require real worker admission, receipt/case producers and the existing operational
-prerequisites. No missing authority or observation is inferred from source/domain PASS.
-
-Validation and independent review results are recorded in
-[execution review](160-execution-review.md#updated-plan-verification-27-september-2026).
-This verification changes plans only and does not repeat a database/provider campaign.
+Historical review verifications and detailed execution notes are preserved in
+[`plans/160-execution-review.md`](160-execution-review.md).

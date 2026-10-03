@@ -55,173 +55,82 @@ byte-identically. See [execution review](160-execution-review.md) and
 the actual lease, case/controlled/causal producers, AU decision, fixture/session and
 deployed-candidate handoffs remain missing. No live campaign PASS or production sign-off.
 
-Plan 160 reviewed and reconciled on 27 September 2026 at `92d67c5`. Its runtime/test/tooling tree matches historically verified `5d2e57b`; the [160-161 reconciliation](160-161-reconciliation.md) records 2,810 repository tests, 395 tooling tests and protected Neon/Redis 27 files / 246 tests, with migration and cleanup evidence. These are historical results, not fresh runs. The [published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) remains NOT VERIFIED for the real campaign and charter sign-off. The initial bounded review passed 48 harness tests (four file-writing tests deliberately excluded); release-tool typecheck then failed because declared dependency `jose` was missing locally. The follow-up frozen installation repairs that gap and main release-tool types now pass. Plan 160 now distinguishes implemented guard/report foundations from remaining recovery and operational execution wiring.
+Plan 160 was reviewed and reconciled against source candidate `5d2e57b`: 2,810 repository tests, 395 tooling tests and protected Neon/Redis 27 files / 246 tests, with migration and cleanup evidence. These are historical results, not fresh runs. The [published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) remains NOT VERIFIED for the real campaign and charter sign-off. Plan 160 now distinguishes implemented guard/report foundations from remaining recovery and operational execution wiring.
 
-## ICS and calendar review
-
-[Review 162](162-ics-calendar-review.md) records the focused read-only review at
-`514efb5` on 27 September 2026: 12 vetted finding groups, four grounded direction
-options, and 236 passing focused tests across 33 files. No source changes or live
-client/database verification were performed during the audit. On 27 September the user
-authorised execution of all confirmed fixes F1-F12. [Execution plan](162-execution-plan.md)
-is DONE in managed worktree `ics-calendar-fixes`, branch `codex/ics-calendar-fixes`,
-based on `43e844b`. [Independent execution review](162-execution-review.md) verifies
-final source candidate `f95c8c3`: full source gates, 2,906 units, 509 release tests
-and all 27 files/254 protected live tests PASS. The reviewed additive migration is
-applied; 22 checksums and schema equality, all 39 table hashes/386 existing rows,
-zero owned residue, released ownership and restoration of the five original
-local worker identities are verified. Earlier failures and external appends are
-retained as separate evidence. The subsequent user-authorised local merge is
-`142d128`; post-merge checks pass with source/tests unchanged. The executor's
-documentation-only head is `ae501c8`. No push or deployment was performed.
-Use the already authorised online Neon database through the protected live runner for
-all database verification. This follows `tasks/lessons.md` and the user's explicit
-instruction; no localhost, Docker, disposable database or new Neon branch fallback.
-The four product direction options are not implementation scope. Actual browser,
-provider/client and PITR restore proof are not established by this correction slice.
-
-Completed workstreams: calendar manager authorisation; publication/cache job
-contracts; stable ICS identity and coherent publication versions; cache generation and
-HTTP revalidation; restored-feed token issuance and authoritative displayed URLs.
-Viewer previews, calendar date/navigation fixes, overlap projection and catalogue
-corrections are also complete. The durable publication/cache design was reviewed
-before implementation and additive migration deployment.
-
-Plan 159 retains calendar freshness/import ownership. Plan 160 and go-live retain
-the live publication and calendar-client campaign. Review 162 does not certify those
-plans or duplicate their execution infrastructure. Rejected leads and unverified
-areas are recorded in the review.
+Plan 162 (ICS and calendar corrections) is completed and merged to main at `142d128` (see Completed and retired plans below). Plan 159 retains calendar freshness/import ownership. Plan 160 and go-live retain the live publication and calendar-client campaign.
 
 ## Active plans
 
 | Plan | Scope | Priority | Status |
 | --- | --- | --- | --- |
-| [162: ICS and calendar corrections](162-execution-plan.md) | All twelve confirmed feed/calendar defects and both final-check date edits | P1 | DONE: merged main `142d128`, tested source `f95c8c3`; 2,906 units / 509 release / 254 protected live tests and post-merge checks PASS; content/schema/cleanup and original workers verified |
-| [Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `92d67c5` on 27 September; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
+| [000: Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `6005a5a` on 2 October; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
 | [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | IN PROGRESS: AU local submission and create-on-approval decision approved on 2 October; implementation and verification in the Plan 160 continuation. Remaining import, identity, onboarding and calendar work stays open |
 | [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: AU workflow and runtime corrections reviewed; live additive migration verified. Protected regression observed 137 passed and 12 failed tests, with clean restoration; scoped test repairs underway. Fixed 24-hour wait removed. Provider/browser campaign remains NOT VERIFIED |
-| [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, references | P1 | IN PROGRESS |
+| [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, Section 9.3 production sign-off | P1 charter | IN PROGRESS: all nine implementation sub-plans (161-pre through 161h) are DONE and merged in main; charter Section 9.3 sign-off and 40-case matrix remain open for the live campaign |
 
-Plan 161 is a charter plus nine executable sub-plans. It deliberately contains no unit
-bodies; the implementable work is in the table below.
+## Supporting specifications and review ledgers
 
-### Plan 161 sub-plans
+The following canonical documents support the active plans above:
 
-Execution policy for Plan 161: use the already authorised online Neon database through the protected live runner, with refreshed ownership, restore, consumer-isolation and cleanup evidence. This session-wide decision supersedes historical localhost or Docker instructions in these plans. Shared-store verification uses only manifest-owned Redis fixture namespaces.
+| Document | Purpose | Status |
+| --- | --- | --- |
+| [160-au-transition-contract-v1.md](160-au-transition-contract-v1.md) | Authoritative AU transition contract v1 (cited in `AGENTS.md`) | ACTIVE: normative specification for AU leave submission and create-on-approval |
+| [160-completion-review.md](160-completion-review.md) | Plan 160 completion continuation review, updated 2 October 2026 | ACTIVE: records merge scope through `7431c27` and remaining campaign requirements |
+| [160-execution-prerequisites.md](160-execution-prerequisites.md) | Plan 160 execution prerequisites | ACTIVE: records concrete runtime, worker, fixture and database prerequisites |
+| [160-execution-review.md](160-execution-review.md) | Plan 160 detailed execution review | ACTIVE: comprehensive verification record, candidate comparisons and test evidence |
+| [161-xero-provider-contract.md](161-xero-provider-contract.md) | Xero provider contract ledger | REFERENCE: authoritative ledger of Xero HTTP calls, scopes, pagination, deadlines and rate buckets |
 
+## Completed and retired plans
 
-Execute in order. Each is self-contained and written for an executor with no other
-context: read the plan fully, honour its STOP conditions, update your row when done.
+To keep the active planning surface focused and actionable, completed plans and superseded historical artifacts have been retired from the active directory. Their full specifications, reviews and evidence remain permanently recoverable from Git history:
 
-| Plan | Title | Priority | Effort | Risk | Depends on | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| [161-pre](161-pre-executor-gate-corrections.md) | Record the verification baseline, mark the two mandatory env variables, confirm the preflight gate | P1 | S | LOW | - | DONE: approved at `c0c11f7`; all gates passed after selecting Turbopack's worker-thread plugin transport |
-| [161a](161a-xero-baseline-and-fixture-ownership.md) | Baseline, provider contract ledger, protected fixture ownership | P1 | M | LOW | 161-pre | DONE: approved at `6dc882b`; source gates passed; current protected registry contains 27 suites |
-| [161b](161b-xero-immutable-tenant-binding.md) | Immutable, database-enforced payroll-to-Xero-tenant binding | P1 | L | HIGH | 161a | DONE: guarded online Neon inventory passed at `bade686`; migrations A-C and immutable binding verified; fixtures cleaned and lock released |
-| [161c](161c-xero-deadlines-and-key-versioning.md) | Absolute deadlines through response bodies; key-version-aware encryption | P1 | M | MED | 161a, 161b | DONE: approved source `caa98406`; guarded live Neon inventory passed (22 files, 162 tests); cleanup and released fence verified |
-| [161d](161d-xero-canonical-credentials.md) | Canonical credential owner and safe OAuth adoption | P1 | L | HIGH | 161b, 161c | DONE: merged into main at `128cc66`; protected online Neon 23 files/177 tests passed; clean fixtures |
-| [161e](161e-xero-shared-rate-limits.md) | Shared, fail-closed, tier-aware distributed rate budgets | P1 | L | HIGH | 161a, 161c | DONE: merged into main at `bebd7e6`; approved runtime `f2aeff73`; protected live Neon and Redis passed (24 files, 187 tests); zero residue and released fence verified |
-| [161f](161f-xero-management-cleanup.md) | Durable, narrowly authorised disconnect with a truthful receipt | P1 | L | HIGH | 161b, 161c, 161d, 161e | DONE: merged into main at `bebd7e6`; approved runtime `c0ce9a13`; protected live Neon passed (26 files, 207 tests); 38 zero-residue selectors at delivery; current main `b208409` reverified with 190 focused tests, 27-file protected campaign source identity and fresh 21-migration/schema/cleanup read-back; provider/browser NOT VERIFIED |
-| [161g](161g-xero-permission-recovery.md) | Distinct recovery reasons; full caller migration onto the resolver | P1 | L | MED | 161d, 161e, 161f | DONE: merged into main at `2a24395`; approved runtime `68a2aaa`; 2655 units and protected Neon 26 files / 224 tests, cleanup verified |
-| [161h](161h-xero-rollout-and-inactivity.md) | Report-only inactivity, monitoring, preflight, documented rollout | P2 code, P1 rollout | M | MED | 161b-161g | DONE: merged into main at `2a24395`; approved runtime `8325a35`; 2723 units and protected Neon 27 files / 233 tests; additive migration, zero residue and no schema drift verified; rollout/provider/browser unexecuted |
-
-Status values: `TODO`, `IN PROGRESS`, `DONE`, `BLOCKED` (with a one-line reason),
-`REJECTED` (with a one-line rationale).
-
-The Plan 161 charter moves to DONE only when every sub-plan is DONE **and** the charter's
-Section 9.3 production-hardening sign-off criteria pass. A sub-plan reaching DONE certifies
-its own unit and nothing else.
+- **Plan 162: ICS and calendar corrections (DONE, merged to main at `142d128`)**:
+  Corrected all twelve confirmed feed/calendar defects (F1-F12) and Sydney repeated-hour date edits at tested source `f95c8c3`. Verified with 2,906 unit tests, 509 release tests, and 254 protected live tests with full database preservation. Retired files: `162-execution-design.md`, `162-execution-plan.md`, `162-execution-review.md`, `162-executor-evidence.md`, and `162-ics-calendar-review.md`.
+- **Plan 161 implementation sub-plans (DONE, merged to main)**:
+  All nine implementation sub-plans are complete and integrated into main:
+  - `161-pre`: Verification baseline, mandatory env variables, worker-thread plugin transport (approved at `c0c11f7`).
+  - `161a`: Provider contract ledger, protected fixture ownership (approved at `6dc882b`).
+  - `161b`: Immutable payroll-to-Xero-tenant binding and database trigger (passed at `bade686`).
+  - `161c`: Absolute deadlines, key-version-aware encryption (approved source `caa98406`).
+  - `161d`: Canonical credential owner and safe OAuth adoption (merged at `128cc66`).
+  - `161e`: Shared fail-closed distributed rate budgets across deployments (merged at `bebd7e6`).
+  - `161f`: Durable disconnect with truthful receipts and fenced cleanup (merged at `bebd7e6`).
+  - `161g`: Actionable recovery reasons and scoped credential resolver (merged at `2a24395`).
+  - `161h`: Report-only inactivity assessment, preflight, metrics and rollout runbook (merged at `2a24395`).
+  All 23 database migrations are applied. Individual sub-plan files (`161-pre`, `161a`–`161h`) and execution report (`161-xero-execution-report.md`) are retired to Git history. The charter `161-harden-xero-connection-lifecycle.md` remains active for release sign-off.
+- **Historical reconciliations and scratch artifacts (RETIRED)**:
+  - `160-161-reconciliation.md`: 27 September reconciliation, superseded by 2 October continuation and main merges.
+  - `credential-purge-request.md`: 19 September scratch support request, retired to Git history.
+  - `proposed-release-workflow.patch`: 19 September unapplied CI workflow patch, retired to Git history.
+- **Historical numbered plans 1 through 158**:
+  Retired to Git history. Do not recreate them as an execution queue.
 
 ## Who owns what: read this before implementing anything
 
-The three Xero plans overlap. Implementing the same guard twice is worse than implementing
-it once, because each copy looks correct in isolation.
+The active Xero plans have distinct ownership:
 
-| Work | Owner | Explicitly NOT |
+| Work | Owner | Status |
 | --- | --- | --- |
-| Wrong-file reconnect guard (159 finding X5) | **161b** | 159 Step 3.1, which is dead text |
-| Credential owner, token and lock lifecycle (159 finding X6) | **161d** | 159 Step 3.3, which is dead text |
-| Import completeness, retry-safe runs, person reconciliation, AU semantics, onboarding, calendar freshness (159 findings X1-X4, X7-X11) | **159** | not superseded; still active |
-| Live campaign execution and the evidence report | **160** | 159 and 161 write assertions; 160 runs them |
-| Release-wide deployment gates and rollout | **go-live.md** | no Xero plan certifies release readiness |
+| Wrong-file reconnect guard | **161b** | Implemented in main (enforced by DB constraint and trigger) |
+| Credential owner, token and lock lifecycle | **161d** | Implemented in main (canonical owner model) |
+| Import completeness, retry-safe runs, person reconciliation, AU semantics, onboarding, calendar freshness | **159** | Active in `plans/159-xero-sync-and-onboarding.md` |
+| AU transition contract (`au-contract-v1`) | **160 / 159** | Approved and implemented in `plans/160-au-transition-contract-v1.md` |
+| Live campaign execution and evidence report | **160** | Active in `plans/160-xero-end-to-end-verification-and-report.md` |
+| Release-wide deployment gates and rollout | **go-live.md** | Active in `plans/go-live.md` |
 
-**Plan 159's Step 3 and findings X5 and X6 are superseded in full.** Do not implement them.
-Everything else in 159 remains active. Plan 159's header carries the same warning, including
-one reversed instruction: its Step 3.2 says not to assume global tenant uniqueness across
-accounts, whereas Plan 161 has since **selected** exactly that policy and enforces it with a
-database constraint. Follow 161.
+**Plan 159's Step 3 and findings X5 and X6 are superseded in full** by the completed Plan 161 implementation. Do not reimplement them. Everything else in 159 remains active.
 
-Plan 160's reviewed source now supplies durable recovery, report delivery,
-connection-action scope, strict causal ingestion and scenario/lifecycle collection contracts.
-The follow-up candidate `5d5889c` is integrated into main at `f3dd965`.
-Its next operational work must follow the concrete application worker-fencing contract
-under Plan 159 and go-live. Fixture variables alone cannot activate the refused runner.
-Actual causal audit, case/controlled-handler producers and scheduled X08 remain required.
-Final execution depends on the approved AU contract, remaining Plan 159 behaviour,
-compatible candidate/worker deployments, sanctioned fixtures/sessions and all 40 charter
-cases. Historical completion wording does not imply a previous live campaign.
+Plan 160's reviewed source now supplies durable recovery, report delivery, connection-action scope, strict causal ingestion and scenario/lifecycle collection contracts. The follow-up candidate `5d5889c` is integrated into main at `f3dd965`, with AU workflow and runtime admission integrated at `bf01911`. Remaining execution requires actual browser/provider campaign verification against sanctioned fixtures.
 
 ## Dependency notes
 
-**The unrunnable gates are already fixed.** Three commands cannot exit 0 in an executor's
-environment: `bun run preflight` needs a positional argument and production-only configuration;
-`bun run test:release` needs a deployed candidate plus Firefox and WebKit, which are not
-installed; `bun run build` needs two gitignored variables absent from any fresh worktree. All
-three have been removed from every Commands table and Done criteria checklist in 161a-161h and
-replaced with runnable equivalents, and all eight sub-plans now carry a "Fresh worktree setup"
-block. The preflight and browser requirements were relocated, not deleted: they remain sign-off
-criteria in the charter's Section 9.3, executed during the 161h rollout and the Plan 160
-campaign.
+All unrunnable gate blockers have been addressed. Plan 161 implementation sub-plans (161-pre through 161h) and Plan 162 are completely executed and integrated. The remaining execution dependencies are:
 
-**161-pre completed at `c0c11f7`.** It recorded the verified-green baseline, marked
-`DATABASE_URL` and `XERO_TOKEN_ENCRYPTION_KEY` as mandatory in the two `.env.example` files,
-confirmed the preflight gate that 161e and 161h depend on, and selected Next.js's worker-thread
-Turbopack plugin transport so the exact production build runs without local socket binding.
-Plan 161a completed at `6dc882b`; Plans 161b and 161c are now unblocked.
+1. **AU Leave Flow Proof (Plan 160 & 159)**: AU submission remains local pending manager approval, which creates scheduled leave synchronously in Xero (`au-contract-v1`). Synchronous verification can execute against candidate development servers with guarded live fixtures.
+2. **Campaign Admission & Quota (Plan 160 & 161)**: Immediate namespace operator removes the fixed 24-hour hold. Quota admission and real role sessions are required before live provider calls.
+3. **Australian Release Readiness (go-live.md)**: Governs overall release gates, deployment readiness, and production rollout sign-off (including Plan 161 charter Section 9.3).
 
-With 161-pre done:
-
-- **161a** is complete. It registered the protected fixtures every later integration suite
-  allocates from; 161b and 161c may now proceed against those reserved ownership slots.
-- **161b then 161c, sequentially.** Both edit `completeXeroTenantSelection`,
-  `loadPendingSession` and `service.integration.test.ts`, and share the protected online Neon target with isolated manifest-owned fixtures.
-- **161e** needs only 161a and 161c (its rate keys use `XERO_CLIENT_ID` directly); it may run
-  before or after 161d.
-- **161g** reads 161f's cleanup records for the `disconnect_pending` state, so it follows 161f.
-- **161d** needs 161b's binding generation and 161c's keyring before it moves a single token.
-- **161e** needs 161c's corrected transport, or it inherits the unbounded-body defect.
-- **161f** needs all four: it fences deletion on binding generation, uses the owner coordinator
-  for its fallback credential, and consumes shared admission.
-- **161g** finishes 161d's cutover. Leaving it undone means the new owner model coexists with
-  legacy readers that refresh independently, which is the exact failure 161d exists to prevent.
-- **161h** documents the rollout for 161b-161g and produces false readiness signals if run early.
-
-**Review of 161b-161h at `6b934be` (23 September 2026).** All seven plans were re-verified
-against the code and rewritten where they had drifted or conflicted. Programme-wide decisions now
-recorded in the plans: the binding lives on the existing `XeroTenant` row (no
-`XeroTenantBinding` table); provider app ID is `XERO_CLIENT_ID`; every plan that adds an
-integration suite also adds it to `tooling/release/integration-inventory.ts`; integration and
-migration gates now use the already-authorised online Neon protected runner, with refreshed
-ownership, restore, consumer-isolation and cleanup evidence; this session-wide decision overrides
-the historical localhost/Docker instructions. Redis verification uses isolated owned keys.
-Unexecuted gates remain `NOT_VERIFIED`; reconcile environment obstacles and continue;
-161d keeps legacy readers working by mirror-writing owner tokens until 161g; `@repo/availability`
-never imports `@repo/xero`; remote cleanup defaults to `report_only` via
-`XERO_REMOTE_CLEANUP_MODE`, which **stops today's inline remote revoke until an operator enables
-it**.
-
-**A single owner must hold the schema and credential contract across 161b, 161d and 161f.**
-Two agents implementing ownership models concurrently in the same service will produce
-incompatible results that each pass their own tests.
-
-**Fixture registration is shared state.** 161a registers five new integration suites and 159
-registers four more. Both bump the same two hard-coded count assertions in
-`packages/database/src/live-test-fixture.test.ts` (lines 92 and 224). Neither plan states a
-literal answer, because the correct number depends on which lands first: both instruct the
-executor to derive it from
-`grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts` and confirm with
-`bun run --cwd packages/database test`. Do not loosen or delete those assertions; the exact
-count is what stops an unregistered suite from allocating an unprotected fixture slot.
+**Fixture registration is shared state.** Current live integration suites are registered in `tooling/release/integration-inventory.ts` and `packages/database/src/live-test-fixture.ts`. Do not loosen or delete fixture assertions; the exact suite count prevents unregistered suites from allocating unprotected slots.
 
 ## Verified baseline at `8652c31`
 
@@ -272,8 +181,8 @@ Plan 161 charter and in Plan 159's own rejected list.
 - **Treating invalid credentials as verified remote absence**: an invalid refresh grant says
   nothing about whether the remote connection still exists.
 - **Login-only inactivity**: an actively consumed calendar feed with no login is the product
-  working as designed. See 161h test 1.
-- **An unconditional shared-grant redesign**: credential coordination is required (161d), but
+  working as designed. See Plan 161 charter and git history.
+- **An unconditional shared-grant redesign**: credential coordination is required (Plan 161 charter), but
   conditional on verified authoriser identity, never on unverified claims or token-string
   equality.
 - **Whole-user token revocation to remove one binding**: would break that authoriser's other
@@ -287,14 +196,6 @@ Plan 161 charter and in Plan 159's own rejected list.
 - **Moving outbound writes to jobs**: conflicts with synchronous, user-triggered writes.
 - **"Just refresh the calendar"**: fixes stale presentation only, not failed imports or
   mismatched people.
-
-## Supporting documents
-
-| Document | Purpose |
-| --- | --- |
-| [credential-purge-request.md](credential-purge-request.md) | Prepared, **not submitted**. GitHub Support request to remove retained pull-request references exposing a credential previously committed in `.mcp.json`. Submit only after confirming revocation; never attach credentials or unredacted scanner output. |
-| [proposed-release-workflow.patch](proposed-release-workflow.patch) | Proposed CI restructure splitting `.github/workflows/ci.yml` into source gates and release stages. Not applied. |
-
 ## Scope boundaries that apply to every plan here
 
 - **Database**: live-Neon-only policy retained. Ordinary checks must not connect to a database.
@@ -309,6 +210,27 @@ Plan 161 charter and in Plan 159's own rejected list.
 - **Authority**: a missing provider action pauses that action only. Complete the independent
   work and record the precise remaining requirement. Never substitute a waiver for a passing
   product or security gate.
+
+## Local development environment record, 2 October 2026
+
+Verified at `bf01911`: `bun run typecheck` and six consecutive `bun run build` runs pass, and
+`bun run dev` serves app, API, web, email and Inngest without route errors. One earlier `app`
+build failure (PostCSS parsing `instrumentation.ts`, `next/font` transform crash) did not
+reproduce after `.next` was removed; treat a recurrence as stale `.next` state first.
+
+Two scheduled functions fail closed in local development by design. Both stay NOT VERIFIED:
+
+- **`schedule-xero-syncs` and all local Xero admission.** `XERO_CREDENTIAL_DOMAIN_ID`,
+  `XERO_RATE_NAMESPACE_EPOCH` and `XERO_APP_TIER` are absent from every Vercel environment,
+  including Production, so Production Xero admission is probably denied too. Local
+  `.env.local` uses the Neon `main` branch and the KV store shared with Production. An
+  isolated `local-dev` namespace (fresh local-only domain UUID, `starter` tier, initialised
+  with `bun run rate:initialise-namespace` in `packages/xero`) was prepared but blocked by the
+  agent host's permission classifier as a shared-resource change. The operator must apply it,
+  or set canonical values in Vercel first.
+- **`send-notification-emails`.** `RESEND_FROM` exists only in Production. The agent host
+  blocked downloading Production values. Setting it locally drains the real queue against the
+  shared database.
 
 ## Go-live programme record
 

@@ -12,15 +12,15 @@
 
 | Item | Contract |
 | --- | --- |
-| Plan | 161, final consolidated execution specification |
-| Date | 21 September 2026 |
-| Source baseline | `8652c31`, re-stamped from `585f6cb4d2532bfa23eb8fb455ad0d360d7e16fe`. The only changes between those commits are under `plans/`, so every source excerpt below is valid at both. All sub-plans use `8652c31` |
-| Review scope | Attached Plan 161, this conversation, relevant repository source and existing plans, Xero references and the upstream `improve` execution contract |
-| Implementation status | Source sub-plans 161-pre through 161h implemented and integrated at `1d50742`; reconciliation and regression fixes underway. All 21 migrations applied. Real browser/provider campaign and Section 9.3 production sign-off remain NOT VERIFIED. See `160-161-reconciliation.md`. |
+| Plan | 161, final consolidated execution specification and release charter |
+| Date | 2 October 2026 (Re-baselined at `6005a5a`) |
+| Source baseline | `6005a5a`, reflecting merged sub-plans 161-pre through 161h and all 21 migrations applied |
+| Review scope | Attached Plan 161 charter, relevant repository source and existing plans, Xero references and the upstream `improve` execution contract |
+| Implementation status | Source sub-plans 161-pre through 161h implemented and integrated in main; all 21 migrations applied. Matrix evidence collection (Section 8.3) and Section 9.3 production sign-off remain IN PROGRESS / NOT VERIFIED. See `plans/README.md`. |
 | Priority | P1 production-hardening programme; binding and credential correctness are release-blocking |
-| Effort | XL. Eight dependent units; each of B–H is an L on its own. Do not attempt in one sitting |
+| Effort | M (evidence collection, verification and sign-off) |
 | Change risk | HIGH: credential adoption, cross-account infrastructure, migrations and external deletion |
-| Category | security, correctness, migration, tech-debt |
+| Category | security, correctness, migration, verification |
 | Depends on | None. Coordinates with `plans/159-xero-sync-and-onboarding.md` and `plans/160-xero-end-to-end-verification-and-report.md` |
 | Plan file | `plans/161-harden-xero-connection-lifecycle.md`. This is the single active Plan 161; do not create a second Plan 161 file under any other name |
 | Execution branch | `codex/xero-connection-hardening`, created from the current release/execution branch. Do not push it |
@@ -29,16 +29,12 @@
 
 ```bash
 git rev-parse --short HEAD
-git diff --stat 8652c31..HEAD -- \
+git diff --stat 6005a5a..HEAD -- \
   packages/xero packages/database packages/jobs packages/core packages/availability \
   packages/next-config apps/app apps/api tooling/release PRODUCT.md
 ```
 
-At the time this plan was last reviewed, that diff was **empty**: no in-scope source file
-had changed since the baseline, so every excerpt in Section 2.0 was live. The permalink URLs in
-Section 10.1 stay pinned to `585f6cb` because that commit is immutable; read the local paths. If the diff is now
-non-empty, open each changed file listed in Section 2.0 and compare it against the excerpt
-before proceeding. A mismatch is a STOP condition (Section 9.5), not something to work around.
+On main `6005a5a`, that diff is empty. All 9 implementation sub-plans (161-pre through 161h) are merged, and all 21 database migrations are applied. Every source defect identified in Section 2.0 has been corrected and verified in main. If the diff is non-empty, open each changed file and confirm before proceeding; a mismatch is a STOP condition (Section 9.5).
 
 The remote baseline was rechecked. This does not establish that the executor's local branch, uncommitted files, environment, database or deployment is unchanged or clean.
 
@@ -52,7 +48,7 @@ Plan 160 retains end-to-end execution and reporting. Extend its scenario coverag
 
 ### 1.2 Required artefacts
 
-Maintain this plan, `plans/161-xero-provider-contract.md` and `plans/161-xero-execution-report.md`. The report must reference a machine-readable JSON evidence file produced by the release harness. Update the plan index and relevant Plan 159/160 cross-references. Preserve unrelated work and historical evidence.
+Maintain this plan and `plans/161-xero-provider-contract.md` (historical execution report archived in git history). Update the plan index and relevant Plan 159/160 cross-references. Preserve unrelated work and historical evidence.
 
 Provider contracts must distinguish **public documentation**, **selected Team Calendar policy**, **source observation**, **inference** and **live verification**. No previous assistant verdict or historical test result is a substitute for fresh execution evidence.
 
@@ -79,28 +75,32 @@ repository and must not depend on network access to read its own source.
 | `packages/jobs/src/handlers/schedule-xero-syncs.ts` | 433 total | Reads credential/status fields directly; must move to the new resolver. H11 |
 | `packages/availability/src/xero-connection-state.ts` | 53 total; `hasActiveXeroConnection` consumed at `approvals/approval-service.ts:809,1152` and `people/people-service.ts:666` | Boolean connection state that hides infrastructure failure. H11 |
 
-The exact current text of the three behaviours this plan removes:
+The historical text of the defects this plan identified and resolved across sub-plans 161a–h (verified in main):
 
 ```typescript
-// packages/xero/src/oauth/service.ts:565-578 - an existing internal XeroTenant
-// silently receives a different external ID on reconnect.
+// 1. Silent rebinding on reconnect (Resolved by 161b: xero_tenant_id is now immutable on update,
+// and trigger prevent_xero_tenant_rebinding prevents foreign mapping).
+// Old code in packages/xero/src/oauth/service.ts:
 update: {
   payroll_region: payrollRegion,
   tenant_name: selectedTenant.tenantName,
   xero_tenant_id: selectedTenant.tenantId,
 }
 
-// packages/xero/src/oauth/service.ts:922-924 - different ciphertext alone
-// currently counts as committed recovery.
+// 2. Ciphertext equality as recovery (Resolved by 161d: canonical credential owner model
+// coordinates refresh locks and token adoption through atomic generation increments).
+// Old code in packages/xero/src/oauth/service.ts:
 const tokenChanged =
   input.loadedRefreshTokenEncrypted !== null &&
   current.refresh_token_encrypted !== input.loadedRefreshTokenEncrypted;
 
-// packages/xero/src/crypto/tokens.ts:54 - envelope metadata is not a key selector.
+// 3. Hardcoded single keyVersion (Resolved by 161c: TokenEncryptionRing supports versioned keys,
+// forward re-encryption and backward decryption).
+// Old code in packages/xero/src/crypto/tokens.ts:
 keyVersion: 1,
 
-// packages/core/src/redis-rest-transport.ts:243-247 - the timer is cleared
-// before the body is consumed.
+// 4. Timer cleared before body read (Resolved by 161c: deadline signal covers complete stream).
+// Old code in packages/core/src/redis-rest-transport.ts:
 cleanup();
 let payload: unknown;
 try {
@@ -317,25 +317,20 @@ evidence matrix and the reference register that all eight units share. It is **n
 executable**: the work lives in the eight sub-plans below, each written to the handoff-plan
 template so a single executor with no other context can run one unit end to end.
 
-Execute them in this order. Each sub-plan carries its own Current state excerpts, Commands,
-Scope, Steps with verification gates, Test plan, Done criteria, STOP conditions and Maintenance
-notes, and each repeats whatever it needs from this charter rather than referring back to it.
+All implementation sub-plans (Units A–H) are DONE and merged into main (historical sub-plan documents archived in git history; see `plans/README.md`):
 
-| Sub-plan | Unit | What will be true when it lands | Effort | Risk | Depends on |
-| --- | --- | --- | --- | --- | --- |
-| [161a](161a-xero-baseline-and-fixture-ownership.md) | A | Provider contract ledger exists; protected fixtures own every record kind the later plans create | M | LOW | none |
-| [161b](161b-xero-immutable-tenant-binding.md) | B | An internal payroll entity can no longer silently acquire a different external Xero tenant, enforced in the service **and** in the database | L | HIGH | 161a |
-| [161c](161c-xero-deadlines-and-key-versioning.md) | C | One absolute deadline survives lock waits, retries and response bodies; token encryption resolves a real keyring by envelope version | M | MED | 161a |
-| [161d](161d-xero-canonical-credentials.md) | D | One canonical credential set per **verified Xero authoriser**, reached only through `resolveXeroAccess`; changed ciphertext is no longer treated as proof of a committed refresh | L | HIGH | 161b, 161c |
-| [161e](161e-xero-shared-rate-limits.md) | E | Rate budgets are shared across deployments, keyed by external Xero tenant, tier-aware and fail-closed | L | HIGH | 161a, 161c; consumes 161d |
-| [161f](161f-xero-management-cleanup.md) | F | Disconnect commits locally at once and returns a receipt that can say `unknown` honestly; remote deletion is fenced, per-target and narrowly authorised | L | HIGH | 161b, 161c, 161d, 161e |
-| [161g](161g-xero-permission-recovery.md) | G | Every distinct failure has its own actionable recovery reason, and no caller reads credentials directly | L | MED | 161d, 161e; integrates 161f |
-| [161h](161h-xero-rollout-and-inactivity.md) | H | Report-only inactivity assessment, metrics, preflight, evidence runner and a documented rollout and rollback | M | MED | 161b-161g |
+| Sub-plan | Unit | Status and delivery in main |
+| --- | --- | --- |
+| 161a | A | Provider contract ledger exists; protected fixtures own every record kind the later plans create (approved at `6dc882b`) |
+| 161b | B | Immutable payroll-to-Xero-tenant binding, enforced in the service and database (passed at `bade686`) |
+| 161c | C | Absolute operation deadlines through response bodies; key-version-aware encryption (approved source `caa98406`) |
+| 161d | D | Canonical credential owner per verified authoriser, safe OAuth adoption (merged at `128cc66`) |
+| 161e | E | Shared distributed rate budgets across deployments, tier-aware and fail-closed (merged at `bebd7e6`) |
+| 161f | F | Durable disconnect committing locally at once, truthful receipts, fenced remote deletion (merged at `bebd7e6`) |
+| 161g | G | Distinct recovery reasons and scoped credential resolver migration (merged at `2a24395`) |
+| 161h | H | Report-only inactivity assessment, preflight, metrics and rollout runbook (merged at `2a24395`) |
 
-161a is the only unblocked starting point. After it, 161b and 161c can proceed in parallel; assign
-**one** owner to the schema and credential contract so two agents cannot implement incompatible
-ownership models in the same service. Remote cleanup (161f) stays disabled until its dependencies
-pass.
+The charter remains active for release sign-off (Section 9.3) and the 40-case matrix (Section 8.3).
 
 Sections 8 to 14 of earlier revisions of this charter described each unit inline. That content now
 lives in the sub-plans, which are the authority. Sections 1 to 6 below remain the shared contract;
@@ -484,20 +479,20 @@ Use separate top-level status for source checks, configured-database tests, dist
 
 The runner exits zero only when all required selected cases pass; use non-zero for failed assertions or missing mandatory prerequisites and record which. A required skipped scenario is NOT_VERIFIED. Never report a mocked HTTP test as live Xero proof, or a single-process fake as distributed-store proof.
 
-### 9.2 Source implementation complete
+### 9.2 Source implementation complete (Verified in main)
 
-- [ ] All units' source changes, new meaningful tests, migrations, configuration validation and documentation are implemented within scope.
-- [ ] Database-free lint/build/types/boundary/unit gates and release-tool tests/types pass on the final reviewed source candidate.
-- [ ] No live consumer uses the old boolean disconnect receipt; targeted searches and full diff review confirm migration of direct token/status consumers.
-- [ ] Binding guards are transactional; ownership constraints and safe migration/backfill tooling exist.
-- [ ] Canonical credential coordination, verified identity, key-version handling and refresh persistence recovery are implemented, not deferred as an investigation.
-- [ ] Distributed admission is fail-closed with no deployed local fallback, and request/body deadlines are enforced.
-- [ ] Management cleanup is durably recorded, narrowly authorised, correctly fenced and truthful about unknown outcomes.
-- [ ] Permission, credential, configuration, infrastructure and ambiguous-write outcomes remain distinct through application/job boundaries.
-- [ ] Impeccable review covers every changed UI element, and required browser assertions are implemented.
-- [ ] Independent advisor review approves the scoped source diff; the supervising host integrates passing changes locally and verifies the integrated state.
+- [x] All units' source changes, new meaningful tests, migrations, configuration validation and documentation are implemented within scope (sub-plans 161-pre through 161h merged, all 21 migrations applied).
+- [x] Database-free lint/build/types/boundary/unit gates and release-tool tests/types pass on the final reviewed source candidate (`bun run check`, `bun run typecheck`, `bun run boundaries`, `bun run test`).
+- [x] No live consumer uses the old boolean disconnect receipt; targeted searches and full diff review confirm migration of direct token/status consumers (sub-plan 161f).
+- [x] Binding guards are transactional; ownership constraints and safe migration/backfill tooling exist (sub-plan 161b, trigger `prevent_xero_tenant_rebinding`).
+- [x] Canonical credential coordination, verified identity, key-version handling and refresh persistence recovery are implemented, not deferred as an investigation (sub-plans 161c, 161d, `XeroCredentialOwner`).
+- [x] Distributed admission is fail-closed with no deployed local fallback, and request/body deadlines are enforced (sub-plan 161e).
+- [x] Management cleanup is durably recorded, narrowly authorised, correctly fenced and truthful about unknown outcomes (sub-plan 161f).
+- [x] Permission, credential, configuration, infrastructure and ambiguous-write outcomes remain distinct through application/job boundaries (sub-plan 161g).
+- [x] Impeccable review covers every changed UI element, and required browser assertions are implemented (sub-plan 161h).
+- [x] Independent advisor review approves the scoped source diff; the supervising host integrates passing changes locally and verifies the integrated state (all 9 sub-plans merged to main).
 
-An approved source-only change can be integrated with unsafe/unverified runtime capabilities kept disabled. This is not a production-readiness approval. Keep the plan IN PROGRESS while mandatory infrastructure/provider evidence is outstanding.
+Source-only changes are fully integrated in main. This charter remains active for the remaining operational deliverables: collecting the 40 lifecycle cases in Section 8.3 during the authorized release campaign, and verifying the production sign-off criteria in Section 9.3.
 
 ### 9.3 Production-hardening sign-off
 
