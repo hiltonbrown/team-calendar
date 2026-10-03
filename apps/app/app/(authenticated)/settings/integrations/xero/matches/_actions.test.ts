@@ -14,6 +14,12 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
+vi.mock("@repo/email", () => ({ resend: {} }));
+vi.mock("@repo/email/keys", () => ({ keys: () => ({}) }));
+vi.mock("@repo/feeds", () => ({
+  invalidateFeedCachesForPerson: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   clerkClient: mocks.clerkClient,
@@ -63,15 +69,75 @@ describe("resolveXeroPersonMatchAction", () => {
       value: { clerkOrgId: orgId, organisationId },
     });
     mocks.database.xeroPersonMatch.findFirst.mockResolvedValue(baseMatch());
-    mocks.database.person.findFirst.mockResolvedValue(null);
+    mocks.database.person.findFirst.mockImplementation(
+      (args?: {
+        where?: { clerk_user_id?: string; id?: string | { notIn?: string[] } };
+      }) => {
+        if (!args?.where) {
+          return null;
+        }
+        if (args.where.id === xeroPersonId) {
+          return { archived_at: null, clerk_user_id: null, id: xeroPersonId };
+        }
+        if (args.where.id === candidatePersonId) {
+          return {
+            archived_at: null,
+            clerk_user_id: "user_candidate",
+            id: candidatePersonId,
+          };
+        }
+        return null;
+      }
+    );
     mocks.database.$transaction.mockImplementation(
-      async (cb: (tx: unknown) => Promise<void>) => {
+      async (cb: (tx: unknown) => Promise<unknown>) => {
         const tx = {
+          alternativeContact: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
           auditEvent: { create: vi.fn().mockResolvedValue({}) },
-          person: { update: vi.fn().mockResolvedValue({}) },
-          xeroPersonMatch: { update: vi.fn().mockResolvedValue({}) },
+          availabilityRecord: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
+          feedScope: {
+            delete: vi.fn().mockResolvedValue({}),
+            findFirst: vi.fn().mockResolvedValue(null),
+            findMany: vi.fn().mockResolvedValue([]),
+            update: vi.fn().mockResolvedValue({}),
+          },
+          leaveBalance: {
+            delete: vi.fn().mockResolvedValue({}),
+            findMany: vi.fn().mockResolvedValue([]),
+            update: vi.fn().mockResolvedValue({}),
+          },
+          notification: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+          person: {
+            findFirst: vi.fn().mockImplementation((args) => {
+              if (args.where.id === xeroPersonId) {
+                return {
+                  archived_at: null,
+                  clerk_user_id: null,
+                  id: xeroPersonId,
+                };
+              }
+              if (args.where.id === candidatePersonId) {
+                return {
+                  archived_at: null,
+                  clerk_user_id: "user_candidate",
+                  id: candidatePersonId,
+                };
+              }
+              return null;
+            }),
+            update: vi.fn().mockResolvedValue({}),
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
+          xeroPersonMatch: {
+            findFirst: vi.fn().mockResolvedValue(baseMatch()),
+            update: vi.fn().mockResolvedValue({}),
+          },
         };
-        await cb(tx as never);
+        return await cb(tx as never);
       }
     );
     mocks.clerkClient.mockResolvedValue({

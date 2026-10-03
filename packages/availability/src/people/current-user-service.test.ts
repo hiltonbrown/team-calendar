@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   personFindMany: vi.fn(),
   personUpdate: vi.fn(),
   withinLimit: vi.fn(),
+  xeroPersonMatchFindFirst: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -28,6 +29,9 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.personFindFirst,
       findMany: mocks.personFindMany,
       update: mocks.personUpdate,
+    },
+    xeroPersonMatch: {
+      findFirst: mocks.xeroPersonMatchFindFirst,
     },
   },
   scopedQuery: (inputClerkOrgId: string, inputOrganisationId: string) => ({
@@ -264,6 +268,7 @@ describe("current-user-service person provisioning", () => {
     vi.clearAllMocks();
     mocks.personFindFirst.mockResolvedValue(null);
     mocks.personFindMany.mockResolvedValue([]);
+    mocks.xeroPersonMatchFindFirst.mockResolvedValue(null);
     mocks.personCreate.mockResolvedValue({
       ...person,
       clerk_user_id: "user_new",
@@ -538,6 +543,43 @@ describe("current-user-service person provisioning", () => {
     expect(mocks.personUpdate).not.toHaveBeenCalled();
     expect(mocks.organisationUpdate).not.toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: otherOrganisationId } })
+    );
+  });
+
+  it("resolves an absorbed candidate person to the canonical active Xero person without creating a new profile", async () => {
+    const xeroTargetPerson = {
+      ...person,
+      archived_at: null,
+      clerk_user_id: null,
+      id: "c2000000-0000-4000-8000-000000000099",
+      source_system: "XERO",
+    };
+    mocks.xeroPersonMatchFindFirst.mockResolvedValue({
+      resolved_clerk_user_id: "user_absorbed",
+      resolved_person: null,
+      status: "matched",
+      xero_person: xeroTargetPerson,
+    });
+    mocks.personUpdate.mockResolvedValue({
+      ...xeroTargetPerson,
+      clerk_user_id: "user_absorbed",
+    });
+
+    const result = await ensureCurrentUserPerson(tenant, {
+      clerkUserId: "user_absorbed",
+      email: "absorbed@example.com",
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { id: xeroTargetPerson.id },
+    });
+    expect(mocks.personCreate).not.toHaveBeenCalled();
+    expect(mocks.personUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ clerk_user_id: "user_absorbed" }),
+        where: { id: xeroTargetPerson.id },
+      })
     );
   });
 });

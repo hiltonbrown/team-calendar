@@ -15,13 +15,10 @@ const mocks = vi.hoisted(() => ({
     uuid: `uuid-${input.name}`,
   })),
   currentUser: vi.fn(),
-  dispatchManualSync: vi.fn(),
+  dispatchInitialXeroSync: vi.fn(),
   getXeroConnectionState: vi.fn(),
   revalidatePath: vi.fn(),
   sessionFind: vi.fn().mockResolvedValue(null),
-  syncXeroLeaveBalances: vi.fn(),
-  syncXeroLeaveRecords: vi.fn(),
-  syncXeroPeople: vi.fn(),
   xeroConnectionFindFirst: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
@@ -40,13 +37,8 @@ vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
 }));
-vi.mock("@repo/availability", () => ({
-  dispatchManualSync: mocks.dispatchManualSync,
-}));
 vi.mock("@repo/jobs", () => ({
-  syncXeroLeaveBalances: mocks.syncXeroLeaveBalances,
-  syncXeroLeaveRecords: mocks.syncXeroLeaveRecords,
-  syncXeroPeople: mocks.syncXeroPeople,
+  dispatchInitialXeroSync: mocks.dispatchInitialXeroSync,
 }));
 vi.mock("@repo/xero", () => ({
   completeXeroTenantSelection: mocks.completeXeroTenantSelection,
@@ -105,17 +97,21 @@ describe("completeTenantSelectionAction", () => {
     mocks.xeroConnectionFindFirst.mockResolvedValue({
       created_at: new Date("2026-09-19T00:00:00.000Z"),
     });
-    mocks.dispatchManualSync.mockResolvedValue({
+    mocks.dispatchInitialXeroSync.mockResolvedValue({
       ok: true,
-      value: { eventName: "sync-xero-people", queued: true },
+      value: {
+        eventName: "initial-xero-sync",
+        ids: ["event_1"],
+        queued: true,
+      },
     });
   });
 
-  it("enqueues complete initial sync (people, leave-records, leave-balances) after a successful connection", async () => {
+  it("dispatches durable initial sync after a successful connection", async () => {
     const result = await completeTenantSelectionAction(validInput);
 
     expect(result.ok).toBe(true);
-    expect(mocks.syncXeroPeople).toHaveBeenCalledWith(
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith(
       expect.objectContaining({
         bindingGeneration: 7,
         clerkOrgId: "org_1",
@@ -125,58 +121,26 @@ describe("completeTenantSelectionAction", () => {
         xeroTenantId: "44444444-4444-4444-8444-444444444444",
       })
     );
-    expect(mocks.syncXeroLeaveRecords).toHaveBeenCalledWith(
-      expect.objectContaining({
-        bindingGeneration: 7,
-        clerkOrgId: "org_1",
-        organisationId: "33333333-3333-4333-8333-333333333333",
-        xeroTenantId: "44444444-4444-4444-8444-444444444444",
-      })
-    );
-    expect(mocks.syncXeroLeaveBalances).toHaveBeenCalledWith(
-      expect.objectContaining({
-        bindingGeneration: 7,
-        clerkOrgId: "org_1",
-        organisationId: "33333333-3333-4333-8333-333333333333",
-        xeroTenantId: "44444444-4444-4444-8444-444444444444",
-      })
-    );
-    expect(mocks.dispatchManualSync).toHaveBeenCalledTimes(3);
     expect(mocks.completeXeroTenantSelection).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user_1" })
     );
-    for (const runType of ["people", "leave_records", "leave_balances"]) {
-      expect(mocks.dispatchManualSync).toHaveBeenCalledWith(
-        expect.objectContaining({
-          actingRole: "admin",
-          actingUserId: "user_1",
-          clerkOrgId: "org_1",
-          organisationId: "33333333-3333-4333-8333-333333333333",
-          runType,
-          xeroTenantId: "44444444-4444-4444-8444-444444444444",
-        })
-      );
+    if (result.ok) {
+      expect(result.value.redirectTo).toContain("/settings/integrations/xero");
     }
   });
 
-  it("keeps durable connection success but skips immediate workers for unavailable state", async () => {
+  it("falls back to default binding generation when connection state is unavailable", async () => {
     mocks.getXeroConnectionState.mockResolvedValue({
       error: { code: "state_unavailable" },
       ok: false,
     });
-    expect((await completeTenantSelectionAction(validInput)).ok).toBe(true);
-    expect(mocks.syncXeroPeople).not.toHaveBeenCalled();
-    expect(mocks.syncXeroLeaveRecords).not.toHaveBeenCalled();
-    expect(mocks.syncXeroLeaveBalances).not.toHaveBeenCalled();
-  });
-
-  it("maps the owner role when dispatching the initial sync", async () => {
-    mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:owner" });
-
-    await completeTenantSelectionAction(validInput);
-
-    expect(mocks.dispatchManualSync).toHaveBeenCalledWith(
-      expect.objectContaining({ actingRole: "owner", runType: "people" })
+    const result = await completeTenantSelectionAction(validInput);
+    expect(result.ok).toBe(true);
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        bindingGeneration: 1,
+        xeroTenantId: "44444444-4444-4444-8444-444444444444",
+      })
     );
   });
 
@@ -187,7 +151,7 @@ describe("completeTenantSelectionAction", () => {
 
     expect(result.ok).toBe(false);
     expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();
-    expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
+    expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
   });
 
   it("does not dispatch a sync when the connection fails", async () => {
@@ -199,7 +163,20 @@ describe("completeTenantSelectionAction", () => {
     const result = await completeTenantSelectionAction(validInput);
 
     expect(result.ok).toBe(false);
-    expect(mocks.dispatchManualSync).not.toHaveBeenCalled();
+    expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
+  });
+
+  it("keeps a durable connection successful when initial sync dispatch throws", async () => {
+    mocks.dispatchInitialXeroSync.mockRejectedValue(
+      new Error("Inngest unavailable")
+    );
+
+    const result = await completeTenantSelectionAction(validInput);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.redirectTo).toContain("/settings/integrations/xero");
+    }
   });
 
   it("keeps a durable connection successful when analytics flush fails", async () => {
@@ -208,7 +185,7 @@ describe("completeTenantSelectionAction", () => {
     const result = await completeTenantSelectionAction(validInput);
 
     expect(result.ok).toBe(true);
-    expect(mocks.dispatchManualSync).toHaveBeenCalledTimes(3);
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(1);
   });
 
   it("uses the durable connection creation time for the activation event", async () => {

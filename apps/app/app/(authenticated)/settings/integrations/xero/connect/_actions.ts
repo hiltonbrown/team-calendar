@@ -3,22 +3,15 @@
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
-import { dispatchManualSync } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
-import {
-  reconcileXeroCampaignActionBinding,
-  withXeroCampaignChildInvocation,
-} from "@repo/database/xero-campaign-access";
-import {
-  syncXeroLeaveBalances,
-  syncXeroLeaveRecords,
-  syncXeroPeople,
-} from "@repo/jobs";
+import { reconcileXeroCampaignActionBinding } from "@repo/database/xero-campaign-access";
+import { dispatchInitialXeroSync } from "@repo/jobs";
 import { completeXeroTenantSelection } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+
 import {
   readXeroCampaignActionHeader,
   withAuthenticatedXeroCampaignAction,
@@ -121,74 +114,31 @@ export async function completeTenantSelectionAction(input: {
       result.value.connectionId
     );
 
-    // Perform immediate initial sync (people, leave-records, leave-balances).
-    // Best effort: the connection is already persisted and scheduled syncs will catch up if
-    // any step fails, so a sync error must not fail the connection itself.
+    // Dispatch durable initial sync (people, leave-records, leave-balances).
+    // Best effort: the connection is already persisted and scheduled recovery will catch up if
+    // dispatch fails, so a dispatch error must not fail the connection itself.
     try {
       const state = await getXeroConnectionState({
         clerkOrgId: orgId,
         organisationId: result.value.organisationId,
       });
-      if (
-        !state.ok ||
-        state.value.state !== "connected" ||
-        state.value.bindingGeneration === null
-      ) {
-        throw new Error("Initial sync connection is unavailable.");
-      }
-      const tenant = await database.xeroTenant.findFirst({
-        select: { id: true },
-        where: {
-          active_slot: 1,
-          binding_generation: state.value.bindingGeneration,
-          clerk_org_id: orgId,
-          id: result.value.xeroTenantId,
-          organisation_id: result.value.organisationId,
-        },
-      });
-      if (!tenant) {
-        throw new Error("Initial sync binding changed.");
-      }
-      const syncContext = {
-        bindingGeneration: state.value.bindingGeneration,
+      const bindingGeneration =
+        state.ok &&
+        state.value.state === "connected" &&
+        state.value.bindingGeneration !== null
+          ? state.value.bindingGeneration
+          : 1;
+
+      await dispatchInitialXeroSync({
+        bindingGeneration,
         clerkOrgId: orgId,
         organisationId: result.value.organisationId,
         triggeredByUserId: user.id,
-        triggerType: "manual" as const,
-        xeroTenantId: tenant.id,
-      };
-      await withXeroCampaignChildInvocation(
-        "sync-xero-people",
-        syncContext,
-        syncXeroPeople
-      );
-      await withXeroCampaignChildInvocation(
-        "sync-xero-leave-records",
-        syncContext,
-        syncXeroLeaveRecords
-      );
-      await withXeroCampaignChildInvocation(
-        "sync-xero-leave-balances",
-        syncContext,
-        syncXeroLeaveBalances
-      );
-    } catch {
-      // Best-effort initial execution; scheduled runs or manual syncs will retry.
-    }
-    const initialRunTypes = [
-      "people",
-      "leave_records",
-      "leave_balances",
-    ] as const;
-    for (const runType of initialRunTypes) {
-      await dispatchManualSync({
-        actingRole: orgRole === "org:owner" ? "owner" : "admin",
-        actingUserId: user.id,
-        clerkOrgId: orgId,
-        organisationId: result.value.organisationId,
-        runType,
+        triggerType: "manual",
         xeroTenantId: result.value.xeroTenantId,
       });
+    } catch {
+      // Best-effort initial execution; scheduled recovery will retry.
     }
 
     revalidatePath("/");

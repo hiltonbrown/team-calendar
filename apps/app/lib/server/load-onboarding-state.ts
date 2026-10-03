@@ -20,6 +20,7 @@ export interface OnboardingState {
   completedRequiredCount: number;
   currentUserPersonLinked: boolean | null;
   isComplete: boolean;
+  pendingPersonMatchesCount: number;
   peopleCount: number;
   publicHolidayJurisdictionCount: number;
   requiredCount: number;
@@ -40,10 +41,10 @@ export async function loadOnboardingState({
 }: LoadOnboardingStateInput): Promise<OnboardingState> {
   const [
     organisation,
-    clerkOrgConnectionCount,
     activeXeroConnection,
     peopleCount,
     currentUserPerson,
+    pendingPersonMatchesCount,
     publicHolidayJurisdictionCount,
     activeFeedCount,
   ] = await Promise.all([
@@ -56,14 +57,6 @@ export async function loadOnboardingState({
         archived_at: null,
         clerk_org_id: clerkOrgId,
         id: organisationId,
-      },
-    }),
-    database.xeroConnection.count({
-      where: {
-        clerk_org_id: clerkOrgId,
-        status: {
-          in: ["active", "pending", "pending_tenant_selection", "stale"],
-        },
       },
     }),
     getXeroConnectionStateForScope({ clerkOrgId, organisationId }),
@@ -85,6 +78,15 @@ export async function loadOnboardingState({
           },
         })
       : Promise.resolve(null),
+    database.xeroPersonMatch?.count
+      ? database.xeroPersonMatch.count({
+          where: {
+            clerk_org_id: clerkOrgId,
+            organisation_id: organisationId,
+            status: "pending",
+          },
+        })
+      : Promise.resolve(0),
     database.publicHolidayJurisdiction.count({
       where: {
         archived_at: null,
@@ -106,29 +108,21 @@ export async function loadOnboardingState({
   const hasProfile = Boolean(organisation);
   const xeroConnectionState =
     toXeroConnectionDisplayState(activeXeroConnection);
-  const showXeroSetupTask =
-    clerkOrgConnectionCount === 0 ||
-    (xeroConnectionState !== "connected" &&
-      xeroConnectionState !== "not_connected");
   const hasPeople = peopleCount > 0;
+  const isPeopleComplete = hasPeople && pendingPersonMatchesCount === 0;
   const currentUserPersonLinked = userId ? Boolean(currentUserPerson) : null;
-  const hasPeopleForCurrentUser =
-    hasPeople && (currentUserPersonLinked ?? true);
   const hasPublicHolidays = publicHolidayJurisdictionCount > 0;
   const hasFeeds = activeFeedCount > 0;
 
   const requiredSteps: Array<{ complete: boolean; id: OnboardingStep["id"] }> =
     [
       { complete: hasProfile, id: "profile" },
-      { complete: hasPeopleForCurrentUser, id: "people" },
+      { complete: isPeopleComplete, id: "people" },
       { complete: hasPublicHolidays, id: "holidays" },
       { complete: hasFeeds, id: "feed" },
     ];
   const nextRequiredId = requiredSteps.find((step) => !step.complete)?.id;
-  const xeroSetupSteps = xeroSetupStepsForState(
-    xeroConnectionState,
-    showXeroSetupTask
-  );
+  const xeroSetupSteps = xeroSetupStepsForState(xeroConnectionState);
 
   const steps: OnboardingStep[] = [
     {
@@ -143,19 +137,22 @@ export async function loadOnboardingState({
     },
     ...xeroSetupSteps,
     {
-      ctaHref: "/people",
-      ctaLabel: hasPeople ? "View people" : "Add people",
-      description:
-        hasPeople && currentUserPersonLinked === false
-          ? "People exist, but your user account is not linked to a person yet. Review the directory before creating plans."
-          : "People can be added manually or synced from Xero when an integration is connected.",
-      id: "people",
-      status: statusForRequiredStep(
-        "people",
-        hasPeopleForCurrentUser,
-        nextRequiredId
+      ctaHref:
+        pendingPersonMatchesCount > 0
+          ? "/settings/integrations/xero/matches"
+          : "/people",
+      ctaLabel: getPeopleCtaLabel(pendingPersonMatchesCount, hasPeople),
+      description: getPeopleDescription(
+        pendingPersonMatchesCount,
+        hasPeople,
+        currentUserPersonLinked
       ),
-      title: "Add or sync people",
+      id: "people",
+      status: statusForRequiredStep("people", isPeopleComplete, nextRequiredId),
+      title:
+        pendingPersonMatchesCount > 0
+          ? "Review imported people"
+          : "Add or sync people",
     },
     {
       ctaHref: "/settings/holidays",
@@ -191,6 +188,7 @@ export async function loadOnboardingState({
     completedRequiredCount,
     currentUserPersonLinked,
     isComplete: completedRequiredCount === requiredSteps.length,
+    pendingPersonMatchesCount,
     peopleCount,
     publicHolidayJurisdictionCount,
     requiredCount: requiredSteps.length,
@@ -211,28 +209,69 @@ function statusForRequiredStep(
 }
 
 function xeroSetupStepsForState(
-  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState,
-  showXeroSetupTask: boolean
+  xeroConnectionState: import("@repo/core").XeroConnectionDisplayState
 ): OnboardingStep[] {
-  return showXeroSetupTask
-    ? [
+  switch (xeroConnectionState) {
+    case "connected":
+      return [
         {
           ctaHref: "/settings/integrations/xero",
-          ctaLabel:
-            xeroConnectionState === "not_connected"
-              ? "Connect Xero"
-              : "Review Xero",
-          description:
-            xeroConnectionState === "not_connected"
-              ? "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place."
-              : xeroRecoveryMessage(xeroConnectionState),
+          ctaLabel: "Manage Xero",
+          description: "Connected to Xero Payroll.",
           id: "xero",
-          status: xeroConnectionState === "connected" ? "complete" : "optional",
-          title:
-            xeroConnectionState === "not_connected"
-              ? "Connect Xero"
-              : "Xero connection",
+          status: "complete",
+          title: "Xero connection",
         },
-      ]
-    : [];
+      ];
+    case "not_connected":
+      return [
+        {
+          ctaHref: "/settings/integrations/xero",
+          ctaLabel: "Connect Xero",
+          description:
+            "Connect Xero now or skip for later. Team Calendar keeps a persistent setup task until the first payroll connection is in place.",
+          id: "xero",
+          status: "optional",
+          title: "Connect Xero",
+        },
+      ];
+    default:
+      return [
+        {
+          ctaHref: "/settings/integrations/xero",
+          ctaLabel: "Review Xero",
+          description: xeroRecoveryMessage(xeroConnectionState),
+          id: "xero",
+          status: "optional",
+          title: "Xero connection",
+        },
+      ];
+  }
+}
+
+function getPeopleCtaLabel(
+  pendingPersonMatchesCount: number,
+  hasPeople: boolean
+): string {
+  if (pendingPersonMatchesCount > 0) {
+    return "Review people";
+  }
+  if (hasPeople) {
+    return "View people";
+  }
+  return "Add people";
+}
+
+function getPeopleDescription(
+  pendingPersonMatchesCount: number,
+  hasPeople: boolean,
+  currentUserPersonLinked: boolean | null
+): string {
+  if (pendingPersonMatchesCount > 0) {
+    return `${pendingPersonMatchesCount} imported ${pendingPersonMatchesCount === 1 ? "person needs" : "people need"} identity review before linking.`;
+  }
+  if (hasPeople && currentUserPersonLinked === false) {
+    return "People exist, but your user account is not linked to a person yet. Review the directory before creating plans.";
+  }
+  return "People can be added manually or synced from Xero when an integration is connected.";
 }

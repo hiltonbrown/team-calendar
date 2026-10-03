@@ -163,6 +163,42 @@ export const ensureOrganisationForClerk = async (
   };
 };
 
+type PersonWithRelations = Parameters<typeof mapPerson>[0];
+
+async function findResolvedMatchPerson(
+  scoped: { clerk_org_id: string; organisation_id: string },
+  clerkUserId: string,
+  safeProfilePatch: Record<string, unknown>
+): Promise<PersonWithRelations | null> {
+  const resolvedMatch = await database.xeroPersonMatch.findFirst({
+    include: {
+      resolved_person: { include: { location: true, team: true } },
+      xero_person: { include: { location: true, team: true } },
+    },
+    where: {
+      ...scoped,
+      resolved_clerk_user_id: clerkUserId,
+      status: "matched",
+    },
+  });
+
+  const targetPerson =
+    resolvedMatch?.resolved_person ?? resolvedMatch?.xero_person;
+  if (!targetPerson || targetPerson.archived_at !== null) {
+    return null;
+  }
+  if (targetPerson.clerk_user_id !== clerkUserId) {
+    await database.person.update({
+      data: {
+        ...safeProfilePatch,
+        clerk_user_id: clerkUserId,
+      },
+      where: { id: targetPerson.id },
+    });
+  }
+  return targetPerson;
+}
+
 export const ensureCurrentUserPerson = async (
   tenant: TenantContext,
   input: CurrentUserPersonInput
@@ -183,6 +219,15 @@ export const ensureCurrentUserPerson = async (
 
     if (existingLinkedPerson) {
       return { ok: true, value: mapPerson(existingLinkedPerson) };
+    }
+
+    const matchPerson = await findResolvedMatchPerson(
+      scoped,
+      input.clerkUserId,
+      safeProfilePatch
+    );
+    if (matchPerson) {
+      return { ok: true, value: mapPerson(matchPerson) };
     }
 
     if (profile.email) {

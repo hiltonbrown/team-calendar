@@ -12,17 +12,17 @@ function restoreEncryptionKey() {
   process.env.XERO_TOKEN_ENCRYPTION_KEY = ORIGINAL_ENV;
 }
 
-function buildXeroTenant() {
+function buildXeroTenant(tenantId = "xero-tenant-1") {
   return {
     accessToken: "access-token",
     bindingGeneration: 1,
     clerk_org_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
-    id: "tenant_1",
+    id: tenantId === "xero-tenant-1" ? "tenant_1" : tenantId,
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: "AU" as const,
     tokenVersion: 1,
-    xero_tenant_id: "xero-tenant-1",
+    xero_tenant_id: tenantId,
   };
 }
 
@@ -302,6 +302,156 @@ describe("AU leave record reads", () => {
       ok: false,
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a complete empty response as complete: true with zero records", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(payItemsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ LeaveApplications: [] }), { status: 200 })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        complete: true,
+        failures: [],
+        hasInvalidRecords: false,
+        leaveRecords: [],
+        rawItemCount: 0,
+        traversalOutcome: "completed",
+      });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns complete: false and envelope_error when the first leave page envelope is malformed", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(payItemsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ LeaveApplications: "not-an-array" }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value).toMatchObject({
+        complete: false,
+        hasInvalidRecords: true,
+        leaveRecords: [],
+        traversalOutcome: "envelope_error",
+      });
+    }
+  });
+
+  it("returns complete: false and retains gathered records when a middle page envelope is malformed", async () => {
+    const firstPageIds = Array.from(
+      { length: 100 },
+      (_, index) => `leave-${index + 1}`
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(payItemsResponse())
+      .mockResolvedValueOnce(leaveApplicationsResponse(firstPageIds))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ LeaveApplications: "invalid" }), {
+          status: 200,
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.complete).toBe(false);
+      expect(result.value.traversalOutcome).toBe("envelope_error");
+      expect(result.value.leaveRecords).toHaveLength(100);
+      expect(result.value.hasInvalidRecords).toBe(true);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("advances pages using raw item count when page has malformed rows and marks complete: false", async () => {
+    // 98 valid + 2 invalid = 100 raw items on page 1.
+    // If parsed records length were used (98 < 100), pagination would stop prematurely.
+    // Raw item count (100) ensures page 2 is fetched.
+    const page1ValidIds = Array.from(
+      { length: 98 },
+      (_, i) => `valid-${i + 1}`
+    );
+    const page1Items = [
+      ...page1ValidIds.map((id) => ({
+        EmployeeID: "00000000-0000-4000-8000-000000000001",
+        EndDate: "2026-05-08",
+        LeaveApplicationID: id,
+        LeavePeriods: [{ NumberOfUnits: 7.6 }],
+        LeaveTypeID: "annual",
+        StartDate: "2026-05-07",
+        Status: "APPROVED",
+      })),
+      { LeaveApplicationID: "bad-row-1", LeavePeriods: "not-an-array" },
+      "not an object at all",
+    ];
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(payItemsResponse())
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ LeaveApplications: page1Items }), {
+          status: 200,
+        })
+      )
+      .mockResolvedValueOnce(leaveApplicationsResponse(["valid-101"]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({ xeroTenant: buildXeroTenant() });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.complete).toBe(false); // malformed rows prevent trustworthy complete
+      expect(result.value.hasInvalidRecords).toBe(true);
+      expect(result.value.traversalOutcome).toBe("malformed_rows");
+      expect(result.value.rawItemCount).toBe(101);
+      expect(result.value.leaveRecords).toHaveLength(99); // 98 from page 1 + 1 from page 2
+      expect(result.value.failures).toHaveLength(2);
+      expect(result.value.failures[0]?.rawLeaveApplicationId).toBe("bad-row-1");
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3); // Verified that page 2 was fetched!
+  });
+
+  it("stops at page limit and marks traversalOutcome: page_limit_exceeded with complete: false", async () => {
+    const fullPageIds = Array.from({ length: 100 }, (_, i) => `page-item-${i}`);
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/PayItems")) {
+        return Promise.resolve(payItemsResponse());
+      }
+      return Promise.resolve(leaveApplicationsResponse(fullPageIds));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchLeaveRecords({
+      maxPages: 2,
+      xeroTenant: buildXeroTenant("page-limit-tenant"),
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.complete).toBe(false);
+      expect(result.value.traversalOutcome).toBe("page_limit_exceeded");
+      expect(result.value.leaveRecords).toHaveLength(2 * 100);
+    }
+    // 1 PayItems + 2 pages
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

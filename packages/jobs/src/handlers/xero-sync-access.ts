@@ -131,9 +131,11 @@ export async function resolveSyncTenant(
   await assertXeroCampaignAccess(scope);
   const loaded = await database.xeroTenant.findFirst({
     select: {
+      approval_state_stale_since: true,
       id: true,
       leave_balances_stale_since: true,
       leave_records_stale_since: true,
+      people_stale_since: true,
       sync_paused_at: true,
     },
     where: {

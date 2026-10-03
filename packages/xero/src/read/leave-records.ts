@@ -23,6 +23,28 @@ export interface XeroLeaveRecord {
   updatedDateUtc: string | null;
 }
 
+export interface XeroLeaveRecordMapFailure {
+  index: number;
+  rawLeaveApplicationId: string | null;
+  rawPayload: unknown;
+  reason: string;
+}
+
+export interface XeroLeaveRecordsFetchResult {
+  complete: boolean;
+  failures: XeroLeaveRecordMapFailure[];
+  hasInvalidRecords: boolean;
+  leaveRecords: XeroLeaveRecord[];
+  rawItemCount: number;
+  rawResponse: unknown;
+  seenLeaveApplicationIds: string[];
+  traversalOutcome:
+    | "completed"
+    | "envelope_error"
+    | "malformed_rows"
+    | "page_limit_exceeded";
+}
+
 const LeavePeriodSchema = z
   .object({
     LeavePeriodStatus: z.string().optional().nullable(),
@@ -49,15 +71,31 @@ const LeaveApplicationSchema = z
   })
   .passthrough();
 
-const LeaveApplicationsResponseSchema = z
+const XeroLeaveApplicationsEnvelopeSchema = z
   .object({
-    LeaveApplications: z.array(LeaveApplicationSchema),
+    LeaveApplications: z.array(z.unknown()).optional(),
+    leaveApplications: z.array(z.unknown()).optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine(
+    (data) =>
+      Array.isArray(data.LeaveApplications) ||
+      Array.isArray(data.leaveApplications),
+    {
+      message:
+        "Envelope must contain LeaveApplications or leaveApplications array",
+    }
+  );
 
 export type MapXeroLeaveRecordsResult =
-  | { ok: true; records: XeroLeaveRecord[] }
-  | { ok: false };
+  | {
+      failures: XeroLeaveRecordMapFailure[];
+      ok: true;
+      rawItemCount: number;
+      records: XeroLeaveRecord[];
+      seenLeaveApplicationIds: string[];
+    }
+  | { ok: false; reason: "malformed_envelope" };
 
 export function mapXeroLeaveRecords(
   payload: unknown,
@@ -71,22 +109,50 @@ export function tryMapXeroLeaveRecords(
   payload: unknown,
   leaveTypeNamesById: ReadonlyMap<string, string> = new Map()
 ): MapXeroLeaveRecordsResult {
-  const parsed = LeaveApplicationsResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    return { ok: false };
+  const parsedEnvelope = XeroLeaveApplicationsEnvelopeSchema.safeParse(payload);
+  if (!parsedEnvelope.success) {
+    return { ok: false, reason: "malformed_envelope" };
   }
 
-  const records = parsed.data.LeaveApplications.map((application) => {
+  const rawItems =
+    parsedEnvelope.data.LeaveApplications ??
+    parsedEnvelope.data.leaveApplications ??
+    [];
+  const rawItemCount = rawItems.length;
+  const records: XeroLeaveRecord[] = [];
+  const failures: XeroLeaveRecordMapFailure[] = [];
+  const seenLeaveApplicationIds: string[] = [];
+
+  rawItems.forEach((rawItem, index) => {
+    const rawLeaveApplicationId = extractRawLeaveApplicationId(rawItem);
+    if (rawLeaveApplicationId) {
+      seenLeaveApplicationIds.push(rawLeaveApplicationId);
+    }
+
+    const parsedItem = LeaveApplicationSchema.safeParse(rawItem);
+    if (!parsedItem.success) {
+      failures.push({
+        index,
+        rawLeaveApplicationId,
+        rawPayload: rawItem,
+        reason: "Leave application record does not match the expected shape",
+      });
+      return;
+    }
+
+    const application = parsedItem.data;
+    const leaveApplicationId = text(
+      application.LeaveApplicationID ?? application.LeaveApplicationId
+    );
     const leaveTypeId = text(
       application.LeaveTypeID ?? application.LeaveTypeId
     );
     const periods = application.LeavePeriods ?? [];
-    return {
+
+    records.push({
       employeeId: text(application.EmployeeID ?? application.EmployeeId),
       endDate: normaliseXeroDateOnly(application.EndDate) ?? "",
-      leaveApplicationId: text(
-        application.LeaveApplicationID ?? application.LeaveApplicationId
-      ),
+      leaveApplicationId,
       leaveTypeId,
       leaveTypeName:
         nullableText(application.LeaveType) ??
@@ -100,10 +166,31 @@ export function tryMapXeroLeaveRecords(
       updatedDateUtc: normaliseXeroDateTime(
         application.UpdatedDateUTC ?? application.UpdatedDateUtc
       ),
-    };
+    });
   });
 
-  return { ok: true, records };
+  return {
+    failures,
+    ok: true,
+    rawItemCount,
+    records,
+    seenLeaveApplicationIds,
+  };
+}
+
+function extractRawLeaveApplicationId(rawItem: unknown): string | null {
+  if (typeof rawItem !== "object" || rawItem === null) {
+    return null;
+  }
+  const item = rawItem as Record<string, unknown>;
+  const candidate =
+    item.LeaveApplicationID ??
+    item.LeaveApplicationId ??
+    item.leaveApplicationID ??
+    item.leaveApplicationId;
+  return typeof candidate === "string" && candidate.trim().length > 0
+    ? candidate.trim()
+    : null;
 }
 
 function text(value: string | null | undefined): string {

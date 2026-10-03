@@ -1,6 +1,10 @@
 "use server";
 
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
+import {
+  ignorePersonMatch,
+  mergeCandidateIntoXeroPerson,
+} from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { log } from "@repo/observability/log";
@@ -61,13 +65,16 @@ export async function resolveXeroPersonMatchAction(input: {
     return clerkUserId;
   }
 
-  await applyResolution({
+  const applied = await applyResolution({
     context,
     match,
     parsed: parsed.data,
     resolvedClerkUserId: clerkUserId.value,
     user,
   });
+  if (!applied.ok) {
+    return applied;
+  }
 
   revalidatePath("/settings/integrations/xero/matches");
   return { ok: true, value: { resolved: true } };
@@ -159,7 +166,11 @@ async function resolveClerkUserId(args: {
       where: {
         clerk_org_id: orgId,
         clerk_user_id: resolvedClerkUserId,
-        id: { not: match.xero_person.id },
+        id: {
+          notIn: [match.xero_person.id, match.candidate_person?.id].filter(
+            Boolean
+          ) as string[],
+        },
         organisation_id: match.organisation_id,
       },
     });
@@ -179,58 +190,52 @@ async function applyResolution(args: {
   parsed: ParsedInput;
   resolvedClerkUserId: string | null;
   user: CallerUser;
-}): Promise<void> {
+}): Promise<ActionResult<void>> {
   const { context, match, parsed, resolvedClerkUserId, user } = args;
 
-  await database.$transaction(async (tx) => {
-    if (parsed.resolution === "match" && resolvedClerkUserId) {
-      await tx.person.update({
-        data: {
-          clerk_user_id: resolvedClerkUserId,
-        },
-        where: { id: match.xero_person.id },
-      });
+  const actorDisplay =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+    user.emailAddresses[0]?.emailAddress ||
+    user.id;
+
+  if (parsed.resolution === "match") {
+    const result = await mergeCandidateIntoXeroPerson(
+      {
+        clerkOrgId: context.clerkOrgId,
+        organisationId: context.organisationId,
+      },
+      {
+        actorDisplay,
+        actorUserId: user.id,
+        candidatePersonId: match.candidate_person?.id ?? null,
+        clerkOrgId: context.clerkOrgId,
+        clerkUserId: resolvedClerkUserId,
+        matchId: match.id,
+        organisationId: match.organisation_id,
+        xeroPersonId: match.xero_person.id,
+      }
+    );
+    if (!result.ok) {
+      return unknownError(result.error.message);
     }
-
-    await tx.xeroPersonMatch.update({
-      data: {
-        resolution_note:
-          parsed.resolution === "ignore"
-            ? "Marked as separate records by admin."
-            : "Linked Xero person to Clerk user.",
-        resolved_at: new Date(),
-        resolved_by_user_id: user.id,
-        resolved_clerk_user_id: resolvedClerkUserId,
-        resolved_person_id: match.candidate_person?.id ?? null,
-        status: parsed.resolution === "ignore" ? "ignored" : "matched",
+  } else {
+    const result = await ignorePersonMatch(
+      {
+        clerkOrgId: context.clerkOrgId,
+        organisationId: context.organisationId,
       },
-      where: { id: match.id },
-    });
+      {
+        actorDisplay,
+        actorUserId: user.id,
+        matchId: match.id,
+      }
+    );
+    if (!result.ok) {
+      return unknownError(result.error.message);
+    }
+  }
 
-    await tx.auditEvent.create({
-      data: {
-        action:
-          parsed.resolution === "ignore"
-            ? "xero.person_match_ignored"
-            : "xero.person_match_resolved",
-        actor_display:
-          [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-          user.emailAddresses[0]?.emailAddress ||
-          user.id,
-        actor_user_id: user.id,
-        clerk_org_id: context.clerkOrgId,
-        entity_id: match.id,
-        entity_type: "xero_person_match",
-        metadata: {
-          resolvedClerkUserId,
-          xeroPersonId: match.xero_person.id,
-        },
-        organisation_id: match.organisation_id,
-        resource_id: match.id,
-        resource_type: "xero_person_match",
-      },
-    });
-  });
+  return { ok: true, value: undefined };
 }
 
 function notAuthorised(): ActionResult<never> {

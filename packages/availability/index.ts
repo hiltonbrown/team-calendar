@@ -158,6 +158,7 @@ export {
   type PersonListItem,
   type PersonProfile,
 } from "./src/people/people-service";
+export * from "./src/people/xero-person-reconciliation";
 export * from "./src/plans/plan-service";
 export {
   archiveRecord,

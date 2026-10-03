@@ -38,6 +38,11 @@ import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
 import {
+  acquireSyncRun,
+  type SyncRunStatus,
+  XeroSyncRunFencedError,
+} from "./sync-run-lifecycle";
+import {
   afterXeroBindingCommit,
   rejectRetryableSyncResult,
   resolveSyncTenant,
@@ -66,6 +71,7 @@ const SyncXeroLeaveRecordsInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
   xeroTenantId: z.string().uuid(),
@@ -91,7 +97,6 @@ const BATCH_SIZE = 50;
 const LEAVE_PAGE_SIZE = 20;
 const PROBE_PAGE_SIZE = 21;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const FailedRecordTypeSchema = z.enum([
   "people",
@@ -210,12 +215,34 @@ async function syncXeroLeaveRecordsUnderCampaign(
   let runId: string | null = null;
 
   try {
-    const duplicateRun = await cancelDuplicateRun(context, startedAt);
-    if (duplicateRun) {
-      return { ok: true, value: emptyResult(duplicateRun.id, "cancelled") };
+    const runAcquisition = await acquireSyncRun(
+      context,
+      "leave_records",
+      startedAt
+    );
+    if (runAcquisition.kind === "terminal") {
+      const term = runAcquisition.run;
+      return {
+        ok: true,
+        value: {
+          archived: term.records_synced - term.records_upserted,
+          failed: term.records_failed,
+          fetched: term.records_fetched,
+          runId: term.id,
+          skipped: term.records_skipped,
+          status: term.status,
+          upserted: term.records_upserted,
+        },
+      };
+    }
+    if (runAcquisition.kind === "cancelled_competing") {
+      return {
+        ok: true,
+        value: emptyResult(runAcquisition.run.id, "cancelled"),
+      };
     }
 
-    const run = await createRun(context, startedAt);
+    const { run } = runAcquisition;
     runId = run.id;
 
     await publishRunStatusChanged(context, run.id, "running");
@@ -245,9 +272,27 @@ async function syncXeroLeaveRecordsUnderCampaign(
         };
       }
 
-      const { complete, leaveRecords: fetched } = leaveRecordsResult.value;
-      counts.fetched = fetched.length;
+      const {
+        complete,
+        failures = [],
+        hasInvalidRecords = false,
+        leaveRecords: fetched,
+        traversalOutcome = "completed",
+      } = leaveRecordsResult.value;
+      counts.fetched = fetched.length + failures.length;
       const processed: AppliedLeaveRecord[] = [];
+
+      for (const mapFailure of failures) {
+        counts.failed += 1;
+        await recordFailure(context, {
+          errorCode: "validation_error",
+          errorMessage: mapFailure.reason,
+          rawPayload: mapFailure.rawPayload,
+          recordType: "leave_records",
+          runId: run.id,
+          sourceId: mapFailure.rawLeaveApplicationId ?? "unknown",
+        });
+      }
 
       for (let index = 0; index < fetched.length; index += BATCH_SIZE) {
         const runState = await database.syncRun.findFirst({
@@ -319,19 +364,28 @@ async function syncXeroLeaveRecordsUnderCampaign(
         }
       }
 
-      const stale = complete
+      const canArchiveStale =
+        complete &&
+        !hasInvalidRecords &&
+        failures.length === 0 &&
+        traversalOutcome === "completed";
+
+      const stale = canArchiveStale
         ? await archiveStaleRecords(
             context,
             fetched.map((record) => record.leaveApplicationId).filter(Boolean),
             startedAt
           )
         : { archived: 0, personIds: [] };
-      if (!complete) {
+      if (!canArchiveStale) {
         log.warn(
-          "Skipped stale-archive because the Xero leave fetch was truncated",
+          "Skipped stale-archive because the Xero leave fetch was incomplete, truncated, or contained invalid records",
           {
             clerkOrgId: context.clerkOrgId,
+            complete,
+            failuresCount: failures.length,
             organisationId: context.organisationId,
+            traversalOutcome,
             xeroTenantId: context.xeroTenantId,
           }
         );
@@ -345,19 +399,38 @@ async function syncXeroLeaveRecordsUnderCampaign(
       ]);
       await enqueueFeedRebuilds(context, [...affectedPersonIds]);
 
+      let staleSinceData: { leave_records_stale_since?: Date | null } = {};
+      if (canArchiveStale) {
+        staleSinceData = { leave_records_stale_since: null };
+      } else if (!xeroTenant.leave_records_stale_since) {
+        staleSinceData = { leave_records_stale_since: startedAt };
+      }
+
       await withXeroBinding(context, async (tx) =>
         tx.xeroTenant.updateMany({
           data: {
             last_leave_records_sync_at: new Date(),
             last_sync_error_code: null,
             last_sync_error_message: null,
-            leave_records_stale_since: null,
+            ...staleSinceData,
           },
           where: { ...scoped(context), id: context.xeroTenantId },
         })
       );
 
-      const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
+      const isFullySuccessful = canArchiveStale && counts.failed === 0;
+      let finalStatus: SyncRunStatus = "partial_success";
+      if (isFullySuccessful) {
+        finalStatus = "succeeded";
+      } else if (
+        counts.upserted === 0 &&
+        counts.archived === 0 &&
+        (!complete || traversalOutcome === "envelope_error") &&
+        fetched.length === 0
+      ) {
+        finalStatus = "failed";
+      }
+
       await completeRun(context, run.id, {
         counts,
         status: finalStatus,
@@ -685,10 +758,17 @@ async function syncXeroLeaveRecordsUnderCampaign(
       value: { ...counts, runId: run.id, status: "failed" },
     };
   } catch (error) {
-    if (error instanceof XeroBindingChangedError && runId) {
+    if (
+      (error instanceof XeroBindingChangedError ||
+        error instanceof XeroSyncRunFencedError) &&
+      runId
+    ) {
       await completeRun(context, runId, {
         counts: emptyCounts(),
-        errorSummary: "generation_changed",
+        errorSummary:
+          error instanceof XeroSyncRunFencedError
+            ? "sync_run_fenced"
+            : "generation_changed",
         status: "cancelled",
       });
       return { ok: true, value: emptyResult(runId, "cancelled") };
@@ -712,56 +792,6 @@ async function syncXeroLeaveRecordsUnderCampaign(
       ok: false,
     };
   }
-}
-
-async function cancelDuplicateRun(
-  context: SyncXeroLeaveRecordsInput,
-  startedAt: Date
-): Promise<{ id: string } | null> {
-  const existingRun = await database.syncRun.findFirst({
-    select: { id: true },
-    where: {
-      ...scoped(context),
-      run_type: "leave_records",
-      started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
-      status: "running",
-      xero_tenant_id: context.xeroTenantId,
-    },
-  });
-  if (!existingRun) {
-    return null;
-  }
-
-  return await database.syncRun.create({
-    data: {
-      ...scoped(context),
-      completed_at: new Date(),
-      error_summary: "Another leave records sync run is already in progress",
-      run_type: "leave_records",
-      started_at: startedAt,
-      status: "cancelled",
-      trigger_type: context.triggerType,
-      triggered_by_user_id: context.triggeredByUserId ?? null,
-      xero_tenant_id: context.xeroTenantId,
-    },
-    select: { id: true },
-  });
-}
-
-function createRun(context: SyncXeroLeaveRecordsInput, startedAt: Date) {
-  return database.syncRun.create({
-    data: {
-      ...scoped(context),
-      entity_type: "leave_records",
-      run_type: "leave_records",
-      started_at: startedAt,
-      status: "running",
-      trigger_type: context.triggerType,
-      triggered_by_user_id: context.triggeredByUserId ?? null,
-      xero_tenant_id: context.xeroTenantId,
-    },
-    select: { id: true },
-  });
 }
 
 async function ensureTenantReady(

@@ -73,7 +73,9 @@ export {
 } from "./src/read/leave-balances";
 export type {
   XeroLeaveRecord,
+  XeroLeaveRecordMapFailure,
   XeroLeaveRecordStatus,
+  XeroLeaveRecordsFetchResult,
 } from "./src/read/leave-records";
 export {
   deriveXeroStableSourceKey,
