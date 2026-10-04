@@ -1,15 +1,17 @@
 # AU transition contract v1
 
-Identifier: `au-contract-v1`. Approved by the user on 2 October 2026: "Approve local submission, Xero creation on manager approval". Implemented in `37b4818`. PRODUCT.md (Outbound write operations) carries the same table.
-
-Reconciled against source at `604d754` on 4 October 2026. **ACTIVE normative specification**, retained after implementation because `AGENTS.md`, PRODUCT.md and Plan 160 depend on it. Source confirmation does not establish deployed or provider behaviour.
+Contract: `au-contract-v1`. Approved on 2 October 2026. Submission stays local;
+manager approval creates scheduled leave in Xero synchronously. PRODUCT.md
+carries the same transition table. Live Xero behaviour remains NOT VERIFIED.
 
 ## Rules
 
 - **Submit** is local. It validates AU eligibility, connection, employee and leave-type mapping, and working days. It creates no Xero leave and no outbound operation.
-- **Approve** of a local request repeats those checks, records an outbound operation with action `approve` before dispatch, then creates scheduled AU leave in Xero synchronously.
+- **Approve** repeats those checks for a local request, records an outbound operation with action `approve` before sending the request, then creates scheduled AU leave in Xero synchronously.
 - **Decline** (reason required) and **withdraw** of a local request make no provider call, including while disconnected.
 - **Imported requested leave** uses Xero's existing approve and reject endpoints.
+- Existing `submit` recovery is retained. Two unresolved actions on one record
+  block further writes.
 - NZ and UK stay unavailable.
 
 ## Transition table
@@ -28,11 +30,7 @@ Reconciled against source at `604d754` on 4 October 2026. **ACTIVE normative spe
 | Independently proved not created | Record evidence | None | Explicit retry allowed |
 | Legacy app-submitted remote record | Approve or decline | None | Scoped administrator review required |
 
-Open question: Xero documents `reject` for requested leave. Whether it accepts scheduled leave created by approval is unverified. Plan 160 Step 4 row 7 observes it.
-
-## Schema
-
-Migration `20261002000000_approval_create_operation` adds the `approve` value to the outbound operation action enum. It adds an enum value only, with no backfill, and prior reconciliation records it applied to live Neon. This planning review did not re-query the database. Existing `submit` recovery still works. Two unresolved actions on one record fail closed.
+Xero documents `reject` for requested leave. Rejection of scheduled leave created on approval remains unverified. Plan 160 Step 4, row 7 tests this.
 
 ## Provider basis
 
@@ -40,4 +38,7 @@ Xero AU leave applications: <https://developer.xero.com/documentation/api/payrol
 
 ## Verification
 
-Unit and integration tests cover local actions, reason enforcement, manager authorisation, legacy rows, duplicate claims, uncertain acceptance, recovery actors, withdrawal intent and concurrent approval fencing. Live provider behaviour remains NOT VERIFIED until Plan 160 records independent readbacks for the approved demo scope. The protected integration replay remains pending; fixture/unit coverage is source evidence only. Do not reapply the enum migration or replay uncertain creates to obtain evidence.
+Plan 160 must independently check the approved demo flow in Xero and replay the
+protected integration suite. Both are pending. Fixture and unit tests do not
+prove live provider behaviour. Do not reapply completed migrations or retry a
+create with an uncertain outcome.
