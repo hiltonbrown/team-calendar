@@ -8,7 +8,7 @@
 > **Drift check (run first)**:
 >
 > ```bash
-> git diff --stat 3b825e5..HEAD -- packages/database/src/live-campaign-fixture.ts packages/database/src/xero-campaign-store.ts packages/xero/src/au packages/availability apps/app/app/\(authenticated\)/leave-approvals apps/app/app/\(authenticated\)/plans .github/workflows/ci.yml
+> git diff --stat 604d754..HEAD -- packages/database/src/live-campaign-fixture.ts packages/database/src/xero-campaign-store.ts packages/database/xero-campaign.integration.test.ts packages/jobs/src/handlers packages/xero/src/au packages/xero/src/oauth packages/xero/src/rate-limit packages/availability apps/app/app/\(authenticated\)/leave-approvals apps/app/app/\(authenticated\)/plans .github/workflows/ci.yml
 > ```
 >
 > If any of these files changed, compare the excerpts below against the live
@@ -16,12 +16,12 @@
 
 ## Status
 
-- **Status**: IN PROGRESS (rescoped 3 October 2026)
+- **Status**: TODO from Step 1; Steps 3 to 6 BLOCKED (reconciled 4 October 2026)
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED. Step 4 writes real leave into Xero's Demo Company (AU).
 - **Category**: tests, correctness verification
-- **Planned at**: commit `3b825e5`, 2026-10-03
+- **Planned at**: commit `604d754`, 2026-10-04 (rescope retained from 3 October)
 - **Depends on**: `plans/160-au-transition-contract-v1.md` (approved, implemented). Steps 3 to 6 also depend on the campaign-sentinel decision under "Blocking dependency" below. Operator inputs in Step 3.
 
 ## Why this matters
@@ -57,7 +57,7 @@ facts from them that still matter are below.
 
 ## Current state
 
-**Merged in main** (all at or before `3b825e5`):
+**Source/history inspected at `604d754`**:
 
 - `37b4818`: approved AU workflow. Submit is local; manager approval creates scheduled
   leave in Xero synchronously, recorded as outbound operation action `approve`.
@@ -66,11 +66,19 @@ facts from them that still matter are below.
   fixtures aged out of the 90-day window; dates are now relative to `Date.now()`).
   **Never replayed** against a database.
 - `2588d97`: decline copy for local AU leave.
-- Live database has all 23 migrations, including `20261002000000_approval_create_operation`.
+- Prior reconciliation records all 23 migrations, including
+  `20261002000000_approval_create_operation`, applied to live Neon. This planning review
+  did not query Neon or re-verify that historical deployment.
+- `604d754` merges Plan 159 import, person reconciliation and onboarding source work.
+  This does not prove the live AU flow or unblock the campaign sentinel.
 
-**CI is red on main.** Every CI run on `main` since `42bb840` (27 September) has failed.
-At `3b825e5` the `Run integration tests` step fails six `packages/xero` suites
-with `Campaign fixture requires the protected online test runner`. The guard:
+**CI failure is historical evidence, not a fresh remote observation.** Prior
+reconciliation records failing main runs since `42bb840` (27 September) and six
+`packages/xero` suites failing the integration step at `3b825e5` with
+`Campaign fixture requires the protected online test runner`. This review did not
+query current GitHub run results. At `604d754` the source mismatch remains: CI supplies
+localhost PostgreSQL/HTTP Redis and `ALLOW_LOCAL_DATABASE_TESTS`, while the fixture
+requires protected live acknowledgement and manifest. Step 1 remains TODO. The guard:
 
 ```typescript
 // packages/database/src/live-campaign-fixture.ts:41-50
@@ -96,16 +104,16 @@ plain PostgreSQL), requires `release:active-run` keys in Redis, and builds a
 `Protected manifest absent` without `TC_RELEASE_MANIFEST`. Making them run in CI would
 mean rebuilding the protected environment inside CI. They are not CI suites.
 
-Turbo stops at the first failing package, so suites in `packages/jobs` and
-`packages/database` that call the same fixture have probably never been observed in CI
-either. Find them all with:
+The same fixture is used by jobs and database suites; do not infer their remote
+result from the earlier Xero failure. Discover the complete protected inventory with:
 
 ```bash
-grep -rln "initialiseLiveCampaignFixture\|TC_RELEASE_MANIFEST" --include="*.integration.test.ts" packages apps
+rg -l 'initialiseLiveCampaignFixture|TC_RELEASE_MANIFEST' --glob '*.integration.test.ts' packages apps
 ```
 
-At `3b825e5` this lists ten or more files across `packages/jobs`, `packages/xero` and
-`packages/database`.
+At `604d754` this lists 13 files: six jobs suites, six Xero suites and
+`packages/database/xero-campaign.integration.test.ts`. Re-discover before editing;
+the list is authoritative, not the count.
 
 **Known operational gaps** (observed 2 October; re-check, do not trust):
 
@@ -126,10 +134,13 @@ approvals, Xero settings) is wrapped by `withAuthenticatedXeroCampaignAction`
 `withXeroCampaignScopedInvocation` (`packages/database/src/xero-campaign-access.ts:1052`).
 That reads `XeroCampaignStore.readOrganisation`, which throws `XeroCampaignDeniedError`
 when KV holds no campaign sentinel for `XERO_CREDENTIAL_DOMAIN_ID`
-(`xero-campaign-store.ts`, `snapshot`, near line 250). The only writer of the sentinel is
-`initialiseXeroCampaign` (`xero-campaign-access.ts:509`), and no application code or
-operator script calls it. Users then see "This action is temporarily unavailable. Try
-again later." Production still runs `42bb840`, which predates this wrapping.
+(`xero-campaign-store.ts`, `snapshot`, near line 250). The ordinary application path has
+no reviewed operator initialisation command.
+`initialiseXeroCampaign` and the protected test fixture can establish sentinels, but
+protected test initialisation is not permission to initialise an application namespace.
+Users then see "This action is temporarily unavailable. Try
+again later." The prior record identified Production as `42bb840`, predating this wrapping;
+the current deployed revision was not checked in this review.
 
 Steps 3 to 6 cannot run until one of these is decided by the user:
 (a) remove the campaign gate from ordinary production actions, in its own plan
@@ -149,8 +160,8 @@ fixture proposal under `.cache/` and are never copied into tracked files.
 | Lint | `bun run check` | exit 0 |
 | Types | `bun run typecheck` | exit 0 |
 | Unit tests | `bun run test` | exit 0 |
-| Harness tests (frozen) | `bun run test:release-tools` | exit 0 |
-| Integration gate | CI `Run integration tests` step on the pushed branch | green |
+| Harness tests (frozen) | `bun run test:release-tools` and `bun run typecheck:release-tools` | both exit 0 |
+| Integration gate | CI `Run integration tests` step on the candidate pull request | green |
 | Protected live integration | `TURBO_CONCURRENCY=1 bun --env-file=<private-run-env> ./tooling/release/run-live-integration.ts --manifest <fresh-private-db-manifest> --evidence-dir <private-evidence-dir>` | all suites pass, cleanup PASS |
 | Single test file | `bunx vitest run <path>` | pass |
 
@@ -162,7 +173,8 @@ instruction in `plans/README.md`).
 ## Scope
 
 **In scope**:
-- The protected-only integration suites found by the Step 1 grep (gating lines only).
+- The protected-only integration suites found by the Step 1 `rg` discovery
+  (discovery gating and necessary hook placement only).
 - `packages/database/src/live-campaign-fixture.ts` (a new exported predicate only) and
   its existing test `packages/database/src/live-campaign-fixture.test.ts`.
 - `reports/xero-e2e/<YYYY-MM-DD>-au-flow.md` (create).
@@ -173,13 +185,17 @@ instruction in `plans/README.md`).
   If the AU flow exposes a product defect, record it and STOP; the fix gets its own plan.
 - The frozen harness listed above.
 - Vercel configuration, deployments, Clerk changes and provider writes outside the
-  recorded authority. Step 3 is an operator checklist, not executor work.
+  recorded authority. Step 3 is an operator checklist, not code implementation. Steps 4 and 5 require
+  the recorded provider authority plus the verified prerequisites.
 
 ## Git workflow
 
 Branch `fix/160-ci-integration-gate` for Step 1. Conventional commits, for example
-`test: run campaign fixture suites only under the protected runner`. Push only to get the CI
-result, and only if the operator allows it. Do not merge.
+`test: run campaign fixture suites only under the protected runner`.
+The workflow runs for pull requests targeting `main` and pushes to `main`; a feature
+branch push alone does not trigger it. With publication authorised, use a candidate
+pull request targeting `main` and capture its exact SHA and run result. Do not merge
+or push directly to `main` to obtain verification.
 
 ## Steps
 
@@ -192,18 +208,29 @@ instead of crashing CI. Do not change what they assert.
    `isProtectedLiveRun(): boolean`, true only when `NODE_ENV === "test"`,
    `ALLOW_LIVE_DATABASE_TESTS === "I_ACKNOWLEDGE_LIVE_MUTATION"` and
    `TC_RELEASE_MANIFEST` is set. Leave `initialiseLiveCampaignFixture` unchanged.
-2. In each file from the Current state grep, wrap the top-level `describe` with
+2. In each file from the Current state `rg` discovery, wrap the top-level `describe` with
    `describe.skipIf(!isProtectedLiveRun())` and move any top-level fixture or manifest
-   work into `beforeAll` inside it, so that nothing runs at import time when skipped.
-   Keep every `it` and assertion byte-for-byte.
-3. Add two cases to the existing `packages/database/src/live-campaign-fixture.test.ts`:
-   the predicate is false with no flags, and false with the flag but no manifest path.
+   work into `beforeAll` inside it. Move file-level `beforeAll`, `afterAll`,
+   `beforeEach` and `afterEach` into the gated suite as well, preserving hook order
+   and the initialisation-before-mutation requirement. Several fixture hooks are
+   currently after the suite; gating `describe` alone leaves them active. Pure
+   allocation helpers may remain outside only if they perform no I/O or mutation.
+   Preserve test cases and assertions; do not skip ordinary localhost suites.
+3. Add cases to the existing `packages/database/src/live-campaign-fixture.test.ts`:
+   the predicate is false with no flags, with wrong acknowledgement or `NODE_ENV`,
+   and with the acknowledgement but absent/empty manifest path; it is true only
+   with all three inputs. Restore stubbed environment after each case. This is a
+   discovery predicate only: manifest validation and write admission stay in the
+   unchanged fixture, so a present invalid manifest must still fail the protected run.
 
 **Verify**: `bunx vitest run packages/database/src/live-campaign-fixture.test.ts` passes.
-`bun run check` and `bun run typecheck` exit 0. `grep -c "skipIf(!isProtectedLiveRun())"`
-across the grep's files equals the number of files the grep listed. Push the branch:
-the CI `Test` job is green, and its log shows those suites as skipped. If CI then
-fails an unrelated suite, fix only test-environment causes. A product failure is a STOP.
+`bun run check`, `bun run typecheck`, `bun run test`, `bun run test:release-tools`
+and `bun run typecheck:release-tools` exit 0. Review all discovered files for
+ungated hooks and import-time I/O; a textual `skipIf` count is insufficient.
+The candidate PR CI `Test` job must be green, including `bun run test:integration`,
+and its log must identify the protected suites as skipped while ordinary
+integration suites execute. Record candidate SHA, CI run reference and skip inventory.
+If CI exposes an unrelated failure, record it and STOP rather than expand this slice.
 
 ### Step 2: Replay the protected live integration once
 
@@ -220,7 +247,13 @@ first assertion error of each.
 The operator confirms each item and records yes/no in the README row. Steps 4 to 6
 do not start until all are yes.
 
-- [ ] The campaign-sentinel blocking dependency is resolved (option a or b).
+- [ ] The campaign-sentinel blocking dependency is resolved (option a or b), with
+      reviewed namespace authority and read-back evidence. Clearing an action gate
+      does not waive worker/consumer isolation or protected live database admission.
+- [ ] The exact UI run has reviewed ownership, before-values, active-consumer
+      isolation and scoped cleanup/restoration evidence. If the only applicable
+      route still refuses with `worker-isolation-unavailable`, keep this run
+      NOT VERIFIED and STOP. Direct Playwright or manual UI use is not a bypass.
 - [ ] Local `.env.local` has `XERO_APP_TIER=starter`, a local-only
       `XERO_CREDENTIAL_DOMAIN_ID` UUID and `XERO_RATE_NAMESPACE_EPOCH`, and the namespace is
       initialised (user removed the 24-hour hold on 2 October):
@@ -240,8 +273,10 @@ Use the local dev servers (`bun run dev`) and the four dev users. Every request 
 one of the seven approved employees and dates 2 to 6 November 2026.
 
 Local dev writes to the live Neon database, which Production also uses. Only the demo
-organisation's records may change. Before the first action, record:
-- the demo organisation's `availability_records` ids overlapping 2 to 6 November;
+organisation's records may change under the Step 3 authority. STOP before mutation
+if any prerequisite or applicable live-execution safety gate is unresolved. Before the first action, record:
+- the demo organisation's `availability_records` ids overlapping 2 to 6 November,
+  filtered by both `clerk_org_id` and `organisation_id`;
 - in Xero's own UI (Demo Company (AU), Payroll, Leave), each approved employee's leave
   for 2 to 6 November.
 
@@ -249,8 +284,8 @@ Write budget for Steps 4 and 5 together: at most 10 Xero writes (creates, reject
 Keep a running count. Each action is attempted once; never retry a refused provider call.
 
 For each row, perform the action in the UI, then read back:
-- **local**: `select id, approval_status, source_remote_id, xero_write_error from availability_records where id = $1 and clerk_org_id = $2;`
-  and `select action, status, known_remote_id from outbound_operations where availability_record_id = $1;`
+- **local**: `select id, approval_status, source_remote_id, xero_write_error from availability_records where id = $1 and clerk_org_id = $2 and organisation_id = $3;`
+  and `select action, status, known_remote_id from outbound_operations where availability_record_id = $1 and clerk_org_id = $2 and organisation_id = $3;`
 - **provider**: read the employee's leave for the dates in Xero's own UI and match it
   to `source_remote_id`. This is independent of the app's own mapping code. Do not
   write a script that decrypts tokens.
@@ -272,7 +307,8 @@ and one `approve` operation. A second application is a FAIL and a STOP; count it
 against the budget and list it in cleanup.
 
 **Verify**: every row's observed local and provider state matches the table, or the
-mismatch is recorded as a FAIL with the readback output. Write count is at most 10.
+mismatch is recorded as a FAIL with private readback evidence. Missing or
+unexecuted observations are NOT VERIFIED. Write count is at most 10.
 
 ### Step 5: Clean up
 
@@ -291,22 +327,24 @@ before-lists recorded at the start of Step 4 with the current state.
 
 Create `reports/xero-e2e/<YYYY-MM-DD>-au-flow.md` with: commit SHA, date, environment
 (local dev servers, live Neon, Demo Company (AU)), the Step 4 table with an
-observed column and PASS/FAIL per row, provider write count, residue list, and an
+observed column and PASS/FAIL/NOT VERIFIED per row, provider write count, residue list, and an
 explicit "Not covered" list copied from "Deferred to go-live" above. Use aliases
 (`employee-1`, `leave-a`) instead of real names, Xero IDs, emails or feed URLs.
 
-**Verify**: `grep -nE '[0-9a-f]{8}-[0-9a-f]{4}-|@|https?://' reports/xero-e2e/*-au-flow.md`
-returns nothing, then read the file once by eye for names. `git diff --check` exits 0.
+**Verify**: `rg -n '[0-9a-f]{8}-[0-9a-f]{4}-|@|https?://' reports/xero-e2e/*-au-flow.md`
+has no matches (exit 1), then read the file once by eye for names. If it exits 2
+(or higher), fix the command/input error; that is not a clean sanitisation check. `git diff --check` exits 0.
 
 ## Done criteria
 
 - [ ] CI `Test` job green on the Step 1 commit.
 - [ ] Protected live integration run passes at that commit; run ID in the README row.
-- [ ] All nine Step 4 rows recorded with PASS or FAIL and readback evidence.
+- [ ] All nine Step 4 rows recorded with PASS, FAIL or NOT VERIFIED and their evidence boundary.
 - [ ] Cleanup done; residue explicitly listed or none.
 - [ ] `reports/xero-e2e/<date>-au-flow.md` exists and passes the Step 6 check.
 - [ ] Plan 160 row in `plans/README.md` updated: DONE if every row passed, otherwise
-      BLOCKED with the failing rows named.
+      BLOCKED with failed/unverified rows or missing prerequisites named. A completed
+      report containing failure is not a completed AU-flow proof.
 
 ## STOP conditions
 
@@ -327,3 +365,13 @@ returns nothing, then read the file once by eye for names. `git diff --check` ex
 - `tooling/release/` campaign harness is frozen. Deleting it is a separate decision;
   until then its tests stay in `test:release-tools`.
 - Re-run Step 4 rows 2 and 7 after any change to `packages/xero/src/au/write.ts`.
+
+## Reconciliation review (4 October 2026)
+
+Source and history were inspected at `604d754`. The 13 protected suites still
+require the live-only fixture, and ordinary invocation still reads a mandatory
+campaign sentinel. No CI, protected database, browser or provider command ran
+in this planning review. Steps 1 and 2 remain TODO; Steps 3 to 6 remain BLOCKED.
+The AU contract is active normative material, not a completed plan to delete.
+Retain this plan until the bounded proof and report meet the done criteria; do
+not resume the superseded campaign-tooling implementation.
