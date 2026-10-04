@@ -11,7 +11,7 @@ authenticated Xero journeys and lifecycle sign-off remain **NOT VERIFIED**.
 
 | Plan | Remaining outcome | Priority | Status |
 | --- | --- | --- | --- |
-| [160: Prove the AU leave flow](160-xero-end-to-end-verification-and-report.md) | Repair the CI integration gate, replay protected live integration once, prove the bounded AU flow through the real UI, clean up and report | P1 | Steps 1 and 2 TODO; Steps 3 to 6 BLOCKED on campaign-store policy and operator/safety prerequisites |
+| [160: Prove the AU leave flow](160-xero-end-to-end-verification-and-report.md) | Repair the CI integration gate, replay protected live integration once, prove the bounded AU flow through the real UI, clean up and report | P1 | Source routing and ordinary admission implemented; live replay FAIL (one database fencing assertion); nine UI/provider rows NOT VERIFIED; cleanup PASS |
 | [000: Australian go-live](go-live.md) | Finish release correctness, export, admission and CI work; collect candidate/deployed evidence; deploy and complete wider journeys and rollout | P0 programme | IN PROGRESS; see its queue for per-gate dependencies |
 | [161: Xero lifecycle sign-off](161-harden-xero-connection-lifecycle.md) | Collect all required unit, database, Redis, browser and provider evidence for Section 8.3 and production sign-off in Section 9.3 | P1 sign-off | IN PROGRESS; implementation delivered, current 40-case evidence and rollout NOT VERIFIED |
 
@@ -29,7 +29,7 @@ The existing plans own these tasks; this index creates no new implementation sco
 | In parallel | go-live D1, C1 and X1 | Harden source isolation/protected routing and add only missing registered database concurrency, recovery and import/identity coverage | Protected execution follows owned fixture registration and current consumer/restore evidence |
 | In parallel | go-live P3 | Finish complete CSV export with bounded queries and buffering | D1 supplies owned database proof |
 | In parallel | go-live G1/T1 | Correct contact/admission assertions, separate browser inventories and observe terminal sync outcomes | Deployed journeys follow O1; worker-dependent actions also require X2 |
-| Before AU UI proof or deployment | go-live X2; Plan 160 blocking dependency | Resolve ordinary-action campaign-sentinel policy in a separately reviewed scope | Plan 163 source reviewed and verified; protected live replay pending |
+| Before AU UI proof or deployment | go-live X2; Plan 160 blocking dependency | Resolve ordinary-action campaign-sentinel policy in a separately reviewed scope | Plan 163 source reviewed and verified; live replay failed one database fencing assertion |
 | After those prerequisites | Plan 160 Steps 3 to 6 | Verify operator inputs, execute nine bounded AU rows, clean up and publish the sanitised report | Existing provider authority, run ownership and applicable safety gates must all hold |
 | Before deployment, then after deployment | go-live X3/O1; Plan 161 | Prepare lifecycle settings/preflights, deploy the verified candidate, then collect wider journey and lifecycle sign-off evidence | Broad X2 tooling remains frozen pending a separate scope review; deployed worker enforcement precedes dependent execution |
 
@@ -135,3 +135,14 @@ This index review reruns documentation and scope checks only. The previous
 reconciliation's source spot-checks, case-preservation checks and candidate
 equivalence remain recorded history. Application tests, remote CI, database,
 browser, provider and deployment gates are not rerun by this index update.
+
+## 4 October execution result
+
+Candidate `7b8e34729a8d2cdaddcd31c4ca6e893033d57c2b`, protected run
+`99eb4aaf-7cd9-4b31-812b-1e1480f38bca`: integration FAIL, exit 1. Feeds
+22 PASS; database 67 PASS, 1 FAIL (worker revocation before persistence).
+Remaining package gates incomplete. Cleanup, lease release and two outside-data
+postchecks PASS. Nine browser/provider rows NOT VERIFIED; zero provider writes.
+Lint, types and unit gates PASS. The user instructed no further expansion and
+then commit and merge to main; preserve this failure rather than imply release
+sign-off. See [sanitised report](../reports/xero-e2e/2026-10-04-au-flow.md).

@@ -284,3 +284,11 @@ was not enforcing it when choosing actions.
 - Stop when the requested outcome is achieved and report its evidence and limits.
   Acknowledging a correction or recording a lesson does not replace changing the
   next action. The user should not need to repeat the instruction.
+
+## 2026-10-04: stop verification expansion when instructed
+
+The existing bounded-work lessons were not enforced: repeated host supervision
+repairs displaced the approved AU flow. On a repeated no-expansion correction,
+stop code and tooling work immediately, finish already-owned cleanup, retain
+the exact failure and complete the requested commit and merge. Do not add another
+plan, reviewer, harness repair or broad test run during that hand-off.

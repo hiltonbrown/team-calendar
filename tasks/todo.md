@@ -2030,9 +2030,9 @@ Review: source delivery and live verification are distinct. The full Plan 160 ca
 - [x] Fix the independent review's malformed bootstrap race, RED then GREEN.
 - [x] Pass lint, root types/unit tests and 604 frozen release-tool tests.
 - [x] Refresh authorised live Neon identity (23 migrations, 40 tables, no owner) and inspect a read-only full backup.
-- [ ] Freeze source, refresh strict consumer isolation and replay protected live integration.
+- [x] Freeze source, refresh strict consumer isolation and replay protected live integration (FAIL).
 - [ ] Verify authorised bounded AU UI/provider rows and cleanup.
-- [ ] Publish sanitised evidence and reconcile final status.
+- [x] Publish sanitised evidence and reconcile final status.
 
 Review: 189 focused database tests pass; ordinary collection skips all 13
 protected suites without database access. One Important review finding was fixed
@@ -2049,8 +2049,18 @@ worker evidence remain NOT VERIFIED.
 - [x] Add the test-only facade, RED 3 and context RED 1, then GREEN 4.
 - [x] Preserve real guard checks, all existing fixture IDs/assertions and production write guard.
 - [x] Pass root lint, types and unit gates; retain six protected collection skips.
-- [ ] Replay live integration at the repaired candidate.
+- [x] Replay live integration at the repaired candidate (FAIL).
 
 Review: interrupted host admissions were cleaned and independently restored.
 The substantive failed run exited 1; cleanup and both outside-data postchecks
 passed. Browser/provider rows remain NOT VERIFIED and no provider writes occurred.
+
+### Commit and merge hand-off, 4 October 2026
+
+The exact source candidate `7b8e347` passed lint, types and unit gates. Protected
+live replay exited 1: feeds 22 PASS; database 67 PASS, 1 FAIL, worker revocation
+before local persistence. Other package gates incomplete. Cleanup released the
+lease; two complete outside-data postchecks PASS. Browser/provider rows remain
+NOT VERIFIED; zero provider writes. The user instructed no expansion, then
+commit and merge. Preserve the remaining failure without new implementation,
+verification tooling or another broad rerun.
