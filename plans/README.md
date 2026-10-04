@@ -29,7 +29,7 @@ The existing plans own these tasks; this index creates no new implementation sco
 | In parallel | go-live D1, C1 and X1 | Harden source isolation/protected routing and add only missing registered database concurrency, recovery and import/identity coverage | Protected execution follows owned fixture registration and current consumer/restore evidence |
 | In parallel | go-live P3 | Finish complete CSV export with bounded queries and buffering | D1 supplies owned database proof |
 | In parallel | go-live G1/T1 | Correct contact/admission assertions, separate browser inventories and observe terminal sync outcomes | Deployed journeys follow O1; worker-dependent actions also require X2 |
-| Before AU UI proof or deployment | go-live X2; Plan 160 blocking dependency | Resolve ordinary-action campaign-sentinel policy in a separately reviewed scope | Decision pending; Plan 160's fixture-only scope cannot change production admission |
+| Before AU UI proof or deployment | go-live X2; Plan 160 blocking dependency | Resolve ordinary-action campaign-sentinel policy in a separately reviewed scope | Plan 163 source reviewed and verified; protected live replay pending |
 | After those prerequisites | Plan 160 Steps 3 to 6 | Verify operator inputs, execute nine bounded AU rows, clean up and publish the sanitised report | Existing provider authority, run ownership and applicable safety gates must all hold |
 | Before deployment, then after deployment | go-live X3/O1; Plan 161 | Prepare lifecycle settings/preflights, deploy the verified candidate, then collect wider journey and lifecycle sign-off evidence | Broad X2 tooling remains frozen pending a separate scope review; deployed worker enforcement precedes dependent execution |
 
@@ -48,11 +48,10 @@ These are active specifications, not completed implementation plans to delete.
 
 ## Dependencies and verification rules
 
-1. Resolve the ordinary-invocation campaign-store sentinel policy before Plan
-   160's provider/UI steps and production deployment. Current callers fail closed
-   when the sentinel is absent. Keep the database, binding, credential-domain,
-   shared quota and fixture controls intact. A written plan does not approve a
-   change to that policy.
+1. Verify Plan 163's ordinary-invocation admission against the live target before
+   Plan 160's provider/UI steps and production deployment. The reviewed source
+   accepts confirmed absence without weakening active campaign isolation. Keep
+   database, binding, credential-domain, shared quota and fixture controls intact.
 2. Make the existing CI integration gate pass in its configured local PostgreSQL
    and Redis environment. Local CI evidence is separate from operator release
    evidence; `ALLOW_LOCAL_DATABASE_TESTS=1` never authorises a remote target.

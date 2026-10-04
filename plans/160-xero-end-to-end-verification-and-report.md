@@ -15,13 +15,13 @@
 
 ## Status
 
-- **Status**: TODO from Step 1; Steps 3 to 6 BLOCKED (reconciled 4 October 2026)
+- **Status**: IN PROGRESS: Step 1 source verified; protected replay pending (4 October 2026)
 - **Priority**: P1
 - **Effort**: M
 - **Risk**: MED. Step 4 writes real leave into Xero's Demo Company (AU).
 - **Category**: tests, correctness verification
 - **Planned at**: commit `604d754`, 2026-10-04
-- **Depends on**: `plans/160-au-transition-contract-v1.md` (approved, implemented). Steps 3 to 6 also depend on the campaign-sentinel decision under "Blocker" below. Operator inputs in Step 3.
+- **Depends on**: `plans/160-au-transition-contract-v1.md` (approved, implemented). Ordinary admission is implemented in separately reviewed Plan 163; live verification remains pending. Operator inputs in Step 3.
 
 ## Purpose
 
@@ -67,24 +67,19 @@ rg -l 'initialiseLiveCampaignFixture|TC_RELEASE_MANIFEST' --glob '*.integration.
 Use the returned file list. Check environment settings, Clerk roles, user links
 and the demo connection through the Step 3 checklist before execution.
 
-**Blocker: the campaign sentinel.** Ordinary authenticated server actions
-(manual availability in `apps/app/app/(authenticated)/plans/_actions.ts`, leave
-approvals and Xero settings) are wrapped by `withAuthenticatedXeroCampaignAction`
-(`apps/app/lib/server/xero-campaign-action.ts`), which calls
-`withXeroCampaignScopedInvocation` (`packages/database/src/xero-campaign-access.ts:1052`).
-That reads `XeroCampaignStore.readOrganisation`, which throws `XeroCampaignDeniedError`
-when KV holds no campaign sentinel for `XERO_CREDENTIAL_DOMAIN_ID`
-(`xero-campaign-store.ts`, `snapshot`, near line 250). The ordinary application path has
-no reviewed operator initialisation command.
-`initialiseXeroCampaign` and the protected test fixture can establish sentinels, but
-protected test initialisation is not permission to initialise an application namespace.
-Without the sentinel, users see "This action is temporarily unavailable. Try
-again later."
+**Ordinary admission dependency resolved in source (Plan 163).** The user's
+continuous-execution instruction on 4 October selected the recommended removal
+of bootstrap dependency in its own scope. Ordinary actions now accept confirmed
+absence of campaign sentinel and reservation, while retaining atomic invocation
+and provider ownership, guarded persistence, active-campaign isolation and all
+mandatory binding/rate/tenant controls. Strict campaign reads still require their
+sentinel. Malformed, orphan and active reservations fail closed.
 
-Steps 3 to 6 cannot run until one of these is decided by the user:
-(a) remove the campaign gate from ordinary production actions, in its own plan
-(recommended; tracked under go-live X2); or (b) add a reviewed operator command that
-initialises the sentinel per environment. Do not hand-write Redis keys.
+One independent source review identified a malformed-sentinel acquisition race;
+the single fix pass added failing regressions, corrected actual Lua validation
+and passed all 189 focused tests. Root lint, types and unit gates pass. Protected
+live integration and authenticated UI/provider behaviour are still NOT VERIFIED.
+No ordinary application sentinel is hand-written or fabricated.
 
 **User authority for provider writes** (recorded 2 October): Demo Company (AU) only;
 the seven employees in the private fixture proposal; at most 20 new leave requests

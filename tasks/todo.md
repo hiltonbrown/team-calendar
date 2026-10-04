@@ -1,5 +1,15 @@
 # Current work
 
+## Task: AU contract continuation, 4 October 2026
+
+- [ ] Remove ordinary campaign bootstrap prerequisite without bypassing isolation.
+- [ ] Route protected integration suites and verify source gates.
+- [ ] Freeze reviewed candidate and replay integration through the live Neon runner.
+- [ ] Execute admissible bounded AU UI/provider rows, clean up and report honestly.
+
+Execution: `plans/163-ordinary-campaign-admission.md` records the narrow source
+prerequisite. The operator target is live Neon only. No new generic harness work.
+
 Last reviewed: 2026-10-03
 
 ## Task: Plan 159 - Make Xero connection, leave sync and onboarding reliable
@@ -2010,3 +2020,23 @@ Checkpoint evidence: 35 credential-free tests passed across native admission, le
 - [ ] If verification resumes, replay corrected live integration and execute the approved bounded AU browser/provider flow with existing mandatory controls and independent readbacks.
 
 Review: source delivery and live verification are distinct. The full Plan 160 catalogue is incomplete. Browser/provider actions, deployed candidate and scheduled-job claims, PITR availability and restore exercise remain NOT VERIFIED. A candidate development app/API can exercise the ordinary synchronous AU flow without deployment; it must still satisfy shared sentinel/rate/binding/database guards, exact fixture authority, fresh demo confirmation and authenticated user sessions. No additional framework is required merely to claim a focused flow, and no focused flow result may be promoted to full campaign completion.
+
+
+### Plan 160 continuation and Plan 163, 4 October 2026
+
+- [x] Resolve ordinary campaign bootstrap dependency in separately reviewed scope.
+- [x] Preserve durable invocation/provider ownership and strict campaign fencing.
+- [x] Route 13 protected suites only under acknowledged manifest execution.
+- [x] Fix the independent review's malformed bootstrap race, RED then GREEN.
+- [x] Pass lint, root types/unit tests and 604 frozen release-tool tests.
+- [x] Refresh authorised live Neon identity (23 migrations, 40 tables, no owner) and inspect a read-only full backup.
+- [ ] Freeze source, refresh strict consumer isolation and replay protected live integration.
+- [ ] Verify authorised bounded AU UI/provider rows and cleanup.
+- [ ] Publish sanitised evidence and reconcile final status.
+
+Review: 189 focused database tests pass; ordinary collection skips all 13
+protected suites without database access. One Important review finding was fixed
+in one pass; no other source findings. Actual Lua regressions are registered in
+the protected suite and await live execution. Backup inspection is not a PITR or
+destructive restore exercise. CI publication, provider/browser and deployed
+worker evidence remain NOT VERIFIED.

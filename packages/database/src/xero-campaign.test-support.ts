@@ -2,6 +2,7 @@ import { vi } from "vitest";
 import {
   type XeroCampaignControl,
   XeroCampaignControlSchema,
+  XeroCampaignSentinelSchema,
 } from "./xero-campaign-contract";
 import {
   type XeroCampaignStoreInput,
@@ -67,6 +68,21 @@ export function controlFixture(overrides: Partial<XeroCampaignControl> = {}) {
     ...overrides,
   });
 }
+function validBootstrap(
+  raw: string | undefined,
+  domain: string | undefined,
+  expectedHash: string | undefined
+) {
+  if (raw === undefined) {
+    return expectedHash === "";
+  }
+  const parsed = XeroCampaignSentinelSchema.safeParse(JSON.parse(raw));
+  return (
+    parsed.success &&
+    parsed.data.credentialDomainId === domain &&
+    (expectedHash === "" || parsed.data.databaseTargetHash === expectedHash)
+  );
+}
 /** Atomic command simulator, with no network or database connections. */
 export function storeFixture(
   initial: XeroCampaignControl | null = controlFixture()
@@ -117,7 +133,9 @@ export function storeFixture(
       const prior = pointer ? values.get(`${args[2]}${pointer}`) : null;
       const hash = hashes.get(redisKeys[2] ?? "") ?? new Map<string, string>();
       result =
-        values.get(redisKeys[0] ?? "") === args[1] &&
+        (args[1] === ""
+          ? !values.has(redisKeys[0] ?? "")
+          : values.get(redisKeys[0] ?? "") === args[1]) &&
         (!pointer || (prior && JSON.parse(prior).phase === "closed")) &&
         hash.size < 2000 &&
         !hash.has(args[0] ?? "")
@@ -130,7 +148,9 @@ export function storeFixture(
     } else if (command[1]?.includes("local invocation =")) {
       const hash = hashes.get(redisKeys[1] ?? "");
       result =
-        values.get(redisKeys[0] ?? "") === args[1] &&
+        (args[1] === ""
+          ? validBootstrap(values.get(redisKeys[0] ?? ""), args[4], "")
+          : values.get(redisKeys[0] ?? "") === args[1]) &&
         hash?.get(args[0] ?? "") === args[2]
           ? 1
           : 0;
@@ -151,11 +171,6 @@ export function storeFixture(
       command[1]?.includes("local previous = redis.call('get', KEYS[2])")
     ) {
       const sentinel = values.get(redisKeys[0] ?? "");
-      const identity: {
-        credentialDomainId: string;
-        databaseTargetHash: string;
-        version: number;
-      } | null = sentinel ? JSON.parse(sentinel) : null;
       const pointer = values.get(redisKeys[1] ?? "");
       const rawControl = pointer ? values.get(`${args[3]}${pointer}`) : null;
       const available =
@@ -164,9 +179,7 @@ export function storeFixture(
       const attemptId = args[0] ?? "";
       const hash = hashes.get(hashKey) ?? new Map<string, string>();
       result =
-        identity?.version === 1 &&
-        identity.credentialDomainId === args[1] &&
-        identity.databaseTargetHash === args[2] &&
+        validBootstrap(sentinel, args[1], args[2]) &&
         available &&
         hash.size < 2000 &&
         !hash.has(attemptId)
@@ -187,16 +200,13 @@ export function storeFixture(
       }
     } else if (command[1]?.includes("redis.call('hget', KEYS[2]")) {
       const sentinelRaw = values.get(redisKeys[0] ?? "");
-      const sentinel = sentinelRaw ? JSON.parse(sentinelRaw) : null;
       const hashKey = redisKeys[1] ?? "";
       const hash = hashes.get(hashKey);
       const attemptId = args[0] ?? "";
       const raw = hash?.get(attemptId);
       const attempt = raw ? JSON.parse(raw) : null;
       result =
-        sentinel?.version === 1 &&
-        sentinel.credentialDomainId === args[2] &&
-        sentinel.databaseTargetHash === args[3] &&
+        validBootstrap(sentinelRaw, args[2], args[3]) &&
         attempt?.state === "dispatched" &&
         attempt.credentialDomainId === args[2] &&
         attempt.databaseTargetHash === args[3] &&

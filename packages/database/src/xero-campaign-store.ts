@@ -107,11 +107,22 @@ redis.call('set', KEYS[2], ARGV[2])
 for i = 3, 2 + reservationCount do redis.call('set', KEYS[i], ARGV[1]) end
 return 1
 `;
-const START_ORDINARY_PROVIDER_ATTEMPT = `
+const VALIDATE_ORDINARY_SENTINEL = `
+local function validOrdinarySentinel(raw, domain, expectedHash)
+  if raw == false then return expectedHash == '' end
+  local identity = cjson.decode(raw)
+  if type(identity) ~= 'table' or identity.version ~= 1 or identity.credentialDomainId ~= domain or type(identity.databaseTargetHash) ~= 'string' then return false end
+  local hash = identity.databaseTargetHash
+  if #hash ~= 71 or string.sub(hash, 1, 7) ~= 'sha256:' or not string.match(string.sub(hash, 8), '^[a-f0-9]+$') then return false end
+  for key in pairs(identity) do
+    if key ~= 'version' and key ~= 'credentialDomainId' and key ~= 'databaseTargetHash' then return false end
+  end
+  return expectedHash == '' or hash == expectedHash
+end
+`;
+const START_ORDINARY_PROVIDER_ATTEMPT = `${VALIDATE_ORDINARY_SENTINEL}
 local sentinel = redis.call('get', KEYS[1])
-if not sentinel then return 0 end
-local identity = cjson.decode(sentinel)
-if identity.version ~= 1 or identity.credentialDomainId ~= ARGV[2] or identity.databaseTargetHash ~= ARGV[3] then return 0 end
+if not validOrdinarySentinel(sentinel, ARGV[2], ARGV[3]) then return 0 end
 local previous = redis.call('get', KEYS[2])
 if previous then
   local raw = redis.call('get', ARGV[4] .. previous)
@@ -121,11 +132,9 @@ if redis.call('hlen', KEYS[3]) >= 2000 or redis.call('hexists', KEYS[3], ARGV[1]
 redis.call('hset', KEYS[3], ARGV[1], cjson.encode({state='dispatched', credentialDomainId=ARGV[2], databaseTargetHash=ARGV[3], providerAppId=ARGV[5], externalTenantId=ARGV[6]}))
 return 1
 `;
-const FINISH_ORDINARY_PROVIDER_ATTEMPT = `
+const FINISH_ORDINARY_PROVIDER_ATTEMPT = `${VALIDATE_ORDINARY_SENTINEL}
 local sentinel = redis.call('get', KEYS[1])
-if not sentinel then return 0 end
-local identity = cjson.decode(sentinel)
-if identity.version ~= 1 or identity.credentialDomainId ~= ARGV[3] or identity.databaseTargetHash ~= ARGV[4] then return 0 end
+if not validOrdinarySentinel(sentinel, ARGV[3], ARGV[4]) then return 0 end
 local raw = redis.call('hget', KEYS[2], ARGV[1])
 if not raw then return 0 end
 local attempt = cjson.decode(raw)
@@ -142,7 +151,9 @@ return 1
 `;
 const START_ORDINARY_INVOCATION = `
 local sentinel = redis.call('get', KEYS[1])
-if sentinel ~= ARGV[2] then return 0 end
+if ARGV[2] == '' then
+  if sentinel ~= false then return 0 end
+elseif sentinel ~= ARGV[2] then return 0 end
 local prior = redis.call('get', KEYS[2])
 if prior then
   local raw = redis.call('get', ARGV[3] .. prior)
@@ -152,8 +163,11 @@ if redis.call('hlen', KEYS[3]) >= 2000 or redis.call('hexists', KEYS[3], ARGV[1]
 redis.call('hset', KEYS[3], ARGV[1], ARGV[4])
 return 1
 `;
-const FINISH_ORDINARY_INVOCATION = `
-if redis.call('get', KEYS[1]) ~= ARGV[2] then return 0 end
+const FINISH_ORDINARY_INVOCATION = `${VALIDATE_ORDINARY_SENTINEL}
+local sentinel = redis.call('get', KEYS[1])
+if ARGV[2] == '' then
+  if not validOrdinarySentinel(sentinel, ARGV[5], '') then return 0 end
+elseif sentinel ~= ARGV[2] then return 0 end
 local invocation = redis.call('hget', KEYS[2], ARGV[1])
 if invocation ~= ARGV[3] then return 0 end
 if ARGV[4] == 'completed' then
@@ -177,6 +191,10 @@ export interface XeroCampaignSnapshot {
   sentinel: XeroCampaignSentinel;
   sentinelRaw: string;
 }
+
+export type OrdinaryXeroCampaignSnapshot =
+  | XeroCampaignSnapshot
+  | { control: null; raw: null; sentinel: null; sentinelRaw: null };
 
 /** Missing control storage is never evidence that a resource is unreserved. */
 export class XeroCampaignStore {
@@ -235,6 +253,25 @@ export class XeroCampaignStore {
     reservationKey: string,
     runId = ""
   ): Promise<XeroCampaignSnapshot> {
+    const snapshot = await this.readSnapshot(reservationKey, runId, false);
+    if (!snapshot.sentinel) {
+      throw new XeroCampaignDeniedError();
+    }
+    return snapshot;
+  }
+  async ordinarySnapshot(reservationKey: string) {
+    const snapshot = await this.readSnapshot(reservationKey, "", true);
+    if (!snapshot.sentinel && reservationKey !== this.keys.active) {
+      // A missing sentinel alongside a namespace reservation is corruption.
+      await this.readSnapshot(this.keys.active, "", true);
+    }
+    return snapshot;
+  }
+  private async readSnapshot(
+    reservationKey: string,
+    runId: string,
+    allowAbsent: boolean
+  ): Promise<OrdinaryXeroCampaignSnapshot> {
     try {
       const [sentinelRaw, raw, owner, pointer] = readResult.parse(
         await this.command([
@@ -247,7 +284,15 @@ export class XeroCampaignStore {
           this.keys.control(""),
         ])
       );
-      if (!sentinelRaw) {
+      if (sentinelRaw === null) {
+        if (allowAbsent && pointer === null && raw === null) {
+          return {
+            control: null,
+            raw: null,
+            sentinel: null,
+            sentinelRaw: null,
+          };
+        }
         throw new XeroCampaignDeniedError();
       }
       const sentinel = XeroCampaignSentinelSchema.parse(
@@ -280,6 +325,9 @@ export class XeroCampaignStore {
   readOrganisation(organisationId: string) {
     return this.snapshot(this.keys.organisation(organisationId));
   }
+  readOrdinaryOrganisation(organisationId: string) {
+    return this.ordinarySnapshot(this.keys.organisation(organisationId));
+  }
   readRun(runId: string) {
     return this.snapshot(this.keys.control(runId), runId);
   }
@@ -290,7 +338,7 @@ export class XeroCampaignStore {
     },
     functionId = "xero.scoped-effect"
   ) {
-    const snapshot = await this.readOrganisation(scope.organisationId);
+    const snapshot = await this.readOrdinaryOrganisation(scope.organisationId);
     const id = randomUUID();
     const attempt = {
       id,
@@ -303,7 +351,7 @@ export class XeroCampaignStore {
         startedAt: new Date().toISOString(),
         state: "running",
       }),
-      sentinelRaw: snapshot.sentinelRaw,
+      sentinelRaw: snapshot.sentinelRaw ?? "",
     };
     const result = await this.command([
       "EVAL",
@@ -341,6 +389,7 @@ export class XeroCampaignStore {
       attempt.sentinelRaw,
       attempt.raw,
       outcome,
+      this.input.credentialDomainId,
     ]);
     if (result !== 1) {
       throw new XeroCampaignDeniedError();
@@ -351,7 +400,7 @@ export class XeroCampaignStore {
     providerAppId: string,
     externalTenantId?: string
   ) {
-    const snapshot = await this.snapshot(
+    const snapshot = await this.ordinarySnapshot(
       this.keys.provider(providerAppId, externalTenantId)
     );
     const id = randomUUID();
@@ -363,8 +412,8 @@ export class XeroCampaignStore {
       this.keys.provider(providerAppId, externalTenantId),
       this.keys.ordinaryProviderAttempts(providerAppId, externalTenantId),
       id,
-      snapshot.sentinel.credentialDomainId,
-      snapshot.sentinel.databaseTargetHash,
+      this.input.credentialDomainId,
+      snapshot.sentinel?.databaseTargetHash ?? "",
       this.keys.control(""),
       providerAppId,
       externalTenantId ?? "",
@@ -373,8 +422,8 @@ export class XeroCampaignStore {
       throw new XeroCampaignDeniedError();
     }
     return {
-      credentialDomainId: snapshot.sentinel.credentialDomainId,
-      databaseTargetHash: snapshot.sentinel.databaseTargetHash,
+      credentialDomainId: this.input.credentialDomainId,
+      databaseTargetHash: snapshot.sentinel?.databaseTargetHash ?? "",
       externalTenantId: externalTenantId ?? "",
       id,
       providerAppId,

@@ -37,6 +37,15 @@ const manifestSchema = z.object({
 
 const protectedCredentialDomains = new Set<string>();
 
+/** Discovery only; the fixture still validates the manifest and write authority. */
+export function isProtectedLiveRun(): boolean {
+  return (
+    process.env.NODE_ENV === "test" &&
+    process.env.ALLOW_LIVE_DATABASE_TESTS === "I_ACKNOWLEDGE_LIVE_MUTATION" &&
+    Boolean(process.env.TC_RELEASE_MANIFEST)
+  );
+}
+
 /** This fixture uses the real shared store and exactly one manifest-owned domain. */
 export async function initialiseLiveCampaignFixture(fixture: LiveTestFixture) {
   assertTestDatabaseConnectionAllowed();

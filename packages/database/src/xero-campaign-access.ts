@@ -16,7 +16,7 @@ import {
   xeroCampaignActionTargetHash,
 } from "./xero-campaign-contract";
 import {
-  type XeroCampaignSnapshot,
+  type OrdinaryXeroCampaignSnapshot,
   XeroCampaignStore,
   type XeroCampaignStoreInput,
 } from "./xero-campaign-store";
@@ -74,7 +74,7 @@ export interface XeroCampaignAuthorityInput extends XeroCampaignScope {
   runId: string;
 }
 function assertSnapshot(
-  snapshot: XeroCampaignSnapshot,
+  snapshot: OrdinaryXeroCampaignSnapshot,
   input: XeroCampaignAuthorityInput,
   store: XeroCampaignStore
 ): XeroCampaignControl {
@@ -127,7 +127,9 @@ async function admission(
   campaign?: XeroCampaignEvent,
   store = new XeroCampaignStore()
 ) {
-  const snapshot = await store.readOrganisation(scope.organisationId);
+  const snapshot = campaign
+    ? await store.readOrganisation(scope.organisationId)
+    : await store.readOrdinaryOrganisation(scope.organisationId);
   if (!snapshot.control || snapshot.control.phase === "closed") {
     if (campaign) {
       throw new XeroCampaignDeniedError();
@@ -763,12 +765,13 @@ export async function assertXeroCampaignProviderAccess(
       throw new XeroCampaignDeniedError();
     }
   }
-  const snapshot = await store.snapshot(
-    store.keys.provider(
-      rateClass.providerAppId,
-      rateClass.kind === "tenant" ? rateClass.xeroTenantId : undefined
-    )
+  const reservationKey = store.keys.provider(
+    rateClass.providerAppId,
+    rateClass.kind === "tenant" ? rateClass.xeroTenantId : undefined
   );
+  const snapshot = invocation
+    ? await store.snapshot(reservationKey)
+    : await store.ordinarySnapshot(reservationKey);
   if (!snapshot.control || snapshot.control.phase === "closed") {
     if (invocation) {
       await assertXeroCampaignAccess(invocation.scope);
@@ -784,7 +787,7 @@ export async function assertXeroCampaignProviderAccess(
       throw new XeroCampaignDeniedError();
     }
     // Campaign initialisation verifies that every live binding of reserved owners is included.
-    const ordinary = await store.readOrganisation(
+    const ordinary = await store.readOrdinaryOrganisation(
       credential.scope.organisationId
     );
     if (ordinary.control && ordinary.control.phase !== "closed") {
@@ -925,7 +928,7 @@ export async function claimXeroCampaignScheduledDispatch(
   schedulerRunId: string | undefined
 ): Promise<XeroCampaignEvent | undefined> {
   const store = new XeroCampaignStore();
-  const snapshot = await store.readOrganisation(scope.organisationId);
+  const snapshot = await store.readOrdinaryOrganisation(scope.organisationId);
   if (!snapshot.control || snapshot.control.phase === "closed") {
     return undefined;
   }
@@ -978,10 +981,10 @@ export async function xeroCampaignAllowsOrdinaryMaintenance(scope?: {
 }) {
   const store = new XeroCampaignStore();
   if (scope) {
-    const snapshot = await store.readOrganisation(scope.organisationId);
+    const snapshot = await store.readOrdinaryOrganisation(scope.organisationId);
     return !snapshot.control || snapshot.control.phase === "closed";
   }
-  const snapshot = await store.snapshot(store.keys.active);
+  const snapshot = await store.ordinarySnapshot(store.keys.active);
   return !snapshot.control || snapshot.control.phase === "closed";
 }
 
@@ -1057,7 +1060,9 @@ export async function withXeroCampaignScopedInvocation<T>(
 ) {
   const scope = scopedInputSchema.parse(input);
   const store = new XeroCampaignStore();
-  const snapshot = await store.readOrganisation(scope.organisationId);
+  const snapshot = scope.campaign
+    ? await store.readOrganisation(scope.organisationId)
+    : await store.readOrdinaryOrganisation(scope.organisationId);
   if (snapshot.control && snapshot.control.phase !== "closed") {
     return withXeroCampaignInvocation(
       functionId,
@@ -1076,7 +1081,9 @@ export async function withXeroCampaignScopedInvocation<T>(
       withDatabaseWriteGuard(async (tx) => {
         const { lockXeroCampaign } = await import("@repo/database");
         await lockXeroCampaign(tx, store.input.credentialDomainId);
-        const latest = await store.readOrganisation(scope.organisationId);
+        const latest = await store.readOrdinaryOrganisation(
+          scope.organisationId
+        );
         if (latest.control && latest.control.phase !== "closed") {
           throw new XeroCampaignDeniedError();
         }

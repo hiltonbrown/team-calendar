@@ -1,5 +1,10 @@
 # Lessons
 
+When the user says to continue without blocking after a recommended plan
+resolution, carry that resolution into a concrete implementation and verification
+record. Reuse the settled live-Neon authority and existing protected runner;
+do not repeat the policy question or substitute a local database.
+
 This file records reusable patterns learned from user corrections and verified
 failures. Canonical product, architecture, security, and design rules belong in
 `PRODUCT.md`, `AGENTS.md`, `SECURITY.md`, and `DESIGN.md`. Keep each lesson

@@ -8,7 +8,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { initialiseLiveCampaignFixture } from "./live-campaign-fixture";
+import {
+  initialiseLiveCampaignFixture,
+  isProtectedLiveRun,
+} from "./live-campaign-fixture";
 import {
   allocateLiveTestFixture,
   type GlobalKeyKind,
@@ -23,6 +26,30 @@ const mocks = vi.hoisted(() => ({
   query: vi.fn(),
   transaction: vi.fn(),
 }));
+
+describe("protected suite discovery", () => {
+  it.each([
+    ["test", undefined, undefined, false],
+    ["test", "wrong", "/private/manifest.json", false],
+    [
+      "production",
+      "I_ACKNOWLEDGE_LIVE_MUTATION",
+      "/private/manifest.json",
+      false,
+    ],
+    ["test", "I_ACKNOWLEDGE_LIVE_MUTATION", undefined, false],
+    ["test", "I_ACKNOWLEDGE_LIVE_MUTATION", "", false],
+    ["test", "I_ACKNOWLEDGE_LIVE_MUTATION", "/private/manifest.json", true],
+  ])(
+    "routes only acknowledged protected test runs (%s, %s, %s)",
+    (mode, acknowledgement, manifestPath, expected) => {
+      vi.stubEnv("NODE_ENV", mode);
+      vi.stubEnv("ALLOW_LIVE_DATABASE_TESTS", acknowledgement);
+      vi.stubEnv("TC_RELEASE_MANIFEST", manifestPath);
+      expect(isProtectedLiveRun()).toBe(expected);
+    }
+  );
+});
 vi.mock("./client", () => ({ database: { $transaction: mocks.transaction } }));
 const productionDomain = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const suite = "packages/jobs/src/handlers/sync-xero-people.integration.test.ts";

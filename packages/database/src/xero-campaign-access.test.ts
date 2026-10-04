@@ -61,6 +61,190 @@ afterEach(() => {
 });
 
 describe("campaign storage and authority", () => {
+  it.each([
+    "invocation-acquire",
+    "provider-acquire",
+    "invocation-finish",
+    "provider-finish",
+  ])("denies malformed bootstrap races at %s", async (phase) => {
+    const corruptSentinels = [
+      "",
+      JSON.stringify({ credentialDomainId: uuid(1), version: 1 }),
+      JSON.stringify({
+        credentialDomainId: uuid(1),
+        databaseTargetHash: "invalid",
+        version: 1,
+      }),
+      JSON.stringify({
+        credentialDomainId: uuid(1),
+        databaseTargetHash: reference,
+        extra: true,
+        version: 1,
+      }),
+    ];
+    for (const corrupt of corruptSentinels) {
+      const fixture = storeFixture(null);
+      fixture.values.delete(fixture.keys.sentinel);
+      const store = new XeroCampaignStore(fixture.configuration);
+      if (phase.endsWith("acquire")) {
+        const read = store.ordinarySnapshot.bind(store);
+        vi.spyOn(store, "ordinarySnapshot").mockImplementationOnce(
+          async (key) => {
+            const snapshot = await read(key);
+            fixture.values.set(fixture.keys.sentinel, corrupt);
+            return snapshot;
+          }
+        );
+        await expect(
+          phase === "invocation-acquire"
+            ? store.beginOrdinaryInvocation(scope)
+            : store.beginOrdinaryProviderAttempt("fixture-app", uuid(4))
+        ).rejects.toThrow("xero_campaign_admission_denied");
+      } else if (phase === "invocation-finish") {
+        const attempt = await store.beginOrdinaryInvocation(scope);
+        fixture.values.set(fixture.keys.sentinel, corrupt);
+        await expect(
+          store.finishOrdinaryInvocation(attempt, "completed")
+        ).rejects.toThrow("xero_campaign_admission_denied");
+      } else {
+        const attempt = await store.beginOrdinaryProviderAttempt(
+          "fixture-app",
+          uuid(4)
+        );
+        fixture.values.set(fixture.keys.sentinel, corrupt);
+        await expect(
+          store.finishOrdinaryProviderAttempt(attempt, "completed")
+        ).rejects.toThrow("xero_campaign_admission_denied");
+      }
+    }
+  });
+
+  it("runs ordinary writes and provider effects without campaign bootstrap", async () => {
+    const fixture = storeFixture(null);
+    fixture.values.delete(fixture.keys.sentinel);
+    const result = await withXeroCampaignInvocation(
+      functionId,
+      scope,
+      async () => {
+        const response = await withXeroCampaignProviderEffect(
+          {
+            kind: "tenant",
+            providerAppId: "fixture-app",
+            tenantHeader: uuid(4),
+            url: "https://api.xero.com/payroll.xro/1.0/Employees",
+            xeroTenantId: uuid(4),
+          },
+          () => Promise.resolve(new Response("ordinary provider read"))
+        );
+        return withXeroCampaignWrite(scope, () => response.text());
+      },
+      null,
+      fixture.configuration
+    );
+    expect(result).toBe("ordinary provider read");
+    expect(fixture.hashes.size).toBe(0);
+    expect(fixture.values.has(fixture.keys.sentinel)).toBe(false);
+  });
+
+  it("cleans exact ordinary ownership after campaign bootstrap", async () => {
+    const fixture = storeFixture(null);
+    const sentinel = fixture.values.get(fixture.keys.sentinel);
+    fixture.values.delete(fixture.keys.sentinel);
+    const result = await withXeroCampaignInvocation(
+      functionId,
+      scope,
+      () => {
+        if (!sentinel) {
+          throw new Error("Fixture sentinel missing");
+        }
+        fixture.values.set(fixture.keys.sentinel, sentinel);
+        return Promise.resolve("ordinary completed");
+      },
+      null,
+      fixture.configuration
+    );
+    expect(result).toBe("ordinary completed");
+    expect(fixture.hashes.size).toBe(0);
+  });
+
+  it("denies a campaign invocation without its sentinel even when no reservation exists", async () => {
+    const fixture = storeFixture(null);
+    fixture.values.delete(fixture.keys.sentinel);
+    await expect(
+      withXeroCampaignInvocation(
+        functionId,
+        { ...scope, campaign },
+        async () => "unreachable",
+        null,
+        fixture.configuration
+      )
+    ).rejects.toThrow("xero_campaign_admission_denied");
+  });
+
+  it.each(["active", "orphan", "namespace-orphan", "malformed", "offline"])(
+    "keeps ordinary admission closed for %s campaign state",
+    async (state) => {
+      const fixture = storeFixture(
+        state === "active" ? controlFixture() : null
+      );
+      if (state === "orphan") {
+        fixture.values.delete(fixture.keys.sentinel);
+        fixture.values.set(
+          fixture.keys.organisation(scope.organisationId),
+          campaign.runId
+        );
+      } else if (state === "namespace-orphan") {
+        fixture.values.delete(fixture.keys.sentinel);
+        fixture.values.set(fixture.keys.active, campaign.runId);
+      } else if (state === "malformed") {
+        fixture.values.set(fixture.keys.sentinel, "");
+      } else if (state === "offline") {
+        fixture.fetchImpl.mockRejectedValue(new Error("Store unavailable"));
+      }
+      await expect(
+        withXeroCampaignInvocation(
+          functionId,
+          scope,
+          async () => "unreachable",
+          null,
+          fixture.configuration
+        )
+      ).rejects.toThrow("xero_campaign_admission_denied");
+    }
+  );
+
+  it("retains an uncertain provider attempt without a bootstrap sentinel", async () => {
+    const fixture = storeFixture(null);
+    fixture.values.delete(fixture.keys.sentinel);
+    await expect(
+      withXeroCampaignInvocation(
+        functionId,
+        scope,
+        () =>
+          withXeroCampaignProviderEffect(
+            {
+              kind: "tenant",
+              method: "POST",
+              providerAppId: "fixture-app",
+              tenantHeader: uuid(4),
+              url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+              xeroTenantId: uuid(4),
+            },
+            () => Promise.reject(new Error("Lost response"))
+          ),
+        null,
+        fixture.configuration
+      )
+    ).rejects.toThrow("Lost response");
+    const attempts = fixture.hashes.get(
+      fixture.keys.ordinaryProviderAttempts("fixture-app", uuid(4))
+    );
+    expect(attempts?.size).toBe(1);
+    expect(JSON.parse([...(attempts?.values() ?? [])][0] ?? "null").state).toBe(
+      "uncertain"
+    );
+  });
+
   it("denies absent sentinel, missing root and wrong active owner", async () => {
     const fixture = storeFixture();
     const store = new XeroCampaignStore(fixture.configuration);
@@ -86,7 +270,7 @@ describe("campaign storage and authority", () => {
       "xero_campaign_admission_denied"
     );
   });
-  it("permits ordinary work only with a verified idle namespace", async () => {
+  it("permits ordinary work with an idle namespace or verified absence", async () => {
     const fixture = storeFixture(null);
     const operation = vi.fn(async () => "ordinary");
     await expect(
@@ -107,8 +291,8 @@ describe("campaign storage and authority", () => {
         null,
         fixture.configuration
       )
-    ).rejects.toThrow();
-    expect(operation).toHaveBeenCalledOnce();
+    ).resolves.toBe("ordinary");
+    expect(operation).toHaveBeenCalledTimes(2);
   });
   it.each([
     { bindingGeneration: 3 },
