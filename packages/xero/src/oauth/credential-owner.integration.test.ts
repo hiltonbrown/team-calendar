@@ -19,6 +19,20 @@ import { classifyXeroFailure } from "../adapter/classify-xero-failure";
 import { lockXeroOwner } from "./locks";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@repo/database", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@repo/database")>();
+  const { createSpyableDatabase } = await import(
+    "@repo/database/integration-spies"
+  );
+  return {
+    ...actual,
+    database: createSpyableDatabase(actual.database, {
+      xeroProviderConnection: ["upsert"],
+      xeroRefreshAttempt: ["findMany"],
+    }),
+  };
+});
+
 vi.mock("./identity", () => ({
   verifyXeroAccessTokenIdentity: (token: string) => {
     try {

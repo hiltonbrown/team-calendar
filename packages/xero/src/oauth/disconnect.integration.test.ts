@@ -16,6 +16,18 @@ import {
 } from "vitest";
 
 vi.mock("server-only", () => ({}));
+vi.mock("@repo/database", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@repo/database")>();
+  const { createSpyableDatabase } = await import(
+    "@repo/database/integration-spies"
+  );
+  return {
+    ...actual,
+    database: createSpyableDatabase(actual.database, {
+      xeroCleanupRequest: ["create"],
+    }),
+  };
+});
 
 describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
   if (!isProtectedLiveRun()) {

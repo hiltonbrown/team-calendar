@@ -2040,3 +2040,17 @@ in one pass; no other source findings. Actual Lua regressions are registered in
 the protected suite and await live execution. Backup inspection is not a PITR or
 destructive restore exercise. CI publication, provider/browser and deployed
 worker evidence remain NOT VERIFIED.
+
+
+### Plan 164 live-test remediation, 4 October 2026
+
+- [x] Observe four failing cases and two failing hooks in the protected Xero suite.
+- [x] Identify missing own method descriptors on guarded Prisma delegates.
+- [x] Add the test-only facade, RED 3 and context RED 1, then GREEN 4.
+- [x] Preserve real guard checks, all existing fixture IDs/assertions and production write guard.
+- [x] Pass root lint, types and unit gates; retain six protected collection skips.
+- [ ] Replay live integration at the repaired candidate.
+
+Review: interrupted host admissions were cleaned and independently restored.
+The substantive failed run exited 1; cleanup and both outside-data postchecks
+passed. Browser/provider rows remain NOT VERIFIED and no provider writes occurred.
