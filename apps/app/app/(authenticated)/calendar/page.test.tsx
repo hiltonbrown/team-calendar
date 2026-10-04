@@ -15,9 +15,13 @@ const mocks = vi.hoisted(() => ({
     organisation_id: organisationId,
   })),
   teamFindMany: vi.fn(),
+  xeroTenantFindFirst: vi.fn(),
 }));
 
 const XERO_NOT_CONNECTED_COPY = /Xero is not connected/;
+const LEAVE_SYNCED_REGEX = /Leave synced/;
+const UNLINKED_PERSON_COPY =
+  /Your account is not linked to a person in this organisation/;
 
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
@@ -32,6 +36,7 @@ vi.mock("@repo/database", () => ({
     organisation: { findFirst: mocks.organisationFindFirst },
     person: { findFirst: mocks.personFindFirst },
     team: { findMany: mocks.teamFindMany },
+    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
   scopedQuery: mocks.scopedQuery,
 }));
@@ -49,6 +54,9 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("../components/header", () => ({
   Header: ({ page }: { page: string }) => <header>{page}</header>,
+}));
+vi.mock("@/components/calendar/calendar-live-updates", () => ({
+  CalendarLiveUpdates: () => <div data-testid="calendar-live-updates" />,
 }));
 vi.mock("@/components/calendar/calendar-toolbar", () => ({
   CalendarToolbar: () => <div>Toolbar</div>,
@@ -93,6 +101,7 @@ describe("CalendarPage", () => {
     });
     mocks.teamFindMany.mockResolvedValue([]);
     mocks.locationFindMany.mockResolvedValue([]);
+    mocks.xeroTenantFindFirst.mockResolvedValue(null);
     mocks.getCalendarRange.mockResolvedValue({
       ok: true,
       value: calendarRange(),
@@ -162,6 +171,45 @@ describe("CalendarPage", () => {
 
     expect(screen.getByText("Unable to load calendar")).toBeDefined();
     expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
+  });
+
+  it("renders connected Xero sync status when connected", async () => {
+    mocks.getCalendarRange.mockResolvedValue({
+      ok: true,
+      value: { ...calendarRange(), xeroConnectionState: "connected" },
+    });
+    mocks.xeroTenantFindFirst.mockResolvedValue({
+      last_leave_records_sync_at: new Date(),
+      last_sync_error_message: null,
+      leave_records_stale_since: null,
+      sync_paused_at: null,
+      tenant_name: "Acme Payroll AU",
+    });
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.queryByText(XERO_NOT_CONNECTED_COPY)).toBeNull();
+    expect(screen.getByText("Acme Payroll AU")).toBeDefined();
+    expect(screen.getByText(LEAVE_SYNCED_REGEX)).toBeDefined();
+  });
+
+  it("renders unlinked person notice when current user is not linked to an employee", async () => {
+    mocks.getCalendarRange.mockResolvedValue({
+      ok: true,
+      value: { ...calendarRange(), xeroConnectionState: "connected" },
+    });
+    mocks.personFindFirst.mockResolvedValue(null);
+    mocks.xeroTenantFindFirst.mockResolvedValue({
+      last_leave_records_sync_at: new Date(),
+      last_sync_error_message: null,
+      leave_records_stale_since: null,
+      sync_paused_at: null,
+      tenant_name: "Acme Payroll AU",
+    });
+
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(screen.getByText(UNLINKED_PERSON_COPY)).toBeDefined();
   });
 });
 

@@ -6,12 +6,12 @@ import {
 import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
 
+import { reconcileXeroPerson } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
-import { noemailFallbackDomain } from "@repo/seo/branding";
 import {
   fetchEmployeesForRegion,
   type XeroEmployee,
@@ -22,6 +22,7 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
+import { acquireSyncRun, XeroSyncRunFencedError } from "./sync-run-lifecycle";
 import {
   rejectRetryableSyncResult,
   resolveSyncTenant,
@@ -37,6 +38,7 @@ const SyncXeroPeopleInputSchema = z.object({
   campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
+  runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
   xeroTenantId: z.string().uuid(),
@@ -57,7 +59,6 @@ type JsonValue =
   | { [key: string]: JsonValue };
 
 const BATCH_SIZE = 50;
-const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 
 export const syncXeroPeopleFunction: InngestFunction.Any =
@@ -118,50 +119,29 @@ async function syncXeroPeopleUnderCampaign(input: unknown): Promise<
   let runId: string | null = null;
 
   try {
-    const existingRun = await database.syncRun.findFirst({
-      select: { id: true },
-      where: {
-        ...scoped(context),
-        run_type: "people",
-        started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
-        status: "running",
-        xero_tenant_id: context.xeroTenantId,
-      },
-    });
-
-    if (existingRun) {
-      const cancelled = await database.syncRun.create({
-        data: {
-          ...scoped(context),
-          completed_at: new Date(),
-          error_summary: "Another people sync run is already in progress",
-          run_type: "people",
-          started_at: startedAt,
-          status: "cancelled",
-          trigger_type: context.triggerType,
-          triggered_by_user_id: context.triggeredByUserId ?? null,
-          xero_tenant_id: context.xeroTenantId,
-        },
-        select: { id: true },
-      });
+    const runAcquisition = await acquireSyncRun(context, "people", startedAt);
+    if (runAcquisition.kind === "terminal") {
+      const term = runAcquisition.run;
       return {
         ok: true,
-        value: emptyResult(cancelled.id, "cancelled"),
+        value: {
+          failed: term.records_failed,
+          fetched: term.records_fetched,
+          runId: term.id,
+          skipped: term.records_skipped,
+          status: term.status,
+          upserted: term.records_upserted,
+        },
+      };
+    }
+    if (runAcquisition.kind === "cancelled_competing") {
+      return {
+        ok: true,
+        value: emptyResult(runAcquisition.run.id, "cancelled"),
       };
     }
 
-    const run = await database.syncRun.create({
-      data: {
-        ...scoped(context),
-        run_type: "people",
-        started_at: startedAt,
-        status: "running",
-        trigger_type: context.triggerType,
-        triggered_by_user_id: context.triggeredByUserId ?? null,
-        xero_tenant_id: context.xeroTenantId,
-      },
-      select: { id: true },
-    });
+    const { run } = runAcquisition;
     runId = run.id;
 
     await publishRunStatusChanged(context, run.id, "running");
@@ -393,20 +373,30 @@ async function syncXeroPeopleUnderCampaign(input: unknown): Promise<
       }
     }
 
+    const canClearStaleness = complete && !guardBlocked && counts.failed === 0;
+    let staleSinceData: { people_stale_since?: Date | null } = {};
+    if (canClearStaleness) {
+      staleSinceData = { people_stale_since: null };
+    } else if (!xeroTenant.people_stale_since) {
+      staleSinceData = { people_stale_since: startedAt };
+    }
+
     await withXeroBinding(context, async (tx) =>
       tx.xeroTenant.updateMany({
         data: {
           last_people_sync_at: new Date(),
           last_sync_error_code: null,
           last_sync_error_message: null,
-          people_stale_since: null,
+          ...staleSinceData,
         },
         where: { ...scoped(context), id: context.xeroTenantId },
       })
     );
 
     const finalStatus =
-      guardBlocked || counts.failed > 0 ? "partial_success" : "succeeded";
+      guardBlocked || counts.failed > 0 || !complete
+        ? "partial_success"
+        : "succeeded";
     const errorSummary = guardBlocked
       ? "Missing person guard threshold exceeded"
       : undefined;
@@ -425,10 +415,17 @@ async function syncXeroPeopleUnderCampaign(input: unknown): Promise<
       value: { ...counts, runId: run.id, status: finalStatus },
     };
   } catch (error) {
-    if (error instanceof XeroBindingChangedError && runId) {
+    if (
+      (error instanceof XeroBindingChangedError ||
+        error instanceof XeroSyncRunFencedError) &&
+      runId
+    ) {
       await completeRun(context, runId, {
         counts: emptyCounts(),
-        errorSummary: "generation_changed",
+        errorSummary:
+          error instanceof XeroSyncRunFencedError
+            ? "sync_run_fenced"
+            : "generation_changed",
         status: "cancelled",
       });
       return { ok: true, value: emptyResult(runId, "cancelled") };
@@ -475,61 +472,24 @@ async function processBatch(
     }
 
     try {
-      const raw =
-        employee.email ||
-        `${employee.firstName}.${employee.lastName}@${noemailFallbackDomain}`;
-      const email = raw.toLowerCase();
       const employmentType = mapEmploymentType(employee.employmentType);
-      const personType =
-        employmentType === "contractor" ? "contractor" : "employee";
       const startDate = optionalValidDate(employee.startDate);
-      await withXeroBinding(context, async (tx) =>
-        tx.person.upsert({
-          create: {
-            clerk_org_id: context.clerkOrgId,
-            display_name: `${employee.firstName} ${employee.lastName}`,
-            email,
-            employment_type: employmentType,
-            first_name: employee.firstName,
-            is_active: employee.status?.toUpperCase() === "ACTIVE",
-            job_title: employee.jobTitle ?? null,
-            last_name: employee.lastName,
-            organisation_id: context.organisationId,
-            person_type: personType,
-            source_person_key: employee.employeeId,
-            source_system: "XERO",
-            start_date: startDate,
-            xero_employee_id: employee.employeeId,
+      await withXeroBinding(context, async (tx) => {
+        await reconcileXeroPerson(
+          context,
+          {
+            email: employee.email,
+            employeeId: employee.employeeId,
+            employmentType,
+            firstName: employee.firstName,
+            isActive: employee.status?.toUpperCase() === "ACTIVE",
+            jobTitle: employee.jobTitle ?? null,
+            lastName: employee.lastName,
+            startDate,
           },
-          update: {
-            // The employee was returned by Xero in this run, so any prior
-            // archival (e.g. from a destructive disconnect) no longer applies.
-            // is_active is mapped independently below and reflects Xero's
-            // employment status, not whether the person is archived.
-            archived_at: null,
-            display_name: `${employee.firstName} ${employee.lastName}`,
-            email,
-            employment_type: employmentType,
-            first_name: employee.firstName,
-            is_active: employee.status?.toUpperCase() === "ACTIVE",
-            job_title: employee.jobTitle ?? null,
-            last_name: employee.lastName,
-            person_type: personType,
-            start_date: startDate,
-            updated_at: new Date(),
-            xero_employee_id: employee.employeeId,
-            xero_missing_since: null,
-          },
-          where: {
-            clerk_org_id: context.clerkOrgId,
-            organisation_id_source_system_source_person_key: {
-              organisation_id: context.organisationId,
-              source_person_key: employee.employeeId,
-              source_system: "XERO",
-            },
-          },
-        })
-      );
+          tx
+        );
+      });
       counts.upserted += 1;
     } catch (error) {
       if (

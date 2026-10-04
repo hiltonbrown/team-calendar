@@ -31,7 +31,10 @@ import type {
   XeroLeaveBalance,
   XeroLeaveBalanceFetchFailure,
 } from "./leave-balances";
-import type { XeroLeaveRecord } from "./leave-records";
+import type {
+  XeroLeaveRecord,
+  XeroLeaveRecordsFetchResult,
+} from "./leave-records";
 
 export async function fetchLeaveApplicationStatusForRegion(
   payrollRegion: PayrollRegion | string,
@@ -79,13 +82,7 @@ export async function fetchEmployeesForRegion(
 export async function fetchLeaveRecordsForRegion(
   payrollRegion: PayrollRegion | string,
   input: { xeroTenant: XeroTenantForWrite }
-): Promise<
-  XeroWriteResult<{
-    complete: boolean;
-    leaveRecords: XeroLeaveRecord[];
-    rawResponse: unknown;
-  }>
-> {
+): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
   return await executeWithXeroAuthRecovery(
     input.xeroTenant,
     async (xeroTenant) => {

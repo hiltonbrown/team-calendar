@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
 import {
   assertXeroCampaignDispatch,
@@ -50,6 +51,7 @@ const SyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  runId: z.string().uuid().optional(),
   runType: z.enum([
     "people",
     "leave_records",
@@ -111,6 +113,7 @@ export async function dispatchSyncEvent(
       eventName,
       parsed.data.campaign
     );
+    const runId = parsed.data.runId ?? randomUUID();
     const sent = await inngest.send({
       data: {
         bindingGeneration: parsed.data.bindingGeneration,
@@ -118,6 +121,7 @@ export async function dispatchSyncEvent(
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,
+        runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         triggerType: parsed.data.triggerType,
         xeroTenantId: parsed.data.xeroTenantId,

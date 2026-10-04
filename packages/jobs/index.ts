@@ -1,12 +1,26 @@
+export {
+  type CaptureInitialSyncCompletedInput,
+  captureInitialSyncCompleted,
+} from "./src/activation";
 export { inngest } from "./src/client";
 export {
   dispatchCancelSyncRun,
+  dispatchInitialXeroSync,
   dispatchSyncEvent,
+  getInitialSyncEventId,
   getRegisteredSyncEventName,
+  type InitialXeroSyncInput,
+  initialXeroSyncEventName,
   type RegisteredSyncRunType,
   syncEventNames,
 } from "./src/events";
 export { functions } from "./src/functions";
+export {
+  type InitialXeroSyncError,
+  type InitialXeroSyncResult,
+  initialXeroSync,
+  initialXeroSyncFunction,
+} from "./src/handlers/initial-xero-sync";
 export {
   type RebuildFeedCacheError,
   type RebuildFeedCacheInput,
@@ -29,6 +43,11 @@ export {
   recountUsage,
   recountUsageFunction,
 } from "./src/handlers/recount-usage";
+export {
+  type RecoverXeroImportDispatchOptions,
+  type RecoverXeroImportDispatchResult,
+  recoverXeroImportDispatch,
+} from "./src/handlers/recover-xero-import-dispatch";
 export {
   scheduleXeroSyncsFunction,
   scheduleXeroSyncsPage,

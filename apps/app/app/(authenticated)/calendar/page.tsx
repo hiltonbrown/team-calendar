@@ -5,13 +5,19 @@ import {
   type CalendarScope,
   getCalendarRange,
 } from "@repo/availability";
-import { xeroRecoveryMessage } from "@repo/core";
+import {
+  type ClerkOrgId,
+  type OrganisationId,
+  xeroRecoveryMessage,
+} from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { CalendarDayView } from "@/components/calendar/calendar-day-view";
+import { CalendarLiveUpdates } from "@/components/calendar/calendar-live-updates";
 import { CalendarMonthView } from "@/components/calendar/calendar-month-view";
 import { CalendarScanPanel } from "@/components/calendar/calendar-scan-panel";
+import { CalendarSyncStatus } from "@/components/calendar/calendar-sync-status";
 import { CalendarTimeline } from "@/components/calendar/calendar-timeline";
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar";
 import { FetchErrorState } from "@/components/states/fetch-error-state";
@@ -38,6 +44,83 @@ const defaultCalendarFilters: CalendarFilterInput = {
   surface: "calendar",
   view: "week",
 };
+
+async function loadCalendarResources(
+  clerkOrgId: ClerkOrgId,
+  organisationId: OrganisationId,
+  userId: string,
+  actingPersonId: string | null,
+  parsedFilters: CalendarFilterInput,
+  role: CalendarRole,
+  scope: CalendarScope
+) {
+  const [organisation, teams, locations, xeroTenant] = await Promise.all([
+    database.organisation.findFirst({
+      select: { name: true, timezone: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        id: organisationId,
+      },
+    }),
+    database.team.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+      where: scopedQuery(clerkOrgId, organisationId),
+    }),
+    database.location.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+      where: scopedQuery(clerkOrgId, organisationId),
+    }),
+    database.xeroTenant.findFirst({
+      select: {
+        last_leave_records_sync_at: true,
+        last_sync_error_message: true,
+        leave_records_stale_since: true,
+        sync_paused_at: true,
+        tenant_name: true,
+      },
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        organisation_id: organisationId,
+      },
+    }),
+  ]);
+  const timezone = organisation?.timezone ?? "UTC";
+  const anchorDate = parsedFilters.anchor
+    ? new Date(`${parsedFilters.anchor}T12:00:00.000Z`)
+    : new Date();
+
+  const dataResult = await getCalendarRange({
+    actingPersonId,
+    actingUserId: userId,
+    anchorDate,
+    clerkOrgId,
+    filters: {
+      approvalStatus: parsedFilters.approvalStatus,
+      includeDrafts: parsedFilters.includeDrafts,
+      locationId: parsedFilters.locationId,
+      personType: parsedFilters.personType,
+      recordType: parsedFilters.recordType,
+      recordTypeCategory: parsedFilters.recordTypeCategory,
+    },
+    organisationId,
+    role,
+    scope,
+    view: parsedFilters.view,
+  });
+
+  return {
+    dataResult,
+    locations,
+    organisation,
+    teams,
+    timezone,
+    xeroTenant,
+  };
+}
 
 const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   await requirePageRole("org:viewer");
@@ -76,49 +159,16 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
     );
   }
 
-  const [organisation, teams, locations] = await Promise.all([
-    database.organisation.findFirst({
-      select: { timezone: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: clerkOrgId,
-        id: organisationId,
-      },
-    }),
-    database.team.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-    database.location.findMany({
-      orderBy: { name: "asc" },
-      select: { id: true, name: true },
-      where: scopedQuery(clerkOrgId, organisationId),
-    }),
-  ]);
-  const timezone = organisation?.timezone ?? "UTC";
-  const anchorDate = parsedFilters.anchor
-    ? new Date(`${parsedFilters.anchor}T12:00:00.000Z`)
-    : new Date();
-
-  const dataResult = await getCalendarRange({
-    actingPersonId: currentPerson?.id ?? null,
-    actingUserId: user.id,
-    anchorDate,
-    clerkOrgId,
-    filters: {
-      approvalStatus: parsedFilters.approvalStatus,
-      includeDrafts: parsedFilters.includeDrafts,
-      locationId: parsedFilters.locationId,
-      personType: parsedFilters.personType,
-      recordType: parsedFilters.recordType,
-      recordTypeCategory: parsedFilters.recordTypeCategory,
-    },
-    organisationId,
-    role,
-    scope: scope.value,
-    view: parsedFilters.view,
-  });
+  const { dataResult, locations, organisation, teams, timezone, xeroTenant } =
+    await loadCalendarResources(
+      clerkOrgId,
+      organisationId,
+      user.id,
+      currentPerson?.id ?? null,
+      parsedFilters,
+      role,
+      scope.value
+    );
 
   if (!dataResult.ok) {
     if (dataResult.error.code === "invalid_scope") {
@@ -153,8 +203,21 @@ const CalendarPage = async ({ searchParams }: CalendarPageProps) => {
   return (
     <>
       <Header page="Calendar" />
+      <CalendarLiveUpdates organisationId={organisationId} />
       <div className="flex flex-1 flex-col gap-8 p-6 pt-0">
-        {dataResult.value.xeroConnectionState !== "connected" && (
+        {dataResult.value.xeroConnectionState === "connected" ? (
+          <CalendarSyncStatus
+            businessName={
+              xeroTenant?.tenant_name ?? organisation?.name ?? "Xero"
+            }
+            isPersonalUnlinked={currentPerson === null}
+            isStale={Boolean(xeroTenant?.leave_records_stale_since)}
+            isSyncPaused={Boolean(xeroTenant?.sync_paused_at)}
+            lastLeaveRefresh={xeroTenant?.last_leave_records_sync_at ?? null}
+            orgQueryValue={orgQueryValue}
+            syncError={xeroTenant?.last_sync_error_message ?? null}
+          />
+        ) : (
           <DisconnectedXeroBanner
             canConnect={role === "admin" || role === "owner"}
             orgQueryValue={orgQueryValue}

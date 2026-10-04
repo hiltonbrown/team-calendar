@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  clerkOrgConnectionCount: vi.fn(),
   currentUserPersonFindFirst: vi.fn(),
   feedCount: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
   organisationFindFirst: vi.fn(),
+  pendingMatchesCount: vi.fn(),
   peopleCount: vi.fn(),
   publicHolidayJurisdictionCount: vi.fn(),
 }));
@@ -30,8 +30,10 @@ vi.mock("@repo/database", () => ({
       count: mocks.publicHolidayJurisdictionCount,
     },
     xeroConnection: {
-      count: mocks.clerkOrgConnectionCount,
       findFirst: mocks.getXeroConnectionStateForScope,
+    },
+    xeroPersonMatch: {
+      count: mocks.pendingMatchesCount,
     },
   },
 }));
@@ -45,13 +47,13 @@ describe("loadOnboardingState", () => {
       country_code: "AU",
       name: "Acme",
     });
-    mocks.clerkOrgConnectionCount.mockResolvedValue(1);
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
       value: { bindingGeneration: 1, state: "connected" },
     });
     mocks.peopleCount.mockResolvedValue(2);
     mocks.currentUserPersonFindFirst.mockResolvedValue({ id: "person_1" });
+    mocks.pendingMatchesCount.mockResolvedValue(0);
     mocks.publicHolidayJurisdictionCount.mockResolvedValue(1);
     mocks.feedCount.mockResolvedValue(1);
   });
@@ -158,7 +160,6 @@ describe("loadOnboardingState", () => {
   });
 
   it("keeps a disconnected Xero task optional so one required step leads", async () => {
-    mocks.clerkOrgConnectionCount.mockResolvedValue(0);
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
       value: { bindingGeneration: null, state: "not_connected" },
@@ -181,5 +182,60 @@ describe("loadOnboardingState", () => {
     expect(state.steps.find((step) => step.status === "next")?.id).toBe(
       "people"
     );
+  });
+
+  it("shows an entity-specific Xero connect step for a second un-connected entity", async () => {
+    mocks.getXeroConnectionStateForScope.mockResolvedValue({
+      ok: true,
+      value: { bindingGeneration: null, state: "not_connected" },
+    });
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000002",
+      userId: "user_1",
+    });
+
+    const xeroStep = state.steps.find((step) => step.id === "xero");
+    expect(xeroStep).toMatchObject({
+      ctaLabel: "Connect Xero",
+      status: "optional",
+      title: "Connect Xero",
+    });
+  });
+
+  it("completes business setup when people exist even if admin user is not a payroll employee", async () => {
+    mocks.peopleCount.mockResolvedValue(10);
+    mocks.currentUserPersonFindFirst.mockResolvedValue(null);
+    mocks.pendingMatchesCount.mockResolvedValue(0);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "admin_external_user",
+    });
+
+    const peopleStep = state.steps.find((step) => step.id === "people");
+    expect(peopleStep?.status).toBe("complete");
+    expect(state.isComplete).toBe(true);
+    expect(state.currentUserPersonLinked).toBe(false);
+  });
+
+  it("requires review when imported people have pending identity matches", async () => {
+    mocks.peopleCount.mockResolvedValue(10);
+    mocks.pendingMatchesCount.mockResolvedValue(2);
+
+    const state = await loadOnboardingState({
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      userId: "user_1",
+    });
+
+    const peopleStep = state.steps.find((step) => step.id === "people");
+    expect(peopleStep?.status).toBe("next");
+    expect(peopleStep?.ctaLabel).toBe("Review people");
+    expect(peopleStep?.ctaHref).toBe("/settings/integrations/xero/matches");
+    expect(state.isComplete).toBe(false);
+    expect(state.pendingPersonMatchesCount).toBe(2);
   });
 });

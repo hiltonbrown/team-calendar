@@ -26,6 +26,7 @@ import {
   type RegisteredSyncRunType,
   syncEventNames,
 } from "../events";
+import { recoverXeroImportDispatch } from "./recover-xero-import-dispatch";
 
 export function isValidTimezone(tz: string | null | undefined): boolean {
   if (!tz) {
@@ -416,6 +417,9 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
 
         await step.run("recover-xero-refresh-attempts", async () =>
           recoverXeroRefreshAttempts({ now: new Date() })
+        );
+        await step.run("recover-xero-import-dispatch", async () =>
+          recoverXeroImportDispatch({ now: new Date() })
         );
         const rotationResult = await step.run(
           "rotate-dormant-connections",

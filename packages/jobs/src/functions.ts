@@ -1,4 +1,5 @@
 import type { InngestFunction } from "inngest";
+import { initialXeroSyncFunction } from "./handlers/initial-xero-sync";
 import { rebuildFeedCacheFunction } from "./handlers/rebuild-feed-cache";
 import { reconcileFeedPublicationsFunction } from "./handlers/reconcile-feed-publications";
 import { reconcileXeroApprovalStateFunction } from "./handlers/reconcile-xero-approval-state";
@@ -21,4 +22,5 @@ export const functions: InngestFunction.Any[] = [
   syncXeroLeaveRecordsFunction,
   syncXeroPeopleFunction,
   scheduleXeroSyncsFunction,
+  initialXeroSyncFunction,
 ];

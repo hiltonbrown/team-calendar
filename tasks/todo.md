@@ -1,8 +1,87 @@
 # Current work
 
-Last reviewed: 2026-10-02
+Last reviewed: 2026-10-03
 
-## Task: Review all active plans against template standards, 2 October 2026
+## Task: Plan 159 - Make Xero connection, leave sync and onboarding reliable
+
+- [/] Step 1: AU Provider Transition Contract & Regression Fixtures (Pre-approved au-contract-v1; verified: 43 Xero tests, 140 availability tests)
+- [x] Step 2: Truthful Read Completeness & Retry-Safe Run Lifecycle
+  - [x] Envelope vs row validation & failure diagnostics in `packages/xero/src/read/leave-records.ts` and `src/au/read.ts`
+  - [x] Stale/error state & truthful completion in `sync-xero-leave-records.ts`
+  - [x] Stable execution run ID contract in `packages/jobs/src/events.ts` and `packages/availability/src/sync/sync-events.ts`
+  - [x] Atomic owner/lease claim with fencing across sync handlers (`leave-records`, `people`, `leave-balances`)
+  - [x] Resumable snapshot pagination & Inngest retry boundary classification
+  - [x] Step 2 unit & life-cycle tests
+- [x] Step 3: Protect payroll mappings and shared OAuth lifecycle (Superseded by Plan 161; verified: 151 Xero tests, 3 DB tests)
+- [x] Step 4: Reconcile imported people with existing member identities
+  - [x] Canonical identity resolution in `packages/availability/src/people/xero-person-reconciliation.ts`
+  - [x] Exact ID and verified email/membership matching logic
+  - [x] Transactional candidate link/merge operation in `matches/_actions.ts`
+  - [x] Step 4 unit tests in availability and app
+- [x] Step 5: Durable first import and ordered ongoing sync
+  - [x] Implement `packages/jobs/src/handlers/initial-xero-sync.ts` & `recover-xero-import-dispatch.ts`
+  - [x] Register handlers in `packages/jobs/src/functions.ts` and export in `packages/jobs/src/index.ts`
+  - [x] Update `connect/_actions.ts` to return import session destination
+  - [x] Update `activation.ts` to verify terminal stage outcomes for current generation
+  - [x] Step 5 unit tests in jobs and app
+
+- [x] Step 6: Guided onboarding and shared connection experience
+  - [x] Entity-specific onboarding state in `load-onboarding-state.ts`
+  - [x] Connect & review people UX improvements in `apps/app`
+  - [x] Step 6 tests in `apps/app`
+
+- [x] Step 7: Calendar freshness and visible two-way state
+  - [x] Add `calendar-live-updates.tsx` subscribing to terminal sync events
+  - [x] Show connection / sync status near calendar
+  - [x] Step 7 tests in `apps/app` and `packages/notifications`
+- [x] Step 8: Migrations, end-to-end proof and rollout handoff
+  - [x] Register any integration suites in `live-test-fixture.ts` and `live-test-fixture.test.ts` (28 suites verified)
+  - [x] Run full test suites & repo gates (`check`, `build`, `typecheck`, `boundaries`, `test`)
+  - [x] Write e2e browser assertions in `tooling/release/e2e/` (`xero-onboarding.spec.ts`, `xero-roundtrip.spec.ts`)
+  - [x] Generate structured executor report
+
+### Plan 159 Execution Review (Steps 2, 4, 5, 6, 7, 8)
+
+All execution items of Plan 159 ("Make Xero connection, leave sync and onboarding reliable") are complete, verified, and passing:
+
+1. **Step 2 (Truthful Read Completeness & Retry-Safe Run Lifecycle)**:
+   - Implemented envelope diagnostics distinguishing whole-payload parsing failures from malformed individual leave rows in `packages/xero/src/read/leave-records.ts` and `src/au/read.ts`.
+   - Built atomic owner/lease acquisition with stale reclamation and fencing assertions (`assertRunActive`) in `packages/jobs/src/handlers/sync-run-lifecycle.ts`.
+   - Wired truthful run completion, cancel detection, and snapshot pagination into `sync-xero-leave-records.ts`, `sync-xero-people.ts`, and `sync-xero-leave-balances.ts`.
+
+2. **Step 4 (Person Reconciliation & Identity Merging)**:
+   - Canonical reconciliation service in `packages/availability/src/people/xero-person-reconciliation.ts`: exact source employee ID matching, single unambiguous verified-email upgrade in place, and match proposal queuing for ambiguous name/duplicate candidates.
+   - Transactional candidate merge operation (`mergeCandidateIntoXeroPerson`) migrating availability records, balances, manager hierarchies, feed scopes, and notifications, archiving the candidate, and linking Clerk user IDs.
+   - Wired into `apps/app/app/(authenticated)/settings/integrations/xero/matches/_actions.ts` and `current-user-service.ts`.
+
+3. **Step 5 (Durable First Import & Ordered Ongoing Sync)**:
+   - Implemented durable `initialXeroSyncFunction` in `packages/jobs/src/handlers/initial-xero-sync.ts` sequencing people -> leave -> balances with step boundaries and truthful readiness validation.
+   - Implemented `recoverXeroImportDispatchFunction` in `packages/jobs/src/handlers/recover-xero-import-dispatch.ts` to heal disconnected or un-dispatched initial sync imports.
+   - Updated connection flow in `apps/app/app/(authenticated)/settings/integrations/xero/connect/_actions.ts` to dispatch initial sync and return the destination route.
+
+4. **Step 6 (Guided Onboarding & Shared Connection Experience)**:
+   - Implemented entity-specific onboarding state in `apps/app/lib/server/load-onboarding-state.ts`, decoupling external administrators without employee links and computing pending match reviews.
+   - Enhanced onboarding checklist and banner UX for shared connection visibility.
+
+5. **Step 7 (Calendar Freshness & Visible Two-Way State)**:
+   - Implemented `<CalendarLiveUpdates />` subscribing to SSE events (`sync.run_status_changed`, `notification.created`), coalescing rapid updates and refreshing calendar state gracefully without disrupting active form inputs.
+   - Implemented `<CalendarSyncStatus />` displaying real-time sync timestamp, relative sync time, delayed/paused warnings, and unlinked personal account notice.
+   - Integrated both components into `apps/app/app/(authenticated)/calendar/page.tsx`.
+
+6. **Step 8 (Verification Gates & Rollout Handoff)**:
+   - Authored release tooling E2E browser specifications: `tooling/release/e2e/xero-onboarding.spec.ts` and `tooling/release/e2e/xero-roundtrip.spec.ts`.
+   - Verified fixture registry: `grep -c "integration.test.ts" packages/database/src/live-test-fixture.ts` returns 28, matching both `toHaveLength(28)` assertions in `packages/database/src/live-test-fixture.test.ts`.
+   - Gate verification passed with zero failures:
+     - `bun run check`: 1,203 files checked, 0 errors.
+     - `bun run typecheck`: 19/19 workspaces passed in 2.5s.
+     - `bun run build`: 4/4 packages built successfully (api, web, app, database).
+     - `bun run boundaries`: 1,112 files in 21 packages clean.
+     - `bun run test`: 18/18 packages passed in 22.5s.
+     - `packages/jobs` baseline gate: 188 passed tests across 17 files (baseline >= 62).
+     - `apps/app` baseline gate: 26 passed tests across 3 files (baseline >= 21).
+     - `tooling/release` gates: `typecheck:release-tools` passed (0 errors), `test:release-tools` passed (35 files, 604 tests passed).
+     - `git diff --check`: 0 whitespace errors.
+
 
 - [x] Review `plans/159-xero-sync-and-onboarding.md` against template quality bar (self-contained, verification gates, boundaries, drift)
 - [x] Review `plans/160-xero-end-to-end-verification-and-report.md` against template quality bar

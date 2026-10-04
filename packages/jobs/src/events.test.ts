@@ -12,7 +12,9 @@ vi.mock("./client", () => ({
 
 const {
   dispatchCancelSyncRun,
+  dispatchInitialXeroSync,
   dispatchSyncEvent,
+  getInitialSyncEventId,
   getRegisteredSyncEventName,
   getScheduledSyncEventId,
   getUtcCadenceSlot,
@@ -51,6 +53,35 @@ describe("jobs events", () => {
         queued: true,
       },
     });
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          runId: expect.any(String),
+        }),
+      })
+    );
+  });
+
+  it("preserves explicit runId in payload when provided", async () => {
+    mocks.send.mockClear();
+    const explicitRunId = "11111111-1111-4111-8111-111111111111";
+    await dispatchSyncEvent({
+      bindingGeneration: 1,
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      runId: explicitRunId,
+      runType: "leave_records",
+      triggerType: "manual",
+      xeroTenantId: "00000000-0000-4000-8000-000000000010",
+    });
+
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          runId: explicitRunId,
+        }),
+      })
+    );
   });
 
   it("passes optional eventId to inngest.send when provided", async () => {
@@ -114,6 +145,47 @@ describe("jobs events", () => {
     });
 
     expect(result).toEqual({ ok: true, value: { queued: true } });
+  });
+
+  it("dispatches initial Xero sync with deterministic event ID and generation payload", async () => {
+    mocks.send.mockClear();
+    const result = await dispatchInitialXeroSync({
+      bindingGeneration: 3,
+      clerkOrgId: "org_1",
+      organisationId: "00000000-0000-4000-8000-000000000001",
+      triggeredByUserId: "user_1",
+      triggerType: "manual",
+      xeroTenantId: "00000000-0000-4000-8000-000000000010",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        eventName: "initial-xero-sync",
+        ids: ["event_1"],
+        queued: true,
+      },
+    });
+
+    expect(
+      getInitialSyncEventId("00000000-0000-4000-8000-000000000010", 3)
+    ).toBe("initial-sync:00000000-0000-4000-8000-000000000010:gen-3");
+
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          bindingGeneration: 3,
+          clerkOrgId: "org_1",
+          organisationId: "00000000-0000-4000-8000-000000000001",
+          runId: expect.any(String),
+          triggeredByUserId: "user_1",
+          triggerType: "manual",
+          xeroTenantId: "00000000-0000-4000-8000-000000000010",
+        }),
+        id: "initial-sync:00000000-0000-4000-8000-000000000010:gen-3",
+        name: "initial-xero-sync",
+      })
+    );
   });
 });
 

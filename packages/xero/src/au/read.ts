@@ -21,7 +21,11 @@ import type {
   XeroLeaveBalanceFetchFailure,
 } from "../read/leave-balances";
 import { mapXeroLeaveBalances } from "../read/leave-balances";
-import type { XeroLeaveRecord } from "../read/leave-records";
+import type {
+  XeroLeaveRecord,
+  XeroLeaveRecordMapFailure,
+  XeroLeaveRecordsFetchResult,
+} from "../read/leave-records";
 import { tryMapXeroLeaveRecords } from "../read/leave-records";
 import type {
   XeroTenantForWrite,
@@ -62,6 +66,10 @@ const LEAVE_BALANCE_READ_INTERVAL_MS = Math.ceil(
 
 export type { XeroEmployeesFetchResult } from "../read/employees";
 export type { XeroLeaveBalanceFetchFailure } from "../read/leave-balances";
+export type {
+  XeroLeaveRecordMapFailure,
+  XeroLeaveRecordsFetchResult,
+} from "../read/leave-records";
 
 export async function fetchEmployees(input: {
   xeroTenant: XeroTenantForWrite;
@@ -183,14 +191,9 @@ export async function fetchEmployees(input: {
 }
 
 export async function fetchLeaveRecords(input: {
+  maxPages?: number;
   xeroTenant: XeroTenantForWrite;
-}): Promise<
-  XeroWriteResult<{
-    complete: boolean;
-    leaveRecords: XeroLeaveRecord[];
-    rawResponse: unknown;
-  }>
-> {
+}): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
   const tokenResult = resolveAccessToken(input.xeroTenant);
   if (!tokenResult.ok) {
     return tokenResult;
@@ -207,10 +210,14 @@ export async function fetchLeaveRecords(input: {
     }
 
     const leaveRecords: XeroLeaveRecord[] = [];
+    const failures: XeroLeaveRecordMapFailure[] = [];
+    const seenLeaveApplicationIds: string[] = [];
+    let rawItemCount = 0;
     let page = 1;
     let rawResponse: unknown = null;
+    const maxPages = input.maxPages ?? XERO_MAX_PAGES;
 
-    while (page <= XERO_MAX_PAGES) {
+    while (page <= maxPages) {
       const response = await xeroFetch({
         deadline: input.xeroTenant.deadline,
         init: {
@@ -250,15 +257,40 @@ export async function fetchLeaveRecords(input: {
         });
         return {
           ok: true,
-          value: { complete: false, leaveRecords, rawResponse },
+          value: {
+            complete: false,
+            failures,
+            hasInvalidRecords: true,
+            leaveRecords,
+            rawItemCount,
+            rawResponse,
+            seenLeaveApplicationIds,
+            traversalOutcome: "envelope_error",
+          },
         };
       }
-      leaveRecords.push(...mappedPage.records);
 
-      if (mappedPage.records.length < XERO_PAGE_SIZE) {
+      leaveRecords.push(...mappedPage.records);
+      failures.push(...mappedPage.failures);
+      seenLeaveApplicationIds.push(...mappedPage.seenLeaveApplicationIds);
+      rawItemCount += mappedPage.rawItemCount;
+
+      if (mappedPage.rawItemCount < XERO_PAGE_SIZE) {
+        const hasInvalidRecords = failures.length > 0;
         return {
           ok: true,
-          value: { complete: true, leaveRecords, rawResponse },
+          value: {
+            complete: !hasInvalidRecords,
+            failures,
+            hasInvalidRecords,
+            leaveRecords,
+            rawItemCount,
+            rawResponse,
+            seenLeaveApplicationIds,
+            traversalOutcome: hasInvalidRecords
+              ? "malformed_rows"
+              : "completed",
+          },
         };
       }
 
@@ -272,7 +304,16 @@ export async function fetchLeaveRecords(input: {
     });
     return {
       ok: true,
-      value: { complete: false, leaveRecords, rawResponse },
+      value: {
+        complete: false,
+        failures,
+        hasInvalidRecords: failures.length > 0,
+        leaveRecords,
+        rawItemCount,
+        rawResponse,
+        seenLeaveApplicationIds,
+        traversalOutcome: "page_limit_exceeded",
+      },
     };
   } catch (error) {
     return {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
 import {
   assertXeroCampaignDispatch,
@@ -32,6 +33,7 @@ const SyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  runId: z.string().uuid().optional(),
   runType: z.enum([
     "people",
     "leave_records",
@@ -128,6 +130,7 @@ export async function dispatchSyncEvent(
       eventName,
       parsed.data.campaign
     );
+    const runId = parsed.data.runId ?? randomUUID();
     const payload: {
       name: string;
       data: {
@@ -136,6 +139,7 @@ export async function dispatchSyncEvent(
         clerkOrgId: string;
         organisationId: string;
         personId?: string;
+        runId: string;
         triggeredByUserId: string | null;
         triggerType: "scheduled" | "manual" | "webhook";
         xeroTenantId: string;
@@ -148,6 +152,7 @@ export async function dispatchSyncEvent(
         clerkOrgId: parsed.data.clerkOrgId,
         organisationId: parsed.data.organisationId,
         personId: parsed.data.personId,
+        runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         triggerType: parsed.data.triggerType,
         xeroTenantId: parsed.data.xeroTenantId,
@@ -209,6 +214,102 @@ export async function dispatchCancelSyncRun(
       error: {
         code: "dispatch_failed",
         message: "Failed to queue the cancellation event.",
+      },
+      ok: false,
+    };
+  }
+}
+
+export const initialXeroSyncEventName = "initial-xero-sync";
+
+export function getInitialSyncEventId(
+  xeroTenantId: string,
+  bindingGeneration: number
+): string {
+  return `initial-sync:${xeroTenantId}:gen-${bindingGeneration}`;
+}
+
+const InitialXeroSyncEventSchema = z.object({
+  bindingGeneration: z.number().int().nonnegative(),
+  campaign: XeroCampaignEventSchema.optional(),
+  clerkOrgId: z.string().min(1),
+  organisationId: z.string().uuid(),
+  runId: z.string().uuid().optional(),
+  triggeredByUserId: z.string().min(1).nullable().optional(),
+  triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
+  xeroTenantId: z.string().uuid(),
+});
+
+export type InitialXeroSyncInput = z.infer<typeof InitialXeroSyncEventSchema>;
+
+export async function dispatchInitialXeroSync(
+  input: z.input<typeof InitialXeroSyncEventSchema>,
+  options?: DispatchSyncEventOptions
+): Promise<
+  Result<
+    { eventName: string; ids: string[]; queued: true },
+    { code: "dispatch_failed" | "validation_error"; message: string }
+  >
+> {
+  const parsed = InitialXeroSyncEventSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      error: {
+        code: "validation_error",
+        message:
+          parsed.error.issues[0]?.message ?? "Invalid initial sync event.",
+      },
+      ok: false,
+    };
+  }
+
+  try {
+    await assertXeroCampaignDispatch(
+      parsed.data,
+      initialXeroSyncEventName,
+      parsed.data.campaign
+    );
+    const eventId =
+      options?.eventId ??
+      getInitialSyncEventId(
+        parsed.data.xeroTenantId,
+        parsed.data.bindingGeneration
+      );
+    const payload = {
+      data: {
+        bindingGeneration: parsed.data.bindingGeneration,
+        ...(parsed.data.campaign ? { campaign: parsed.data.campaign } : {}),
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+        runId: parsed.data.runId ?? randomUUID(),
+        triggeredByUserId: parsed.data.triggeredByUserId ?? null,
+        triggerType: parsed.data.triggerType,
+        xeroTenantId: parsed.data.xeroTenantId,
+      },
+      id: eventId,
+      name: initialXeroSyncEventName,
+    };
+
+    const sent = await inngest.send(payload);
+    await recordXeroCampaignDispatch(
+      parsed.data,
+      initialXeroSyncEventName,
+      parsed.data.campaign,
+      sent.ids
+    );
+    return {
+      ok: true,
+      value: {
+        eventName: initialXeroSyncEventName,
+        ids: sent.ids,
+        queued: true,
+      },
+    };
+  } catch {
+    return {
+      error: {
+        code: "dispatch_failed",
+        message: "Failed to queue the initial sync job.",
       },
       ok: false,
     };

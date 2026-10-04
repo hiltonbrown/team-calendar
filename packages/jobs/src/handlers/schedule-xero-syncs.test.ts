@@ -6,9 +6,14 @@ const mocks = vi.hoisted(() => ({
   dispatchSyncEvent: vi.fn(),
   findConnectionsNeedingTokenRotation: vi.fn(),
   listSchedulableXeroTenants: vi.fn(),
+  recoverXeroImportDispatch: vi.fn(),
   recoverXeroRefreshAttempts: vi.fn(),
   resolveXeroAccess: vi.fn(),
   scrubInactiveXeroOAuthSessionCredentials: vi.fn(),
+}));
+
+vi.mock("./recover-xero-import-dispatch", () => ({
+  recoverXeroImportDispatch: mocks.recoverXeroImportDispatch,
 }));
 
 vi.mock("@repo/database", () => ({
@@ -394,6 +399,9 @@ describe("scheduleXeroSyncs Coordinator", () => {
         },
       });
       expect(mocks.recoverXeroRefreshAttempts).toHaveBeenCalledExactlyOnceWith({
+        now: expect.any(Date),
+      });
+      expect(mocks.recoverXeroImportDispatch).toHaveBeenCalledExactlyOnceWith({
         now: expect.any(Date),
       });
       expect(steps.indexOf("recover-xero-refresh-attempts")).toBeLessThan(

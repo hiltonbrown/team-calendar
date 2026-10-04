@@ -25,6 +25,7 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
+import { acquireSyncRun, XeroSyncRunFencedError } from "./sync-run-lifecycle";
 import {
   rejectRetryableSyncResult,
   resolveSyncTenant,
@@ -41,6 +42,7 @@ const SyncXeroLeaveBalancesInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
   xeroTenantId: z.string().uuid(),
@@ -86,10 +88,6 @@ const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const BALANCE_PAGE_SIZE = 40;
 const PROBE_PAGE_SIZE = BALANCE_PAGE_SIZE + 1;
 const BALANCE_BATCH_SIZE = 50;
-// A running balance sync is treated as abandoned once its last heartbeat is this
-// old. Balance fetches read one employee per second, so a live run keeps
-// touching `updated_at`; only a crashed run lets the heartbeat go stale.
-const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
 // How often the fetch loop refreshes the run heartbeat. Kept well below the
 // stale window so a healthy run is never mistaken for an abandoned one.
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
@@ -148,12 +146,33 @@ async function syncXeroLeaveBalancesUnderCampaign(
   let runId: string | null = null;
 
   try {
-    const duplicateRun = await cancelDuplicateRun(context, startedAt);
-    if (duplicateRun) {
-      return { ok: true, value: emptyResult(duplicateRun.id, "cancelled") };
+    const runAcquisition = await acquireSyncRun(
+      context,
+      "leave_balances",
+      startedAt
+    );
+    if (runAcquisition.kind === "terminal") {
+      const term = runAcquisition.run;
+      return {
+        ok: true,
+        value: {
+          failed: term.records_failed,
+          fetched: term.records_fetched,
+          runId: term.id,
+          skipped: term.records_skipped,
+          status: term.status,
+          upserted: term.records_upserted,
+        },
+      };
+    }
+    if (runAcquisition.kind === "cancelled_competing") {
+      return {
+        ok: true,
+        value: emptyResult(runAcquisition.run.id, "cancelled"),
+      };
     }
 
-    const run = await createRun(context, startedAt);
+    const { run } = runAcquisition;
     runId = run.id;
     await publishRunStatusChanged(context, run.id, "running");
 
@@ -301,7 +320,7 @@ async function syncXeroLeaveBalancesUnderCampaign(
       }
 
       let staleSinceData: { leave_balances_stale_since?: Date | null } = {};
-      if (isLastPage) {
+      if (isLastPage && counts.failed === 0) {
         staleSinceData = { leave_balances_stale_since: null };
       } else if (!xeroTenant.leave_balances_stale_since) {
         staleSinceData = { leave_balances_stale_since: startedAt };
@@ -334,10 +353,17 @@ async function syncXeroLeaveBalancesUnderCampaign(
       value: { ...counts, runId: run.id, status: finalStatus },
     };
   } catch (error) {
-    if (error instanceof XeroBindingChangedError && runId) {
+    if (
+      (error instanceof XeroBindingChangedError ||
+        error instanceof XeroSyncRunFencedError) &&
+      runId
+    ) {
       await completeRun(context, runId, {
         counts: emptyCounts(),
-        errorSummary: "generation_changed",
+        errorSummary:
+          error instanceof XeroSyncRunFencedError
+            ? "sync_run_fenced"
+            : "generation_changed",
         status: "cancelled",
       });
       return { ok: true, value: emptyResult(runId, "cancelled") };
@@ -543,59 +569,6 @@ async function recordFetchFailures(
     });
     counts.failed += 1;
   }
-}
-
-async function cancelDuplicateRun(
-  context: SyncXeroLeaveBalancesInput,
-  startedAt: Date
-): Promise<{ id: string } | null> {
-  const existingRun = await database.syncRun.findFirst({
-    select: { id: true },
-    where: {
-      ...scoped(context),
-      run_type: "leave_balances",
-      status: "running",
-      // Use the heartbeat (updated_at), not started_at: a large tenant can take
-      // well over the window to fetch, so anchoring on start would wrongly free
-      // a still-running sync and let a duplicate race the same balance writes.
-      updated_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
-      xero_tenant_id: context.xeroTenantId,
-    },
-  });
-  if (!existingRun) {
-    return null;
-  }
-
-  return await database.syncRun.create({
-    data: {
-      ...scoped(context),
-      completed_at: new Date(),
-      error_summary: "Another leave balances sync run is already in progress",
-      run_type: "leave_balances",
-      started_at: startedAt,
-      status: "cancelled",
-      trigger_type: context.triggerType,
-      triggered_by_user_id: context.triggeredByUserId ?? null,
-      xero_tenant_id: context.xeroTenantId,
-    },
-    select: { id: true },
-  });
-}
-
-function createRun(context: SyncXeroLeaveBalancesInput, startedAt: Date) {
-  return database.syncRun.create({
-    data: {
-      ...scoped(context),
-      entity_type: "leave_balances",
-      run_type: "leave_balances",
-      started_at: startedAt,
-      status: "running",
-      trigger_type: context.triggerType,
-      triggered_by_user_id: context.triggeredByUserId ?? null,
-      xero_tenant_id: context.xeroTenantId,
-    },
-    select: { id: true },
-  });
 }
 
 async function ensureTenantReady(
