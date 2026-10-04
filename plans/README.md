@@ -10,13 +10,11 @@ instructions. Refresh candidate-specific protected ownership, target, consumer
 isolation and cleanup evidence; missing safeguards are implementation work.
 Historical live results never establish a new candidate's pass.
 
-Plan 160 continuation on 29 September uses isolated branch `codex/xero-e2e-completion`
-from `42bb840`. It adds worker/provider and database admission, observer authority,
-causal receipt producers and protected campaign fixtures. Full Plan 160 remains
-IN PROGRESS: browser/OAuth admission, full drivers, real lease/drain, sanctioned
-fixtures/sessions, AU policy and deployment prerequisites are still missing.
-The [continuation review](160-completion-review.md) owns fresh exact-candidate evidence.
-No provider campaign result is inferred from the protected domain regression suite.
+Plan 160 was rescoped on 3 October 2026 to prove the approved AU leave flow once
+through the real UI against Demo Company (AU), after the user stopped further campaign
+tooling on 2 October. CI's integration gate has been red on main since `42bb840`
+(campaign fixture refuses CI's local store); fixing that is Plan 160 Step 1. The
+three Plan 160 execution diaries are retired to git history at `3b825e5`.
 
 Plan 162 is merged to main at `142d128` under the user's subsequent commit
 and merge instruction. Fresh feed review found no blocker; the valid timed edit
@@ -29,34 +27,6 @@ boundaries, all 2,906 units and 509 release tests pass; source/tests equal the
 exact verified candidate. No push or deployment was performed. Prior
 `4c603ded` and `146a74d` results remain historical candidate-specific evidence.
 
-Plan 160 follow-up review corrected nine vetted defect groups at `5d5889c` and is
-merged into main at `f3dd965`. Fresh checks PASS: 2,810
-repository tests, 505 harness tests, lint, build, types and boundaries; protected online
-run `b207173c-ec6b-4bef-ba68-3937ad8227df` passes 246 tests with zero owned residue,
-unchanged existing content/schema and released ownership. Main post-merge lint,
-release types, all 505 release tests and boundaries PASS; tested runtime bytes are unchanged.
-Full Plan 160 and the real provider/browser campaign remain IN PROGRESS/NOT VERIFIED.
-The current execution steps and completion ledger were verified against main `514efb5`;
-completed safety contracts are preservation checks, and remaining execution starts with
-Plan 160 Step 3. Discovery is 110 tests/five specs, with no scenario execution implied.
-See the [follow-up review](160-execution-review.md) and
-[latest diagnostic](../reports/xero-e2e/2026-09-27-ab5dbf95-8931-489b-a53f-45ee1dceda50.md).
-
-Initial Plan 160 execution reviewed on 27 September 2026 from baseline `d6da4e8` in managed worktree
-`/home/hilton/.codex/worktrees/xero-e2e-verification/teamcalendar`, branch
-`codex/xero-e2e-verification`, final HEAD `eb604d0`. The isolated source slice is APPROVED:
-runtime `76a5dfb`, test-only clock correction `c52c5fa`; no merge or deployment. Fresh
-independent gates pass lint, build, both types, 2,810 repository tests, 457 harness tests
-and boundaries. Protected online run `f782ad54-69b6-4bf3-ada0-08a535215c19` passes 27 files /
-246 tests at exact runtime `76a5dfb`, with zero residue, unchanged existing content/schema
-and released fence. Both fresh diagnostic formats remain NOT VERIFIED and rerender
-byte-identically. See [execution review](160-execution-review.md) and
-[runtime prerequisites](160-execution-prerequisites.md). Full Plan 160 stays IN PROGRESS:
-the actual lease, case/controlled/causal producers, AU decision, fixture/session and
-deployed-candidate handoffs remain missing. No live campaign PASS or production sign-off.
-
-Plan 160 was reviewed and reconciled against source candidate `5d2e57b`: 2,810 repository tests, 395 tooling tests and protected Neon/Redis 27 files / 246 tests, with migration and cleanup evidence. These are historical results, not fresh runs. The [published diagnostic report](../reports/xero-e2e/2026-09-26-3c9912d5-3785-4276-8a13-8aa05b14e710.md) remains NOT VERIFIED for the real campaign and charter sign-off. Plan 160 now distinguishes implemented guard/report foundations from remaining recovery and operational execution wiring.
-
 Plan 162 (ICS and calendar corrections) is completed and merged to main at `142d128` (see Completed and retired plans below). Plan 159 retains calendar freshness/import ownership. Plan 160 and go-live retain the live publication and calendar-client campaign.
 
 ## Active plans
@@ -64,8 +34,8 @@ Plan 162 (ICS and calendar corrections) is completed and merged to main at `142d
 | Plan | Scope | Priority | Status |
 | --- | --- | --- | --- |
 | [000: Australian go-live](go-live.md) | Release-wide readiness, deployment gates and rollout | P0 programme | IN PROGRESS: reviewed at `6005a5a` on 2 October; source/fixture evidence reconciled; C1 database proof, P3 export, D1 CI, admission/browser fixes and Xero execution/rollout remain open |
-| [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | IN PROGRESS: AU local submission and create-on-approval decision approved on 2 October; implementation and verification in the Plan 160 continuation. Remaining import, identity, onboarding and calendar work stays open |
-| [160: Xero end-to-end verification and report](160-xero-end-to-end-verification-and-report.md) | 26-scenario live campaign and the evidence report contract | P1 | IN PROGRESS: AU workflow and runtime corrections reviewed; live additive migration verified. Protected regression observed 137 passed and 12 failed tests, with clean restoration; scoped test repairs underway. Fixed 24-hour wait removed. Provider/browser campaign remains NOT VERIFIED |
+| [159: Xero sync and onboarding](159-xero-sync-and-onboarding.md) | Import completeness, retry-safe jobs, person reconciliation, AU approval semantics, onboarding, calendar freshness | P1 | DONE: candidate `4bb6fca` on isolated branch `codex/xero-sync-onboarding`; all gates pass (lint, types, build, boundaries, 18/18 packages, release tools, baseline regressions) |
+| [160: Prove the AU leave flow against Xero](160-xero-end-to-end-verification-and-report.md) | Green CI integration gate, one protected live replay, AU flow through the real UI against Demo Company (AU), short sanitised report | P1 | TODO from Step 1 (rescoped 3 October). Steps 3 to 6 BLOCKED: ordinary server actions fail closed without a campaign sentinel that nothing initialises; needs a user decision (see plan). Broader campaign deferred to go-live and NOT VERIFIED |
 | [161: Xero connection lifecycle hardening](161-harden-xero-connection-lifecycle.md) | Charter only: shared boundaries, architecture, 40-case evidence matrix, Section 9.3 production sign-off | P1 charter | IN PROGRESS: all nine implementation sub-plans (161-pre through 161h) are DONE and merged in main; charter Section 9.3 sign-off and 40-case matrix remain open for the live campaign |
 
 ## Supporting specifications and review ledgers
@@ -75,9 +45,6 @@ The following canonical documents support the active plans above:
 | Document | Purpose | Status |
 | --- | --- | --- |
 | [160-au-transition-contract-v1.md](160-au-transition-contract-v1.md) | Authoritative AU transition contract v1 (cited in `AGENTS.md`) | ACTIVE: normative specification for AU leave submission and create-on-approval |
-| [160-completion-review.md](160-completion-review.md) | Plan 160 completion continuation review, updated 2 October 2026 | ACTIVE: records merge scope through `7431c27` and remaining campaign requirements |
-| [160-execution-prerequisites.md](160-execution-prerequisites.md) | Plan 160 execution prerequisites | ACTIVE: records concrete runtime, worker, fixture and database prerequisites |
-| [160-execution-review.md](160-execution-review.md) | Plan 160 detailed execution review | ACTIVE: comprehensive verification record, candidate comparisons and test evidence |
 | [161-xero-provider-contract.md](161-xero-provider-contract.md) | Xero provider contract ledger | REFERENCE: authoritative ledger of Xero HTTP calls, scopes, pagination, deadlines and rate buckets |
 
 ## Completed and retired plans
@@ -98,6 +65,8 @@ To keep the active planning surface focused and actionable, completed plans and 
   - `161g`: Actionable recovery reasons and scoped credential resolver (merged at `2a24395`).
   - `161h`: Report-only inactivity assessment, preflight, metrics and rollout runbook (merged at `2a24395`).
   All 23 database migrations are applied. Individual sub-plan files (`161-pre`, `161a`–`161h`) and execution report (`161-xero-execution-report.md`) are retired to Git history. The charter `161-harden-xero-connection-lifecycle.md` remains active for release sign-off.
+- **Plan 160 execution diaries (RETIRED 3 October 2026, recover from `3b825e5`)**:
+  `160-execution-review.md`, `160-completion-review.md`, `160-execution-prerequisites.md`. Facts still relevant are inlined in the rescoped Plan 160. The 26-scenario campaign harness under `tooling/release/` is frozen, not extended.
 - **Historical reconciliations and scratch artifacts (RETIRED)**:
   - `160-161-reconciliation.md`: 27 September reconciliation, superseded by 2 October continuation and main merges.
   - `credential-purge-request.md`: 19 September scratch support request, retired to Git history.
@@ -115,12 +84,11 @@ The active Xero plans have distinct ownership:
 | Credential owner, token and lock lifecycle | **161d** | Implemented in main (canonical owner model) |
 | Import completeness, retry-safe runs, person reconciliation, AU semantics, onboarding, calendar freshness | **159** | Active in `plans/159-xero-sync-and-onboarding.md` |
 | AU transition contract (`au-contract-v1`) | **160 / 159** | Approved and implemented in `plans/160-au-transition-contract-v1.md` |
-| Live campaign execution and evidence report | **160** | Active in `plans/160-xero-end-to-end-verification-and-report.md` |
+| AU flow proof against Xero and its report | **160** | Active in `plans/160-xero-end-to-end-verification-and-report.md` |
+| Wider live campaign (OAuth, scheduled sync, multi-entity, reconnect, PITR) | **go-live.md** | Deferred, NOT VERIFIED |
 | Release-wide deployment gates and rollout | **go-live.md** | Active in `plans/go-live.md` |
 
 **Plan 159's Step 3 and findings X5 and X6 are superseded in full** by the completed Plan 161 implementation. Do not reimplement them. Everything else in 159 remains active.
-
-Plan 160's reviewed source now supplies durable recovery, report delivery, connection-action scope, strict causal ingestion and scenario/lifecycle collection contracts. The follow-up candidate `5d5889c` is integrated into main at `f3dd965`, with AU workflow and runtime admission integrated at `bf01911`. Remaining execution requires actual browser/provider campaign verification against sanctioned fixtures.
 
 ## Dependency notes
 
@@ -164,12 +132,11 @@ either count means a regression test was deleted rather than fixed.
 
 ## Findings considered and rejected
 
-Plan 160 review at `92d67c5`: rejected recreating the existing guard/report/oracle foundation,
-using discovery or aggregate test totals as scenario proof, and treating local `--preflight`
-as live admission. That initial remaining-work assessment is superseded by merged runtime
-`5d5889c`: R1/R3/R5/R6 and R7 ingestion contracts are implemented and verified. Actual
-operational admission, causal/layer producers, complete case drivers and campaign proof
-remain open; default live refusal stays intentional until runtime enforcement is verified.
+Plan 160 rescope, 3 October 2026: rejected continuing the 26-scenario / 92-subcase /
+40-charter-case campaign build (execution lease, worker fencing, causal receipt producers,
+cryptographic evidence bundle). About 22,000 lines of harness produced zero provider
+observations; the user stopped it on 2 October. One real UI run with direct readbacks
+answers the release question the campaign was meant to answer.
 
 Recorded so they are not re-audited. Detailed reasons and provider evidence limits are in the
 Plan 161 charter and in Plan 159's own rejected list.

@@ -31,7 +31,7 @@
 
 ## Status and scope of the decision
 
-- Status: TODO. No implementation performed by this plan.
+- Status: DONE. Implemented in isolated branch `codex/xero-sync-onboarding` (candidate `4bb6fca`); review approved.
 - Priority: P1, with P2 experience improvements included.
 - Effort: L, several coordinated implementation slices.
 - Change risk: HIGH for payroll state, credentials and person reconciliation;
@@ -830,5 +830,5 @@ readiness from queue acknowledgement, a connection flag or a single page timesta
 | Second plan review | COMPLETE | Re-verified all 11 finding anchors and both baseline test counts at `8652c31`; corrected the Plan 161 supersession note to name X5, 161b and 161d and flag the reversed cross-account uniqueness policy; relocated the unrunnable `bun run test:release` gate; added worktree env setup, the `LIVE_FIXTURE_SUITES` count trap and machine-checkable gates |
 | Plan review | COMPLETE | Independent cold review incorporated | Added verified grant-identity contract, shared-connection detach rules, per-batch fencing, resumed-snapshot semantics, durable state/dispatch contract and guarded per-slice integration commands |
 | Existing focused baseline | Unchanged | PASS, 74 tests in 6 files | Commands in baseline section, run during preceding audit |
-| Steps 1 through 8 | TODO | NOT VERIFIED | Execute only when implementation requested |
+| Steps 1 through 8 | COMPLETE | PASS | Verified in isolated worktree branch `codex/xero-sync-onboarding` (candidate `4bb6fca`); lint, build, types, boundaries, 18/18 packages, release tools, baseline regressions all pass |
 | Production round trip | Not executed | NOT VERIFIED | Owned provider/job/database/browser proof required |
