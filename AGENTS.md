@@ -84,6 +84,15 @@ Read before implementing or changing domain entities, sync logic, feed rendering
 - Never optimise for appearing useful. A list that describes unfixed problems is not useful
 - If the task is "implement X to match Y", the session is not over until zero differences remain
 
+8. Execution Discipline
+- Before each tool call or delegation, name the current deliverable and its stopping condition. Act only to deliver required work, fix an observed defect or remove a demonstrated blocker
+- Explicit user constraints take precedence over inferred improvements, skill workflows and plan extensions. Production quality does not authorise scope expansion
+- Prove the approved user flow before building general infrastructure. Add tooling only when a named safety or evidence requirement of the next operation needs it
+- Reuse valid evidence. Repeat verification only when relevant changes invalidate it, an observed failure needs investigation or an explicit gate requires it
+- Give subagents the same scope, constraints and stopping condition. On a user correction, stop conflicting delegated work immediately
+- Treat "commit and merge" as the current operation: preserve unfinished work, record verification gaps and complete it without adding another implementation, review or verification phase
+- Stop when the requested outcome is achieved and report its evidence and limits. Acknowledging a correction or recording a lesson does not replace changing the next action
+
 Task Management
 
 1. **Plan First**: Write plan to `tasks/todo.md` with checkable items
