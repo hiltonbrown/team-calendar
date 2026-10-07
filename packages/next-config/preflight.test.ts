@@ -16,8 +16,6 @@ const validCommonVars = {
 
 const validAppVars = {
   XERO_APP_TIER: "starter",
-  XERO_CREDENTIAL_DOMAIN_ID: "11111111-1111-4111-8111-111111111111",
-  XERO_RATE_NAMESPACE_EPOCH: "test",
   XERO_REDIRECT_URI: "https://api.teamcalendar.online/oauth/callback",
   ...validCommonVars,
   CLERK_SECRET_KEY: "clerk_sec_123456",
@@ -310,7 +308,6 @@ describe("production preflight validation", () => {
 describe("shared Xero admission preflight", () => {
   for (const variable of [
     "XERO_APP_TIER",
-    "XERO_RATE_NAMESPACE_EPOCH",
     "KV_REST_API_URL",
     "KV_REST_API_TOKEN",
   ]) {
@@ -344,18 +341,15 @@ describe("shared Xero admission preflight", () => {
   });
 });
 
-describe("credential domain and redirect production contract", () => {
-  it.each(["XERO_CREDENTIAL_DOMAIN_ID", "XERO_REDIRECT_URI"])(
-    "reports missing %s",
-    (name) => {
-      expect(() =>
-        runProductionPreflight({
-          appName: "app",
-          envVars: { ...validAppVars, [name]: undefined },
-        })
-      ).toThrow(name);
-    }
-  );
+describe("redirect production contract", () => {
+  it.each(["XERO_REDIRECT_URI"])("reports missing %s", (name) => {
+    expect(() =>
+      runProductionPreflight({
+        appName: "app",
+        envVars: { ...validAppVars, [name]: undefined },
+      })
+    ).toThrow(name);
+  });
   it("rejects non-HTTPS redirect without printing its value", () => {
     const value = "http://secret-canary.example/callback";
     try {
@@ -369,26 +363,6 @@ describe("credential domain and redirect production contract", () => {
       expect(String(error)).not.toContain(value);
     }
   });
-  it("rejects malformed credential domain without its value", () => {
-    expect(() =>
-      runProductionPreflight({
-        appName: "api",
-        envVars: { ...validApiVars, XERO_CREDENTIAL_DOMAIN_ID: "secret-value" },
-      })
-    ).toThrow("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
-  });
-});
-
-it("rejects a whitespace credential domain exactly as runtime keys do", () => {
-  expect(() =>
-    runProductionPreflight({
-      appName: "app",
-      envVars: {
-        ...validAppVars,
-        XERO_CREDENTIAL_DOMAIN_ID: " 11111111-1111-4111-8111-111111111111 ",
-      },
-    })
-  ).toThrow("XERO_CREDENTIAL_DOMAIN_ID must be a UUID");
 });
 
 describe("complete Xero configuration preflight", () => {
@@ -534,19 +508,6 @@ describe("complete Xero configuration preflight", () => {
       ).toThrow("XERO_APP_TIER must be a supported commercial tier");
     }
   );
-  it.each(["Uppercase", "epoch space", "a".repeat(33), " epoch "])(
-    "rejects invalid namespace epochs",
-    (value) => {
-      expect(() =>
-        runProductionPreflight({
-          appName: "api",
-          envVars: { ...validApiVars, XERO_RATE_NAMESPACE_EPOCH: value },
-        })
-      ).toThrow(
-        "XERO_RATE_NAMESPACE_EPOCH must contain 1 to 32 lowercase letters, digits or hyphens"
-      );
-    }
-  );
   it("reports variable names without supplied encryption or admission values", () => {
     let failure: unknown;
     try {
@@ -555,7 +516,6 @@ describe("complete Xero configuration preflight", () => {
         envVars: {
           ...validAppVars,
           XERO_APP_TIER: SECRET_CANARY_VALUE,
-          XERO_RATE_NAMESPACE_EPOCH: SECRET_CANARY_VALUE,
           XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: SECRET_CANARY_VALUE,
           XERO_TOKEN_ENCRYPTION_KEY: SECRET_CANARY_VALUE,
           XERO_TOKEN_ENCRYPTION_KEYS_JSON: JSON.stringify({
@@ -570,7 +530,6 @@ describe("complete Xero configuration preflight", () => {
     expect(String(failure)).not.toContain(SECRET_CANARY_VALUE);
     for (const name of [
       "XERO_APP_TIER",
-      "XERO_RATE_NAMESPACE_EPOCH",
       "XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION",
       "XERO_TOKEN_ENCRYPTION_KEY",
       "XERO_TOKEN_ENCRYPTION_KEYS_JSON",
@@ -589,3 +548,15 @@ describe("complete Xero configuration preflight", () => {
     ).toEqual([]);
   });
 });
+
+it.each(["app", "api"] as const)(
+  "requires no retired quota bootstrap for %s",
+  (appName) => {
+    const envVars = {
+      ...(appName === "app" ? validAppVars : validApiVars),
+      XERO_CREDENTIAL_DOMAIN_ID: undefined,
+      XERO_RATE_NAMESPACE_EPOCH: undefined,
+    };
+    expect(runProductionPreflight({ appName, envVars }).ok).toBe(true);
+  }
+);

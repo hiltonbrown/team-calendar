@@ -87,6 +87,17 @@ describe("Xero sync connection lock", () => {
     expect(mocks.query).toHaveBeenCalledTimes(1);
     expect(mocks.writes).toHaveBeenCalledTimes(1);
   });
+  it("checks the captured external file before allowing persistence", async () => {
+    await withXeroBinding(
+      { ...scope, expectedXeroTenantId: "captured-file" },
+      async () => undefined
+    );
+    expect(mocks.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ xero_tenant_id: "captured-file" }),
+      })
+    );
+  });
   it("cancels a changed or disconnected connection before any batch mutation", async () => {
     mocks.find.mockResolvedValue(null);
     await expect(

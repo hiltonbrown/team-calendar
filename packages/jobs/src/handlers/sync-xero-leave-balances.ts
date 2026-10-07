@@ -18,7 +18,11 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
-import { acquireSyncRun, XeroSyncRunFencedError } from "./sync-run-lifecycle";
+import {
+  acquireSyncRun,
+  assertRunActive,
+  XeroSyncRunFencedError,
+} from "./sync-run-lifecycle";
 import {
   rejectRetryableSyncResult,
   resolveSyncTenant,
@@ -34,6 +38,7 @@ const SyncXeroLeaveBalancesInputSchema = z.object({
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
@@ -70,6 +75,7 @@ type SyncXeroLeaveBalancesResult = Result<
   Counts & {
     runId: string;
     status: SyncStatus;
+    hasMore?: boolean;
   },
   SyncXeroLeaveBalancesError
 >;
@@ -122,7 +128,8 @@ async function syncXeroLeaveBalancesInternal(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const context = parsed.data;
+  const context: typeof parsed.data & { expectedXeroTenantId?: string } =
+    parsed.data;
   const startedAt = new Date();
   let runId: string | null = null;
   try {
@@ -159,6 +166,7 @@ async function syncXeroLeaveBalancesInternal(
       return tenantReadiness.result;
     }
     const { xeroConnection } = tenantReadiness;
+    context.expectedXeroTenantId = xeroConnection.xero_tenant_id;
     const counts = emptyCounts();
     const isTargetedPerson = Boolean(context.personId);
     let peopleToProcess: Array<{
@@ -167,6 +175,7 @@ async function syncXeroLeaveBalancesInternal(
     }>;
     let isLastPage = true;
     let cursorRecord: {
+      balance_sweep_failed?: boolean;
       balance_next_person_id: string | null;
       id: string;
     } | null = null;
@@ -184,7 +193,11 @@ async function syncXeroLeaveBalancesInternal(
       });
     } else {
       cursorRecord = await database.xeroConnection.findFirst({
-        select: { balance_next_person_id: true, id: true },
+        select: {
+          balance_next_person_id: true,
+          balance_sweep_failed: true,
+          id: true,
+        },
         where: {
           ...scoped(context),
           id: context.connectionId,
@@ -276,12 +289,26 @@ async function syncXeroLeaveBalancesInternal(
         value: { ...counts, runId: run.id, status: "cancelled" },
       };
     }
+    const sweepFailed =
+      counts.failed > 0 ||
+      Boolean(initialCursorValue && cursorRecord?.balance_sweep_failed);
     if (!isTargetedPerson) {
+      let staleSinceData: {
+        leave_balances_stale_since?: Date | null;
+      } = {};
+      if (isLastPage && !sweepFailed) {
+        staleSinceData = { leave_balances_stale_since: null };
+      } else if (!xeroConnection.leave_balances_stale_since) {
+        staleSinceData = { leave_balances_stale_since: startedAt };
+      }
       const casSuccess = await advanceCursor({
         context,
         cursorRecord,
         initialCursorValue,
         nextCursorValue,
+        runId: run.id,
+        staleSinceData,
+        sweepFailed,
       });
       if (!casSuccess) {
         await completeRun(context, run.id, {
@@ -295,27 +322,11 @@ async function syncXeroLeaveBalancesInternal(
           value: { ...counts, runId: run.id, status: "cancelled" },
         };
       }
-      let staleSinceData: {
-        leave_balances_stale_since?: Date | null;
-      } = {};
-      if (isLastPage && counts.failed === 0) {
-        staleSinceData = { leave_balances_stale_since: null };
-      } else if (!xeroConnection.leave_balances_stale_since) {
-        staleSinceData = { leave_balances_stale_since: startedAt };
-      }
-      await withXeroBinding(context, async (tx) =>
-        tx.xeroConnection.updateMany({
-          data: {
-            last_leave_balances_sync_at: new Date(),
-            last_sync_error_code: null,
-            last_sync_error_message: null,
-            ...staleSinceData,
-          },
-          where: { ...scoped(context), id: context.connectionId },
-        })
-      );
     }
-    const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
+    const finalStatus =
+      counts.failed > 0 || (!isTargetedPerson && isLastPage && sweepFailed)
+        ? "partial_success"
+        : "succeeded";
     await completeRun(context, run.id, {
       counts,
       status: finalStatus,
@@ -325,7 +336,12 @@ async function syncXeroLeaveBalancesInternal(
     }
     return {
       ok: true,
-      value: { ...counts, runId: run.id, status: finalStatus },
+      value: {
+        ...counts,
+        hasMore: !(isTargetedPerson || isLastPage),
+        runId: run.id,
+        status: finalStatus,
+      },
     };
   } catch (error) {
     if (
@@ -688,6 +704,7 @@ function validationError(
   };
 }
 async function advanceCursor(params: {
+  runId: string;
   context: SyncXeroLeaveBalancesInput;
   cursorRecord: {
     balance_next_person_id: string | null;
@@ -695,18 +712,28 @@ async function advanceCursor(params: {
   } | null;
   initialCursorValue: string | null;
   nextCursorValue: string | null;
+  sweepFailed: boolean;
+  staleSinceData: { leave_balances_stale_since?: Date | null };
 }): Promise<boolean> {
   const { context, initialCursorValue, nextCursorValue } = params;
-  const result = await withXeroBinding(context, (tx) =>
-    tx.xeroConnection.updateMany({
-      data: { balance_next_person_id: nextCursorValue },
+  const result = await withXeroBinding(context, async (tx) => {
+    await assertRunActive(context, params.runId, tx);
+    return await tx.xeroConnection.updateMany({
+      data: {
+        balance_next_person_id: nextCursorValue,
+        balance_sweep_failed: params.sweepFailed,
+        last_leave_balances_sync_at: new Date(),
+        last_sync_error_code: null,
+        last_sync_error_message: null,
+        ...params.staleSinceData,
+      },
       where: {
         ...scoped(context),
         balance_next_person_id: initialCursorValue,
         id: context.connectionId,
       },
-    })
-  );
+    });
+  });
   return result.count === 1;
 }
 function isBlanketFailure(error: XeroWriteError): boolean {

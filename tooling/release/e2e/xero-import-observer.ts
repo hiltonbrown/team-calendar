@@ -93,14 +93,14 @@ export function assertIndependentInitialImport(
     clerkOrgId: string;
     organisationId: string;
     xeroTenantId: string;
-    campaignStartedAt: string;
+    verificationStartedAt: string;
     expectedRunIds: readonly string[];
   }
 ) {
   const raw = rawAuEnumerationSchema.parse(rawValue);
   const canonical = canonicalImportSchema.parse(canonicalValue);
-  const campaignStartedAt = Date.parse(
-    z.iso.datetime().parse(scope.campaignStartedAt)
+  const verificationStartedAt = Date.parse(
+    z.iso.datetime().parse(scope.verificationStartedAt)
   );
   const expectedRunIds = z
     .array(z.uuid())
@@ -197,7 +197,7 @@ export function assertIndependentInitialImport(
       runs.length !== 1 ||
       !run ||
       run.fetched !== expectedCounts[entity] ||
-      Date.parse(run.startedAt) < campaignStartedAt ||
+      Date.parse(run.startedAt) < verificationStartedAt ||
       Date.parse(run.startedAt) > Date.parse(run.completedAt) ||
       Date.parse(run.completedAt) > observedUntil
     ) {

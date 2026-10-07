@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   xeroConnectionFindFirst: vi.fn(),
   xeroConnectionUpdateMany: vi.fn(),
   xeroSyncCursorCreate: vi.fn(),
+  xeroSyncCursorCreateMany: vi.fn(),
   xeroSyncCursorFindFirst: vi.fn(),
   xeroSyncCursorUpdateMany: vi.fn(),
 }));
@@ -76,6 +77,7 @@ const databaseMock = {
   },
   xeroSyncCursor: {
     create: mocks.xeroSyncCursorCreate,
+    createMany: mocks.xeroSyncCursorCreateMany,
     findFirst: mocks.xeroSyncCursorFindFirst,
     updateMany: mocks.xeroSyncCursorUpdateMany,
   },
@@ -173,6 +175,9 @@ function input() {
 describe("leave records stale archival", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.availabilityRecordFindMany.mockReset();
+    mocks.availabilityRecordUpdateMany.mockReset();
+    mocks.personFindMany.mockReset();
     connectionFixture = { leave_next_person_id: null };
     Object.assign(database, {
       $executeRaw: vi.fn(async () => 1),
@@ -190,7 +195,13 @@ describe("leave records stale archival", () => {
     });
     mocks.feedIdsForPeople.mockResolvedValue([]);
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+      )
+    );
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
     mockConnection({
       id: XERO_CONNECTION_ID,
@@ -198,6 +209,9 @@ describe("leave records stale archival", () => {
       sync_paused_at: null,
     });
     mocks.xeroConnectionUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
+    mocks.xeroSyncCursorCreateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
     mocks.resolveXeroAccess.mockResolvedValue({
       ok: true,
       value: { refreshed: false },
@@ -224,6 +238,99 @@ describe("leave records stale archival", () => {
     );
     mocks.personFindFirst.mockResolvedValue(null);
     mocks.personFindMany.mockResolvedValue([]);
+  });
+  it("commits an empty AU delta watermark only after successful traversal", async () => {
+    const modifiedSince = new Date("2026-10-06T12:00:00Z");
+    mockConnection({
+      sync_cursors: [
+        { entity_type: "leave_records", modified_since: modifiedSince },
+      ],
+    });
+    mocks.xeroSyncCursorFindFirst.mockResolvedValue({
+      id: "cursor",
+      modified_since: modifiedSince,
+    });
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        failures: [],
+        leaveRecords: [],
+        traversalOutcome: "completed",
+      },
+    });
+    const result = await syncXeroLeaveRecords({
+      ...input(),
+      mode: "incremental",
+    });
+    expect(result.ok && result.value.status).toBe("succeeded");
+    expect(mocks.fetchLeaveRecordsForRegion).toHaveBeenCalledWith(
+      "AU",
+      expect.objectContaining({ mode: "incremental", modifiedSince })
+    );
+    expect(mocks.xeroSyncCursorUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { modified_since: expect.any(Date) },
+        where: expect.objectContaining({
+          clerk_org_id: CLERK_ORG_ID,
+          modified_since: modifiedSince,
+          organisation_id: ORGANISATION_ID,
+        }),
+      })
+    );
+    expect(mocks.availabilityRecordUpdateMany).not.toHaveBeenCalled();
+  });
+  it("does not commit a provider watermark after a downstream record failure", async () => {
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        failures: [],
+        hasInvalidRecords: false,
+        leaveRecords: [xeroLeaveRecord({ leaveApplicationId: "" })],
+        traversalOutcome: "completed",
+      },
+    });
+    await syncXeroLeaveRecords({ ...input(), mode: "full" });
+    expect(mocks.xeroSyncCursorCreateMany).not.toHaveBeenCalled();
+    expect(mocks.xeroSyncCursorUpdateMany).not.toHaveBeenCalled();
+  });
+  it("does not archive or clear staleness after downstream invalid identity", async () => {
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        failures: [],
+        hasInvalidRecords: false,
+        leaveRecords: [xeroLeaveRecord({ leaveApplicationId: "" })],
+        traversalOutcome: "completed",
+      },
+    });
+    const result = await syncXeroLeaveRecords(input());
+    expect(result.ok && result.value.failed).toBe(1);
+    expect(
+      mocks.availabilityRecordUpdateMany.mock.calls.some(
+        ([call]) => call.data.publish_status === "archived"
+      )
+    ).toBe(false);
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(
+        ([call]) => call.data.leave_records_stale_since === null
+      )
+    ).toBe(false);
+  });
+  it("never infers absence from an empty AU incremental traversal", async () => {
+    mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        complete: true,
+        failures: [],
+        leaveRecords: [],
+        traversalOutcome: "completed",
+      },
+    });
+    await syncXeroLeaveRecords({ ...input(), mode: "incremental" });
+    expect(mocks.availabilityRecordUpdateMany).not.toHaveBeenCalled();
   });
   it("archives scoped records when Xero returns an authoritative empty leave set", async () => {
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
@@ -328,6 +435,9 @@ describe("leave records stale archival", () => {
     expect(mocks.availabilityRecordCreate).toHaveBeenCalledTimes(1);
   });
   it("uses a notIn query for stale archival when Xero returns records", async () => {
+    mocks.personFindMany.mockResolvedValue([
+      person(PERSON_ID, XERO_EMPLOYEE_ID),
+    ]);
     mocks.fetchLeaveRecordsForRegion.mockResolvedValue({
       ok: true,
       value: {
@@ -1106,7 +1216,13 @@ describe("regional leave sync (NZ/UK)", () => {
     });
     mocks.feedIdsForPeople.mockResolvedValue([]);
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+      )
+    );
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
     mockConnection({
       id: XERO_CONNECTION_ID,
@@ -1161,6 +1277,90 @@ describe("regional leave sync (NZ/UK)", () => {
         },
       })
     );
+  });
+  it.each([{ leaveApplicationId: "" }, { startDate: "invalid-date" }])(
+    "does not infer per-person absence after a malformed complete regional row: %o",
+    async (invalidFields) => {
+      mocks.personFindMany.mockResolvedValue([
+        person(PERSON_ID, XERO_EMPLOYEE_ID),
+      ]);
+      mocks.fetchLeaveForEmployeeForRegion.mockResolvedValue({
+        ok: true,
+        value: {
+          complete: true,
+          leaveRecords: [
+            xeroLeaveRecord(),
+            {
+              ...xeroLeaveRecord({
+                leaveApplicationId: "50000000-0000-4000-8000-000000000099",
+              }),
+              ...invalidFields,
+            },
+          ],
+          rawResponse: {},
+        },
+      });
+      const result = await syncXeroLeaveRecords(input());
+      expect(result.ok && result.value).toMatchObject({
+        failed: 1,
+        status: "partial_success",
+        upserted: 1,
+      });
+      expect(
+        mocks.availabilityRecordUpdateMany.mock.calls.some(
+          ([call]) => call.data.publish_status === "archived"
+        )
+      ).toBe(false);
+      expect(
+        mocks.xeroConnectionUpdateMany.mock.calls.some(
+          ([call]) => call.data.leave_records_stale_since === null
+        )
+      ).toBe(false);
+    }
+  );
+  it("does not commit roster progress after its run has been superseded", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "failed" }
+          : null
+      )
+    );
+    const result = await syncXeroLeaveRecords(input());
+    expect(result.ok && result.value.status).toBe("cancelled");
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(([call]) =>
+        Object.hasOwn(call.data, "leave_next_person_id")
+      )
+    ).toBe(false);
+  });
+  it("cannot clear a newer failed sweep after its final-page cursor commit", async () => {
+    mockConnection({
+      leave_next_person_id: "50000000-0000-4000-8000-000000000040",
+      leave_records_stale_since: new Date("2026-10-06T00:00:00Z"),
+      leave_sweep_failed: false,
+    });
+    mocks.personFindMany.mockResolvedValue([]);
+    const newerFailure = new Date("2026-10-07T12:01:00Z");
+    let persistedStaleness: Date | null = null;
+    mocks.xeroConnectionUpdateMany.mockImplementation((call) => {
+      if (Object.hasOwn(call.data, "leave_records_stale_since")) {
+        persistedStaleness = call.data.leave_records_stale_since;
+      }
+      if (Object.hasOwn(call.data, "leave_next_person_id")) {
+        // Interpose the next sweep immediately after this page's atomic commit.
+        persistedStaleness = newerFailure;
+        mockConnection({
+          leave_next_person_id: "50000000-0000-4000-8000-000000000080",
+          leave_records_stale_since: newerFailure,
+          leave_sweep_failed: true,
+        });
+      }
+      return Promise.resolve({ count: 1 });
+    });
+    await syncXeroLeaveRecords(input());
+    expect(persistedStaleness).toEqual(newerFailure);
   });
   it("fails and retries a per-employee operational incident without advancing canonical progress", async () => {
     mocks.personFindMany.mockResolvedValueOnce([
@@ -1221,7 +1421,9 @@ describe("regional leave sync (NZ/UK)", () => {
     expect(mocks.fetchLeaveForEmployeeForRegion).toHaveBeenCalledTimes(20);
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { leave_next_person_id: peopleList[19]?.id },
+        data: expect.objectContaining({
+          leave_next_person_id: peopleList[19]?.id,
+        }),
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
@@ -1265,7 +1467,9 @@ describe("regional leave sync (NZ/UK)", () => {
     );
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { leave_next_person_id: peopleList[19]?.id },
+        data: expect.objectContaining({
+          leave_next_person_id: peopleList[19]?.id,
+        }),
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
@@ -1291,7 +1495,7 @@ describe("regional leave sync (NZ/UK)", () => {
     expect(result.ok).toBe(true);
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { leave_next_person_id: null },
+        data: expect.objectContaining({ leave_next_person_id: null }),
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,
@@ -1320,7 +1524,7 @@ describe("regional leave sync (NZ/UK)", () => {
     expect(result.ok).toBe(true);
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { leave_next_person_id: null },
+        data: expect.objectContaining({ leave_next_person_id: null }),
         where: expect.objectContaining({
           clerk_org_id: CLERK_ORG_ID,
           id: XERO_CONNECTION_ID,

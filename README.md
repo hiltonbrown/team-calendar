@@ -32,9 +32,13 @@ Xero remains the source of truth for balances. Team Calendar never calculates ac
 | Direction | Mechanism | Scope |
 |---|---|---|
 | Inbound | Pull-first, scheduled Inngest jobs | Employees, leave records, leave balances. Xero provides no leave webhooks. |
-| Outbound | Synchronous, user-triggered API write | Submit, approve, decline, withdraw. No background queue. Failures surfaced inline. |
+| Outbound | Synchronous, user-triggered API write | AU submission stays local; approval creates scheduled leave. Imported requested leave uses approve/reject; supported remote withdrawal uses reject. No background queue. Failures surfaced inline. |
 
 Outbound writes are synchronous; feed publication and cache rebuilds follow successful changes. Inbound Xero sync is pull-first and periodic, since Xero provides no leave webhooks. External calendar refresh timing is controlled by each calendar provider.
+
+Xero consent requests exactly `offline_access accounting.settings.read payroll.employees payroll.settings.read`. One persisted full initial import covers people, leave and the complete balance roster. AU scheduled people/leave deltas use provider watermarks with a two-minute overlap; manual and nightly reconciliation are full reads. Balance polling remains provider-derived and rolling hourly.
+
+Remote leave mutations reuse a durable UUID idempotency key for five minutes from first dispatch. Uncertain writes after that boundary require provider inspection and administrator recovery. Disconnect removes the selected remote connection before committing local teardown; failed or uncertain deletion preserves retryable state and sibling connections.
 
 ## Covers everyone who affects cover, not just payroll
 
@@ -44,7 +48,7 @@ Team Calendar is built for the whole team, not only the people on the pay run. E
 
 Team Calendar is multi-tenant by design. A small business that grows into several payroll entities (each with its own Xero file) can run them under one Account, with strict isolation between entities and role-based access for owners, admins, managers, and viewers.
 
-The tenancy boundary is the Clerk Organisation (the Account). Each payroll entity within it owns exactly one Xero connection and one Xero tenant. One Account maps to exactly one country code.
+The tenancy boundary is the Clerk Organisation (the Account). Each payroll entity within it owns at most one Xero connection to an external payroll file. Canonical encrypted credentials belong to one verified Xero user/app authorisation, which may support several scoped connections. One Account maps to exactly one country code.
 
 ## Tech stack
 
@@ -68,7 +72,7 @@ The following are out of scope for the initial build and do not require structur
 
 ## Current status
 
-Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop.
+Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate source and integration verification is recorded separately in `tasks/todo.md`. Live Xero credentials are unavailable in this simplification session, so every live OAuth, import, write, refresh and disconnect journey remains **NOT VERIFIED**.
 
 ## Production URLs
 
@@ -204,6 +208,7 @@ Each project requires `NEXT_PUBLIC_LAUNCH_MODE` to be set explicitly to `early_a
 | `DATABASE_URL` | `app`, `api` | Required | Required |
 | `XERO_TOKEN_ENCRYPTION_KEY` | `app`, `api` | Required | Required |
 | `XERO_CLIENT_ID` / `XERO_CLIENT_SECRET` | `app`, `api` | Required | Required |
+| `XERO_APP_TIER` / `XERO_REDIRECT_URI` | `app`, `api` | Required commercial allowance / registered HTTPS callback | Required commercial allowance / registered HTTPS callback |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` | `app`, `api` | Required | Required |
 | `CLERK_WEBHOOK_SECRET` | `api` | Required | Required |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | `app`, `api` | Required pair | Required pair |
@@ -254,6 +259,8 @@ exactly five public resources named `App access`, `Xero connection and
 synchronisation`, `Calendar feed delivery`, `In-app notifications`, and `Email
 notifications`. If the trio or a required resource is absent, `/status` reports
 Unknown rather than assuming the service is operational.
+
+For versioned encrypted envelopes, configure `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` and the server-only `XERO_TOKEN_ENCRYPTION_KEYS_JSON` key map as specified in each app's example. Preserve every key still referenced by canonical authorisations. Never print the key map.
 
 `XERO_TOKEN_ENCRYPTION_KEY` (32 bytes, base64-encoded) is validated on startup in `packages/xero`. An absent or malformed key prevents the application from starting rather than failing later at token access time.
 

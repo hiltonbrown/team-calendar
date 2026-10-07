@@ -64,6 +64,7 @@ vi.mock("@repo/database", () => ({
     person: { findFirst: mocks.personFindFirst },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
+  getSubmitOperation: vi.fn(async () => null),
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   lockActiveScopedXeroConnection: vi.fn(async () => true),
   markSubmitCompleted: mocks.markSubmitCompleted,
@@ -94,6 +95,15 @@ vi.mock("./submit-side-effects", () => ({
 const mockPort = {
   approveLeaveApplication: vi.fn(),
   declineLeaveApplication: vi.fn(),
+  prepareLeaveMutation: vi.fn(async () => ({
+    ok: true as const,
+    value: {
+      body: "[]",
+      method: "POST" as const,
+      url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+      xeroTenantId: "tenant-1",
+    },
+  })),
   resolveEmployeeId: mocks.resolveXeroEmployeeId,
   resolveLeaveTypeId: mocks.resolveXeroLeaveTypeId,
   submitLeaveApplication: mocks.submitLeaveApplicationForRegion,
@@ -180,8 +190,11 @@ describe("submit-service", () => {
     });
     mocks.personFindFirst.mockResolvedValue({ id: record.person.id });
     mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+      actorUserId: "original_actor",
       attemptGeneration: 1,
       claimedAt: new Date("2026-05-01T00:00:00.000Z"),
+      mutation: { idempotencyKey: "11111111-1111-4111-8111-111111111111" },
+      providerAccepted: false,
     });
     mocks.resolveXeroEmployeeId.mockResolvedValue({
       ok: true,
@@ -673,12 +686,11 @@ describe("submit-service", () => {
     const result = await withdrawSubmission(input, mockPort);
     expect(result.ok).toBe(true);
     expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalled();
-    expect(mocks.dispatchNotification).toHaveBeenCalledWith(
+    expect(mocks.completeSideEffects).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: "leave_withdrawn",
-      }),
-      expect.anything(),
-      { publishRealtime: undefined }
+        attempt: expect.objectContaining({ action: "withdraw" }),
+        notifyManager: true,
+      })
     );
   });
   it("moves an owner's approved leave to the Xero failure state when withdrawal fails", async () => {

@@ -20,12 +20,13 @@ export async function recoverXeroImportDispatch(
       select: {
         clerk_org_id: true,
         id: true,
+        initial_sync_requested_at: true,
         organisation_id: true,
       },
       where: {
         authorisation: { status: "active" },
         disconnected_at: null,
-        last_people_sync_at: null,
+        initial_sync_completed_at: null,
         organisation: {
           archived_at: null,
           is_active: true,
@@ -55,6 +56,9 @@ export async function recoverXeroImportDispatch(
         clerkOrgId: tenant.clerk_org_id,
         connectionId: tenant.id,
         organisationId: tenant.organisation_id,
+        ...(tenant.initial_sync_requested_at
+          ? { requestedAt: tenant.initial_sync_requested_at.toISOString() }
+          : {}),
         triggerType: "scheduled",
       });
       if (dispatchRes.ok) {

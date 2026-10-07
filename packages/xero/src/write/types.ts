@@ -1,4 +1,8 @@
-import { type Result, xeroRecoveryMessage } from "@repo/core";
+import {
+  type Result,
+  type XeroMutationIdentity,
+  xeroRecoveryMessage,
+} from "@repo/core";
 import type { XeroProviderConnectionCapture } from "@repo/database/queries/xero-connections";
 import type { XeroDeadline } from "../rate-limit/deadline";
 
@@ -47,6 +51,7 @@ export interface XeroAccessContext {
   clerk_org_id: string;
   deadline: XeroDeadline;
   id: string;
+  mutationAttemptBudget?: { remaining: number };
   organisation_id: string;
   payroll_region: PayrollRegion;
   providerConnection?: XeroProviderConnectionCapture;
@@ -55,6 +60,7 @@ export interface XeroAccessContext {
 
 export interface SubmitLeaveApplicationInput {
   endsAt: Date;
+  mutation?: XeroMutationIdentity;
   startsAt: Date;
   title?: string;
   units: number;
@@ -64,12 +70,14 @@ export interface SubmitLeaveApplicationInput {
 }
 
 export interface ApproveLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
   xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
 }
 
 export interface DeclineLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
   reason: string;
   xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
@@ -77,6 +85,7 @@ export interface DeclineLeaveApplicationInput {
 }
 
 export interface WithdrawLeaveApplicationInput {
+  mutation?: XeroMutationIdentity;
   xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;

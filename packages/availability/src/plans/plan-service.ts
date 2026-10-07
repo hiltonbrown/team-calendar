@@ -997,7 +997,7 @@ const recordInclude = {
   outbound_operations: {
     select: { status: true },
     where: {
-      action: { in: ["submit", "approve"] },
+      action: { in: ["approve", "decline", "withdraw"] },
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },
   },

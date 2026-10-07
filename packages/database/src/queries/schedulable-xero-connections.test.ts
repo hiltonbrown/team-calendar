@@ -8,7 +8,7 @@ const { listSchedulableXeroConnections } = await import(
 beforeEach(() => {
   findMany.mockReset();
 });
-test("scheduler selects safe routing and health for active unpaused AU connections", async () => {
+test("scheduler only selects completed initial imports for active unpaused AU connections", async () => {
   findMany.mockResolvedValue([]);
   expect(await listSchedulableXeroConnections()).toEqual({
     ok: true,
@@ -17,6 +17,7 @@ test("scheduler selects safe routing and health for active unpaused AU connectio
   const args = findMany.mock.calls[0]?.[0];
   expect(args.where).toEqual({
     authorisation: { status: "active" },
+    initial_sync_completed_at: { not: null },
     organisation: { archived_at: null, is_active: true },
     payroll_region: "AU",
     status: "active",

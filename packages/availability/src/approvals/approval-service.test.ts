@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  acquireSideEffects: vi.fn(async () => new Date()),
   approveLeaveApplicationForRegion: vi.fn(),
   auditCreate: vi.fn(),
   availabilityClaimUpdateMany: vi.fn(),
@@ -14,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   declineLeaveApplicationForRegion: vi.fn(),
   dispatchNotification: vi.fn(),
   dispatchSyncEvent: vi.fn(),
+  getOperation: vi.fn(async () => null),
   getSettings: vi.fn(),
   getXeroConnectionStateForScope: vi.fn(),
   hasUnresolved: vi.fn().mockResolvedValue(false),
@@ -23,10 +25,16 @@ const mocks = vi.hoisted(() => ({
   locationFindMany: vi.fn(),
   logError: vi.fn(),
   managerScopePersonIds: vi.fn(),
+  markSubmitCompleted: vi.fn(),
+  markSubmitDefinitiveFailure: vi.fn(),
+  markSubmitDispatchStarted: vi.fn(),
+  markSubmitOutcomeUnknown: vi.fn(),
+  markSubmitProviderAccepted: vi.fn(),
   materialiseAvailabilityPublication: vi.fn(() =>
     Promise.resolve({ ok: true, value: undefined })
   ),
   organisationFindFirst: vi.fn(),
+  prepareAndClaimSubmitOperation: vi.fn(),
   resolveXeroEmployeeId: vi.fn(),
   resolveXeroLeaveTypeId: vi.fn(),
   scopedTo: vi.fn((scope: { clerkOrgId: string; organisationId: string }) => ({
@@ -39,10 +47,14 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
+  acquireSubmitRecoverySideEffects: mocks.acquireSideEffects,
   database: {
     $transaction: async (callback: (tx: unknown) => unknown) =>
       await callback({
-        auditEvent: { create: mocks.auditCreate },
+        auditEvent: {
+          create: mocks.auditCreate,
+          findFirst: vi.fn(async () => null),
+        },
         availabilityRecord: {
           updateMany: (mutation: {
             data: { xero_write_claimed_at?: Date | null };
@@ -52,7 +64,11 @@ vi.mock("@repo/database", () => ({
               : mocks.availabilityUpdateMany(mutation),
         },
       }),
-    auditEvent: { findMany: mocks.auditCreate },
+    auditEvent: {
+      create: mocks.auditCreate,
+      findFirst: vi.fn(async () => null),
+      findMany: mocks.auditCreate,
+    },
     availabilityRecord: {
       count: mocks.availabilityCount,
       findFirst: mocks.availabilityFindFirst,
@@ -70,8 +86,17 @@ vi.mock("@repo/database", () => ({
     },
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
+  fenceSubmitRecoverySideEffectClaim: vi.fn(async () => true),
+  getSubmitOperation: mocks.getOperation,
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   lockActiveScopedXeroConnection: vi.fn(async () => true),
+  markSubmitCompleted: mocks.markSubmitCompleted,
+  markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
+  markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,
+  markSubmitOutcomeUnknown: mocks.markSubmitOutcomeUnknown,
+  markSubmitProviderAccepted: mocks.markSubmitProviderAccepted,
+  prepareAndClaimSubmitOperation: mocks.prepareAndClaimSubmitOperation,
+  releaseSubmitRecoverySideEffects: vi.fn(),
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../duration/working-days", () => ({
@@ -97,6 +122,7 @@ vi.mock("../settings/manager-scope", () => ({
 }));
 vi.mock("@repo/notifications", () => ({
   dispatchNotification: mocks.dispatchNotification,
+  publishPersistedNotification: vi.fn(),
 }));
 vi.mock("@repo/feeds", () => ({
   materialiseAvailabilityPublication: mocks.materialiseAvailabilityPublication,
@@ -107,6 +133,15 @@ vi.mock("@repo/observability/log", () => ({
 const mockPort = {
   approveLeaveApplication: mocks.approveLeaveApplicationForRegion,
   declineLeaveApplication: mocks.declineLeaveApplicationForRegion,
+  prepareLeaveMutation: vi.fn(async () => ({
+    ok: true as const,
+    value: {
+      body: "[]",
+      method: "POST" as const,
+      url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+      xeroTenantId: "tenant-1",
+    },
+  })),
   resolveEmployeeId: mocks.resolveXeroEmployeeId,
   resolveLeaveTypeId: vi.fn(),
   submitLeaveApplication: vi.fn(),
@@ -188,7 +223,19 @@ function deferred<T>() {
 }
 describe("approval-service", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+      actorUserId: "manager_1",
+      attemptGeneration: 1,
+      claimedAt: new Date(),
+      mutation: { idempotencyKey: "11111111-1111-4111-8111-111111111111" },
+      providerAccepted: false,
+    });
+    mocks.markSubmitDispatchStarted.mockResolvedValue(true);
+    mocks.markSubmitProviderAccepted.mockResolvedValue(true);
+    mocks.markSubmitOutcomeUnknown.mockResolvedValue(true);
+    mocks.markSubmitDefinitiveFailure.mockResolvedValue(true);
+    mocks.markSubmitCompleted.mockResolvedValue(true);
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.availabilityClaimUpdateMany.mockReset();
     mocks.availabilityClaimUpdateMany.mockResolvedValue({ count: 1 });
@@ -264,6 +311,79 @@ describe("approval-service", () => {
     });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroConnection);
   });
+  it("journals an imported approval before dispatch and retains accepted outcome when the local save fails", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.approveLeaveApplicationForRegion.mockResolvedValue({
+      ok: true,
+      value: undefined,
+    });
+    mocks.availabilityUpdateMany.mockRejectedValueOnce(
+      new Error("local save lost")
+    );
+    await approve(input, mockPort);
+    expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "approve",
+        remoteId: record.source_remote_id,
+      })
+    );
+    expect(mocks.markSubmitProviderAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
+      record.source_remote_id
+    );
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
+  });
+  it("permits the same approval create to resume after response loss inside its recorded window", async () => {
+    mocks.hasUnresolved.mockResolvedValue(true);
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "xero_sync_failed",
+      failed_action: "approve",
+      outbound_operations: [
+        {
+          action: "approve",
+          dispatch_started_at: new Date(),
+          idempotency_replay_before: new Date(Date.now() + 60_000),
+          status: "outcome_unknown",
+        },
+      ],
+      source_remote_id: null,
+      source_type: "team_calendar_leave",
+      xero_write_claimed_at: null,
+    });
+    mocks.createLeaveOnApproval.mockResolvedValue({ ok: true, value: record });
+    const result = await retryApproval(input, mockPort);
+    expect(result.ok).toBe(true);
+    expect(mocks.createLeaveOnApproval).toHaveBeenCalled();
+  });
+  it.each([
+    ["approve", "approved"],
+    ["decline", "declined"],
+  ] as const)(
+    "returns a completed %s without another mutation or side effect",
+    async (action, status) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: status,
+      });
+      mocks.getOperation.mockResolvedValueOnce({
+        status: "completed",
+      } as never);
+      const result =
+        action === "approve"
+          ? await approve(input, mockPort)
+          : await decline(
+              { ...input, reason: "Coverage unavailable" },
+              mockPort
+            );
+      expect(result.ok).toBe(true);
+      expect(mockPort.prepareLeaveMutation).not.toHaveBeenCalled();
+      expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
+      expect(mocks.dispatchNotification).not.toHaveBeenCalled();
+      expect(mocks.prepareAndClaimSubmitOperation).not.toHaveBeenCalled();
+    }
+  );
   it.each([
     ["update_permissions", "Update Xero permissions to continue."],
     [
@@ -324,6 +444,14 @@ describe("approval-service", () => {
     mocks.availabilityClaimUpdateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
+    mocks.prepareAndClaimSubmitOperation
+      .mockResolvedValueOnce({
+        actorUserId: "actor",
+        attemptGeneration: 1,
+        claimedAt: new Date(),
+        mutation: { idempotencyKey: "11111111-1111-4111-8111-111111111111" },
+      })
+      .mockResolvedValueOnce(null);
     mocks.approveLeaveApplicationForRegion.mockReturnValue(approval.promise);
     const approving = approve(input, mockPort);
     await vi.waitFor(() =>
@@ -334,7 +462,7 @@ describe("approval-service", () => {
       mockPort
     );
     await expect(declining).resolves.toMatchObject({
-      error: { code: "invalid_state_for_decline" },
+      error: { code: "xero_write_failed" },
       ok: false,
     });
     expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
@@ -390,6 +518,14 @@ describe("approval-service", () => {
     mocks.availabilityClaimUpdateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
+    mocks.prepareAndClaimSubmitOperation
+      .mockResolvedValueOnce({
+        actorUserId: "actor",
+        attemptGeneration: 1,
+        claimedAt: new Date(),
+        mutation: { idempotencyKey: "11111111-1111-4111-8111-111111111111" },
+      })
+      .mockResolvedValueOnce(null);
     mocks.withdrawLeaveApplicationForRegion.mockReturnValue(withdrawal.promise);
     const withdrawInput = {
       actingOrgRole: "org:viewer",
@@ -404,7 +540,7 @@ describe("approval-service", () => {
     );
     const second = withdrawSubmission(withdrawInput, mockPort);
     await expect(second).resolves.toMatchObject({
-      error: { code: "invalid_state_for_withdraw" },
+      error: { code: "submission_outcome_unknown" },
       ok: false,
     });
     expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledTimes(1);
@@ -622,27 +758,6 @@ describe("approval-service", () => {
       })
     );
   });
-  it.each(["approve", "decline"])(
-    "requires scoped review of legacy remote-created submissions before %s",
-    async (action) => {
-      mocks.availabilityFindFirst.mockResolvedValue({
-        ...record,
-        source_type: "team_calendar_leave",
-      });
-      const result =
-        action === "approve"
-          ? await approve(input, mockPort)
-          : await decline(
-              { ...input, reason: "Insufficient coverage" },
-              mockPort
-            );
-      expect(result).toMatchObject({ ok: false });
-      expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
-      expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
-      expect(mocks.auditCreate).not.toHaveBeenCalled();
-      expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
-    }
-  );
   it("approves submitted leave, clears failed_action, notifies owner and audits", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -674,7 +789,8 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_approved",
       }),
-      expect.anything()
+      expect.anything(),
+      { publishRealtime: false }
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -757,7 +873,8 @@ describe("approval-service", () => {
       ok: false,
     });
     const result = await approve(input, mockPort);
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ approval_status: "approved" }),
@@ -769,7 +886,8 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_approved",
       }),
-      expect.anything()
+      expect.anything(),
+      { publishRealtime: false }
     );
   });
   it("keeps a declined transition when notification dispatch fails", async () => {
@@ -788,7 +906,8 @@ describe("approval-service", () => {
       { ...input, reason: "Too much overlap" },
       mockPort
     );
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(mocks.markSubmitCompleted).not.toHaveBeenCalled();
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ approval_status: "declined" }),
@@ -800,7 +919,8 @@ describe("approval-service", () => {
         recipientUserId: "employee_1",
         type: "leave_declined",
       }),
-      expect.anything()
+      expect.anything(),
+      { publishRealtime: false }
     );
   });
   it("persists failed approve without setting approver fields", async () => {

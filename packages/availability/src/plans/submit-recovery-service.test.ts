@@ -78,19 +78,23 @@ const input = {
 };
 const record = {
   all_day: true,
+  approval_status: "submitted",
   ends_at: new Date("2026-05-05T00:00:00.000Z"),
   id: input.recordId,
   person: {
+    clerk_user_id: "employee_1",
+    id: "person_1",
     location_id: null,
     manager: { clerk_user_id: "manager_user_1", id: "manager_person_1" },
   },
   person_id: "person_1",
   record_type: "annual_leave",
+  source_remote_id: null,
   starts_at: new Date("2026-05-04T00:00:00.000Z"),
   title: "Annual leave",
 };
 const candidate = {
-  approvalStatus: "submitted" as const,
+  approvalStatus: "approved" as const,
   employeeId: "employee_1",
   endsAt: "2026-05-05",
   leaveTypeId: "leave_type_1",
@@ -113,6 +117,8 @@ const requestFingerprint = createHash("sha256")
   )
   .digest("hex");
 const operation = {
+  action: "approve",
+  actor_user_id: "original_manager",
   attempt_generation: 1,
   merged_record_id: null,
   request_employee_id: candidate.employeeId,
@@ -128,6 +134,7 @@ const port = {
   approveLeaveApplication: vi.fn(),
   declineLeaveApplication: vi.fn(),
   findLeaveApplicationCandidates: vi.fn(),
+  prepareLeaveMutation: vi.fn(),
   resolveEmployeeId: vi.fn(),
   resolveLeaveTypeId: vi.fn(),
   submitLeaveApplication: vi.fn(),
@@ -136,12 +143,12 @@ const port = {
 
 describe("submit recovery service", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
     mocks.computeWorkingDays.mockResolvedValue({ ok: true, value: 2 });
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
-      scope.action === "approve" ? null : operation
+      scope.action === "approve" ? operation : null
     );
     mocks.personFindFirst.mockResolvedValue({ id: "original_person" });
     mocks.hasSideEffectClaim.mockResolvedValue(true);
@@ -312,7 +319,7 @@ describe("submit recovery service", () => {
     );
     expect(mocks.auditCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        action: "availability_records.submit_recovery_attached",
+        action: "availability_records.approval_recovery_attached",
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
       }),
@@ -350,7 +357,7 @@ describe("submit recovery service", () => {
       value: {
         candidates: [
           { ...candidate, employeeId: "another_employee" },
-          { ...candidate, remoteId: "remote_2", units: 3 },
+          { ...candidate, remoteId: "remote_2", title: "Changed title" },
         ],
         complete: true,
       },
@@ -395,16 +402,67 @@ describe("submit recovery service", () => {
     });
   });
 
+  it("attaches a date-only AU approval whose local one day differs from provider hours", async () => {
+    const localFingerprint = createHash("sha256")
+      .update(
+        JSON.stringify({
+          employeeId: candidate.employeeId,
+          endsAt: record.ends_at.toISOString(),
+          leaveTypeId: candidate.leaveTypeId,
+          startsAt: record.starts_at.toISOString(),
+          title: candidate.title,
+          units: 1,
+        })
+      )
+      .digest("hex");
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve"
+        ? {
+            ...operation,
+            request_fingerprint: localFingerprint,
+            request_units: 1,
+          }
+        : null
+    );
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce(record)
+      .mockResolvedValueOnce(null);
+    port.findLeaveApplicationCandidates.mockResolvedValueOnce({
+      ok: true,
+      value: { candidates: [{ ...candidate, units: 7.6 }], complete: true },
+    });
+    expect(
+      await attachSubmitRecoveryCandidate(
+        {
+          ...input,
+          reason: "Verified one calendar day against provider hours.",
+          remoteId: "remote_1",
+        },
+        port
+      )
+    ).toEqual({ ok: true, value: undefined });
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          approval_status: "approved",
+          source_remote_id: "remote_1",
+        }),
+      })
+    );
+    expect(port.submitLeaveApplication).not.toHaveBeenCalled();
+    expect(port.approveLeaveApplication).not.toHaveBeenCalled();
+  });
+
   it("cannot attach a different candidate after Xero accepted a known remote ID", async () => {
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             attempt_generation: 1,
             known_remote_id: "remote_accepted",
             status: "provider_accepted",
           }
+        : null
     );
 
     const result = await attachSubmitRecoveryCandidate(
@@ -423,7 +481,7 @@ describe("submit recovery service", () => {
     expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("preserves an authoritative approved provider state when attaching", async () => {
+  it("preserves an authoritative approved provider state and notifies the employee when attaching", async () => {
     port.findLeaveApplicationCandidates.mockResolvedValueOnce({
       ok: true,
       value: {
@@ -450,7 +508,7 @@ describe("submit recovery service", () => {
         data: expect.objectContaining({ approval_status: "approved" }),
       })
     );
-    expect(mocks.notify).not.toHaveBeenCalled();
+    expect(mocks.notify).toHaveBeenCalledOnce();
   });
 
   it("resumes duplicate publication cancellation from the persisted merge checkpoint", async () => {
@@ -482,16 +540,17 @@ describe("submit recovery service", () => {
 
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             known_remote_id: "remote_1",
             merged_record_id: duplicate.id,
             status: "provider_accepted",
           }
+        : null
     );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
+      approval_status: "approved",
       source_remote_id: "remote_1",
     });
     mocks.auditFindFirst.mockResolvedValueOnce({
@@ -535,15 +594,16 @@ describe("submit recovery service", () => {
   it("does not run notification effects when another recovery owns the lease", async () => {
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             known_remote_id: "remote_1",
             status: "provider_accepted",
           }
+        : null
     );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
+      approval_status: "approved",
       source_remote_id: "remote_1",
     });
     mocks.acquireSideEffects.mockResolvedValueOnce(null);
@@ -568,15 +628,16 @@ describe("submit recovery service", () => {
   it("prevents an expired claimant from notifying after a takeover", async () => {
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             known_remote_id: "remote_1",
             status: "provider_accepted",
           }
+        : null
     );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
+      approval_status: "approved",
       source_remote_id: "remote_1",
     });
     mocks.auditFindFirst.mockResolvedValueOnce({
@@ -624,16 +685,17 @@ describe("submit recovery service", () => {
 
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             attempt_generation: 1,
             known_remote_id: "remote_1",
             status: "provider_accepted",
           }
+        : null
     );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
+      approval_status: "approved",
       source_remote_id: "remote_1",
     });
     const retry = await attachSubmitRecoveryCandidate(
@@ -675,16 +737,17 @@ describe("submit recovery service", () => {
 
     mocks.getSubmitOperation.mockImplementation(async (scope) =>
       scope.action === "approve"
-        ? null
-        : {
+        ? {
             ...operation,
             attempt_generation: 1,
             known_remote_id: "remote_1",
             status: "provider_accepted",
           }
+        : null
     );
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
+      approval_status: "approved",
       source_remote_id: "remote_1",
     });
     mocks.auditFindFirst
@@ -703,5 +766,227 @@ describe("submit recovery service", () => {
     expect(retry.ok).toBe(true);
     expect(mocks.notify).toHaveBeenCalledTimes(2);
     expect(mocks.markSubmitCompleted).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("administrator imported leave transition recovery", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.availabilityFindFirst.mockResolvedValue({
+      ...record,
+      approval_status: "submitted",
+      source_remote_id: "remote_1",
+    });
+    mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.hasSideEffectClaim.mockResolvedValue(true);
+    mocks.acquireSideEffects.mockResolvedValue(new Date());
+    mocks.persistMerge.mockResolvedValue(true);
+    mocks.markSubmitCompleted.mockResolvedValue(true);
+    mocks.markSubmitProviderAccepted.mockResolvedValue(true);
+    mocks.personFindFirst.mockResolvedValue({ id: "original_person" });
+    mocks.materialise.mockResolvedValue({ ok: true, value: undefined });
+    mocks.notify.mockResolvedValue({ ok: true, value: {} });
+  });
+  function remoteOperation(action: "approve" | "decline" | "withdraw") {
+    const descriptor = {
+      body:
+        action === "approve"
+          ? null
+          : JSON.stringify({
+              Reason:
+                action === "decline"
+                  ? "Declined by original manager"
+                  : "Withdrawn by employee in Team Calendar.",
+            }),
+      method: "POST",
+      url: `https://api.xero.com/payroll.xro/1.0/LeaveApplications/remote_1/${action === "approve" ? "approve" : "reject"}`,
+      xeroTenantId: "original_xero_tenant",
+    };
+    return {
+      ...operation,
+      action,
+      actor_user_id: "original_actor",
+      known_remote_id: "remote_1",
+      request_body_json: descriptor.body,
+      request_fingerprint: createHash("sha256")
+        .update(
+          JSON.stringify([
+            descriptor.xeroTenantId,
+            descriptor.method,
+            descriptor.url,
+            descriptor.body,
+          ])
+        )
+        .digest("hex"),
+      request_leave_type_id: "",
+      request_method: descriptor.method,
+      request_reason:
+        action === "decline" ? "Declined by original manager" : null,
+      request_url: descriptor.url,
+      request_xero_tenant_id: descriptor.xeroTenantId,
+    };
+  }
+  it.each([
+    ["approve", "approved", "approved", "leave_approved", "employee_1"],
+    ["decline", "declined", "declined", "leave_declined", "employee_1"],
+    ["withdraw", "declined", "withdrawn", "leave_withdrawn", "manager_user_1"],
+  ] as const)(
+    "recovers imported %s from authoritative provider state without replay",
+    async (action, providerStatus, localStatus, notificationType, recipientUserId) => {
+      const pending = remoteOperation(action);
+      mocks.getSubmitOperation.mockImplementation(async (scope) =>
+        scope.action === action ? pending : null
+      );
+      mocks.availabilityFindFirst
+        .mockResolvedValueOnce({
+          ...record,
+          approval_status: "submitted",
+          source_remote_id: "remote_1",
+        })
+        .mockResolvedValueOnce(null);
+      port.findLeaveApplicationCandidates.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          candidates: [{ ...candidate, approvalStatus: providerStatus }],
+          complete: true,
+        },
+      });
+      const result = await attachSubmitRecoveryCandidate(
+        {
+          ...input,
+          reason: "Verified the imported transition directly in Xero.",
+          remoteId: "remote_1",
+        },
+        port
+      );
+      expect(result).toEqual({ ok: true, value: undefined });
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ approval_status: localStatus }),
+          where: expect.objectContaining({
+            clerk_org_id: input.clerkOrgId,
+            organisation_id: input.organisationId,
+            source_remote_id: "remote_1",
+          }),
+        })
+      );
+      expect(mocks.markSubmitCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({ action, attemptGeneration: 1 }),
+        expect.anything()
+      );
+      expect(mocks.auditCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          action: `availability_records.${action === "approve" ? "approval" : action}_recovery_attached`,
+          payload: expect.objectContaining({
+            originalActorUserId: "original_actor",
+          }),
+        }),
+      });
+      expect(mocks.notify).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ recipientUserId, type: notificationType }),
+        expect.anything(),
+        expect.anything()
+      );
+      for (const write of [
+        port.prepareLeaveMutation,
+        port.submitLeaveApplication,
+        port.approveLeaveApplication,
+        port.declineLeaveApplication,
+        port.withdrawLeaveApplication,
+      ]) {
+        expect(write).not.toHaveBeenCalled();
+      }
+    }
+  );
+  it("recovers a provider-accepted decline after local save loss with the original reason", async () => {
+    const originalReason = "Declined by original manager";
+    const pending = {
+      ...remoteOperation("decline"),
+      request_reason: originalReason,
+      status: "provider_accepted",
+    };
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "decline" ? pending : null
+    );
+    mocks.availabilityFindFirst
+      .mockResolvedValueOnce({
+        ...record,
+        approval_note: "Stale local note",
+        approval_status: "submitted",
+        source_remote_id: "remote_1",
+      })
+      .mockResolvedValueOnce(null);
+    port.findLeaveApplicationCandidates.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        candidates: [{ ...candidate, approvalStatus: "declined" }],
+        complete: true,
+      },
+    });
+    expect(
+      await attachSubmitRecoveryCandidate(
+        {
+          ...input,
+          reason: "Administrator checked provider state after local save loss.",
+          remoteId: "remote_1",
+        },
+        port
+      )
+    ).toEqual({ ok: true, value: undefined });
+    expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          approval_note: originalReason,
+          approval_status: "declined",
+        }),
+      })
+    );
+    expect(mocks.notify).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ body: originalReason, type: "leave_declined" }),
+      expect.anything(),
+      expect.anything()
+    );
+    expect(port.declineLeaveApplication).not.toHaveBeenCalled();
+    expect(port.submitLeaveApplication).not.toHaveBeenCalled();
+  });
+
+  it("does not attach an imported transition whose target provider state is unconfirmed", async () => {
+    const pending = remoteOperation("approve");
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "approve" ? pending : null
+    );
+    port.findLeaveApplicationCandidates.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        candidates: [{ ...candidate, approvalStatus: "submitted" }],
+        complete: true,
+      },
+    });
+    expect(
+      await attachSubmitRecoveryCandidate(
+        {
+          ...input,
+          reason: "Provider state still needs administrator verification.",
+          remoteId: "remote_1",
+        },
+        port
+      )
+    ).toMatchObject({ error: { code: "candidate_mismatch" }, ok: false });
+    expect(mocks.markSubmitProviderAccepted).not.toHaveBeenCalled();
+    expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
+  });
+  it("rejects altered imported request evidence before reading provider candidates", async () => {
+    const pending = {
+      ...remoteOperation("decline"),
+      request_body_json: "changed-body",
+    };
+    mocks.getSubmitOperation.mockImplementation(async (scope) =>
+      scope.action === "decline" ? pending : null
+    );
+    expect(await listSubmitRecoveryCandidates(input, port)).toMatchObject({
+      error: { code: "not_recoverable" },
+      ok: false,
+    });
+    expect(port.findLeaveApplicationCandidates).not.toHaveBeenCalled();
   });
 });

@@ -21,10 +21,14 @@ describe("closed lifecycle metric labels", () => {
     expect(info).toHaveBeenCalledWith("Xero lifecycle metric", {
       class: "tenant",
       metric: "xero.admission.denied",
-      outcome: "failed",
       reason: "daily",
       value: 1,
     });
+  });
+  it("ignores retired cleanup measurements", () => {
+    // @ts-expect-error Retired metrics are not part of the current API.
+    emitXeroMetric("xero.cleanup.unknown_oldest_age_hours", 1);
+    expect(info).not.toHaveBeenCalled();
   });
   it("rejects UUID labels statically and drops them at runtime", () => {
     emitXeroMetric("xero.admission.denied", 1, {

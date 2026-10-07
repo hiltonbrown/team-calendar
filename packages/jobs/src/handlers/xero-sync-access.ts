@@ -12,7 +12,9 @@ import {
 export interface XeroSyncScope {
   clerkOrgId: string;
   connectionId: string;
+  expectedXeroTenantId?: string;
   organisationId: string;
+  requestedAt?: string;
 }
 export class XeroBindingChangedError extends Error {
   constructor() {
@@ -64,6 +66,12 @@ export async function withXeroBinding<T>(
           organisation_id: scope.organisationId,
           status: "active",
           sync_paused_at: null,
+          ...(scope.expectedXeroTenantId
+            ? { xero_tenant_id: scope.expectedXeroTenantId }
+            : {}),
+          ...(scope.requestedAt
+            ? { initial_sync_requested_at: new Date(scope.requestedAt) }
+            : {}),
         },
       });
       if (!connection) {
@@ -93,6 +101,7 @@ export async function resolveSyncTenant(
       leave_balances_stale_since: true,
       leave_records_stale_since: true,
       people_stale_since: true,
+      sync_cursors: { select: { entity_type: true, modified_since: true } },
       sync_paused_at: true,
     },
     where: {

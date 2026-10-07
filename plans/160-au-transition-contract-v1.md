@@ -10,8 +10,7 @@ carries the same transition table. Live Xero behaviour remains NOT VERIFIED.
 - **Approve** repeats those checks for a local request, records an outbound operation with action `approve` before sending the request, then creates scheduled AU leave in Xero synchronously.
 - **Decline** (reason required) and **withdraw** of a local request make no provider call, including while disconnected.
 - **Imported requested leave** uses Xero's existing approve and reject endpoints.
-- Existing `submit` recovery is retained. Two unresolved actions on one record
-  block further writes.
+- Remote approve, decline and withdraw reuse the existing `OutboundOperation` journal. Persist one UUID idempotency key and exact tenant/method/URL/body identity before dispatch; replay uses that key only for five minutes from first dispatch, inside Xero's six-minute retention. An uncertain result after the cutoff requires authoritative provider inspection and administrator recovery. Completed outcomes apply side effects once.
 - NZ and UK stay unavailable.
 
 ## Transition table
@@ -25,12 +24,12 @@ carries the same transition table. Live Xero behaviour remains NOT VERIFIED.
 | Imported requested | Approve or decline | Approve or reject existing ID | Approved or declined |
 | Remote submitted or approved | Withdraw | Reject existing ID where Xero allows it | Withdrawn; if Xero refuses, stays approved with a plain-language error |
 | Approval create failed definitively | Explicit retry | New fenced create attempt | Provider outcome decides |
-| Approval create uncertain, or accepted but not persisted | Any retry, edit or withdraw | None | Administrator recovery required |
+| Approval create uncertain, or accepted but not persisted | Exact replay within the five-minute cutoff | Same request and UUID key | Recover original outcome; unresolved state blocks other writes |
+| Uncertain remote operation after replay cutoff | Retry, edit or withdraw | Authoritative read only | Administrator recovery required before another mutation |
 | Exact verified recovery candidate | Attach | Read only | Provider state attached, original actor kept |
 | Independently proved not created | Record evidence | None | Explicit retry allowed |
-| Legacy app-submitted remote record | Approve or decline | None | Scoped administrator review required |
 
-Xero documents `reject` for requested leave. Rejection of scheduled leave created on approval remains unverified. Plan 160 Step 4, row 7 tests this.
+Xero documents `reject` for requested or scheduled leave not included in a pay run. Live rejection of scheduled leave created on approval remains NOT VERIFIED; Plan 160 row 7 observes this.
 
 ## Provider basis
 

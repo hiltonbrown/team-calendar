@@ -10,13 +10,12 @@ import { xeroRecoveryMessage } from "@repo/core";
 import {
   acquireSubmitRecoverySideEffects,
   database,
+  getSubmitOperation,
   hasUnresolvedSubmitOperation,
   markSubmitCompleted,
   markSubmitDefinitiveFailure,
-  markSubmitDispatchStarted,
   markSubmitOutcomeUnknown,
   markSubmitProviderAccepted,
-  prepareAndClaimSubmitOperation,
   releaseSubmitRecoverySideEffects,
   scopedTo as scoped,
 } from "@repo/database";
@@ -45,6 +44,11 @@ import {
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
 import { completeSubmitSideEffects } from "./submit-side-effects";
+import {
+  completeXeroWriteSideEffects,
+  prepareXeroWrite as prepareJournaledWrite,
+  recordXeroWriteOutcome,
+} from "./write-operation";
 export type SubmitServiceError =
   | {
       code: "invalid_state_for_retry";
@@ -347,6 +351,7 @@ export async function revertToDraft(
     return unknownError("Failed to revert this record to draft.");
   }
 }
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep local withdrawal and journalled remote withdrawal uncertainty beside their scoped transitions.
 export async function withdrawSubmission(
   input: RecordActionInput,
   externalWritePort: ExternalWritePort
@@ -356,21 +361,38 @@ export async function withdrawSubmission(
     return unknownError("Invalid submission request.");
   }
   let claimedAt: Date | null = null;
+  let journalAttempt:
+    | import("@repo/database").OutboundOperationAttemptScope
+    | null = null;
   try {
     const authorised = await loadAndAuthorise(parsed.data, "owner_only");
     if (!authorised.ok) {
       return authorised;
     }
     const record = authorised.value;
+    if (
+      record.approval_status === "withdrawn" &&
+      (
+        await getSubmitOperation({
+          action: "withdraw",
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        })
+      )?.status === "completed"
+    ) {
+      return { ok: true, value: record };
+    }
     if (!canWithdrawRecord(record)) {
       return invalidState("invalid_state_for_withdraw");
     }
     if (
-      await hasUnresolvedSubmitOperation({
+      !record.source_remote_id &&
+      (await hasUnresolvedSubmitOperation({
         availabilityRecordId: record.id,
         clerkOrgId: input.clerkOrgId,
         organisationId: input.organisationId,
-      })
+      }))
     ) {
       return submissionOutcomeUnknown();
     }
@@ -380,25 +402,76 @@ export async function withdrawSubmission(
     if (prepared && !prepared.ok) {
       return prepared;
     }
-    claimedAt = await acquireXeroWriteClaim({
-      ...parsed.data,
-      expectedFailedAction: record.failed_action,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: record.approval_status,
-      localAction: record.source_remote_id ? undefined : "withdraw",
-    });
+    const journal =
+      record.source_remote_id && prepared?.ok
+        ? await prepareJournaledWrite(
+            {
+              action: "withdraw",
+              actorUserId: parsed.data.actingUserId,
+              ...parsed.data,
+              employeeId: prepared.value.xeroEmployeeId,
+              endsAt: record.ends_at,
+              expectedFailedAction:
+                record.failed_action === "withdraw" ? "withdraw" : null,
+              expectedSequence: record.derived_sequence,
+              expectedStatus: record.approval_status,
+              remoteId: record.source_remote_id,
+              startsAt: record.starts_at,
+              title: record.title,
+              units: 0,
+            },
+            externalWritePort
+          )
+        : null;
+    if (journal && !journal.ok) {
+      return submissionOutcomeUnknown();
+    }
+    if (journal?.ok) {
+      journalAttempt = {
+        action: "withdraw",
+        attemptGeneration: journal.value.attemptGeneration,
+        availabilityRecordId: record.id,
+        clerkOrgId: parsed.data.clerkOrgId,
+        organisationId: parsed.data.organisationId,
+      };
+    }
+    claimedAt = journal?.ok
+      ? journal.value.claimedAt
+      : await acquireXeroWriteClaim({
+          ...parsed.data,
+          expectedFailedAction: record.failed_action,
+          expectedSequence: record.derived_sequence,
+          expectedStatus: record.approval_status,
+          localAction: "withdraw",
+        });
     if (!claimedAt) {
       return invalidState("invalid_state_for_withdraw");
     }
     const ownerClaim = claimedAt;
     const xeroLeaveApplicationId = record.source_remote_id;
     if (xeroLeaveApplicationId) {
-      const response = await externalWritePort.withdrawLeaveApplication({
-        clerkOrgId: parsed.data.clerkOrgId,
-        employeeId: prepared?.ok ? prepared.value.xeroEmployeeId : "",
-        organisationId: parsed.data.organisationId,
-        remoteId: xeroLeaveApplicationId,
-      });
+      const response =
+        journal?.ok && journal.value.providerAccepted
+          ? { ok: true as const, value: undefined }
+          : await externalWritePort.withdrawLeaveApplication({
+              clerkOrgId: parsed.data.clerkOrgId,
+              employeeId: prepared?.ok ? prepared.value.xeroEmployeeId : "",
+              mutation: journal?.ok ? journal.value.mutation : undefined,
+              organisationId: parsed.data.organisationId,
+              remoteId: xeroLeaveApplicationId,
+            });
+      if (
+        !(journal?.ok && journal.value.providerAccepted) &&
+        journalAttempt &&
+        !(await recordXeroWriteOutcome(
+          journalAttempt,
+          response,
+          xeroLeaveApplicationId,
+          journal?.ok ? journal.value.replayedUnknown : false
+        ))
+      ) {
+        throw new Error("Xero journal outcome changed.");
+      }
       if (!response.ok) {
         return await persistXeroFailure({
           actionUrl: `/plans?recordId=${record.id}`,
@@ -418,7 +491,9 @@ export async function withdrawSubmission(
           approval_status: "withdrawn",
           derived_sequence: { increment: 1 },
           failed_action: null,
-          updated_by_user_id: parsed.data.actingUserId,
+          updated_by_user_id: journal?.ok
+            ? journal.value.actorUserId
+            : parsed.data.actingUserId,
           withdrawn_at: new Date(),
           xero_write_claimed_at: null,
           xero_write_error: null,
@@ -436,19 +511,51 @@ export async function withdrawSubmission(
         throw new OptimisticConflictError();
       }
       await tx.auditEvent.create({
-        data: auditData(parsed.data, "availability_records.withdrawn", {
-          ...(xeroLeaveApplicationId ? { xeroLeaveApplicationId } : {}),
-        }),
+        data: auditData(
+          {
+            ...parsed.data,
+            actingUserId: journal?.ok
+              ? journal.value.actorUserId
+              : parsed.data.actingUserId,
+          },
+          "availability_records.withdrawn",
+          {
+            ...(xeroLeaveApplicationId ? { xeroLeaveApplicationId } : {}),
+          }
+        ),
       });
     });
-    await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
-      actionUrl: `/leave-approvals?recordId=${record.id}`,
-    });
+    if (journal?.ok && journalAttempt) {
+      if (
+        !(await completeXeroWriteSideEffects({
+          actorUserId: journal.value.actorUserId,
+          attempt: journalAttempt,
+          clerkOrgId: parsed.data.clerkOrgId,
+          manager: record.person.manager?.clerk_user_id
+            ? {
+                clerkUserId: record.person.manager.clerk_user_id,
+                personId: record.person.manager.id,
+              }
+            : null,
+          organisationId: parsed.data.organisationId,
+          recipient: null,
+          recordId: record.id,
+        }))
+      ) {
+        return submissionOutcomeUnknown();
+      }
+    } else {
+      await notifyManagerBestEffort(parsed.data, record, "leave_withdrawn", {
+        actionUrl: `/leave-approvals?recordId=${record.id}`,
+      });
+    }
     const updated = await loadBareRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
     }
-    await materialiseSubmitPublication(parsed.data);
+    if (!journalAttempt) {
+      await materialiseSubmitPublication(parsed.data);
+    }
     return { ok: true, value: updated };
   } catch (error) {
     if (claimedAt) {
@@ -523,6 +630,19 @@ async function performApprovalCreation(
       }
     }
     if (
+      record.approval_status === "approved" &&
+      (
+        await getSubmitOperation({
+          action: "approve",
+          availabilityRecordId: record.id,
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        })
+      )?.status === "completed"
+    ) {
+      return { ok: true, value: record };
+    }
+    if (
       record.source_type !== "team_calendar_leave" ||
       record.source_remote_id !== null ||
       record.approval_status !== options.validStatus ||
@@ -568,56 +688,63 @@ async function performApprovalCreation(
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
     };
-    const preparedOperation = await prepareAndClaimSubmitOperation({
-      ...operationScope,
-      actorUserId: parsed.data.actingUserId,
-      claimableBefore: new Date(Date.now() - XERO_WRITE_CLAIM_LEASE_MS),
-      expectedFailedAction:
-        options.validStatus === "xero_sync_failed" ? "approve" : null,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: options.validStatus,
-      requestEmployeeId: prepared.value.xeroEmployeeId,
-      requestEndsAt: record.ends_at,
-      requestFingerprint: submitRequestFingerprint({
+    const journal = await prepareJournaledWrite(
+      {
+        action: "approve",
+        actorUserId: parsed.data.actingUserId,
+        ...parsed.data,
         employeeId: prepared.value.xeroEmployeeId,
         endsAt: record.ends_at,
+        expectedFailedAction:
+          options.validStatus === "xero_sync_failed" ? "approve" : null,
+        expectedSequence: record.derived_sequence,
+        expectedStatus: options.validStatus,
         leaveTypeId: prepared.value.xeroLeaveTypeId,
+        requestFingerprint: submitRequestFingerprint({
+          employeeId: prepared.value.xeroEmployeeId,
+          endsAt: record.ends_at,
+          leaveTypeId: prepared.value.xeroLeaveTypeId,
+          startsAt: record.starts_at,
+          title: record.title ?? "Leave request",
+          units: prepared.value.units,
+        }),
         startsAt: record.starts_at,
         title: record.title ?? "Leave request",
         units: prepared.value.units,
-      }),
-      requestLeaveTypeId: prepared.value.xeroLeaveTypeId,
-      requestStartsAt: record.starts_at,
-      requestTitle: record.title ?? "Leave request",
-      requestUnits: prepared.value.units,
-    });
-    if (!preparedOperation) {
+      },
+      externalWritePort
+    );
+    if (!journal.ok) {
       return submissionOutcomeUnknown();
     }
+    const preparedOperation = journal.value;
     ({ attemptGeneration, claimedAt } = preparedOperation);
     const operationAttempt = { ...operationScope, attemptGeneration };
-    // Fence the immutable create attempt before dispatch. An uncertain response
-    // requires provider evidence before another create may be attempted.
-    dispatchStarted = await markSubmitDispatchStarted(operationAttempt);
-    if (!dispatchStarted) {
-      await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
-      claimedAt = null;
-      return submissionOutcomeUnknown();
-    }
+    dispatchStarted = !preparedOperation.providerAccepted;
     let submission: Awaited<
       ReturnType<ExternalWritePort["submitLeaveApplication"]>
     >;
     try {
-      submission = await externalWritePort.submitLeaveApplication({
-        clerkOrgId: parsed.data.clerkOrgId,
-        employeeId: prepared.value.xeroEmployeeId,
-        endsAt: record.ends_at,
-        leaveTypeId: prepared.value.xeroLeaveTypeId,
-        organisationId: parsed.data.organisationId,
-        startsAt: record.starts_at,
-        title: record.title ?? "Leave request",
-        units: prepared.value.units,
-      });
+      submission =
+        preparedOperation.providerAccepted && preparedOperation.knownRemoteId
+          ? {
+              ok: true,
+              value: {
+                rawResponse: {},
+                remoteId: preparedOperation.knownRemoteId,
+              },
+            }
+          : await externalWritePort.submitLeaveApplication({
+              clerkOrgId: parsed.data.clerkOrgId,
+              employeeId: prepared.value.xeroEmployeeId,
+              endsAt: record.ends_at,
+              leaveTypeId: prepared.value.xeroLeaveTypeId,
+              mutation: preparedOperation.mutation,
+              organisationId: parsed.data.organisationId,
+              startsAt: record.starts_at,
+              title: record.title ?? "Leave request",
+              units: prepared.value.units,
+            });
     } catch {
       await markSubmitOutcomeUnknown(operationAttempt, "transport_exception");
       await releaseXeroWriteClaim({ ...parsed.data, claimedAt });
@@ -625,7 +752,10 @@ async function performApprovalCreation(
       return submissionOutcomeUnknown();
     }
     if (!submission.ok) {
-      if (isDefinitiveWriteFailure(submission.error)) {
+      if (
+        !preparedOperation.replayedUnknown &&
+        isDefinitiveWriteFailure(submission.error)
+      ) {
         await markSubmitDefinitiveFailure(
           operationAttempt,
           submission.error.code
@@ -644,10 +774,12 @@ async function performApprovalCreation(
         record,
       });
     }
-    const accepted = await markSubmitProviderAccepted(
-      operationAttempt,
-      submission.value.remoteId
-    );
+    const accepted =
+      preparedOperation.providerAccepted ||
+      (await markSubmitProviderAccepted(
+        operationAttempt,
+        submission.value.remoteId
+      ));
     if (!accepted) {
       return submissionOutcomeUnknown();
     }
@@ -655,17 +787,30 @@ async function performApprovalCreation(
     // transaction closure (evaluated later, from TypeScript's perspective)
     // keeps the non-null type instead of widening back to LoadedRecord | null.
     const claimedRecord = record;
+    const originalApproverId =
+      preparedOperation.actorUserId === parsed.data.actingUserId
+        ? (actingPerson?.id ?? null)
+        : ((
+            await database.person.findFirst({
+              select: { id: true },
+              where: {
+                ...scoped(parsed.data),
+                archived_at: null,
+                clerk_user_id: preparedOperation.actorUserId,
+              },
+            })
+          )?.id ?? null);
     await database.$transaction(async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
           approval_status: "approved",
           approved_at: new Date(),
-          approved_by_person_id: actingPerson?.id ?? null,
+          approved_by_person_id: originalApproverId,
           derived_sequence: { increment: 1 },
           failed_action: null,
           source_payload_json: toPrismaJsonValue(submission.value.rawResponse),
           source_remote_id: submission.value.remoteId,
-          updated_by_user_id: parsed.data.actingUserId,
+          updated_by_user_id: preparedOperation.actorUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
@@ -682,9 +827,13 @@ async function performApprovalCreation(
         throw new OptimisticConflictError();
       }
       await tx.auditEvent.create({
-        data: auditData(parsed.data, options.successAuditAction, {
-          xeroLeaveApplicationId: submission.value.remoteId,
-        }),
+        data: auditData(
+          { ...parsed.data, actingUserId: preparedOperation.actorUserId },
+          options.successAuditAction,
+          {
+            xeroLeaveApplicationId: submission.value.remoteId,
+          }
+        ),
       });
     });
     claimedAt = null;
@@ -696,7 +845,7 @@ async function performApprovalCreation(
       return submissionOutcomeUnknown();
     }
     const sideEffects = await completeSubmitSideEffects({
-      actorUserId: parsed.data.actingUserId,
+      actorUserId: preparedOperation.actorUserId,
       approvalRecipient: record.person.clerk_user_id
         ? {
             clerkUserId: record.person.clerk_user_id,

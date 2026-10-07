@@ -95,7 +95,7 @@ export function noUnresolvedSubmitOperationWhere() {
   return {
     outbound_operations: {
       none: {
-        action: { in: ["submit", "approve"] },
+        action: { in: ["approve", "decline", "withdraw"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },

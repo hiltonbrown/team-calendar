@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
-  connectionFindFirst: vi.fn(),
-  findFirst: vi.fn(),
+  connection: vi.fn(),
   flush: vi.fn(),
-  matchCount: vi.fn(),
+  matches: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/analytics/server", () => ({
@@ -13,143 +12,56 @@ vi.mock("@repo/analytics/server", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: {
-    syncRun: { findFirst: mocks.findFirst },
-    xeroConnection: { findFirst: mocks.connectionFindFirst },
-    xeroPersonMatch: { count: mocks.matchCount },
+    xeroConnection: { findFirst: mocks.connection },
+    xeroPersonMatch: { count: mocks.matches },
   },
 }));
-vi.mock("@repo/observability/log", () => ({
-  log: { warn: vi.fn() },
-}));
+vi.mock("@repo/observability/log", () => ({ log: { warn: vi.fn() } }));
 const { captureInitialSyncCompleted, checkXeroImportReadiness } = await import(
   "./activation"
 );
-describe("captureInitialSyncCompleted", () => {
+const scope = {
+  clerkOrgId: "org_a",
+  connectionId: "22222222-2222-4222-8222-222222222222",
+  organisationId: "11111111-1111-4111-8111-111111111111",
+};
+describe("persisted complete initial import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.flush.mockResolvedValue(undefined);
-    mocks.connectionFindFirst.mockResolvedValue(null);
+    mocks.matches.mockResolvedValue(0);
+    mocks.connection.mockResolvedValue({ initial_sync_completed_at: null });
   });
-  it("uses three bounded first-success queries and the final milestone time", async () => {
-    mocks.findFirst
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:00:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:02:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:01:00.000Z"),
-      });
-    await captureInitialSyncCompleted({
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-    });
-    expect(mocks.findFirst).toHaveBeenCalledTimes(3);
-    expect(
-      mocks.findFirst.mock.calls.map(([query]) => query.where.run_type)
-    ).toEqual(["people", "leave_records", "leave_balances"]);
-    expect(mocks.capture).toHaveBeenCalledWith(
-      expect.objectContaining({
-        timestamp: new Date("2026-09-19T00:02:00.000Z"),
-      })
+  it("never advertises completion for a successful but partial balance sweep", async () => {
+    expect((await checkXeroImportReadiness(scope)).isInitialSyncCompleted).toBe(
+      false
     );
-    expect(mocks.flush).toHaveBeenCalledTimes(1);
-  });
-  it("does not capture until every required successful run exists", async () => {
-    mocks.findFirst
-      .mockResolvedValueOnce({ completed_at: new Date() })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ completed_at: new Date() });
-    await captureInitialSyncCompleted({
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-    });
+    await captureInitialSyncCompleted(scope);
     expect(mocks.capture).not.toHaveBeenCalled();
   });
-  it("scopes queries to the current active connection and its creation time", async () => {
-    const tenantCreatedAt = new Date("2026-09-19T10:00:00.000Z");
-    mocks.connectionFindFirst.mockResolvedValue({
-      created_at: tenantCreatedAt,
-      id: "tenant_uuid_1",
+  it("uses the persisted full-import boundary and keeps person matching separate", async () => {
+    const completedAt = new Date("2026-10-07T12:00:00Z");
+    mocks.connection.mockResolvedValue({
+      initial_sync_completed_at: completedAt,
     });
-    mocks.findFirst
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T10:01:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T10:02:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T10:03:00.000Z"),
-      });
-    await captureInitialSyncCompleted({
-      clerkOrgId: "org_1",
-      connectionId: "tenant_uuid_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
+    mocks.matches.mockResolvedValue(3);
+    expect(await checkXeroImportReadiness(scope)).toEqual({
+      completedAt,
+      hasUnresolvedPeople: true,
+      isInitialSyncCompleted: true,
+      unresolvedPeopleCount: 3,
     });
-    expect(mocks.connectionFindFirst).toHaveBeenCalledWith(
+    await captureInitialSyncCompleted(scope);
+    expect(mocks.capture).toHaveBeenCalledWith(
+      expect.objectContaining({ timestamp: completedAt })
+    );
+    expect(mocks.connection).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          id: "tenant_uuid_1",
+          clerk_org_id: scope.clerkOrgId,
+          id: scope.connectionId,
+          organisation_id: scope.organisationId,
         }),
       })
     );
-    for (const [query] of mocks.findFirst.mock.calls) {
-      expect(query.where.xero_connection_id).toBe("tenant_uuid_1");
-      expect(query.where.started_at).toEqual({ gte: tenantCreatedAt });
-    }
-    expect(mocks.capture).toHaveBeenCalledWith(
-      expect.objectContaining({
-        timestamp: new Date("2026-09-19T10:03:00.000Z"),
-      })
-    );
-  });
-});
-describe("checkXeroImportReadiness", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.connectionFindFirst.mockResolvedValue(null);
-    mocks.matchCount.mockResolvedValue(0);
-  });
-  it("reports ready with zero pending matches when all runs succeeded", async () => {
-    mocks.findFirst
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:00:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:02:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:01:00.000Z"),
-      });
-    const readiness = await checkXeroImportReadiness({
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-    });
-    expect(readiness.isInitialSyncCompleted).toBe(true);
-    expect(readiness.hasUnresolvedPeople).toBe(false);
-    expect(readiness.unresolvedPeopleCount).toBe(0);
-    expect(readiness.completedAt).toEqual(new Date("2026-09-19T00:02:00.000Z"));
-  });
-  it("reports pending people matches separately from sync completion", async () => {
-    mocks.findFirst
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:00:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:02:00.000Z"),
-      })
-      .mockResolvedValueOnce({
-        completed_at: new Date("2026-09-19T00:01:00.000Z"),
-      });
-    mocks.matchCount.mockResolvedValue(3);
-    const readiness = await checkXeroImportReadiness({
-      clerkOrgId: "org_1",
-      organisationId: "11111111-1111-4111-8111-111111111111",
-    });
-    expect(readiness.isInitialSyncCompleted).toBe(true);
-    expect(readiness.hasUnresolvedPeople).toBe(true);
-    expect(readiness.unresolvedPeopleCount).toBe(3);
   });
 });

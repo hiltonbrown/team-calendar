@@ -69,6 +69,8 @@ export type {
   XeroLeaveRecordsFetchResult,
 } from "../read/leave-records";
 export async function fetchEmployees(input: {
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
   xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<XeroEmployeesFetchResult>> {
   const tokenResult = resolveAccessToken(input.xeroConnection);
@@ -91,6 +93,7 @@ export async function fetchEmployees(input: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
             "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
+            ...modificationHeaders(input),
           },
           method: "GET",
         },
@@ -180,6 +183,8 @@ export async function fetchEmployees(input: {
 }
 export async function fetchLeaveRecords(input: {
   maxPages?: number;
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
   xeroConnection: XeroAccessContext;
 }): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
   const tokenResult = resolveAccessToken(input.xeroConnection);
@@ -210,6 +215,7 @@ export async function fetchLeaveRecords(input: {
             Accept: "application/json",
             Authorization: `Bearer ${decryptedAccessToken}`,
             "Xero-Tenant-Id": input.xeroConnection.xero_tenant_id,
+            ...modificationHeaders(input),
           },
           method: "GET",
         },
@@ -510,4 +516,20 @@ function resolveAccessToken(xeroConnection: XeroAccessContext):
     };
   }
   return { ok: true, token: xeroConnection.accessToken };
+}
+
+const UTC_SECONDS_SUFFIX = /\.\d{3}Z$/;
+
+function modificationHeaders(input: {
+  mode?: "full" | "incremental";
+  modifiedSince?: Date | null;
+}): Record<string, string> {
+  if (input.mode !== "incremental" || !input.modifiedSince) {
+    return {};
+  }
+  return {
+    "If-Modified-Since": new Date(input.modifiedSince.getTime() - 120_000)
+      .toISOString()
+      .replace(UTC_SECONDS_SUFFIX, "Z"),
+  };
 }

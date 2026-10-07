@@ -10,7 +10,9 @@ import type {
 import { xeroRecoveryMessage } from "@repo/core";
 import {
   database,
+  getSubmitOperation,
   hasUnresolvedSubmitOperation,
+  type OutboundOperationAttemptScope,
   scopedTo as scoped,
 } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
@@ -38,6 +40,11 @@ import {
   createLeaveOnApproval,
   type SubmitServiceError,
 } from "../plans/submit-service";
+import {
+  completeXeroWriteSideEffects,
+  prepareXeroWrite as prepareJournaledWrite,
+  recordXeroWriteOutcome,
+} from "../plans/write-operation";
 import { isXeroLeaveType } from "../records/record-type-categories";
 import { managerScopePersonIds } from "../settings/manager-scope";
 import { getSettings } from "../settings/organisation-settings-service";
@@ -878,6 +885,7 @@ async function dispatchXeroSyncInternal(
   }
   return { ok: true, value: { queued: true } };
 }
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep durable journal fencing beside the synchronous provider and local approval transitions.
 async function performApproval(
   input: CommandInput,
   externalWritePort: ExternalWritePort,
@@ -895,6 +903,7 @@ async function performApproval(
   let failureStage: ApprovalFailureStage = "prepare";
   let xeroWriteSucceeded = false;
   let claimedAt: Date | null = null;
+  let journalAttempt: OutboundOperationAttemptScope | null = null;
   try {
     const prepared = await prepareApprovalWrite(
       parsed.data,
@@ -911,6 +920,9 @@ async function performApproval(
       return prepared;
     }
     const { record, xeroEmployeeId } = prepared.value;
+    if (prepared.value.completed) {
+      return { ok: true, value: await toApprovalListItem(record) };
+    }
     const xeroLeaveApplicationId = record.source_remote_id;
     if (!xeroLeaveApplicationId) {
       return await approveLocalRequest(
@@ -919,25 +931,83 @@ async function performApproval(
         options.retry
       );
     }
-    claimedAt = await acquireXeroWriteClaim({
-      ...parsed.data,
-      expectedFailedAction: options.retry ? "approve" : null,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
-    });
+    const journal = await prepareJournaledWrite(
+      {
+        action: "approve",
+        actorUserId: parsed.data.actingUserId,
+        ...parsed.data,
+        employeeId: xeroEmployeeId,
+        endsAt: record.ends_at,
+        expectedFailedAction: options.retry ? "approve" : null,
+        expectedSequence: record.derived_sequence,
+        expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+        remoteId: xeroLeaveApplicationId,
+        startsAt: record.starts_at,
+        title: null,
+        units: 0,
+      },
+      externalWritePort
+    );
+    if (!journal.ok) {
+      return {
+        error: {
+          code: "xero_write_failed",
+          message: journal.error.userMessage,
+          xeroError: journal.error,
+        },
+        ok: false,
+      };
+    }
+    journalAttempt = {
+      action: "approve",
+      attemptGeneration: journal.value.attemptGeneration,
+      availabilityRecordId: record.id,
+      clerkOrgId: parsed.data.clerkOrgId,
+      organisationId: parsed.data.organisationId,
+    };
+    ({ claimedAt } = journal.value);
     if (!claimedAt) {
       return invalidState(
         options.retry ? "invalid_state_for_retry" : "invalid_state_for_approve"
       );
     }
     const ownerClaim = claimedAt;
+    const originalApproverId =
+      journal.value.actorUserId === parsed.data.actingUserId
+        ? parsed.data.actingPersonId
+        : ((
+            await database.person.findFirst({
+              select: { id: true },
+              where: {
+                archived_at: null,
+                clerk_org_id: parsed.data.clerkOrgId,
+                clerk_user_id: journal.value.actorUserId,
+                organisation_id: parsed.data.organisationId,
+              },
+            })
+          )?.id ?? null);
     failureStage = "xero_write";
-    const response = await externalWritePort.approveLeaveApplication({
-      clerkOrgId: parsed.data.clerkOrgId,
-      employeeId: xeroEmployeeId,
-      organisationId: parsed.data.organisationId,
-      remoteId: xeroLeaveApplicationId,
-    });
+    const response = journal.value.providerAccepted
+      ? { ok: true as const, value: undefined }
+      : await externalWritePort.approveLeaveApplication({
+          clerkOrgId: parsed.data.clerkOrgId,
+          employeeId: xeroEmployeeId,
+          mutation: journal.value.mutation,
+          organisationId: parsed.data.organisationId,
+          remoteId: xeroLeaveApplicationId,
+        });
+    if (
+      !journal.value.providerAccepted &&
+      journalAttempt &&
+      !(await recordXeroWriteOutcome(
+        journalAttempt,
+        response,
+        xeroLeaveApplicationId ?? undefined,
+        journal.value.replayedUnknown
+      ))
+    ) {
+      throw new Error("Xero journal outcome changed.");
+    }
     if (!response.ok) {
       failureStage = "local_transaction";
       return await persistApprovalFailure({
@@ -957,10 +1027,10 @@ async function performApproval(
         data: {
           approval_status: "approved",
           approved_at: now,
-          approved_by_person_id: parsed.data.actingPersonId,
+          approved_by_person_id: originalApproverId,
           derived_sequence: { increment: 1 },
           failed_action: null,
-          updated_by_user_id: parsed.data.actingUserId,
+          updated_by_user_id: journal.value.actorUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
@@ -971,24 +1041,47 @@ async function performApproval(
         throw new OptimisticConflictError();
       }
       await tx.auditEvent.create({
-        data: auditData(parsed.data, options.successAuditAction, {
-          xeroLeaveApplicationId,
-        }),
+        data: auditData(
+          { ...parsed.data, actingUserId: journal.value.actorUserId },
+          options.successAuditAction,
+          {
+            xeroLeaveApplicationId,
+          }
+        ),
       });
     });
     claimedAt = null;
     failureStage = "notification";
-    await notifyApprovalBestEffort(parsed.data, record, {
-      actionUrl: `/plans?recordId=${record.id}`,
-      type: "leave_approved",
-    });
+    if (
+      !(await completeXeroWriteSideEffects({
+        actorUserId: journal.value.actorUserId,
+        attempt: journalAttempt,
+        clerkOrgId: parsed.data.clerkOrgId,
+        manager: record.person.manager?.clerk_user_id
+          ? {
+              clerkUserId: record.person.manager.clerk_user_id,
+              personId: record.person.manager.id,
+            }
+          : null,
+        organisationId: parsed.data.organisationId,
+        recipient: record.person.clerk_user_id
+          ? {
+              clerkUserId: record.person.clerk_user_id,
+              personId: record.person.id,
+            }
+          : null,
+        recordId: record.id,
+      }))
+    ) {
+      return unknownError(
+        "The Xero action is saved. Its calendar or notification update requires administrator recovery."
+      );
+    }
     failureStage = "reload";
     const updated = await loadRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
     }
-    failureStage = "publication";
-    await materialiseApprovalPublication(parsed.data);
     failureStage = "projection";
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
@@ -1024,6 +1117,7 @@ async function performDecline(
   let failureStage: ApprovalFailureStage = "prepare";
   let xeroWriteSucceeded = false;
   let claimedAt: Date | null = null;
+  let journalAttempt: OutboundOperationAttemptScope | null = null;
   try {
     const prepared = await prepareApprovalWrite(input, externalWritePort, {
       expectedFailedAction: options.retry ? "decline" : null,
@@ -1037,6 +1131,9 @@ async function performDecline(
       return prepared;
     }
     const { record, xeroEmployeeId } = prepared.value;
+    if (prepared.value.completed) {
+      return { ok: true, value: await toApprovalListItem(record) };
+    }
     const xeroLeaveApplicationId = record.source_remote_id;
     if (
       !xeroLeaveApplicationId &&
@@ -1047,27 +1144,101 @@ async function performDecline(
         message: "This record does not have a Xero leave application ID.",
       });
     }
-    claimedAt = await acquireXeroWriteClaim({
-      ...input,
-      expectedFailedAction: options.retry ? "decline" : null,
-      expectedSequence: record.derived_sequence,
-      expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
-      localAction: xeroLeaveApplicationId ? undefined : "decline",
-    });
+    const journal = xeroLeaveApplicationId
+      ? await prepareJournaledWrite(
+          {
+            action: "decline",
+            actorUserId: input.actingUserId,
+            ...input,
+            employeeId: xeroEmployeeId,
+            endsAt: record.ends_at,
+            expectedFailedAction: options.retry ? "decline" : null,
+            expectedSequence: record.derived_sequence,
+            expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+            reason: options.reason,
+            remoteId: xeroLeaveApplicationId,
+            startsAt: record.starts_at,
+            title: null,
+            units: 0,
+          },
+          externalWritePort
+        )
+      : null;
+    if (journal && !journal.ok) {
+      return {
+        error: {
+          code: "xero_write_failed",
+          message: journal.error.userMessage,
+          xeroError: journal.error,
+        },
+        ok: false,
+      };
+    }
+    if (journal?.ok) {
+      journalAttempt = {
+        action: "decline",
+        attemptGeneration: journal.value.attemptGeneration,
+        availabilityRecordId: record.id,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+      };
+    }
+    claimedAt = journal?.ok
+      ? journal.value.claimedAt
+      : await acquireXeroWriteClaim({
+          ...input,
+          expectedFailedAction: options.retry ? "decline" : null,
+          expectedSequence: record.derived_sequence,
+          expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+          localAction: "decline",
+        });
     if (!claimedAt) {
       return invalidState(
         options.retry ? "invalid_state_for_retry" : "invalid_state_for_decline"
       );
     }
     const ownerClaim = claimedAt;
+    const originalActorUserId = journal?.ok
+      ? journal.value.actorUserId
+      : input.actingUserId;
+    const originalApproverId =
+      originalActorUserId === input.actingUserId
+        ? input.actingPersonId
+        : ((
+            await database.person.findFirst({
+              select: { id: true },
+              where: {
+                archived_at: null,
+                clerk_org_id: input.clerkOrgId,
+                clerk_user_id: originalActorUserId,
+                organisation_id: input.organisationId,
+              },
+            })
+          )?.id ?? null);
     failureStage = "xero_write";
-    const response = await declineRemoteIfPresent(
-      input,
-      externalWritePort,
-      xeroEmployeeId,
-      xeroLeaveApplicationId,
-      options.reason
-    );
+    const response =
+      journal?.ok && journal.value.providerAccepted
+        ? { ok: true as const, value: undefined }
+        : await declineRemoteIfPresent(
+            input,
+            externalWritePort,
+            xeroEmployeeId,
+            xeroLeaveApplicationId,
+            options.reason,
+            journal?.ok ? journal.value.mutation : undefined
+          );
+    if (
+      !(journal?.ok && journal.value.providerAccepted) &&
+      journalAttempt &&
+      !(await recordXeroWriteOutcome(
+        journalAttempt,
+        response,
+        xeroLeaveApplicationId ?? undefined,
+        journal?.ok ? journal.value.replayedUnknown : false
+      ))
+    ) {
+      throw new Error("Xero journal outcome changed.");
+    }
     if (!response.ok) {
       failureStage = "local_transaction";
       return await persistApprovalFailure({
@@ -1086,13 +1257,15 @@ async function performDecline(
     await database.$transaction(async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
-          approval_note: options.reason,
+          approval_note: journal?.ok
+            ? (journal.value.requestReason ?? options.reason)
+            : options.reason,
           approval_status: "declined",
           approved_at: now,
-          approved_by_person_id: input.actingPersonId,
+          approved_by_person_id: originalApproverId,
           derived_sequence: { increment: 1 },
           failed_action: null,
-          updated_by_user_id: input.actingUserId,
+          updated_by_user_id: originalActorUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
           xero_write_error_raw: Prisma.DbNull,
@@ -1103,26 +1276,58 @@ async function performDecline(
         throw new OptimisticConflictError();
       }
       await tx.auditEvent.create({
-        data: auditData(input, options.successAuditAction, {
-          reasonLength: options.reason.length,
-          xeroLeaveApplicationId,
-        }),
+        data: auditData(
+          { ...input, actingUserId: originalActorUserId },
+          options.successAuditAction,
+          {
+            reasonLength: options.reason.length,
+            xeroLeaveApplicationId,
+          }
+        ),
       });
     });
     claimedAt = null;
     failureStage = "notification";
-    await notifyApprovalBestEffort(input, record, {
-      actionUrl: `/plans?recordId=${record.id}`,
-      payload: { body: options.reason },
-      type: "leave_declined",
-    });
+    if (journal?.ok && journalAttempt) {
+      if (
+        !(await completeXeroWriteSideEffects({
+          actorUserId: journal.value.actorUserId,
+          attempt: journalAttempt,
+          clerkOrgId: input.clerkOrgId,
+          declineReason: journal.value.requestReason,
+          manager: record.person.manager?.clerk_user_id
+            ? {
+                clerkUserId: record.person.manager.clerk_user_id,
+                personId: record.person.manager.id,
+              }
+            : null,
+          organisationId: input.organisationId,
+          recipient: record.person.clerk_user_id
+            ? {
+                clerkUserId: record.person.clerk_user_id,
+                personId: record.person.id,
+              }
+            : null,
+          recordId: record.id,
+        }))
+      ) {
+        return unknownError(
+          "The Xero action is saved. Its calendar or notification update requires administrator recovery."
+        );
+      }
+    } else {
+      await notifyApprovalBestEffort(input, record, {
+        actionUrl: `/plans?recordId=${record.id}`,
+        payload: { body: options.reason },
+        type: "leave_declined",
+      });
+      await materialiseApprovalPublication(input);
+    }
     failureStage = "reload";
     const updated = await loadRecord(input);
     if (!updated) {
       return recordNotFound();
     }
-    failureStage = "publication";
-    await materialiseApprovalPublication(input);
     failureStage = "projection";
     return { ok: true, value: await toApprovalListItem(updated) };
   } catch (error) {
@@ -1161,6 +1366,7 @@ async function prepareApprovalWrite(
     {
       record: LoadedApprovalRecord;
       xeroEmployeeId: string;
+      completed?: boolean;
     },
     ApprovalServiceError
   >
@@ -1170,6 +1376,21 @@ async function prepareApprovalWrite(
     return authorised;
   }
   const record = authorised.value;
+  const action = options.localDecline ? "decline" : "approve";
+  if (
+    record.approval_status ===
+      (action === "approve" ? "approved" : "declined") &&
+    (
+      await getSubmitOperation({
+        action,
+        availabilityRecordId: record.id,
+        clerkOrgId: input.clerkOrgId,
+        organisationId: input.organisationId,
+      })
+    )?.status === "completed"
+  ) {
+    return { ok: true, value: { completed: true, record, xeroEmployeeId: "" } };
+  }
   if (
     record.approval_status !== options.expectedStatus ||
     (options.expectedFailedAction &&
@@ -1192,7 +1413,8 @@ async function prepareApprovalWrite(
       clerkOrgId: input.clerkOrgId,
       organisationId: input.organisationId,
     })) &&
-    (options.localDecline || !canResumeUndispatchedApproval(record))
+    !record.source_remote_id &&
+    (options.localDecline || !canResumeJournaledApproval(record))
   ) {
     return {
       error: {
@@ -1210,29 +1432,7 @@ async function prepareApprovalWrite(
   ) {
     return { ok: true, value: { record, xeroEmployeeId: "" } };
   }
-  if (
-    record.source_type === "team_calendar_leave" &&
-    record.source_remote_id &&
-    record.approval_status === "submitted"
-  ) {
-    return {
-      error: {
-        code: "invalid_state_for_approve",
-        message:
-          "This earlier submission already exists in Xero. An administrator must review its current payroll status before another approval action.",
-      },
-      ok: false,
-    };
-  }
-  if (
-    !record.source_remote_id &&
-    record.source_type !== "team_calendar_leave"
-  ) {
-    return resolutionBlocked({
-      code: "missing_mapping",
-      message: "This record does not have a Xero leave application ID.",
-    });
-  }
+
   const xeroStateResult = await getXeroConnectionStateForScope(input);
   if (!xeroStateResult.ok) {
     return {
@@ -1653,7 +1853,7 @@ async function loadBalanceSnapshot(
     unit: balance.balance_unit,
   };
 }
-function canResumeUndispatchedApproval(record: LoadedApprovalRecord): boolean {
+function canResumeJournaledApproval(record: LoadedApprovalRecord): boolean {
   const operations = record.outbound_operations;
   const operation = operations?.[0];
   return (
@@ -1661,15 +1861,22 @@ function canResumeUndispatchedApproval(record: LoadedApprovalRecord): boolean {
     !record.source_remote_id &&
     operations?.length === 1 &&
     operation?.action === "approve" &&
-    operation.status === "prepared" &&
-    operation.dispatch_started_at === null &&
+    ((operation.status === "prepared" &&
+      operation.dispatch_started_at === null) ||
+      (operation.status === "outcome_unknown" &&
+        !!operation.idempotency_replay_before &&
+        Date.now() < operation.idempotency_replay_before.getTime())) &&
     (!record.xero_write_claimed_at ||
       record.xero_write_claimed_at.getTime() <
         Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
   );
 }
 function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
-  if (canResumeUndispatchedApproval(record)) {
+  const replayActions = remoteReplayActions(record);
+  if (replayActions) {
+    return replayActions;
+  }
+  if (canResumeJournaledApproval(record)) {
     if (record.approval_status === "submitted") {
       return ["approve"];
     }
@@ -1681,12 +1888,7 @@ function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
     }
     return ["view_only"];
   }
-  if (
-    record.outbound_operations?.length ||
-    (record.source_type === "team_calendar_leave" &&
-      record.source_remote_id &&
-      record.approval_status === "submitted")
-  ) {
+  if (record.outbound_operations?.length) {
     return ["view_only"];
   }
   switch (record.approval_status) {
@@ -1709,19 +1911,15 @@ function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
   }
 }
 function mutedNoteForRecord(record: LoadedApprovalRecord): string | null {
-  if (canResumeUndispatchedApproval(record)) {
-    return "The previous approval stopped before contacting Xero. A manager can retry approval.";
+  if (canResumeJournaledApproval(record)) {
+    return record.outbound_operations?.[0]?.dispatch_started_at
+      ? "A manager can safely retry this approval during its recorded Xero retry window."
+      : "The previous approval stopped before contacting Xero. A manager can retry approval.";
   }
   if (record.outbound_operations?.length) {
     return "An administrator must resolve the uncertain Xero action in Plans before another action can be attempted.";
   }
-  if (
-    record.source_type === "team_calendar_leave" &&
-    record.source_remote_id &&
-    record.approval_status === "submitted"
-  ) {
-    return "This earlier submission requires administrator review of its current Xero status.";
-  }
+
   if (
     record.approval_status === "xero_sync_failed" &&
     (record.failed_action === "submit" || record.failed_action === "withdraw")
@@ -2179,9 +2377,14 @@ function toJsonValue(value: unknown): JsonValue {
 }
 const recordInclude = {
   outbound_operations: {
-    select: { action: true, dispatch_started_at: true, status: true },
+    select: {
+      action: true,
+      dispatch_started_at: true,
+      idempotency_replay_before: true,
+      status: true,
+    },
     where: {
-      action: { in: ["submit", "approve"] },
+      action: { in: ["approve", "decline", "withdraw"] },
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },
   },
@@ -2225,9 +2428,14 @@ const approvalRecordSelect = {
   notes_internal: true,
   organisation_id: true,
   outbound_operations: {
-    select: { action: true, dispatch_started_at: true, status: true },
+    select: {
+      action: true,
+      dispatch_started_at: true,
+      idempotency_replay_before: true,
+      status: true,
+    },
     where: {
-      action: { in: ["submit", "approve"] },
+      action: { in: ["approve", "decline", "withdraw"] },
       status: { in: ["prepared", "outcome_unknown", "provider_accepted"] },
     },
   },
@@ -2297,7 +2505,8 @@ async function declineRemoteIfPresent(
   port: ExternalWritePort,
   employeeId: string,
   remoteId: string | null,
-  reason: string
+  reason: string,
+  mutation?: import("@repo/core").XeroMutationIdentity
 ) {
   if (!remoteId) {
     return { ok: true as const, value: undefined };
@@ -2305,8 +2514,37 @@ async function declineRemoteIfPresent(
   return await port.declineLeaveApplication({
     clerkOrgId: input.clerkOrgId,
     employeeId,
+    mutation,
     organisationId: input.organisationId,
     reason,
     remoteId,
   });
+}
+
+function remoteReplayActions(
+  record: LoadedApprovalRecord
+): ApprovalAction[] | null {
+  const operation = record.outbound_operations?.[0];
+  if (
+    record.source_remote_id &&
+    record.outbound_operations?.length === 1 &&
+    operation?.status === "outcome_unknown" &&
+    operation.idempotency_replay_before &&
+    Date.now() < operation.idempotency_replay_before.getTime() &&
+    !record.xero_write_claimed_at
+  ) {
+    if (record.approval_status === "submitted") {
+      return [operation.action === "approve" ? "approve" : "decline"];
+    }
+    if (record.approval_status === "xero_sync_failed") {
+      if (operation.action === "approve") {
+        return ["retry_approval"];
+      }
+      if (operation.action === "decline") {
+        return ["retry_decline"];
+      }
+      return ["view_only"];
+    }
+  }
+  return null;
 }

@@ -620,11 +620,20 @@ describe("canonical OAuth persistence", () => {
     await connection();
     const intentionalPause = new Date("2026-09-01");
     await database.xeroConnection.update({
-      data: { sync_paused_at: intentionalPause },
+      data: {
+        balance_next_person_id: allocation.id("balance-person"),
+        balance_sweep_failed: true,
+        initial_sync_completed_at: intentionalPause,
+        initial_sync_requested_at: intentionalPause,
+        leave_next_person_id: allocation.id("leave-person"),
+        leave_sweep_failed: true,
+        sync_paused_at: intentionalPause,
+      },
       where: { id: fixture.connectionId },
     });
     await selection();
     stubPayroll();
+    const reconnectStartedAt = new Date();
     expect(await select()).toMatchObject({
       ok: true,
       value: { connectionId: fixture.connectionId },
@@ -634,11 +643,24 @@ describe("canonical OAuth persistence", () => {
         where: { id: fixture.connectionId },
       })
     ).toMatchObject({
+      balance_next_person_id: null,
+      balance_sweep_failed: false,
+      initial_sync_completed_at: null,
+      initial_sync_requested_at: expect.any(Date),
+      leave_next_person_id: null,
+      leave_sweep_failed: false,
       remote_connection_id: fixture.remoteId,
       sync_paused_at: intentionalPause,
       xero_authorisation_id: fixture.authorisationId,
       xero_tenant_id: fixture.externalId,
     });
+    expect(
+      (
+        await database.xeroConnection.findUniqueOrThrow({
+          where: { id: fixture.connectionId },
+        })
+      ).initial_sync_requested_at?.getTime()
+    ).toBeGreaterThanOrEqual(reconnectStartedAt.getTime());
   });
 
   it("rejects selection when disconnect commits after inventory validation", async () => {
@@ -777,6 +799,138 @@ describe("canonical OAuth persistence", () => {
       ).status
     ).toBe("selecting");
   });
+  it.each([false, true])(
+    "cleans an empty-inventory callback grant while preserving sibling usage: %s",
+    async (hasSibling) => {
+      if (hasSibling) {
+        await connection();
+      } else {
+        await grant();
+      }
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url) =>
+          String(url).endsWith("/connect/token")
+            ? tokenResponse()
+            : Response.json([])
+        )
+      );
+      const started = await service.buildXeroOAuthStartUrl({
+        clerkOrgId: fixture.clerkOrgId,
+        userId: "user_integration_1",
+      });
+      if (!started.ok) {
+        throw new Error("Expected protected OAuth start");
+      }
+      expect(
+        await service.completeXeroOAuth({
+          authenticatedClerkOrgId: fixture.clerkOrgId,
+          authenticatedUserId: "user_integration_1",
+          code: "owned-code",
+          nonce: started.value.nonce,
+          state:
+            new URL(started.value.redirectUrl).searchParams.get("state") ?? "",
+        })
+      ).toMatchObject({ error: { code: "tenant_not_found" }, ok: false });
+      const closed = await database.xeroOAuthSession.findFirstOrThrow({
+        where: { clerk_org_id: fixture.clerkOrgId, status: "cancelled" },
+      });
+      expect(closed.xero_authorisation_id).toBe(fixture.authorisationId);
+      await service.purgeClosedXeroOAuthSessions();
+      expect(
+        await database.xeroAuthorisation.count({
+          where: { id: fixture.authorisationId },
+        })
+      ).toBe(hasSibling ? 1 : 0);
+    }
+  );
+
+  it.each([false, true])(
+    "prunes a replaced authoriser only when no sibling still uses it: %s",
+    async (hasSibling) => {
+      await connection();
+      await database.xeroAuthorisation.update({
+        data: { access_token_expires_at: new Date(Date.now() + 1_800_000) },
+        where: { id: fixture.authorisationId },
+      });
+      if (hasSibling) {
+        await organisation(secondary);
+        await database.xeroConnection.create({
+          data: {
+            clerk_org_id: secondary.clerkOrgId,
+            organisation_id: secondary.organisationId,
+            payroll_region: "AU",
+            remote_connection_id: allocation.id("remote", 1),
+            xero_authorisation_id: fixture.authorisationId,
+            xero_tenant_id: allocation.id("external", 1),
+          },
+        });
+      }
+      const replacement = await grant(
+        new Date(Date.now() + 1_800_000),
+        ownedGrants[1]
+      );
+      await database.xeroAuthorisation.update({
+        data: tokens("replacement-access", "replacement-refresh"),
+        where: { id: replacement.id },
+      });
+      await selection();
+      const replacementRemote = allocation.id("replacement-remote");
+      await database.xeroOAuthSession.update({
+        data: {
+          available_tenants_json: {
+            tenants: [
+              {
+                connectionId: replacementRemote,
+                tenantId: fixture.externalId,
+                tenantName: "Payroll",
+              },
+            ],
+          },
+          xero_authorisation_id: replacement.id,
+        },
+        where: { id: fixture.sessionId },
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn((url, init) => {
+          if (String(url).endsWith("/connections")) {
+            return Promise.resolve(
+              Response.json(
+                new Headers(init?.headers).get("Authorization") ===
+                  "Bearer replacement-access"
+                  ? [
+                      {
+                        id: replacementRemote,
+                        tenantId: fixture.externalId,
+                        tenantName: "Payroll",
+                        tenantType: "ORGANISATION",
+                      },
+                    ]
+                  : []
+              )
+            );
+          }
+          return Promise.resolve(
+            Response.json({ Organisations: [{ CountryCode: "AU" }] })
+          );
+        })
+      );
+      expect(await select()).toMatchObject({ ok: true });
+      await service.purgeClosedXeroOAuthSessions();
+      expect(
+        await database.xeroAuthorisation.count({
+          where: { id: fixture.authorisationId },
+        })
+      ).toBe(hasSibling ? 1 : 0);
+      expect(
+        await database.xeroConnection.findUniqueOrThrow({
+          where: { id: fixture.connectionId },
+        })
+      ).toMatchObject({ xero_authorisation_id: replacement.id });
+    }
+  );
+
   it("deletes expired and terminal sessions while retaining a live selection reference", async () => {
     await organisation();
     await selection();

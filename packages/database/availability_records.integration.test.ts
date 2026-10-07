@@ -292,6 +292,20 @@ describe("availability_records", () => {
       expectedFailedAction: null,
       expectedSequence: record.derived_sequence,
       expectedStatus: "submitted" as const,
+      request: {
+        body: JSON.stringify([
+          {
+            EmployeeID: "fixture_employee",
+            EndDate: record.ends_at.toISOString().slice(0, 10),
+            LeaveTypeID: "fixture_leave_type",
+            StartDate: record.starts_at.toISOString().slice(0, 10),
+            Title: "Annual leave",
+          },
+        ]),
+        method: "POST" as const,
+        url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+        xeroTenantId: "fixture_xero_tenant",
+      },
       requestEmployeeId: "fixture_employee",
       requestEndsAt: record.ends_at,
       requestFingerprint: "fixture_immutable_request",
@@ -330,9 +344,61 @@ describe("availability_records", () => {
         organisation_id: tenantA.organisationId,
       },
     });
+    const dispatched = await getSubmitOperation(scope);
+    const replay = await prepareAndClaimSubmitOperation({
+      ...request,
+      actorUserId: "second_manager",
+    });
+    expect(replay).toMatchObject({
+      actorUserId: "fixture_manager",
+      attemptGeneration: 2,
+      mutation: {
+        firstDispatchedAt: dispatched?.idempotency_first_dispatched_at,
+        idempotencyKey: dispatched?.idempotency_key,
+        replayBefore: dispatched?.idempotency_replay_before,
+      },
+      replayedUnknown: true,
+    });
+    expect(await getSubmitOperation(scope)).toMatchObject({
+      attempt_generation: 2,
+      status: "outcome_unknown",
+    });
+    expect(
+      await markSubmitDispatchStarted(
+        { ...scope, attemptGeneration: 2 },
+        replay?.mutation
+      )
+    ).toBe(true);
+    await database.availabilityRecord.updateMany({
+      data: { xero_write_claimed_at: null },
+      where: {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: record.id,
+        organisation_id: tenantA.organisationId,
+      },
+    });
+    expect(
+      await prepareAndClaimSubmitOperation({
+        ...request,
+        request: { ...request.request, xeroTenantId: "different_tenant" },
+      })
+    ).toBeNull();
+    await database.outboundOperation.updateMany({
+      data: { idempotency_replay_before: new Date(Date.now() - 1) },
+      where: {
+        ...{
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+        },
+        action: "approve",
+        availability_record_id: record.id,
+      },
+    });
     expect(await prepareAndClaimSubmitOperation(request)).toBeNull();
     expect(await getSubmitOperation(scope)).toMatchObject({
-      attempt_generation: 1,
+      actor_user_id: "fixture_manager",
+      attempt_generation: 2,
+      idempotency_key: dispatched?.idempotency_key,
       status: "outcome_unknown",
     });
   });

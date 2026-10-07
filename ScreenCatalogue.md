@@ -85,7 +85,7 @@ Status definitions: `Matches`, `Drifted` (exists but differs from catalogue), `U
 | S-25 | Sync health | `/sync` | Drifted | All 4 sync dispatch buttons now wired (was 2/4); Records-failed count now colour-differentiated; failure/partial-success card logic more nuanced than previously described. |
 | S-26 | Sync run detail | `/sync/[runId]` | Drifted | "Re-run sync" enabled for every run type; Records-failed stat cell colour-differentiated; undocumented Cancel/Timeline controls found. |
 | S-27 | Settings: Members | `/settings/members` | Matches | No drift found. |
-| S-28 | Settings: Xero connect | `/settings/integrations/xero/connect` | Matches | No drift on documented behaviour; found an undocumented connect-vs-reconnect audit distinction and a redundant duplicate initial sync (inline + queued). |
+| S-28 | Settings: Xero connect | `/settings/integrations/xero/connect` | Matches | Reconciled 7 October: connect/reconnect audit distinction, one persisted queued full initial import and request-timestamp completion check. Live import NOT VERIFIED. |
 | S-29 | Settings: Xero person matches | `/settings/integrations/xero/matches` | Matches | No drift; Clerk-ID field is placeholder+fallback rather than a literal pre-filled value, functionally equivalent. |
 | S-30 | Settings: Getting started | `/settings/getting-started` | Matches | No drift; derived-state logic, step set, and badge labels all verified exactly. |
 | E-01 | Empty state | Component | Matches | No drift. |
@@ -682,7 +682,7 @@ sidebar width on small screens.
 
 **Purpose:** Xero OAuth management and per-tenant sync configuration, one card per payroll Organisation.
 
-**User interactions, as-built:** Per-org card: connection and paused-state badges, plain-language error banner, payroll region text and a four-stat sync-timestamp grid. The oldest or never-run sync is promoted as the one recommended action. Other manual sync types live under a native disclosure. Audited pause/resume and both disconnect modes live under a separate Connection controls disclosure. Disconnect opens `ConfirmActionDialog`, previews soft versus destructive consequences, requires the exact organisation name and prevents duplicate submission while pending.
+**User interactions, as-built:** Per-org card: connection and paused-state badges, plain-language error banner, payroll region text and a four-stat sync-timestamp grid. The oldest or never-run sync is promoted as the one recommended action. Other manual sync types live under a native disclosure. Audited pause/resume and both disconnect modes live under a separate Connection controls disclosure. Disconnect opens `ConfirmActionDialog`, previews soft versus destructive consequences, requires the exact organisation name and prevents duplicate submission while pending. Both modes delete the selected remote connection first; 204/404 permits scoped local teardown and audit, while uncertain/provider failure retains retryable state. Soft disconnect retains imported history; purge archives imported entries and removes imported balances/mappings, preserving manual data and stable calendar identities. Other connections sharing the grant remain intact. Manual sync requests a full reconciliation; pause affects scheduled imports, while dormant grant maintenance continues. Live provider journeys remain NOT VERIFIED.
 
 **Design requirements:** Routine health and one recommended sync remain primary; manual and high-risk connection controls use progressive disclosure. Destructive purge keeps explicit destructive emphasis inside its confirmation flow.
 
@@ -772,6 +772,8 @@ sidebar width on small screens.
 
 **User interactions, as-built:** Per-tenant summary cards: name, payroll-region badge, connection status dot, a four-cell "last synced" grid. **All four manual dispatch buttons are now wired**: `people`, `leave_records`, `leave_balances`, and `approval_state_reconciliation` are all registered handlers; this is a fix since the last pass (previously only two of four were registered). Buttons are disabled only when a sync of that type is currently running or the connection is inactive. Run history table's Records column **now colour-differentiates**: failed counts render with `font-medium text-destructive` when greater than zero. Failure-surfacing logic is more nuanced than previously documented: a current-failure card, a distinct partial-success banner, and a plain historical-failures paragraph are three separate, mutually-adjusted states driven by current failed runs, pending failed records, and current partial-success runs in combination. The CTA in both failure states reads "Review affected runs", not "N pending failures" as previously documented.
 
+**Sync semantics, reconciled 7 October:** Manual people/leave sync requests a full reconciliation. Scheduled AU people/leave reads use provider-watermark deltas with a two-minute overlap every 15 minutes on weekdays 07:00 to 18:59 local and hourly otherwise; one nightly full reconciliation runs during 01:00 to 02:59 local. Scheduled provider balances use rolling hourly roster pages. Run details and initial-import completion reflect actual persisted full/delta completeness, not dispatch acknowledgement. Live journeys remain NOT VERIFIED.
+
 **Design requirements:** `ConnectionDot` is still a static element with no pulse animation. Three other `animate-pulse` usages remain, unrelated to the connection dot (header avatar skeleton, a "Running" text pill, and the running-status badge shared with S-26).
 
 **`[v5 proposal]` interaction improvements:**
@@ -823,7 +825,7 @@ sidebar width on small screens.
 
 **Purpose:** OAuth callback and tenant/organisation attachment step, reached via a session parameter after `apps/api`'s OAuth start endpoint.
 
-**User interactions, as-built:** "Select a Xero tenant" list. "Attach to an existing payroll organisation" or "Create the first payroll organisation" when none exist. "Complete connection" writes a distinct audit event depending on whether this is a fresh connect or a reconnect of an existing `XeroConnection` (previously undocumented), and fires a best-effort initial inline sync for people/leave records/leave balances, wrapped so a sync error never fails the connection. **New finding:** immediately after, the action also dispatches the same three run types through the manual-sync queue: since all three are now registered handlers (see S-25), the initial sync effectively runs twice, once inline and once queued. Idempotent per the jobs rules, so not incorrect, but redundant work worth a follow-up decision on whether to drop one path.
+**User interactions, as-built:** "Select a Xero tenant" list. "Attach to an existing payroll organisation" or "Create the first payroll organisation" when none exist. "Complete connection" writes a distinct audit event depending on whether this is a fresh connect or a reconnect of an existing `XeroConnection` (previously undocumented), and persists one queued initial full-import request. The job imports people, leave records and the entire balance roster in order. Scheduler recovery redispatches a pending request; completion requires its `requestedAt` to match the persisted request timestamp. A reconnect preserves records and feeds while requesting full reconciliation. Live completion remains NOT VERIFIED.
 
 ---
 
@@ -957,7 +959,7 @@ Numbered independently of the change table above for cross-reference clarity.
 
 5. **Should `/settings/billing`'s owner-only restriction be implemented to match the dashboard widget's actual behaviour, or should the unused `isOwner`/`actingRole` computation be deleted?** Dead server-side plumbing computes a distinction the page's rendering ignores entirely.
 
-6. **Should the redundant duplicate initial sync on Xero connect (`/settings/integrations/xero/connect`) be simplified to just the inline call or just the queued dispatch, now that both paths work?** Not incorrect (idempotent), but wasteful.
+6. **Initial Xero import is resolved by the approved simplification:** one persisted queued full import, with scheduler recovery and request-timestamp completion checks. Live import remains NOT VERIFIED.
 
 ---
 

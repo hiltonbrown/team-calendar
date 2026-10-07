@@ -92,11 +92,14 @@ export type {
   ApproveLeaveInput,
   DeclineLeaveInput,
   ExternalWritePort,
+  PrepareLeaveMutationInput,
   ProviderLeaveCandidate,
+  ProviderMutationRequest,
   ProviderResolutionError,
   ProviderWriteError,
   SubmitLeaveInput,
   WithdrawLeaveInput,
+  XeroMutationIdentity,
 } from "./src/ports/external-write-port";
 export type {
   ExecuteRedisRestCommandInput,

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Result } from "@repo/core";
+import { ensureXeroInitialSyncRequested } from "@repo/database/queries/xero-sync-cursors";
 import { z } from "zod";
 import { inngest } from "./client";
 export const syncEventNames = {
@@ -18,6 +19,7 @@ const registeredHandlers = new Set<RegisteredSyncRunType>([
 const SyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   connectionId: z.string().uuid(),
+  mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
   runId: z.string().uuid().optional(),
@@ -113,6 +115,7 @@ export async function dispatchSyncEvent(
       data: {
         clerkOrgId: string;
         organisationId: string;
+        mode?: "full" | "incremental";
         personId?: string;
         runId: string;
         triggeredByUserId: string | null;
@@ -125,6 +128,15 @@ export async function dispatchSyncEvent(
         clerkOrgId: parsed.data.clerkOrgId,
         connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
+        ...(["people", "leave_records"].includes(parsed.data.runType)
+          ? {
+              mode:
+                parsed.data.mode ??
+                (parsed.data.triggerType === "scheduled"
+                  ? ("incremental" as const)
+                  : ("full" as const)),
+            }
+          : {}),
         personId: parsed.data.personId,
         runId,
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
@@ -188,13 +200,17 @@ export async function dispatchCancelSyncRun(
   }
 }
 export const initialXeroSyncEventName = "initial-xero-sync";
-export function getInitialSyncEventId(connectionId: string): string {
-  return `initial-sync:${connectionId}`;
+export function getInitialSyncEventId(
+  connectionId: string,
+  requestedAt: string
+): string {
+  return `initial-sync:${connectionId}:${requestedAt}`;
 }
 const InitialXeroSyncEventSchema = z.object({
   clerkOrgId: z.string().min(1),
   connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
+  requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
@@ -228,13 +244,28 @@ export async function dispatchInitialXeroSync(
     };
   }
   try {
+    const requestedAt = await ensureXeroInitialSyncRequested(parsed.data);
+    if (
+      !requestedAt ||
+      (parsed.data.requestedAt && parsed.data.requestedAt !== requestedAt)
+    ) {
+      return {
+        error: {
+          code: "dispatch_failed",
+          message: "The initial Xero import request is no longer active.",
+        },
+        ok: false,
+      };
+    }
     const eventId =
-      options?.eventId ?? getInitialSyncEventId(parsed.data.connectionId);
+      options?.eventId ??
+      getInitialSyncEventId(parsed.data.connectionId, requestedAt);
     const payload = {
       data: {
         clerkOrgId: parsed.data.clerkOrgId,
         connectionId: parsed.data.connectionId,
         organisationId: parsed.data.organisationId,
+        requestedAt,
         runId: parsed.data.runId ?? randomUUID(),
         triggeredByUserId: parsed.data.triggeredByUserId ?? null,
         triggerType: parsed.data.triggerType,

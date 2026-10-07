@@ -212,8 +212,9 @@ export type availability_failed_action = (typeof availability_failed_action)[key
 
 
 export const outbound_operation_action = {
-  submit: 'submit',
-  approve: 'approve'
+  approve: 'approve',
+  decline: 'decline',
+  withdraw: 'withdraw'
 } as const
 
 export type outbound_operation_action = (typeof outbound_operation_action)[keyof typeof outbound_operation_action]

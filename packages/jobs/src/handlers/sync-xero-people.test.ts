@@ -20,6 +20,9 @@ const mocks = vi.hoisted(() => ({
   toPlainLanguageMessage: vi.fn(() => "Xero request failed"),
   xeroConnectionFindFirst: vi.fn(),
   xeroConnectionUpdateMany: vi.fn(),
+  xeroSyncCursorCreateMany: vi.fn(),
+  xeroSyncCursorFindFirst: vi.fn(),
+  xeroSyncCursorUpdateMany: vi.fn(),
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
@@ -45,6 +48,11 @@ vi.mock("@repo/database", () => ({
     xeroConnection: {
       findFirst: mocks.xeroConnectionFindFirst,
       updateMany: mocks.xeroConnectionUpdateMany,
+    },
+    xeroSyncCursor: {
+      createMany: mocks.xeroSyncCursorCreateMany,
+      findFirst: mocks.xeroSyncCursorFindFirst,
+      updateMany: mocks.xeroSyncCursorUpdateMany,
     },
   },
   scopedTo: mocks.scopedTo,
@@ -128,6 +136,9 @@ describe("syncXeroPeople unit tests", () => {
     mocks.personUpdateMany.mockResolvedValue({ count: 0 });
     mocks.personUpsert.mockResolvedValue({ id: "person_1" });
     mocks.xeroConnectionUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorFindFirst.mockResolvedValue(null);
+    mocks.xeroSyncCursorCreateMany.mockResolvedValue({ count: 1 });
+    mocks.xeroSyncCursorUpdateMany.mockResolvedValue({ count: 1 });
   });
   it("rejects invalid input schema with validation_error", async () => {
     const result = await syncXeroPeople({

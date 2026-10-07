@@ -137,6 +137,29 @@ function providerPort(
   return {
     approveLeaveApplication: vi.fn(fail),
     declineLeaveApplication: vi.fn(fail),
+    prepareLeaveMutation: vi.fn(async (input) => ({
+      ok: true as const,
+      value: {
+        body:
+          input.action === "create"
+            ? JSON.stringify([
+                {
+                  EmployeeID: input.employeeId,
+                  EndDate: input.endsAt?.toISOString().slice(0, 10),
+                  LeaveTypeID: input.leaveTypeId,
+                  StartDate: input.startsAt?.toISOString().slice(0, 10),
+                  Title: input.title,
+                },
+              ])
+            : null,
+        method: "POST" as const,
+        url:
+          input.action === "create"
+            ? "https://api.xero.com/payroll.xro/1.0/LeaveApplications"
+            : `https://api.xero.com/payroll.xro/1.0/LeaveApplications/${input.remoteId}/${input.action === "approve" ? "approve" : "reject"}`,
+        xeroTenantId: `xero-${input.clerkOrgId}`,
+      },
+    })),
     resolveEmployeeId: vi.fn(async () => ({
       ok: true as const,
       value: "employee",
@@ -255,12 +278,8 @@ describe("canonical disconnect isolation", () => {
         data: { status },
         where: { id: tenantA.connectionId },
       });
-      const { decline } = await import(
-        "../../../availability/src/approvals/approval-service"
-      );
-      const { withdrawSubmission } = await import(
-        "../../../availability/src/plans/submit-service"
-      );
+      const { decline } = await import("@repo/availability");
+      const { withdrawSubmission } = await import("@repo/availability");
       const port = providerPort();
       const command = {
         actingPersonId: null,
@@ -318,12 +337,8 @@ describe("canonical disconnect isolation", () => {
         },
         where: { id: tenantA.availabilityRecordId },
       });
-      const { approve, decline } = await import(
-        "../../../availability/src/approvals/approval-service"
-      );
-      const { withdrawSubmission } = await import(
-        "../../../availability/src/plans/submit-service"
-      );
+      const { approve, decline } = await import("@repo/availability");
+      const { withdrawSubmission } = await import("@repo/availability");
       const port = providerPort(certainty);
       const command = {
         actingPersonId: null,
@@ -509,9 +524,7 @@ describe("canonical disconnect isolation", () => {
         title: "Manual WFH",
       },
     });
-    const { establishFeedRepresentation } = await import(
-      "../../../feeds/src/publication/feed-representation"
-    );
+    const { establishFeedRepresentation } = await import("@repo/feeds");
     const feedScope = {
       clerkOrgId: tenantA.clerkOrgId,
       feedId: tenantA.feedId,
@@ -636,9 +649,7 @@ describe("canonical disconnect isolation", () => {
     );
     const stopping = disconnect();
     await deleting;
-    const { acquireXeroWriteClaim } = await import(
-      "../../../availability/src/xero-write-claim"
-    );
+    const { acquireXeroWriteClaim } = await import("@repo/availability");
     const claiming = acquireXeroWriteClaim({
       clerkOrgId: tenantA.clerkOrgId,
       expectedSequence: 0,
@@ -681,9 +692,7 @@ describe("canonical disconnect isolation", () => {
     );
     const stopping = disconnect();
     await deleting;
-    const { prepareAndClaimSubmitOperation } = await import(
-      "../../../database/src/queries/outbound-operations"
-    );
+    const { prepareAndClaimSubmitOperation } = await import("@repo/database");
     const preparing = prepareAndClaimSubmitOperation({
       action: "approve",
       actorUserId: "admin_1",
@@ -694,6 +703,12 @@ describe("canonical disconnect isolation", () => {
       expectedSequence: 0,
       expectedStatus: "submitted",
       organisationId: tenantA.organisationId,
+      request: {
+        body: "[]",
+        method: "POST",
+        url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+        xeroTenantId: `xero-${tenantA.clerkOrgId}`,
+      },
       requestEmployeeId: "employee",
       requestEndsAt: new Date(),
       requestFingerprint: "race",

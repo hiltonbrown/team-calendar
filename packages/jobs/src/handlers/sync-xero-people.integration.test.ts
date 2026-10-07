@@ -165,6 +165,7 @@ describe("local persistence integration", () => {
     await database.syncRun.deleteMany({ where: scope });
     await database.xeroPersonMatch.deleteMany({ where: scope });
     await database.person.deleteMany({ where: scope });
+    await database.xeroSyncCursor.deleteMany({ where: scope });
     await database.xeroConnection.deleteMany({ where: scope });
     await database.xeroAuthorisation.deleteMany({
       where: { xero_user_id: { in: testAuthorisationIds } },

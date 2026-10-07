@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  request: vi.fn(async () => "2026-10-07T12:00:00.000Z"),
   send: vi.fn(async () => ({ ids: ["event_1"] })),
+}));
+vi.mock("@repo/database/queries/xero-sync-cursors", () => ({
+  ensureXeroInitialSyncRequested: mocks.request,
 }));
 vi.mock("./client", () => ({
   inngest: {
@@ -142,8 +146,13 @@ describe("jobs events", () => {
         queued: true,
       },
     });
-    expect(getInitialSyncEventId("00000000-0000-4000-8000-000000000010")).toBe(
-      "initial-sync:00000000-0000-4000-8000-000000000010"
+    expect(
+      getInitialSyncEventId(
+        "00000000-0000-4000-8000-000000000010",
+        "2026-10-07T12:00:00.000Z"
+      )
+    ).toBe(
+      "initial-sync:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z"
     );
     expect(mocks.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -155,7 +164,7 @@ describe("jobs events", () => {
           triggeredByUserId: "user_1",
           triggerType: "manual",
         }),
-        id: "initial-sync:00000000-0000-4000-8000-000000000010",
+        id: "initial-sync:00000000-0000-4000-8000-000000000010:2026-10-07T12:00:00.000Z",
         name: "initial-xero-sync",
       })
     );

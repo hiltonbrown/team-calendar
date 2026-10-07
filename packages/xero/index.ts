@@ -29,7 +29,6 @@ export {
   type XeroOAuthError,
 } from "./src/oauth/service";
 export {
-  initialiseXeroRateNamespace,
   type XeroRateClass,
   xeroRateKeys,
 } from "./src/rate-limit/shared-store";

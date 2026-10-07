@@ -175,6 +175,9 @@ describe("scheduleXeroSyncs Coordinator", () => {
             connectionId: baseTenant.connectionId,
             organisationId: baseTenant.organisationId,
             runType,
+            ...(runType === "people" || runType === "leave_records"
+              ? { mode: "incremental" }
+              : {}),
             triggerType: "scheduled",
           },
           {
@@ -310,4 +313,42 @@ describe("scheduleXeroSyncs Coordinator", () => {
       expect(coordinators).toHaveLength(1);
     });
   });
+});
+
+it("dispatches distinct nightly full traversal and normal incremental modes", async () => {
+  const tenant = {
+    clerkOrgId: "org_1",
+    connectionId: "connection",
+    connectionStatus: "active",
+    disconnectedAt: null,
+    lastApprovalStateReconciledAt: new Date("2026-10-07T01:00:00Z"),
+    lastFullLeaveRecordsSyncAt: new Date("2026-10-06T01:00:00Z"),
+    lastFullPeopleSyncAt: new Date("2026-10-06T01:00:00Z"),
+    lastLeaveBalancesSyncAt: new Date("2026-10-07T01:00:00Z"),
+    lastLeaveRecordsSyncAt: null,
+    lastPeopleSyncAt: null,
+    organisationId: "organisation",
+    payrollRegion: "AU" as const,
+    syncPausedAt: null,
+    timezone: "UTC",
+  };
+  mocks.listSchedulableXeroConnections.mockResolvedValue({
+    ok: true,
+    value: { connections: [tenant] },
+  });
+  mocks.dispatchSyncEvent.mockResolvedValue({
+    ok: true,
+    value: { queued: true },
+  });
+  await scheduleXeroSyncsPage({ now: new Date("2026-10-07T01:15:00Z") });
+  expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith(
+    expect.objectContaining({ mode: "full", runType: "people" }),
+    expect.anything()
+  );
+  mocks.dispatchSyncEvent.mockClear();
+  await scheduleXeroSyncsPage({ now: new Date("2026-10-07T12:00:00Z") });
+  expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith(
+    expect.objectContaining({ mode: "incremental", runType: "people" }),
+    expect.anything()
+  );
 });

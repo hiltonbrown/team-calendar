@@ -14,12 +14,12 @@ const scope = {
 };
 const importScope = {
   ...scope,
-  campaignStartedAt: now,
   expectedRunIds: [
     "00000000-0000-4000-8000-000000000003",
     "00000000-0000-4000-8000-000000000004",
     "00000000-0000-4000-8000-000000000005",
   ],
+  verificationStartedAt: now,
 };
 function raw() {
   return {

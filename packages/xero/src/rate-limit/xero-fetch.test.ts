@@ -466,7 +466,6 @@ it("reports operation expiry before admission infrastructure failure", async () 
   vi.useFakeTimers();
   try {
     const store = new RedisSharedXeroRateStore({
-      epoch: "test",
       fetchImpl: () =>
         new Promise(() => {
           /* Unresponsive transport. */
@@ -477,6 +476,7 @@ it("reports operation expiry before admission infrastructure failure", async () 
         callsPerMinutePerOrg: 10,
         concurrentRequestsPerOrg: 5,
       },
+      namespace: "test",
       token: "test",
       url: "https://invalid.example",
     });
@@ -589,36 +589,6 @@ it("normalises pre-aborted signals as definite non-attempts", async () => {
   expect(fetchImpl).not.toHaveBeenCalled();
 });
 describe("transport lifecycle metrics", () => {
-  it("fails domain mismatch before provider dispatch without reporting a store outage", async () => {
-    const store = new MemorySharedXeroRateStore({
-      expectedCredentialDomainId: "11111111-1111-4111-8111-111111111111",
-      limits: {
-        appCallsPerMinute: 100,
-        callsPerDayPerOrg: 1000,
-        callsPerMinutePerOrg: 60,
-        concurrentRequestsPerOrg: 5,
-      },
-      observedCredentialDomainId: "22222222-2222-4222-8222-222222222222",
-    });
-    const limiter = new XeroRateLimiter({ maxWaitMs: 0 }, { store });
-    const fetchImpl = vi.fn();
-    await expect(
-      xeroFetch(
-        { rateClass, url: "https://api.xero.com/x" },
-        { fetchImpl, limiter }
-      )
-    ).rejects.toMatchObject({
-      code: "admission_unavailable",
-      dispatched: false,
-    });
-    expect(fetchImpl).not.toHaveBeenCalled();
-    expect(metricLog).toHaveBeenCalledExactlyOnceWith("Xero lifecycle metric", {
-      class: "tenant",
-      metric: "xero.admission.denied",
-      reason: "credential_domain_mismatch",
-      value: 1,
-    });
-  });
   it.each([false, true])(
     "records a definite deadline failure even when metric logging throws: %s",
     async (loggerFails) => {
@@ -648,4 +618,152 @@ describe("transport lifecycle metrics", () => {
       );
     }
   );
+});
+
+describe("recorded mutation replay", () => {
+  function mutation() {
+    const now = Date.now();
+    return {
+      firstDispatchedAt: new Date(now - 1000),
+      idempotencyKey: "3890e6b4-47d0-40b9-ad47-c802f92c836a",
+      replayBefore: new Date(now + 299_000),
+      request: {
+        body: "[]",
+        method: "POST" as const,
+        url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+        xeroTenantId: "org-a",
+      },
+    };
+  }
+  function input(identity = mutation()) {
+    return {
+      init: {
+        body: "[]",
+        headers: {
+          "Idempotency-Key": identity.idempotencyKey,
+          "Xero-Tenant-Id": "org-a",
+        },
+        method: "POST",
+      },
+      mutation: identity,
+      rateClass,
+      url: identity.request.url,
+    };
+  }
+  it("freezes the original request across retries", async () => {
+    const request = input();
+    const fetchImpl = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        request.init.body = "changed";
+        request.init.headers["Idempotency-Key"] = "changed";
+        return Promise.reject(new TypeError("response lost"));
+      })
+      .mockResolvedValueOnce(new Response("{}"));
+    await xeroFetch(request, {
+      fetchImpl,
+      limiter: permissiveLimiter(),
+      sleep: () => Promise.resolve(),
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchImpl.mock.calls) {
+      expect(init.body).toBe("[]");
+      expect(new Headers(init.headers).get("Idempotency-Key")).toBe(
+        request.mutation.idempotencyKey
+      );
+    }
+  });
+  it("rejects a missing key before dispatch", async () => {
+    const request = input();
+    const headers = new Headers(request.init.headers);
+    headers.delete("Idempotency-Key");
+    const missingKeyRequest = {
+      ...request,
+      init: { ...request.init, headers },
+    };
+    const fetchImpl = vi.fn();
+    await expect(
+      xeroFetch(missingKeyRequest, { fetchImpl, limiter: permissiveLimiter() })
+    ).rejects.toMatchObject({ dispatched: false });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it("does not sleep into an expired replay window", async () => {
+    const identity = mutation();
+    identity.replayBefore = new Date(Date.now() + 100);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(new Response("cached failure", { status: 500 }));
+    const sleep = vi.fn();
+    const response = await xeroFetch(input(identity), {
+      fetchImpl,
+      limiter: permissiveLimiter(),
+      sleep,
+    });
+    expect(response.status).toBe(500);
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+it("logs only safe endpoint diagnostics for a sensitive payroll retry", async () => {
+  const fetchImpl = vi
+    .fn()
+    .mockResolvedValueOnce(
+      new Response("sensitive payroll body", {
+        headers: { "x-correlation-id": "correlation-1" },
+        status: 503,
+      })
+    )
+    .mockResolvedValueOnce(
+      new Response("{}", {
+        headers: { "xero-correlation-id": "correlation-2" },
+      })
+    );
+  await xeroFetch(
+    {
+      init: { headers: { Authorization: "Bearer sensitive-token" } },
+      rateClass,
+      url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications?code=sensitive-code&state=sensitive-state",
+    },
+    { fetchImpl, limiter: permissiveLimiter(), sleep: () => Promise.resolve() }
+  );
+  expect(metricLog).toHaveBeenCalledWith("xero.http.response", {
+    correlationId: "correlation-1",
+    endpoint: "/payroll.xro/1.0/LeaveApplications",
+    method: "GET",
+    retryDelayMs: 500,
+    status: 503,
+  });
+  expect(metricLog).toHaveBeenCalledWith("xero.http.response", {
+    correlationId: "correlation-2",
+    endpoint: "/payroll.xro/1.0/LeaveApplications",
+    method: "GET",
+    retryDelayMs: 0,
+    status: 200,
+  });
+  const logs = JSON.stringify(metricLog.mock.calls);
+  for (const secret of [
+    "sensitive-token",
+    "sensitive-code",
+    "sensitive-state",
+    "sensitive payroll body",
+  ]) {
+    expect(logs).not.toContain(secret);
+  }
+});
+
+it("never retries an ambiguous unsupported mutation without recorded identity", async () => {
+  const fetchImpl = vi
+    .fn()
+    .mockResolvedValue(new Response("", { status: 503 }));
+  const response = await xeroFetch(
+    {
+      init: { body: "[]", method: "POST" },
+      rateClass,
+      url: "https://api.xero.com/payroll.xro/1.0/LeaveApplications",
+    },
+    { fetchImpl, limiter: permissiveLimiter(), sleep: () => Promise.resolve() }
+  );
+  expect(response.status).toBe(503);
+  expect(fetchImpl).toHaveBeenCalledOnce();
 });

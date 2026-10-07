@@ -90,6 +90,112 @@ describe("local persistence integration", async () => {
       await cleanTestData();
       await database.$disconnect();
     });
+    it("persists all 81 initial roster balances in three pages before completion", async () => {
+      await setupTenant(tenantA);
+      const requestedAt = new Date("2026-10-07T12:00:00Z");
+      await database.xeroConnection.update({
+        data: { initial_sync_requested_at: requestedAt },
+        where: { id: tenantA.connectionId },
+      });
+      const people = Array.from({ length: 81 }, (_, i) => ({
+        ...tenantA,
+        personId: fixture.id("initial-person", i),
+        xeroEmployeeId: fixture.id("initial-employee", i),
+      }));
+      await database.person.createMany({
+        data: people.map((person) => ({
+          clerk_org_id: person.clerkOrgId,
+          email: `${person.personId}@example.com`,
+          employment_type: "employee",
+          first_name: "Owned",
+          id: person.personId,
+          last_name: "Employee",
+          organisation_id: person.organisationId,
+          source_person_key: person.xeroEmployeeId,
+          source_system: "XERO",
+          xero_employee_id: person.xeroEmployeeId,
+        })),
+      });
+      const byId = new Map(
+        people.map((person) => [person.xeroEmployeeId, person])
+      );
+      mockFetchLeaveBalancesForRegion.mockImplementation(
+        async (_region: string, request: { employeeIds: string[] }) => ({
+          ok: true,
+          value: {
+            failures: [],
+            leaveBalances: request.employeeIds.map((id) =>
+              xeroBalance(byId.get(id) ?? tenantA, 76)
+            ),
+            rawResponses: [],
+          },
+        })
+      );
+      const pages: number[] = [];
+      let hasMore = true;
+      while (hasMore) {
+        const result = await syncXeroLeaveBalances({
+          ...syncInput(tenantA),
+          requestedAt: requestedAt.toISOString(),
+        });
+        expect(result.ok).toBe(true);
+        if (!result.ok) {
+          throw new Error("Initial balance page failed");
+        }
+        expect(result.value.status).toBe("succeeded");
+        pages.push(result.value.upserted);
+        hasMore = result.value.hasMore === true;
+      }
+      expect(pages).toEqual([40, 40, 1]);
+      expect(
+        await database.leaveBalance.count({
+          where: {
+            clerk_org_id: tenantA.clerkOrgId,
+            organisation_id: tenantA.organisationId,
+          },
+        })
+      ).toBe(81);
+      const { completeXeroInitialSync } = await import(
+        "@repo/database/queries/xero-sync-cursors"
+      );
+      expect(
+        await completeXeroInitialSync({
+          ...syncInput(tenantA),
+          requestedAt: requestedAt.toISOString(),
+        })
+      ).toBeInstanceOf(Date);
+    });
+    it("fences old external file and old initial request before database persistence", async () => {
+      await setupTenant(tenantA);
+      const { withXeroBinding } = await import("./xero-sync-access");
+      await expect(
+        withXeroBinding(
+          { ...syncInput(tenantA), expectedXeroTenantId: "foreign-file" },
+          async (tx) =>
+            tx.xeroConnection.updateMany({
+              data: { balance_sweep_failed: true },
+              where: { id: tenantA.connectionId },
+            })
+        )
+      ).rejects.toThrow("connection_changed");
+      await database.xeroConnection.update({
+        data: { initial_sync_requested_at: new Date("2026-10-07T12:01:00Z") },
+        where: { id: tenantA.connectionId },
+      });
+      await expect(
+        withXeroBinding(
+          { ...syncInput(tenantA), requestedAt: "2026-10-07T12:00:00.000Z" },
+          async () => undefined
+        )
+      ).rejects.toThrow("connection_changed");
+      expect(
+        (
+          await database.xeroConnection.findUnique({
+            where: { id: tenantA.connectionId },
+          })
+        )?.balance_sweep_failed
+      ).toBe(false);
+    });
     it("syncs AU leave balances idempotently by person, tenant, and leave type", async () => {
       await setupTenant(tenantA);
       await setupPerson(tenantA);
@@ -272,6 +378,79 @@ describe("local persistence integration", async () => {
       expect(failedRecords[0]).toMatchObject({
         error_code: "not_found_error",
         source_id: "99999999-9999-4999-8999-999999999999",
+      });
+    });
+    it("retains a failed first page through a clean final page and clears health only after a clean new sweep", async () => {
+      await setupTenant(tenantA);
+      const people = Array.from({ length: 41 }, (_, i) => ({
+        clerk_org_id: tenantA.clerkOrgId,
+        email: `failed-sweep-${i}@example.com`,
+        employment_type: "employee" as const,
+        first_name: "Employee",
+        id: `71000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+        last_name: String(i),
+        organisation_id: tenantA.organisationId,
+        source_person_key: `failed-sweep-${i}`,
+        source_system: "XERO" as const,
+        xero_employee_id: `71000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+      }));
+      await database.person.createMany({ data: people });
+      let page = 0;
+      mockFetchLeaveBalancesForRegion.mockImplementation(
+        (_region, request: { employeeIds: string[] }) => {
+          const hasFailure = page === 0;
+          page += 1;
+          const successfulIds = hasFailure
+            ? request.employeeIds.slice(1)
+            : request.employeeIds;
+          return Promise.resolve({
+            ok: true,
+            value: {
+              failures: hasFailure
+                ? [
+                    {
+                      employeeId: request.employeeIds[0],
+                      error: {
+                        code: "employee_not_active",
+                        message: "Employee unavailable",
+                      },
+                    },
+                  ]
+                : [],
+              leaveBalances: successfulIds.map((employeeId) => ({
+                ...xeroBalance(tenantA, 38),
+                employeeId,
+              })),
+              rawResponses: [],
+            },
+          });
+        }
+      );
+      const input = {
+        ...syncInput(tenantA),
+        triggerType: "scheduled" as const,
+      };
+      const first = await syncXeroLeaveBalances(input);
+      expect(first.ok && first.value.status).toBe("partial_success");
+      const final = await syncXeroLeaveBalances(input);
+      expect(final.ok && final.value.status).toBe("partial_success");
+      const where = {
+        clerk_org_id: tenantA.clerkOrgId,
+        id: tenantA.connectionId,
+        organisation_id: tenantA.organisationId,
+      };
+      const failedSweep = await database.xeroConnection.findFirst({ where });
+      expect(failedSweep).toMatchObject({
+        balance_next_person_id: null,
+        balance_sweep_failed: true,
+      });
+      expect(failedSweep?.leave_balances_stale_since).toBeInstanceOf(Date);
+      await syncXeroLeaveBalances(input);
+      await syncXeroLeaveBalances(input);
+      expect(await database.xeroConnection.findFirst({ where })).toMatchObject({
+        balance_next_person_id: null,
+        balance_sweep_failed: false,
+        leave_balances_stale_since: null,
       });
     });
     it("pages scheduled balance sync across runs with cursor and stale_since lifecycle", async () => {

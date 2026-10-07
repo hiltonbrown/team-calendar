@@ -158,6 +158,8 @@ beforeEach(async () => {
       data: {
         clerk_org_id: tenant.clerkOrgId,
         id: tenant.connectionId,
+        initial_sync_completed_at: new Date("2026-10-06T00:10:00Z"),
+        initial_sync_requested_at: new Date("2026-10-06T00:00:00Z"),
         last_connected_at: new Date("2026-10-06T00:00:00Z"),
         organisation_id: tenant.organisationId,
         payroll_region: "AU",

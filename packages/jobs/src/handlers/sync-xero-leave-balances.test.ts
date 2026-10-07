@@ -141,7 +141,13 @@ describe("leave balances sync run lifecycle", () => {
       $transaction: vi.fn(async (callback) => callback(database)),
     });
     mocks.syncRunCreate.mockResolvedValue({ id: RUN_ID });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+      )
+    );
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
     mocks.xeroConnectionUpdateMany.mockResolvedValue({ count: 1 });
     mockConnection({
@@ -497,7 +503,9 @@ describe("leave balances sync run lifecycle", () => {
     // Roster continuation stored with 40th person's ID
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: people[39]?.id },
+        data: expect.objectContaining({
+          balance_next_person_id: people[39]?.id,
+        }),
         where: expect.objectContaining({
           balance_next_person_id: null,
           clerk_org_id: CLERK_ORG_ID,
@@ -563,7 +571,9 @@ describe("leave balances sync run lifecycle", () => {
     // CAS cursor update
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: people[39]?.id },
+        data: expect.objectContaining({
+          balance_next_person_id: people[39]?.id,
+        }),
         where: expect.objectContaining({
           balance_next_person_id: cursorPersonId,
           clerk_org_id: CLERK_ORG_ID,
@@ -577,6 +587,76 @@ describe("leave balances sync run lifecycle", () => {
       expect.objectContaining({
         data: expect.not.objectContaining({
           leave_balances_stale_since: null,
+        }),
+      })
+    );
+  });
+  it("does not commit roster progress after its run has been superseded", async () => {
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.syncRunFindFirst.mockImplementation((args) =>
+      Promise.resolve(
+        args.select?.status
+          ? { cancel_requested_at: null, status: "failed" }
+          : null
+      )
+    );
+    const result = await syncXeroLeaveBalances(input());
+    expect(result.ok && result.value.status).toBe("cancelled");
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(([call]) =>
+        Object.hasOwn(call.data, "balance_next_person_id")
+      )
+    ).toBe(false);
+  });
+  it("cannot clear a newer failed sweep after its final-page cursor commit", async () => {
+    mockConnection({
+      balance_next_person_id: "50000000-0000-4000-8000-000000000040",
+      balance_sweep_failed: false,
+      leave_balances_stale_since: new Date("2026-10-06T00:00:00Z"),
+    });
+    mocks.personFindMany.mockResolvedValue([]);
+    const newerFailure = new Date("2026-10-07T12:01:00Z");
+    let persistedStaleness: Date | null = null;
+    mocks.xeroConnectionUpdateMany.mockImplementation((call) => {
+      if (Object.hasOwn(call.data, "leave_balances_stale_since")) {
+        persistedStaleness = call.data.leave_balances_stale_since;
+      }
+      if (Object.hasOwn(call.data, "balance_next_person_id")) {
+        // Interpose the next sweep immediately after this page's atomic commit.
+        persistedStaleness = newerFailure;
+        mockConnection({
+          balance_next_person_id: "50000000-0000-4000-8000-000000000080",
+          balance_sweep_failed: true,
+          leave_balances_stale_since: newerFailure,
+        });
+      }
+      return Promise.resolve({ count: 1 });
+    });
+    await syncXeroLeaveBalances(input());
+    expect(persistedStaleness).toEqual(newerFailure);
+  });
+  it("keeps whole-roster staleness after a failed earlier page and a clean final page", async () => {
+    mockConnection({
+      balance_next_person_id: "50000000-0000-4000-8000-000000000040",
+      balance_sweep_failed: true,
+      leave_balances_stale_since: new Date("2026-10-06T00:00:00Z"),
+    });
+    mocks.personFindMany.mockResolvedValue([]);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: { failures: [], leaveBalances: [], rawResponses: [] },
+    });
+    await syncXeroLeaveBalances(input());
+    expect(
+      mocks.xeroConnectionUpdateMany.mock.calls.some(
+        ([call]) => call.data.leave_balances_stale_since === null
+      )
+    ).toBe(false);
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          balance_next_person_id: null,
+          balance_sweep_failed: true,
         }),
       })
     );
@@ -607,7 +687,7 @@ describe("leave balances sync run lifecycle", () => {
     // Cursor cleared to null
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: null },
+        data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
           balance_next_person_id: cursorPersonId,
           clerk_org_id: CLERK_ORG_ID,
@@ -646,7 +726,7 @@ describe("leave balances sync run lifecycle", () => {
     expect(result.ok).toBe(true);
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: null },
+        data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
           balance_next_person_id: cursorPersonId,
           clerk_org_id: CLERK_ORG_ID,
@@ -904,7 +984,9 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: people[39]?.id },
+        data: expect.objectContaining({
+          balance_next_person_id: people[39]?.id,
+        }),
         where: expect.objectContaining({
           balance_next_person_id: null,
           clerk_org_id: CLERK_ORG_ID,
@@ -970,7 +1052,9 @@ describe("leave balances sync run lifecycle", () => {
     );
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: people[39]?.id },
+        data: expect.objectContaining({
+          balance_next_person_id: people[39]?.id,
+        }),
         where: expect.objectContaining({
           balance_next_person_id: null,
           clerk_org_id: CLERK_ORG_ID,
@@ -1095,7 +1179,7 @@ describe("leave balances sync run lifecycle", () => {
     // Even with 3 balances for 1 person on a 1-person final page, cursor is updated to null (isLastPage)
     expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { balance_next_person_id: null },
+        data: expect.objectContaining({ balance_next_person_id: null }),
         where: expect.objectContaining({
           balance_next_person_id: null,
           clerk_org_id: CLERK_ORG_ID,

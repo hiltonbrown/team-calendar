@@ -24,7 +24,7 @@ export type RateLimitAcquireResult =
   | { ok: false; reason: RateLimitDeniedReason }
   | { ok: true; release: () => Promise<void> };
 
-// Plan 161e: atomic admission shared by deployments, per external Xero tenant.
+// Atomic admission shared by deployments, per external Xero tenant.
 export class XeroRateLimiter {
   private readonly store: SharedXeroRateStore;
   private readonly now: () => number;
@@ -117,12 +117,7 @@ export class XeroRateLimiter {
           ? remainingMs(options.deadline)
           : Number.POSITIVE_INFINITY
       );
-      if (
-        reason === "daily" ||
-        reason === "infrastructure" ||
-        reason === "credential_domain_mismatch" ||
-        left <= 0
-      ) {
+      if (reason === "daily" || reason === "infrastructure" || left <= 0) {
         return { ok: false, reason };
       }
       await this.sleep(Math.min(left, backoff * (0.75 + this.random() / 2)));

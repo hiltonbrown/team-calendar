@@ -302,7 +302,7 @@ Outbound writes are synchronous and user-triggered. The four write operations ar
 - **Decline**: manager declines with a required reason; local requests without a remote ID make no provider call, imported requested leave uses reject. Transition to `declined`.
 - **Withdraw**: employee or admin withdraws; local requests without a remote ID make no provider call, remote leave uses the supported provider operation. Transition to `withdrawn`.
 
-The approved AU transition contract is `au-contract-v1` in `plans/160-au-transition-contract-v1.md`. Approval creation has its own durable `approve` operation; uncertain creates require administrator recovery before retry. Preserve legacy remote-created submissions for scoped review without duplicate creation or fabricated approval history.
+The approved AU transition contract is `au-contract-v1` in `plans/160-au-transition-contract-v1.md`. Remote approve, decline and withdraw reuse `OutboundOperation` with a stable UUID idempotency key and exact tenant/method/URL/body identity. The replay cutoff is five minutes from first dispatch, inside Xero's six-minute retention. Uncertain outcomes after that cutoff require authoritative provider reads and administrator recovery; never mint a new key to retry an ambiguous write.
 
 Do not queue outbound writes as background jobs. Failures are surfaced inline to the user.
 
@@ -388,8 +388,12 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Raw Xero responses stored in `source_payload_json` on `availability_records` for audit.
 - Raw Xero write error payloads stored in `xero_write_error_raw` for admin audit only. A plain-language version is stored in `xero_write_error` for display. Never expose raw Xero error codes or payloads to employees.
 - Xero-specific types never leak into `packages/availability` or `packages/feeds`.
-- Rate limiting uses a shared, atomic store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. Admission fails closed when the store or its explicitly initialised namespace is unavailable.
-- Token refresh handled proactively before sync runs.
+- Rate limiting uses a shared, atomic store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. Ordinary quota keys initialise atomically on first use. App-wide admission also enforces 10,000 calls/minute; store failure denies admission.
+- Consent requests exactly `offline_access accounting.settings.read payroll.employees payroll.settings.read`; validate actual granted capabilities, accepting write permission for its corresponding reads.
+- Server-only scoped access refreshes within two minutes of expiry, serialises token rotation under the canonical authorisation lock and atomically saves both tokens. Dormant active grants, including paused connections, refresh at 45 days. Invalid grants require reconnect.
+- AU people and V2 leave deltas use completed provider watermarks with a two-minute overlap. Only complete successful full reads may archive absent Xero-owned rows. Manual and nightly reconciliation are full reads.
+- A single persisted initial full import sequences people, leave and the entire balance roster; completion requires the event `requestedAt` to match `initial_sync_requested_at`. Scheduler recovery redispatches pending imports.
+- Owner/admin disconnect deletes the exact remote connection before local teardown/audit; provider 204/404 permits completion, uncertain failure preserves retryable state and sibling connections.
 - All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
 - Resolve XeroConnection with both `clerk_org_id` and `organisation_id`, then its canonical authorisation.
 - Outbound writes return `Result<T, XeroWriteError>`. `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `permission_error`, `rate_limit_error`, `network_error`, `not_found_error`, `region_not_supported_error`, `unknown_error`.
@@ -416,7 +420,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`.
 - Inngest handles retries with exponential backoff for inbound sync failures.
 - Outbound write failures are not retried automatically; they are surfaced to the user.
-- Record-level inbound failures do not fail the entire sync run.
+- Record-level inbound failures are isolated and captured, but prevent traversal completeness, watermark advancement and absent-row archival.
 - All inbound upserts must be idempotent.
 - Jobs carry both `clerk_org_id` and `organisation_id` in their event payload. Never rely on session context inside a job handler.
 
@@ -473,8 +477,6 @@ Optional variables with format constraints must be absent (commented out), not `
 | `XERO_CLIENT_SECRET` | `packages/xero` | Xero OAuth app secret |
 | `XERO_TOKEN_ENCRYPTION_KEY` | `packages/xero` | AES-256-GCM key for encrypting Xero OAuth tokens at rest; must be 32 bytes, base64-encoded |
 | `XERO_APP_TIER` | `packages/xero` | Required production commercial allowance: Starter 1,000/day; Core and above 5,000/day |
-| `XERO_RATE_NAMESPACE_EPOCH` | `packages/xero` | Required shared namespace epoch; initialise conservatively before traffic |
-| `XERO_CREDENTIAL_DOMAIN_ID` | `packages/xero` | UUID identifying the canonical credential database; immutable per store epoch |
 | `XERO_REDIRECT_URI` | `packages/xero` | Registered HTTPS OAuth callback, required by production preflight |
 | `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` | `packages/xero` | Positive version for new envelopes; preserve referenced old keys |
 | `XERO_TOKEN_ENCRYPTION_KEYS_JSON` | `packages/xero` | Server-only versioned encryption key map, never print values |

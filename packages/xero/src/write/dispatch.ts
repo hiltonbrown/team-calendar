@@ -1,3 +1,4 @@
+import type { XeroMutationIdentity } from "@repo/core";
 import { executeWithXeroAuthRecovery } from "../adapter/auth-recovery";
 import {
   approveLeaveApplication as approveAuLeaveApplication,
@@ -34,10 +35,22 @@ export async function submitLeaveApplicationForRegion(
     xeroLeaveApplicationId: string;
   }>
 > {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroConnection,
+    frozenInput.xeroConnection,
     async (xeroConnection) => {
-      const nextInput = { ...input, xeroConnection };
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await submitAuLeaveApplication(nextInput);
@@ -60,10 +73,22 @@ export async function approveLeaveApplicationForRegion(
     rawResponse: unknown;
   }>
 > {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroConnection,
+    frozenInput.xeroConnection,
     async (xeroConnection) => {
-      const nextInput = { ...input, xeroConnection };
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await approveAuLeaveApplication(nextInput);
@@ -86,10 +111,22 @@ export async function declineLeaveApplicationForRegion(
     rawResponse: unknown;
   }>
 > {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroConnection,
+    frozenInput.xeroConnection,
     async (xeroConnection) => {
-      const nextInput = { ...input, xeroConnection };
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await declineAuLeaveApplication(nextInput);
@@ -112,10 +149,22 @@ export async function withdrawLeaveApplicationForRegion(
     rawResponse: unknown;
   }>
 > {
+  const mutationAttemptBudget = { remaining: 4 };
+  const frozenInput = {
+    ...input,
+    mutation: snapshotMutation(input.mutation),
+  };
   return await executeWithXeroAuthRecovery(
-    input.xeroConnection,
+    frozenInput.xeroConnection,
     async (xeroConnection) => {
-      const nextInput = { ...input, xeroConnection };
+      const nextInput = {
+        ...frozenInput,
+        xeroConnection: {
+          ...xeroConnection,
+          deadline: frozenInput.xeroConnection.deadline,
+          mutationAttemptBudget,
+        },
+      };
       switch (payrollRegion) {
         case "AU":
           return await withdrawAuLeaveApplication(nextInput);
@@ -138,4 +187,17 @@ function unsupportedRegion(): XeroWriteResult<never> {
     },
     ok: false,
   };
+}
+
+function snapshotMutation(
+  mutation?: XeroMutationIdentity
+): XeroMutationIdentity | undefined {
+  return mutation
+    ? {
+        firstDispatchedAt: new Date(mutation.firstDispatchedAt),
+        idempotencyKey: mutation.idempotencyKey,
+        replayBefore: new Date(mutation.replayBefore),
+        request: { ...mutation.request },
+      }
+    : undefined;
 }

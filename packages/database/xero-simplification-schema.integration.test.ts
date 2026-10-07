@@ -21,6 +21,47 @@ describe("simplified Xero persistence", () => {
     ]);
   });
 
+  test("persists write replay boundaries and whole-roster failure truth", async () => {
+    const columns = await database.$queryRaw<
+      Array<{ table_name: string; column_name: string }>
+    >`
+      SELECT table_name, column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND (
+        (table_name = 'outbound_operations' AND column_name IN (
+          'idempotency_key', 'request_xero_tenant_id', 'request_method', 'request_url',
+          'request_body_json', 'request_reason', 'idempotency_first_dispatched_at', 'idempotency_replay_before'))
+        OR (table_name = 'xero_connections' AND column_name IN (
+          'balance_sweep_failed', 'leave_sweep_failed')))
+      ORDER BY table_name, column_name`;
+    expect(columns).toEqual([
+      ...[
+        "idempotency_first_dispatched_at",
+        "idempotency_key",
+        "idempotency_replay_before",
+        "request_body_json",
+        "request_method",
+        "request_reason",
+        "request_url",
+        "request_xero_tenant_id",
+      ].map((column_name) => ({
+        column_name,
+        table_name: "outbound_operations",
+      })),
+      ...["balance_sweep_failed", "leave_sweep_failed"].map((column_name) => ({
+        column_name,
+        table_name: "xero_connections",
+      })),
+    ]);
+    const actions = await database.$queryRaw<Array<{ enumlabel: string }>>`
+      SELECT enumlabel FROM pg_enum JOIN pg_type ON pg_enum.enumtypid = pg_type.oid
+      WHERE typname = 'outbound_operation_action' ORDER BY enumlabel`;
+    expect(actions.map((row) => row.enumlabel)).toEqual([
+      "approve",
+      "decline",
+      "withdraw",
+    ]);
+  });
+
   test("stores one grant for two scoped connections", async () => {
     await database
       .$transaction(async (tx) => {

@@ -98,6 +98,42 @@ describe("AU employee reads", () => {
   afterEach(() => {
     restoreEncryptionKey();
   });
+  it("uses one UTC-seconds overlap filter across every AU employee page", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        employeeListResponse(
+          Array.from({ length: 100 }, () =>
+            validEmployeeItem("11111111-1111-4111-8111-111111111111")
+          )
+        )
+      )
+      .mockResolvedValueOnce(employeeListResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchEmployees({
+      mode: "incremental",
+      modifiedSince: new Date("2026-10-07T12:34:56.789Z"),
+      xeroConnection: buildXeroTenant(),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, request] of fetchMock.mock.calls) {
+      expect(new Headers(request.headers).get("If-Modified-Since")).toBe(
+        "2026-10-07T12:32:56Z"
+      );
+    }
+  });
+  it("omits the modification filter for explicit full employee traversal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(employeeListResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchEmployees({
+      mode: "full",
+      modifiedSince: new Date("2026-10-07T12:34:56Z"),
+      xeroConnection: buildXeroTenant(),
+    });
+    expect(
+      new Headers(fetchMock.mock.calls[0][1].headers).has("If-Modified-Since")
+    ).toBe(false);
+  });
   it("marks a single short page as complete and preserves valid neighbours of a malformed record", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       employeeListResponse([
@@ -206,6 +242,31 @@ describe("AU leave record reads", () => {
   });
   afterEach(() => {
     restoreEncryptionKey();
+  });
+  it("uses one overlap filter on all AU leave V2 pages but not PayItems", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(payItemsResponse())
+      .mockResolvedValueOnce(
+        leaveApplicationsResponse(
+          Array.from({ length: 100 }, (_, i) => `leave-${i}`)
+        )
+      )
+      .mockResolvedValueOnce(leaveApplicationsResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchLeaveRecords({
+      mode: "incremental",
+      modifiedSince: new Date("2026-10-07T12:34:56.789Z"),
+      xeroConnection: buildXeroTenant(),
+    });
+    expect(
+      new Headers(fetchMock.mock.calls[0][1].headers).has("If-Modified-Since")
+    ).toBe(false);
+    for (const [, request] of fetchMock.mock.calls.slice(1)) {
+      expect(new Headers(request.headers).get("If-Modified-Since")).toBe(
+        "2026-10-07T12:32:56Z"
+      );
+    }
   });
   it("accumulates a full page and a following short page", async () => {
     const firstPageIds = Array.from(
@@ -550,8 +611,28 @@ describe("161g AU scoped read evidence", () => {
       .mockResolvedValueOnce(new Response('{"Employees":[]}'));
     vi.stubGlobal("fetch", fetchMock);
     const current = buildXeroTenant();
+    const now = Date.now();
+    const prepared = module.prepareAuLeaveMutation(
+      {
+        action: "approve",
+        clerkOrgId: current.clerk_org_id,
+        employeeId: "employee",
+        organisationId: current.organisation_id,
+        remoteId: "leave",
+      },
+      current.xero_tenant_id
+    );
+    if (!prepared.ok) {
+      throw new Error(prepared.error.message);
+    }
     expect(
       await module.approveLeaveApplication({
+        mutation: {
+          firstDispatchedAt: new Date(now),
+          idempotencyKey: "3890e6b4-47d0-40b9-ad47-c802f92c836a",
+          replayBefore: new Date(now + 300_000),
+          request: prepared.value,
+        },
         xeroConnection: current,
         xeroEmployeeId: "employee",
         xeroLeaveApplicationId: "leave",

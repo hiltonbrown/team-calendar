@@ -330,6 +330,8 @@ describe("buildXeroOAuthStartUrl", () => {
     "http://attacker.example/path",
     "//attacker.example/path",
     "/\\attacker.example/path",
+    "/a/..//attacker.example/path",
+    "/%2e%2e//attacker.example/path",
     "/settings\n/integrations",
   ])("rejects the unsafe return path %j", async (returnTo) => {
     const result = await buildXeroOAuthStartUrl({
@@ -535,6 +537,10 @@ describe("isLocalApplicationPath", () => {
     expect(isLocalApplicationPath("/")).toBe(true);
     expect(isLocalApplicationPath("//attacker.example/path")).toBe(false);
     expect(isLocalApplicationPath("/\\attacker.example/path")).toBe(false);
+    expect(isLocalApplicationPath("/a/..//attacker.example/path")).toBe(false);
+    expect(isLocalApplicationPath("/%2e%2e//attacker.example/path")).toBe(
+      false
+    );
     expect(isLocalApplicationPath("/settings\u0085/integrations")).toBe(false);
   });
 });
@@ -1108,6 +1114,27 @@ describe("canonical tenant selection", () => {
       ok: false,
     });
     expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+  });
+  it("returns a safe local destination for a persisted path that normalizes to an external redirect", async () => {
+    dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+      available_tenants_json: {
+        tenants: [
+          {
+            connectionId: "remote_1",
+            tenantId: "file_1",
+            tenantName: "Payroll",
+          },
+        ],
+      },
+      id: input.sessionId,
+      organisation_id: null,
+      return_to: "/a/..//attacker.example/path",
+      xero_authorisation_id: "grant_1",
+    });
+    expect(await completeXeroTenantSelection(input)).toMatchObject({
+      ok: true,
+      value: { returnTo: "/settings/integrations/xero" },
+    });
   });
   it("creates one merged connection, completes the session and provisions defaults", async () => {
     expect(await completeXeroTenantSelection(input)).toEqual({

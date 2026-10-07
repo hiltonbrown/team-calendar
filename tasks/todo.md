@@ -1,5 +1,37 @@
 # Current work
 
+## Final Xero architecture audit, 8 October 2026
+
+- [x] Independently audit current architecture/security/sync/writes and every residual lifecycle/campaign reference against official Xero contracts.
+- [x] Fix verified defects and remove obsolete infrastructure/docs without adding speculative architecture; verify regression coverage.
+- [x] Run fresh complete check, typecheck, boundaries, unit, integration and production build commands; resolve their root causes.
+- [x] Confirm safe live fixture availability and record each unavailable provider/browser flow explicitly as NOT VERIFIED.
+- [x] Reconcile AGENTS/PRODUCT/README and current developer documentation with actual implemented architecture.
+- [x] Resolve all Critical/Important independent review findings, report exact evidence and commit the phase in the existing branch after required gates pass.
+
+Stopping condition: actual approved lifecycle and current provider contracts are
+verified, required gates pass, independent review has no unresolved Critical or
+Important findings, documentation is canonical and branch finishing is handled.
+This is an audit and verified-defect correction phase. Add no speculative
+infrastructure, new worktree, new campaign framework or unapproved provider write.
+Baseline is clean commit 8d38e978 (simplification phases 2, 3 and 4); later phases
+are not represented by commits in this checkout, so audit existing sync/write
+and release code rather than assuming that missing work was completed elsewhere.
+
+Review: final independent security and sync/write reviews have no unresolved
+Critical or Important findings. The full lint, typecheck, boundaries, unit,
+integration and production build gates passed uncached where Turbo applies:
+1,153 linted files; 19 typecheck tasks; 1,082 boundary files in 21 packages;
+2,948 unit tests across 18 tasks; 252 PostgreSQL/Redis integration tests across
+6 tasks; all 4 production build tasks. Release tooling passed 195 tests with
+4 explicit Chromium-dependent static-browser skips; its typecheck passed.
+Prisma generated and all 26 migrations replayed into a fresh owned local
+database with no schema drift. Build configuration used the user-supplied Clerk
+development publishable key and a temporary real encryption key, without
+provider credentials or validation bypass. No live Xero or application-browser
+verification is claimed. The 11-part result and resolved review rulings are in
+`docs/reports/2026-10-08-xero-architecture-audit.md`.
+
 ## Xero disconnect lifecycle, 8 October 2026
 
 - [x] Verify official user-authorisation DELETE and absent-connection contracts; map current lifecycle consumers.
@@ -158,22 +190,6 @@ document structure, relative links, whitespace, red/green task structure, all 92
 exact deletion paths and planning-only change inventory. No production suite,
 provider mutation or implementation is claimed.
 
-## Task: AU contract continuation, 4 October 2026
-
-- [ ] Remove ordinary campaign bootstrap prerequisite without bypassing isolation.
-- [ ] Route protected integration suites and verify source gates.
-- [ ] Freeze reviewed candidate and replay integration through the live Neon runner.
-- [ ] Execute admissible bounded AU UI/provider rows, clean up and report honestly.
-
-Execution: `plans/163-ordinary-campaign-admission.md` records the narrow source
-prerequisite. The operator target is live Neon only. No new generic harness work.
-
-Last reviewed: 2026-10-03
-
-## Task: Reconcile Plans 160 through 161h, 27 September 2026
-
-- [ ] Obtain the separately authorised real provider/application-browser observations and charter sign-off when sanctioned fixtures, approved AU contract, deployed revisions, role sessions and enforced worker isolation are available.
-
 ## Active plan: Australian go-live implementation and release validation
 
 Source: `plans/go-live.md`. Tested source candidate:
@@ -318,74 +334,14 @@ Tailwind's preflight strips the default, so bullets on the privacy policy and
 terms pages render as indented paragraphs. Present at baseline. Worth a one-line
 fix later; not changed here to keep the production push to reviewed scope.
 
-# Plan 160 execution
+# Previous Xero verification work
 
-## Plan 160 completion, 29 September 2026
+The former Plan 160/161/163 campaign tasks are retired by the approved Xero
+simplification. Their execution history remains in Git. No campaign lease,
+credential-domain sentinel, namespace bootstrap, tenant-binding cutover or
+cleanup receipt is a current prerequisite. Current release work uses ordinary
+scoped fixtures, the shared quota limiter and the guarded release runner.
 
-- [ ] Complete synchronous action/OAuth admission, acquisition drain and the real campaign lease/drivers.
-- [ ] Verify the final candidate and protected online inventory.
-- [ ] Execute admitted scenarios and reconcile cleanup and reports.
-- [ ] Independent review and final evidence reconciliation.
-
-Review: in progress; live/browser/provider results require actual admitted execution.
-
-### Plan 160 resumed continuation, 30 September 2026
-
-- [ ] Rebuild protected monitor artefacts lost with the temporary worktree, freeze the corrected candidate and repeat required gates and online verification.
-- [ ] Reconcile final source, evidence and remaining full-campaign requirements independently.
-
-Review: `72a7115` passed offline gates, but its online attempts were interrupted and failed respectively. Both cleaned up and preserved the database, but their private receipts were lost when `/tmp` was cleared by the disconnect. The persistent isolated worktree now holds the next corrections. Neither attempt proves the browser/provider campaign or a passing domain regression for the changed source.
-
-### Plan 160 source verification after disconnect, 30 September 2026
-
-- [ ] Complete protected exact-candidate online integration and independent postcheck.
-- [ ] Complete actual approved fixture/session and browser/provider verification. Full campaign drivers/recovery remain deferred outside the merge scope.
-
-Review: source result is PASS within the stated gates; protected online, actual browser/provider and PITR evidence remain NOT VERIFIED. Historical failed online attempts are not promoted to this source candidate.
-
-## Plan 160 campaign continuation, 2 October 2026
-
-Execution policy: the user removed the fixed 24-hour namespace initialisation
-waiting period. It is excluded from remaining tasks and completion estimates.
-Proceed when namespace authority and actual Xero quota admission checks pass.
-
-- [ ] Verify new source against focused and complete source gates; freeze for protected live verification.
-- [ ] Complete lease and scenario drivers if the full campaign is resumed; preserve unfinished tooling outside this merge.
-- [ ] Record actual remaining operational requirements and final evidence without promoting unit tests to campaign proof.
-
-### Remaining runtime and campaign work, execution order
-
-- [ ] Implement operational lease acquisition/recovery: exact deployment and registered worker revision, partial ownership retention, independent writer closure, worker drain and settings restoration.
-- [ ] Wire actual producer execution to browser subcases, including independent provider/local observations and causal no-call receipts.
-- [ ] Implement scheduled X08 driver with real tick/run join and controlled X03/X05/X14/X22 handler drivers, then complete remaining multi-step catalogue cases.
-- [ ] Freeze candidate, pass source gates and protected live inventory; execute only scenarios whose sanctioned fixtures, sessions, deployed revision and operation authority are present.
-- [ ] Reconcile effects and emit exact-candidate sanitised reports. Missing operational facts and PITR remain NOT VERIFIED.
-
-### Plan 160 deferred native execution work, excluded from merge (2026-10-02)
-
-- [ ] Verify the runtime controller uses the existing SQL advisory transition barrier and complete its focused regression checkpoint.
-- [ ] Implement campaign-fenced consumer admission distinct from the ordinary paused/unregistered database-fixture contract.
-- [ ] Implement durable native browser supervisor identity and independent cross-process recovery closure.
-- [ ] Implement narrowly scoped post-drain cleanup action authority for new-request withdrawal, with no create replay or generic provider deletion.
-- [ ] Compose the actual lease members and default CLI path with the native scenario operation factory; bind private actors/session files and reobserve deployment/registration throughout execution.
-- [ ] Complete outside-owned baseline/restoration/release evidence, final source gates, exact candidate freeze and coordinated protected live verification.
-
-Checkpoint evidence: 35 credential-free tests passed across native admission, lease recovery, fixture resolution and runtime control; release-tool typecheck passed. Subsequent advisory-barrier and cleanup-only journal-transition corrections remain under focused verification. The default execution adapter is not yet wired and no end-to-end campaign is claimed.
-
-### Plan 160 commit and merge reconciliation, 2 October 2026
-
-- [ ] Complete the requested reviewed commits and merge to main (reviewer owns staging and merge).
-- [ ] If verification resumes, replay corrected live integration and execute the approved bounded AU browser/provider flow with existing mandatory controls and independent readbacks.
-
-Review: source delivery and live verification are distinct. The full Plan 160 catalogue is incomplete. Browser/provider actions, deployed candidate and scheduled-job claims, PITR availability and restore exercise remain NOT VERIFIED. A candidate development app/API can exercise the ordinary synchronous AU flow without deployment; it must still satisfy shared sentinel/rate/binding/database guards, exact fixture authority, fresh demo confirmation and authenticated user sessions. No additional framework is required merely to claim a focused flow, and no focused flow result may be promoted to full campaign completion.
-
-### Plan 160 continuation and Plan 163, 4 October 2026
-
-- [ ] Verify authorised bounded AU UI/provider rows and cleanup.
-
-Review: 189 focused database tests pass; ordinary collection skips all 13
-protected suites without database access. One Important review finding was fixed
-in one pass; no other source findings. Actual Lua regressions are registered in
-the protected suite and await live execution. Backup inspection is not a PITR or
-destructive restore exercise. CI publication, provider/browser and deployed
-worker evidence remain NOT VERIFIED.
+Historical source results do not verify the current candidate. Live Xero,
+application browser, deployment and recovery observations remain NOT VERIFIED
+until explicitly authorised safe fixtures and valid sessions are available.

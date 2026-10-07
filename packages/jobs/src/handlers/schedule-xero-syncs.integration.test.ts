@@ -15,6 +15,7 @@ const sentEvents: Array<{
     clerkOrgId: string;
     organisationId: string;
     connectionId: string;
+    mode?: "full" | "incremental";
     triggerType: string;
   };
   id?: string;
@@ -102,6 +103,7 @@ describe("local persistence integration", async () => {
     });
     const connection = {
       clerk_org_id: tenant.clerkOrgId,
+      initial_sync_completed_at: now,
       organisation_id: tenant.organisationId,
       payroll_region: "AU" as const,
       remote_connection_id: `remote-${tenant.connectionId}`,
@@ -140,6 +142,32 @@ describe("local persistence integration", async () => {
       if (database) {
         await database.$disconnect();
       }
+    });
+    it("holds cadence dispatch until the initial import completion boundary exists", async () => {
+      await setupTenant(tenantA, "Australia/Sydney");
+      await setupTenant(tenantB, "Australia/Melbourne");
+      await database.xeroConnection.updateMany({
+        data: { initial_sync_completed_at: null },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          id: tenantA.connectionId,
+          organisation_id: tenantA.organisationId,
+        },
+      });
+      const result = await scheduleXeroSyncsPage({
+        now: new Date("2026-08-11T15:30:00Z"),
+      });
+      expect(result.ok).toBe(true);
+      expect(
+        sentEvents.filter(
+          (event) => event.data.connectionId === tenantA.connectionId
+        )
+      ).toHaveLength(0);
+      expect(
+        sentEvents.filter(
+          (event) => event.data.connectionId === tenantB.connectionId
+        )
+      ).toHaveLength(4);
     });
     it("scans database tenants and emits tenant-scoped events carrying matching Clerk Org and Organisation IDs", async () => {
       await setupTenant(tenantA, "Australia/Sydney");
@@ -189,7 +217,8 @@ describe("local persistence integration", async () => {
           (candidate) => candidate.name === syncEventNames[runType]
         );
         expect(event?.id).toBe(
-          getScheduledSyncEventId(tenantA.connectionId, runType, now)
+          getScheduledSyncEventId(tenantA.connectionId, runType, now) +
+            (runType === "people" || runType === "leave_records" ? ":full" : "")
         );
       }
       for (const evt of tenantBEvents) {
@@ -204,7 +233,8 @@ describe("local persistence integration", async () => {
           (candidate) => candidate.name === syncEventNames[runType]
         );
         expect(event?.id).toBe(
-          getScheduledSyncEventId(tenantB.connectionId, runType, now)
+          getScheduledSyncEventId(tenantB.connectionId, runType, now) +
+            (runType === "people" || runType === "leave_records" ? ":full" : "")
         );
       }
     });

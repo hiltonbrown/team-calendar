@@ -3,6 +3,7 @@ import { reconcileXeroPerson } from "@repo/availability";
 import type { Result } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
+import { advanceXeroSyncCursor } from "@repo/database/queries/xero-sync-cursors";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
 import {
@@ -29,7 +30,9 @@ import {
 const SyncXeroPeopleInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   connectionId: z.string().uuid(),
+  mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
+  requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
@@ -97,7 +100,12 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const context = parsed.data;
+  const context: typeof parsed.data & { expectedXeroTenantId?: string } = {
+    ...parsed.data,
+    mode:
+      parsed.data.mode ??
+      (parsed.data.triggerType === "scheduled" ? "incremental" : "full"),
+  };
   const startedAt = new Date();
   let runId: string | null = null;
   try {
@@ -130,10 +138,15 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       return prepared.result;
     }
     const { xeroConnection } = prepared;
+    context.expectedXeroTenantId = xeroConnection.xero_tenant_id;
+    const modifiedSince =
+      xeroConnection.sync_cursors?.find(
+        (cursor) => cursor.entity_type === "people"
+      )?.modified_since ?? null;
     const counts = emptyCounts();
     const employeesResult = await fetchEmployeesForRegion(
       xeroConnection.payroll_region,
-      { xeroConnection }
+      { mode: context.mode, modifiedSince, xeroConnection }
     );
     if (!employeesResult.ok) {
       if (isBlanketFailure(employeesResult.error)) {
@@ -232,7 +245,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
     }
     let guardBlocked = false;
     // Absence is inferred only from a complete snapshot.
-    if (complete) {
+    if (context.mode === "full" && complete && counts.failed === 0) {
       const unarchivedXeroPeople = await database.person.findMany({
         select: {
           id: true,
@@ -337,22 +350,41 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
     let staleSinceData: {
       people_stale_since?: Date | null;
     } = {};
-    if (canClearStaleness) {
+    if (canClearStaleness && context.mode === "full") {
       staleSinceData = { people_stale_since: null };
-    } else if (!xeroConnection.people_stale_since) {
+    } else if (!(canClearStaleness || xeroConnection.people_stale_since)) {
       staleSinceData = { people_stale_since: startedAt };
     }
-    await withXeroBinding(context, async (tx) =>
-      tx.xeroConnection.updateMany({
+    await withXeroBinding(context, async (tx) => {
+      if (
+        xeroConnection.payroll_region === "AU" &&
+        canClearStaleness &&
+        !(await advanceXeroSyncCursor(
+          {
+            connectionId: context.connectionId,
+            entityType: "people",
+            expectedModifiedSince: modifiedSince,
+            nextModifiedSince: startedAt,
+            scope: context,
+          },
+          tx
+        ))
+      ) {
+        throw new XeroSyncRunFencedError();
+      }
+      await tx.xeroConnection.updateMany({
         data: {
           last_people_sync_at: new Date(),
+          ...(canClearStaleness && context.mode === "full"
+            ? { last_full_people_sync_at: startedAt }
+            : {}),
           last_sync_error_code: null,
           last_sync_error_message: null,
           ...staleSinceData,
         },
         where: { ...scoped(context), id: context.connectionId },
-      })
-    );
+      });
+    });
     const finalStatus =
       guardBlocked || counts.failed > 0 || !complete
         ? "partial_success"

@@ -59,6 +59,8 @@ export async function fetchLeaveApplicationStatusForRegion(
 export async function fetchEmployeesForRegion(
   payrollRegion: PayrollRegion | string,
   input: {
+    mode?: "full" | "incremental";
+    modifiedSince?: Date | null;
     xeroConnection: XeroAccessContext;
   }
 ): Promise<XeroWriteResult<XeroEmployeesFetchResult>> {
@@ -67,7 +69,7 @@ export async function fetchEmployeesForRegion(
     async (xeroConnection) => {
       switch (payrollRegion) {
         case "AU":
-          return await fetchAuEmployees({ xeroConnection });
+          return await fetchAuEmployees({ ...input, xeroConnection });
         case "NZ":
           return await fetchNzEmployees({ xeroConnection });
         case "UK":
@@ -81,6 +83,8 @@ export async function fetchEmployeesForRegion(
 export async function fetchLeaveRecordsForRegion(
   payrollRegion: PayrollRegion | string,
   input: {
+    mode?: "full" | "incremental";
+    modifiedSince?: Date | null;
     xeroConnection: XeroAccessContext;
   }
 ): Promise<XeroWriteResult<XeroLeaveRecordsFetchResult>> {
@@ -89,7 +93,7 @@ export async function fetchLeaveRecordsForRegion(
     async (xeroConnection) => {
       switch (payrollRegion) {
         case "AU":
-          return await fetchAuLeaveRecords({ xeroConnection });
+          return await fetchAuLeaveRecords({ ...input, xeroConnection });
         case "NZ":
           return unsupportedRegion(
             "NZ payroll requires per-employee leave reads."

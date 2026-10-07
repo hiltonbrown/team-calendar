@@ -7,6 +7,8 @@ export interface SchedulableXeroConnection {
   connectionStatus: string;
   disconnectedAt: Date | null;
   lastApprovalStateReconciledAt: Date | null;
+  lastFullLeaveRecordsSyncAt?: Date | null;
+  lastFullPeopleSyncAt?: Date | null;
   lastLeaveBalancesSyncAt: Date | null;
   lastLeaveRecordsSyncAt: Date | null;
   lastPeopleSyncAt: Date | null;
@@ -37,6 +39,8 @@ export async function listSchedulableXeroConnections(
         disconnected_at: true,
         id: true,
         last_approval_state_reconciled_at: true,
+        last_full_leave_records_sync_at: true,
+        last_full_people_sync_at: true,
         last_leave_balances_sync_at: true,
         last_leave_records_sync_at: true,
         last_people_sync_at: true,
@@ -48,6 +52,7 @@ export async function listSchedulableXeroConnections(
       },
       where: {
         authorisation: { status: "active" },
+        initial_sync_completed_at: { not: null },
         organisation: { archived_at: null, is_active: true },
         payroll_region: "AU",
         status: "active",
@@ -68,6 +73,8 @@ export async function listSchedulableXeroConnections(
           connectionStatus: row.status,
           disconnectedAt: row.disconnected_at,
           lastApprovalStateReconciledAt: row.last_approval_state_reconciled_at,
+          lastFullLeaveRecordsSyncAt: row.last_full_leave_records_sync_at,
+          lastFullPeopleSyncAt: row.last_full_people_sync_at,
           lastLeaveBalancesSyncAt: row.last_leave_balances_sync_at,
           lastLeaveRecordsSyncAt: row.last_leave_records_sync_at,
           lastPeopleSyncAt: row.last_people_sync_at,

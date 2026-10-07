@@ -25,6 +25,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/database/src/seed/seed.integration.test.ts",
   "packages/database/xero-authorisation-locks.integration.test.ts",
   "packages/database/xero-simplification-schema.integration.test.ts",
+  "packages/database/xero-sync-cursors.integration.test.ts",
   "packages/database/xero-tenancy.integration.test.ts",
   "packages/feeds/index.integration.test.ts",
   "packages/jobs/src/handlers/reconcile-xero-approval-state.integration.test.ts",

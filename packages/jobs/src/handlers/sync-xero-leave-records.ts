@@ -11,6 +11,7 @@ import {
   type availability_privacy_mode,
   Prisma,
 } from "@repo/database/generated/client";
+import { advanceXeroSyncCursor } from "@repo/database/queries/xero-sync-cursors";
 import { feedIdsForPeople } from "@repo/feeds";
 import { publishOrganisationNotificationEvent } from "@repo/notifications";
 import { log } from "@repo/observability/log";
@@ -30,6 +31,7 @@ import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
 import {
   acquireSyncRun,
+  assertRunActive,
   type SyncRunStatus,
   XeroSyncRunFencedError,
 } from "./sync-run-lifecycle";
@@ -48,7 +50,7 @@ const noUnresolvedSubmitOperationWhere =
   (): Prisma.AvailabilityRecordWhereInput => ({
     outbound_operations: {
       none: {
-        action: { in: ["submit", "approve"] },
+        action: { in: ["approve", "decline", "withdraw"] },
         status: {
           in: ["prepared", "outcome_unknown", "provider_accepted"],
         },
@@ -58,8 +60,10 @@ const noUnresolvedSubmitOperationWhere =
 const SyncXeroLeaveRecordsInputSchema = z.object({
   clerkOrgId: z.string().min(1),
   connectionId: z.string().uuid(),
+  mode: z.enum(["full", "incremental"]).optional(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
+  requestedAt: z.string().datetime().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
@@ -193,7 +197,12 @@ async function syncXeroLeaveRecordsInternal(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-  const context = parsed.data;
+  const context: typeof parsed.data & { expectedXeroTenantId?: string } = {
+    ...parsed.data,
+    mode:
+      parsed.data.mode ??
+      (parsed.data.triggerType === "scheduled" ? "incremental" : "full"),
+  };
   const startedAt = new Date();
   let runId: string | null = null;
   try {
@@ -231,9 +240,16 @@ async function syncXeroLeaveRecordsInternal(
       return tenantReadiness.result;
     }
     const { xeroConnection } = tenantReadiness;
+    context.expectedXeroTenantId = xeroConnection.xero_tenant_id;
+    const modifiedSince =
+      xeroConnection.sync_cursors?.find(
+        (cursor) => cursor.entity_type === "leave_records"
+      )?.modified_since ?? null;
     const counts = emptyCounts();
     if (xeroConnection.payroll_region === "AU") {
       const leaveRecordsResult = await fetchLeaveRecordsForRegion("AU", {
+        mode: context.mode,
+        modifiedSince,
         xeroConnection,
       });
       if (!leaveRecordsResult.ok) {
@@ -334,7 +350,15 @@ async function syncXeroLeaveRecordsInternal(
           await sleep(150);
         }
       }
+      const traversalSucceeded =
+        complete &&
+        counts.failed === 0 &&
+        !hasInvalidRecords &&
+        failures.length === 0 &&
+        traversalOutcome === "completed";
       const canArchiveStale =
+        context.mode !== "incremental" &&
+        counts.failed === 0 &&
         complete &&
         !hasInvalidRecords &&
         failures.length === 0 &&
@@ -370,23 +394,43 @@ async function syncXeroLeaveRecordsInternal(
       let staleSinceData: {
         leave_records_stale_since?: Date | null;
       } = {};
-      if (canArchiveStale) {
+      if (traversalSucceeded && context.mode !== "incremental") {
         staleSinceData = { leave_records_stale_since: null };
-      } else if (!xeroConnection.leave_records_stale_since) {
+      } else if (
+        !(traversalSucceeded || xeroConnection.leave_records_stale_since)
+      ) {
         staleSinceData = { leave_records_stale_since: startedAt };
       }
-      await withXeroBinding(context, async (tx) =>
-        tx.xeroConnection.updateMany({
+      await withXeroBinding(context, async (tx) => {
+        if (
+          traversalSucceeded &&
+          !(await advanceXeroSyncCursor(
+            {
+              connectionId: context.connectionId,
+              entityType: "leave_records",
+              expectedModifiedSince: modifiedSince,
+              nextModifiedSince: startedAt,
+              scope: context,
+            },
+            tx
+          ))
+        ) {
+          throw new XeroSyncRunFencedError();
+        }
+        await tx.xeroConnection.updateMany({
           data: {
             last_leave_records_sync_at: new Date(),
+            ...(traversalSucceeded && context.mode === "full"
+              ? { last_full_leave_records_sync_at: startedAt }
+              : {}),
             last_sync_error_code: null,
             last_sync_error_message: null,
             ...staleSinceData,
           },
           where: { ...scoped(context), id: context.connectionId },
-        })
-      );
-      const isFullySuccessful = canArchiveStale && counts.failed === 0;
+        });
+      });
+      const isFullySuccessful = traversalSucceeded;
       let finalStatus: SyncRunStatus = "partial_success";
       if (isFullySuccessful) {
         finalStatus = "succeeded";
@@ -423,6 +467,7 @@ async function syncXeroLeaveRecordsInternal(
       }>;
       let isLastPage = true;
       let cursorRecord: {
+        leave_sweep_failed?: boolean;
         leave_next_person_id: string | null;
         id: string;
       } | null = null;
@@ -445,7 +490,11 @@ async function syncXeroLeaveRecordsInternal(
         });
       } else {
         cursorRecord = await database.xeroConnection.findFirst({
-          select: { id: true, leave_next_person_id: true },
+          select: {
+            id: true,
+            leave_next_person_id: true,
+            leave_sweep_failed: true,
+          },
           where: {
             ...scoped(context),
             id: context.connectionId,
@@ -573,6 +622,7 @@ async function syncXeroLeaveRecordsInternal(
           counts.failed += 1;
           continue;
         }
+        const failuresBeforePerson = counts.failed;
         const personLeaveRecords = employeeLeave.value.leaveRecords;
         counts.fetched += personLeaveRecords.length;
         const peopleByEmployeeId = new Map([[person.xero_employee_id, person]]);
@@ -614,6 +664,10 @@ async function syncXeroLeaveRecordsInternal(
             }
           }
         }
+        // Absence requires every mapped row for this person to have persisted safely.
+        if (counts.failed > failuresBeforePerson) {
+          continue;
+        }
         // Person-scoped stale archival
         const staleOutcome = await archiveStaleRecords(
           context,
@@ -627,6 +681,9 @@ async function syncXeroLeaveRecordsInternal(
         }
       }
       await enqueueFeedRebuilds(context, [...affectedPersonIds]);
+      const sweepFailed =
+        counts.failed > 0 ||
+        Boolean(initialCursorValue && cursorRecord?.leave_sweep_failed);
       if (isTargetedPerson) {
         await withXeroBinding(context, async (tx) =>
           tx.xeroConnection.updateMany({
@@ -639,11 +696,22 @@ async function syncXeroLeaveRecordsInternal(
           })
         );
       } else {
+        let staleSinceData: {
+          leave_records_stale_since?: Date | null;
+        } = {};
+        if (isLastPage && !sweepFailed) {
+          staleSinceData = { leave_records_stale_since: null };
+        } else if (!xeroConnection.leave_records_stale_since) {
+          staleSinceData = { leave_records_stale_since: startedAt };
+        }
         const casSuccess = await advanceCursor({
           context,
           cursorRecord,
           initialCursorValue,
           nextCursorValue,
+          runId: run.id,
+          staleSinceData,
+          sweepFailed,
         });
         if (!casSuccess) {
           await completeRun(context, run.id, {
@@ -657,27 +725,11 @@ async function syncXeroLeaveRecordsInternal(
             value: { ...counts, runId: run.id, status: "cancelled" },
           };
         }
-        let staleSinceData: {
-          leave_records_stale_since?: Date | null;
-        } = {};
-        if (isLastPage) {
-          staleSinceData = { leave_records_stale_since: null };
-        } else if (!xeroConnection.leave_records_stale_since) {
-          staleSinceData = { leave_records_stale_since: startedAt };
-        }
-        await withXeroBinding(context, async (tx) =>
-          tx.xeroConnection.updateMany({
-            data: {
-              last_leave_records_sync_at: new Date(),
-              last_sync_error_code: null,
-              last_sync_error_message: null,
-              ...staleSinceData,
-            },
-            where: { ...scoped(context), id: context.connectionId },
-          })
-        );
       }
-      const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
+      const finalStatus =
+        counts.failed > 0 || (!isTargetedPerson && isLastPage && sweepFailed)
+          ? "partial_success"
+          : "succeeded";
       await completeRun(context, run.id, {
         counts,
         status: finalStatus,
@@ -1211,6 +1263,7 @@ async function archiveStaleRecords(
   };
 }
 async function advanceCursor(params: {
+  runId: string;
   context: SyncXeroLeaveRecordsInput;
   cursorRecord: {
     leave_next_person_id: string | null;
@@ -1218,18 +1271,28 @@ async function advanceCursor(params: {
   } | null;
   initialCursorValue: string | null;
   nextCursorValue: string | null;
+  sweepFailed: boolean;
+  staleSinceData: { leave_records_stale_since?: Date | null };
 }): Promise<boolean> {
   const { context, initialCursorValue, nextCursorValue } = params;
-  const result = await withXeroBinding(context, (tx) =>
-    tx.xeroConnection.updateMany({
-      data: { leave_next_person_id: nextCursorValue },
+  const result = await withXeroBinding(context, async (tx) => {
+    await assertRunActive(context, params.runId, tx);
+    return await tx.xeroConnection.updateMany({
+      data: {
+        last_leave_records_sync_at: new Date(),
+        last_sync_error_code: null,
+        last_sync_error_message: null,
+        leave_next_person_id: nextCursorValue,
+        leave_sweep_failed: params.sweepFailed,
+        ...params.staleSinceData,
+      },
       where: {
         ...scoped(context),
         id: context.connectionId,
         leave_next_person_id: initialCursorValue,
       },
-    })
-  );
+    });
+  });
   return result.count === 1;
 }
 async function materialiseSyncedPublication(

@@ -22,6 +22,7 @@ import { z } from "zod";
 import { XERO_WRITE_CLAIM_LEASE_MS } from "../xero-write-claim";
 import { submitRequestFingerprint } from "./submit-service";
 import { completeSubmitSideEffects } from "./submit-side-effects";
+import { mutationRequestFingerprint } from "./write-operation";
 
 const RecoveryScopeSchema = z.object({
   actingOrgRole: z.enum(["org:owner", "org:admin"]),
@@ -80,6 +81,8 @@ export async function listSubmitRecoveryCandidates(
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
     clerkOrgId: context.value.input.clerkOrgId,
     employeeId: context.value.employeeId,
+    expectedXeroTenantId:
+      context.value.operation.request_xero_tenant_id ?? undefined,
     organisationId: context.value.input.organisationId,
   });
   if (!candidates?.ok) {
@@ -112,6 +115,8 @@ export async function attachSubmitRecoveryCandidate(
   const candidates = await externalWritePort.findLeaveApplicationCandidates?.({
     clerkOrgId: parsed.data.clerkOrgId,
     employeeId: context.value.employeeId,
+    expectedXeroTenantId:
+      context.value.operation.request_xero_tenant_id ?? undefined,
     organisationId: parsed.data.organisationId,
   });
   if (!candidates?.ok) {
@@ -154,8 +159,14 @@ export async function attachSubmitRecoveryCandidate(
   }
 
   let mergedRecordId: string | null = context.value.operation.merged_record_id;
+  const remoteTransition = isRemoteTransition(context.value.operation);
+  const targetStatus =
+    context.value.operation.action === "withdraw"
+      ? "withdrawn"
+      : candidate.approvalStatus;
   const alreadyAttached =
-    context.value.record.source_remote_id === candidate.remoteId;
+    context.value.record.source_remote_id === candidate.remoteId &&
+    context.value.record.approval_status === targetStatus;
   const originalApprover =
     context.value.operation.action === "approve"
       ? await database.person.findFirst({
@@ -168,6 +179,7 @@ export async function attachSubmitRecoveryCandidate(
         })
       : null;
   if (!alreadyAttached) {
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep verified recovery state, original actor and reason, merge fencing and audit in one transaction.
     await database.$transaction(async (tx) => {
       const duplicate = await tx.availabilityRecord.findFirst({
         where: {
@@ -190,7 +202,10 @@ export async function attachSubmitRecoveryCandidate(
 
       const updated = await tx.availabilityRecord.updateMany({
         data: {
-          approval_status: candidate.approvalStatus,
+          approval_status: targetStatus,
+          ...(context.value.operation.action === "decline"
+            ? { approval_note: context.value.operation.request_reason }
+            : {}),
           derived_sequence: { increment: 1 },
           failed_action: null,
           source_payload_json: candidate.rawResponse as Prisma.InputJsonValue,
@@ -201,7 +216,7 @@ export async function attachSubmitRecoveryCandidate(
                   context.value.operation.provider_accepted_at ?? new Date(),
                 approved_by_person_id: originalApprover?.id ?? null,
               }
-            : { submitted_at: new Date() }),
+            : {}),
           updated_by_user_id: parsed.data.actingUserId,
           xero_write_claimed_at: null,
           xero_write_error: null,
@@ -210,7 +225,7 @@ export async function attachSubmitRecoveryCandidate(
         where: {
           ...scopedTo(parsed.data),
           id: parsed.data.recordId,
-          source_remote_id: null,
+          source_remote_id: remoteTransition ? candidate.remoteId : null,
         },
       });
       if (updated.count !== 1) {
@@ -234,7 +249,7 @@ export async function attachSubmitRecoveryCandidate(
           action:
             context.value.operation.action === "approve"
               ? "availability_records.approval_recovery_attached"
-              : "availability_records.submit_recovery_attached",
+              : `availability_records.${context.value.operation.action}_recovery_attached`,
           actor_user_id: parsed.data.actingUserId,
           clerk_org_id: parsed.data.clerkOrgId,
           organisation_id: parsed.data.organisationId,
@@ -303,10 +318,9 @@ async function completeRecoverySideEffects(input: {
 }): Promise<Result<void, SubmitRecoveryError>> {
   const { manager } = input.context.record.person;
   const primary = await completeSubmitSideEffects({
-    actorUserId: input.input.actingUserId,
+    actorUserId: input.context.operation.actor_user_id,
     approvalRecipient:
-      input.context.operation.action === "approve" &&
-      input.candidate.approvalStatus === "approved" &&
+      input.context.operation.action !== "withdraw" &&
       input.context.record.person.clerk_user_id
         ? {
             clerkUserId: input.context.record.person.clerk_user_id,
@@ -316,12 +330,11 @@ async function completeRecoverySideEffects(input: {
     attempt: input.attempt,
     claimedAt: input.claimedAt,
     clerkOrgId: input.input.clerkOrgId,
+    declineReason: input.context.operation.request_reason,
     manager: manager?.clerk_user_id
       ? { clerkUserId: manager.clerk_user_id, personId: manager.id }
       : null,
-    notifyManager:
-      input.context.operation.action !== "approve" &&
-      input.candidate.approvalStatus === "submitted",
+    notifyManager: input.context.operation.action === "withdraw",
     organisationId: input.input.organisationId,
     recordId: input.input.recordId,
   });
@@ -377,7 +390,7 @@ export async function resolveSubmitAsNotCreated(
         action:
           operation.action === "approve"
             ? "availability_records.approval_recovery_not_created"
-            : "availability_records.submit_recovery_not_created",
+            : `availability_records.${operation.action}_recovery_not_processed`,
         actor_user_id: parsed.data.actingUserId,
         clerk_org_id: parsed.data.clerkOrgId,
         organisation_id: parsed.data.organisationId,
@@ -439,7 +452,7 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
   if (
     !(
       operation.request_employee_id &&
-      operation.request_leave_type_id &&
+      (operation.request_leave_type_id || isRemoteTransition(operation)) &&
       operation.request_starts_at &&
       operation.request_ends_at
     ) ||
@@ -453,12 +466,20 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
   const immutableFingerprint = submitRequestFingerprint({
     employeeId: operation.request_employee_id,
     endsAt: operation.request_ends_at,
-    leaveTypeId: operation.request_leave_type_id,
+    leaveTypeId: operation.request_leave_type_id ?? "",
     startsAt: operation.request_starts_at,
     title: operation.request_title,
     units: Number(operation.request_units),
   });
-  if (immutableFingerprint !== operation.request_fingerprint) {
+  const fingerprint = isRemoteTransition(operation)
+    ? mutationRequestFingerprint({
+        body: operation.request_body_json,
+        method: operation.request_method as "POST",
+        url: operation.request_url ?? "",
+        xeroTenantId: operation.request_xero_tenant_id ?? "",
+      })
+    : immutableFingerprint;
+  if (fingerprint !== operation.request_fingerprint) {
     return recoveryError(
       "not_recoverable",
       "The original request fingerprint is invalid."
@@ -470,7 +491,7 @@ async function loadRecoveryContext(input: z.input<typeof RecoveryScopeSchema>) {
       duration: Number(operation.request_units),
       employeeId: operation.request_employee_id,
       input: parsed.data,
-      leaveTypeId: operation.request_leave_type_id,
+      leaveTypeId: operation.request_leave_type_id ?? "",
       operation: {
         ...operation,
         request_employee_id: operation.request_employee_id,
@@ -490,35 +511,44 @@ const candidateMatches = (
     employeeId: string;
     leaveTypeId: string;
     operation: {
-      action?: "submit" | "approve";
+      action?: "approve" | "decline" | "withdraw";
       request_ends_at: Date;
       request_fingerprint: string;
       request_starts_at: Date;
       request_title: string | null;
+      known_remote_id?: string | null;
+      request_url?: string | null;
     };
   },
   candidate: ProviderLeaveCandidate
 ): boolean =>
-  !(
-    context.operation.action === "approve" &&
-    candidate.approvalStatus === "submitted"
-  ) &&
-  candidate.employeeId === context.employeeId &&
-  candidate.leaveTypeId === context.leaveTypeId &&
-  candidate.startsAt ===
-    context.operation.request_starts_at.toISOString().slice(0, 10) &&
-  candidate.endsAt ===
-    context.operation.request_ends_at.toISOString().slice(0, 10) &&
-  candidate.units === context.duration &&
-  candidate.title === context.operation.request_title &&
-  submitRequestFingerprint({
-    employeeId: candidate.employeeId,
-    endsAt: context.operation.request_ends_at,
-    leaveTypeId: candidate.leaveTypeId,
-    startsAt: context.operation.request_starts_at,
-    title: candidate.title,
-    units: candidate.units,
-  }) === context.operation.request_fingerprint;
+  isRemoteTransition(context.operation)
+    ? candidate.remoteId === context.operation.known_remote_id &&
+      candidate.employeeId === context.employeeId &&
+      (context.operation.action === "approve"
+        ? candidate.approvalStatus === "approved"
+        : ["declined", "withdrawn", "cancelled"].includes(
+            candidate.approvalStatus
+          ))
+    : !(
+        context.operation.action === "approve" &&
+        candidate.approvalStatus === "submitted"
+      ) &&
+      candidate.employeeId === context.employeeId &&
+      candidate.leaveTypeId === context.leaveTypeId &&
+      candidate.startsAt ===
+        context.operation.request_starts_at.toISOString().slice(0, 10) &&
+      candidate.endsAt ===
+        context.operation.request_ends_at.toISOString().slice(0, 10) &&
+      candidate.title === context.operation.request_title &&
+      submitRequestFingerprint({
+        employeeId: candidate.employeeId,
+        endsAt: context.operation.request_ends_at,
+        leaveTypeId: candidate.leaveTypeId,
+        startsAt: context.operation.request_starts_at,
+        title: candidate.title,
+        units: context.duration,
+      }) === context.operation.request_fingerprint;
 
 const operationScope = (input: {
   clerkOrgId: string;
@@ -533,7 +563,7 @@ const operationScope = (input: {
 const operationAttempt = (
   input: { clerkOrgId: string; organisationId: string; recordId: string },
   attemptGeneration: number,
-  action: "submit" | "approve" = "submit"
+  action: "approve" | "decline" | "withdraw" = "approve"
 ) => ({ ...operationScope(input), action, attemptGeneration });
 
 const recoveryError = (
@@ -551,14 +581,26 @@ async function getRecoveryOperation(input: {
 }) {
   const operations = await Promise.all([
     getSubmitOperation({ ...operationScope(input), action: "approve" }),
-    getSubmitOperation(operationScope(input)),
+    getSubmitOperation({ ...operationScope(input), action: "decline" }),
+    getSubmitOperation({ ...operationScope(input), action: "withdraw" }),
   ]);
   const unresolved = operations.filter(
     (operation) =>
       operation &&
       ["outcome_unknown", "provider_accepted"].includes(operation.status)
   );
-  // Multiple unresolved create operations violate the record invariant. Fail
+  // Multiple unresolved operations violate the record invariant. Fail
   // closed rather than choosing an actor or payroll request arbitrarily.
   return unresolved.length === 1 ? unresolved[0] : null;
+}
+
+const REMOTE_TRANSITION_PATH = /\/(approve|reject)$/;
+function isRemoteTransition(operation: {
+  request_url?: string | null;
+  known_remote_id?: string | null;
+}) {
+  return (
+    !!operation.known_remote_id &&
+    REMOTE_TRANSITION_PATH.test(operation.request_url ?? "")
+  );
 }

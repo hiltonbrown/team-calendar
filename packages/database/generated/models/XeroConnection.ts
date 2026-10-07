@@ -58,7 +58,9 @@ export type XeroConnectionMinAggregateOutputType = {
   last_full_people_sync_at: Date | null
   last_full_leave_records_sync_at: Date | null
   balance_next_person_id: string | null
+  balance_sweep_failed: boolean | null
   leave_next_person_id: string | null
+  leave_sweep_failed: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -97,7 +99,9 @@ export type XeroConnectionMaxAggregateOutputType = {
   last_full_people_sync_at: Date | null
   last_full_leave_records_sync_at: Date | null
   balance_next_person_id: string | null
+  balance_sweep_failed: boolean | null
   leave_next_person_id: string | null
+  leave_sweep_failed: boolean | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -136,7 +140,9 @@ export type XeroConnectionCountAggregateOutputType = {
   last_full_people_sync_at: number
   last_full_leave_records_sync_at: number
   balance_next_person_id: number
+  balance_sweep_failed: number
   leave_next_person_id: number
+  leave_sweep_failed: number
   created_at: number
   updated_at: number
   _all: number
@@ -177,7 +183,9 @@ export type XeroConnectionMinAggregateInputType = {
   last_full_people_sync_at?: true
   last_full_leave_records_sync_at?: true
   balance_next_person_id?: true
+  balance_sweep_failed?: true
   leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
 }
@@ -216,7 +224,9 @@ export type XeroConnectionMaxAggregateInputType = {
   last_full_people_sync_at?: true
   last_full_leave_records_sync_at?: true
   balance_next_person_id?: true
+  balance_sweep_failed?: true
   leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
 }
@@ -255,7 +265,9 @@ export type XeroConnectionCountAggregateInputType = {
   last_full_people_sync_at?: true
   last_full_leave_records_sync_at?: true
   balance_next_person_id?: true
+  balance_sweep_failed?: true
   leave_next_person_id?: true
+  leave_sweep_failed?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -367,7 +379,9 @@ export type XeroConnectionGroupByOutputType = {
   last_full_people_sync_at: Date | null
   last_full_leave_records_sync_at: Date | null
   balance_next_person_id: string | null
+  balance_sweep_failed: boolean
   leave_next_person_id: string | null
+  leave_sweep_failed: boolean
   created_at: Date
   updated_at: Date
   _count: XeroConnectionCountAggregateOutputType | null
@@ -427,7 +441,9 @@ export type XeroConnectionWhereInput = {
   last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -471,7 +487,9 @@ export type XeroConnectionOrderByWithRelationInput = {
   last_full_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_full_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
   balance_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
   leave_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
@@ -520,7 +538,9 @@ export type XeroConnectionWhereUniqueInput = Prisma.AtLeast<{
   last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -564,7 +584,9 @@ export type XeroConnectionOrderByWithAggregationInput = {
   last_full_people_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
   last_full_leave_records_sync_at?: Prisma.SortOrderInput | Prisma.SortOrder
   balance_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
   leave_next_person_id?: Prisma.SortOrderInput | Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.XeroConnectionCountOrderByAggregateInput
@@ -609,7 +631,9 @@ export type XeroConnectionScalarWhereWithAggregatesInput = {
   last_full_people_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   last_full_leave_records_sync_at?: Prisma.DateTimeNullableWithAggregatesFilter<"XeroConnection"> | Date | string | null
   balance_next_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolWithAggregatesFilter<"XeroConnection"> | boolean
   leave_next_person_id?: Prisma.UuidNullableWithAggregatesFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolWithAggregatesFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeWithAggregatesFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"XeroConnection"> | Date | string
 }
@@ -645,7 +669,9 @@ export type XeroConnectionCreateInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
@@ -689,7 +715,9 @@ export type XeroConnectionUncheckedCreateInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -728,7 +756,9 @@ export type XeroConnectionUpdateInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
@@ -772,7 +802,9 @@ export type XeroConnectionUncheckedUpdateInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -814,7 +846,9 @@ export type XeroConnectionCreateManyInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -850,7 +884,9 @@ export type XeroConnectionUpdateManyMutationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -889,7 +925,9 @@ export type XeroConnectionUncheckedUpdateManyInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -954,7 +992,9 @@ export type XeroConnectionCountOrderByAggregateInput = {
   last_full_people_sync_at?: Prisma.SortOrder
   last_full_leave_records_sync_at?: Prisma.SortOrder
   balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
   leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -993,7 +1033,9 @@ export type XeroConnectionMaxOrderByAggregateInput = {
   last_full_people_sync_at?: Prisma.SortOrder
   last_full_leave_records_sync_at?: Prisma.SortOrder
   balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
   leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -1032,7 +1074,9 @@ export type XeroConnectionMinOrderByAggregateInput = {
   last_full_people_sync_at?: Prisma.SortOrder
   last_full_leave_records_sync_at?: Prisma.SortOrder
   balance_next_person_id?: Prisma.SortOrder
+  balance_sweep_failed?: Prisma.SortOrder
   leave_next_person_id?: Prisma.SortOrder
+  leave_sweep_failed?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -1201,7 +1245,9 @@ export type XeroConnectionCreateWithoutOrganisationInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   authorisation?: Prisma.XeroAuthorisationCreateNestedOneWithoutConnectionsInput
@@ -1242,7 +1288,9 @@ export type XeroConnectionUncheckedCreateWithoutOrganisationInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -1297,7 +1345,9 @@ export type XeroConnectionUpdateWithoutOrganisationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   authorisation?: Prisma.XeroAuthorisationUpdateOneWithoutConnectionsNestedInput
@@ -1338,7 +1388,9 @@ export type XeroConnectionUncheckedUpdateWithoutOrganisationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -1377,7 +1429,9 @@ export type XeroConnectionCreateWithoutAuthorisationInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
@@ -1419,7 +1473,9 @@ export type XeroConnectionUncheckedCreateWithoutAuthorisationInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -1490,7 +1546,9 @@ export type XeroConnectionScalarWhereInput = {
   last_full_people_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   last_full_leave_records_sync_at?: Prisma.DateTimeNullableFilter<"XeroConnection"> | Date | string | null
   balance_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  balance_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   leave_next_person_id?: Prisma.UuidNullableFilter<"XeroConnection"> | string | null
+  leave_sweep_failed?: Prisma.BoolFilter<"XeroConnection"> | boolean
   created_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"XeroConnection"> | Date | string
 }
@@ -1526,7 +1584,9 @@ export type XeroConnectionCreateWithoutSync_cursorsInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
@@ -1569,7 +1629,9 @@ export type XeroConnectionUncheckedCreateWithoutSync_cursorsInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -1623,7 +1685,9 @@ export type XeroConnectionUpdateWithoutSync_cursorsInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
@@ -1666,7 +1730,9 @@ export type XeroConnectionUncheckedUpdateWithoutSync_cursorsInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -1704,7 +1770,9 @@ export type XeroConnectionCreateWithoutLeave_balancesInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
@@ -1747,7 +1815,9 @@ export type XeroConnectionUncheckedCreateWithoutLeave_balancesInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -1801,7 +1871,9 @@ export type XeroConnectionUpdateWithoutLeave_balancesInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
@@ -1844,7 +1916,9 @@ export type XeroConnectionUncheckedUpdateWithoutLeave_balancesInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -1882,7 +1956,9 @@ export type XeroConnectionCreateWithoutSync_runsInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutXero_connectionInput
@@ -1925,7 +2001,9 @@ export type XeroConnectionUncheckedCreateWithoutSync_runsInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedCreateNestedManyWithoutXero_connectionInput
@@ -1979,7 +2057,9 @@ export type XeroConnectionUpdateWithoutSync_runsInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
@@ -2022,7 +2102,9 @@ export type XeroConnectionUncheckedUpdateWithoutSync_runsInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -2062,7 +2144,9 @@ export type XeroConnectionCreateManyAuthorisationInput = {
   last_full_people_sync_at?: Date | string | null
   last_full_leave_records_sync_at?: Date | string | null
   balance_next_person_id?: string | null
+  balance_sweep_failed?: boolean
   leave_next_person_id?: string | null
+  leave_sweep_failed?: boolean
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -2098,7 +2182,9 @@ export type XeroConnectionUpdateWithoutAuthorisationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutXero_connectionNestedInput
@@ -2140,7 +2226,9 @@ export type XeroConnectionUncheckedUpdateWithoutAuthorisationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sync_cursors?: Prisma.XeroSyncCursorUncheckedUpdateManyWithoutXero_connectionNestedInput
@@ -2181,7 +2269,9 @@ export type XeroConnectionUncheckedUpdateManyWithoutAuthorisationInput = {
   last_full_people_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   last_full_leave_records_sync_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   balance_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balance_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   leave_next_person_id?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  leave_sweep_failed?: Prisma.BoolFieldUpdateOperationsInput | boolean
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2269,7 +2359,9 @@ export type XeroConnectionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   last_full_people_sync_at?: boolean
   last_full_leave_records_sync_at?: boolean
   balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
   leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -2314,7 +2406,9 @@ export type XeroConnectionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   last_full_people_sync_at?: boolean
   last_full_leave_records_sync_at?: boolean
   balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
   leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -2355,7 +2449,9 @@ export type XeroConnectionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   last_full_people_sync_at?: boolean
   last_full_leave_records_sync_at?: boolean
   balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
   leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -2396,12 +2492,14 @@ export type XeroConnectionSelectScalar = {
   last_full_people_sync_at?: boolean
   last_full_leave_records_sync_at?: boolean
   balance_next_person_id?: boolean
+  balance_sweep_failed?: boolean
   leave_next_person_id?: boolean
+  leave_sweep_failed?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_authorisation_id" | "xero_tenant_id" | "remote_connection_id" | "tenant_name" | "tenant_type" | "auth_event_id" | "payroll_region" | "status" | "sync_paused_at" | "last_connected_at" | "last_disconnected_at" | "disconnected_at" | "disconnected_by_user_id" | "last_error_code" | "last_error_message" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "initial_sync_requested_at" | "initial_sync_completed_at" | "last_full_people_sync_at" | "last_full_leave_records_sync_at" | "balance_next_person_id" | "leave_next_person_id" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
+export type XeroConnectionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "xero_authorisation_id" | "xero_tenant_id" | "remote_connection_id" | "tenant_name" | "tenant_type" | "auth_event_id" | "payroll_region" | "status" | "sync_paused_at" | "last_connected_at" | "last_disconnected_at" | "disconnected_at" | "disconnected_by_user_id" | "last_error_code" | "last_error_message" | "last_people_sync_at" | "last_leave_records_sync_at" | "last_leave_balances_sync_at" | "last_approval_state_reconciled_at" | "people_stale_since" | "leave_records_stale_since" | "leave_balances_stale_since" | "approval_state_stale_since" | "last_sync_error_code" | "last_sync_error_message" | "initial_sync_requested_at" | "initial_sync_completed_at" | "last_full_people_sync_at" | "last_full_leave_records_sync_at" | "balance_next_person_id" | "balance_sweep_failed" | "leave_next_person_id" | "leave_sweep_failed" | "created_at" | "updated_at", ExtArgs["result"]["xeroConnection"]>
 export type XeroConnectionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   authorisation?: boolean | Prisma.XeroConnection$authorisationArgs<ExtArgs>
@@ -2462,7 +2560,9 @@ export type $XeroConnectionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     last_full_people_sync_at: Date | null
     last_full_leave_records_sync_at: Date | null
     balance_next_person_id: string | null
+    balance_sweep_failed: boolean
     leave_next_person_id: string | null
+    leave_sweep_failed: boolean
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["xeroConnection"]>
@@ -2926,7 +3026,9 @@ export interface XeroConnectionFieldRefs {
   readonly last_full_people_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly last_full_leave_records_sync_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly balance_next_person_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly balance_sweep_failed: Prisma.FieldRef<"XeroConnection", 'Boolean'>
   readonly leave_next_person_id: Prisma.FieldRef<"XeroConnection", 'String'>
+  readonly leave_sweep_failed: Prisma.FieldRef<"XeroConnection", 'Boolean'>
   readonly created_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"XeroConnection", 'DateTime'>
 }

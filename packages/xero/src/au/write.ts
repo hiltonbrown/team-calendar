@@ -1,3 +1,8 @@
+import type {
+  PrepareLeaveMutationInput,
+  ProviderMutationRequest,
+  XeroMutationIdentity,
+} from "@repo/core";
 import { z } from "zod";
 import { keys } from "../../keys";
 import {
@@ -47,11 +52,15 @@ export async function submitLeaveApplication(
       Title: input.title ?? "Leave request",
     },
   ];
-  const response = await xeroRequest(input.xeroConnection, {
-    body: payload,
-    method: "POST",
-    path: "/payroll.xro/1.0/LeaveApplications",
-  });
+  const response = await xeroRequest(
+    input.xeroConnection,
+    {
+      body: payload,
+      method: "POST",
+      path: "/payroll.xro/1.0/LeaveApplications",
+    },
+    input.mutation
+  );
   if (!response.ok) {
     return response;
   }
@@ -87,10 +96,14 @@ export async function approveLeaveApplication(
     rawResponse: unknown;
   }>
 > {
-  const response = await xeroRequest(input.xeroConnection, {
-    method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/approve`,
-  });
+  const response = await xeroRequest(
+    input.xeroConnection,
+    {
+      method: "POST",
+      path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/approve`,
+    },
+    input.mutation
+  );
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
@@ -102,13 +115,17 @@ export async function declineLeaveApplication(
     rawResponse: unknown;
   }>
 > {
-  const response = await xeroRequest(input.xeroConnection, {
-    body: {
-      Reason: input.reason,
+  const response = await xeroRequest(
+    input.xeroConnection,
+    {
+      body: {
+        Reason: input.reason,
+      },
+      method: "POST",
+      path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
     },
-    method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
-  });
+    input.mutation
+  );
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
@@ -120,13 +137,17 @@ export async function withdrawLeaveApplication(
     rawResponse: unknown;
   }>
 > {
-  const response = await xeroRequest(input.xeroConnection, {
-    body: {
-      Reason: "Withdrawn by employee in Team Calendar.",
+  const response = await xeroRequest(
+    input.xeroConnection,
+    {
+      body: {
+        Reason: "Withdrawn by employee in Team Calendar.",
+      },
+      method: "POST",
+      path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
     },
-    method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
-  });
+    input.mutation
+  );
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
@@ -137,8 +158,20 @@ async function xeroRequest(
     body?: unknown;
     method: "POST" | "PUT";
     path: string;
-  }
+  },
+  mutation?: XeroMutationIdentity
 ): Promise<XeroWriteResult<unknown>> {
+  if (!mutation) {
+    return {
+      error: {
+        code: "validation_error",
+        dispatchPhase: "before_dispatch",
+        message:
+          "A recorded mutation identity is required for Xero payroll writes.",
+      },
+      ok: false,
+    };
+  }
   if (!xeroConnection.accessToken) {
     return {
       error: {
@@ -150,30 +183,48 @@ async function xeroRequest(
       ok: false,
     };
   }
+  const descriptor: ProviderMutationRequest = {
+    body: request.body === undefined ? null : JSON.stringify(request.body),
+    method: request.method,
+    url: `${baseUrl()}${request.path}`,
+    xeroTenantId: xeroConnection.xero_tenant_id,
+  };
+  if (!sameMutationRequest(mutation.request, descriptor)) {
+    return {
+      error: {
+        code: "validation_error",
+        dispatchPhase: "before_dispatch",
+        message: "The recorded Xero mutation request has changed.",
+        recoveryReason: "outcome_unknown",
+      },
+      ok: false,
+    };
+  }
+  const frozen = mutation.request;
   try {
     const response = await xeroFetch({
+      attemptBudget: xeroConnection.mutationAttemptBudget,
       deadline: xeroConnection.deadline,
       init: {
-        body: request.body ? JSON.stringify(request.body) : undefined,
+        body: frozen.body ?? undefined,
         headers: {
           Accept: "application/json",
           Authorization: `Bearer ${xeroConnection.accessToken}`,
           "Content-Type": "application/json",
-          "Xero-Tenant-Id": xeroConnection.xero_tenant_id,
+          "Idempotency-Key": mutation.idempotencyKey,
+          "Xero-Tenant-Id": frozen.xeroTenantId,
         },
-        method: request.method,
+        method: frozen.method,
       },
-      maxAttempts: 1,
+      maxAttempts: 4,
+      mutation,
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
         xeroTenantId: xeroConnection.xero_tenant_id,
       },
-      // Every request through this helper mutates payroll state. See the field
-      // comment in xero-fetch.ts: an ambiguous failure must surface to the user
-      // rather than be retried into a duplicate.
-      retryOnAmbiguousFailure: false,
-      url: `${baseUrl()}${request.path}`,
+      retryOnAmbiguousFailure: true,
+      url: frozen.url,
     });
     const rawPayload = await readPayload(response);
     if (!response.ok) {
@@ -265,4 +316,76 @@ function dateOnly(date: Date): string {
 }
 function baseUrl(): string {
   return keys().XERO_API_BASE_URL ?? XERO_DEFAULT_BASE_URL;
+}
+
+function sameMutationRequest(
+  left: ProviderMutationRequest,
+  right: ProviderMutationRequest
+): boolean {
+  return (
+    left.body === right.body &&
+    left.method === right.method &&
+    left.url === right.url &&
+    left.xeroTenantId === right.xeroTenantId
+  );
+}
+
+export function prepareAuLeaveMutation(
+  input: PrepareLeaveMutationInput,
+  xeroTenantId: string
+): XeroWriteResult<ProviderMutationRequest> {
+  let body: unknown;
+  let path: string;
+  if (input.action === "create") {
+    if (!(input.startsAt && input.endsAt && input.leaveTypeId)) {
+      return {
+        error: {
+          code: "validation_error",
+          dispatchPhase: "before_dispatch",
+          message: "Leave dates and type are required.",
+        },
+        ok: false,
+      };
+    }
+    path = "/payroll.xro/1.0/LeaveApplications";
+    body = [
+      {
+        EmployeeID: input.employeeId,
+        EndDate: dateOnly(input.endsAt),
+        LeaveTypeID: input.leaveTypeId,
+        StartDate: dateOnly(input.startsAt),
+        Title: input.title ?? "Leave request",
+      },
+    ];
+  } else {
+    if (!input.remoteId || (input.action === "decline" && !input.reason)) {
+      return {
+        error: {
+          code: "validation_error",
+          dispatchPhase: "before_dispatch",
+          message: "Remote leave ID and decline reason are required.",
+        },
+        ok: false,
+      };
+    }
+    const transition = input.action === "approve" ? "approve" : "reject";
+    path = `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.remoteId)}/${transition}`;
+    if (input.action !== "approve") {
+      body = {
+        Reason:
+          input.action === "withdraw"
+            ? "Withdrawn by employee in Team Calendar."
+            : input.reason,
+      };
+    }
+  }
+  return {
+    ok: true,
+    value: {
+      body: body === undefined ? null : JSON.stringify(body),
+      method: "POST",
+      url: `${baseUrl()}${path}`,
+      xeroTenantId,
+    },
+  };
 }

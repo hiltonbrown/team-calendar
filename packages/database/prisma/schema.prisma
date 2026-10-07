@@ -160,8 +160,9 @@ enum availability_failed_action {
 }
 
 enum outbound_operation_action {
-  submit
   approve
+  decline
+  withdraw
 }
 
 enum outbound_operation_status {
@@ -530,7 +531,9 @@ model XeroConnection {
   last_full_people_sync_at          DateTime?
   last_full_leave_records_sync_at   DateTime?
   balance_next_person_id            String?                @db.Uuid
+  balance_sweep_failed              Boolean                @default(false)
   leave_next_person_id              String?                @db.Uuid
+  leave_sweep_failed                Boolean                @default(false)
   created_at                        DateTime               @default(now())
   updated_at                        DateTime               @updatedAt
   organisation                      Organisation           @relation(fields: [organisation_id, clerk_org_id], references: [id, clerk_org_id])
@@ -664,31 +667,39 @@ model AvailabilityRecord {
 }
 
 model OutboundOperation {
-  id                     String                    @id @default(uuid()) @db.Uuid
-  clerk_org_id           String
-  organisation_id        String                    @db.Uuid
-  availability_record_id String                    @db.Uuid
-  action                 outbound_operation_action
-  status                 outbound_operation_status
-  request_fingerprint    String
-  request_employee_id    String?
-  request_leave_type_id  String?
-  request_starts_at      DateTime?
-  request_ends_at        DateTime?
-  request_title          String?
-  request_units          Decimal?                  @db.Decimal(12, 4)
-  actor_user_id          String
-  attempt_generation     Int                       @default(1)
-  safe_error_code        String?
-  known_remote_id        String?
-  merged_record_id       String?                   @db.Uuid
-  side_effect_claimed_at DateTime?
-  prepared_at            DateTime                  @default(now())
-  dispatch_started_at    DateTime?
-  provider_accepted_at   DateTime?
-  completed_at           DateTime?
-  created_at             DateTime                  @default(now())
-  updated_at             DateTime                  @updatedAt
+  id                              String                    @id @default(uuid()) @db.Uuid
+  clerk_org_id                    String
+  organisation_id                 String                    @db.Uuid
+  availability_record_id          String                    @db.Uuid
+  action                          outbound_operation_action
+  status                          outbound_operation_status
+  idempotency_key                 String?                   @unique @db.Uuid
+  request_xero_tenant_id          String?
+  request_method                  String?
+  request_url                     String?
+  request_body_json               String?
+  request_reason                  String?
+  idempotency_first_dispatched_at DateTime?
+  idempotency_replay_before       DateTime?
+  request_fingerprint             String
+  request_employee_id             String?
+  request_leave_type_id           String?
+  request_starts_at               DateTime?
+  request_ends_at                 DateTime?
+  request_title                   String?
+  request_units                   Decimal?                  @db.Decimal(12, 4)
+  actor_user_id                   String
+  attempt_generation              Int                       @default(1)
+  safe_error_code                 String?
+  known_remote_id                 String?
+  merged_record_id                String?                   @db.Uuid
+  side_effect_claimed_at          DateTime?
+  prepared_at                     DateTime                  @default(now())
+  dispatch_started_at             DateTime?
+  provider_accepted_at            DateTime?
+  completed_at                    DateTime?
+  created_at                      DateTime                  @default(now())
+  updated_at                      DateTime                  @updatedAt
 
   availability_record AvailabilityRecord @relation(fields: [availability_record_id], references: [id])
   organisation        Organisation       @relation(fields: [organisation_id], references: [id])

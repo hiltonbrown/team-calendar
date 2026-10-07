@@ -303,7 +303,7 @@ Outbound write failures are surfaced synchronously to the user in plain language
 - Five concurrent requests maximum per external Xero tenant and provider app
 - 10,000 calls per minute app-wide
 
-Rate limiting, backoff, and retry logic live inside this package. Admission uses a shared, atomic store across deployments and fails closed when that store or its explicitly initialised namespace is unavailable.
+Rate limiting, backoff, and retry logic live inside this package. Admission uses a shared, atomic store across deployments. Ordinary quota keys initialise atomically on first use; store failures deny calls. Limits are five concurrent and 60/minute per external tenant, 1,000/day on Starter or 5,000/day on higher tiers, and 10,000/minute per provider app.
 
 ### `packages/availability`
 
@@ -558,6 +558,8 @@ The feed representation hash covers its name and ordered serialised events. `fee
 
 ## Xero sync model
 
+Live Xero credentials are unavailable in the 7 October simplification session. All live OAuth, granted consent, import, refresh, mutation and disconnect journeys remain **NOT VERIFIED**; source/integration gates are recorded separately in `tasks/todo.md`.
+
 Inbound: pull-first polling. Xero does not provide webhooks for leave data.
 Outbound: synchronous API write triggered by user action. No background queue for outbound writes.
 
@@ -571,7 +573,7 @@ A single eligible Xero organisation connects directly when its Team Calendar
 target is known or unambiguous. Multiple eligible Xero organisations use the
 scoped selection page; a single file needs only a Team Calendar target choice
 when that account has several payroll organisations. Completing connection
-consumes the temporary session and dispatches one durable initial import.
+consumes the temporary session and persists one initial full-import request. Its Inngest job imports people, leave and the entire provider balance roster in order; scheduler recovery redispatches an uncompleted request. Only the job whose `requestedAt` still matches `initial_sync_requested_at` can set `initial_sync_completed_at`. Reconnect preserves canonical IDs and feeds and requests a new full reconciliation.
 
 The requested scopes are exactly `offline_access accounting.settings.read
 payroll.employees payroll.settings.read`. Organisation country discovery requires
@@ -579,7 +581,7 @@ accounting settings reads; employee/leave reads and leave writes require employe
 access; PayItems metadata requires payroll settings reads. Write scopes satisfy
 their matching read capability, and every required capability must be present.
 
-One server-only scoped access resolver performs automatic refresh near expiry,
+One server-only scoped access resolver performs automatic refresh within two minutes of expiry,
 rechecks canonical credentials under the authorisation lock and saves the rotated
 pair atomically. Dormant grants with active connections, including paused sync,
 are refreshed at 45 days through the same implementation. An uncertain response
@@ -613,9 +615,9 @@ Approved AU contract: `au-contract-v1` (2 October 2026). Xero AU API creation sc
 | Approve/decline imported requested leave | Documented Xero approve/reject operation | `submitted → approved/declined` |
 | Withdraw remote leave | Documented Xero reject operation where supported | `submitted/approved → withdrawn` |
 
-The create on approval uses a durable `approve` outbound operation, immutable request fingerprint and fenced attempt generation. An uncertain outcome blocks further edits, retries and withdrawal until an administrator attaches verified provider evidence or independently confirms no creation. Recovery retains the original approving actor; a removed person leaves the approver link explicitly unknown. Inbound sync preserves completed withdrawal when Xero reports rejection.
+The create on approval uses a durable `approve` outbound operation, immutable request fingerprint and fenced attempt generation. An uncertain outcome blocks conflicting edits and writes. Exact in-request replay within the persisted five-minute window may recover the original result; uncertainty after the cutoff requires an administrator to attach verified provider evidence or independently confirm no creation. Recovery retains the original approving actor; a removed person leaves the approver link explicitly unknown. Inbound sync preserves completed withdrawal when Xero reports rejection.
 
-Legacy app-submitted records already present in Xero require scoped administrator review of remote state. They are never recreated, automatically rejected or deleted, or assigned fabricated manager approval history. Existing `submit` operations remain recoverable. No data backfill accompanies this contract.
+Remote approve, decline and withdraw reuse `OutboundOperation`; local submit/decline/withdraw create no provider journal entry. Persist one immutable UUID idempotency key and the exact tenant, method, URL/body identity before dispatch. Short in-request retries reuse that request and key only within five minutes of first dispatch, conservatively inside Xero's six-minute retention. Retries never extend the cutoff. A changed request, cached 5xx or expired uncertain result cannot justify a new key. After the cutoff, authoritative provider reads and administrator recovery precede another mutation. Completed operations return the stored result and apply audit, notifications and publication once.
 
 All provider mutations are synchronous and user-triggered. Failures are surfaced inline; outbound writes have no automatic background retry. NZ and UK submission remain unavailable.
 
@@ -628,14 +630,16 @@ All provider mutations are synchronous and user-triggered. Failures are surfaced
 5. Fetch leave balances per employee per leave type.
 6. Map to canonical `availability_records`, updating `approval_status` from Xero state.
 7. Compute `source_remote_hash` for change detection.
-8. Archive or suppress stale records no longer present in Xero.
+8. Archive absent Xero-owned records only after a complete successful unfiltered full read. Delta or incomplete reads never establish absence; manual entries are preserved.
 9. Enqueue feed rebuilds for affected feeds only.
+
+For AU employees and V2 leave, every delta page uses the prior completed `modified_since` minus a two-minute overlap in `If-Modified-Since` (UTC seconds), with page size 100. Capture run start before fetching and advance the scoped watermark to that start only after all pages and relevant records persist successfully. Empty complete deltas are valid. Malformed or incomplete traversal and failed upserts leave the watermark unchanged. Compare-and-set the prior watermark and recheck the active scoped connection/external tenant before persistence; delayed jobs cannot move progress backwards. Full reads omit the header. NZ/UK retain their supported paging and per-employee reads without a fabricated modification filter; local roster progress belongs on the connection.
 
 ### Failure rules
 
 - Inbound transient failures: exponential backoff via Inngest.
 - Outbound write failures: surfaced synchronously to the user; no automatic retry.
-- Record-level inbound failures do not fail the entire sync run.
+- Record-level inbound failures are isolated and captured, but prevent traversal completeness, watermark advancement and absent-row archival.
 - Failed records captured in `failed_records` with full context.
 - All inbound upserts must be idempotent.
 
@@ -644,7 +648,7 @@ All provider mutations are synchronous and user-triggered. Failures are surfaced
 - Incremental inbound syncs (people, leave records): every 15 minutes during business hours (07:00 through 18:59 local time on weekdays, Monday–Friday), every 60 minutes outside (weekends and 19:00 through 06:59 local time).
 - Leave balance sync: every 60 minutes at all times. The scheduler processes one ordered page of 40 active people per run to support an unlimited employee roster. Roster balance refreshes are rolling best-effort across scheduled pages rather than fixed whole-roster batch completions.
 - Nightly reconciliation: full re-sync, approval state reconciliation (dispatched once per local night between 01:00 and 02:59 local time), and stale record detection.
-- Manual re-sync: available from the UI for admin users.
+- Manual re-sync: explicit full reconciliation, available from the UI for admin users.
 
 ---
 

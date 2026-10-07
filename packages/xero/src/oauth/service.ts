@@ -116,7 +116,11 @@ export function isLocalApplicationPath(value: string): boolean {
     }
   }
 
-  return true;
+  // URL normalization removes dot segments; the resulting pathname must not
+  // become a protocol-relative destination when returned to the browser.
+  return !new URL(value, "https://teamcalendar.local").pathname.startsWith(
+    "//"
+  );
 }
 
 async function resolveOrganisationForTenantSelection(input: {
@@ -1084,7 +1088,6 @@ async function closeOAuthSession(
       nonce_hash: null,
       state_hash: null,
       status,
-      xero_authorisation_id: null,
     },
     where: scope,
   });
@@ -1354,7 +1357,11 @@ export async function completeXeroTenantSelection(input: {
           selected_tenant_name: selected.tenantName,
           state_hash: null,
           status: "completed",
-          xero_authorisation_id: null,
+          // Retain a replaced grant for the existing atomic session purge.
+          xero_authorisation_id:
+            connectionSnapshot?.xero_authorisation_id === grant.id
+              ? null
+              : (connectionSnapshot?.xero_authorisation_id ?? null),
         },
         where: {
           clerk_org_id: input.clerkOrgId,
@@ -1399,10 +1406,16 @@ export async function completeXeroTenantSelection(input: {
         throw new Error("tenant_replacement_required");
       }
       const data = {
+        balance_next_person_id: null,
+        balance_sweep_failed: false,
         disconnected_at: null,
+        initial_sync_completed_at: null,
+        initial_sync_requested_at: new Date(),
         last_connected_at: new Date(),
         last_error_code: null,
         last_error_message: null,
+        leave_next_person_id: null,
+        leave_sweep_failed: false,
         payroll_region: region.value.payrollRegion,
         remote_connection_id: selected.connectionId,
         status: "active" as const,
@@ -1444,7 +1457,9 @@ export async function completeXeroTenantSelection(input: {
       value: {
         connectionId: connection.id,
         organisationId: connection.organisation_id,
-        returnTo: session.return_to,
+        returnTo: isLocalApplicationPath(session.return_to)
+          ? session.return_to
+          : DEFAULT_XERO_RETURN_TO,
       },
     };
   } catch (error) {

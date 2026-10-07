@@ -150,10 +150,28 @@ export function dueRunTypes(
   const isWeekday = local.dayOfWeek >= 1 && local.dayOfWeek <= 5;
   const isBusinessHours = isWeekday && local.hour >= 7 && local.hour <= 18;
   const due: RegisteredSyncRunType[] = [];
-  if (isInboundDue(tenant.lastPeopleSyncAt, now, isBusinessHours)) {
+  if (
+    isInboundDue(tenant.lastPeopleSyncAt, now, isBusinessHours) ||
+    isReconciliationDue(
+      tenant.lastFullPeopleSyncAt ?? null,
+      now,
+      tenant.timezone,
+      local.hour,
+      local.dateStr
+    )
+  ) {
     due.push("people");
   }
-  if (isInboundDue(tenant.lastLeaveRecordsSyncAt, now, isBusinessHours)) {
+  if (
+    isInboundDue(tenant.lastLeaveRecordsSyncAt, now, isBusinessHours) ||
+    isReconciliationDue(
+      tenant.lastFullLeaveRecordsSyncAt ?? null,
+      now,
+      tenant.timezone,
+      local.hour,
+      local.dateStr
+    )
+  ) {
     due.push("leave_records");
   }
   if (isBalanceDue(tenant.lastLeaveBalancesSyncAt, now)) {
@@ -171,6 +189,31 @@ export function dueRunTypes(
     due.push("approval_state_reconciliation");
   }
   return due;
+}
+function scheduledSyncMode(
+  tenant: SchedulableXeroConnection,
+  runType: RegisteredSyncRunType,
+  now: Date
+): "full" | "incremental" | undefined {
+  if (runType !== "people" && runType !== "leave_records") {
+    return undefined;
+  }
+  const timezone = tenant.timezone ?? "";
+  const local = getTenantLocalTimeParts(now, timezone);
+  const lastFullAt =
+    runType === "people"
+      ? tenant.lastFullPeopleSyncAt
+      : tenant.lastFullLeaveRecordsSyncAt;
+  return local &&
+    isReconciliationDue(
+      lastFullAt ?? null,
+      now,
+      timezone,
+      local.hour,
+      local.dateStr
+    )
+    ? "full"
+    : "incremental";
 }
 export interface ScheduleXeroSyncsPageOptions {
   cursor?: string;
@@ -225,17 +268,17 @@ export async function scheduleXeroSyncsPage(
       continue;
     }
     for (const runType of due) {
-      const eventId = getScheduledSyncEventId(
-        tenant.connectionId,
-        runType,
-        now
-      );
+      const mode = scheduledSyncMode(tenant, runType, now);
+      const eventId =
+        getScheduledSyncEventId(tenant.connectionId, runType, now) +
+        (mode === "full" ? ":full" : "");
       const dispatchRes = await dispatchSyncEvent(
         {
           clerkOrgId: tenant.clerkOrgId,
           connectionId: tenant.connectionId,
           organisationId: tenant.organisationId,
           runType,
+          ...(mode ? { mode } : {}),
           triggerType: "scheduled",
         },
         { eventId }
