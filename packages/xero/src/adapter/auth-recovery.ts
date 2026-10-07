@@ -1,19 +1,18 @@
-import { resolveXeroAccess } from "../oauth/credential-owner";
-import type { XeroTenantForWrite, XeroWriteResult } from "../write/types";
+import { resolveXeroAccess } from "../oauth/authorisation";
+import type { XeroAccessContext, XeroWriteResult } from "../write/types";
 import {
   classifyXeroFailure,
   mapXeroTransportError,
 } from "./classify-xero-failure";
-import { toResolvedXeroTenant } from "./resolved-tenant";
-
+import { toResolvedXeroConnection } from "./resolved-tenant";
 export async function executeWithXeroAuthRecovery<T>(
-  xeroTenant: XeroTenantForWrite,
-  operation: (currentTenant: XeroTenantForWrite) => Promise<XeroWriteResult<T>>,
+  xeroConnection: XeroAccessContext,
+  operation: (currentTenant: XeroAccessContext) => Promise<XeroWriteResult<T>>,
   isMutation = false
 ): Promise<XeroWriteResult<T>> {
   let first: XeroWriteResult<T>;
   try {
-    first = await operation(xeroTenant);
+    first = await operation(xeroConnection);
   } catch (error) {
     return { error: mapXeroTransportError(error, isMutation), ok: false };
   }
@@ -26,20 +25,16 @@ export async function executeWithXeroAuthRecovery<T>(
   ) {
     return first;
   }
-
   const scope = {
-    capability: xeroTenant.capability,
-    clerkOrgId: xeroTenant.clerk_org_id,
-    organisationId: xeroTenant.organisation_id,
+    capability: xeroConnection.capability,
+    clerkOrgId: xeroConnection.clerk_org_id,
+    organisationId: xeroConnection.organisation_id,
   };
   const refreshed = await resolveXeroAccess({
     ...scope,
-    deadline: xeroTenant.deadline,
-    expectedBindingGeneration: xeroTenant.bindingGeneration,
+    deadline: xeroConnection.deadline,
     forceRefresh: true,
-    previousAccessToken:
-      xeroTenant.tokenVersion === null ? xeroTenant.accessToken : undefined,
-    previousTokenVersion: xeroTenant.tokenVersion,
+    previousAccessToken: xeroConnection.accessToken,
   });
   if (!refreshed.ok) {
     return {
@@ -57,7 +52,7 @@ export async function executeWithXeroAuthRecovery<T>(
     };
   }
   try {
-    return await operation(toResolvedXeroTenant(scope, refreshed.value));
+    return await operation(toResolvedXeroConnection(scope, refreshed.value));
   } catch (error) {
     return { error: mapXeroTransportError(error, isMutation), ok: false };
   }

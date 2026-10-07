@@ -9,7 +9,6 @@ import { keys } from "../keys";
 import { isLocalDatabase } from "./is-local-database";
 import { createLazyClient } from "./lazy-client";
 import { assertTestDatabaseConnectionAllowed } from "./live-test-guard";
-import { createWriteGuardedClient } from "./write-guard";
 
 declare global {
   var __teamCalendarDatabase: PrismaClient | undefined;
@@ -31,17 +30,15 @@ const createDatabaseClient = (): PrismaClient => {
 
 // Keep imports harmless for builds and mocked unit tests. The live-test guard
 // runs before the first adapter or network-capable client is constructed.
-export const database = createWriteGuardedClient(
-  createLazyClient({
-    create: createDatabaseClient,
-    guard: assertTestDatabaseConnectionAllowed,
-    initial: globalThis.__teamCalendarDatabase,
-    onCreate: (client) => {
-      if (process.env.NODE_ENV !== "production") {
-        globalThis.__teamCalendarDatabase = client;
-      }
-    },
-  })
-);
+export const database = createLazyClient({
+  create: createDatabaseClient,
+  guard: assertTestDatabaseConnectionAllowed,
+  initial: globalThis.__teamCalendarDatabase,
+  onCreate: (client) => {
+    if (process.env.NODE_ENV !== "production") {
+      globalThis.__teamCalendarDatabase = client;
+    }
+  },
+});
 
 export type Database = PrismaClient;

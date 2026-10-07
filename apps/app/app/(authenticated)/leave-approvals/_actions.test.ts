@@ -22,7 +22,6 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   revertApprovalAttempt: vi.fn(),
 }));
-
 vi.mock("@repo/auth/server", () => ({
   auth: mocks.auth,
   currentUser: mocks.currentUser,
@@ -52,7 +51,6 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
-
 const {
   approveAction,
   declineAction,
@@ -63,12 +61,10 @@ const {
   retryDeclineAction,
   revertApprovalAttemptAction,
 } = await import("./_actions");
-
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const recordId = "00000000-0000-4000-8000-000000000002";
 const clerkOrgId = "org_123";
 const userId = "user_456";
-
 describe("leave approval server actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -147,11 +143,9 @@ describe("leave approval server actions", () => {
       value: { queued: true },
     });
   });
-
   describe("baseline authorization and scoping tests", () => {
     it("rejects unauthenticated callers for all actions", async () => {
       mocks.currentUser.mockResolvedValue(null);
-
       const resApprove = await approveAction({ organisationId, recordId });
       expect(resApprove).toEqual({
         error: {
@@ -161,7 +155,6 @@ describe("leave approval server actions", () => {
         ok: false,
       });
       expect(mocks.approve).not.toHaveBeenCalled();
-
       const resDecline = await declineAction({
         organisationId,
         reason: "Valid reason",
@@ -169,7 +162,6 @@ describe("leave approval server actions", () => {
       });
       expect(resDecline.ok).toBe(false);
       expect(mocks.decline).not.toHaveBeenCalled();
-
       const resReq = await requestMoreInfoAction({
         organisationId,
         question: "Valid question?",
@@ -178,10 +170,8 @@ describe("leave approval server actions", () => {
       expect(resReq.ok).toBe(false);
       expect(mocks.requestMoreInfo).not.toHaveBeenCalled();
     });
-
     it("rejects insufficient role for viewer and admin-only actions", async () => {
       mocks.auth.mockResolvedValue({ orgRole: "org:viewer" });
-
       const resApprove = await approveAction({ organisationId, recordId });
       expect(resApprove).toEqual({
         error: {
@@ -191,7 +181,6 @@ describe("leave approval server actions", () => {
         ok: false,
       });
       expect(mocks.approve).not.toHaveBeenCalled();
-
       // For dispatchApprovalReconciliationAction, org:manager is insufficient (admin only)
       mocks.auth.mockResolvedValue({ orgRole: "org:manager" });
       const resReconcile = await dispatchApprovalReconciliationAction({
@@ -206,7 +195,6 @@ describe("leave approval server actions", () => {
       });
       expect(mocks.dispatchApprovalReconciliation).not.toHaveBeenCalled();
     });
-
     it("rejects malformed inputs for actions", async () => {
       const resDecline = await declineAction({
         organisationId,
@@ -218,7 +206,6 @@ describe("leave approval server actions", () => {
         expect(resDecline.error.code).toBe("validation_error");
       }
       expect(mocks.decline).not.toHaveBeenCalled();
-
       const resApprove = await approveAction({
         organisationId: "not-a-uuid",
         recordId,
@@ -229,10 +216,8 @@ describe("leave approval server actions", () => {
       }
       expect(mocks.approve).not.toHaveBeenCalled();
     });
-
     it("scopes database queries to clerk_org_id and organisation_id", async () => {
       await approveAction({ organisationId, recordId });
-
       expect(mocks.database.person.findFirst).toHaveBeenCalledWith({
         select: { id: true },
         where: {
@@ -244,7 +229,6 @@ describe("leave approval server actions", () => {
       });
     });
   });
-
   describe("action specific functionality", () => {
     it("declineAction requires a valid reason and passes it to the decline service", async () => {
       const result = await declineAction({
@@ -252,7 +236,6 @@ describe("leave approval server actions", () => {
         reason: "Taking annual leave during critical project delivery window.",
         recordId,
       });
-
       expect(result.ok).toBe(true);
       expect(mocks.decline).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -268,7 +251,6 @@ describe("leave approval server actions", () => {
       );
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/leave-approvals");
     });
-
     it("surfaces Xero write failure to the caller inline", async () => {
       mocks.approve.mockResolvedValue({
         error: {
@@ -277,7 +259,6 @@ describe("leave approval server actions", () => {
         },
         ok: false,
       });
-
       const result = await approveAction({ organisationId, recordId });
       expect(result).toEqual({
         error: {
@@ -287,7 +268,6 @@ describe("leave approval server actions", () => {
         ok: false,
       });
     });
-
     it("revalidates approval write paths on successful approveAction", async () => {
       const result = await approveAction({ organisationId, recordId });
       expect(result.ok).toBe(true);
@@ -297,14 +277,12 @@ describe("leave approval server actions", () => {
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/notifications");
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
     });
-
     it("executes requestMoreInfoAction and revalidates leave-approvals and notifications", async () => {
       const result = await requestMoreInfoAction({
         organisationId,
         question: "Can you provide coverage details for Thursday?",
         recordId,
       });
-
       expect(result.ok).toBe(true);
       expect(mocks.requestMoreInfo).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -315,35 +293,26 @@ describe("leave approval server actions", () => {
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/leave-approvals");
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/notifications");
     });
-
     it("executes retryApprovalAction, retryDeclineAction, revertApprovalAttemptAction", async () => {
       await retryApprovalAction({ organisationId, recordId });
       expect(mocks.retryApproval).toHaveBeenCalled();
-
       await retryDeclineAction({ organisationId, recordId });
       expect(mocks.retryDecline).toHaveBeenCalled();
-
       await revertApprovalAttemptAction({ organisationId, recordId });
       expect(mocks.revertApprovalAttempt).toHaveBeenCalled();
     });
-
     it("allows admin to dispatch approval reconciliation", async () => {
       mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
-
       const result = await dispatchApprovalReconciliationAction({
         organisationId,
       });
-
       expect(result).toEqual({ ok: true, value: { queued: true } });
       expect(mocks.dispatchApprovalReconciliation).toHaveBeenCalled();
       expect(mocks.revalidatePath).toHaveBeenCalledWith("/leave-approvals");
     });
-
     it("allows admin to dispatch an inbound Xero leave sync", async () => {
       mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
-
       const result = await dispatchXeroLeaveSyncAction({ organisationId });
-
       expect(result).toEqual({ ok: true, value: { queued: true } });
       expect(mocks.dispatchXeroLeaveSync).toHaveBeenCalledWith(
         expect.objectContaining({ organisationId, role: "admin" })
@@ -353,12 +322,3 @@ describe("leave approval server actions", () => {
     });
   });
 });
-
-vi.mock("@/lib/server/xero-campaign-action", () => ({
-  withAuthenticatedXeroCampaignAction: (
-    _id: unknown,
-    _scope: unknown,
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

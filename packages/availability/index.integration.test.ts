@@ -32,7 +32,6 @@ vi.mock("./src/holidays/nager-client", () => ({
     })
   ),
 }));
-
 const fixture = allocateLiveTestFixture(
   "packages/availability/index.integration.test.ts"
 );
@@ -49,18 +48,15 @@ const {
   updateManualAvailability,
 } = await import("./index");
 const { database } = await import("@repo/database");
-
 interface TenantFixture {
   clerkOrgId: string;
   organisationId: string;
   personId: string;
 }
-
 const tenantA: TenantFixture = {
   ...tenantSlotA,
   personId: fixture.id("person", 0),
 };
-
 const tenantB: TenantFixture = {
   ...tenantSlotB,
   personId: fixture.id("person", 1),
@@ -69,13 +65,11 @@ if (!(tenantA.clerkOrgId && tenantB.clerkOrgId && provisioningTenant)) {
   throw new Error("Availability live fixture tenants were not allocated");
 }
 const provisioningClerkOrgId = provisioningTenant.clerkOrgId;
-
 const testClerkOrgIds = [
   tenantA.clerkOrgId,
   tenantB.clerkOrgId,
   provisioningClerkOrgId,
 ];
-
 const inputFor = (tenant: TenantFixture) => ({
   allDay: true,
   contactability: "limited",
@@ -89,7 +83,6 @@ const inputFor = (tenant: TenantFixture) => ({
   title: "Working from home",
   workingLocation: "Brisbane",
 });
-
 const patchInput = {
   allDay: true,
   contactability: "limited",
@@ -102,7 +95,6 @@ const patchInput = {
   title: "Working from home",
   workingLocation: "Brisbane",
 } as const;
-
 const createTenant = async (tenant: TenantFixture) => {
   await database.organisation.create({
     data: {
@@ -112,7 +104,6 @@ const createTenant = async (tenant: TenantFixture) => {
       name: `Manual availability ${tenant.clerkOrgId}`,
     },
   });
-
   await database.person.create({
     data: {
       clerk_org_id: tenant.clerkOrgId,
@@ -128,7 +119,6 @@ const createTenant = async (tenant: TenantFixture) => {
     },
   });
 };
-
 const cleanTestData = async () => {
   await database.availabilityPublication.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
@@ -167,13 +157,11 @@ const cleanTestData = async () => {
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
 };
-
 const contextFor = (tenant: TenantFixture): TenantContext => ({
   // Test fixture IDs are fixed strings that match the branded runtime shape.
   clerkOrgId: tenant.clerkOrgId as ClerkOrgId,
   organisationId: tenant.organisationId as OrganisationId,
 });
-
 const createProvisioningOrganisation = () =>
   database.organisation.create({
     data: {
@@ -183,18 +171,15 @@ const createProvisioningOrganisation = () =>
       name: "Provisioning fixture",
     },
   });
-
 beforeEach(async () => {
   await cleanTestData();
   await createTenant(tenantA);
   await createTenant(tenantB);
 });
-
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
-
 afterAll(async () => {
   await cleanTestData();
   await expect(
@@ -204,7 +189,6 @@ afterAll(async () => {
   ).resolves.toBe(0);
   await database.$disconnect();
 });
-
 describe("manual availability services", () => {
   test("creates records visible to scoped calendar and people queries", async () => {
     const result = await createManualAvailability(
@@ -212,12 +196,10 @@ describe("manual availability services", () => {
       inputFor(tenantA),
       { orgRole: "org:admin", userId: "user_test" }
     );
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     expect(result.value).toMatchObject({
       contactability: "limited",
       includeInFeed: true,
@@ -228,7 +210,6 @@ describe("manual availability services", () => {
       title: "Working from home",
       workingLocation: "Brisbane",
     });
-
     await expect(listAvailabilityRecords(contextFor(tenantA))).resolves.toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -238,7 +219,6 @@ describe("manual availability services", () => {
       ])
     );
   });
-
   test("rejects invalid dates and person IDs outside the tenant", async () => {
     await expect(
       createManualAvailability(
@@ -253,7 +233,6 @@ describe("manual availability services", () => {
       error: expect.objectContaining({ code: "bad_request" }),
       ok: false,
     });
-
     await expect(
       createManualAvailability(
         contextFor(tenantA),
@@ -265,7 +244,6 @@ describe("manual availability services", () => {
       ok: false,
     });
   });
-
   test("preserves creation UID and advances material publication while saving edited Brisbane slot instants", async () => {
     const actor = { orgRole: "org:admin", userId: "user_admin" };
     const startsAt = new Date("2026-10-02T23:00:00.000Z");
@@ -331,19 +309,16 @@ describe("manual availability services", () => {
       })
     ).toBe(0);
   });
-
   test("updates and archives only manual records in the active tenant", async () => {
     const created = await createManualAvailability(
       contextFor(tenantA),
       inputFor(tenantA),
       { orgRole: "org:admin", userId: "user_test" }
     );
-
     expect(created.ok).toBe(true);
     if (!created.ok) {
       return;
     }
-
     await expect(
       updateManualAvailability(
         contextFor(tenantB),
@@ -355,7 +330,6 @@ describe("manual availability services", () => {
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
-
     const updated = await updateManualAvailability(
       contextFor(tenantA),
       created.value.id,
@@ -367,7 +341,6 @@ describe("manual availability services", () => {
       },
       { orgRole: "org:admin", userId: "user_test" }
     );
-
     expect(updated).toMatchObject({
       ok: true,
       value: expect.objectContaining({
@@ -376,7 +349,6 @@ describe("manual availability services", () => {
         title: "Training day",
       }),
     });
-
     await expect(
       archiveManualAvailability(contextFor(tenantB), created.value.id, {
         orgRole: "org:admin",
@@ -386,14 +358,12 @@ describe("manual availability services", () => {
       error: expect.objectContaining({ code: "not_found" }),
       ok: false,
     });
-
     await expect(
       archiveManualAvailability(contextFor(tenantA), created.value.id, {
         orgRole: "org:admin",
         userId: "user_test",
       })
     ).resolves.toMatchObject({ ok: true });
-
     await expect(
       listAvailabilityRecords(contextFor(tenantA))
     ).resolves.not.toEqual(
@@ -403,7 +373,6 @@ describe("manual availability services", () => {
     );
   });
 });
-
 describe("current user person identity", () => {
   test("provisions one default feed when ensuring an organisation", async () => {
     await cleanTestData();
@@ -413,13 +382,11 @@ describe("current user person identity", () => {
       countryCode: "AU",
       name: "Default feed provisioning",
     });
-
     await expect(
       database.organisation.count({
         where: { clerk_org_id: provisioningClerkOrgId },
       })
     ).resolves.toBe(1);
-
     const feeds = await database.feed.findMany({
       where: {
         archived_at: null,
@@ -433,7 +400,6 @@ describe("current user person identity", () => {
       privacy_mode: "named",
       status: "active",
     });
-
     await expect(
       database.feedScope.findMany({
         where: {
@@ -445,7 +411,6 @@ describe("current user person identity", () => {
     ).resolves.toEqual([
       expect.objectContaining({ scope_type: "org", scope_value: null }),
     ]);
-
     await expect(
       database.feedToken.count({
         where: {
@@ -456,13 +421,11 @@ describe("current user person identity", () => {
         },
       })
     ).resolves.toBe(1);
-
     await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
       name: "Default feed provisioning renamed",
     });
-
     await expect(
       database.feed.count({
         where: {
@@ -472,7 +435,6 @@ describe("current user person identity", () => {
       })
     ).resolves.toBe(1);
   });
-
   test("provisions default public holidays when ensuring an organisation", async () => {
     await cleanTestData();
     await createProvisioningOrganisation();
@@ -481,12 +443,10 @@ describe("current user person identity", () => {
       countryCode: "AU",
       name: "Default holiday provisioning test",
     });
-
     const orgCount = await database.organisation.count({
       where: { clerk_org_id: provisioningClerkOrgId },
     });
     expect(orgCount).toBe(1);
-
     const jurisdictions = await database.publicHolidayJurisdiction.findMany({
       where: {
         clerk_org_id: provisioningClerkOrgId,
@@ -496,7 +456,6 @@ describe("current user person identity", () => {
       },
     });
     expect(jurisdictions.length).toBeGreaterThanOrEqual(1);
-
     const currentYear = new Date().getUTCFullYear();
     const holidays = await database.publicHoliday.findMany({
       where: {
@@ -505,19 +464,15 @@ describe("current user person identity", () => {
         source: "nager",
       },
     });
-
     const holidayYears = holidays.map((h) => h.holiday_date.getUTCFullYear());
     expect(holidayYears).toContain(currentYear);
     expect(holidayYears).toContain(currentYear + 1);
-
     const initialHolidayCount = holidays.length;
-
     await ensureOrganisationForClerk({
       clerkOrgId: provisioningClerkOrgId,
       countryCode: "AU",
       name: "Default holiday provisioning test",
     });
-
     const finalJurisdictions = await database.publicHolidayJurisdiction.count({
       where: {
         clerk_org_id: provisioningClerkOrgId,
@@ -525,7 +480,6 @@ describe("current user person identity", () => {
       },
     });
     expect(finalJurisdictions).toBe(jurisdictions.length);
-
     const finalHolidayCount = await database.publicHoliday.count({
       where: {
         clerk_org_id: provisioningClerkOrgId,
@@ -535,37 +489,31 @@ describe("current user person identity", () => {
     });
     expect(finalHolidayCount).toBe(initialHolidayCount);
   });
-
   test("returns an existing linked person", async () => {
     await database.person.update({
       data: { clerk_user_id: "user_existing" },
       where: { id: tenantA.personId },
     });
-
     const result = await ensureCurrentUserPerson(contextFor(tenantA), {
       clerkUserId: "user_existing",
       displayName: "Existing User",
       email: `${tenantA.clerkOrgId}@example.com`,
     });
-
     expect(result).toMatchObject({
       ok: true,
       value: expect.objectContaining({ id: tenantA.personId }),
     });
   });
-
   test("links one same-email unlinked person in the active tenant", async () => {
     const result = await ensureCurrentUserPerson(contextFor(tenantA), {
       clerkUserId: "user_same_email",
       displayName: "Manual Person",
       email: `${tenantA.clerkOrgId}@example.com`,
     });
-
     expect(result).toMatchObject({
       ok: true,
       value: expect.objectContaining({ id: tenantA.personId }),
     });
-
     await expect(
       database.person.findFirst({
         select: { id: true },
@@ -577,20 +525,17 @@ describe("current user person identity", () => {
       })
     ).resolves.toEqual({ id: tenantA.personId });
   });
-
   test("does not link same-email people outside the active tenant", async () => {
     const result = await ensureCurrentUserPerson(contextFor(tenantA), {
       clerkUserId: "user_cross_tenant",
       displayName: "Cross Tenant",
       email: `${tenantB.clerkOrgId}@example.com`,
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
     expect(result.value.id).not.toBe(tenantB.personId);
-
     await expect(
       database.person.findUnique({
         select: { clerk_user_id: true },
@@ -598,7 +543,6 @@ describe("current user person identity", () => {
       })
     ).resolves.toEqual({ clerk_user_id: null });
   });
-
   test("creates a manual person when no same-email profile exists", async () => {
     const result = await ensureCurrentUserPerson(contextFor(tenantA), {
       avatarUrl: "https://img.clerk.com/avatar.png",
@@ -606,12 +550,10 @@ describe("current user person identity", () => {
       displayName: "New User",
       email: "New.User@example.com",
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     await expect(
       database.person.findUnique({
         select: {
@@ -633,7 +575,6 @@ describe("current user person identity", () => {
       source_system: "MANUAL",
     });
   });
-
   test("returns a conflict when multiple same-email people exist", async () => {
     await database.person.createMany({
       data: [
@@ -659,7 +600,6 @@ describe("current user person identity", () => {
         },
       ],
     });
-
     await expect(
       ensureCurrentUserPerson(contextFor(tenantA), {
         clerkUserId: "user_conflict",
@@ -672,7 +612,6 @@ describe("current user person identity", () => {
     });
   });
 });
-
 describe("release list-query evidence", () => {
   test("returns no public-holiday people when no holiday applies", async () => {
     const result = await listPeople({
@@ -682,18 +621,15 @@ describe("release list-query evidence", () => {
       pagination: { pageSize: 50 },
       role: "admin",
     });
-
     expect(result).toEqual({
       ok: true,
       value: { nextCursor: null, people: [], totalCount: 0 },
     });
   });
-
   test("matches every people status filter to the current-status oracle", async () => {
     const at = new Date("2026-10-03T14:30:00.000Z");
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(at);
-
     const losAngelesLocationId = fixture.id("people-location", 0);
     const sydneyLocationId = fixture.id("people-location", 1);
     const workingOverrideLocationId = fixture.id("people-location", 2);
@@ -746,7 +682,6 @@ describe("release list-query evidence", () => {
       data: { archived_at: new Date("2026-09-01T00:00:00.000Z") },
       where: { id: tenantA.personId },
     });
-
     const statusCases = [
       ["alternative_contact", "alternative_contact", "approved"],
       ["another_office", "another_office", "approved"],
@@ -891,7 +826,6 @@ describe("release list-query evidence", () => {
         },
       ],
     });
-
     const oracle = await computeCurrentStatusForPeople({
       at,
       clerkOrgId: tenantA.clerkOrgId,
@@ -941,7 +875,6 @@ describe("release list-query evidence", () => {
       );
       expect(result.value.totalCount).toBe(expectedIds.length);
     }
-
     expect(oracle.get(holidayPersonId)?.statusKey).toBe("public_holiday");
     expect(oracle.get(workingOverridePersonId)?.statusKey).toBe("available");
     expect(oracle.get(archivedOverridePersonId)?.statusKey).toBe(
@@ -965,21 +898,19 @@ describe("release list-query evidence", () => {
       },
     });
   });
-
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));
     const findMany = vi.spyOn(database.availabilityRecord, "findMany");
     const count = vi.spyOn(database.availabilityRecord, "count");
     const balanceFindMany = vi.spyOn(database.leaveBalance, "findMany");
-    const tenantFindFirst = vi.spyOn(database.xeroTenant, "findFirst");
+    const tenantFindFirst = vi.spyOn(database.xeroConnection, "findFirst");
     const measurements: Array<{
       durationMs: number;
       payloadBytes: number;
       queryCount: number;
       rowCount: number;
     }> = [];
-
     for (const rowCount of [1, 50, 200]) {
       await database.availabilityRecord.deleteMany({
         where: {
@@ -1042,7 +973,6 @@ describe("release list-query evidence", () => {
         rowCount,
       });
     }
-
     expect(measurements.map(({ queryCount }) => queryCount)).toEqual([4, 4, 4]);
     expect(measurements.map(({ rowCount }) => rowCount)).toEqual([1, 50, 200]);
     expect(
@@ -1051,7 +981,6 @@ describe("release list-query evidence", () => {
       )
     ).toBe(true);
   });
-
   test("paginates equal timestamps after cursor deletion and supports all history", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));

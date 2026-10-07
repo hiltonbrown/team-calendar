@@ -1,11 +1,8 @@
 import "server-only";
-
 import { getXeroConnectionStateForScope } from "@repo/availability";
 import { toXeroConnectionDisplayState, xeroRecoveryMessage } from "@repo/core";
 import { database } from "@repo/database";
-
 export type OnboardingStepStatus = "complete" | "next" | "optional" | "pending";
-
 export interface OnboardingStep {
   ctaHref: string;
   ctaLabel: string;
@@ -14,7 +11,6 @@ export interface OnboardingStep {
   status: OnboardingStepStatus;
   title: string;
 }
-
 export interface OnboardingState {
   activeFeedCount: number;
   completedRequiredCount: number;
@@ -27,13 +23,11 @@ export interface OnboardingState {
   steps: OnboardingStep[];
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
-
 interface LoadOnboardingStateInput {
   clerkOrgId: string;
   organisationId: string;
   userId?: string | null;
 }
-
 export async function loadOnboardingState({
   clerkOrgId,
   organisationId,
@@ -104,7 +98,6 @@ export async function loadOnboardingState({
       },
     }),
   ]);
-
   const hasProfile = Boolean(organisation);
   const xeroConnectionState =
     toXeroConnectionDisplayState(activeXeroConnection);
@@ -113,17 +106,17 @@ export async function loadOnboardingState({
   const currentUserPersonLinked = userId ? Boolean(currentUserPerson) : null;
   const hasPublicHolidays = publicHolidayJurisdictionCount > 0;
   const hasFeeds = activeFeedCount > 0;
-
-  const requiredSteps: Array<{ complete: boolean; id: OnboardingStep["id"] }> =
-    [
-      { complete: hasProfile, id: "profile" },
-      { complete: isPeopleComplete, id: "people" },
-      { complete: hasPublicHolidays, id: "holidays" },
-      { complete: hasFeeds, id: "feed" },
-    ];
+  const requiredSteps: Array<{
+    complete: boolean;
+    id: OnboardingStep["id"];
+  }> = [
+    { complete: hasProfile, id: "profile" },
+    { complete: isPeopleComplete, id: "people" },
+    { complete: hasPublicHolidays, id: "holidays" },
+    { complete: hasFeeds, id: "feed" },
+  ];
   const nextRequiredId = requiredSteps.find((step) => !step.complete)?.id;
   const xeroSetupSteps = xeroSetupStepsForState(xeroConnectionState);
-
   const steps: OnboardingStep[] = [
     {
       ctaHref: "/settings/general",
@@ -178,11 +171,9 @@ export async function loadOnboardingState({
       title: "Review calendar feed",
     },
   ];
-
   const completedRequiredCount = requiredSteps.filter(
     (step) => step.complete
   ).length;
-
   return {
     activeFeedCount,
     completedRequiredCount,
@@ -196,7 +187,6 @@ export async function loadOnboardingState({
     xeroConnectionState,
   };
 }
-
 function statusForRequiredStep(
   id: OnboardingStep["id"],
   complete: boolean,
@@ -207,7 +197,6 @@ function statusForRequiredStep(
   }
   return id === nextRequiredId ? "next" : "pending";
 }
-
 function xeroSetupStepsForState(
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState
 ): OnboardingStep[] {
@@ -248,7 +237,6 @@ function xeroSetupStepsForState(
       ];
   }
 }
-
 function getPeopleCtaLabel(
   pendingPersonMatchesCount: number,
   hasPeople: boolean
@@ -261,7 +249,6 @@ function getPeopleCtaLabel(
   }
   return "Add people";
 }
-
 function getPeopleDescription(
   pendingPersonMatchesCount: number,
   hasPeople: boolean,

@@ -8,7 +8,6 @@ const FORBIDDEN_PATTERN =
 const messages = [
   ["connected", "Xero is connected."],
   ["not_connected", "Connect Xero to sync your payroll data."],
-  ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
   ["reauthorisation_required", "Xero access needs to be renewed."],
   ["reauthorise", "Xero access needs to be renewed."],
   ["update_permissions", "Update Xero permissions to continue."],

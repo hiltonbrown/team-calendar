@@ -2,23 +2,14 @@ import "./keys";
 
 export { XERO_OPERATION_CAPABILITIES } from "./src/adapter/capabilities";
 export { classifyXeroFailure } from "./src/adapter/classify-xero-failure";
-export { toResolvedXeroTenant } from "./src/adapter/resolved-tenant";
+export { toResolvedXeroConnection } from "./src/adapter/resolved-tenant";
 export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
 export { emitXeroMetric } from "./src/metrics";
 export {
-  aggregateXeroDisconnectReceipt,
-  getXeroDisconnectReceipt,
-  processXeroCleanupAttempt,
-  reissueXeroCleanupAttempt,
-  retireResolvedCleanupRequest,
-  type XeroDisconnectReceipt,
-} from "./src/oauth/connection-cleanup";
-export {
-  recoverXeroRefreshAttempts,
-  refreshXeroCredentialOwner,
+  refreshXeroAuthorisation,
   resolveXeroAccess,
-} from "./src/oauth/credential-owner";
+} from "./src/oauth/authorisation";
 export {
   buildXeroOAuthStartUrl,
   cancelXeroOAuth,
@@ -32,11 +23,10 @@ export {
   markXeroConnectionStale,
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,
+  purgeClosedXeroOAuthSessions,
   refreshXeroOAuthConnection,
-  scrubInactiveXeroOAuthSessionCredentials,
-  type XeroConnectionRefreshDecision,
+  type XeroDisconnectResult,
   type XeroOAuthError,
-  xeroConnectionRefreshDecision,
 } from "./src/oauth/service";
 export {
   initialiseXeroRateNamespace,
@@ -94,7 +84,7 @@ export {
   submitLeaveApplicationForRegion,
   withdrawLeaveApplicationForRegion,
 } from "./src/write/dispatch";
-export type { XeroRecoveryReason, XeroTenantForWrite } from "./src/write/types";
+export type { XeroAccessContext, XeroRecoveryReason } from "./src/write/types";
 export {
   toPlainLanguageMessage,
   type XeroWriteError,

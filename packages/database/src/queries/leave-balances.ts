@@ -2,7 +2,6 @@ import type { ClerkOrgId, OrganisationId, PersonId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { database } from "../client";
 import { scopedQuery } from "../tenant-query";
-
 export interface LeaveBalanceData {
   balance: number;
   clerkOrgId: string;
@@ -13,9 +12,8 @@ export interface LeaveBalanceData {
   organisationId: OrganisationId;
   personId: PersonId;
   updatedAt: Date;
-  xeroTenantId: null | string;
+  xeroConnectionId: null | string;
 }
-
 export interface LeaveBalanceSummaryData {
   balance: number;
   currencyCode: null | string;
@@ -25,9 +23,8 @@ export interface LeaveBalanceSummaryData {
   personId: PersonId;
   personLastName: string;
   updatedAt: Date;
-  xeroTenantId: null | string;
+  xeroConnectionId: null | string;
 }
-
 export async function listLeaveBalancesForPerson(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
@@ -46,14 +43,13 @@ export async function listLeaveBalancesForPerson(
         organisation_id: true,
         person_id: true,
         updated_at: true,
-        xero_tenant_id: true,
+        xero_connection_id: true,
       },
       where: {
         ...scopedQuery(clerkOrgId, organisationId),
         person_id: personId,
       },
     });
-
     return {
       ok: true,
       value: balances.map((b) => ({
@@ -66,7 +62,7 @@ export async function listLeaveBalancesForPerson(
         organisationId: b.organisation_id as OrganisationId,
         personId: b.person_id as PersonId,
         updatedAt: b.updated_at,
-        xeroTenantId: b.xero_tenant_id,
+        xeroConnectionId: b.xero_connection_id,
       })),
     };
   } catch {
@@ -76,11 +72,12 @@ export async function listLeaveBalancesForPerson(
     };
   }
 }
-
 export async function listLeaveBalancesForOrganisation(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
-  filters?: { personId?: PersonId }
+  filters?: {
+    personId?: PersonId;
+  }
 ): Promise<Result<LeaveBalanceSummaryData[]>> {
   try {
     const balances = await database.leaveBalance.findMany({
@@ -101,14 +98,13 @@ export async function listLeaveBalancesForOrganisation(
         },
         person_id: true,
         updated_at: true,
-        xero_tenant_id: true,
+        xero_connection_id: true,
       },
       where: {
         ...scopedQuery(clerkOrgId, organisationId),
         ...(filters?.personId && { person_id: filters.personId }),
       },
     });
-
     return {
       ok: true,
       value: balances.map((b) => ({
@@ -120,7 +116,7 @@ export async function listLeaveBalancesForOrganisation(
         personId: b.person_id as PersonId,
         personLastName: b.person.last_name,
         updatedAt: b.updated_at,
-        xeroTenantId: b.xero_tenant_id,
+        xeroConnectionId: b.xero_connection_id,
       })),
     };
   } catch {

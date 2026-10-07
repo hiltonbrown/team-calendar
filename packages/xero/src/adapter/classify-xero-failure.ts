@@ -142,7 +142,7 @@ export function classifyXeroFailure(input: {
     [
       "not_connected",
       "disconnected",
-      "generation_changed",
+      "connection_changed",
       "connection_changed",
       "connection_inactive",
     ].includes(code ?? "")

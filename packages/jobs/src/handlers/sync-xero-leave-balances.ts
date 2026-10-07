@@ -1,11 +1,4 @@
-import {
-  assertXeroCampaignAccess,
-  withXeroCampaignInvocation,
-  withXeroCampaignScopedEffect,
-} from "@repo/database/xero-campaign-access";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
-
 import type { Result } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
@@ -37,40 +30,41 @@ import {
 } from "./xero-sync-access";
 
 const SyncXeroLeaveBalancesInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   personId: z.string().uuid().optional(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
-  xeroTenantId: z.string().uuid(),
 });
-
 export type SyncXeroLeaveBalancesInput = z.infer<
   typeof SyncXeroLeaveBalancesInputSchema
 >;
-
 export type SyncXeroLeaveBalancesError =
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 type JsonValue =
   | boolean
   | null
   | number
   | string
   | JsonValue[]
-  | { [key: string]: JsonValue };
-
+  | {
+      [key: string]: JsonValue;
+    };
 interface Counts {
   failed: number;
   fetched: number;
   skipped: number;
   upserted: number;
 }
-
 type SyncStatus = "cancelled" | "failed" | "partial_success" | "succeeded";
 type SyncXeroLeaveBalancesResult = Result<
   Counts & {
@@ -79,11 +73,12 @@ type SyncXeroLeaveBalancesResult = Result<
   },
   SyncXeroLeaveBalancesError
 >;
-type XeroTenant = Extract<
+type ScopedXeroConnection = Extract<
   Awaited<ReturnType<typeof resolveSyncTenant>>,
-  { ok: true }
+  {
+    ok: true;
+  }
 >["value"];
-
 const UUID_REGEX = /^[0-9a-fA-F-]{36}$/;
 const BALANCE_PAGE_SIZE = 40;
 const PROBE_PAGE_SIZE = BALANCE_PAGE_SIZE + 1;
@@ -91,7 +86,6 @@ const BALANCE_BATCH_SIZE = 50;
 // How often the fetch loop refreshes the run heartbeat. Kept well below the
 // stale window so a healthy run is never mistaken for an abandoned one.
 const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
-
 export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
   inngest.createFunction(
     {
@@ -102,49 +96,35 @@ export const syncXeroLeaveBalancesFunction: InngestFunction.Any =
         },
       ],
       concurrency: {
-        key: "event.data.xeroTenantId",
+        key: "event.data.connectionId",
         limit: 1,
       },
       id: "sync-xero-leave-balances",
       triggers: { event: "sync-xero-leave-balances" },
     },
-    async ({ event, step, runId: workerRunId }) =>
+    async ({ event, step }) =>
       await step.run("sync-leave-balances", async () =>
-        rejectRetryableSyncResult(
-          syncXeroLeaveBalances(event.data, workerRunId)
-        )
+        rejectRetryableSyncResult(syncXeroLeaveBalances(event.data))
       )
   );
-
-export function syncXeroLeaveBalances(
-  input: unknown,
-  workerRunId: string | null = null
-) {
+export function syncXeroLeaveBalances(input: unknown) {
   const parsed = SyncXeroLeaveBalancesInputSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
   }
-  return withXeroCampaignInvocation(
-    "sync-xero-leave-balances",
-    input,
-    () => syncXeroLeaveBalancesUnderCampaign(input),
-    workerRunId
-  );
+  return syncXeroLeaveBalancesInternal(input);
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates balance sync paging, cursor compare-and-swap, and lifecycle updates.
-async function syncXeroLeaveBalancesUnderCampaign(
+async function syncXeroLeaveBalancesInternal(
   input: unknown
 ): Promise<SyncXeroLeaveBalancesResult> {
   const parsed = SyncXeroLeaveBalancesInputSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   const context = parsed.data;
   const startedAt = new Date();
   let runId: string | null = null;
-
   try {
     const runAcquisition = await acquireSyncRun(
       context,
@@ -171,26 +151,27 @@ async function syncXeroLeaveBalancesUnderCampaign(
         value: emptyResult(runAcquisition.run.id, "cancelled"),
       };
     }
-
     const { run } = runAcquisition;
     runId = run.id;
     await publishRunStatusChanged(context, run.id, "running");
-
     const tenantReadiness = await ensureTenantReady(context, run.id);
     if (!tenantReadiness.ready) {
       return tenantReadiness.result;
     }
-    const { xeroTenant } = tenantReadiness;
-
+    const { xeroConnection } = tenantReadiness;
     const counts = emptyCounts();
-
     const isTargetedPerson = Boolean(context.personId);
-    let peopleToProcess: Array<{ id: string; xero_employee_id: string | null }>;
+    let peopleToProcess: Array<{
+      id: string;
+      xero_employee_id: string | null;
+    }>;
     let isLastPage = true;
-    let cursorRecord: { cursor_value: string | null; id: string } | null = null;
+    let cursorRecord: {
+      balance_next_person_id: string | null;
+      id: string;
+    } | null = null;
     let initialCursorValue: string | null = null;
     let nextCursorValue: string | null = null;
-
     if (isTargetedPerson) {
       peopleToProcess = await database.person.findMany({
         select: { id: true, xero_employee_id: true },
@@ -202,16 +183,14 @@ async function syncXeroLeaveBalancesUnderCampaign(
         },
       });
     } else {
-      cursorRecord = await database.xeroSyncCursor.findFirst({
-        select: { cursor_value: true, id: true },
+      cursorRecord = await database.xeroConnection.findFirst({
+        select: { balance_next_person_id: true, id: true },
         where: {
           ...scoped(context),
-          entity_type: "leave_balances",
-          xero_tenant_id: context.xeroTenantId,
+          id: context.connectionId,
         },
       });
-      initialCursorValue = cursorRecord?.cursor_value ?? null;
-
+      initialCursorValue = cursorRecord?.balance_next_person_id ?? null;
       const candidatePeople = await database.person.findMany({
         orderBy: { id: "asc" },
         select: { id: true, xero_employee_id: true },
@@ -223,7 +202,6 @@ async function syncXeroLeaveBalancesUnderCampaign(
           xero_employee_id: { not: null },
         },
       });
-
       const hasMoreAfterPage = candidatePeople.length > BALANCE_PAGE_SIZE;
       peopleToProcess = candidatePeople.slice(0, BALANCE_PAGE_SIZE);
       isLastPage = !hasMoreAfterPage;
@@ -231,7 +209,6 @@ async function syncXeroLeaveBalancesUnderCampaign(
         ? (peopleToProcess[BALANCE_PAGE_SIZE - 1]?.id ?? null)
         : null;
     }
-
     const employeeIds = peopleToProcess
       .map((person) => person.xero_employee_id)
       .filter((employeeId): employeeId is string => Boolean(employeeId));
@@ -241,10 +218,13 @@ async function syncXeroLeaveBalancesUnderCampaign(
         personIdByEmployeeId.set(person.xero_employee_id, person.id);
       }
     }
-
     const balancesResult = await fetchLeaveBalancesForRegion(
-      xeroTenant.payroll_region,
-      { employeeIds, onProgress: makeHeartbeat(context, run.id), xeroTenant }
+      xeroConnection.payroll_region,
+      {
+        employeeIds,
+        onProgress: makeHeartbeat(context, run.id),
+        xeroConnection,
+      }
     );
     if (!balancesResult.ok) {
       await completeRun(context, run.id, {
@@ -258,7 +238,6 @@ async function syncXeroLeaveBalancesUnderCampaign(
         value: { ...counts, runId: run.id, status: "failed" },
       };
     }
-
     const blanketFailure = balancesResult.value.failures.find((failure) =>
       isBlanketFailure(failure.error)
     );
@@ -281,12 +260,11 @@ async function syncXeroLeaveBalancesUnderCampaign(
       balancesResult.value.failures,
       counts
     );
-
     const cancelled = await processBalances(
       context,
       run.id,
-      xeroTenant.id,
-      xeroTenant.payroll_region,
+      xeroConnection.id,
+      xeroConnection.payroll_region,
       balancesResult.value.leaveBalances,
       personIdByEmployeeId,
       counts
@@ -298,7 +276,6 @@ async function syncXeroLeaveBalancesUnderCampaign(
         value: { ...counts, runId: run.id, status: "cancelled" },
       };
     }
-
     if (!isTargetedPerson) {
       const casSuccess = await advanceCursor({
         context,
@@ -318,27 +295,26 @@ async function syncXeroLeaveBalancesUnderCampaign(
           value: { ...counts, runId: run.id, status: "cancelled" },
         };
       }
-
-      let staleSinceData: { leave_balances_stale_since?: Date | null } = {};
+      let staleSinceData: {
+        leave_balances_stale_since?: Date | null;
+      } = {};
       if (isLastPage && counts.failed === 0) {
         staleSinceData = { leave_balances_stale_since: null };
-      } else if (!xeroTenant.leave_balances_stale_since) {
+      } else if (!xeroConnection.leave_balances_stale_since) {
         staleSinceData = { leave_balances_stale_since: startedAt };
       }
-
       await withXeroBinding(context, async (tx) =>
-        tx.xeroTenant.updateMany({
+        tx.xeroConnection.updateMany({
           data: {
             last_leave_balances_sync_at: new Date(),
             last_sync_error_code: null,
             last_sync_error_message: null,
             ...staleSinceData,
           },
-          where: { ...scoped(context), id: context.xeroTenantId },
+          where: { ...scoped(context), id: context.connectionId },
         })
       );
     }
-
     const finalStatus = counts.failed > 0 ? "partial_success" : "succeeded";
     await completeRun(context, run.id, {
       counts,
@@ -347,7 +323,6 @@ async function syncXeroLeaveBalancesUnderCampaign(
     if (finalStatus === "succeeded") {
       await captureInitialSyncCompleted(context);
     }
-
     return {
       ok: true,
       value: { ...counts, runId: run.id, status: finalStatus },
@@ -363,7 +338,7 @@ async function syncXeroLeaveBalancesUnderCampaign(
         errorSummary:
           error instanceof XeroSyncRunFencedError
             ? "sync_run_fenced"
-            : "generation_changed",
+            : "connection_changed",
         status: "cancelled",
       });
       return { ok: true, value: emptyResult(runId, "cancelled") };
@@ -388,11 +363,10 @@ async function syncXeroLeaveBalancesUnderCampaign(
     };
   }
 }
-
 async function processBalance(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
-  xeroTenantId: string,
+  connectionId: string,
   payrollRegion: XeroPayrollRegion,
   balance: XeroLeaveBalance,
   personIdByEmployeeId: Map<string, string>
@@ -408,7 +382,6 @@ async function processBalance(
     });
     return false;
   }
-
   try {
     const personId = personIdByEmployeeId.get(balance.employeeId);
     if (!personId) {
@@ -421,15 +394,12 @@ async function processBalance(
       });
       return false;
     }
-
     const { recordType } = mapXeroLeaveType({
       leaveTypeName: balance.leaveTypeName,
       payrollRegion,
     });
-
     const sourcePayloadJson =
       toValidatedLeaveBalanceRawPayload(balance.rawPayload) ?? Prisma.DbNull;
-
     await withXeroBinding(context, async (tx) =>
       tx.leaveBalance.upsert({
         create: {
@@ -444,7 +414,7 @@ async function processBalance(
           person_id: personId,
           record_type: recordType,
           source_payload_json: sourcePayloadJson,
-          xero_tenant_id: xeroTenantId,
+          xero_connection_id: connectionId,
         },
         update: {
           as_at: new Date(),
@@ -459,10 +429,10 @@ async function processBalance(
         },
         where: {
           ...scoped(context),
-          person_id_xero_tenant_id_leave_type_xero_id: {
+          person_id_xero_connection_id_leave_type_xero_id: {
             leave_type_xero_id: balance.leaveTypeId,
             person_id: personId,
-            xero_tenant_id: xeroTenantId,
+            xero_connection_id: connectionId,
           },
         },
       })
@@ -486,11 +456,10 @@ async function processBalance(
     return false;
   }
 }
-
 async function processBalances(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
-  xeroTenantId: string,
+  connectionId: string,
   payrollRegion: XeroPayrollRegion,
   balances: XeroLeaveBalance[],
   personIdByEmployeeId: Map<string, string>,
@@ -500,13 +469,12 @@ async function processBalances(
     if (await cancellationRequested(context, runId)) {
       return true;
     }
-
     const batch = balances.slice(index, index + BALANCE_BATCH_SIZE);
     for (const balance of batch) {
       const result = await processBalance(
         context,
         runId,
-        xeroTenantId,
+        connectionId,
         payrollRegion,
         balance,
         personIdByEmployeeId
@@ -520,7 +488,6 @@ async function processBalances(
   }
   return false;
 }
-
 // Returns a throttled progress callback that refreshes the run's heartbeat
 // (updated_at) while a long fetch is in flight, so the duplicate-run guard can
 // tell a live run from a crashed one. The final tick always flushes.
@@ -541,7 +508,6 @@ function makeHeartbeat(
     });
   };
 }
-
 async function cancellationRequested(
   context: SyncXeroLeaveBalancesInput,
   runId: string
@@ -552,7 +518,6 @@ async function cancellationRequested(
   });
   return Boolean(runState?.cancel_requested_at);
 }
-
 async function recordFetchFailures(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
@@ -570,13 +535,18 @@ async function recordFetchFailures(
     counts.failed += 1;
   }
 }
-
 async function ensureTenantReady(
   context: SyncXeroLeaveBalancesInput,
   runId: string
 ): Promise<
-  | { ready: true; xeroTenant: XeroTenant }
-  | { ready: false; result: SyncXeroLeaveBalancesResult }
+  | {
+      ready: true;
+      xeroConnection: ScopedXeroConnection;
+    }
+  | {
+      ready: false;
+      result: SyncXeroLeaveBalancesResult;
+    }
 > {
   const readiness = await resolveSyncTenant(context, "payroll.employees.read");
   if (!readiness.ok) {
@@ -591,12 +561,16 @@ async function ensureTenantReady(
       result: { ok: true, value: emptyResult(runId, "failed") },
     };
   }
-  return { ready: true, xeroTenant: readiness.value };
+  return { ready: true, xeroConnection: readiness.value };
 }
-
-function validateBalance(
-  balance: XeroLeaveBalance
-): { valid: true } | { message: string; valid: false } {
+function validateBalance(balance: XeroLeaveBalance):
+  | {
+      valid: true;
+    }
+  | {
+      message: string;
+      valid: false;
+    } {
   if (!(balance.employeeId && UUID_REGEX.test(balance.employeeId))) {
     return { message: "Invalid or missing Employee ID", valid: false };
   }
@@ -626,7 +600,6 @@ function validateBalance(
   }
   return { valid: true };
 }
-
 async function recordFailure(
   context: SyncXeroLeaveBalancesInput,
   input: {
@@ -651,7 +624,6 @@ async function recordFailure(
     },
   });
 }
-
 async function completeRun(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
@@ -687,10 +659,8 @@ async function completeRun(
   } else {
     await persist(database);
   }
-
   await publishRunStatusChanged(context, runId, input.status);
 }
-
 function emptyCounts(): Counts {
   return {
     failed: 0,
@@ -699,7 +669,6 @@ function emptyCounts(): Counts {
     upserted: 0,
   };
 }
-
 function emptyResult(runId: string, status: SyncStatus) {
   return {
     ...emptyCounts(),
@@ -707,7 +676,6 @@ function emptyResult(runId: string, status: SyncStatus) {
     status,
   };
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, SyncXeroLeaveBalancesError> {
@@ -719,65 +687,28 @@ function validationError(
     ok: false,
   };
 }
-
 async function advanceCursor(params: {
   context: SyncXeroLeaveBalancesInput;
-  cursorRecord: { cursor_value: string | null; id: string } | null;
+  cursorRecord: {
+    balance_next_person_id: string | null;
+    id: string;
+  } | null;
   initialCursorValue: string | null;
   nextCursorValue: string | null;
 }): Promise<boolean> {
-  const { context, cursorRecord, initialCursorValue, nextCursorValue } = params;
-
-  if (cursorRecord) {
-    const updated = await withXeroBinding(context, async (tx) =>
-      tx.xeroSyncCursor.updateMany({
-        data: {
-          cursor_value: nextCursorValue,
-          updated_at: new Date(),
-        },
-        where: {
-          ...scoped(context),
-          cursor_value: initialCursorValue,
-          entity_type: "leave_balances",
-          id: cursorRecord.id,
-          xero_tenant_id: context.xeroTenantId,
-        },
-      })
-    );
-    return updated.count > 0;
-  }
-
-  try {
-    await withXeroBinding(context, async (tx) =>
-      tx.xeroSyncCursor.create({
-        data: {
-          ...scoped(context),
-          cursor_value: nextCursorValue,
-          entity_type: "leave_balances",
-          xero_tenant_id: context.xeroTenantId,
-        },
-      })
-    );
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
-      return false;
-    }
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2002"
-    ) {
-      return false;
-    }
-    throw error;
-  }
+  const { context, initialCursorValue, nextCursorValue } = params;
+  const result = await withXeroBinding(context, (tx) =>
+    tx.xeroConnection.updateMany({
+      data: { balance_next_person_id: nextCursorValue },
+      where: {
+        ...scoped(context),
+        balance_next_person_id: initialCursorValue,
+        id: context.connectionId,
+      },
+    })
+  );
+  return result.count === 1;
 }
-
 function isBlanketFailure(error: XeroWriteError): boolean {
   return (
     Boolean(error.recoveryReason) ||
@@ -788,15 +719,13 @@ function isBlanketFailure(error: XeroWriteError): boolean {
     error.code === "validation_error"
   );
 }
-
 async function publishRunStatusChanged(
   context: SyncXeroLeaveBalancesInput,
   runId: string,
   status: "cancelled" | "failed" | "partial_success" | "running" | "succeeded"
 ) {
   try {
-    await assertXeroCampaignAccess(context);
-    await withXeroCampaignScopedEffect(context, () =>
+    await (() =>
       publishOrganisationNotificationEvent(
         {
           clerkOrgId: context.clerkOrgId,
@@ -804,16 +733,15 @@ async function publishRunStatusChanged(
         },
         {
           payload: {
+            connectionId: context.connectionId,
             organisationId: context.organisationId,
             runId,
             runType: "leave_balances",
             status,
-            xeroTenantId: context.xeroTenantId,
           },
           type: "sync.run_status_changed",
         }
-      )
-    );
+      ))();
   } catch (error) {
     if (
       error instanceof XeroBindingChangedError ||
@@ -828,14 +756,12 @@ async function publishRunStatusChanged(
     });
   }
 }
-
 function toPrismaJsonValue(
   value: unknown
 ): Exclude<JsonValue, null> | typeof Prisma.JsonNull {
   const jsonValue = toJsonValue(value);
   return jsonValue === null ? Prisma.JsonNull : jsonValue;
 }
-
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) {
     return null;

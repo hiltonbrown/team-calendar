@@ -39,6 +39,10 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Xero integration
 
+- Prefer provider-native Xero capabilities and the minimum application
+  infrastructure required by observed product behaviour. The failed Plan 161
+  approach turned speculative failure modes into durable architecture; require
+  a demonstrated need before adding state, recovery tables or background jobs.
 - Before claiming a live Xero sync works, verify the full path: event acceptance,
   registered function execution, terminal run outcome, and authorised,
   tenant-scoped source records persisted with their downstream data. Queue

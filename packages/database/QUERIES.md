@@ -306,3 +306,7 @@ Tests for these services should verify:
 4. **Empty results are valid**: Queries on orgs with no matching data return empty arrays, never throw
 
 See `availability_records.test.ts` in the repo root for the existing test pattern.
+
+## Xero persistence
+
+Use `getScopedXeroConnection({ clerkOrgId, organisationId, connectionId? })` to resolve customer access, then its canonical `authorisation` relation. `xero_authorisations` is system scoped and unique per verified app/user. Never expose grants directly across account boundaries or copy tokens into connections or OAuth sessions. `advanceXeroSyncCursor` performs monotonic completed-provider watermark updates scoped to both keys and connection ID. Balances and regional leave roster progress belongs on `XeroConnection`.

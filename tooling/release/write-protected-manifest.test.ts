@@ -89,13 +89,8 @@ describe("protected manifest writer", () => {
       "run.json"
     );
     const lifecycleKinds = [
-      "credential_owner",
+      "authorisation",
       "provider_app",
-      "provider_connection",
-      "tenant_binding",
-      "oauth_attempt",
-      "cleanup_request",
-      "cleanup_attempt",
       "shared_store_namespace",
     ];
     const result = spawnSync(

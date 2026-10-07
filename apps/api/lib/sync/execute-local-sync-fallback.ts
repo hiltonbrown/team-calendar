@@ -13,15 +13,13 @@ type LocalSyncRunType =
   | "leave_balances"
   | "leave_records"
   | "people";
-
 interface LocalSyncFallbackInput {
   actingUserId: string;
   clerkOrgId: string;
+  connectionId: string;
   organisationId: string;
   runType: LocalSyncRunType;
-  xeroTenantId: string;
 }
-
 interface LocalSyncFallbackValue {
   eventName: string;
   failed: number;
@@ -32,19 +30,25 @@ interface LocalSyncFallbackValue {
   status: "partial_success" | "succeeded";
   upserted?: number;
 }
-
 export type LocalSyncFallbackError =
-  | { code: "sync_failed"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "sync_failed";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 const localEventNames: Record<LocalSyncRunType, string> = {
   approval_state_reconciliation: "reconcile-xero-approval-state",
   leave_balances: "sync-xero-leave-balances",
   leave_records: "sync-xero-leave-records",
   people: "sync-xero-people",
 };
-
 export async function executeLocalSyncFallback(
   input: LocalSyncFallbackInput
 ): Promise<Result<LocalSyncFallbackValue, LocalSyncFallbackError>> {
@@ -53,19 +57,14 @@ export async function executeLocalSyncFallback(
     if (!state.ok) {
       return syncFailed(xeroRecoveryMessage("unavailable"));
     }
-    if (
-      state.value.state !== "connected" ||
-      state.value.bindingGeneration === null
-    ) {
+    if (state.value.state !== "connected") {
       return syncFailed(xeroRecoveryMessage(state.value.state));
     }
-    const tenant = await database.xeroTenant.findFirst({
+    const tenant = await database.xeroConnection.findFirst({
       select: { id: true },
       where: {
-        active_slot: 1,
-        binding_generation: state.value.bindingGeneration,
         clerk_org_id: input.clerkOrgId,
-        id: input.xeroTenantId,
+        id: input.connectionId,
         organisation_id: input.organisationId,
       },
     });
@@ -73,18 +72,16 @@ export async function executeLocalSyncFallback(
       return syncFailed("The Xero connection changed. Try again.");
     }
     const payload = {
-      bindingGeneration: state.value.bindingGeneration,
       clerkOrgId: input.clerkOrgId,
+      connectionId: tenant.id,
       organisationId: input.organisationId,
       triggeredByUserId: input.actingUserId,
       triggerType: "manual" as const,
-      xeroTenantId: tenant.id,
     };
     const syncResult = await executeLocalSync(input.runType, payload);
     if (!syncResult.ok) {
       return syncResult;
     }
-
     if (
       syncResult.value.status === "failed" ||
       syncResult.value.status === "cancelled"
@@ -102,7 +99,6 @@ export async function executeLocalSyncFallback(
       }
       return syncFailed("Sync run failed or was cancelled.");
     }
-
     const { value } = syncResult;
     const status =
       value.status === "partial_success" ? "partial_success" : "succeeded";
@@ -123,16 +119,14 @@ export async function executeLocalSyncFallback(
     return syncFailed(xeroRecoveryMessage("operational_incident"));
   }
 }
-
 async function executeLocalSync(
   runType: LocalSyncRunType,
   payload: {
-    bindingGeneration: number;
     clerkOrgId: string;
     organisationId: string;
     triggeredByUserId: string;
     triggerType: "manual";
-    xeroTenantId: string;
+    connectionId: string;
   }
 ) {
   if (runType === "people") {
@@ -146,21 +140,18 @@ async function executeLocalSync(
   }
   return await reconcileXeroApprovalState(payload);
 }
-
 function hasCount<
   T extends object,
   K extends "fetched" | "skipped" | "upserted",
 >(value: T, key: K): value is T & Record<K, number> {
   return key in value && typeof Reflect.get(value, key) === "number";
 }
-
 function syncFailed(message: string): Result<never, LocalSyncFallbackError> {
   return {
     error: { code: "sync_failed", message },
     ok: false,
   };
 }
-
 function safeSyncFailureMessage(summary: string | null | undefined): string {
   switch (summary) {
     case "update_permissions":

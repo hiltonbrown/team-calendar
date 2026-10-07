@@ -23,7 +23,6 @@ interface DashboardBodyProps {
   orgRole: string | null | undefined;
   userId: string;
 }
-
 /**
  * Data-heavy half of the dashboard. Rendered inside a Suspense boundary so the
  * app shell paints immediately while role resolution and the batched view query
@@ -53,11 +52,9 @@ export async function DashboardBody({
     }),
     loadOnboardingState({ clerkOrgId, organisationId, userId }),
   ]);
-
   if (!roleResult.ok) {
     return <FetchErrorState entityName="dashboard" />;
   }
-
   const canManageOnboarding =
     roleResult.value === "owner" || roleResult.value === "admin";
   const cache = createDashboardCache();
@@ -71,7 +68,6 @@ export async function DashboardBody({
     role: roleResult.value,
     userId,
   });
-
   return (
     <>
       {canManageOnboarding ? (
@@ -87,7 +83,6 @@ export async function DashboardBody({
     </>
   );
 }
-
 interface RenderDashboardInput {
   actingPersonId: string | null;
   cache: ReturnType<typeof createDashboardCache>;
@@ -98,7 +93,6 @@ interface RenderDashboardInput {
   role: "admin" | "employee" | "manager" | "owner" | "viewer";
   userId: string;
 }
-
 async function renderDashboard({
   role,
   actingPersonId,
@@ -121,11 +115,9 @@ async function renderDashboard({
     }
     return <ViewerView />;
   }
-
   if (role === "viewer") {
     return <ViewerView />;
   }
-
   if (role === "owner" || role === "admin") {
     const result = await getAdminView(
       {
@@ -137,11 +129,9 @@ async function renderDashboard({
       },
       cache
     );
-
     if (!result.ok) {
       return <FetchErrorState entityName="dashboard" />;
     }
-
     return (
       <AdminView
         orgQueryValue={orgQueryValue}
@@ -150,7 +140,6 @@ async function renderDashboard({
       />
     );
   }
-
   if (role === "manager") {
     const result = await getManagerView(
       {
@@ -162,11 +151,9 @@ async function renderDashboard({
       },
       cache
     );
-
     if (!result.ok) {
       return <FetchErrorState entityName="dashboard" />;
     }
-
     return (
       <ManagerView
         orgQueryValue={orgQueryValue}
@@ -175,7 +162,6 @@ async function renderDashboard({
       />
     );
   }
-
   const result = await getEmployeeView(
     {
       actingRole: "employee",
@@ -186,11 +172,9 @@ async function renderDashboard({
     },
     cache
   );
-
   if (!result.ok) {
     return <FetchErrorState entityName="dashboard" />;
   }
-
   return (
     <EmployeeView
       orgQueryValue={orgQueryValue}

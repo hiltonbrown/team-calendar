@@ -6,7 +6,7 @@ describe("createSlice14Fixture", () => {
     const fixture = createSlice14Fixture();
 
     expect(fixture.organisations).toHaveLength(2);
-    expect(fixture.xeroTenants).toHaveLength(3);
+    expect(fixture.xeroConnections).toHaveLength(3);
     expect(fixture.people).toHaveLength(30);
     expect(fixture.teams).toHaveLength(6);
     expect(fixture.locations).toHaveLength(4);

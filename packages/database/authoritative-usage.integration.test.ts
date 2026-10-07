@@ -4,7 +4,6 @@ import type { Prisma } from "./generated/client";
 import { allocateLiveTestFixture } from "./src/live-test-fixture";
 
 vi.mock("server-only", () => ({}));
-
 const fixture = allocateLiveTestFixture(
   "packages/database/authoritative-usage.integration.test.ts"
 );
@@ -12,7 +11,6 @@ const { database, getAuthoritativeUsageCount } = await import("./index.js");
 const clerkOrgId = fixture.tenants[0]?.clerkOrgId as string;
 const activeOrganisationId = fixture.tenants[0]?.organisationId as string;
 const archivedOrganisationId = fixture.tenants[1]?.organisationId as string;
-
 describe("authoritative billing usage", () => {
   beforeEach(async () => {
     await cleanTestData();
@@ -36,12 +34,10 @@ describe("authoritative billing usage", () => {
       ],
     });
   });
-
   afterAll(async () => {
     await cleanTestData();
     await database.$disconnect();
   });
-
   test("counts every supported type from active rows only", async () => {
     await database.person.createMany({
       data: [
@@ -75,7 +71,6 @@ describe("authoritative billing usage", () => {
         ),
       ],
     });
-
     await expect(getAuthoritativeUsageCount(clerkOrgId, "seats")).resolves.toBe(
       1
     );
@@ -93,7 +88,6 @@ describe("authoritative billing usage", () => {
     ).resolves.toBe(1);
   });
 });
-
 function person(
   id: string,
   isActive: boolean,
@@ -112,7 +106,6 @@ function person(
     source_system: "MANUAL",
   };
 }
-
 function feed(
   id: string,
   status: "active" | "archived" | "paused",
@@ -129,7 +122,6 @@ function feed(
     status,
   };
 }
-
 function connection(
   id: string,
   status: "active" | "disconnected",
@@ -138,14 +130,14 @@ function connection(
   return {
     clerk_org_id: clerkOrgId,
     disconnected_at: disconnectedAt,
-    expires_at: new Date("2027-01-01T00:00:00.000Z"),
     id,
     organisation_id:
       status === "active" ? activeOrganisationId : archivedOrganisationId,
+    payroll_region: "AU",
     status,
+    xero_tenant_id: id,
   };
 }
-
 async function cleanTestData() {
   await database.xeroConnection.deleteMany({
     where: { clerk_org_id: clerkOrgId },

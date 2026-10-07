@@ -24,7 +24,6 @@ export type Brand<T, TBrand extends string> = T & { readonly __brand: TBrand };
 
 export type ClerkOrgId = Brand<string, "ClerkOrgId">;
 export type OrganisationId = Brand<string, "OrganisationId">;
-export type XeroCredentialOwnerId = Brand<string, "XeroCredentialOwnerId">;
 export type PersonId = Brand<string, "PersonId">;
 export type AvailabilityRecordId = Brand<string, "AvailabilityRecordId">;
 export type FeedId = Brand<string, "FeedId">;

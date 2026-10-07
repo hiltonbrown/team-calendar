@@ -10,13 +10,12 @@ import type {
   DeclineLeaveApplicationInput,
   SubmitLeaveApplicationInput,
   WithdrawLeaveApplicationInput,
-  XeroTenantForWrite,
+  XeroAccessContext,
   XeroWriteError,
   XeroWriteResult,
 } from "../write/types";
 
 const XERO_DEFAULT_BASE_URL = "https://api.xero.com";
-
 const LeaveApplicationResponseSchema = z
   .object({
     LeaveApplications: z
@@ -31,11 +30,13 @@ const LeaveApplicationResponseSchema = z
       .optional(),
   })
   .passthrough();
-
 export async function submitLeaveApplication(
   input: SubmitLeaveApplicationInput
 ): Promise<
-  XeroWriteResult<{ rawResponse: unknown; xeroLeaveApplicationId: string }>
+  XeroWriteResult<{
+    rawResponse: unknown;
+    xeroLeaveApplicationId: string;
+  }>
 > {
   const payload = [
     {
@@ -46,23 +47,19 @@ export async function submitLeaveApplication(
       Title: input.title ?? "Leave request",
     },
   ];
-
-  const response = await xeroRequest(input.xeroTenant, {
+  const response = await xeroRequest(input.xeroConnection, {
     body: payload,
     method: "POST",
     path: "/payroll.xro/1.0/LeaveApplications",
   });
-
   if (!response.ok) {
     return response;
   }
-
   const parsed = LeaveApplicationResponseSchema.safeParse(response.value);
   const xeroLeaveApplicationId = parsed.success
     ? (parsed.data.LeaveApplications?.[0]?.LeaveApplicationID ??
       parsed.data.LeaveApplications?.[0]?.LeaveApplicationId)
     : null;
-
   if (!xeroLeaveApplicationId) {
     return {
       error: {
@@ -75,7 +72,6 @@ export async function submitLeaveApplication(
       ok: false,
     };
   }
-
   return {
     ok: true,
     value: {
@@ -84,67 +80,66 @@ export async function submitLeaveApplication(
     },
   };
 }
-
 export async function approveLeaveApplication(
   input: ApproveLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
-  const response = await xeroRequest(input.xeroTenant, {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const response = await xeroRequest(input.xeroConnection, {
     method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
-      input.xeroLeaveApplicationId
-    )}/approve`,
+    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/approve`,
   });
-
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
 }
-
 export async function declineLeaveApplication(
   input: DeclineLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
-  const response = await xeroRequest(input.xeroTenant, {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const response = await xeroRequest(input.xeroConnection, {
     body: {
       Reason: input.reason,
     },
     method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
-      input.xeroLeaveApplicationId
-    )}/reject`,
+    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
   });
-
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
 }
-
 export async function withdrawLeaveApplication(
   input: WithdrawLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
-  const response = await xeroRequest(input.xeroTenant, {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
+  const response = await xeroRequest(input.xeroConnection, {
     body: {
       Reason: "Withdrawn by employee in Team Calendar.",
     },
     method: "POST",
-    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(
-      input.xeroLeaveApplicationId
-    )}/reject`,
+    path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
   });
-
   return response.ok
     ? { ok: true, value: { rawResponse: response.value } }
     : response;
 }
-
 async function xeroRequest(
-  xeroTenant: XeroTenantForWrite,
+  xeroConnection: XeroAccessContext,
   request: {
     body?: unknown;
     method: "POST" | "PUT";
     path: string;
   }
 ): Promise<XeroWriteResult<unknown>> {
-  if (!xeroTenant.accessToken) {
+  if (!xeroConnection.accessToken) {
     return {
       error: {
         code: "unknown_error",
@@ -157,14 +152,14 @@ async function xeroRequest(
   }
   try {
     const response = await xeroFetch({
-      deadline: xeroTenant.deadline,
+      deadline: xeroConnection.deadline,
       init: {
         body: request.body ? JSON.stringify(request.body) : undefined,
         headers: {
           Accept: "application/json",
-          Authorization: `Bearer ${xeroTenant.accessToken}`,
+          Authorization: `Bearer ${xeroConnection.accessToken}`,
           "Content-Type": "application/json",
-          "Xero-Tenant-Id": xeroTenant.xero_tenant_id,
+          "Xero-Tenant-Id": xeroConnection.xero_tenant_id,
         },
         method: request.method,
       },
@@ -172,7 +167,7 @@ async function xeroRequest(
       rateClass: {
         kind: "tenant",
         providerAppId: keys().XERO_CLIENT_ID ?? "",
-        xeroTenantId: xeroTenant.xero_tenant_id,
+        xeroTenantId: xeroConnection.xero_tenant_id,
       },
       // Every request through this helper mutates payroll state. See the field
       // comment in xero-fetch.ts: an ambiguous failure must surface to the user
@@ -181,14 +176,12 @@ async function xeroRequest(
       url: `${baseUrl()}${request.path}`,
     });
     const rawPayload = await readPayload(response);
-
     if (!response.ok) {
       return {
         error: mapHttpError(response, rawPayload),
         ok: false,
       };
     }
-
     const parsed = LeaveApplicationResponseSchema.safeParse(rawPayload);
     const application = parsed.success
       ? parsed.data.LeaveApplications?.[0]
@@ -213,20 +206,17 @@ async function xeroRequest(
     };
   }
 }
-
 async function readPayload(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!text) {
     return {};
   }
-
   try {
     return JSON.parse(text);
   } catch {
     return text;
   }
 }
-
 function mapHttpError(response: Response, rawPayload: unknown): XeroWriteError {
   const details = {
     correlationId: response.headers.get("xero-correlation-id") ?? undefined,
@@ -234,7 +224,6 @@ function mapHttpError(response: Response, rawPayload: unknown): XeroWriteError {
     message: messageFromPayload(rawPayload) ?? response.statusText,
     rawPayload,
   };
-
   const classified = classifyXeroHttpFailure(response, true);
   if (classified.code) {
     return { ...details, ...classified, code: classified.code };
@@ -259,7 +248,6 @@ function mapHttpError(response: Response, rawPayload: unknown): XeroWriteError {
   }
   return { ...details, code: "unknown_error" };
 }
-
 function messageFromPayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") {
     return null;
@@ -272,11 +260,9 @@ function messageFromPayload(payload: unknown): string | null {
   }
   return null;
 }
-
 function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
-
 function baseUrl(): string {
   return keys().XERO_API_BASE_URL ?? XERO_DEFAULT_BASE_URL;
 }

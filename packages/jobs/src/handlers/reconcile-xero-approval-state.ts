@@ -1,11 +1,4 @@
-import {
-  assertXeroCampaignAccess,
-  withXeroCampaignInvocation,
-  withXeroCampaignScopedEffect,
-} from "@repo/database/xero-campaign-access";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import "server-only";
-
 import { clerkClient } from "@repo/auth/server";
 import { unclaimedOrExpiredXeroWriteWhere } from "@repo/availability";
 import { type Result, xeroRecoveryMessage } from "@repo/core";
@@ -47,31 +40,32 @@ const noUnresolvedSubmitOperationWhere =
       },
     },
   });
-
 const ReconcileInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
-  xeroTenantId: z.string().uuid(),
 });
-
 export type ReconcileApprovalStateInput = z.infer<typeof ReconcileInputSchema>;
-
 export type ReconcileApprovalStateError =
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 type JsonValue =
   | boolean
   | null
   | number
   | string
   | JsonValue[]
-  | { [key: string]: JsonValue };
-
+  | {
+      [key: string]: JsonValue;
+    };
 const ACTIVE_STATUSES = [
   "submitted",
   "approved",
@@ -80,13 +74,11 @@ const ACTIVE_STATUSES = [
 ] as const;
 const BATCH_SIZE = 5;
 const STALE_RUN_WINDOW_MS = 30 * 60 * 1000;
-
 // How far back to reconcile. A leave record that finished more than this long
 // ago cannot change what the calendar publishes, so re-checking it against Xero
 // on every run is pure rate-limit cost. The window is generous enough to catch
 // late payroll edits. Records outside it keep whatever state they last synced.
 const RECONCILE_LOOKBACK_DAYS = 90;
-
 // Ceiling on Xero requests per run. The per-organisation budget is 5,000 a day
 // (see the Xero adapter rules in AGENTS.md); this leaves ample headroom for
 // the scheduled people, leave-record and balance syncs that share it. A run
@@ -119,7 +111,6 @@ const FailedRecordTypeSchema = z.enum([
   "other",
   "leave_request",
 ]);
-
 interface ReconciliationRecord {
   approval_status: availability_approval_status;
   derived_sequence: number;
@@ -135,7 +126,6 @@ interface ReconciliationRecord {
   record_type: string;
   source_remote_id: string | null;
 }
-
 export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
   inngest.createFunction(
     {
@@ -148,32 +138,20 @@ export const reconcileXeroApprovalStateFunction: InngestFunction.Any =
       id: "reconcile-xero-approval-state",
       triggers: { event: "reconcile-xero-approval-state" },
     },
-    async ({ event, step, runId: workerRunId }) =>
+    async ({ event, step }) =>
       await step.run("reconcile-approval-state", async () =>
-        rejectRetryableSyncResult(
-          reconcileXeroApprovalState(event.data, workerRunId)
-        )
+        rejectRetryableSyncResult(reconcileXeroApprovalState(event.data))
       )
   );
-
-export function reconcileXeroApprovalState(
-  input: unknown,
-  workerRunId: string | null = null
-) {
+export function reconcileXeroApprovalState(input: unknown) {
   const parsed = ReconcileInputSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
   }
-  return withXeroCampaignInvocation(
-    "reconcile-xero-approval-state",
-    input,
-    () => reconcileXeroApprovalStateUnderCampaign(input),
-    workerRunId
-  );
+  return reconcileXeroApprovalStateInternal(input);
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This handler coordinates run lifecycle, batching, per-record outcomes and finalisation.
-async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
+async function reconcileXeroApprovalStateInternal(input: unknown): Promise<
   Result<
     {
       archivedMissing: number;
@@ -193,11 +171,9 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   const context = parsed.data;
   const startedAt = new Date();
   let runId: string | null = null;
-
   try {
     const existingRun = await database.syncRun.findFirst({
       select: { id: true },
@@ -206,10 +182,9 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
         run_type: "approval_state_reconciliation",
         started_at: { gte: new Date(Date.now() - STALE_RUN_WINDOW_MS) },
         status: "running",
-        xero_tenant_id: context.xeroTenantId,
+        xero_connection_id: context.connectionId,
       },
     });
-
     if (existingRun) {
       const cancelled = await database.syncRun.create({
         data: {
@@ -221,7 +196,7 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
           status: "cancelled",
           trigger_type: context.triggerType,
           triggered_by_user_id: context.triggeredByUserId ?? null,
-          xero_tenant_id: context.xeroTenantId,
+          xero_connection_id: context.connectionId,
         },
         select: { id: true },
       });
@@ -230,7 +205,6 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
         value: emptyResult(cancelled.id, "cancelled"),
       };
     }
-
     const run = await database.syncRun.create({
       data: {
         ...scoped(context),
@@ -239,14 +213,12 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
         status: "running",
         trigger_type: context.triggerType,
         triggered_by_user_id: context.triggeredByUserId ?? null,
-        xero_tenant_id: context.xeroTenantId,
+        xero_connection_id: context.connectionId,
       },
       select: { id: true },
     });
     runId = run.id;
-
     await publishRunStatusChanged(context, run.id, "running");
-
     const readiness = await resolveSyncTenant(
       context,
       "payroll.employees.read"
@@ -259,12 +231,10 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
       throwRetryableXeroFailure(readiness.error);
       return { ok: true, value: emptyResult(run.id, "failed") };
     }
-    const xeroTenant = readiness.value;
-
+    const xeroConnection = readiness.value;
     const windowStart = new Date(
       Date.now() - RECONCILE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
     );
-
     const records = await database.availabilityRecord.findMany({
       include: {
         person: {
@@ -293,10 +263,8 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
         ...noUnresolvedSubmitOperationWhere(),
       },
     });
-
     const partial = records.length === MAX_REQUESTS_PER_RUN;
     const checkedAt = new Date();
-
     const counts = {
       approved: 0,
       archivedMissing: 0,
@@ -305,7 +273,6 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
       matched: 0,
       withdrawn: 0,
     };
-
     for (let index = 0; index < records.length; index += BATCH_SIZE) {
       const runState = await database.syncRun.findFirst({
         select: { cancel_requested_at: true },
@@ -322,11 +289,17 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
           value: { ...counts, partial, runId: run.id, status: "cancelled" },
         };
       }
-
       const batch = records.slice(index, index + BATCH_SIZE);
       const results = await Promise.all(
         batch.map((record) =>
-          reconcileOne(context, run.id, xeroTenant, record, counts, checkedAt)
+          reconcileOne(
+            context,
+            run.id,
+            xeroConnection,
+            record,
+            counts,
+            checkedAt
+          )
         )
       );
       const blanket = results.find((result) => result.blanketError);
@@ -347,19 +320,17 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
         await sleep(150);
       }
     }
-
     await withXeroBinding(context, async (tx) =>
-      tx.xeroTenant.updateMany({
+      tx.xeroConnection.updateMany({
         data: {
           approval_state_stale_since: null,
           last_approval_state_reconciled_at: new Date(),
           last_sync_error_code: null,
           last_sync_error_message: null,
         },
-        where: { ...scoped(context), id: context.xeroTenantId },
+        where: { ...scoped(context), id: context.connectionId },
       })
     );
-
     const finalStatus: "partial_success" | "succeeded" =
       partial || counts.failed > 0 ? "partial_success" : "succeeded";
     await completeRun(context, run.id, {
@@ -378,7 +349,7 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
   } catch (error) {
     if (error instanceof XeroBindingChangedError && runId) {
       await completeRun(context, runId, {
-        errorSummary: "generation_changed",
+        errorSummary: "connection_changed",
         status: "cancelled",
       });
       return { ok: true, value: emptyResult(runId, "cancelled") };
@@ -402,7 +373,6 @@ async function reconcileXeroApprovalStateUnderCampaign(input: unknown): Promise<
     };
   }
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This function reconciles a single record's approval state against Xero across several divergence cases (approved, declined, withdrawn, unchanged) with audit logging for each; splitting it during a release freeze risks the Xero write-back path more than the suppression does.
 async function reconcileRecord(
   context: ReconcileApprovalStateInput,
@@ -442,7 +412,6 @@ async function reconcileRecord(
     await stampCheckedAt(context, record.id, checkedAt);
     return "matched";
   }
-
   if (
     xero.status === "REJECTED" &&
     (record.approval_status === "submitted" ||
@@ -469,7 +438,6 @@ async function reconcileRecord(
     await stampCheckedAt(context, record.id, checkedAt);
     return "matched";
   }
-
   if (
     (xero.status === "REJECTED" ||
       xero.status === "WITHDRAWN" ||
@@ -497,7 +465,6 @@ async function reconcileRecord(
     await stampCheckedAt(context, record.id, checkedAt);
     return "matched";
   }
-
   if (
     (xero.status === "WITHDRAWN" || xero.status === "DELETED") &&
     record.approval_status !== "withdrawn" &&
@@ -523,11 +490,9 @@ async function reconcileRecord(
     await stampCheckedAt(context, record.id, checkedAt);
     return "matched";
   }
-
   await stampCheckedAt(context, record.id, checkedAt);
   return "matched";
 }
-
 async function transitionRecord(
   context: ReconcileApprovalStateInput,
   runId: string,
@@ -574,7 +539,6 @@ async function transitionRecord(
     return true;
   });
 }
-
 async function archiveMissing(
   context: ReconcileApprovalStateInput,
   runId: string,
@@ -630,7 +594,6 @@ async function archiveMissing(
     });
   });
 }
-
 async function notifyRecordOwner(
   tx: NotificationDispatchDatabase,
   context: ReconcileApprovalStateInput,
@@ -657,7 +620,6 @@ async function notifyRecordOwner(
     tx
   );
 }
-
 async function notifyCompletion(
   context: ReconcileApprovalStateInput,
   runId: string,
@@ -685,7 +647,6 @@ async function notifyCompletion(
     });
   }
 }
-
 async function completionRecipients(
   context: ReconcileApprovalStateInput
 ): Promise<string[]> {
@@ -720,7 +681,6 @@ async function completionRecipients(
     return [];
   }
 }
-
 async function recordFailure(
   context: ReconcileApprovalStateInput,
   input: {
@@ -758,14 +718,12 @@ async function recordFailure(
     },
   });
 }
-
 function failedRecordType(
   value: string
 ): z.infer<typeof FailedRecordTypeSchema> {
   const parsed = FailedRecordTypeSchema.safeParse(value);
   return parsed.success ? parsed.data : "leave_records";
 }
-
 async function completeRun(
   context: ReconcileApprovalStateInput,
   runId: string,
@@ -817,10 +775,8 @@ async function completeRun(
   } else {
     await persist(database);
   }
-
   await publishRunStatusChanged(context, runId, input.status);
 }
-
 function isBlanketFailure(error: XeroWriteError): boolean {
   return (
     Boolean(error.recoveryReason) ||
@@ -830,15 +786,13 @@ function isBlanketFailure(error: XeroWriteError): boolean {
     error.code === "rate_limit_error"
   );
 }
-
 async function publishRunStatusChanged(
   context: ReconcileApprovalStateInput,
   runId: string,
   status: string
 ) {
   try {
-    await assertXeroCampaignAccess(context);
-    await withXeroCampaignScopedEffect(context, () =>
+    await (() =>
       publishOrganisationNotificationEvent(
         {
           clerkOrgId: context.clerkOrgId,
@@ -846,16 +800,15 @@ async function publishRunStatusChanged(
         },
         {
           payload: {
+            connectionId: context.connectionId,
             organisationId: context.organisationId,
             runId,
             runType: "approval_state_reconciliation",
             status,
-            xeroTenantId: context.xeroTenantId,
           },
           type: "sync.run_status_changed",
         }
-      )
-    );
+      ))();
   } catch (error) {
     if (
       error instanceof XeroBindingChangedError ||
@@ -870,7 +823,6 @@ async function publishRunStatusChanged(
     });
   }
 }
-
 function auditBase(
   context: ReconcileApprovalStateInput,
   action: string,
@@ -886,7 +838,6 @@ function auditBase(
     resource_type: "availability_record",
   };
 }
-
 function notificationTitle(
   type: "leave_approved" | "leave_declined" | "leave_withdrawn"
 ) {
@@ -898,7 +849,6 @@ function notificationTitle(
   }
   return "Leave withdrawn";
 }
-
 function notificationBody(
   record: ReconciliationRecord,
   type: "leave_approved" | "leave_declined" | "leave_withdrawn"
@@ -912,7 +862,6 @@ function notificationBody(
   }
   return `${name}'s leave request was withdrawn in Xero Payroll.`;
 }
-
 function emptyResult(
   runId: string,
   status: "cancelled" | "failed" | "partial_success" | "succeeded"
@@ -929,13 +878,14 @@ function emptyResult(
     withdrawn: 0,
   };
 }
-
 async function reconcileOne(
   context: ReconcileApprovalStateInput,
   runId: string,
-  xeroTenant: Extract<
+  xeroConnection: Extract<
     Awaited<ReturnType<typeof resolveSyncTenant>>,
-    { ok: true }
+    {
+      ok: true;
+    }
   >["value"],
   record: ReconciliationRecord,
   counts: {
@@ -947,7 +897,9 @@ async function reconcileOne(
     withdrawn: number;
   },
   checkedAt: Date
-): Promise<{ blanketError?: XeroWriteError }> {
+): Promise<{
+  blanketError?: XeroWriteError;
+}> {
   try {
     const xeroLeaveApplicationId = record.source_remote_id;
     if (!xeroLeaveApplicationId) {
@@ -956,11 +908,11 @@ async function reconcileOne(
     }
     const xeroEmployeeId = record.person.xero_employee_id ?? undefined;
     const status = await fetchLeaveApplicationStatusForRegion(
-      xeroTenant.payroll_region,
+      xeroConnection.payroll_region,
       {
+        xeroConnection,
         xeroEmployeeId,
         xeroLeaveApplicationId,
-        xeroTenant,
       }
     );
     if (!status.ok) {
@@ -990,7 +942,6 @@ async function reconcileOne(
       counts.failed += 1;
       return {};
     }
-
     const reconciled = await reconcileRecord(
       context,
       runId,
@@ -1021,7 +972,6 @@ async function reconcileOne(
     return {};
   }
 }
-
 async function stampCheckedAt(
   context: ReconcileApprovalStateInput,
   recordId: string,
@@ -1039,14 +989,12 @@ async function stampCheckedAt(
     })
   );
 }
-
 function toPrismaJsonValue(
   value: unknown
 ): Exclude<JsonValue, null> | typeof Prisma.JsonNull {
   const jsonValue = toJsonValue(value);
   return jsonValue === null ? Prisma.JsonNull : jsonValue;
 }
-
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) {
     return null;
@@ -1073,7 +1021,6 @@ function toJsonValue(value: unknown): JsonValue {
   }
   return String(value);
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, ReconcileApprovalStateError> {
@@ -1085,7 +1032,6 @@ function validationError(
     ok: false,
   };
 }
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

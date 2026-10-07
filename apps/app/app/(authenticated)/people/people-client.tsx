@@ -1,5 +1,4 @@
 "use client";
-
 import type {
   ClerkAccessReviewResult,
   ClerkAccessState,
@@ -69,10 +68,10 @@ interface FilterOption {
   id: string;
   name: string;
 }
-
 interface PeopleClientProps {
   canIncludeArchived: boolean;
   canManageClerkAccess?: boolean;
+  connectionId: string | null;
   filters: PeopleFilterInput;
   locations: FilterOption[];
   nextCursor: string | null;
@@ -82,9 +81,7 @@ interface PeopleClientProps {
   teams: FilterOption[];
   totalCount: number;
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
-  xeroTenantId: string | null;
 }
-
 const statusLabels: Record<string, string> = {
   alternative_contact: "Alternative contact",
   another_office: "Another office",
@@ -100,7 +97,6 @@ const statusLabels: Record<string, string> = {
   travelling: "Travelling",
   wfh: "Working from home",
 };
-
 function renderEmptyState({
   canIncludeArchived,
   xeroConnectionState,
@@ -108,7 +104,7 @@ function renderEmptyState({
   orgQueryValue,
   syncPending,
   totalCount,
-  xeroTenantId,
+  connectionId,
 }: {
   canIncludeArchived: boolean;
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
@@ -116,7 +112,7 @@ function renderEmptyState({
   orgQueryValue: string | null;
   syncPending: boolean;
   totalCount: number;
-  xeroTenantId: string | null;
+  connectionId: string | null;
 }) {
   if (
     totalCount === 0 &&
@@ -134,7 +130,7 @@ function renderEmptyState({
     const canSync =
       canIncludeArchived &&
       xeroConnectionState === "connected" &&
-      Boolean(xeroTenantId);
+      Boolean(connectionId);
     return (
       <EmptyState
         actionSlot={
@@ -170,7 +166,6 @@ function renderEmptyState({
     />
   );
 }
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This directory coordinates role-gated sync, filters and responsive person rows in one URL-backed surface.
 export function PeopleClient({
   canIncludeArchived,
@@ -184,7 +179,7 @@ export function PeopleClient({
   people,
   teams,
   totalCount,
-  xeroTenantId,
+  connectionId,
 }: PeopleClientProps) {
   const router = useRouter();
   const { subscribe } = useNotificationEvents();
@@ -208,7 +203,6 @@ export function PeopleClient({
     () => peopleActiveFilterLabels(filters, teams, locations),
     [filters, locations, teams]
   );
-
   useEffect(() => {
     const handle = window.setTimeout(() => {
       if (search !== (filters.search ?? "")) {
@@ -217,7 +211,6 @@ export function PeopleClient({
     }, 250);
     return () => window.clearTimeout(handle);
   }, [filters.search, search, setFilterParams]);
-
   useEffect(
     () =>
       subscribe((event) => {
@@ -230,25 +223,26 @@ export function PeopleClient({
       }),
     [organisationId, router, subscribe]
   );
-
   const handleSyncFromXero = () => {
-    if (!xeroTenantId) {
+    if (!connectionId) {
       return;
     }
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: people sync handles queued/failed/succeeded branching
     startSyncTransition(async () => {
       try {
         const result = await dispatchManualSyncAction({
+          connectionId,
           organisationId,
           runType: "people",
-          xeroTenantId,
         });
         if (!result.ok) {
           setSyncMessage({ text: result.error.message, tone: "error" });
           return;
         }
         if (!result.value.queued) {
-          const { reason } = result.value as { reason?: string };
+          const { reason } = result.value as {
+            reason?: string;
+          };
           let text = "This sync is not available yet.";
           if (reason === "connection_not_active") {
             text = "Reconnect Xero before running this sync.";
@@ -303,7 +297,6 @@ export function PeopleClient({
       }
     });
   };
-
   return (
     <section className="flex flex-col gap-6">
       {syncMessage ? (
@@ -334,7 +327,7 @@ export function PeopleClient({
             </p>
             {canIncludeArchived &&
             xeroConnectionState === "connected" &&
-            xeroTenantId ? (
+            connectionId ? (
               <Button
                 disabled={isSyncPending}
                 onClick={handleSyncFromXero}
@@ -509,12 +502,12 @@ export function PeopleClient({
       {people.length === 0 ? (
         renderEmptyState({
           canIncludeArchived,
+          connectionId,
           onSync: handleSyncFromXero,
           orgQueryValue,
           syncPending: isSyncPending,
           totalCount,
           xeroConnectionState,
-          xeroTenantId,
         })
       ) : (
         <div className="rounded-2xl bg-muted">
@@ -630,7 +623,6 @@ export function PeopleClient({
     </section>
   );
 }
-
 export function ClerkAccessReviewDialog({
   isOpen,
   onClose,
@@ -649,7 +641,6 @@ export function ClerkAccessReviewDialog({
   );
   const [resultData, setResultData] =
     useState<ClerkInvitationDispatchResult | null>(null);
-
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -670,14 +661,12 @@ export function ClerkAccessReviewDialog({
       setIsLoading(false);
     }
   }, [organisationId]);
-
   useEffect(() => {
     if (isOpen) {
       setResultData(null);
       loadData();
     }
   }, [isOpen, loadData]);
-
   const handleInviteAndLink = async () => {
     setIsSubmitting(true);
     setError(null);
@@ -696,12 +685,10 @@ export function ClerkAccessReviewDialog({
       setIsSubmitting(false);
     }
   };
-
   const handleDone = () => {
     onClose();
     router.refresh();
   };
-
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open={isOpen}>
       <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
@@ -762,7 +749,6 @@ export function ClerkAccessReviewDialog({
     </Dialog>
   );
 }
-
 function ReviewDialogBody({
   error,
   isLoading,
@@ -784,7 +770,6 @@ function ReviewDialogBody({
       </div>
     );
   }
-
   if (error) {
     return (
       <div className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-destructive text-label-lg">
@@ -796,7 +781,6 @@ function ReviewDialogBody({
       </div>
     );
   }
-
   if (resultData) {
     return (
       <div className="flex flex-col gap-4 py-4">
@@ -818,7 +802,6 @@ function ReviewDialogBody({
       </div>
     );
   }
-
   if (reviewData) {
     return (
       <div className="flex flex-col gap-4 py-2">
@@ -833,10 +816,8 @@ function ReviewDialogBody({
       </div>
     );
   }
-
   return null;
 }
-
 function ReviewStatChips({
   reviewData,
 }: {
@@ -877,7 +858,6 @@ function ReviewStatChips({
     </div>
   );
 }
-
 function ReviewCandidateTable({
   candidates,
 }: {
@@ -924,7 +904,6 @@ function ReviewCandidateTable({
     </div>
   );
 }
-
 function CandidateStateBadge({
   conflictReason,
   state,
@@ -951,7 +930,6 @@ function CandidateStateBadge({
       return null;
   }
 }
-
 function FilterField({
   children,
   className,
@@ -970,7 +948,6 @@ function FilterField({
     </div>
   );
 }
-
 function Avatar({ person }: { person: PersonListItem }) {
   const initials =
     `${person.firstName[0] ?? ""}${person.lastName[0] ?? ""}`.toUpperCase();
@@ -989,7 +966,6 @@ function Avatar({ person }: { person: PersonListItem }) {
     </span>
   );
 }
-
 function PeopleDatum({
   children,
   label,
@@ -1004,7 +980,6 @@ function PeopleDatum({
     </td>
   );
 }
-
 function locationLabel(person: PersonListItem): string {
   if (!person.location) {
     return "Unassigned";
@@ -1012,7 +987,6 @@ function locationLabel(person: PersonListItem): string {
   const suffix = person.location.regionCode ?? person.location.countryCode;
   return suffix ? `${person.location.name} (${suffix})` : person.location.name;
 }
-
 function peopleActiveFilterLabels(
   filters: PeopleFilterInput,
   teams: FilterOption[],
@@ -1046,14 +1020,12 @@ function peopleActiveFilterLabels(
   }
   return labels;
 }
-
 function labelForPersonType(personType: string): string {
   return personType
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
-
 function peopleHref(
   filters: PeopleFilterInput,
   orgQueryValue: string | null

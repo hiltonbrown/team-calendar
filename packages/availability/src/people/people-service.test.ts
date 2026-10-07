@@ -447,7 +447,7 @@ function balanceRowInput(
     leave_type_name: "Annual Leave",
     leave_type_xero_id: "annual-leave-id",
     record_type: "leave",
-    xero_tenant_id: "00000000-0000-4000-8000-0000000000bb",
+    xero_connection_id: "00000000-0000-4000-8000-0000000000bb",
     ...overrides,
   };
 }

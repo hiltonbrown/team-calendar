@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
     organisation_id: organisationId,
   })),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
@@ -34,9 +33,7 @@ vi.mock("@repo/database", () => ({
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
-
 const { setManualLeaveBalance } = await import("./manual-balance-service");
-
 const input = {
   actingRole: "admin" as const,
   actingUserId: "user_1",
@@ -48,21 +45,19 @@ const input = {
   organisationId: "00000000-0000-4000-8000-000000000001",
   personId: "00000000-0000-4000-8000-000000000002",
 };
-
 describe("manual balance service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.auditCreate.mockResolvedValue({});
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
     mocks.leaveBalanceCreate.mockResolvedValue({ id: "balance_1" });
     mocks.leaveBalanceFindFirst.mockResolvedValue(null);
     mocks.leaveBalanceUpdateMany.mockResolvedValue({ count: 1 });
     mocks.personFindFirst.mockResolvedValue({ id: input.personId });
   });
-
   it("cannot fall back to manual balances when the state lookup is unavailable", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       error: { code: "state_unavailable" },
@@ -79,15 +74,12 @@ describe("manual balance service", () => {
     expect(mocks.leaveBalanceCreate).not.toHaveBeenCalled();
     expect(mocks.leaveBalanceUpdateMany).not.toHaveBeenCalled();
   });
-
   it("blocks manual edits while Xero is connected", async () => {
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
-
     const result = await setManualLeaveBalance(input);
-
     expect(result).toEqual({
       error: {
         code: "xero_connected",
@@ -98,10 +90,8 @@ describe("manual balance service", () => {
     });
     expect(mocks.leaveBalanceCreate).not.toHaveBeenCalled();
   });
-
   it("creates a scoped manual balance while Xero is disconnected", async () => {
     const result = await setManualLeaveBalance(input);
-
     expect(result).toEqual({ ok: true, value: { id: "balance_1" } });
     expect(mocks.leaveBalanceCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -112,17 +102,14 @@ describe("manual balance service", () => {
         organisation_id: input.organisationId,
         person_id: input.personId,
         source_payload_json: Prisma.DbNull,
-        xero_tenant_id: null,
+        xero_connection_id: null,
       }),
       select: { id: true },
     });
   });
-
   it("updates the existing manual row by person and leave type", async () => {
     mocks.leaveBalanceFindFirst.mockResolvedValue({ id: "balance_existing" });
-
     const result = await setManualLeaveBalance(input);
-
     expect(result).toEqual({
       ok: true,
       value: { id: "balance_existing" },
@@ -134,7 +121,7 @@ describe("manual balance service", () => {
         leave_type_xero_id: input.leaveTypeXeroId,
         organisation_id: input.organisationId,
         person_id: input.personId,
-        xero_tenant_id: null,
+        xero_connection_id: null,
       },
     });
     expect(mocks.leaveBalanceUpdateMany).toHaveBeenCalledWith({
@@ -150,13 +137,11 @@ describe("manual balance service", () => {
       },
     });
   });
-
   it("rejects a currency balance unit; manual balances are hours/days only", async () => {
     const result = await setManualLeaveBalance({
       ...input,
       balanceUnit: "currency",
     });
-
     expect(result).toEqual({
       error: {
         code: "validation_error",

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-
 const mocks = vi.hoisted(() => ({
   fetchAuEmployees: vi.fn(),
   fetchAuLeaveApplicationStatus: vi.fn(),
@@ -16,28 +15,24 @@ const mocks = vi.hoisted(() => ({
   fetchUkLeaveBalancesForEmployee: vi.fn(),
   fetchUkLeaveForEmployee: vi.fn(),
 }));
-
 vi.mock("../adapter/auth-recovery", () => ({
   executeWithXeroAuthRecovery: (
     _tenant: unknown,
     operation: (tenant: unknown) => unknown
   ) => operation(_tenant),
 }));
-
 vi.mock("../au/read", () => ({
   fetchEmployees: mocks.fetchAuEmployees,
   fetchLeaveApplicationStatus: mocks.fetchAuLeaveApplicationStatus,
   fetchLeaveBalances: mocks.fetchAuLeaveBalances,
   fetchLeaveRecords: mocks.fetchAuLeaveRecords,
 }));
-
 vi.mock("../nz/read", () => ({
   fetchEmployees: mocks.fetchNzEmployees,
   fetchLeaveApplicationStatus: mocks.fetchNzLeaveApplicationStatus,
   fetchLeaveBalancesForEmployee: mocks.fetchNzLeaveBalancesForEmployee,
   fetchLeaveForEmployee: mocks.fetchNzLeaveForEmployee,
 }));
-
 vi.mock("../uk/read", () => ({
   fetchEmployees: mocks.fetchUkEmployees,
   fetchLeaveApplicationStatus: mocks.fetchUkLeaveApplicationStatus,
@@ -56,22 +51,18 @@ import {
 function buildTenant(region: "AU" | "NZ" | "UK") {
   return {
     accessToken: "access-token",
-    bindingGeneration: 1,
     clerk_org_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "tenant_1",
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: region,
-    tokenVersion: 1,
     xero_tenant_id: "xero-tenant-1",
   };
 }
-
 describe("fetchEmployeesForRegion dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it("dispatches to AU reader for AU region", async () => {
     mocks.fetchAuEmployees.mockResolvedValueOnce({
       ok: true,
@@ -84,14 +75,15 @@ describe("fetchEmployeesForRegion dispatch", () => {
         seenEmployeeIds: [],
       },
     });
-
     const tenant = buildTenant("AU");
-    const result = await fetchEmployeesForRegion("AU", { xeroTenant: tenant });
-
+    const result = await fetchEmployeesForRegion("AU", {
+      xeroConnection: tenant,
+    });
     expect(result.ok).toBe(true);
-    expect(mocks.fetchAuEmployees).toHaveBeenCalledWith({ xeroTenant: tenant });
+    expect(mocks.fetchAuEmployees).toHaveBeenCalledWith({
+      xeroConnection: tenant,
+    });
   });
-
   it("dispatches to NZ reader for NZ region", async () => {
     mocks.fetchNzEmployees.mockResolvedValueOnce({
       ok: true,
@@ -104,14 +96,15 @@ describe("fetchEmployeesForRegion dispatch", () => {
         seenEmployeeIds: [],
       },
     });
-
     const tenant = buildTenant("NZ");
-    const result = await fetchEmployeesForRegion("NZ", { xeroTenant: tenant });
-
+    const result = await fetchEmployeesForRegion("NZ", {
+      xeroConnection: tenant,
+    });
     expect(result.ok).toBe(true);
-    expect(mocks.fetchNzEmployees).toHaveBeenCalledWith({ xeroTenant: tenant });
+    expect(mocks.fetchNzEmployees).toHaveBeenCalledWith({
+      xeroConnection: tenant,
+    });
   });
-
   it("dispatches to UK reader for UK region", async () => {
     mocks.fetchUkEmployees.mockResolvedValueOnce({
       ok: true,
@@ -124,18 +117,20 @@ describe("fetchEmployeesForRegion dispatch", () => {
         seenEmployeeIds: [],
       },
     });
-
     const tenant = buildTenant("UK");
-    const result = await fetchEmployeesForRegion("UK", { xeroTenant: tenant });
-
+    const result = await fetchEmployeesForRegion("UK", {
+      xeroConnection: tenant,
+    });
     expect(result.ok).toBe(true);
-    expect(mocks.fetchUkEmployees).toHaveBeenCalledWith({ xeroTenant: tenant });
+    expect(mocks.fetchUkEmployees).toHaveBeenCalledWith({
+      xeroConnection: tenant,
+    });
   });
-
   it("returns unsupported payroll region error for unknown regions", async () => {
     const tenant = buildTenant("AU");
-    const result = await fetchEmployeesForRegion("US", { xeroTenant: tenant });
-
+    const result = await fetchEmployeesForRegion("US", {
+      xeroConnection: tenant,
+    });
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
@@ -143,28 +138,24 @@ describe("fetchEmployeesForRegion dispatch", () => {
     }
   });
 });
-
 describe("fetchLeaveRecordsForRegion dispatch", () => {
   it("dispatches to AU reader for AU region", async () => {
     mocks.fetchAuLeaveRecords.mockResolvedValueOnce({
       ok: true,
       value: { complete: true, leaveRecords: [], rawResponse: {} },
     });
-
     const tenant = buildTenant("AU");
     const result = await fetchLeaveRecordsForRegion("AU", {
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchAuLeaveRecords).toHaveBeenCalledWith({
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
   });
-
   it("returns per-employee requirement error for NZ leave records", async () => {
     const result = await fetchLeaveRecordsForRegion("NZ", {
-      xeroTenant: buildTenant("NZ"),
+      xeroConnection: buildTenant("NZ"),
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -173,10 +164,9 @@ describe("fetchLeaveRecordsForRegion dispatch", () => {
       );
     }
   });
-
   it("returns per-employee requirement error for UK leave records", async () => {
     const result = await fetchLeaveRecordsForRegion("UK", {
-      xeroTenant: buildTenant("UK"),
+      xeroConnection: buildTenant("UK"),
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -185,10 +175,9 @@ describe("fetchLeaveRecordsForRegion dispatch", () => {
       );
     }
   });
-
   it("returns unsupported payroll region error for unknown regions", async () => {
     const result = await fetchLeaveRecordsForRegion("US", {
-      xeroTenant: buildTenant("AU"),
+      xeroConnection: buildTenant("AU"),
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -197,53 +186,45 @@ describe("fetchLeaveRecordsForRegion dispatch", () => {
     }
   });
 });
-
 describe("fetchLeaveForEmployeeForRegion dispatch", () => {
   it("dispatches to NZ reader for NZ region", async () => {
     mocks.fetchNzLeaveForEmployee.mockResolvedValueOnce({
       ok: true,
       value: { complete: true, leaveRecords: [], rawResponse: {} },
     });
-
     const tenant = buildTenant("NZ");
     const result = await fetchLeaveForEmployeeForRegion("NZ", {
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-nz-1",
-      xeroTenant: tenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchNzLeaveForEmployee).toHaveBeenCalledWith({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-nz-1",
-      xeroTenant: tenant,
     });
   });
-
   it("dispatches to UK reader for UK region", async () => {
     mocks.fetchUkLeaveForEmployee.mockResolvedValueOnce({
       ok: true,
       value: { complete: true, leaveRecords: [], rawResponse: {} },
     });
-
     const tenant = buildTenant("UK");
     const result = await fetchLeaveForEmployeeForRegion("UK", {
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: tenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchUkLeaveForEmployee).toHaveBeenCalledWith({
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-uk-1",
-      xeroTenant: tenant,
     });
   });
-
   it("returns unsupported for AU per-employee leave reads", async () => {
     const tenant = buildTenant("AU");
     const result = await fetchLeaveForEmployeeForRegion("AU", {
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-au-1",
-      xeroTenant: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
@@ -252,14 +233,12 @@ describe("fetchLeaveForEmployeeForRegion dispatch", () => {
       );
     }
   });
-
   it("returns unsupported payroll region error for unknown regions", async () => {
     const tenant = buildTenant("AU");
     const result = await fetchLeaveForEmployeeForRegion("US", {
+      xeroConnection: tenant,
       xeroEmployeeId: "emp-1",
-      xeroTenant: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
@@ -267,12 +246,10 @@ describe("fetchLeaveForEmployeeForRegion dispatch", () => {
     }
   });
 });
-
 describe("fetchLeaveBalancesForRegion dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it("dispatches to AU reader for AU region", async () => {
     const tenant = buildTenant("AU");
     mocks.fetchAuLeaveBalances.mockResolvedValueOnce({
@@ -283,19 +260,16 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
         rawResponses: [],
       },
     });
-
     const result = await fetchLeaveBalancesForRegion("AU", {
       employeeIds: ["emp-au-1", "emp-au-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchAuLeaveBalances).toHaveBeenCalledWith({
       employeeIds: ["emp-au-1", "emp-au-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
   });
-
   it("dispatches to NZ reader per employee for NZ region", async () => {
     const tenant = buildTenant("NZ");
     mocks.fetchNzLeaveBalancesForEmployee
@@ -342,16 +316,14 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
           rawResponse: { raw: "nz-2" },
         },
       });
-
     const progressCalls: [number, number][] = [];
     const result = await fetchLeaveBalancesForRegion("NZ", {
       employeeIds: ["emp-nz-1", "emp-nz-2"],
       onProgress: (p, t) => {
         progressCalls.push([p, t]);
       },
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.leaveBalances).toHaveLength(3);
@@ -367,7 +339,6 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
       [2, 2],
     ]);
   });
-
   it("aborts NZ balance fetch on blanket auth failure (401)", async () => {
     const tenant = buildTenant("NZ");
     mocks.fetchNzLeaveBalancesForEmployee.mockResolvedValueOnce({
@@ -378,19 +349,16 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveBalancesForRegion("NZ", {
       employeeIds: ["emp-nz-1", "emp-nz-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("auth_error");
     }
     expect(mocks.fetchNzLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
-
   it("aborts NZ balance fetch on blanket permission failure (403)", async () => {
     const tenant = buildTenant("NZ");
     mocks.fetchNzLeaveBalancesForEmployee.mockResolvedValueOnce({
@@ -401,19 +369,16 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveBalancesForRegion("NZ", {
       employeeIds: ["emp-nz-1", "emp-nz-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("permission_error");
     }
     expect(mocks.fetchNzLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
-
   it("isolates NZ employee failure and continues to next employee", async () => {
     const tenant = buildTenant("NZ");
     mocks.fetchNzLeaveBalancesForEmployee
@@ -442,12 +407,10 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
           rawResponse: { raw: "nz-2" },
         },
       });
-
     const result = await fetchLeaveBalancesForRegion("NZ", {
       employeeIds: ["emp-nz-1", "emp-nz-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.leaveBalances).toHaveLength(1);
@@ -456,7 +419,6 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     }
     expect(mocks.fetchNzLeaveBalancesForEmployee).toHaveBeenCalledTimes(2);
   });
-
   it("dispatches to UK reader per employee for UK region", async () => {
     const tenant = buildTenant("UK");
     mocks.fetchUkLeaveBalancesForEmployee
@@ -494,12 +456,10 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
           rawResponse: { raw: "uk-2" },
         },
       });
-
     const result = await fetchLeaveBalancesForRegion("UK", {
       employeeIds: ["emp-uk-1", "emp-uk-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.leaveBalances).toHaveLength(2);
@@ -511,7 +471,6 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     }
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(2);
   });
-
   it("aborts UK balance fetch on blanket rate-limit failure (429)", async () => {
     const tenant = buildTenant("UK");
     mocks.fetchUkLeaveBalancesForEmployee.mockResolvedValueOnce({
@@ -522,19 +481,16 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveBalancesForRegion("UK", {
       employeeIds: ["emp-uk-1", "emp-uk-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("rate_limit_error");
     }
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
-
   it("aborts UK balance fetch on blanket permission failure (403)", async () => {
     const tenant = buildTenant("UK");
     mocks.fetchUkLeaveBalancesForEmployee.mockResolvedValueOnce({
@@ -545,19 +501,16 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveBalancesForRegion("UK", {
       employeeIds: ["emp-uk-1", "emp-uk-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("permission_error");
     }
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
-
   it("stops balance collection on an operational incident before the next employee", async () => {
     mocks.fetchUkLeaveBalancesForEmployee.mockResolvedValue({
       ok: true,
@@ -573,7 +526,7 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     });
     const result = await fetchLeaveBalancesForRegion("UK", {
       employeeIds: ["emp-uk-1", "emp-uk-2"],
-      xeroTenant: buildTenant("UK"),
+      xeroConnection: buildTenant("UK"),
     });
     expect(result).toMatchObject({
       error: { recoveryReason: "operational_incident" },
@@ -581,7 +534,6 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     });
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(1);
   });
-
   it("isolates UK employee validation failure and continues to next employee", async () => {
     const tenant = buildTenant("UK");
     mocks.fetchUkLeaveBalancesForEmployee
@@ -610,12 +562,10 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
           rawResponse: { raw: "uk-2" },
         },
       });
-
     const result = await fetchLeaveBalancesForRegion("UK", {
       employeeIds: ["emp-uk-1", "emp-uk-2"],
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.leaveBalances).toHaveLength(1);
@@ -628,13 +578,11 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     }
     expect(mocks.fetchUkLeaveBalancesForEmployee).toHaveBeenCalledTimes(2);
   });
-
   it("returns unsupported payroll region error for unknown regions", async () => {
     const result = await fetchLeaveBalancesForRegion("US", {
       employeeIds: ["emp-1"],
-      xeroTenant: buildTenant("AU"),
+      xeroConnection: buildTenant("AU"),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
@@ -642,12 +590,10 @@ describe("fetchLeaveBalancesForRegion dispatch", () => {
     }
   });
 });
-
 describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
   it("dispatches to AU reader for AU region", async () => {
     const auTenant = buildTenant("AU");
     mocks.fetchAuLeaveApplicationStatus.mockResolvedValueOnce({
@@ -658,21 +604,18 @@ describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
         status: "APPROVED",
       },
     });
-
     const result = await fetchLeaveApplicationStatusForRegion("AU", {
+      xeroConnection: auTenant,
       xeroEmployeeId: "emp-au-1",
       xeroLeaveApplicationId: "app-au-1",
-      xeroTenant: auTenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchAuLeaveApplicationStatus).toHaveBeenCalledWith({
+      xeroConnection: auTenant,
       xeroEmployeeId: "emp-au-1",
       xeroLeaveApplicationId: "app-au-1",
-      xeroTenant: auTenant,
     });
   });
-
   it("dispatches to NZ reader for NZ region with employee and leave IDs", async () => {
     const nzTenant = buildTenant("NZ");
     mocks.fetchNzLeaveApplicationStatus.mockResolvedValueOnce({
@@ -683,21 +626,18 @@ describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
         status: "REJECTED",
       },
     });
-
     const result = await fetchLeaveApplicationStatusForRegion("NZ", {
+      xeroConnection: nzTenant,
       xeroEmployeeId: "emp-nz-1",
       xeroLeaveApplicationId: "app-nz-1",
-      xeroTenant: nzTenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchNzLeaveApplicationStatus).toHaveBeenCalledWith({
+      xeroConnection: nzTenant,
       xeroEmployeeId: "emp-nz-1",
       xeroLeaveApplicationId: "app-nz-1",
-      xeroTenant: nzTenant,
     });
   });
-
   it("dispatches to UK reader for UK region with employee and leave IDs", async () => {
     const ukTenant = buildTenant("UK");
     mocks.fetchUkLeaveApplicationStatus.mockResolvedValueOnce({
@@ -708,35 +648,30 @@ describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
         status: "WITHDRAWN",
       },
     });
-
     const result = await fetchLeaveApplicationStatusForRegion("UK", {
+      xeroConnection: ukTenant,
       xeroEmployeeId: "emp-uk-1",
       xeroLeaveApplicationId: "app-uk-1",
-      xeroTenant: ukTenant,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.fetchUkLeaveApplicationStatus).toHaveBeenCalledWith({
+      xeroConnection: ukTenant,
       xeroEmployeeId: "emp-uk-1",
       xeroLeaveApplicationId: "app-uk-1",
-      xeroTenant: ukTenant,
     });
   });
-
   it("returns unsupported payroll region error for unknown regions", async () => {
     const result = await fetchLeaveApplicationStatusForRegion("US", {
+      xeroConnection: buildTenant("AU"),
       xeroEmployeeId: "emp-1",
       xeroLeaveApplicationId: "app-1",
-      xeroTenant: buildTenant("AU"),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("unknown_error");
       expect(result.error.message).toBe("Unsupported payroll region.");
     }
   });
-
   it("propagates permission_error (403) from regional readers", async () => {
     mocks.fetchNzLeaveApplicationStatus.mockResolvedValueOnce({
       error: {
@@ -746,20 +681,17 @@ describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveApplicationStatusForRegion("NZ", {
+      xeroConnection: buildTenant("NZ"),
       xeroEmployeeId: "emp-nz-1",
       xeroLeaveApplicationId: "app-nz-1",
-      xeroTenant: buildTenant("NZ"),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("permission_error");
       expect(result.error.httpStatus).toBe(403);
     }
   });
-
   it("propagates not_found_error (404) from regional readers", async () => {
     mocks.fetchUkLeaveApplicationStatus.mockResolvedValueOnce({
       error: {
@@ -769,13 +701,11 @@ describe("fetchLeaveApplicationStatusForRegion dispatch", () => {
       },
       ok: false,
     });
-
     const result = await fetchLeaveApplicationStatusForRegion("UK", {
+      xeroConnection: buildTenant("UK"),
       xeroEmployeeId: "emp-uk-1",
       xeroLeaveApplicationId: "app-uk-1",
-      xeroTenant: buildTenant("UK"),
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("not_found_error");

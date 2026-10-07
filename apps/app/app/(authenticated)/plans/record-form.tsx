@@ -1,7 +1,5 @@
 "use client";
-
 import { getAvailabilityRecordLabel, xeroRecoveryMessage } from "@repo/core";
-
 import { Button } from "@repo/design-system/components/ui/button";
 import { Checkbox } from "@repo/design-system/components/ui/checkbox";
 import { Input } from "@repo/design-system/components/ui/input";
@@ -42,7 +40,6 @@ interface PlanPersonOption {
   id: string;
   label: string;
 }
-
 interface EditablePlanRecord {
   allDay: boolean;
   contactabilityStatus: PlanRecordFormInput["contactabilityStatus"];
@@ -56,7 +53,6 @@ interface EditablePlanRecord {
   startsAt: string;
   startTime: string;
 }
-
 interface RecordFormProps {
   balanceAvailable: number | null;
   balanceCurrencyCode?: string | null;
@@ -70,9 +66,7 @@ interface RecordFormProps {
   timezone?: string;
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
-
 type PlanIntent = "availability" | "leave";
-
 const recordTypeDescriptions: Record<string, string> = {
   alternative_contact: "Use another contact.",
   annual_leave: "Paid annual leave.",
@@ -91,7 +85,6 @@ const recordTypeDescriptions: Record<string, string> = {
   unpaid_leave: "Unpaid leave.",
   wfh: "Working from home.",
 };
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This form coordinates record type, intent, submit-path and Xero balance state in one component; the explicit conditional rendering added by noLeakedRender pushed it just over the threshold.
 export function RecordForm({
   balanceAvailable,
@@ -133,25 +126,21 @@ export function RecordForm({
     startsAt: string;
     workingDays: number | null;
   } | null>(null);
-
   const selectedPerson = people.find((person) => person.id === personId);
   const isXeroLeave = isXeroLeaveSelection(intent, recordType);
   const showSubmitPath = isXeroLeave && xeroConnectionState === "connected";
   const primaryLabel = primarySubmitLabel(showSubmitPath, mode);
   const visibleRecordTypes = recordTypesForIntent(intent);
   const recordTypeLabels = recordTypeLabelsForIntent(intent);
-
   const dynamicPanel = useMemo(
     () => dynamicPanelForIntent(intent, xeroConnectionState),
     [xeroConnectionState, intent]
   );
-
   useEffect(() => {
     if (error) {
       errorRef.current?.focus();
     }
   }, [error]);
-
   const setPlanIntent = (value: string) => {
     if (value !== "leave" && value !== "availability") {
       return;
@@ -160,7 +149,6 @@ export function RecordForm({
     setIntent(nextIntent);
     setRecordType(firstRecordTypeForIntent(nextIntent));
   };
-
   const submit = (formData: FormData, submitAfterSave: boolean) => {
     if (
       isXeroLeave &&
@@ -183,22 +171,18 @@ export function RecordForm({
       startsAt: String(formData.get("startsAt") ?? ""),
       startTime: String(formData.get("startTime") ?? ""),
     };
-
     const parsed = PlanRecordFormSchema.safeParse(input);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Invalid plan record");
       return;
     }
-
     startTransition(async () => {
       setError(null);
       const result = await saveRecord(mode, record, parsed.data);
-
       if (!result.ok) {
         setError(result.error.message);
         return;
       }
-
       if (submitAfterSave) {
         setConfirmationRecord({
           endsAt: parsed.data.endsAt,
@@ -212,12 +196,10 @@ export function RecordForm({
         });
         return;
       }
-
       router.push(closeHref);
       router.refresh();
     });
   };
-
   if (people.length === 0) {
     return (
       <div className="rounded-2xl bg-muted p-5 text-label-lg text-muted-foreground">
@@ -225,7 +207,6 @@ export function RecordForm({
       </div>
     );
   }
-
   return (
     <form
       aria-busy={isPending}
@@ -518,7 +499,6 @@ export function RecordForm({
     </form>
   );
 }
-
 function Field({
   children,
   label,
@@ -545,14 +525,12 @@ function Field({
     </div>
   );
 }
-
 function isXeroLeaveSelection(
   intent: PlanIntent,
   recordType: PlanRecordFormInput["recordType"]
 ): boolean {
   return intent === "leave" && isOneOf(recordType, xeroLeaveRecordTypes);
 }
-
 function recordTypesForIntent(
   intent: PlanIntent
 ): readonly PlanRecordFormInput["recordType"][] {
@@ -561,7 +539,6 @@ function recordTypesForIntent(
   }
   return localOnlyRecordTypes;
 }
-
 function firstRecordTypeForIntent(
   intent: PlanIntent
 ): PlanRecordFormInput["recordType"] {
@@ -570,7 +547,6 @@ function firstRecordTypeForIntent(
   }
   return localOnlyRecordTypes[0];
 }
-
 function recordTypeLabelsForIntent(intent: PlanIntent): {
   field: string;
   group: string;
@@ -580,7 +556,6 @@ function recordTypeLabelsForIntent(intent: PlanIntent): {
   }
   return { field: "Availability type", group: "Availability" };
 }
-
 function dynamicPanelForIntent(
   intent: PlanIntent,
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState
@@ -599,18 +574,15 @@ function dynamicPanelForIntent(
   }
   return "Saves as a draft first. Use Save and submit when you are ready to submit it for manager approval.";
 }
-
 function isOneOf<T extends string>(
   value: string,
   values: readonly T[]
 ): value is T {
   return values.some((candidate) => candidate === value);
 }
-
 function intentForRecordType(recordType: string): PlanIntent {
   return isOneOf(recordType, localOnlyRecordTypes) ? "availability" : "leave";
 }
-
 function isUnchanged(
   record: EditablePlanRecord,
   input: PlanRecordFormInput
@@ -628,7 +600,6 @@ function isUnchanged(
     record.startTime === (input.startTime ?? "")
   );
 }
-
 function primarySubmitLabel(
   showSubmitPath: boolean,
   mode: RecordFormProps["mode"]
@@ -641,12 +612,15 @@ function primarySubmitLabel(
   }
   return "Save";
 }
-
 async function saveRecord(
   mode: RecordFormProps["mode"],
   record: EditablePlanRecord | undefined,
   input: PlanRecordFormInput
-): Promise<PlanActionResult<{ id: string }>> {
+): Promise<
+  PlanActionResult<{
+    id: string;
+  }>
+> {
   if (mode === "edit" && record?.id) {
     if (isUnchanged(record, input)) {
       return { ok: true, value: { id: record.id } };
@@ -655,7 +629,6 @@ async function saveRecord(
   }
   return await createRecordAction(input);
 }
-
 function estimateWorkingDays(startsAt: string, endsAt: string): number | null {
   const start = new Date(`${startsAt}T00:00:00.000Z`);
   const end = new Date(`${endsAt}T00:00:00.000Z`);
@@ -666,7 +639,6 @@ function estimateWorkingDays(startsAt: string, endsAt: string): number | null {
   ) {
     return null;
   }
-
   let count = 0;
   for (
     let cursor = new Date(start);

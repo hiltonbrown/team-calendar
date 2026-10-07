@@ -9,7 +9,6 @@ describe("xeroRecoveryMessageFromCode", () => {
       "operational_incident",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     [
       "state_unavailable",
       "We cannot reach Xero right now. Try again later or contact support.",

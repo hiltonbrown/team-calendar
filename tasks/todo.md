@@ -1,5 +1,54 @@
 # Current work
 
+## Xero persistence simplification, 7 October 2026
+
+- [x] Establish failing real-database assertions for canonical credentials, connection ownership, cursor scope and manual balance uniqueness.
+- [x] Generate the four-model schema and destructive migration; replace scoped queries and affected consumers without legacy wrappers.
+- [x] Delete obsolete lifecycle-only code, tests and scripts; verify no runtime obsolete model or token mirror remains.
+- [x] Pass Prisma generation, targeted tests, database integrations and repository check/typecheck/test/integration gates.
+- [x] Obtain independent code review, resolve findings and commit this phase on the existing branch.
+
+Stopping condition: persistence and compile-time consumers are consistent,
+required checks pass, code review is resolved and the focused phase is committed.
+OAuth, refresh, incremental sync and payroll write redesign remain later phases.
+
+Verification: Prisma Client 7.10.0 generated successfully. The complete historical
+migration chain and generated `20261007122236_simplify_xero_lifecycle` applied to
+a fresh disposable PostgreSQL database with zero schema drift. Existing manual
+availability and active feed-token partial uniqueness are preserved. Repository
+check passed for 1129 files; typecheck passed 19 tasks; unit tests passed all 18
+tasks; integration tests passed all 6 packages (195 tests) against local
+PostgreSQL and Redis. After review fixes, 23 affected PostgreSQL integration
+tests and 65 affected unit tests also passed. Release tooling passed 179 tests
+with 4 existing skips, and its typecheck passed. The final Xero unit suite passed
+496 tests; only 7 tests for an unused obsolete credential decision were removed
+after the earlier 503-test run. Runtime obsolete-model/mirroring audit is clean.
+
+Independent review approved spec compliance and code quality after fixes for
+initial-import recovery's removed relation, disconnect-induced reconnect pause,
+and stale selection racing disconnect. The latter has a failing/passing real
+PostgreSQL interleaving regression. Unused legacy refresh decisions were deleted;
+canonical adoption uses the stable-identity database save helper. This phase is
+committed on the existing branch; later phases remain outside this change.
+
+
+## Xero simplification planning, 7 October 2026
+
+- [x] Inspect repository instructions, product requirements, Plans 160/161 and current Xero code/schema/jobs/UI/tooling.
+- [x] Validate the approved direction against current official Xero documentation and OpenAPI; use Context7 where applicable.
+- [x] Write `docs/superpowers/specs/2026-10-07-xero-simplification-design.md` and record the Plan 161 lesson.
+- [x] Write and self-review `docs/superpowers/plans/2026-10-07-xero-simplification.md` with exact files, deletions and TDD red/green tasks.
+
+Stopping condition: both requested planning artefacts and the lesson are complete
+and self-reviewed. Production code, schema application and live provider work
+are outside this turn. Existing unrelated task history is preserved below.
+
+Review: inspected repository source and current official Xero/OpenAPI contracts.
+The self-reviewed design and 13-task implementation plan are complete. PASS:
+document structure, relative links, whitespace, red/green task structure, all 92
+exact deletion paths and planning-only change inventory. No production suite,
+provider mutation or implementation is claimed.
+
 ## Task: AU contract continuation, 4 October 2026
 
 - [ ] Remove ordinary campaign bootstrap prerequisite without bypassing isolation.
@@ -231,4 +280,3 @@ in one pass; no other source findings. Actual Lua regressions are registered in
 the protected suite and await live execution. Backup inspection is not a PITR or
 destructive restore exercise. CI publication, provider/browser and deployed
 worker evidence remain NOT VERIFIED.
-

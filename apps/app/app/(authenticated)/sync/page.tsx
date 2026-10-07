@@ -64,6 +64,7 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     );
   const parsedFilters = parseFilterParams(params, SyncRunFiltersSchema) ?? {};
   const filters = {
+    connectionId: parsedFilters.connectionId,
     dateFrom: parsedFilters.dateFrom
       ? new Date(`${parsedFilters.dateFrom}T00:00:00.000Z`)
       : undefined,
@@ -73,7 +74,6 @@ const SyncPage = async ({ searchParams }: SyncPageProps) => {
     runType: parsedFilters.runType,
     status: parsedFilters.status,
     triggerType: parsedFilters.triggerType,
-    xeroTenantId: parsedFilters.xeroTenantId,
   };
 
   const [summariesResult, runsResult] = await Promise.all([

@@ -1,34 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
-
 const mocks = vi.hoisted(() => ({
   dispatchSyncEvent: vi.fn(),
   findConnectionsNeedingTokenRotation: vi.fn(),
-  listSchedulableXeroTenants: vi.fn(),
+  listSchedulableXeroConnections: vi.fn(),
+  purgeClosedXeroOAuthSessions: vi.fn(),
   recoverXeroImportDispatch: vi.fn(),
-  recoverXeroRefreshAttempts: vi.fn(),
   resolveXeroAccess: vi.fn(),
-  scrubInactiveXeroOAuthSessionCredentials: vi.fn(),
 }));
-
 vi.mock("./recover-xero-import-dispatch", () => ({
   recoverXeroImportDispatch: mocks.recoverXeroImportDispatch,
 }));
-
 vi.mock("@repo/database", () => ({
   findConnectionsNeedingTokenRotation:
     mocks.findConnectionsNeedingTokenRotation,
-  listSchedulableXeroTenants: mocks.listSchedulableXeroTenants,
+  listSchedulableXeroConnections: mocks.listSchedulableXeroConnections,
 }));
-
 vi.mock("@repo/xero", () => ({
-  recoverXeroRefreshAttempts: mocks.recoverXeroRefreshAttempts,
+  purgeClosedXeroOAuthSessions: mocks.purgeClosedXeroOAuthSessions,
   resolveXeroAccess: mocks.resolveXeroAccess,
-  scrubInactiveXeroOAuthSessionCredentials:
-    mocks.scrubInactiveXeroOAuthSessionCredentials,
 }));
-
 vi.mock("../events", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../events")>();
   return {
@@ -37,7 +29,7 @@ vi.mock("../events", async (importOriginal) => {
   };
 });
 
-import type { SchedulableXeroTenant } from "@repo/database";
+import type { SchedulableXeroConnection } from "@repo/database";
 import { getScheduledSyncEventId, type RegisteredSyncRunType } from "../events";
 
 const {
@@ -47,14 +39,12 @@ const {
   scheduleXeroSyncsPage,
 } = await import("./schedule-xero-syncs");
 const { functions } = await import("../functions");
-
 describe("scheduleXeroSyncs Coordinator", () => {
   const providerTenantId = "00000000-0000-4000-8000-000000000099";
-  const baseTenant: SchedulableXeroTenant = {
-    bindingGeneration: 1,
+  const baseTenant: SchedulableXeroConnection = {
     clerkOrgId: "org_clerk_1",
+    connectionId: "00000000-0000-4000-8000-000000000010",
     connectionStatus: "active",
-    databaseTenantId: "00000000-0000-4000-8000-000000000010",
     disconnectedAt: null,
     lastApprovalStateReconciledAt: null,
     lastLeaveBalancesSyncAt: null,
@@ -62,19 +52,16 @@ describe("scheduleXeroSyncs Coordinator", () => {
     lastPeopleSyncAt: null,
     organisationId: "00000000-0000-4000-8000-000000000001",
     payrollRegion: "AU",
-    revokedAt: null,
     syncPausedAt: null,
     timezone: "Australia/Sydney",
   };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.scrubInactiveXeroOAuthSessionCredentials.mockResolvedValue({
+    mocks.purgeClosedXeroOAuthSessions.mockResolvedValue({
       ok: true,
       value: { scrubbed: 0 },
     });
   });
-
   describe("rotateDormantXeroConnections", () => {
     it("refreshes active connections whose refresh tokens are older than 45 days", async () => {
       const now = new Date("2026-08-23T00:00:00.000Z");
@@ -82,13 +69,11 @@ describe("scheduleXeroSyncs Coordinator", () => {
         ok: true,
         value: [
           {
-            bindingGeneration: 1,
+            authorisationId: "authorisation_1",
             clerkOrgId: "org_clerk_1",
-            connectionId: "connection-id-1",
-            databaseTenantId: baseTenant.databaseTenantId,
+            connectionId: baseTenant.connectionId,
             lastRefreshedAt: new Date("2026-07-01T00:00:00.000Z"),
             organisationId: baseTenant.organisationId,
-            ownerId: "owner_1",
           },
         ],
       });
@@ -99,48 +84,40 @@ describe("scheduleXeroSyncs Coordinator", () => {
           refreshed: true,
         },
       });
-
       const result = await rotateDormantXeroConnections(now);
-
       expect(result).toEqual({
         ok: true,
         value: { failed: 0, rotated: 1, scanned: 1 },
       });
       expect(mocks.resolveXeroAccess).toHaveBeenCalledWith(
         expect.objectContaining({
-          capability: "payroll.employees.read",
+          capability: ["payroll.employees", "payroll.employees.read"],
           clerkOrgId: "org_clerk_1",
           deadline: expect.objectContaining({
             expiresAtMs: expect.any(Number),
           }),
-          expectedBindingGeneration: 1,
           forceRefresh: true,
           organisationId: baseTenant.organisationId,
         })
       );
     });
-
     it("isolates a failed rotation so remaining connections are still refreshed", async () => {
       mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
         ok: true,
         value: [
           {
-            bindingGeneration: 1,
+            authorisationId: "authorisation_1",
             clerkOrgId: "org_clerk_1",
-            connectionId: "connection-id-1",
-            databaseTenantId: baseTenant.databaseTenantId,
+            connectionId: baseTenant.connectionId,
             lastRefreshedAt: new Date("2026-07-01T00:00:00.000Z"),
             organisationId: baseTenant.organisationId,
-            ownerId: "owner_1",
           },
           {
-            bindingGeneration: 1,
+            authorisationId: "authorisation_2",
             clerkOrgId: "org_clerk_2",
-            connectionId: "connection-id-2",
-            databaseTenantId: "tenant_2",
+            connectionId: "tenant_2",
             lastRefreshedAt: new Date("2026-07-02T00:00:00.000Z"),
             organisationId: "00000000-0000-4000-8000-000000000002",
-            ownerId: "owner_2",
           },
         ],
       });
@@ -153,9 +130,7 @@ describe("scheduleXeroSyncs Coordinator", () => {
           ok: true,
           value: { expiresAt: new Date(), refreshed: true },
         });
-
       const result = await rotateDormantXeroConnections();
-
       expect(result).toEqual({
         ok: true,
         value: { failed: 1, rotated: 1, scanned: 2 },
@@ -163,7 +138,6 @@ describe("scheduleXeroSyncs Coordinator", () => {
       expect(mocks.resolveXeroAccess).toHaveBeenCalledTimes(2);
     });
   });
-
   describe("dueRunTypes decision function", () => {
     it("treats null last-sync timestamps as immediately due", () => {
       // Wednesday 10:00 AM Sydney (Business hours)
@@ -171,22 +145,19 @@ describe("scheduleXeroSyncs Coordinator", () => {
       const due = dueRunTypes(baseTenant, now);
       expect(due).toEqual(["people", "leave_records", "leave_balances"]);
     });
-
     it("evaluates 15-minute cadence for people & leave records during weekday business hours", () => {
       // Wednesday 10:00 AM Sydney (Business hours)
       const now = new Date("2026-08-12T00:00:00.000Z");
       const fourteenMinAgo = new Date(now.getTime() - 14 * 60 * 1000);
       const sixteenMinAgo = new Date(now.getTime() - 16 * 60 * 1000);
-
-      const tenantNotDue: SchedulableXeroTenant = {
+      const tenantNotDue: SchedulableXeroConnection = {
         ...baseTenant,
         lastLeaveBalancesSyncAt: fourteenMinAgo,
         lastLeaveRecordsSyncAt: fourteenMinAgo,
         lastPeopleSyncAt: fourteenMinAgo,
       };
       expect(dueRunTypes(tenantNotDue, now)).toEqual([]);
-
-      const tenantDue: SchedulableXeroTenant = {
+      const tenantDue: SchedulableXeroConnection = {
         ...baseTenant,
         lastLeaveBalancesSyncAt: fourteenMinAgo,
         lastLeaveRecordsSyncAt: sixteenMinAgo,
@@ -194,22 +165,19 @@ describe("scheduleXeroSyncs Coordinator", () => {
       };
       expect(dueRunTypes(tenantDue, now)).toEqual(["people", "leave_records"]);
     });
-
     it("evaluates 60-minute cadence outside business hours and on weekends", () => {
       // Saturday 12:00 PM Sydney
       const saturday = new Date("2026-08-15T02:00:00.000Z");
       const thirtyMinAgo = new Date(saturday.getTime() - 30 * 60 * 1000);
       const sixtyFiveMinAgo = new Date(saturday.getTime() - 65 * 60 * 1000);
-
-      const tenantNotDue: SchedulableXeroTenant = {
+      const tenantNotDue: SchedulableXeroConnection = {
         ...baseTenant,
         lastLeaveBalancesSyncAt: thirtyMinAgo,
         lastLeaveRecordsSyncAt: thirtyMinAgo,
         lastPeopleSyncAt: thirtyMinAgo,
       };
       expect(dueRunTypes(tenantNotDue, saturday)).toEqual([]);
-
-      const tenantDue: SchedulableXeroTenant = {
+      const tenantDue: SchedulableXeroConnection = {
         ...baseTenant,
         lastLeaveBalancesSyncAt: sixtyFiveMinAgo,
         lastLeaveRecordsSyncAt: sixtyFiveMinAgo,
@@ -221,24 +189,20 @@ describe("scheduleXeroSyncs Coordinator", () => {
         "leave_balances",
       ]);
     });
-
     it("schedules approval reconciliation once per local night (01:00-02:59 local time)", () => {
       // Wednesday 01:30 AM Sydney local time = Tuesday 15:30 UTC
       const wednesdayNight = new Date("2026-08-11T15:30:00.000Z");
-
-      const tenant: SchedulableXeroTenant = {
+      const tenant: SchedulableXeroConnection = {
         ...baseTenant,
         lastApprovalStateReconciledAt: null,
         lastLeaveBalancesSyncAt: wednesdayNight,
         lastLeaveRecordsSyncAt: wednesdayNight,
         lastPeopleSyncAt: wednesdayNight,
       };
-
       const due = dueRunTypes(tenant, wednesdayNight);
       expect(due).toContain("approval_state_reconciliation");
-
       // If already reconciled today (Wednesday local date 2026-08-12)
-      const reconciledToday: SchedulableXeroTenant = {
+      const reconciledToday: SchedulableXeroConnection = {
         ...tenant,
         lastApprovalStateReconciledAt: new Date("2026-08-11T15:05:00.000Z"), // 01:05 AM Wed
       };
@@ -246,7 +210,6 @@ describe("scheduleXeroSyncs Coordinator", () => {
         "approval_state_reconciliation"
       );
     });
-
     it("returns empty array for invalid or missing timezone", () => {
       const now = new Date();
       expect(dueRunTypes({ ...baseTenant, timezone: null }, now)).toEqual([]);
@@ -255,60 +218,51 @@ describe("scheduleXeroSyncs Coordinator", () => {
       ).toEqual([]);
     });
   });
-
   describe("scheduleXeroSyncsPage", () => {
     it("dispatches due sync events with deterministic event IDs and updates counts", async () => {
       const now = new Date("2026-08-12T00:00:00.000Z"); // Wed 10:00 AM Sydney
-
-      mocks.listSchedulableXeroTenants.mockResolvedValue({
+      mocks.listSchedulableXeroConnections.mockResolvedValue({
         ok: true,
         value: {
-          tenants: [
+          connections: [
             baseTenant,
             {
               ...baseTenant,
-              databaseTenantId: "00000000-0000-4000-8000-000000000020",
+              connectionId: "00000000-0000-4000-8000-000000000020",
               timezone: "Invalid/Timezone",
             },
           ],
         },
       });
-
       mocks.dispatchSyncEvent.mockResolvedValue({
         ok: true,
         value: { eventName: "sync-xero-people", ids: ["evt_1"], queued: true },
       });
-
       const res = await scheduleXeroSyncsPage({ now });
-
       expect(res.ok).toBe(true);
       if (!res.ok) {
         return;
       }
-
       expect(res.value.scanned).toBe(2);
       expect(res.value.invalidTimezone).toBe(1);
       expect(res.value.dispatched).toBe(3); // people, leave_records, leave_balances for tenant 1
-
       const expectedRunTypes = [
         "people",
         "leave_records",
         "leave_balances",
       ] satisfies RegisteredSyncRunType[];
-
       expect(mocks.dispatchSyncEvent.mock.calls).toEqual(
         expectedRunTypes.map((runType) => [
           {
-            bindingGeneration: baseTenant.bindingGeneration,
             clerkOrgId: baseTenant.clerkOrgId,
+            connectionId: baseTenant.connectionId,
             organisationId: baseTenant.organisationId,
             runType,
             triggerType: "scheduled",
-            xeroTenantId: baseTenant.databaseTenantId,
           },
           {
             eventId: getScheduledSyncEventId(
-              baseTenant.databaseTenantId,
+              baseTenant.connectionId,
               runType,
               now
             ),
@@ -316,20 +270,17 @@ describe("scheduleXeroSyncs Coordinator", () => {
         ])
       );
       for (const [event] of mocks.dispatchSyncEvent.mock.calls) {
-        expect(event.xeroTenantId).not.toBe(providerTenantId);
+        expect(event.connectionId).not.toBe(providerTenantId);
       }
     });
-
     it("isolates dispatch failures so one failing tenant/event does not drop the rest", async () => {
       const now = new Date("2026-08-12T00:00:00.000Z");
-
-      mocks.listSchedulableXeroTenants.mockResolvedValue({
+      mocks.listSchedulableXeroConnections.mockResolvedValue({
         ok: true,
         value: {
-          tenants: [baseTenant],
+          connections: [baseTenant],
         },
       });
-
       // Fail first dispatch, succeed second
       mocks.dispatchSyncEvent
         .mockResolvedValueOnce({
@@ -344,27 +295,21 @@ describe("scheduleXeroSyncs Coordinator", () => {
             queued: true,
           },
         });
-
       const res = await scheduleXeroSyncsPage({ now });
-
       expect(res.ok).toBe(true);
       if (!res.ok) {
         return;
       }
-
       expect(res.value.scanned).toBe(1);
       expect(res.value.dispatched).toBe(2); // 2 of 3 succeeded
       expect(mocks.dispatchSyncEvent).toHaveBeenCalledTimes(3);
     });
-
     it("returns failure when listing schedulable Xero tenants fails", async () => {
-      mocks.listSchedulableXeroTenants.mockResolvedValue({
+      mocks.listSchedulableXeroConnections.mockResolvedValue({
         error: { code: "internal", message: "Database failure" },
         ok: false,
       });
-
       const res = await scheduleXeroSyncsPage();
-
       expect(res.ok).toBe(false);
       if (!res.ok) {
         expect(res.error).toEqual({
@@ -374,16 +319,15 @@ describe("scheduleXeroSyncs Coordinator", () => {
       }
     });
   });
-
   describe("scheduleXeroSyncsFunction registration", () => {
-    it("runs durable refresh recovery once before scheduled tenant dispatch", async () => {
+    it("runs session cleanup and import recovery before token rotation and scheduled dispatch", async () => {
       mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
         ok: true,
         value: [],
       });
-      mocks.listSchedulableXeroTenants.mockResolvedValue({
+      mocks.listSchedulableXeroConnections.mockResolvedValue({
         ok: true,
-        value: { tenants: [] },
+        value: { connections: [] },
       });
       const handler: unknown = Reflect.get(scheduleXeroSyncsFunction, "fn");
       if (typeof handler !== "function") {
@@ -398,24 +342,18 @@ describe("scheduleXeroSyncs Coordinator", () => {
           },
         },
       });
-      expect(mocks.recoverXeroRefreshAttempts).toHaveBeenCalledExactlyOnceWith({
-        now: expect.any(Date),
-      });
       expect(mocks.recoverXeroImportDispatch).toHaveBeenCalledExactlyOnceWith({
         now: expect.any(Date),
       });
-      expect(steps.indexOf("recover-xero-refresh-attempts")).toBeLessThan(
+      expect(steps.indexOf("recover-xero-import-dispatch")).toBeLessThan(
         steps.indexOf("rotate-dormant-connections")
       );
     });
-
     it("registers scheduleXeroSyncsFunction with id schedule-xero-syncs and 15-min cron", () => {
       expect(functions).toContain(scheduleXeroSyncsFunction);
-
       const fnOpts = scheduleXeroSyncsFunction.opts;
       expect(fnOpts.id).toBe("schedule-xero-syncs");
       expect(fnOpts.triggers).toEqual([{ cron: "*/15 * * * *" }]);
-
       const coordinators = functions.filter(
         (fn) => fn.opts.id === "schedule-xero-syncs"
       );
@@ -423,27 +361,22 @@ describe("scheduleXeroSyncs Coordinator", () => {
     });
   });
 });
-
-it("rotates once for a shared owner across sibling payroll bindings", async () => {
+it("rotates once for a shared authorisation across sibling payroll connections", async () => {
   vi.clearAllMocks();
   mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
     ok: true,
     value: [
       {
-        bindingGeneration: 1,
+        authorisationId: "shared",
         clerkOrgId: "org_a",
-        connectionId: "c_a",
-        databaseTenantId: "t_a",
+        connectionId: "t_a",
         organisationId: "o_a",
-        ownerId: "shared",
       },
       {
-        bindingGeneration: 1,
+        authorisationId: "shared",
         clerkOrgId: "org_b",
-        connectionId: "c_b",
-        databaseTenantId: "t_b",
+        connectionId: "t_b",
         organisationId: "o_b",
-        ownerId: "shared",
       },
     ],
   });
@@ -454,26 +387,3 @@ it("rotates once for a shared owner across sibling payroll bindings", async () =
   });
   expect(mocks.resolveXeroAccess).toHaveBeenCalledTimes(1);
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

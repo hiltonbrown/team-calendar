@@ -42,11 +42,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_1",
           runType: "leave_records",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -66,11 +66,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_1",
           runType: "leave_records",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -84,11 +84,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_1",
           runType: "leave_records",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -105,11 +105,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_OTHER",
           runId: "run_1",
           runType: "leave_records",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -126,11 +126,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_1",
           runType: "leave_records",
           status: "running",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -174,11 +174,11 @@ describe("CalendarLiveUpdates", () => {
     act(() => {
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_1",
           runType: "leave_records",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });
@@ -187,11 +187,11 @@ describe("CalendarLiveUpdates", () => {
 
       eventHandler?.({
         payload: {
+          connectionId: "tenant_1",
           organisationId: "org_model_1",
           runId: "run_2",
           runType: "people",
           status: "succeeded",
-          xeroTenantId: "tenant_1",
         },
         type: "sync.run_status_changed",
       });

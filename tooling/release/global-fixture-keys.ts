@@ -3,15 +3,9 @@ export const SUPPORTED_GLOBAL_KEY_PREFIXES = [
   "plan_id:",
   "plan_key:",
   "stripe_event:",
-  "credential_owner:",
+  "authorisation:",
   "provider_app:",
-  "provider_connection:",
-  "tenant_binding:",
-  "oauth_attempt:",
-  "cleanup_request:",
-  "cleanup_attempt:",
   "shared_store_namespace:",
-  "campaign_domain:",
 ] as const;
 
 export const isSupportedGlobalFixtureKey = (key: string): boolean =>

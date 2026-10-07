@@ -212,7 +212,7 @@ Team Calendar uses **Clerk Organisations** as the top-level tenant boundary. The
 Clerk Organisation (clerk_org_id)   : one per customer account; one country code; billing anchor
   └─ Organisation                   : one or many payroll entities (e.g. Acme Restaurants, Acme Hotels)
         └─ XeroConnection           : one per Organisation; UNIQUE on organisation_id
-              └─ XeroTenant         : one per XeroConnection; UNIQUE on xero_connection_id
+              └─ XeroAuthorisation : canonical grant reference; one verified app/user may serve multiple connections
 ```
 
 ### Key invariants
@@ -220,9 +220,9 @@ Clerk Organisation (clerk_org_id)   : one per customer account; one country code
 - `clerk_org_id` (text, not null, indexed) is present on every tenant-scoped table.
 - **Every database query that touches tenant data must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context or from job event payloads.
 - One Clerk Organisation = one country code (app-layer invariant, not a DB constraint).
-- One Organisation owns exactly one XeroConnection (`UNIQUE` on `organisation_id`).
-- One XeroConnection owns exactly one XeroTenant (`UNIQUE` on `xero_connection_id`).
-- A Clerk Org with two Xero files has two Organisation rows, two XeroConnections, two XeroTenants.
+- One Organisation owns at most one XeroConnection (`UNIQUE` on `organisation_id`).
+- An active XeroConnection references its canonical XeroAuthorisation; credentials are never copied into the connection.
+- A Clerk Org with two Xero files has two Organisation rows, two scoped XeroConnections.
 - Membership and roles are managed entirely by Clerk. No custom membership or role tables.
 - Personal Accounts are disabled. Every user must belong to at least one Clerk Organisation.
 - Billing enforced at the Clerk Organisation level via `clerk_org_subscriptions`.
@@ -308,18 +308,12 @@ Do not queue outbound writes as background jobs. Failures are surfaced inline to
 
 ### Xero connection structure
 
-Each Organisation owns exactly one `XeroConnection` and through it exactly one `XeroTenant`. When implementing Xero sync or write operations, always resolve the connection and tenant via the Organisation FK, never via a bare `clerk_org_id` lookup.
+Each Organisation owns at most one `XeroConnection`. It contains the external Xero tenant and remote connection IDs, region and sync health. Resolve it with both `clerk_org_id` and `organisation_id`; its optional `authorisation` relation is the sole encrypted token owner.
 
 ```typescript
-// Correct: resolve tenant via Organisation
-const tenant = await db.xeroTenant.findFirst({
-  where: { organisation_id: organisationId },
-  include: { xero_connection: true },
-});
-
-// Wrong: clerk_org_id alone can match multiple tenants across multiple Organisations
-const tenant = await db.xeroTenant.findFirst({
-  where: { clerk_org_id: clerkOrgId },
+const connection = await db.xeroConnection.findFirst({
+  where: { clerk_org_id: clerkOrgId, organisation_id: organisationId },
+  include: { authorisation: true },
 });
 ```
 
@@ -363,12 +357,13 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 ## Database conventions
 
-- Table names: `snake_case`, plural (e.g. `availability_records`, `xero_tenants`).
+- Table names: `snake_case`, plural (e.g. `availability_records`, `xero_connections`).
 - Column names: `snake_case`.
 - Every table: `id` (UUID, PK), `created_at`, `updated_at`.
 - `clerk_org_id` (text, not null, indexed) on every tenant-scoped table.
 
-The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempts` and `xero_provider_connections` deliberately have no `clerk_org_id`. They coordinate one verified Xero authoriser across payroll bindings and customer accounts. Customer visibility and access remain scoped through `XeroTenant` by Clerk organisation and payroll organisation.
+`xero_authorisations` deliberately has no `clerk_org_id`: it coordinates one verified Xero user per provider app across payroll connections and accounts. Customer access always resolves a `XeroConnection` using both tenancy keys before accessing its authorisation. Connections and OAuth sessions never store credential copies.
+
 - Soft deletes where specified: `archived_at` (nullable timestamp).
 - Foreign keys explicit. Enums at database level.
 - JSON columns typed with Zod schemas and documented with a schema reference comment.
@@ -383,7 +378,7 @@ The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempt
 - Vitest as runner. Tests from the first slice; every feature or fix includes corresponding tests. No deferring.
 - Factories or builders for test data, not repeated raw literals.
 - Fixture-based tests for Xero response mappers and region-specific parsers.
-- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroTenant uniqueness invariants, approval state transitions, decline-reason enforcement.
+- Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroAuthorisation uniqueness invariants, approval state transitions, decline-reason enforcement.
 
 ---
 
@@ -396,7 +391,7 @@ The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempt
 - Rate limiting uses a shared, atomic store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. Admission fails closed when the store or its explicitly initialised namespace is unavailable.
 - Token refresh handled proactively before sync runs.
 - All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
-- Resolve XeroTenant via `organisation_id` FK, not bare `clerk_org_id`.
+- Resolve XeroConnection with both `clerk_org_id` and `organisation_id`, then its canonical authorisation.
 - Outbound writes return `Result<T, XeroWriteError>`. `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `permission_error`, `rate_limit_error`, `network_error`, `not_found_error`, `region_not_supported_error`, `unknown_error`.
 
 ---
@@ -516,7 +511,7 @@ Optional variables with format constraints must be absent (commented out), not `
 - Keep changes aligned with existing package boundaries.
 - Default to Server Components unless a client component is necessary.
 - Every new service function must accept and apply both `clerk_org_id` and `organisation_id`.
-- Resolve XeroTenant via Organisation FK, not bare `clerk_org_id`.
+- Resolve XeroConnection through its Organisation FK using both tenancy keys.
 
 ### 3. Verify changes
 
@@ -538,7 +533,7 @@ Optional variables with format constraints must be absent (commented out), not `
 ## Build order
 
 1. Organisation, people, team, location schema and seed data (keyed by `clerk_org_id`)
-2. Xero OAuth and tenant persistence (XeroConnection + XeroTenant per Organisation)
+2. Xero OAuth and tenant persistence (scoped XeroConnection + canonical XeroAuthorisation)
 3. Xero employee sync (AU, NZ, UK)
 4. Xero leave normalisation into `availability_records`
 5. Leave balance sync from Xero
@@ -556,6 +551,6 @@ Optional variables with format constraints must be absent (commented out), not `
 
 Each step: deployable, testable vertical slice.
 
-### Xero lifecycle enablement controls
+### Xero persistence controls
 
-The binding guard and shared rate limiter are mandatory correctness controls, not discretionary toggles. A namespace without an initialised matching credential-domain sentinel denies admission. `XERO_REMOTE_CLEANUP_MODE` defaults to `report_only`; `enabled` requires reviewed provider evidence and a staffed operator procedure. Canonical credential cutover is per binding through `XeroTenant.xero_credential_owner_id`; null preserves the existing legacy fallback. Inactivity assessment is manually scoped and report-only. No job, notice, disable or deletion is driven by its classifications.
+`XeroAuthorisation` is the sole encrypted token owner, unique per verified provider app and Xero user. `XeroConnection` is unique per payroll organisation and carries both tenancy keys. `XeroOAuthSession` holds a short-lived grant reference and safe selection metadata; it has no credentials. Provider timestamp cursors cover people and leave records, with roster progress on the connection. Historical migrations are retained; generate migrations and Prisma output rather than editing them.

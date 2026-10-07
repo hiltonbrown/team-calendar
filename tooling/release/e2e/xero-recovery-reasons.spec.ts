@@ -26,7 +26,6 @@ const messages = [
     "unavailable",
     "We cannot reach Xero right now. Try again later or contact support.",
   ],
-  ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
   ["reauthorisation_required", "Xero access needs to be renewed."],
   ["not_connected", "Xero is not connected."],
 ] as const;

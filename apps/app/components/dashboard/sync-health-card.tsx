@@ -9,7 +9,6 @@ interface SyncHealthCardProps {
   orgQueryValue: string | null;
   state: AdminDashboardView["syncHealth"];
 }
-
 export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
   if (state.status === "error") {
     return (
@@ -24,7 +23,6 @@ export function SyncHealthCard({ state, orgQueryValue }: SyncHealthCardProps) {
       </DashboardCardShell>
     );
   }
-
   return (
     <DashboardCardShell
       ctaHref="/sync"

@@ -1,52 +1,42 @@
 import "server-only";
-
 import type { Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { database } from "@repo/database";
 import { log } from "@repo/observability/log";
 import { dispatchInitialXeroSync } from "../events";
-
 export interface RecoverXeroImportDispatchOptions {
   now?: Date;
 }
-
 export interface RecoverXeroImportDispatchResult {
   dispatched: number;
   scanned: number;
   skipped: number;
 }
-
 export async function recoverXeroImportDispatch(
   _options: RecoverXeroImportDispatchOptions = {}
 ): Promise<Result<RecoverXeroImportDispatchResult>> {
   try {
-    const tenants = await database.xeroTenant.findMany({
+    const tenants = await database.xeroConnection.findMany({
       select: {
-        binding_generation: true,
         clerk_org_id: true,
         id: true,
         organisation_id: true,
       },
       where: {
-        active_slot: 1,
+        authorisation: { status: "active" },
+        disconnected_at: null,
         last_people_sync_at: null,
         organisation: {
           archived_at: null,
           is_active: true,
         },
         payroll_region: "AU",
+        status: "active",
         sync_paused_at: null,
-        xero_connection: {
-          disconnected_at: null,
-          revoked_at: null,
-          status: "active",
-        },
       },
     });
-
     let dispatched = 0;
     let skipped = 0;
-
     for (const tenant of tenants) {
       const activeRun = await database.syncRun.findFirst({
         where: {
@@ -54,35 +44,31 @@ export async function recoverXeroImportDispatch(
           organisation_id: tenant.organisation_id,
           run_type: "people",
           status: "running",
-          xero_tenant_id: tenant.id,
+          xero_connection_id: tenant.id,
         },
       });
       if (activeRun) {
         skipped += 1;
         continue;
       }
-
       const dispatchRes = await dispatchInitialXeroSync({
-        bindingGeneration: tenant.binding_generation,
         clerkOrgId: tenant.clerk_org_id,
+        connectionId: tenant.id,
         organisationId: tenant.organisation_id,
         triggerType: "scheduled",
-        xeroTenantId: tenant.id,
       });
-
       if (dispatchRes.ok) {
         dispatched += 1;
       } else {
         skipped += 1;
         log.error("Failed to recover initial Xero sync dispatch", {
           clerkOrgId: tenant.clerk_org_id,
+          connectionId: tenant.id,
           error: dispatchRes.error,
           organisationId: tenant.organisation_id,
-          xeroTenantId: tenant.id,
         });
       }
     }
-
     return {
       ok: true,
       value: {

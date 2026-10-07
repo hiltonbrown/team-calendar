@@ -1,7 +1,5 @@
 "use client";
-
 import { getAvailabilityRecordLabel, xeroRecoveryMessage } from "@repo/core";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -86,10 +84,8 @@ type EditableAction =
   | "submit_for_approval"
   | "view"
   | "withdraw";
-
 type RunnableAction = Exclude<EditableAction, "edit" | "view">;
 type RowAction = Exclude<EditableAction, "view">;
-
 interface BalanceChip {
   balanceAvailable: number | null;
   balanceUnavailableReason: "local_only" | "not_synced" | "not_xero_leave";
@@ -97,7 +93,6 @@ interface BalanceChip {
   leaveBalanceUpdatedAt: string | Date | null;
   unit?: string | null;
 }
-
 export interface PlansClientRecord {
   allDay: boolean;
   approvalStatus: string;
@@ -116,7 +111,6 @@ export interface PlansClientRecord {
   workingDaysError: string | null;
   xeroWriteError: string | null;
 }
-
 interface PlansClientProps {
   canRecoverSubmit?: boolean;
   canViewTeam: boolean;
@@ -126,10 +120,12 @@ interface PlansClientProps {
   orgQueryValue: string | null;
   records: PlansClientRecord[];
   totalCount?: number;
-  window?: { from: string | null; to: string | null };
+  window?: {
+    from: string | null;
+    to: string | null;
+  };
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
 }
-
 const recordTypeLabels: Record<string, string> = {
   alternative_contact: "Alternative contact",
   annual_leave: "Annual leave",
@@ -148,7 +144,6 @@ const recordTypeLabels: Record<string, string> = {
   unpaid_leave: "Unpaid leave",
   wfh: "Working from home",
 };
-
 const leaveRecordTypes = new Set([
   "annual_leave",
   "holiday",
@@ -157,7 +152,6 @@ const leaveRecordTypes = new Set([
   "sick_leave",
   "unpaid_leave",
 ]);
-
 const primaryActionOrder: RowAction[] = [
   "retry_submission",
   "submit_for_approval",
@@ -168,7 +162,6 @@ const primaryActionOrder: RowAction[] = [
   "withdraw",
   "delete_draft",
 ];
-
 export function PlansClient({
   canRecoverSubmit = false,
   canViewTeam,
@@ -193,9 +186,7 @@ export function PlansClient({
     action: "revert_to_draft" | "withdraw";
     record: PlansClientRecord;
   } | null>(null);
-
   const newRecordHref = withOrg("/plans/new", orgQueryValue);
-
   const runAction = (recordId: string, action: RunnableAction) => {
     const record = records.find((candidate) => candidate.id === recordId);
     if (!record) {
@@ -214,7 +205,6 @@ export function PlansClient({
     }
     executeAction(recordId, action);
   };
-
   const executeAction = (recordId: string, action: RunnableAction) => {
     setPendingRecordId(recordId);
     setInlineError((current) => ({ ...current, [recordId]: "" }));
@@ -224,7 +214,6 @@ export function PlansClient({
           organisationId,
           recordId,
         });
-
         if (!result.ok) {
           setInlineError((current) => ({
             ...current,
@@ -232,7 +221,6 @@ export function PlansClient({
           }));
           return;
         }
-
         setConfirmationAction(null);
         if (action === "withdraw") {
           toast.success("Submission withdrawn.");
@@ -243,7 +231,6 @@ export function PlansClient({
       }
     });
   };
-
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-col gap-5 rounded-2xl bg-muted p-6 lg:flex-row lg:items-end lg:justify-between">
@@ -649,7 +636,6 @@ export function PlansClient({
     </section>
   );
 }
-
 function formatWindowDate(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
@@ -658,7 +644,6 @@ function formatWindowDate(value: string): string {
     year: "numeric",
   }).format(new Date(value));
 }
-
 function SubmitRecoveryControls({
   organisationId,
   recordId,
@@ -667,13 +652,16 @@ function SubmitRecoveryControls({
   recordId: string;
 }) {
   const router = useRouter();
-  const [candidates, setCandidates] = useState<Array<{ remoteId: string }>>([]);
+  const [candidates, setCandidates] = useState<
+    Array<{
+      remoteId: string;
+    }>
+  >([]);
   const [reason, setReason] = useState("");
   const [evidenceReference, setEvidenceReference] = useState("");
   const [independentlyVerified, setIndependentlyVerified] = useState(false);
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
-
   const loadCandidates = () =>
     startTransition(async () => {
       const result = await listSubmitRecoveryCandidatesAction({
@@ -687,7 +675,6 @@ function SubmitRecoveryControls({
       setError("");
       setCandidates(result.value.candidates);
     });
-
   const attach = (remoteId: string) =>
     startTransition(async () => {
       const result = await attachSubmitRecoveryCandidateAction({
@@ -702,7 +689,6 @@ function SubmitRecoveryControls({
       }
       router.refresh();
     });
-
   const attestNotCreated = () =>
     startTransition(async () => {
       const result = await resolveSubmitAsNotCreatedAction({
@@ -718,7 +704,6 @@ function SubmitRecoveryControls({
       }
       router.refresh();
     });
-
   return (
     <details className="mt-2 rounded-xl bg-muted p-3 text-label-md">
       <summary className="cursor-pointer font-medium">
@@ -795,7 +780,6 @@ function SubmitRecoveryControls({
     </details>
   );
 }
-
 function FilterField({
   children,
   htmlFor,
@@ -814,7 +798,6 @@ function FilterField({
     </div>
   );
 }
-
 function TabLink({
   active,
   children,
@@ -830,7 +813,6 @@ function TabLink({
     </Button>
   );
 }
-
 function ActiveFilters({
   filters,
   orgQueryValue,
@@ -842,7 +824,6 @@ function ActiveFilters({
   if (labels.length === 0) {
     return null;
   }
-
   return (
     <fieldset className="flex flex-wrap items-center gap-2">
       <legend className="sr-only">Active filters</legend>
@@ -862,11 +843,9 @@ function ActiveFilters({
     </fieldset>
   );
 }
-
 function tabHref(tab: "my" | "team", orgQueryValue: string | null): string {
   return withOrg(`/plans?tab=${tab}`, orgQueryValue);
 }
-
 function plansPageHref(
   filters: PlansFilterInput,
   cursor: string,
@@ -904,7 +883,6 @@ function plansPageHref(
   }
   return withOrg(`/plans?${params.toString()}`, orgQueryValue);
 }
-
 function RowActions({
   disabled,
   onRunAction,
@@ -919,13 +897,11 @@ function RowActions({
   const actions = renderableActions(record.editableActions);
   const primaryAction = primaryActionForRecord(actions);
   const secondaryActions = actions.filter((action) => action !== primaryAction);
-
   if (!primaryAction && secondaryActions.length === 0) {
     return (
       <p className="text-right text-body-sm text-muted-foreground">No action</p>
     );
   }
-
   return (
     <div className="flex items-center justify-end gap-2">
       {primaryAction && (
@@ -967,7 +943,6 @@ function RowActions({
     </div>
   );
 }
-
 function ActionButton({
   action,
   disabled,
@@ -990,7 +965,6 @@ function ActionButton({
       </Button>
     );
   }
-
   return (
     <Button
       disabled={disabled}
@@ -1003,7 +977,6 @@ function ActionButton({
     </Button>
   );
 }
-
 function ActionMenuItem({
   action,
   disabled,
@@ -1026,7 +999,6 @@ function ActionMenuItem({
       </DropdownMenuItem>
     );
   }
-
   return (
     <DropdownMenuItem
       disabled={disabled}
@@ -1037,14 +1009,12 @@ function ActionMenuItem({
     </DropdownMenuItem>
   );
 }
-
 function StatusOverview({ records }: { records: PlansClientRecord[] }) {
   const summary = planStatusLegend.map((item) => ({
     ...item,
     count: countRecordsForLegend(records, item.tone),
     style: planStatusStyle(item.tone),
   }));
-
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-muted p-5 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -1072,7 +1042,6 @@ function StatusOverview({ records }: { records: PlansClientRecord[] }) {
     </div>
   );
 }
-
 function CategoryBadge({ recordType }: { recordType: string }) {
   return (
     <Badge variant="secondary">
@@ -1080,7 +1049,6 @@ function CategoryBadge({ recordType }: { recordType: string }) {
     </Badge>
   );
 }
-
 function SourceBadge({ sourceType }: { sourceType: string }) {
   const isManual = sourceType === "manual";
   return (
@@ -1101,7 +1069,6 @@ function SourceBadge({ sourceType }: { sourceType: string }) {
     </Badge>
   );
 }
-
 function StatusBadge({
   status,
 }: {
@@ -1115,7 +1082,6 @@ function StatusBadge({
     </Badge>
   );
 }
-
 function renderBalance(record: PlansClientRecord): string {
   if (!record.balanceChip) {
     return "";
@@ -1137,7 +1103,6 @@ function renderBalance(record: PlansClientRecord): string {
     unit,
   })} available`;
 }
-
 function balanceUnavailableCopy(
   reason: BalanceChip["balanceUnavailableReason"]
 ) {
@@ -1151,13 +1116,11 @@ function balanceUnavailableCopy(
       return "Balance not available";
   }
 }
-
 function formatDateRange(startsAt: string, endsAt: string): string {
   const start = formatDate(startsAt);
   const end = formatDate(endsAt);
   return start === end ? start : `${start} to ${end}`;
 }
-
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en-AU", {
     day: "numeric",
@@ -1166,7 +1129,6 @@ function formatDate(value: string): string {
     year: "numeric",
   }).format(new Date(value));
 }
-
 function activeFilterLabels(filters: PlansFilterInput): string[] {
   const labels: string[] = [];
   if (filters.recordTypeCategory === "xero_leave") {
@@ -1202,7 +1164,6 @@ function activeFilterLabels(filters: PlansFilterInput): string[] {
   }
   return labels;
 }
-
 function normalisePlanFailedAction(
   value: PlansClientRecord["failedAction"]
 ): XeroFailedAction | null {
@@ -1213,7 +1174,6 @@ function normalisePlanFailedAction(
     ? value
     : null;
 }
-
 function actionLabel(action: EditableAction): string {
   switch (action) {
     case "archive":
@@ -1238,7 +1198,6 @@ function actionLabel(action: EditableAction): string {
       return action;
   }
 }
-
 function countRecordsForLegend(
   records: PlansClientRecord[],
   tone: PlanStatusTone
@@ -1258,7 +1217,6 @@ function countRecordsForLegend(
     return recordTone === tone;
   }).length;
 }
-
 function iconForPlanStatus(tone: PlanStatusTone) {
   switch (tone) {
     case "approved":
@@ -1277,7 +1235,6 @@ function iconForPlanStatus(tone: PlanStatusTone) {
       return CircleDashedIcon;
   }
 }
-
 function StatusCue({
   status,
 }: {
@@ -1293,7 +1250,6 @@ function StatusCue({
     </span>
   );
 }
-
 function statusCueForTone(tone: PlanStatusTone): string | null {
   switch (tone) {
     case "pending":
@@ -1306,11 +1262,9 @@ function statusCueForTone(tone: PlanStatusTone): string | null {
       return null;
   }
 }
-
 function renderableActions(actions: EditableAction[]): RowAction[] {
   return actions.filter((action): action is RowAction => action !== "view");
 }
-
 function primaryActionForRecord(actions: RowAction[]): RowAction | null {
   for (const action of primaryActionOrder) {
     if (actions.includes(action)) {
@@ -1319,11 +1273,9 @@ function primaryActionForRecord(actions: RowAction[]): RowAction | null {
   }
   return actions[0] ?? null;
 }
-
 function isDestructiveAction(action: RowAction): boolean {
   return action === "delete_draft" || action === "withdraw";
 }
-
 function buttonVariantForAction(
   action: RowAction
 ): "default" | "destructive" | "secondary" {
@@ -1335,11 +1287,9 @@ function buttonVariantForAction(
   }
   return "secondary";
 }
-
 function recordTypeLabel(recordType: string): string {
   return recordTypeLabels[recordType] ?? getAvailabilityRecordLabel(recordType);
 }
-
 function ConfirmActionDialog({
   action,
   disabled,
@@ -1358,13 +1308,11 @@ function ConfirmActionDialog({
     : "This clears the failed Xero sync state and keeps the record editable. It will not be sent again until you submit.";
   const cancelLabel = isWithdraw ? "Keep submitted" : "Keep failed state";
   const confirmLabel = isWithdraw ? "Withdraw leave" : "Revert to draft";
-
   const handleOpenChange = (open: boolean) => {
     if (!(open || disabled)) {
       onCancel();
     }
   };
-
   return (
     <AlertDialog onOpenChange={handleOpenChange} open={true}>
       <AlertDialogContent className="rounded-2xl">
@@ -1395,10 +1343,12 @@ function ConfirmActionDialog({
     </AlertDialog>
   );
 }
-
 async function runRecordAction(
   action: RunnableAction,
-  input: { organisationId: string; recordId: string }
+  input: {
+    organisationId: string;
+    recordId: string;
+  }
 ) {
   switch (action) {
     case "archive":

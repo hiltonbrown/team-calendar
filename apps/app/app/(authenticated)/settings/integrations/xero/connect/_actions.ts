@@ -1,45 +1,46 @@
 "use server";
-
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
-import { getXeroConnectionState } from "@repo/database/queries/xero-connection-state";
-import { reconcileXeroCampaignActionBinding } from "@repo/database/xero-campaign-access";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import { completeXeroTenantSelection } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-
-import {
-  readXeroCampaignActionHeader,
-  withAuthenticatedXeroCampaignAction,
-} from "@/lib/server/xero-campaign-action";
 
 const CompleteTenantSelectionSchema = z.object({
   organisationId: z.string().uuid().optional(),
   sessionId: z.string().uuid(),
   tenantId: z.string().min(1),
 });
-
 type ActionError =
-  | { code: "not_authorised"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 type ActionResult<T> = Result<T, ActionError>;
-
 export async function completeTenantSelectionAction(input: {
   organisationId?: string;
   sessionId: string;
   tenantId: string;
-}): Promise<ActionResult<{ redirectTo: string }>> {
+}): Promise<
+  ActionResult<{
+    redirectTo: string;
+  }>
+> {
   const parsed = CompleteTenantSelectionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-
   const [{ orgId, orgRole }, user] = await Promise.all([auth(), currentUser()]);
   if (
     !(orgId && user) ||
@@ -47,7 +48,6 @@ export async function completeTenantSelectionAction(input: {
   ) {
     return notAuthorised();
   }
-
   const session = await database.xeroOAuthSession.findFirst({
     select: { organisation_id: true },
     where: {
@@ -57,7 +57,11 @@ export async function completeTenantSelectionAction(input: {
     },
   });
   const organisationId = parsed.data.organisationId ?? session?.organisation_id;
-  const operation = async (): Promise<ActionResult<{ redirectTo: string }>> => {
+  const operation = async (): Promise<
+    ActionResult<{
+      redirectTo: string;
+    }>
+  > => {
     const existingConnection = organisationId
       ? await database.xeroConnection.findFirst({
           select: { id: true },
@@ -67,7 +71,6 @@ export async function completeTenantSelectionAction(input: {
           },
         })
       : null;
-
     const result = await completeXeroTenantSelection({
       clerkOrgId: orgId,
       organisationId: organisationId ?? null,
@@ -84,8 +87,6 @@ export async function completeTenantSelectionAction(input: {
         ok: false,
       };
     }
-
-    await reconcileXeroCampaignActionBinding();
     await database.auditEvent.create({
       data: {
         action: existingConnection
@@ -100,8 +101,8 @@ export async function completeTenantSelectionAction(input: {
         entity_id: result.value.connectionId,
         entity_type: "xero_connection",
         metadata: {
+          connectionId: result.value.connectionId,
           organisationId: result.value.organisationId,
-          xeroTenantId: result.value.xeroTenantId,
         },
         organisation_id: result.value.organisationId,
         resource_id: result.value.connectionId,
@@ -113,34 +114,20 @@ export async function completeTenantSelectionAction(input: {
       result.value.organisationId,
       result.value.connectionId
     );
-
     // Dispatch durable initial sync (people, leave-records, leave-balances).
     // Best effort: the connection is already persisted and scheduled recovery will catch up if
     // dispatch fails, so a dispatch error must not fail the connection itself.
     try {
-      const state = await getXeroConnectionState({
-        clerkOrgId: orgId,
-        organisationId: result.value.organisationId,
-      });
-      const bindingGeneration =
-        state.ok &&
-        state.value.state === "connected" &&
-        state.value.bindingGeneration !== null
-          ? state.value.bindingGeneration
-          : 1;
-
       await dispatchInitialXeroSync({
-        bindingGeneration,
         clerkOrgId: orgId,
+        connectionId: result.value.connectionId,
         organisationId: result.value.organisationId,
         triggeredByUserId: user.id,
         triggerType: "manual",
-        xeroTenantId: result.value.xeroTenantId,
       });
     } catch {
       // Best-effort initial execution; scheduled recovery will retry.
     }
-
     revalidatePath("/");
     revalidatePath("/people");
     revalidatePath("/leave-approvals");
@@ -148,7 +135,6 @@ export async function completeTenantSelectionAction(input: {
     revalidatePath("/settings/integrations");
     revalidatePath("/settings/integrations/xero");
     revalidatePath("/sync");
-
     return {
       ok: true,
       value: {
@@ -159,31 +145,13 @@ export async function completeTenantSelectionAction(input: {
       },
     };
   };
-  if (organisationId) {
-    return await withAuthenticatedXeroCampaignAction(
-      "xero.tenant-selection",
-      { clerkOrgId: orgId, organisationId, userId: user.id },
-      { ...parsed.data, organisationId },
-      operation
-    );
-  }
-  // Legacy onboarding can create a new organisation; campaign fixtures require a reserved existing scope.
-  try {
-    if (await readXeroCampaignActionHeader()) {
-      return notAuthorised();
-    }
-  } catch {
-    return notAuthorised();
-  }
   return await operation();
 }
-
 function appendOrgQuery(path: string, organisationId: string): string {
   const url = new URL(path, "https://teamcalendar.local");
   url.searchParams.set("org", organisationId);
   return `${url.pathname}${url.search}`;
 }
-
 function notAuthorised(): ActionResult<never> {
   return {
     error: {
@@ -193,7 +161,6 @@ function notAuthorised(): ActionResult<never> {
     ok: false,
   };
 }
-
 function validationError(message?: string): ActionResult<never> {
   return {
     error: {
@@ -203,7 +170,6 @@ function validationError(message?: string): ActionResult<never> {
     ok: false,
   };
 }
-
 async function captureXeroConnected(
   orgId: string,
   organisationId: string,

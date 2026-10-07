@@ -1,6 +1,3 @@
-import { createHash } from "node:crypto";
-import { withXeroCampaignProviderEffect } from "@repo/database/xero-campaign-access";
-import { XeroCampaignDeniedError } from "@repo/database/xero-campaign-contract";
 import { keys } from "../../keys";
 import { emitXeroMetric } from "../metrics";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
@@ -20,13 +17,11 @@ const RETRY_DATE_REGEX =
 const DEFAULT_MAX_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_CAP_MS = 8000;
-
 export interface XeroFetchDeps {
   fetchImpl: typeof fetch;
   limiter: XeroRateLimiter;
   sleep: (ms: number) => Promise<void>;
 }
-
 export interface XeroFetchInput {
   deadline?: XeroDeadline;
   init?: RequestInit;
@@ -47,18 +42,15 @@ export interface XeroFetchInput {
   retryOnAmbiguousFailure?: boolean;
   url: string;
 }
-
 // Process-wide limiter shared by every Xero call that does not inject its own.
 // Lazily created so tests that never touch it pay nothing.
 let sharedLimiter: XeroRateLimiter | null = null;
-
 function getSharedLimiter(): XeroRateLimiter {
   if (!sharedLimiter) {
     sharedLimiter = new XeroRateLimiter();
   }
   return sharedLimiter;
 }
-
 function defaultSleep(ms: number): Promise<void> {
   // Keep the test suite fast and deterministic: real timers only outside tests.
   if (ms <= 0 || process.env.NODE_ENV === "test") {
@@ -68,7 +60,6 @@ function defaultSleep(ms: number): Promise<void> {
     setTimeout(resolve, ms);
   });
 }
-
 // Single choke point for every Xero HTTP call. Acquires per-org budget through
 // the limiter, performs the fetch, honours Retry-After on 429, and applies
 // exponential backoff to transient failures. When the budget is genuinely
@@ -83,7 +74,6 @@ export async function xeroFetch(
   const sleep = deps.sleep ?? defaultSleep;
   const maxAttempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const retryOnAmbiguousFailure = input.retryOnAmbiguousFailure ?? true;
-
   const deadline =
     input.deadline ?? createXeroDeadline(XERO_DEFAULT_OPERATION_BUDGET_MS);
   assertOrigin(input.url);
@@ -125,7 +115,6 @@ export async function xeroFetch(
   }
   return rateLimitedResponse("minute");
 }
-
 function retryDelayMs(response: Response, attempt: number): number {
   return (
     (response.status === 429
@@ -133,7 +122,6 @@ function retryDelayMs(response: Response, attempt: number): number {
       : null) ?? backoffMs(attempt)
   );
 }
-
 function canRetryError(
   error: unknown,
   input: XeroFetchInput,
@@ -142,14 +130,10 @@ function canRetryError(
   retryOnAmbiguousFailure: boolean
 ): boolean {
   return (
-    !(
-      error instanceof XeroFetchError ||
-      error instanceof XeroCampaignDeniedError ||
-      input.init?.signal?.aborted
-    ) && shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
+    !(error instanceof XeroFetchError || input.init?.signal?.aborted) &&
+    shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
   );
 }
-
 async function performAttempt(
   input: XeroFetchInput,
   deadline: XeroDeadline,
@@ -202,48 +186,35 @@ async function performAttempt(
     }
     signal.throwIfAborted();
     dispatched = true;
-    return await withXeroCampaignProviderEffect(
-      {
-        ...input.rateClass,
-        bodyHash: campaignRequestBodyHash(request.init.body),
-        method: request.init.method ?? "GET",
-        tenantHeader: new Headers(request.init.headers).get("Xero-Tenant-Id"),
-        tokenGrantType:
-          request.init.body instanceof URLSearchParams
-            ? request.init.body.get("grant_type")
-            : null,
-        url: request.url,
-      },
-      async () => {
-        const fetched = await raceAbort(
-          fetchImpl(request.url, {
-            ...request.init,
-            redirect: "manual",
-            signal,
-          }),
-          signal
-        );
-        if (fetched.status >= 300 && fetched.status < 400) {
-          fetched.body?.cancel().catch(() => {
-            /* The body may already be closed. */
-          });
-          throw new XeroFetchError("redirect_rejected", true);
-        }
-        const buffered = await bufferWithRejectionEvidence(
-          fetched,
+    return await (async () => {
+      const fetched = await raceAbort(
+        fetchImpl(request.url, {
+          ...request.init,
+          redirect: "manual",
           signal,
-          input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
-        );
-        const headers = new Headers(buffered.headers);
-        if (buffered.status !== 429) {
-          headers.delete("Retry-After");
-        }
-        if (remainingMs(deadline) > 0) {
-          await limiter.observe(input.rateClass, headers, deadline);
-        }
-        return buffered;
+        }),
+        signal
+      );
+      if (fetched.status >= 300 && fetched.status < 400) {
+        fetched.body?.cancel().catch(() => {
+          /* The body may already be closed. */
+        });
+        throw new XeroFetchError("redirect_rejected", true);
       }
-    );
+      const buffered = await bufferWithRejectionEvidence(
+        fetched,
+        signal,
+        input.maxBodyBytes ?? XERO_MAX_RESPONSE_BYTES
+      );
+      const headers = new Headers(buffered.headers);
+      if (buffered.status !== 429) {
+        headers.delete("Retry-After");
+      }
+      if (remainingMs(deadline) > 0) {
+        await limiter.observe(input.rateClass, headers, deadline);
+      }
+      return buffered;
+    })();
   } catch (error) {
     if (signal.aborted) {
       // biome-ignore lint/style/useErrorCause: Exclude provider response values from policy errors.
@@ -255,7 +226,6 @@ async function performAttempt(
     clearTimeout(timeout);
   }
 }
-
 async function bufferWithRejectionEvidence(
   fetched: Response,
   signal: AbortSignal,
@@ -276,7 +246,6 @@ async function bufferWithRejectionEvidence(
     });
   }
 }
-
 export class XeroFetchError extends Error {
   readonly code:
     | "admission_unavailable"
@@ -295,7 +264,6 @@ export class XeroFetchError extends Error {
     }
   }
 }
-
 function assertOrigin(url: string): void {
   let origin: string;
   try {
@@ -319,7 +287,6 @@ function assertOrigin(url: string): void {
   }
   throw new XeroFetchError("origin_rejected", false);
 }
-
 async function raceAbort<T>(
   operation: Promise<T>,
   signal: AbortSignal
@@ -341,7 +308,6 @@ async function raceAbort<T>(
     signal.removeEventListener("abort", onAbort);
   }
 }
-
 async function bufferResponse(
   response: Response,
   signal: AbortSignal,
@@ -387,11 +353,9 @@ async function bufferResponse(
     statusText: response.statusText,
   });
 }
-
 function isTransientStatus(status: number): boolean {
   return status === 429 || (status >= 500 && status < 600);
 }
-
 // A 429 is always safe to retry: Xero rejected the request before processing
 // it. Any other transient status is only retried when the caller has not
 // opted out, because a 5xx is ambiguous about whether the write completed.
@@ -401,7 +365,6 @@ function isRetryableStatus(
 ): boolean {
   return retryOnAmbiguousFailure ? isTransientStatus(status) : status === 429;
 }
-
 // A thrown network error is always ambiguous (was the request received?), so
 // it is only retried when attempts remain and the caller has not opted out.
 function shouldRetryAfterThrow(
@@ -411,11 +374,9 @@ function shouldRetryAfterThrow(
 ): boolean {
   return attempt < maxAttempts && retryOnAmbiguousFailure;
 }
-
 function backoffMs(attempt: number): number {
   return Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempt - 1));
 }
-
 // Retry-After is either delta-seconds or an HTTP date. Returns milliseconds, or
 // null when the header is absent or unparseable.
 export function parseRetryAfter(headerValue: null | string): null | number {
@@ -435,7 +396,6 @@ export function parseRetryAfter(headerValue: null | string): null | number {
   }
   return Math.max(0, dateMs - Date.now());
 }
-
 function rateLimitedResponse(reason: string): Response {
   return new Response(
     JSON.stringify({
@@ -448,16 +408,4 @@ function rateLimitedResponse(reason: string): Response {
       statusText: "Too Many Requests",
     }
   );
-}
-
-function campaignRequestBodyHash(
-  body: BodyInit | null | undefined
-): string | null | undefined {
-  if (body === null || body === undefined) {
-    return null;
-  }
-  if (typeof body !== "string" && !(body instanceof URLSearchParams)) {
-    return undefined;
-  }
-  return `sha256:${createHash("sha256").update(String(body)).digest("hex")}`;
 }

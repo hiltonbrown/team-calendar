@@ -1,5 +1,4 @@
 "use server";
-
 import { auth, clerkClient, currentUser } from "@repo/auth/server";
 import {
   type AlternativeContactServiceError,
@@ -42,20 +41,27 @@ import {
   type UpdateAlternativeContactActionInput,
   UpdateAlternativeContactActionSchema,
 } from "./_schemas";
-
 export type PeopleActionError =
   | AlternativeContactServiceError
   | BalanceRefreshError
   | ClerkAccessServiceError
   | ManualBalanceServiceError
-  | { code: "not_authorised"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 export type PeopleActionResult<T> = Result<T, PeopleActionError>;
-
 export async function addAlternativeContactAction(
   input: AddAlternativeContactActionInput
-): Promise<PeopleActionResult<{ id: string }>> {
+): Promise<
+  PeopleActionResult<{
+    id: string;
+  }>
+> {
   const parsed = AddAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -64,7 +70,6 @@ export async function addAlternativeContactAction(
   if (!context.ok) {
     return context;
   }
-
   const result = await addAlternativeContact({
     actingPersonId: context.value.actingPersonId,
     actingRole: context.value.role,
@@ -81,14 +86,16 @@ export async function addAlternativeContactAction(
   if (!result.ok) {
     return result;
   }
-
   revalidatePeoplePaths(parsed.data.personId);
   return { ok: true, value: { id: result.value.id } };
 }
-
 export async function updateAlternativeContactAction(
   input: UpdateAlternativeContactActionInput
-): Promise<PeopleActionResult<{ id: string }>> {
+): Promise<
+  PeopleActionResult<{
+    id: string;
+  }>
+> {
   const parsed = UpdateAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -102,7 +109,6 @@ export async function updateAlternativeContactAction(
     context.value.organisationId,
     parsed.data.contactId
   );
-
   const result = await updateAlternativeContact({
     actingPersonId: context.value.actingPersonId,
     actingRole: context.value.role,
@@ -115,7 +121,6 @@ export async function updateAlternativeContactAction(
   if (!result.ok) {
     return result;
   }
-
   if (personId) {
     revalidatePeoplePaths(personId);
   } else {
@@ -123,10 +128,13 @@ export async function updateAlternativeContactAction(
   }
   return { ok: true, value: { id: result.value.id } };
 }
-
 export async function deleteAlternativeContactAction(
   input: DeleteAlternativeContactActionInput
-): Promise<PeopleActionResult<{ personId: string }>> {
+): Promise<
+  PeopleActionResult<{
+    personId: string;
+  }>
+> {
   const parsed = DeleteAlternativeContactActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -135,7 +143,6 @@ export async function deleteAlternativeContactAction(
   if (!context.ok) {
     return context;
   }
-
   const result = await deleteAlternativeContact({
     actingPersonId: context.value.actingPersonId,
     actingRole: context.value.role,
@@ -147,14 +154,16 @@ export async function deleteAlternativeContactAction(
   if (!result.ok) {
     return result;
   }
-
   revalidatePeoplePaths(result.value.personId);
   return result;
 }
-
 export async function reorderAlternativeContactsAction(
   input: ReorderAlternativeContactsActionInput
-): Promise<PeopleActionResult<{ personId: string }>> {
+): Promise<
+  PeopleActionResult<{
+    personId: string;
+  }>
+> {
   const parsed = ReorderAlternativeContactsActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -163,7 +172,6 @@ export async function reorderAlternativeContactsAction(
   if (!context.ok) {
     return context;
   }
-
   const result = await reorderAlternativeContacts({
     actingPersonId: context.value.actingPersonId,
     actingRole: context.value.role,
@@ -176,14 +184,17 @@ export async function reorderAlternativeContactsAction(
   if (!result.ok) {
     return result;
   }
-
   revalidatePeoplePaths(parsed.data.personId);
   return result;
 }
-
 export async function refreshBalancesAction(
   input: RefreshBalancesActionInput
-): Promise<PeopleActionResult<{ queued: boolean; reason?: string }>> {
+): Promise<
+  PeopleActionResult<{
+    queued: boolean;
+    reason?: string;
+  }>
+> {
   const parsed = RefreshBalancesActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -192,7 +203,6 @@ export async function refreshBalancesAction(
   if (!context.ok) {
     return context;
   }
-
   const result = await dispatchBalanceRefresh({
     actingRole: context.value.role,
     actingUserId: context.value.actingUserId,
@@ -203,9 +213,8 @@ export async function refreshBalancesAction(
   if (!result.ok) {
     return result;
   }
-
   if (result.value.queued) {
-    const xeroTenant = await database.xeroTenant.findFirst({
+    const xeroConnection = await database.xeroConnection.findFirst({
       select: { id: true },
       where: {
         clerk_org_id: context.value.clerkOrgId,
@@ -217,36 +226,36 @@ export async function refreshBalancesAction(
       organisationId: context.value.organisationId,
     });
     if (
-      xeroTenant &&
+      xeroConnection &&
       connectionState.ok &&
-      connectionState.value.state === "connected" &&
-      connectionState.value.bindingGeneration !== null
+      connectionState.value.state === "connected"
     ) {
       try {
         await syncXeroLeaveBalances({
-          bindingGeneration: connectionState.value.bindingGeneration,
           clerkOrgId: context.value.clerkOrgId,
+          connectionId: xeroConnection.id,
           organisationId: context.value.organisationId,
           personId: parsed.data.personId,
           triggeredByUserId: context.value.actingUserId,
           triggerType: "manual",
-          xeroTenantId: xeroTenant.id,
         });
       } catch {
         // Sync run error will be recorded in sync_runs
       }
     }
   }
-
   revalidatePath(`/people/${parsed.data.personId}`);
   revalidatePath("/people");
   revalidatePath("/leave-balances");
   return result;
 }
-
 export async function setManualBalanceAction(
   input: SetManualBalanceActionInput
-): Promise<PeopleActionResult<{ id: string }>> {
+): Promise<
+  PeopleActionResult<{
+    id: string;
+  }>
+> {
   const parsed = SetManualBalanceActionSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
@@ -255,7 +264,6 @@ export async function setManualBalanceAction(
   if (!context.ok) {
     return context;
   }
-
   const result = await setManualLeaveBalance({
     actingRole: context.value.role,
     actingUserId: context.value.actingUserId,
@@ -271,11 +279,9 @@ export async function setManualBalanceAction(
   if (!result.ok) {
     return result;
   }
-
   revalidatePeoplePaths(parsed.data.personId);
   return result;
 }
-
 async function resolveActionContext(organisationId: string): Promise<
   PeopleActionResult<{
     actingPersonId: string | null;
@@ -297,7 +303,6 @@ async function resolveActionContext(organisationId: string): Promise<
   if (!context.ok) {
     return notAuthorised(context.error.message);
   }
-
   const actingPerson = await database.person.findFirst({
     select: { id: true },
     where: {
@@ -306,7 +311,6 @@ async function resolveActionContext(organisationId: string): Promise<
       clerk_user_id: user.id,
     },
   });
-
   return {
     ok: true,
     value: {
@@ -318,7 +322,6 @@ async function resolveActionContext(organisationId: string): Promise<
     },
   };
 }
-
 async function resolveContactPersonId(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId,
@@ -333,7 +336,6 @@ async function resolveContactPersonId(
   });
   return contact?.person_id ?? null;
 }
-
 function effectiveRole(role: string | null | undefined): PeopleRole | null {
   if (role === "org:owner") {
     return "owner";
@@ -349,12 +351,10 @@ function effectiveRole(role: string | null | undefined): PeopleRole | null {
   }
   return null;
 }
-
 function revalidatePeoplePaths(personId: string) {
   revalidatePath("/people");
   revalidatePath(`/people/${personId}`);
 }
-
 export async function loadClerkAccessCandidates(
   input: LoadClerkAccessCandidatesInput
 ): Promise<PeopleActionResult<ClerkAccessReviewResult>> {
@@ -366,7 +366,6 @@ export async function loadClerkAccessCandidates(
   if (!context.ok) {
     return context;
   }
-
   const clerk = await clerkClient();
   const reviewResult = await loadClerkAccessReview({
     clerkOrganizations: clerk.organizations,
@@ -376,7 +375,6 @@ export async function loadClerkAccessCandidates(
   if (!reviewResult.ok) {
     return reviewResult;
   }
-
   await database.auditEvent.create({
     data: {
       action: "people.clerk_access_reviewed",
@@ -399,12 +397,9 @@ export async function loadClerkAccessCandidates(
       resource_type: "people",
     },
   });
-
   return reviewResult;
 }
-
 export const loadClerkAccessCandidatesAction = loadClerkAccessCandidates;
-
 export async function inviteClerkAccessCandidates(
   input: InviteClerkAccessCandidatesInput
 ): Promise<PeopleActionResult<ClerkInvitationDispatchResult>> {
@@ -416,7 +411,6 @@ export async function inviteClerkAccessCandidates(
   if (!context.ok) {
     return context;
   }
-
   const clerk = await clerkClient();
   const inviteResult = await serviceInviteClerkAccessCandidates({
     candidatePersonIds: parsed.data.candidatePersonIds,
@@ -428,7 +422,6 @@ export async function inviteClerkAccessCandidates(
   if (!inviteResult.ok) {
     return inviteResult;
   }
-
   await database.auditEvent.create({
     data: {
       action: "people.clerk_invitations_sent",
@@ -451,13 +444,10 @@ export async function inviteClerkAccessCandidates(
       resource_type: "people",
     },
   });
-
   revalidatePath("/people");
   return inviteResult;
 }
-
 export const inviteClerkAccessCandidatesAction = inviteClerkAccessCandidates;
-
 async function resolveAdminAccessContext(organisationId: string): Promise<
   PeopleActionResult<{
     actingUserId: string;
@@ -475,14 +465,12 @@ async function resolveAdminAccessContext(organisationId: string): Promise<
     orgRole === "org:admin" ||
     Boolean(has?.({ role: "org:owner" })) ||
     Boolean(has?.({ role: "org:admin" }));
-
   if (!(isOwnerOrAdmin && user)) {
     return notAuthorised();
   }
   if (!context.ok) {
     return notAuthorised(context.error.message);
   }
-
   return {
     ok: true,
     value: {
@@ -492,7 +480,6 @@ async function resolveAdminAccessContext(organisationId: string): Promise<
     },
   };
 }
-
 function notAuthorised(message?: string): PeopleActionResult<never> {
   return {
     error: {
@@ -502,7 +489,6 @@ function notAuthorised(message?: string): PeopleActionResult<never> {
     ok: false,
   };
 }
-
 function validationError(message?: string): PeopleActionResult<never> {
   return {
     error: {

@@ -47,10 +47,8 @@ export type payroll_region = (typeof payroll_region)[keyof typeof payroll_region
 
 
 export const xero_connection_status = {
-  pending: 'pending',
-  pending_tenant_selection: 'pending_tenant_selection',
   active: 'active',
-  stale: 'stale',
+  reconnect_required: 'reconnect_required',
   disconnected: 'disconnected'
 } as const
 
@@ -59,8 +57,9 @@ export type xero_connection_status = (typeof xero_connection_status)[keyof typeo
 
 export const xero_oauth_session_status = {
   pending: 'pending',
+  exchanging: 'exchanging',
+  selecting: 'selecting',
   completed: 'completed',
-  expired: 'expired',
   cancelled: 'cancelled'
 } as const
 
@@ -74,6 +73,14 @@ export const xero_person_match_status = {
 } as const
 
 export type xero_person_match_status = (typeof xero_person_match_status)[keyof typeof xero_person_match_status]
+
+
+export const xero_cursor_entity_type = {
+  people: 'people',
+  leave_records: 'leave_records'
+} as const
+
+export type xero_cursor_entity_type = (typeof xero_cursor_entity_type)[keyof typeof xero_cursor_entity_type]
 
 
 export const xero_sync_entity_type = {
@@ -377,89 +384,9 @@ export const stripe_event_delivery_state = {
 export type stripe_event_delivery_state = (typeof stripe_event_delivery_state)[keyof typeof stripe_event_delivery_state]
 
 
-export const xero_credential_usability = {
-  usable: 'usable',
-  reauthorisation_required: 'reauthorisation_required'
-} as const
-
-export type xero_credential_usability = (typeof xero_credential_usability)[keyof typeof xero_credential_usability]
-
-
-export const xero_refresh_attempt_outcome = {
-  pending: 'pending',
-  superseded: 'superseded',
-  committed: 'committed',
-  lost_response: 'lost_response',
-  failed: 'failed'
-} as const
-
-export type xero_refresh_attempt_outcome = (typeof xero_refresh_attempt_outcome)[keyof typeof xero_refresh_attempt_outcome]
-
-
-export const xero_provider_connection_status = {
-  present: 'present',
-  absent_confirmed: 'absent_confirmed',
-  unknown: 'unknown'
-} as const
-
-export type xero_provider_connection_status = (typeof xero_provider_connection_status)[keyof typeof xero_provider_connection_status]
-
-
-export const xero_oauth_intent_kind = {
-  initial_binding: 'initial_binding',
-  same_file_reauthorisation: 'same_file_reauthorisation'
-} as const
-
-export type xero_oauth_intent_kind = (typeof xero_oauth_intent_kind)[keyof typeof xero_oauth_intent_kind]
-
-
-export const xero_token_exchange_status = {
-  not_started: 'not_started',
-  dispatching: 'dispatching',
-  exchanged: 'exchanged',
-  unknown: 'unknown'
-} as const
-
-export type xero_token_exchange_status = (typeof xero_token_exchange_status)[keyof typeof xero_token_exchange_status]
-
-
-export const xero_cleanup_data_action_status = {
-  not_requested: 'not_requested',
-  pending: 'pending',
-  completed: 'completed',
-  failed: 'failed'
-} as const
-
-export type xero_cleanup_data_action_status = (typeof xero_cleanup_data_action_status)[keyof typeof xero_cleanup_data_action_status]
-
-
-export const xero_cleanup_attempt_state = {
-  pending: 'pending',
-  claimed: 'claimed',
-  dispatching: 'dispatching',
-  confirmed_deleted: 'confirmed_deleted',
-  confirmed_absent: 'confirmed_absent',
-  unknown: 'unknown',
-  blocked_authorisation: 'blocked_authorisation',
-  cancelled: 'cancelled'
-} as const
-
-export type xero_cleanup_attempt_state = (typeof xero_cleanup_attempt_state)[keyof typeof xero_cleanup_attempt_state]
-
-
-export const xero_inactivity_kind = {
+export const xero_authorisation_status = {
   active: 'active',
-  unknown: 'unknown',
-  candidate: 'candidate'
+  reconnect_required: 'reconnect_required'
 } as const
 
-export type xero_inactivity_kind = (typeof xero_inactivity_kind)[keyof typeof xero_inactivity_kind]
-
-
-export const xero_inactivity_review_status = {
-  unreviewed: 'unreviewed',
-  reviewed_keep: 'reviewed_keep',
-  reviewed_escalate: 'reviewed_escalate'
-} as const
-
-export type xero_inactivity_review_status = (typeof xero_inactivity_review_status)[keyof typeof xero_inactivity_review_status]
+export type xero_authorisation_status = (typeof xero_authorisation_status)[keyof typeof xero_authorisation_status]

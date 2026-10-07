@@ -1,12 +1,8 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Co-located integration test convention.
-
 import { randomUUID } from "node:crypto";
 import { executeRedisRestCommand } from "@repo/core";
 import {
-  initialiseLiveCampaignFixture,
-  isProtectedLiveRun,
-} from "@repo/database/live-campaign-fixture";
-import {
+  countSharedStoreFixtureKeys,
   deleteSharedStoreFixtureKeys,
   sharedStoreFixtureEpoch,
 } from "@repo/database/live-shared-store-fixture";
@@ -22,15 +18,7 @@ import {
 
 vi.mock("server-only", () => ({}));
 const applications: string[] = [];
-
-describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
-  if (!isProtectedLiveRun()) {
-    it.skip("requires the protected live runner", () => {
-      /* Collection does not allocate fixtures outside protected runs. */
-    });
-    return;
-  }
-
+describe("guarded shared-store integration", () => {
   const fixture = allocateLiveTestFixture(
     "packages/xero/src/rate-limit/shared-store.integration.test.ts"
   );
@@ -105,16 +93,48 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
     if (!authorised) {
       return;
     }
-    await deleteSharedStoreFixtureKeys({
+    const ownedStore = {
       globalKeys: [
         `shared_store_namespace:${fixture.globalKey("shared_store_namespace")}`,
       ],
       token,
       url,
-    });
+    };
+    await deleteSharedStoreFixtureKeys(ownedStore);
+    expect(await countSharedStoreFixtureKeys(ownedStore)).toBe(0);
   });
-
   describe("owned Redis REST atomic admission", () => {
+    it("allocates only owned quota keys and isolates application budgets", async () => {
+      const config = { ...limits, callsPerMinutePerOrg: 1 };
+      const firstApp = await application(config);
+      const secondApp = await application(config);
+      const rateClass = tenant(firstApp.appId);
+      expect(
+        xeroRateKeys(rateClass, epoch).every((key) =>
+          key.startsWith(
+            `xero:{${encodeURIComponent(firstApp.appId)}}:${epoch}:`
+          )
+        )
+      ).toBe(true);
+      expect((await reserve(firstApp.first, rateClass)).ok).toBe(true);
+      expect(await reserve(firstApp.second, rateClass)).toMatchObject({
+        error: { reason: "minute" },
+        ok: false,
+      });
+      expect((await reserve(secondApp.first, tenant(secondApp.appId))).ok).toBe(
+        true
+      );
+      expect(
+        await countSharedStoreFixtureKeys({
+          globalKeys: [
+            `shared_store_namespace:${fixture.globalKey("shared_store_namespace")}`,
+          ],
+          token,
+          url,
+        })
+      ).toBeGreaterThan(0);
+    });
+
     it("shares minute exhaustion between two instances without consuming denied app budget", async () => {
       const { appId, first, second } = await application({
         ...limits,
@@ -282,7 +302,6 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       ).toBe(true);
     });
   });
-
   describe("owned Redis credential domain fence", () => {
     it("initialisation is immutable and idempotent without resetting allowance", async () => {
       const { appId, first } = await application({
@@ -325,7 +344,6 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
   });
-
   describe("owned Redis sentinel integrity", () => {
     async function command(values: readonly (string | number)[]) {
       const result = await executeRedisRestCommand({
@@ -411,7 +429,4 @@ describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
       });
     });
   });
-
-  // The protected runner owns this real isolated campaign control namespace.
-  beforeAll(() => initialiseLiveCampaignFixture(fixture));
 });

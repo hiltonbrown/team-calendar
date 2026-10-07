@@ -20,9 +20,7 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
   sessionFind: vi.fn().mockResolvedValue(null),
   xeroConnectionFindFirst: vi.fn(),
-  xeroTenantFindFirst: vi.fn(),
 }));
-
 vi.mock("@repo/analytics/activation-events", () => ({
   createActivationEvent: mocks.createActivationEvent,
 }));
@@ -51,28 +49,24 @@ vi.mock("@repo/database", () => ({
     auditEvent: { create: mocks.auditEventCreate },
     xeroConnection: { findFirst: mocks.xeroConnectionFindFirst },
     xeroOAuthSession: { findFirst: mocks.sessionFind },
-    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
   },
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
 }));
-
 const { completeTenantSelectionAction } = await import("./_actions");
-
 const validInput = {
   sessionId: "11111111-1111-4111-8111-111111111111",
   tenantId: "xero-tenant-abc",
 };
-
 describe("completeTenantSelectionAction", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.getXeroConnectionState.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 7, state: "connected" },
+      value: { state: "connected" },
     });
-    mocks.xeroTenantFindFirst.mockResolvedValue({
+    mocks.xeroConnectionFindFirst.mockResolvedValue({
       id: "44444444-4444-4444-8444-444444444444",
     });
     mocks.analyticsShutdown.mockResolvedValue(undefined);
@@ -87,10 +81,9 @@ describe("completeTenantSelectionAction", () => {
     mocks.completeXeroTenantSelection.mockResolvedValue({
       ok: true,
       value: {
-        connectionId: "22222222-2222-4222-8222-222222222222",
+        connectionId: "44444444-4444-4444-8444-444444444444",
         organisationId: "33333333-3333-4333-8333-333333333333",
         returnTo: "/settings/integrations/xero",
-        xeroTenantId: "44444444-4444-4444-8444-444444444444",
       },
     });
     mocks.auditEventCreate.mockResolvedValue({});
@@ -106,19 +99,16 @@ describe("completeTenantSelectionAction", () => {
       },
     });
   });
-
   it("dispatches durable initial sync after a successful connection", async () => {
     const result = await completeTenantSelectionAction(validInput);
-
     expect(result.ok).toBe(true);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith(
       expect.objectContaining({
-        bindingGeneration: 7,
         clerkOrgId: "org_1",
+        connectionId: "44444444-4444-4444-8444-444444444444",
         organisationId: "33333333-3333-4333-8333-333333333333",
         triggeredByUserId: "user_1",
         triggerType: "manual",
-        xeroTenantId: "44444444-4444-4444-8444-444444444444",
       })
     );
     expect(mocks.completeXeroTenantSelection).toHaveBeenCalledWith(
@@ -128,8 +118,7 @@ describe("completeTenantSelectionAction", () => {
       expect(result.value.redirectTo).toContain("/settings/integrations/xero");
     }
   });
-
-  it("falls back to default binding generation when connection state is unavailable", async () => {
+  it("dispatches the selected canonical connection when status display is unavailable", async () => {
     mocks.getXeroConnectionState.mockResolvedValue({
       error: { code: "state_unavailable" },
       ok: false,
@@ -138,87 +127,53 @@ describe("completeTenantSelectionAction", () => {
     expect(result.ok).toBe(true);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith(
       expect.objectContaining({
-        bindingGeneration: 1,
-        xeroTenantId: "44444444-4444-4444-8444-444444444444",
+        connectionId: "44444444-4444-4444-8444-444444444444",
       })
     );
   });
-
   it("does not dispatch a sync for unauthorised roles", async () => {
     mocks.auth.mockResolvedValue({ orgId: "org_1", orgRole: "org:member" });
-
     const result = await completeTenantSelectionAction(validInput);
-
     expect(result.ok).toBe(false);
     expect(mocks.completeXeroTenantSelection).not.toHaveBeenCalled();
     expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
   });
-
   it("does not dispatch a sync when the connection fails", async () => {
     mocks.completeXeroTenantSelection.mockResolvedValue({
       error: { code: "unknown_error", message: "boom" },
       ok: false,
     });
-
     const result = await completeTenantSelectionAction(validInput);
-
     expect(result.ok).toBe(false);
     expect(mocks.dispatchInitialXeroSync).not.toHaveBeenCalled();
   });
-
   it("keeps a durable connection successful when initial sync dispatch throws", async () => {
     mocks.dispatchInitialXeroSync.mockRejectedValue(
       new Error("Inngest unavailable")
     );
-
     const result = await completeTenantSelectionAction(validInput);
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.redirectTo).toContain("/settings/integrations/xero");
     }
   });
-
   it("keeps a durable connection successful when analytics flush fails", async () => {
     mocks.analyticsFlush.mockRejectedValue(new Error("analytics unavailable"));
-
     const result = await completeTenantSelectionAction(validInput);
-
     expect(result.ok).toBe(true);
     expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(1);
   });
-
   it("uses the durable connection creation time for the activation event", async () => {
     const createdAt = new Date("2026-09-18T03:04:05.000Z");
     mocks.xeroConnectionFindFirst
-      .mockResolvedValueOnce({ id: "existing-connection" })
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ created_at: createdAt });
-
     await completeTenantSelectionAction({
       ...validInput,
       organisationId: "33333333-3333-4333-8333-333333333333",
     });
-
     expect(mocks.createActivationEvent).toHaveBeenCalledWith(
       expect.objectContaining({ occurredAt: createdAt })
     );
   });
 });
-
-vi.mock("@/lib/server/xero-campaign-action", () => ({
-  readXeroCampaignActionHeader: async () => undefined,
-  withAuthenticatedXeroCampaignAction: (
-    _id: unknown,
-    _scope: unknown,
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  reconcileXeroCampaignActionBinding: async () => undefined,
-  withXeroCampaignChildInvocation: (
-    _id: unknown,
-    data: unknown,
-    handler: (value: unknown) => Promise<unknown>
-  ) => handler(data),
-}));

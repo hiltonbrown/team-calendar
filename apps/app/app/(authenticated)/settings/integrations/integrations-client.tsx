@@ -1,5 +1,4 @@
 "use client";
-
 import { xeroRecoveryMessage } from "@repo/core";
 import { Button } from "@repo/design-system/components/ui/button";
 import {
@@ -17,7 +16,6 @@ import type { OrganisationWithConnectionView } from "./_connection-view";
 interface IntegrationsClientProps {
   organisations: OrganisationWithConnectionView[];
 }
-
 export const IntegrationsClient = ({
   organisations,
 }: IntegrationsClientProps) => {
@@ -36,7 +34,6 @@ export const IntegrationsClient = ({
     },
     { connected: 0, disconnected: 0, stale: 0, total: 0 }
   );
-
   let rolledUpStatus: "connected" | "disconnected" | "error" | "expired";
   if (totals.connected > 0 && totals.stale === 0) {
     rolledUpStatus = "connected";
@@ -47,7 +44,6 @@ export const IntegrationsClient = ({
   } else {
     rolledUpStatus = "disconnected";
   }
-
   return (
     <div className="space-y-6">
       <SettingsSectionHeader
@@ -81,9 +77,7 @@ export const IntegrationsClient = ({
                 organisation.xeroConnectionState
               );
               const tenantName =
-                organisation.xero_connection?.xero_tenant?.tenant_name ??
-                "Not connected";
-
+                organisation.xero_connection?.tenant_name ?? "Not connected";
               return (
                 <div
                   className="flex flex-wrap items-center justify-between gap-3"
@@ -93,8 +87,8 @@ export const IntegrationsClient = ({
                     <p className="font-medium">{organisation.name}</p>
                     <p className="text-muted-foreground">
                       {tenantName}
-                      {organisation.xero_connection?.xero_tenant?.payroll_region
-                        ? ` · ${organisation.xero_connection.xero_tenant.payroll_region}`
+                      {organisation.xero_connection?.payroll_region
+                        ? ` · ${organisation.xero_connection.payroll_region}`
                         : ""}
                     </p>
                   </div>
@@ -119,7 +113,6 @@ export const IntegrationsClient = ({
     </div>
   );
 };
-
 function statusForConnection(
   state: import("@repo/core").XeroConnectionDisplayState
 ): "connected" | "disconnected" | "error" | "expired" | "revoked" {
@@ -131,7 +124,6 @@ function statusForConnection(
   }
   return state === "not_connected" ? "disconnected" : "error";
 }
-
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted/30 p-3">

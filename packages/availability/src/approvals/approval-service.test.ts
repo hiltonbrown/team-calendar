@@ -37,7 +37,6 @@ const mocks = vi.hoisted(() => ({
   workingDayYearsForInput: vi.fn(),
   xeroTenantFindFirst: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
@@ -62,7 +61,7 @@ vi.mock("@repo/database", () => ({
     person: {
       findFirst: vi.fn(() => Promise.resolve({ id: record.person.id })),
     },
-    xeroTenant: { findFirst: mocks.xeroTenantFindFirst },
+    xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
   scopedTo: mocks.scopedTo,
@@ -97,7 +96,6 @@ vi.mock("@repo/feeds", () => ({
 vi.mock("@repo/observability/log", () => ({
   log: { error: mocks.logError, warn: vi.fn() },
 }));
-
 const mockPort = {
   approveLeaveApplication: mocks.approveLeaveApplicationForRegion,
   declineLeaveApplication: mocks.declineLeaveApplicationForRegion,
@@ -106,7 +104,6 @@ const mockPort = {
   submitLeaveApplication: vi.fn(),
   withdrawLeaveApplication: mocks.withdrawLeaveApplicationForRegion,
 };
-
 const {
   approve,
   decline,
@@ -120,7 +117,6 @@ const {
   retryDecline,
 } = await import("./approval-service");
 const { withdrawSubmission } = await import("../plans/submit-service");
-
 const input = {
   actingPersonId: "00000000-0000-4000-8000-000000000012",
   actingUserId: "manager_1",
@@ -129,7 +125,6 @@ const input = {
   recordId: "00000000-0000-4000-8000-000000000099",
   role: "manager" as const,
 };
-
 const record = {
   all_day: true,
   approval_note: null,
@@ -165,8 +160,7 @@ const record = {
   submitted_at: new Date("2026-04-01T00:00:00.000Z"),
   xero_write_error: null,
 };
-
-const xeroTenant = {
+const xeroConnection = {
   clerk_org_id: input.clerkOrgId,
   id: "00000000-0000-4000-8000-000000000201",
   organisation_id: input.organisationId,
@@ -175,9 +169,8 @@ const xeroTenant = {
     access_token_encrypted: "token",
     revoked_at: null,
   },
-  xero_tenant_id: "xero-tenant-1",
+  xero_connection_id: "xero-tenant-1",
 };
-
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((promiseResolve) => {
@@ -185,7 +178,6 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
-
 describe("approval-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -199,7 +191,7 @@ describe("approval-service", () => {
     });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
     mocks.leaveBalanceFindMany.mockResolvedValue([
       {
@@ -262,9 +254,8 @@ describe("approval-service", () => {
       ok: true,
       value: [2026],
     });
-    mocks.xeroTenantFindFirst.mockResolvedValue(xeroTenant);
+    mocks.xeroTenantFindFirst.mockResolvedValue(xeroConnection);
   });
-
   it.each([
     ["update_permissions", "Update Xero permissions to continue."],
     [
@@ -292,14 +283,12 @@ describe("approval-service", () => {
       expect(JSON.stringify(result)).not.toContain("WWW-Authenticate");
     }
   );
-
   it.each([
     [
       "unavailable",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
     ["reauthorisation_required", "Xero access needs to be renewed."],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
   ] as const)(
     "blocks provider work with truthful recovery during %s",
     async (state, message) => {
@@ -307,7 +296,7 @@ describe("approval-service", () => {
       mocks.getXeroConnectionStateForScope.mockResolvedValue(
         state === "unavailable"
           ? { error: { code: "state_unavailable" }, ok: false }
-          : { ok: true, value: { bindingGeneration: 7, state } }
+          : { ok: true, value: { state } }
       );
       const result = await approve(input, mockPort);
       expect(result).toMatchObject({ error: { message }, ok: false });
@@ -316,15 +305,18 @@ describe("approval-service", () => {
       expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
     }
   );
-
   it("allows only the claim winner to call Xero for approve versus decline", async () => {
-    const approval = deferred<{ ok: true; value: { rawResponse: object } }>();
+    const approval = deferred<{
+      ok: true;
+      value: {
+        rawResponse: object;
+      };
+    }>();
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.availabilityClaimUpdateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
     mocks.approveLeaveApplicationForRegion.mockReturnValue(approval.promise);
-
     const approving = approve(input, mockPort);
     await vi.waitFor(() =>
       expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
@@ -333,7 +325,6 @@ describe("approval-service", () => {
       { ...input, reason: "Coverage is unavailable" },
       mockPort
     );
-
     await expect(declining).resolves.toMatchObject({
       error: { code: "invalid_state_for_decline" },
       ok: false,
@@ -342,15 +333,18 @@ describe("approval-service", () => {
     approval.resolve({ ok: true, value: { rawResponse: {} } });
     await expect(approving).resolves.toMatchObject({ ok: true });
   });
-
   it("allows only the claim winner to call Xero for approve versus withdraw", async () => {
-    const approval = deferred<{ ok: true; value: { rawResponse: object } }>();
+    const approval = deferred<{
+      ok: true;
+      value: {
+        rawResponse: object;
+      };
+    }>();
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.availabilityClaimUpdateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockResolvedValueOnce({ count: 0 });
     mocks.approveLeaveApplicationForRegion.mockReturnValue(approval.promise);
-
     const approving = approve(input, mockPort);
     await vi.waitFor(() =>
       expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
@@ -365,7 +359,6 @@ describe("approval-service", () => {
       },
       mockPort
     );
-
     await expect(withdrawing).resolves.toMatchObject({
       error: { code: "invalid_state_for_withdraw" },
       ok: false,
@@ -374,9 +367,13 @@ describe("approval-service", () => {
     approval.resolve({ ok: true, value: { rawResponse: {} } });
     await expect(approving).resolves.toMatchObject({ ok: true });
   });
-
   it("allows only one duplicate withdrawal to call Xero", async () => {
-    const withdrawal = deferred<{ ok: true; value: { rawResponse: object } }>();
+    const withdrawal = deferred<{
+      ok: true;
+      value: {
+        rawResponse: object;
+      };
+    }>();
     mocks.availabilityFindFirst.mockResolvedValue({
       ...record,
       approval_status: "approved",
@@ -393,13 +390,11 @@ describe("approval-service", () => {
       organisationId: input.organisationId,
       recordId: input.recordId,
     };
-
     const first = withdrawSubmission(withdrawInput, mockPort);
     await vi.waitFor(() =>
       expect(mocks.withdrawLeaveApplicationForRegion).toHaveBeenCalledTimes(1)
     );
     const second = withdrawSubmission(withdrawInput, mockPort);
-
     await expect(second).resolves.toMatchObject({
       error: { code: "invalid_state_for_withdraw" },
       ok: false,
@@ -408,35 +403,29 @@ describe("approval-service", () => {
     withdrawal.resolve({ ok: true, value: { rawResponse: {} } });
     await expect(first).resolves.toMatchObject({ ok: true });
   });
-
   it("dispatches inbound Xero leave records for an authorised admin", async () => {
     const result = await dispatchXeroLeaveSync({
       ...input,
       role: "admin",
     });
-
     expect(result).toEqual({ ok: true, value: { queued: true } });
     expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith({
-      bindingGeneration: 1,
       clerkOrgId: input.clerkOrgId,
+      connectionId: xeroConnection.id,
       organisationId: input.organisationId,
       runType: "leave_records",
       triggeredByUserId: input.actingUserId,
       triggerType: "manual",
-      xeroTenantId: xeroTenant.id,
     });
   });
-
   it("does not allow a manager to dispatch an organisation-wide Xero leave sync", async () => {
     const result = await dispatchXeroLeaveSync(input);
-
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
     });
     expect(mocks.dispatchSyncEvent).not.toHaveBeenCalled();
   });
-
   it.each([
     {
       configure: () =>
@@ -509,7 +498,6 @@ describe("approval-service", () => {
       );
     }
   );
-
   it.each([
     [
       "approve",
@@ -544,7 +532,6 @@ describe("approval-service", () => {
       );
     }
   );
-
   it.each([
     [
       "retry_approve",
@@ -584,7 +571,6 @@ describe("approval-service", () => {
       );
     }
   );
-
   it("logs preparation failures before any Xero write", async () => {
     mocks.availabilityFindFirst.mockRejectedValueOnce(
       new Error("database unavailable")
@@ -603,7 +589,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("declines local pending leave without any Xero resolution or write", async () => {
     mocks.availabilityFindFirst.mockResolvedValue({
       ...record,
@@ -629,7 +614,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it.each(["approve", "decline"])(
     "requires scoped review of legacy remote-created submissions before %s",
     async (action) => {
@@ -651,7 +635,6 @@ describe("approval-service", () => {
       expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
     }
   );
-
   it("approves submitted leave, clears failed_action, notifies owner and audits", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -660,9 +643,7 @@ describe("approval-service", () => {
       ok: true,
       value: undefined,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.approveLeaveApplicationForRegion).toHaveBeenCalledWith(
       expect.objectContaining({ remoteId: "xero-leave-1" })
@@ -695,7 +676,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it.each([
     ["approve", () => approve(input, mockPort)],
     ["retry approval", () => retryApproval(input, mockPort)],
@@ -717,9 +697,7 @@ describe("approval-service", () => {
       person_id: input.actingPersonId,
     });
     mocks.managerScopePersonIds.mockResolvedValue([]);
-
     const result = await command();
-
     expect(result).toMatchObject({
       error: { code: "not_authorised" },
       ok: false,
@@ -728,7 +706,6 @@ describe("approval-service", () => {
       expect.objectContaining({ excludeSelf: true })
     );
   });
-
   it("lets a manager approve direct-report leave using a self-excluding scope", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -737,15 +714,12 @@ describe("approval-service", () => {
       ok: true,
       value: undefined,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.managerScopePersonIds).toHaveBeenCalledWith(
       expect.objectContaining({ excludeSelf: true })
     );
   });
-
   it("lets an admin approve their own leave", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
@@ -758,13 +732,10 @@ describe("approval-service", () => {
       ok: true,
       value: undefined,
     });
-
     const result = await approve({ ...input, role: "admin" }, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.managerScopePersonIds).not.toHaveBeenCalled();
   });
-
   it("keeps an approved transition when notification dispatch fails", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -777,9 +748,7 @@ describe("approval-service", () => {
       error: { message: "Notification unavailable" },
       ok: false,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -795,7 +764,6 @@ describe("approval-service", () => {
       expect.anything()
     );
   });
-
   it("keeps a declined transition when notification dispatch fails", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -808,12 +776,10 @@ describe("approval-service", () => {
       error: { message: "Notification unavailable" },
       ok: false,
     });
-
     const result = await decline(
       { ...input, reason: "Too much overlap" },
       mockPort
     );
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -829,7 +795,6 @@ describe("approval-service", () => {
       expect.anything()
     );
   });
-
   it("persists failed approve without setting approver fields", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -848,9 +813,7 @@ describe("approval-service", () => {
       },
       ok: false,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -870,7 +833,6 @@ describe("approval-service", () => {
       "rawPayload"
     );
   });
-
   it("persists failed approve when notification fails", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -892,9 +854,7 @@ describe("approval-service", () => {
       error: { message: "Notification unavailable" },
       ok: false,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -909,7 +869,6 @@ describe("approval-service", () => {
     // Verify notification was attempted
     expect(mocks.dispatchNotification).toHaveBeenCalled();
   });
-
   it("dispatches failure notifications after the transaction completes", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -927,7 +886,6 @@ describe("approval-service", () => {
       },
       ok: false,
     });
-
     let transactionFinished = false;
     mocks.availabilityUpdateMany.mockImplementation(() => {
       transactionFinished = true;
@@ -937,11 +895,9 @@ describe("approval-service", () => {
       expect(transactionFinished).toBe(true);
       return Promise.resolve({ ok: true, value: undefined });
     });
-
     await approve(input, mockPort);
     expect(mocks.dispatchNotification).toHaveBeenCalled();
   });
-
   it("decline failure preserves the reason for retry", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(record)
@@ -960,12 +916,10 @@ describe("approval-service", () => {
       },
       ok: false,
     });
-
     const result = await decline(
       { ...input, reason: "Too much overlap" },
       mockPort
     );
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -976,7 +930,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("retryDecline blocks when the preserved reason is missing", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
@@ -984,15 +937,12 @@ describe("approval-service", () => {
       approval_status: "xero_sync_failed",
       failed_action: "decline",
     });
-
     const result = await retryDecline(input, mockPort);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("missing_preserved_reason");
     }
   });
-
   it("retryDecline rejects a preserved reason outside the required bounds", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
@@ -1000,9 +950,7 @@ describe("approval-service", () => {
       approval_status: "xero_sync_failed",
       failed_action: "decline",
     });
-
     const result = await retryDecline(input, mockPort);
-
     expect(result).toMatchObject({
       error: { code: "validation_error" },
       ok: false,
@@ -1010,56 +958,46 @@ describe("approval-service", () => {
     expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
     expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("rejects approve when the record is not submitted", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       approval_status: "approved",
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_approve");
     }
     expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("rejects decline when the record is not submitted", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       approval_status: "declined",
     });
-
     const result = await decline(
       { ...input, reason: "Too much overlap" },
       mockPort
     );
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_decline");
     }
     expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("rejects retryApproval unless the failed action is approve", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       approval_status: "xero_sync_failed",
       failed_action: "decline",
     });
-
     const result = await retryApproval(input, mockPort);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_retry");
     }
     expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("rejects retryDecline unless the failed action is decline", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
@@ -1067,50 +1005,41 @@ describe("approval-service", () => {
       approval_status: "xero_sync_failed",
       failed_action: "approve",
     });
-
     const result = await retryDecline(input, mockPort);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_retry");
     }
     expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("rejects more-info requests when the record is not submitted", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       approval_status: "approved",
     });
-
     const result = await requestMoreInfo({
       ...input,
       question: "Can you add more context?",
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_info_request");
     }
     expect(mocks.dispatchNotification).not.toHaveBeenCalled();
   });
-
   it("rejects revert unless the record is a failed approve or decline", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce({
       ...record,
       approval_status: "submitted",
       failed_action: null,
     });
-
     const result = await revertApprovalAttempt(input);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_revert");
     }
     expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
   });
-
   it("surfaces optimistic approval conflicts as invalid state", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce(record);
     mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
@@ -1118,9 +1047,7 @@ describe("approval-service", () => {
       ok: true,
       value: undefined,
     });
-
     const result = await approve(input, mockPort);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_state_for_approve");
@@ -1138,7 +1065,6 @@ describe("approval-service", () => {
       expect.anything()
     );
   });
-
   it("keeps decline conflicts mapped to invalid state", async () => {
     mocks.availabilityFindFirst.mockResolvedValueOnce(record);
     mocks.availabilityUpdateMany.mockResolvedValueOnce({ count: 0 });
@@ -1146,12 +1072,10 @@ describe("approval-service", () => {
       ok: true,
       value: undefined,
     });
-
     const result = await decline(
       { ...input, reason: "Too much overlap" },
       mockPort
     );
-
     expect(result).toMatchObject({
       error: { code: "invalid_state_for_decline" },
       ok: false,
@@ -1170,7 +1094,6 @@ describe("approval-service", () => {
     );
     expect(mocks.dispatchNotification).not.toHaveBeenCalled();
   });
-
   it("reverts failed declines to submitted and clears approval_note", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
@@ -1185,9 +1108,7 @@ describe("approval-service", () => {
         approval_status: "submitted",
         failed_action: null,
       });
-
     const result = await revertApprovalAttempt(input);
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1199,15 +1120,12 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("lists only direct reports for managers", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1226,7 +1144,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("preloads approver list durations and balances without per-row reference queries", async () => {
     const locationId = "00000000-0000-4000-8000-000000000301";
     const secondRecord = {
@@ -1274,12 +1191,10 @@ describe("approval-service", () => {
         updated_at: new Date("2026-04-02T00:00:00.000Z"),
       },
     ]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1305,7 +1220,6 @@ describe("approval-service", () => {
       unit: "days",
     });
   });
-
   it("does not compute remaining balance for hours or currency leave balances", async () => {
     const locationId = "00000000-0000-4000-8000-000000000301";
     const secondRecord = {
@@ -1355,12 +1269,10 @@ describe("approval-service", () => {
         updated_at: new Date("2026-04-02T00:00:00.000Z"),
       },
     ]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1378,14 +1290,11 @@ describe("approval-service", () => {
       unit: "currency",
     });
   });
-
   it("includes declined and xero_sync_failed in the default filter when showDeclinedOnApprovals is true", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1411,7 +1320,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("omits declined but includes xero_sync_failed in the default filter when showDeclinedOnApprovals is false", async () => {
     mocks.getSettings.mockResolvedValueOnce({
       ok: true,
@@ -1430,11 +1338,9 @@ describe("approval-service", () => {
       },
     });
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1456,7 +1362,6 @@ describe("approval-service", () => {
       })
     );
   });
-
   describe("decline validation and organisation settings handling", () => {
     it.each([
       ["empty", "", "Enter a decline reason of at least 3 characters."],
@@ -1479,7 +1384,6 @@ describe("approval-service", () => {
       "rejects a %s reason before claiming or calling Xero",
       async (_label, reason, message) => {
         const result = await decline({ ...input, reason }, mockPort);
-
         expect(result).toEqual({
           error: { code: "validation_error", message },
           ok: false,
@@ -1488,7 +1392,6 @@ describe("approval-service", () => {
         expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
       }
     );
-
     it("does not allow a legacy false setting to bypass reason validation", async () => {
       mocks.getSettings.mockResolvedValueOnce({
         ok: true,
@@ -1506,9 +1409,7 @@ describe("approval-service", () => {
           showPendingOnCalendar: true,
         },
       });
-
       const result = await decline({ ...input, reason: "" }, mockPort);
-
       expect(result).toMatchObject({
         error: { code: "validation_error" },
         ok: false,
@@ -1517,7 +1418,6 @@ describe("approval-service", () => {
       expect(mocks.availabilityClaimUpdateMany).not.toHaveBeenCalled();
       expect(mocks.declineLeaveApplicationForRegion).not.toHaveBeenCalled();
     });
-
     it.each([
       ["exactly 3 characters", "abc"],
       ["exactly 1,000 characters", "a".repeat(1000)],
@@ -1529,15 +1429,12 @@ describe("approval-service", () => {
         ok: true,
         value: undefined,
       });
-
       const result = await decline({ ...input, reason }, mockPort);
-
       expect(result.ok).toBe(true);
       expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledWith(
         expect.objectContaining({ reason, remoteId: "xero-leave-1" })
       );
     });
-
     it.each([
       [
         "a legacy false setting",
@@ -1573,28 +1470,23 @@ describe("approval-service", () => {
           ok: true,
           value: undefined,
         });
-
         const result = await decline(
           { ...input, reason: "Valid reason" },
           mockPort
         );
-
         expect(result.ok).toBe(true);
         expect(mocks.declineLeaveApplicationForRegion).toHaveBeenCalledOnce();
       }
     );
-
     it("omits declined records from default list filter when getSettings fails", async () => {
       mocks.getSettings.mockResolvedValueOnce({
         error: { code: "not_found", message: "Failed" },
         ok: false,
       });
       mocks.availabilityFindMany.mockResolvedValue([record]);
-
       const result = await listForApprover({
         ...input,
       });
-
       expect(result.ok).toBe(true);
       expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1617,15 +1509,12 @@ describe("approval-service", () => {
       );
     });
   });
-
   it("passes explicit status filter through unchanged", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1637,50 +1526,40 @@ describe("approval-service", () => {
       })
     );
   });
-
   it("does not select audit blobs source_payload_json or xero_write_error_raw", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     const select = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.select as Record<string, unknown>;
     expect(select).not.toHaveProperty("source_payload_json");
     expect(select).not.toHaveProperty("xero_write_error_raw");
   });
-
   it("selects the plain-language xero_write_error column", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     const select = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.select as Record<string, unknown>;
     expect(select).toHaveProperty("xero_write_error");
   });
-
   it("requests take as pageSize plus one", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 51 })
     );
   });
-
   it("returns nextCursor and truncates items when more results than page size", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-01T00:00:00.000Z"));
@@ -1696,12 +1575,10 @@ describe("approval-service", () => {
     });
     mocks.listForOrganisation.mockResolvedValue({ ok: true, value: [] });
     mocks.leaveBalanceFindMany.mockResolvedValue([]);
-
     const result = await listForApprover({
       ...input,
       pageSize: 50,
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1710,16 +1587,13 @@ describe("approval-service", () => {
     expect(result.value.nextCursor).toBe(rows[49]?.id ?? null);
     vi.useRealTimers();
   });
-
   it("returns null nextCursor when fewer results than page size", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
       pageSize: 50,
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -1727,15 +1601,12 @@ describe("approval-service", () => {
     expect(result.value.nextCursor).toBeNull();
     expect(result.value.items).toHaveLength(1);
   });
-
   it("does not hide actionable submitted records with old ends_at", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     const where = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.where as Record<string, unknown>;
@@ -1744,14 +1615,11 @@ describe("approval-service", () => {
       approval_status: { in: ["submitted"] },
     });
   });
-
   it("windows terminal approved records to recent ends_at by default", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-06-01T00:00:00.000Z"));
     mocks.availabilityFindMany.mockResolvedValue([]);
-
     const result = await listForApprover({ ...input });
-
     expect(result.ok).toBe(true);
     const where = mocks.availabilityFindMany.mock.calls[0]?.[0]?.where as {
       OR?: Record<string, unknown>[];
@@ -1767,16 +1635,13 @@ describe("approval-service", () => {
     });
     vi.useRealTimers();
   });
-
   it("does not window terminal records when caller supplies explicit dateFrom", async () => {
     const dateFrom = new Date("2024-01-01T00:00:00.000Z");
     mocks.availabilityFindMany.mockResolvedValue([]);
-
     const result = await listForApprover({
       ...input,
       filters: { dateFrom, status: ["approved"] },
     });
-
     expect(result.ok).toBe(true);
     const where = mocks.availabilityFindMany.mock.calls[0]?.[0]
       ?.where as Record<string, unknown>;
@@ -1786,15 +1651,12 @@ describe("approval-service", () => {
     });
     expect(where).not.toHaveProperty("OR");
   });
-
   it("keeps clerk_org_id and organisation_id in the where clause", async () => {
     mocks.availabilityFindMany.mockResolvedValue([record]);
-
     const result = await listForApprover({
       ...input,
       filters: { status: ["submitted"] },
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1806,12 +1668,10 @@ describe("approval-service", () => {
     );
   });
 });
-
 vi.mock("../plans/submit-service", async (importOriginal) => ({
   ...(await importOriginal()),
   createLeaveOnApproval: mocks.createLeaveOnApproval,
 }));
-
 describe("undispatched approval recovery", () => {
   beforeEach(() => {
     mocks.hasUnresolved.mockResolvedValue(true);

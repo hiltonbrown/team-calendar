@@ -157,7 +157,7 @@ export function SyncRunDetailClient({
   );
 
   const rerun = () => {
-    if (!run.xeroTenantId) {
+    if (!run.connectionId) {
       setMessage({
         text: "This run is not linked to a Xero tenant.",
         tone: "error",
@@ -179,9 +179,9 @@ export function SyncRunDetailClient({
       try {
         setConfirmRerun(false);
         const result = await dispatchManualSyncAction({
+          connectionId: run.connectionId ?? "",
           organisationId,
           runType: run.runType,
-          xeroTenantId: run.xeroTenantId ?? "",
         });
         if (!result.ok) {
           setMessage({ text: result.error.message, tone: "error" });

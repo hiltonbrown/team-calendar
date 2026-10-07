@@ -49,6 +49,7 @@ const detail: RunDetail = {
   failedRecordsNextCursor: null,
   run: {
     completedAt: new Date("2026-08-01T00:01:00.000Z"),
+    connectionId: tenantId,
     durationSeconds: 60,
     errorSummary: null,
     hasFailedRecords: false,
@@ -63,12 +64,12 @@ const detail: RunDetail = {
     tenantName: "Team Calendar AU",
     triggeredByUserDisplay: "Admin",
     triggerType: "manual",
-    xeroTenantId: tenantId,
   },
   timeline: [],
   timelineNextCursor: null,
 };
 const tenantSummary: TenantSummary = {
+  connectionId: tenantId,
   connectionStatus: "active",
   currentFailedRuns: 0,
   currentPartialSuccessRuns: 0,
@@ -85,7 +86,6 @@ const tenantSummary: TenantSummary = {
   syncPausedAt: null,
   tenantName: "Team Calendar AU",
   totalRunsLast30Days: 0,
-  xeroTenantId: tenantId,
 };
 
 describe("SyncRunDetailClient", () => {
@@ -95,7 +95,7 @@ describe("SyncRunDetailClient", () => {
   });
 
   it("shows an accessible reason when re-run is unavailable", () => {
-    renderDetail({ ...tenantSummary, connectionStatus: "revoked" });
+    renderDetail({ ...tenantSummary, connectionStatus: "disconnected" });
 
     const action = screen.getByRole("button", { name: "Re-run this sync" });
     const descriptionId = action.getAttribute("aria-describedby");

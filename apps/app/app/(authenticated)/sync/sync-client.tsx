@@ -62,8 +62,8 @@ const syncRunStatuses: SyncRunStatus[] = [
 const syncTriggerTypes: SyncTriggerType[] = ["scheduled", "manual", "webhook"];
 
 interface PendingDispatch {
+  connectionId: string;
   runType: SyncRunType;
-  xeroTenantId: string;
 }
 
 export function SyncClient({
@@ -109,20 +109,20 @@ export function SyncClient({
     );
   }, [filters, nextCursor, orgQueryValue]);
 
-  const dispatch = (xeroTenantId: string, runType: SyncRunType) => {
-    const key = pendingDispatchKey({ runType, xeroTenantId });
+  const dispatch = (connectionId: string, runType: SyncRunType) => {
+    const key = pendingDispatchKey({ connectionId, runType });
     if (pendingDispatchesRef.current.has(key)) {
       return;
     }
-    pendingDispatchesRef.current.set(key, { runType, xeroTenantId });
+    pendingDispatchesRef.current.set(key, { connectionId, runType });
     setPendingDispatches([...pendingDispatchesRef.current.values()]);
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: sync dispatch handles queued/failed/succeeded branching with counts
     startTransition(async () => {
       try {
         const result = await dispatchManualSyncAction({
+          connectionId,
           organisationId,
           runType,
-          xeroTenantId,
         });
         if (!result.ok) {
           setMessage({
@@ -211,12 +211,12 @@ export function SyncClient({
         <section className="grid gap-4 xl:grid-cols-2">
           {summaries.map((summary) => (
             <TenantCard
-              key={summary.xeroTenantId}
+              key={summary.connectionId}
               onDispatch={dispatch}
               orgQueryValue={orgQueryValue}
               pendingRunTypes={pendingDispatches
                 .filter(
-                  (pending) => pending.xeroTenantId === summary.xeroTenantId
+                  (pending) => pending.connectionId === summary.connectionId
                 )
                 .map((pending) => pending.runType)}
               summary={summary}
@@ -356,7 +356,7 @@ function TenantCard({
   pendingRunTypes,
   summary,
 }: {
-  onDispatch: (xeroTenantId: string, runType: SyncRunType) => void;
+  onDispatch: (connectionId: string, runType: SyncRunType) => void;
   orgQueryValue: string | null;
   pendingRunTypes: SyncRunType[];
   summary: TenantSummary;
@@ -377,9 +377,9 @@ function TenantCard({
     runningSelected,
     syncPaused,
   });
-  const actionDescriptionId = `sync-action-description-${summary.xeroTenantId}`;
-  const selectId = `sync-type-${summary.xeroTenantId}`;
-  const titleId = `sync-tenant-${summary.xeroTenantId}`;
+  const actionDescriptionId = `sync-action-description-${summary.connectionId}`;
+  const selectId = `sync-type-${summary.connectionId}`;
+  const titleId = `sync-tenant-${summary.connectionId}`;
 
   return (
     <article
@@ -425,8 +425,8 @@ function TenantCard({
               <Link
                 href={withOrg(
                   `/sync?${buildQuery({
+                    connectionId: [summary.connectionId],
                     status: ["failed", "partial_success"],
-                    xeroTenantId: [summary.xeroTenantId],
                   })}`,
                   orgQueryValue
                 )}
@@ -453,8 +453,8 @@ function TenantCard({
               <Link
                 href={withOrg(
                   `/sync?${buildQuery({
+                    connectionId: [summary.connectionId],
                     status: ["failed", "partial_success"],
-                    xeroTenantId: [summary.xeroTenantId],
                   })}`,
                   orgQueryValue
                 )}
@@ -499,7 +499,7 @@ function TenantCard({
             aria-describedby={actionDescriptionId}
             className="sm:min-w-28"
             disabled={pendingSelected || disabledReason !== null}
-            onClick={() => onDispatch(summary.xeroTenantId, selectedRunType)}
+            onClick={() => onDispatch(summary.connectionId, selectedRunType)}
             type="button"
           >
             {pendingSelected || runningSelected ? "Running" : "Run sync"}
@@ -623,7 +623,7 @@ function FilterBar({
   summaries: TenantSummary[];
 }) {
   const router = useRouter();
-  const [tenant, setTenant] = useState(filters.xeroTenantId?.[0] ?? "all");
+  const [tenant, setTenant] = useState(filters.connectionId?.[0] ?? "all");
   const [runType, setRunType] = useState(filters.runType?.[0] ?? "all");
   const [status, setStatus] = useState(filters.status?.[0] ?? "all");
   const [triggerType, setTriggerType] = useState(
@@ -635,10 +635,10 @@ function FilterBar({
     router.push(
       withOrg(
         `/sync?${buildQuery({
+          connectionId: tenant === "all" ? undefined : [tenant],
           runType: runType === "all" ? undefined : [runType],
           status: status === "all" ? undefined : [status],
           triggerType: triggerType === "all" ? undefined : [triggerType],
-          xeroTenantId: tenant === "all" ? undefined : [tenant],
         })}`,
         orgQueryValue
       )
@@ -663,7 +663,7 @@ function FilterBar({
             { label: "All tenants", value: "all" },
             ...summaries.map((summary) => ({
               label: summary.tenantName,
-              value: summary.xeroTenantId,
+              value: summary.connectionId,
             })),
           ]}
           value={tenant}
@@ -772,17 +772,16 @@ function ConnectionDot({
 }) {
   const colour = {
     active: statusToneClasses.leave,
-    disconnect_pending: statusToneClasses.holiday,
-    expired: statusToneClasses.holiday,
+    disconnected: statusToneClasses.failed,
     not_configured: statusToneClasses.private,
-    revoked: statusToneClasses.failed,
+    reconnect_required: statusToneClasses.holiday,
     unavailable: statusToneClasses.failed,
   }[status];
   return (
     <span
       className="inline-flex items-center gap-2 text-label-lg text-muted-foreground"
       title={
-        status === "revoked"
+        status === "disconnected"
           ? "Reconnect from the Xero integrations settings"
           : undefined
       }
@@ -813,7 +812,7 @@ function buildQuery(input: {
   runType?: string[];
   status?: string[];
   triggerType?: string[];
-  xeroTenantId?: string[];
+  connectionId?: string[];
 }): string {
   const params = new URLSearchParams();
   if (input.cursor) {
@@ -823,7 +822,7 @@ function buildQuery(input: {
     "runType",
     "status",
     "triggerType",
-    "xeroTenantId",
+    "connectionId",
   ] as const) {
     const values = input[key];
     if (values?.length) {
@@ -840,7 +839,7 @@ function countActiveFilters(filters: SyncRunFiltersInput): number {
     filters.runType?.length ? filters.runType : undefined,
     filters.status?.length ? filters.status : undefined,
     filters.triggerType?.length ? filters.triggerType : undefined,
-    filters.xeroTenantId?.length ? filters.xeroTenantId : undefined,
+    filters.connectionId?.length ? filters.connectionId : undefined,
   ].filter(Boolean).length;
 }
 
@@ -849,7 +848,7 @@ function hasActiveFilters(filters: SyncRunFiltersInput): boolean {
 }
 
 function pendingDispatchKey(dispatch: PendingDispatch): string {
-  return `${dispatch.xeroTenantId}:${dispatch.runType}`;
+  return `${dispatch.connectionId}:${dispatch.runType}`;
 }
 
 function runTypeOptionLabel(runType: SyncRunType): string {

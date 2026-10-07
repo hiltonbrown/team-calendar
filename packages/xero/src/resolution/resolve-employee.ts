@@ -1,15 +1,22 @@
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
-import type { XeroTenantForWrite } from "../write/types";
-
+import type { XeroAccessContext } from "../write/types";
 export type ResolutionError =
-  | { code: "missing_mapping"; message: string }
-  | { code: "person_not_in_tenant"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "missing_mapping";
+      message: string;
+    }
+  | {
+      code: "person_not_in_tenant";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 export async function resolveXeroEmployeeId(input: {
   personId: string;
-  xeroTenant: XeroTenantForWrite;
+  xeroConnection: XeroAccessContext;
 }): Promise<Result<string, ResolutionError>> {
   try {
     const person = await database.person.findFirst({
@@ -19,12 +26,11 @@ export async function resolveXeroEmployeeId(input: {
       },
       where: {
         archived_at: null,
-        clerk_org_id: input.xeroTenant.clerk_org_id,
+        clerk_org_id: input.xeroConnection.clerk_org_id,
         id: input.personId,
-        organisation_id: input.xeroTenant.organisation_id,
+        organisation_id: input.xeroConnection.organisation_id,
       },
     });
-
     if (!person) {
       const exists = await database.person.findFirst({
         select: { id: true },
@@ -40,7 +46,6 @@ export async function resolveXeroEmployeeId(input: {
         ok: false,
       };
     }
-
     if (person.source_system !== "XERO" || !person.source_person_key) {
       return {
         error: {
@@ -50,7 +55,6 @@ export async function resolveXeroEmployeeId(input: {
         ok: false,
       };
     }
-
     return { ok: true, value: person.source_person_key };
   } catch {
     return {

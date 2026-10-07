@@ -40,16 +40,14 @@ export type XeroWriteResult<T> = Result<T, XeroWriteError>;
 
 export type PayrollRegion = "AU" | "NZ" | "UK";
 
-export interface XeroTenantForWrite {
+export interface XeroAccessContext {
   accessToken: string;
-  bindingGeneration: number;
   capability?: string | readonly string[];
   clerk_org_id: string;
   deadline: XeroDeadline;
   id: string;
   organisation_id: string;
   payroll_region: PayrollRegion;
-  tokenVersion: number | null;
   xero_tenant_id: string;
 }
 
@@ -58,28 +56,28 @@ export interface SubmitLeaveApplicationInput {
   startsAt: Date;
   title?: string;
   units: number;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveTypeId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface ApproveLeaveApplicationInput {
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface DeclineLeaveApplicationInput {
   reason: string;
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export interface WithdrawLeaveApplicationInput {
+  xeroConnection: XeroAccessContext;
   xeroEmployeeId: string;
   xeroLeaveApplicationId: string;
-  xeroTenant: XeroTenantForWrite;
 }
 
 export function toPlainLanguageMessage(error: XeroWriteError): string {

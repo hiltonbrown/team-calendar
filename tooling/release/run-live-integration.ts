@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   acquireActiveRun,
@@ -22,13 +23,15 @@ import {
 } from "./live-run-environment.js";
 import { type LiveRunMode, resolveLiveRunAction } from "./live-run-mode.js";
 
-import {
-  buildXeroEvidence,
-  writeXeroEvidence,
-  type XeroRunnerEvidence,
-} from "./xero-evidence.js";
-
-const runner: XeroRunnerEvidence = {
+const runner: {
+  cleanupStatus: string;
+  exitCode: number;
+  fenceState: string;
+  inventoryStatus: string;
+  outcome: string;
+  phase: string;
+  failurePhase?: string;
+} = {
   cleanupStatus: "NOT_VERIFIED",
   exitCode: 1,
   fenceState: "not_acquired",
@@ -286,23 +289,23 @@ try {
         cwd: resolve(import.meta.dirname, "../.."),
         encoding: "utf8",
       });
-      // A suite exit is infrastructure inventory evidence, not proof of charter assertions.
-      writeXeroEvidence(
-        evidenceDir,
-        buildXeroEvidence({
-          assessedAt: new Date().toISOString(),
-          candidateSha: candidate.status === 0 ? candidate.stdout.trim() : "",
-          deployedSha: null,
-          expectedTargetFingerprints: {},
-          prerequisites: {},
-          results: {},
-          runner,
-        })
+      mkdirSync(evidenceDir, { recursive: true });
+      writeFileSync(
+        resolve(evidenceDir, "live-integration.json"),
+        JSON.stringify(
+          {
+            assessedAt: new Date().toISOString(),
+            candidateSha: candidate.status === 0 ? candidate.stdout.trim() : "",
+            runner,
+          },
+          null,
+          2
+        )
       );
     } catch (error) {
       if (failed || exitStatus !== 0) {
         process.stderr.write(
-          "Xero evidence output failed; original runner failure preserved.\n"
+          "Integration evidence output failed; original runner failure preserved.\n"
         );
       } else {
         exitStatus = 1;

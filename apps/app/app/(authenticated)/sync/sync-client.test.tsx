@@ -39,6 +39,7 @@ const organisationId = "00000000-0000-4000-8000-000000000001";
 const tenantId = "00000000-0000-4000-8000-000000000011";
 const runId = "00000000-0000-4000-8000-000000000021";
 const summary: TenantSummary = {
+  connectionId: tenantId,
   connectionStatus: "active",
   currentFailedRuns: 0,
   currentPartialSuccessRuns: 0,
@@ -55,10 +56,10 @@ const summary: TenantSummary = {
   syncPausedAt: null,
   tenantName: "Team Calendar AU",
   totalRunsLast30Days: 0,
-  xeroTenantId: tenantId,
 };
 const run: RunListItem = {
   completedAt: new Date("2026-08-01T00:01:00.000Z"),
+  connectionId: tenantId,
   durationSeconds: 60,
   errorSummary: null,
   hasFailedRecords: false,
@@ -73,7 +74,6 @@ const run: RunListItem = {
   tenantName: "Team Calendar AU",
   triggeredByUserDisplay: "Admin",
   triggerType: "manual",
-  xeroTenantId: tenantId,
 };
 
 describe("SyncClient", () => {
@@ -89,7 +89,6 @@ describe("SyncClient", () => {
       "operational_incident",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     ["Payroll NZ is not enabled.", "Payroll NZ is not enabled."],
   ])(
     "renders live dispatch summary %s as recovery copy",
@@ -151,9 +150,9 @@ describe("SyncClient", () => {
       "Sync queued."
     );
     expect(mocks.dispatchManualSyncAction).toHaveBeenCalledWith({
+      connectionId: tenantId,
       organisationId,
       runType: "leave_balances",
-      xeroTenantId: tenantId,
     });
   });
 
@@ -175,8 +174,8 @@ describe("SyncClient", () => {
           summary,
           {
             ...summary,
+            connectionId: secondTenantId,
             tenantName: "Team Calendar NZ",
-            xeroTenantId: secondTenantId,
           },
         ]}
       />
@@ -215,7 +214,7 @@ describe("SyncClient", () => {
         organisationId={organisationId}
         orgQueryValue={organisationId}
         runs={[]}
-        summaries={[{ ...summary, connectionStatus: "revoked" }]}
+        summaries={[{ ...summary, connectionStatus: "disconnected" }]}
       />
     );
 
@@ -389,7 +388,7 @@ describe("SyncClient", () => {
         .getByRole("link", { name: "Review affected runs" })
         .getAttribute("href")
     ).toBe(
-      `/sync?status=failed%2Cpartial_success&xeroTenantId=${tenantId}&org=${organisationId}`
+      `/sync?status=failed%2Cpartial_success&connectionId=${tenantId}&org=${organisationId}`
     );
   });
 
@@ -434,7 +433,7 @@ describe("SyncClient", () => {
         .getByRole("link", { name: "Review affected runs" })
         .getAttribute("href")
     ).toBe(
-      `/sync?status=failed%2Cpartial_success&xeroTenantId=${tenantId}&org=${organisationId}`
+      `/sync?status=failed%2Cpartial_success&connectionId=${tenantId}&org=${organisationId}`
     );
   });
 

@@ -1,6 +1,5 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-
 import {
   type ClerkOrgId,
   holidayIsNonWorking,
@@ -25,24 +24,48 @@ import {
 } from "../records/record-type-categories";
 import { getSettings } from "../settings/organisation-settings-service";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
-
 export type CalendarRole = "admin" | "manager" | "owner" | "viewer";
 export type CalendarView = "day" | "month" | "week";
 export type CalendarScope =
-  | { type: "all_teams"; value?: string }
-  | { type: "my_self"; value?: string }
-  | { type: "my_team"; value?: string }
-  | { type: "person"; value: string }
-  | { type: "team"; value: string };
+  | {
+      type: "all_teams";
+      value?: string;
+    }
+  | {
+      type: "my_self";
+      value?: string;
+    }
+  | {
+      type: "my_team";
+      value?: string;
+    }
+  | {
+      type: "person";
+      value: string;
+    }
+  | {
+      type: "team";
+      value: string;
+    };
 export type CalendarRecordType = availability_record_type | "private";
 export type RenderTreatment = "draft" | "dashed" | "failed" | "solid";
-
 export type CalendarServiceError =
-  | { code: "invalid_scope"; message: string }
-  | { code: "not_authorised"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "invalid_scope";
+      message: string;
+    }
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 export interface CalendarPerson {
   avatarUrl: string | null;
   displayName: string;
@@ -55,14 +78,12 @@ export interface CalendarPerson {
   teamName: string | null;
   xeroSyncFailedCountInRange: number;
 }
-
 export interface PublicHolidayCell {
   appliesToAllLocationsInView: boolean;
   isSuppressed: boolean;
   locationNames: readonly string[];
   name: string;
 }
-
 export interface CalendarEvent {
   allDay: boolean;
   approvalStatus: availability_approval_status;
@@ -82,7 +103,6 @@ export interface CalendarEvent {
   startsAt: Date;
   xeroWriteError: string | null;
 }
-
 export interface CalendarDay {
   date: Date;
   dayOfWeek: 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -90,26 +110,26 @@ export interface CalendarDay {
   isToday: boolean;
   publicHolidays: readonly PublicHolidayCell[];
 }
-
 export interface CalendarRange {
   days: readonly CalendarDay[];
   people: readonly CalendarPerson[];
-  range: { end: Date; start: Date; timezone: string };
+  range: {
+    end: Date;
+    start: Date;
+    timezone: string;
+  };
   totalPeopleInScope: number;
   truncated: boolean;
   view: CalendarView;
   xeroConnectionState: import("@repo/core").XeroConnectionDisplayState;
   xeroSyncFailedCount: number;
 }
-
 export interface CalendarEventDetail extends CalendarEvent {
   approvalNote: string | null;
   submittedAt: Date | null;
   title: string | null;
 }
-
 const MAX_VISIBLE_PEOPLE = 200;
-
 const RoleSchema = z.enum(["admin", "manager", "owner", "viewer"]);
 const ViewSchema = z.enum(["day", "week", "month"]);
 const ScopeSchema = z.discriminatedUnion("type", [
@@ -130,7 +150,6 @@ const ApprovalStatusSchema = z.enum([
 ]);
 const PersonTypeSchema = z.enum(["contractor", "employee"]);
 const RecordTypeSchema = z.enum(USER_CREATABLE_RECORD_TYPES);
-
 const RangeInputSchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
@@ -154,7 +173,6 @@ const RangeInputSchema = z.object({
   scope: ScopeSchema,
   view: ViewSchema,
 });
-
 const DetailInputSchema = z.object({
   actingPersonId: z.string().uuid().nullable().optional(),
   actingUserId: z.string().min(1),
@@ -163,10 +181,8 @@ const DetailInputSchema = z.object({
   recordId: z.string().uuid(),
   role: RoleSchema,
 });
-
 type ParsedRangeInput = z.infer<typeof RangeInputSchema>;
 type ParsedDetailInput = z.infer<typeof DetailInputSchema>;
-
 interface ScopedPerson {
   archived_at: Date | null;
   avatar_url: string | null;
@@ -185,10 +201,12 @@ interface ScopedPerson {
   location_id: string | null;
   manager_person_id: string | null;
   person_type: person_type | null;
-  team: { id: string; name: string } | null;
+  team: {
+    id: string;
+    name: string;
+  } | null;
   team_id: string | null;
 }
-
 interface ScopedRecord {
   all_day: boolean;
   approval_note: string | null;
@@ -208,7 +226,6 @@ interface ScopedRecord {
   title: string | null;
   xero_write_error: string | null;
 }
-
 export async function getCalendarRange(
   input: unknown
 ): Promise<Result<CalendarRange, CalendarServiceError>> {
@@ -216,7 +233,6 @@ export async function getCalendarRange(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const [organisation, settingsResult] = await Promise.all([
       database.organisation.findFirst({
@@ -243,7 +259,6 @@ export async function getCalendarRange(
       start: zonedStartOfDayToUtc(localRange.startDateOnly, timezone),
       timezone,
     };
-
     const allPeople = await loadPeople(parsed.data);
     const managerReportIds = authorisedReportIds(
       parsed.data,
@@ -259,7 +274,6 @@ export async function getCalendarRange(
     if (!scopedPeopleResult.ok) {
       return scopedPeopleResult;
     }
-
     const filteredPeople = applyPeopleFilters(
       scopedPeopleResult.value,
       parsed.data.filters
@@ -320,7 +334,6 @@ export async function getCalendarRange(
     const xeroConnectionState = xeroStateResult.ok
       ? xeroStateResult.value.state
       : "unavailable";
-
     return {
       ok: true,
       value: {
@@ -342,7 +355,6 @@ export async function getCalendarRange(
     return unknownError("Failed to load calendar.");
   }
 }
-
 export async function getEventDetail(
   input: unknown
 ): Promise<Result<CalendarEventDetail, CalendarServiceError>> {
@@ -350,7 +362,6 @@ export async function getEventDetail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const settingsResult = await getSettings({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -417,7 +428,6 @@ export async function getEventDetail(
     return unknownError("Failed to load calendar event.");
   }
 }
-
 async function loadPeople(input: ParsedRangeInput): Promise<ScopedPerson[]> {
   return await database.person.findMany({
     orderBy: [{ last_name: "asc" }, { first_name: "asc" }, { id: "asc" }],
@@ -432,7 +442,6 @@ async function loadPeople(input: ParsedRangeInput): Promise<ScopedPerson[]> {
     },
   });
 }
-
 function resolvePeopleForScope(
   input: ParsedRangeInput,
   people: ScopedPerson[],
@@ -450,12 +459,10 @@ function resolvePeopleForScope(
   ) {
     return notAuthorised();
   }
-
   if (input.scope.type === "my_self") {
     const self = people.find((candidate) => candidate.id === actingPersonId);
     return self ? { ok: true, value: [self] } : notAuthorised();
   }
-
   if (input.scope.type === "my_team") {
     const scopedPeople = people.filter(
       (candidate) =>
@@ -464,7 +471,6 @@ function resolvePeopleForScope(
     );
     return { ok: true, value: scopedPeople };
   }
-
   if (input.scope.type === "all_teams") {
     if (isAdminOrOwner(input.role)) {
       return { ok: true, value: people };
@@ -481,11 +487,9 @@ function resolvePeopleForScope(
       ),
     };
   }
-
   if (input.scope.type === "team") {
     return resolveTeamPeople(input, people, options);
   }
-
   const person = people.find((candidate) => candidate.id === input.scope.value);
   if (!person) {
     return invalidScope();
@@ -502,7 +506,6 @@ function resolvePeopleForScope(
   }
   return invalidScope();
 }
-
 function resolveTeamPeople(
   input: ParsedRangeInput,
   people: ScopedPerson[],
@@ -533,7 +536,6 @@ function resolveTeamPeople(
         ),
   };
 }
-
 function applyPeopleFilters(
   people: ScopedPerson[],
   filters: ParsedRangeInput["filters"]
@@ -553,17 +555,17 @@ function applyPeopleFilters(
     return true;
   });
 }
-
 async function loadRecords(
   input: ParsedRangeInput,
   range: CalendarRange["range"],
   personIds: string[],
-  options: { showPendingOnCalendar: boolean }
+  options: {
+    showPendingOnCalendar: boolean;
+  }
 ): Promise<ScopedRecord[]> {
   if (personIds.length === 0) {
     return [];
   }
-
   const filteredApprovalStatuses = approvalStatusesForFilter(
     input.filters,
     options
@@ -580,7 +582,6 @@ async function loadRecords(
         ]
       : []),
   ];
-
   return await database.availabilityRecord.findMany({
     orderBy: [{ starts_at: "asc" }, { person_id: "asc" }, { id: "asc" }],
     select: recordSelect,
@@ -601,10 +602,11 @@ async function loadRecords(
     },
   });
 }
-
 function approvalStatusesForFilter(
   filters: ParsedRangeInput["filters"],
-  options: { showPendingOnCalendar: boolean }
+  options: {
+    showPendingOnCalendar: boolean;
+  }
 ): availability_approval_status[] {
   const statuses = filters.approvalStatus?.length
     ? filters.approvalStatus
@@ -621,7 +623,6 @@ function approvalStatusesForFilter(
       status !== "draft"
   );
 }
-
 async function loadPublicHolidayCells(input: {
   clerkOrgId: string;
   dateOnlyValues: string[];
@@ -667,7 +668,6 @@ async function loadPublicHolidayCells(input: {
           classification: assignment.day_classification,
           locationId: assignment.scope_value,
         }));
-
       const locationNames = [...locations.values()]
         .filter((location): location is NonNullable<typeof location> =>
           Boolean(location)
@@ -715,7 +715,6 @@ async function loadPublicHolidayCells(input: {
   }
   return cells;
 }
-
 function toCalendarEvent(
   record: ScopedRecord,
   actor: {
@@ -737,7 +736,6 @@ function toCalendarEvent(
     displayName = "Team member";
   }
   const recordType = isPrivatePeer ? "private" : record.record_type;
-
   return {
     allDay: record.all_day,
     approvalStatus: record.approval_status,
@@ -767,7 +765,6 @@ function toCalendarEvent(
         : null,
   };
 }
-
 function toCalendarPerson(
   person: ScopedPerson,
   xeroSyncFailedCountInRange: number
@@ -785,7 +782,6 @@ function toCalendarPerson(
     xeroSyncFailedCountInRange,
   };
 }
-
 function renderTreatment(
   approvalStatus: availability_approval_status
 ): RenderTreatment {
@@ -800,7 +796,6 @@ function renderTreatment(
   }
   return "solid";
 }
-
 function relationshipToOwner(
   actor: {
     actingPersonId: string | null;
@@ -820,7 +815,6 @@ function relationshipToOwner(
   }
   return "peer";
 }
-
 function canViewRecord(input: {
   actingPersonId: string | null;
   managerReportIds: ReadonlySet<string>;
@@ -837,12 +831,15 @@ function canViewRecord(input: {
   );
   return relationship !== "peer";
 }
-
 function resolveLocalRange(
   view: CalendarView,
   anchorDate: Date,
   timezone: string
-): { dateOnlyValues: string[]; endDateOnly: string; startDateOnly: string } {
+): {
+  dateOnlyValues: string[];
+  endDateOnly: string;
+  startDateOnly: string;
+} {
   const anchor = dateOnlyInTimeZone(anchorDate, timezone);
   if (view === "day") {
     const end = addDays(anchor, 1);
@@ -871,9 +868,11 @@ function resolveLocalRange(
     startDateOnly: start,
   };
 }
-
 function authorisedReportIds(
-  actor: { actingPersonId?: string | null; role: CalendarRole },
+  actor: {
+    actingPersonId?: string | null;
+    role: CalendarRole;
+  },
   people: ScopedPerson[],
   settings: Awaited<ReturnType<typeof getSettings>>
 ): Set<string> {
@@ -893,7 +892,6 @@ function authorisedReportIds(
           .map((person) => person.id)
       );
 }
-
 function transitiveReportIds(
   people: ScopedPerson[],
   actingPersonId: string
@@ -920,7 +918,6 @@ function transitiveReportIds(
   }
   return visited;
 }
-
 function countFailedByPerson(events: CalendarEvent[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const event of events) {
@@ -930,7 +927,6 @@ function countFailedByPerson(events: CalendarEvent[]): Map<string, number> {
   }
   return counts;
 }
-
 function effectivePersonType(
   person: Pick<ScopedPerson, "employment_type" | "person_type">
 ): "contractor" | "employee" {
@@ -939,11 +935,9 @@ function effectivePersonType(
   }
   return person.employment_type === "contractor" ? "contractor" : "employee";
 }
-
 function isAdminOrOwner(role: CalendarRole): boolean {
   return role === "admin" || role === "owner";
 }
-
 function dateOnlyInTimeZone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     day: "2-digit",
@@ -955,7 +949,6 @@ function dateOnlyInTimeZone(date: Date, timezone: string): string {
     parts.find((part) => part.type === type)?.value ?? "";
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
-
 function localPartsInTimeZone(date: Date, timezone: string) {
   const parts = new Intl.DateTimeFormat("en-AU", {
     day: "2-digit",
@@ -978,7 +971,6 @@ function localPartsInTimeZone(date: Date, timezone: string) {
     year: value("year"),
   };
 }
-
 function zonedStartOfDayToUtc(dateOnly: string, timezone: string): Date {
   const [year = 1970, month = 1, day = 1] = dateOnly
     .split("-")
@@ -999,7 +991,6 @@ function zonedStartOfDayToUtc(dateOnly: string, timezone: string): Date {
   }
   return new Date(guess);
 }
-
 function dateRange(startDateOnly: string, endDateOnly: string): string[] {
   const dates: string[] = [];
   let cursor = dateOnlyToUtcDate(startDateOnly);
@@ -1010,17 +1001,14 @@ function dateRange(startDateOnly: string, endDateOnly: string): string[] {
   }
   return dates;
 }
-
 function dateOnlyToUtcDate(dateOnly: string): Date {
   return new Date(`${dateOnly}T00:00:00.000Z`);
 }
-
 function addDays(dateOnly: string, days: number): string {
   const date = dateOnlyToUtcDate(dateOnly);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
 }
-
 function startOfWeekMonday(dateOnly: string): string {
   const date = dateOnlyToUtcDate(dateOnly);
   const day = date.getUTCDay();
@@ -1028,20 +1016,17 @@ function startOfWeekMonday(dateOnly: string): string {
   date.setUTCDate(date.getUTCDate() + mondayOffset);
   return date.toISOString().slice(0, 10);
 }
-
 function lastDayOfMonth(dateOnly: string): string {
   const [year = 1970, month = 1] = dateOnly
     .split("-")
     .map((part) => Number(part));
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
 }
-
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((first, second) =>
     first.localeCompare(second)
   );
 }
-
 async function recordNotFound(
   input: ParsedDetailInput
 ): Promise<Result<never, CalendarServiceError>> {
@@ -1066,7 +1051,6 @@ async function recordNotFound(
     ok: false,
   };
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, CalendarServiceError> {
@@ -1078,7 +1062,6 @@ function validationError(
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, CalendarServiceError> {
   return {
     error: {
@@ -1088,7 +1071,6 @@ function notAuthorised(): Result<never, CalendarServiceError> {
     ok: false,
   };
 }
-
 function invalidScope(): Result<never, CalendarServiceError> {
   return {
     error: {
@@ -1098,14 +1080,12 @@ function invalidScope(): Result<never, CalendarServiceError> {
     ok: false,
   };
 }
-
 function unknownError(message: string): Result<never, CalendarServiceError> {
   return {
     error: { code: "unknown_error", message },
     ok: false,
   };
 }
-
 const personSelect = {
   archived_at: true,
   avatar_url: true,
@@ -1134,7 +1114,6 @@ const personSelect = {
   },
   team_id: true,
 } as const;
-
 const recordSelect = {
   all_day: true,
   approval_note: true,

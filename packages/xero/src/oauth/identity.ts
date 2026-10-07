@@ -1,10 +1,7 @@
+const SCOPE_SEPARATOR = /\s+/;
+
 import type { Result } from "@repo/core";
-import {
-  compactVerify,
-  createRemoteJWKSet,
-  type JWTVerifyGetKey,
-  jwtVerify,
-} from "jose";
+import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import { z } from "zod";
 import { keys } from "../../keys";
 
@@ -27,6 +24,7 @@ const claimsSchema = z.object({
   exp: z.number().int().nonnegative(),
   iss: z.literal(XERO_IDENTITY_ISSUER),
   nbf: z.number().int().nonnegative().optional(),
+  scope: z.union([z.string(), z.array(z.string())]).optional(),
   xero_userid: z.string().trim().min(1),
 });
 export interface XeroIdentityError {
@@ -36,6 +34,7 @@ export interface XeroIdentityError {
 export interface XeroAccessTokenIdentity {
   authEventId: string | null;
   expiresAt: Date;
+  grantedScopes: string[];
   xeroUserId: string;
 }
 interface IdentityDependencies {
@@ -52,7 +51,6 @@ const failed = (): Result<never, XeroIdentityError> => ({
 
 async function verifyIdentity(
   accessToken: string,
-  legacy: boolean,
   deps?: IdentityDependencies
 ): Promise<
   Result<XeroAccessTokenIdentity & { expired: boolean }, XeroIdentityError>
@@ -63,22 +61,13 @@ async function verifyIdentity(
       return failed();
     }
     const jwks = deps?.jwks ?? remoteJwks;
-    let payload: unknown;
-    if (legacy) {
-      // Migration relaxes expiry only. Authenticate before decoding or accepting claims.
-      const verified = await compactVerify(accessToken, jwks, {
-        algorithms: ["RS256"],
-      });
-      payload = JSON.parse(new TextDecoder().decode(verified.payload));
-    } else {
-      ({ payload } = await jwtVerify(accessToken, jwks, {
-        algorithms: ["RS256"],
-        audience: XERO_IDENTITY_AUDIENCE,
-        currentDate: now,
-        issuer: XERO_IDENTITY_ISSUER,
-        requiredClaims: ["exp", "client_id", "xero_userid"],
-      }));
-    }
+    const { payload } = await jwtVerify(accessToken, jwks, {
+      algorithms: ["RS256"],
+      audience: XERO_IDENTITY_AUDIENCE,
+      currentDate: now,
+      issuer: XERO_IDENTITY_ISSUER,
+      requiredClaims: ["exp", "client_id", "xero_userid"],
+    });
     const claims = claimsSchema.safeParse(payload);
     if (
       !claims.success ||
@@ -92,7 +81,7 @@ async function verifyIdentity(
       return failed();
     }
     const expired = expiresAt.getTime() <= now.getTime();
-    if (expired && !legacy) {
+    if (expired) {
       return failed();
     }
     return {
@@ -101,6 +90,10 @@ async function verifyIdentity(
         authEventId: claims.data.authentication_event_id ?? null,
         expired,
         expiresAt,
+        grantedScopes:
+          typeof claims.data.scope === "string"
+            ? claims.data.scope.split(SCOPE_SEPARATOR).filter(Boolean)
+            : (claims.data.scope ?? []),
         xeroUserId: claims.data.xero_userid,
       },
     };
@@ -113,19 +106,10 @@ export async function verifyXeroAccessTokenIdentity(
   accessToken: string,
   deps?: IdentityDependencies
 ): Promise<Result<XeroAccessTokenIdentity, XeroIdentityError>> {
-  const result = await verifyIdentity(accessToken, false, deps);
+  const result = await verifyIdentity(accessToken, deps);
   if (!result.ok) {
     return result;
   }
   const { expired: _expired, ...identity } = result.value;
   return { ok: true, value: identity };
-}
-
-export function verifyLegacyXeroAccessTokenIdentity(
-  accessToken: string,
-  deps?: IdentityDependencies
-): Promise<
-  Result<XeroAccessTokenIdentity & { expired: boolean }, XeroIdentityError>
-> {
-  return verifyIdentity(accessToken, true, deps);
 }

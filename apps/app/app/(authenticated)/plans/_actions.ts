@@ -1,5 +1,4 @@
 "use server";
-
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
@@ -26,7 +25,6 @@ import { log } from "@repo/observability/log";
 import { XeroWriteAdapter } from "@repo/xero";
 import { revalidatePath } from "next/cache";
 import { getActiveOrgContext } from "@/lib/server/get-active-org-context";
-import { withAuthenticatedXeroCampaignAction } from "@/lib/server/xero-campaign-action";
 import {
   buildFormDate,
   type PlanRecordActionInput,
@@ -37,16 +35,23 @@ import {
   UpdatePlanRecordFormSchema,
 } from "./_schemas";
 import { formatPlanDateTime } from "./plan-form-time";
-
 export type PlanActionError =
   | PlanServiceError
   | SubmitRecoveryError
   | SubmitServiceError
-  | { code: "not_authorised"; message: string }
-  | { code: "validation_error"; message: string };
-
-export type PlanActionResult<T = { id?: string }> = Result<T, PlanActionError>;
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
+export type PlanActionResult<
+  T = {
+    id?: string;
+  },
+> = Result<T, PlanActionError>;
 export async function attachSubmitRecoveryCandidateAction(input: {
   organisationId: string;
   reason: string;
@@ -57,32 +62,22 @@ export async function attachSubmitRecoveryCandidateAction(input: {
   if (!context.ok) {
     return context;
   }
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.recovery-attach",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    input,
-    async () => {
-      const result = await attachSubmitRecoveryCandidate(
-        {
-          ...context.value,
-          reason: input.reason,
-          recordId: input.recordId,
-          remoteId: input.remoteId,
-        },
-        XeroWriteAdapter
-      );
-      if (result.ok) {
-        revalidateSubmissionPaths();
-      }
-      return result;
+  return await (async () => {
+    const result = await attachSubmitRecoveryCandidate(
+      {
+        ...context.value,
+        reason: input.reason,
+        recordId: input.recordId,
+        remoteId: input.remoteId,
+      },
+      XeroWriteAdapter
+    );
+    if (result.ok) {
+      revalidateSubmissionPaths();
     }
-  );
+    return result;
+  })();
 }
-
 export async function listSubmitRecoveryCandidatesAction(input: {
   organisationId: string;
   recordId: string;
@@ -91,22 +86,12 @@ export async function listSubmitRecoveryCandidatesAction(input: {
   if (!context.ok) {
     return context;
   }
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.recovery-candidates",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    input,
-    async () =>
-      await listSubmitRecoveryCandidates(
-        { ...context.value, recordId: input.recordId },
-        XeroWriteAdapter
-      )
-  );
+  return await (async () =>
+    await listSubmitRecoveryCandidates(
+      { ...context.value, recordId: input.recordId },
+      XeroWriteAdapter
+    ))();
 }
-
 export async function resolveSubmitAsNotCreatedAction(input: {
   evidenceReference: string;
   independentlyVerified: boolean;
@@ -123,97 +108,76 @@ export async function resolveSubmitAsNotCreatedAction(input: {
       "Independent provider verification must be confirmed."
     );
   }
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.recovery-not-created",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    input,
-    async () => {
-      const result = await resolveSubmitAsNotCreated({
-        ...context.value,
-        evidenceReference: input.evidenceReference,
-        independentlyVerified: true,
-        reason: input.reason,
-        recordId: input.recordId,
-      });
-      if (result.ok) {
-        revalidateSubmissionPaths();
-      }
-      return result;
+  return await (async () => {
+    const result = await resolveSubmitAsNotCreated({
+      ...context.value,
+      evidenceReference: input.evidenceReference,
+      independentlyVerified: true,
+      reason: input.reason,
+      recordId: input.recordId,
+    });
+    if (result.ok) {
+      revalidateSubmissionPaths();
     }
-  );
+    return result;
+  })();
 }
-
-export async function createRecordAction(
-  input: PlanRecordFormInput
-): Promise<PlanActionResult<{ id: string }>> {
+export async function createRecordAction(input: PlanRecordFormInput): Promise<
+  PlanActionResult<{
+    id: string;
+  }>
+> {
   const parsed = PlanRecordFormSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
   const dates = await resolveFormDates(parsed.data, context.value);
   if (!dates.ok) {
     return dates;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.create-local",
-    {
+  return await (async () => {
+    const result = await createRecord({
+      actingOrgRole: context.value.orgRole,
+      allDay: parsed.data.allDay,
       clerkOrgId: context.value.clerkOrgId,
+      contactabilityStatus: parsed.data.contactabilityStatus,
+      createdByUserId: context.value.userId,
+      endsAt: dates.value.endsAt,
+      notesInternal: parsed.data.notesInternal,
       organisationId: context.value.organisationId,
-      userId: context.value.userId,
-    },
-    parsed.data,
-    async () => {
-      const result = await createRecord({
-        actingOrgRole: context.value.orgRole,
-        allDay: parsed.data.allDay,
-        clerkOrgId: context.value.clerkOrgId,
-        contactabilityStatus: parsed.data.contactabilityStatus,
-        createdByUserId: context.value.userId,
-        endsAt: dates.value.endsAt,
-        notesInternal: parsed.data.notesInternal,
-        organisationId: context.value.organisationId,
-        personId: parsed.data.personId,
-        privacyMode: parsed.data.privacyMode,
-        recordType: parsed.data.recordType,
-        startsAt: dates.value.startsAt,
-      });
-
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      revalidatePath("/");
-      return { ok: true, value: { id: result.value.id } };
+      personId: parsed.data.personId,
+      privacyMode: parsed.data.privacyMode,
+      recordType: parsed.data.recordType,
+      startsAt: dates.value.startsAt,
+    });
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    revalidatePath("/");
+    return { ok: true, value: { id: result.value.id } };
+  })();
 }
-
 export async function updateRecordAction(
   input: UpdatePlanRecordFormInput
-): Promise<PlanActionResult<{ id: string }>> {
+): Promise<
+  PlanActionResult<{
+    id: string;
+  }>
+> {
   const parsed = UpdatePlanRecordFormSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error.issues[0]?.message);
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
   const dates = await resolveFormDates(
     parsed.data,
     context.value,
@@ -222,44 +186,31 @@ export async function updateRecordAction(
   if (!dates.ok) {
     return dates;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.update-local",
-    {
+  return await (async () => {
+    const result = await updateRecord({
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      userId: context.value.userId,
-    },
-    parsed.data,
-    async () => {
-      const result = await updateRecord({
-        actingOrgRole: context.value.orgRole,
-        actingUserId: context.value.userId,
-        clerkOrgId: context.value.clerkOrgId,
-        organisationId: context.value.organisationId,
-        patch: {
-          allDay: parsed.data.allDay,
-          contactabilityStatus: parsed.data.contactabilityStatus,
-          endsAt: dates.value.endsAt,
-          notesInternal: parsed.data.notesInternal,
-          privacyMode: parsed.data.privacyMode,
-          recordType: parsed.data.recordType,
-          startsAt: dates.value.startsAt,
-        },
-        recordId: parsed.data.recordId,
-      });
-
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      return { ok: true, value: { id: result.value.id } };
+      patch: {
+        allDay: parsed.data.allDay,
+        contactabilityStatus: parsed.data.contactabilityStatus,
+        endsAt: dates.value.endsAt,
+        notesInternal: parsed.data.notesInternal,
+        privacyMode: parsed.data.privacyMode,
+        recordType: parsed.data.recordType,
+        startsAt: dates.value.startsAt,
+      },
+      recordId: parsed.data.recordId,
+    });
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    return { ok: true, value: { id: result.value.id } };
+  })();
 }
-
 async function captureSubmissionActivation(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -295,7 +246,6 @@ async function captureSubmissionActivation(input: {
   });
   await analytics?.flush();
 }
-
 export async function deleteDraftAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
@@ -303,39 +253,25 @@ export async function deleteDraftAction(
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.delete-draft",
-    {
+  return await (async () => {
+    const result = await deleteDraftRecord({
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      userId: context.value.userId,
-    },
-    parsed.data,
-    async () => {
-      const result = await deleteDraftRecord({
-        actingOrgRole: context.value.orgRole,
-        actingUserId: context.value.userId,
-        clerkOrgId: context.value.clerkOrgId,
-        organisationId: context.value.organisationId,
-        recordId: parsed.data.recordId,
-      });
-
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      return { ok: true, value: undefined };
+      recordId: parsed.data.recordId,
+    });
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    return { ok: true, value: undefined };
+  })();
 }
-
 export async function archiveRecordAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
@@ -343,40 +279,26 @@ export async function archiveRecordAction(
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.archive",
-    {
+  return await (async () => {
+    const result = await archiveRecord({
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      userId: context.value.userId,
-    },
-    parsed.data,
-    async () => {
-      const result = await archiveRecord({
-        actingOrgRole: context.value.orgRole,
-        actingUserId: context.value.userId,
-        clerkOrgId: context.value.clerkOrgId,
-        organisationId: context.value.organisationId,
-        recordId: parsed.data.recordId,
-      });
-
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      return { ok: true, value: undefined };
+      recordId: parsed.data.recordId,
+    });
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    return { ok: true, value: undefined };
+  })();
 }
-
 export async function restoreRecordAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<void>> {
@@ -384,40 +306,26 @@ export async function restoreRecordAction(
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.restore",
-    {
+  return await (async () => {
+    const result = await restoreRecord({
+      actingOrgRole: context.value.orgRole,
+      actingUserId: context.value.userId,
       clerkOrgId: context.value.clerkOrgId,
       organisationId: context.value.organisationId,
-      userId: context.value.userId,
-    },
-    parsed.data,
-    async () => {
-      const result = await restoreRecord({
-        actingOrgRole: context.value.orgRole,
-        actingUserId: context.value.userId,
-        clerkOrgId: context.value.clerkOrgId,
-        organisationId: context.value.organisationId,
-        recordId: parsed.data.recordId,
-      });
-
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      return { ok: true, value: undefined };
+      recordId: parsed.data.recordId,
+    });
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    return { ok: true, value: undefined };
+  })();
 }
-
 export async function submitForApprovalAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
@@ -425,40 +333,24 @@ export async function submitForApprovalAction(
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.submit",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    {
-      organisationId: context.value.organisationId,
-      recordId: context.value.recordId,
-    },
-    async () => {
-      const result = await submitDraftRecord(context.value, XeroWriteAdapter);
-      if (!result.ok) {
-        return result;
-      }
-
-      try {
-        await captureSubmissionActivation({
-          clerkOrgId: context.value.clerkOrgId,
-          organisationId: context.value.organisationId,
-          submittedAt: result.value.submitted_at,
-        });
-      } catch (error) {
-        log.warn("Leave submission activation capture failed", { error });
-      }
-
-      revalidateSubmissionPaths();
-      return submissionValue(result.value);
+  return await (async () => {
+    const result = await submitDraftRecord(context.value, XeroWriteAdapter);
+    if (!result.ok) {
+      return result;
     }
-  );
+    try {
+      await captureSubmissionActivation({
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        submittedAt: result.value.submitted_at,
+      });
+    } catch (error) {
+      log.warn("Leave submission activation capture failed", { error });
+    }
+    revalidateSubmissionPaths();
+    return submissionValue(result.value);
+  })();
 }
-
 export async function withdrawSubmissionAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
@@ -466,33 +358,18 @@ export async function withdrawSubmissionAction(
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.withdraw",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    {
-      organisationId: context.value.organisationId,
-      recordId: context.value.recordId,
-    },
-    async () => {
-      const result = await withdrawSubmission(context.value, XeroWriteAdapter);
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      revalidatePath("/leave-approvals");
-      revalidatePath("/notifications");
-      return submissionValue(result.value);
+  return await (async () => {
+    const result = await withdrawSubmission(context.value, XeroWriteAdapter);
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    revalidatePath("/leave-approvals");
+    revalidatePath("/notifications");
+    return submissionValue(result.value);
+  })();
 }
-
 export async function retrySubmissionAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
@@ -500,40 +377,24 @@ export async function retrySubmissionAction(
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.retry-submit",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    {
-      organisationId: context.value.organisationId,
-      recordId: context.value.recordId,
-    },
-    async () => {
-      const result = await retrySubmission(context.value, XeroWriteAdapter);
-      if (!result.ok) {
-        return result;
-      }
-
-      try {
-        await captureSubmissionActivation({
-          clerkOrgId: context.value.clerkOrgId,
-          organisationId: context.value.organisationId,
-          submittedAt: result.value.submitted_at,
-        });
-      } catch (error) {
-        log.warn("Leave submission activation capture failed", { error });
-      }
-
-      revalidateSubmissionPaths();
-      return submissionValue(result.value);
+  return await (async () => {
+    const result = await retrySubmission(context.value, XeroWriteAdapter);
+    if (!result.ok) {
+      return result;
     }
-  );
+    try {
+      await captureSubmissionActivation({
+        clerkOrgId: context.value.clerkOrgId,
+        organisationId: context.value.organisationId,
+        submittedAt: result.value.submitted_at,
+      });
+    } catch (error) {
+      log.warn("Leave submission activation capture failed", { error });
+    }
+    revalidateSubmissionPaths();
+    return submissionValue(result.value);
+  })();
 }
-
 export async function revertToDraftAction(
   input: PlanRecordActionInput
 ): Promise<PlanActionResult<SubmissionActionValue>> {
@@ -541,37 +402,21 @@ export async function revertToDraftAction(
   if (!context.ok) {
     return context;
   }
-
-  return await withAuthenticatedXeroCampaignAction(
-    "leave.revert-draft",
-    {
-      clerkOrgId: context.value.clerkOrgId,
-      organisationId: context.value.organisationId,
-      userId: context.value.actingUserId,
-    },
-    {
-      organisationId: context.value.organisationId,
-      recordId: context.value.recordId,
-    },
-    async () => {
-      const result = await revertToDraft(context.value);
-      if (!result.ok) {
-        return result;
-      }
-
-      revalidatePath("/plans");
-      revalidatePath("/calendar");
-      return submissionValue(result.value);
+  return await (async () => {
+    const result = await revertToDraft(context.value);
+    if (!result.ok) {
+      return result;
     }
-  );
+    revalidatePath("/plans");
+    revalidatePath("/calendar");
+    return submissionValue(result.value);
+  })();
 }
-
 interface SubmissionActionValue {
   approvalStatus: string;
   id: string;
   xeroWriteError: string | null;
 }
-
 async function resolveActionContext(organisationId: string): Promise<
   PlanActionResult<{
     clerkOrgId: string;
@@ -585,7 +430,6 @@ async function resolveActionContext(organisationId: string): Promise<
     currentUser(),
     getActiveOrgContext(organisationId),
   ]);
-
   if (!(user && canUsePlans(orgRole))) {
     return {
       error: {
@@ -595,7 +439,6 @@ async function resolveActionContext(organisationId: string): Promise<
       ok: false,
     };
   }
-
   if (!context.ok) {
     return {
       error: {
@@ -605,7 +448,6 @@ async function resolveActionContext(organisationId: string): Promise<
       ok: false,
     };
   }
-
   return {
     ok: true,
     value: {
@@ -616,7 +458,6 @@ async function resolveActionContext(organisationId: string): Promise<
     },
   };
 }
-
 function canUsePlans(role: string | null | undefined): boolean {
   return (
     role === "org:viewer" ||
@@ -625,7 +466,6 @@ function canUsePlans(role: string | null | undefined): boolean {
     role === "org:owner"
   );
 }
-
 async function resolveRecoveryContext(organisationId: string): Promise<
   PlanActionResult<{
     actingOrgRole: "org:admin" | "org:owner";
@@ -661,7 +501,6 @@ async function resolveRecoveryContext(organisationId: string): Promise<
     },
   };
 }
-
 async function resolveRecordActionContext(
   input: PlanRecordActionInput
 ): Promise<
@@ -677,12 +516,10 @@ async function resolveRecordActionContext(
   if (!parsed.success) {
     return validationError("Invalid record");
   }
-
   const context = await resolveActionContext(parsed.data.organisationId);
   if (!context.ok) {
     return context;
   }
-
   return {
     ok: true,
     value: {
@@ -694,7 +531,6 @@ async function resolveRecordActionContext(
     },
   };
 }
-
 function revalidateSubmissionPaths() {
   revalidatePath("/plans");
   revalidatePath("/calendar");
@@ -702,7 +538,6 @@ function revalidateSubmissionPaths() {
   revalidatePath("/notifications");
   revalidatePath("/");
 }
-
 function submissionValue(record: {
   approval_status: string;
   id: string;
@@ -717,7 +552,6 @@ function submissionValue(record: {
     },
   };
 }
-
 function validationError(message?: string): PlanActionResult<never> {
   return {
     error: {
@@ -727,12 +561,19 @@ function validationError(message?: string): PlanActionResult<never> {
     ok: false,
   };
 }
-
 async function resolveFormDates(
   input: PlanRecordFormInput,
-  context: { clerkOrgId: string; organisationId: string },
+  context: {
+    clerkOrgId: string;
+    organisationId: string;
+  },
   recordId?: string
-): Promise<PlanActionResult<{ startsAt: Date; endsAt: Date }>> {
+): Promise<
+  PlanActionResult<{
+    startsAt: Date;
+    endsAt: Date;
+  }>
+> {
   const organisation = await database.organisation.findFirst({
     select: { timezone: true },
     where: {

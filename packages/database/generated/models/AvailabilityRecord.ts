@@ -545,6 +545,7 @@ export type AvailabilityRecordOrderByWithRelationInput = {
 
 export type AvailabilityRecordWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  organisation_id_person_id_record_type_starts_at_ends_at?: Prisma.AvailabilityRecordOrganisation_idPerson_idRecord_typeStarts_atEnds_atCompoundUniqueInput
   organisation_id_source_type_source_remote_id?: Prisma.AvailabilityRecordOrganisation_idSource_typeSource_remote_idCompoundUniqueInput
   AND?: Prisma.AvailabilityRecordWhereInput | Prisma.AvailabilityRecordWhereInput[]
   OR?: Prisma.AvailabilityRecordWhereInput[]
@@ -593,7 +594,7 @@ export type AvailabilityRecordWhereUniqueInput = Prisma.AtLeast<{
   approved_by?: Prisma.XOR<Prisma.PersonNullableScalarRelationFilter, Prisma.PersonWhereInput> | null
   publication?: Prisma.XOR<Prisma.AvailabilityPublicationNullableScalarRelationFilter, Prisma.AvailabilityPublicationWhereInput> | null
   outbound_operations?: Prisma.OutboundOperationListRelationFilter
-}, "id" | "organisation_id_source_type_source_remote_id">
+}, "id" | "organisation_id_person_id_record_type_starts_at_ends_at" | "organisation_id_source_type_source_remote_id">
 
 export type AvailabilityRecordOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -1003,6 +1004,14 @@ export type AvailabilityRecordListRelationFilter = {
 
 export type AvailabilityRecordOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type AvailabilityRecordOrganisation_idPerson_idRecord_typeStarts_atEnds_atCompoundUniqueInput = {
+  organisation_id: string
+  person_id: string
+  record_type: $Enums.availability_record_type
+  starts_at: Date | string
+  ends_at: Date | string
 }
 
 export type AvailabilityRecordOrganisation_idSource_typeSource_remote_idCompoundUniqueInput = {

@@ -1,6 +1,5 @@
 import { log } from "@repo/observability/log";
 import "server-only";
-
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { database, scopedQuery } from "@repo/database";
 import { Prisma } from "@repo/database/generated/client";
@@ -11,14 +10,27 @@ import type {
 import { z } from "zod";
 import { getXeroConnectionStateForScope } from "../xero-connection-state";
 import type { PeopleRole } from "./people-service";
-
 export type ManualBalanceServiceError =
-  | { code: "not_authorised"; message: string }
-  | { code: "person_not_found"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string }
-  | { code: "xero_connected"; message: string };
-
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "person_not_found";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "xero_connected";
+      message: string;
+    };
 const ManualBalanceSchema = z.object({
   actingRole: z.enum(["admin", "manager", "owner", "viewer"]),
   actingUserId: z.string().min(1),
@@ -55,7 +67,6 @@ const ManualBalanceSchema = z.object({
     .nullable()
     .optional(),
 });
-
 export async function setManualLeaveBalance(input: {
   actingRole: PeopleRole;
   actingUserId: string;
@@ -67,7 +78,14 @@ export async function setManualLeaveBalance(input: {
   organisationId: string;
   personId: string;
   recordType?: availability_record_type | null;
-}): Promise<Result<{ id: string }, ManualBalanceServiceError>> {
+}): Promise<
+  Result<
+    {
+      id: string;
+    },
+    ManualBalanceServiceError
+  >
+> {
   const parsed = ManualBalanceSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -77,13 +95,11 @@ export async function setManualLeaveBalance(input: {
   ) {
     return notAuthorised();
   }
-
   try {
     const scoped = scopedQuery(
       parsed.data.clerkOrgId as ClerkOrgId,
       parsed.data.organisationId as OrganisationId
     );
-
     const xeroStateResult = await getXeroConnectionStateForScope({
       clerkOrgId: parsed.data.clerkOrgId,
       organisationId: parsed.data.organisationId,
@@ -110,7 +126,6 @@ export async function setManualLeaveBalance(input: {
         ok: false,
       };
     }
-
     const person = await database.person.findFirst({
       select: { id: true },
       where: { ...scoped, id: parsed.data.personId },
@@ -118,7 +133,6 @@ export async function setManualLeaveBalance(input: {
     if (!person) {
       return await personNotFound(parsed.data);
     }
-
     return await createOrUpdateManualBalance(parsed.data, scoped);
   } catch {
     return {
@@ -130,16 +144,24 @@ export async function setManualLeaveBalance(input: {
     };
   }
 }
-
 async function createOrUpdateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId }
-): Promise<Result<{ id: string }, ManualBalanceServiceError>> {
+  scoped: {
+    clerk_org_id: ClerkOrgId;
+    organisation_id: OrganisationId;
+  }
+): Promise<
+  Result<
+    {
+      id: string;
+    },
+    ManualBalanceServiceError
+  >
+> {
   const existing = await findManualBalance(input, scoped);
   if (existing) {
     return await updateManualBalance(input, scoped, existing.id);
   }
-
   try {
     const created = await database.leaveBalance.create({
       data: {
@@ -147,7 +169,7 @@ async function createOrUpdateManualBalance(
         ...manualBalanceData(input),
         leave_type_xero_id: input.leaveTypeXeroId,
         person_id: input.personId,
-        xero_tenant_id: null,
+        xero_connection_id: null,
       },
       select: { id: true },
     });
@@ -164,12 +186,21 @@ async function createOrUpdateManualBalance(
     return await updateManualBalance(input, scoped, conflicting.id);
   }
 }
-
 async function updateManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId },
+  scoped: {
+    clerk_org_id: ClerkOrgId;
+    organisation_id: OrganisationId;
+  },
   balanceId: string
-): Promise<Result<{ id: string }, ManualBalanceServiceError>> {
+): Promise<
+  Result<
+    {
+      id: string;
+    },
+    ManualBalanceServiceError
+  >
+> {
   await database.leaveBalance.updateMany({
     data: {
       ...manualBalanceData(input),
@@ -180,7 +211,6 @@ async function updateManualBalance(
   await auditManualBalance(input, balanceId);
   return { ok: true, value: { id: balanceId } };
 }
-
 function manualBalanceData(input: z.infer<typeof ManualBalanceSchema>) {
   return {
     balance: input.balance.toFixed(4),
@@ -193,10 +223,12 @@ function manualBalanceData(input: z.infer<typeof ManualBalanceSchema>) {
     source_payload_json: Prisma.DbNull,
   };
 }
-
 function findManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
-  scoped: { clerk_org_id: ClerkOrgId; organisation_id: OrganisationId }
+  scoped: {
+    clerk_org_id: ClerkOrgId;
+    organisation_id: OrganisationId;
+  }
 ) {
   return database.leaveBalance.findFirst({
     select: { id: true },
@@ -204,11 +236,10 @@ function findManualBalance(
       ...scoped,
       leave_type_xero_id: input.leaveTypeXeroId,
       person_id: input.personId,
-      xero_tenant_id: null,
+      xero_connection_id: null,
     },
   });
 }
-
 async function auditManualBalance(
   input: z.infer<typeof ManualBalanceSchema>,
   balanceId: string
@@ -230,7 +261,6 @@ async function auditManualBalance(
     },
   });
 }
-
 async function personNotFound(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -257,14 +287,12 @@ async function personNotFound(input: {
     ok: false,
   };
 }
-
 function isUniqueConflict(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2002"
   );
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, ManualBalanceServiceError> {
@@ -276,7 +304,6 @@ function validationError(
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, ManualBalanceServiceError> {
   return {
     error: {

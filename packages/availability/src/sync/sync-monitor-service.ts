@@ -1,7 +1,6 @@
 import { log } from "@repo/observability/log";
 import { sanitizeObject } from "@repo/observability/scrubber";
 import "server-only";
-
 import type { Result } from "@repo/core";
 import { xeroRecoveryMessage, xeroRecoveryMessageFromCode } from "@repo/core";
 import { database, scopedTo as scoped } from "@repo/database";
@@ -14,18 +13,43 @@ import {
   getRegisteredSyncEventName,
   syncEventNames,
 } from "./sync-events";
-
 export type SyncMonitorError =
-  | { code: "connection_not_active"; message: string }
-  | { code: "dispatch_failed"; message: string }
-  | { code: "invalid_run_type"; message: string }
-  | { code: "not_authorised"; message: string }
-  | { code: "tenant_sync_paused"; message: string }
-  | { code: "run_not_found"; message: string }
-  | { code: "tenant_not_found"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string };
-
+  | {
+      code: "connection_not_active";
+      message: string;
+    }
+  | {
+      code: "dispatch_failed";
+      message: string;
+    }
+  | {
+      code: "invalid_run_type";
+      message: string;
+    }
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "tenant_sync_paused";
+      message: string;
+    }
+  | {
+      code: "run_not_found";
+      message: string;
+    }
+  | {
+      code: "tenant_not_found";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    };
 export type SyncRunType =
   | "approval_state_reconciliation"
   | "leave_balances"
@@ -44,14 +68,13 @@ export type SyncMonitorRole =
   | "manager"
   | "owner"
   | "viewer";
-
 export interface TenantSummary {
+  connectionId: string;
   connectionStatus:
     | "active"
-    | "expired"
+    | "reconnect_required"
+    | "disconnected"
     | "not_configured"
-    | "revoked"
-    | "disconnect_pending"
     | "unavailable";
   currentFailedRuns: number;
   currentPartialSuccessRuns: number;
@@ -80,11 +103,10 @@ export interface TenantSummary {
   syncPausedAt: Date | null;
   tenantName: string;
   totalRunsLast30Days: number;
-  xeroTenantId: string;
 }
-
 export interface RunListItem {
   completedAt: Date | null;
+  connectionId: string | null;
   durationSeconds: number | null;
   errorSummary: string | null;
   hasFailedRecords: boolean;
@@ -99,9 +121,7 @@ export interface RunListItem {
   tenantName: string;
   triggeredByUserDisplay: string;
   triggerType: SyncTriggerType;
-  xeroTenantId: string | null;
 }
-
 export interface RunDetail {
   failedRecords: FailedRecordSummary[];
   failedRecordsNextCursor: string | null;
@@ -109,7 +129,6 @@ export interface RunDetail {
   timeline: TimelineEvent[];
   timelineNextCursor: string | null;
 }
-
 export interface FailedRecordSummary {
   createdAt: Date;
   errorCode: string;
@@ -118,33 +137,28 @@ export interface FailedRecordSummary {
   recordType: string;
   sourceRemoteId: string | null;
 }
-
 export interface TimelineEvent {
   action: string;
   actorUserId: string | null;
   createdAt: Date;
   id: string;
 }
-
 export interface RunDetailPage {
   nextCursor: string | null;
   records: FailedRecordSummary[];
 }
-
 export interface TimelinePage {
   events: TimelineEvent[];
   nextCursor: string | null;
 }
-
 export interface SyncRunFilters {
+  connectionId?: string[];
   dateFrom?: Date;
   dateTo?: Date;
   runType?: SyncRunType[];
   status?: SyncRunStatus[];
   triggerType?: SyncTriggerType[];
-  xeroTenantId?: string[];
 }
-
 const RoleSchema = z.enum([
   "admin",
   "contractor",
@@ -166,7 +180,6 @@ const RunStatusSchema = z.enum([
   "cancelled",
 ]);
 const TriggerTypeSchema = z.enum(["scheduled", "manual", "webhook"]);
-
 const BaseSchema = z.object({
   actingRole: RoleSchema,
   actingUserId: z.string().min(1).optional(),
@@ -177,12 +190,12 @@ const ListTenantSummariesSchema = BaseSchema;
 const ListRunsSchema = BaseSchema.extend({
   filters: z
     .object({
+      connectionId: z.array(z.string().uuid()).optional(),
       dateFrom: z.coerce.date().optional(),
       dateTo: z.coerce.date().optional(),
       runType: z.array(RunTypeSchema).optional(),
       status: z.array(RunStatusSchema).optional(),
       triggerType: z.array(TriggerTypeSchema).optional(),
-      xeroTenantId: z.array(z.string().uuid()).optional(),
     })
     .optional(),
   pagination: z
@@ -206,8 +219,8 @@ const GetRawFailureSchema = BaseSchema.extend({
 });
 const DispatchManualSyncSchema = BaseSchema.extend({
   actingUserId: z.string().min(1),
+  connectionId: z.string().uuid(),
   runType: RunTypeSchema,
-  xeroTenantId: z.string().uuid(),
 });
 const ExportFailedRecordsCsvSchema = BaseSchema.extend({
   actingUserId: z.string().min(1),
@@ -217,14 +230,12 @@ const CancelRunSchema = BaseSchema.extend({
   actingUserId: z.string().min(1),
   runId: z.string().uuid(),
 });
-
 type BaseInput = z.infer<typeof BaseSchema>;
 type ListRunsInput = z.infer<typeof ListRunsSchema>;
 type GetRunDetailInput = z.infer<typeof GetRunDetailSchema>;
 type DispatchManualSyncInput = z.infer<typeof DispatchManualSyncSchema>;
 type ExportFailedRecordsCsvInput = z.infer<typeof ExportFailedRecordsCsvSchema>;
 type CancelRunInput = z.infer<typeof CancelRunSchema>;
-
 const CSV_EXPORT_LIMIT = 50_000;
 const CSV_ESCAPE_PATTERN = /[",\r\n]/;
 const SUCCESS_STATUSES: SyncRunStatus[] = ["succeeded", "partial_success"];
@@ -235,7 +246,6 @@ const syncRunTypes: SyncRunType[] = [
   "people",
 ];
 const DETAIL_PAGE_SIZE = 50;
-
 export async function listTenantSummaries(
   input: z.input<typeof ListTenantSummariesSchema>
 ): Promise<Result<TenantSummary[], SyncMonitorError>> {
@@ -246,19 +256,9 @@ export async function listTenantSummaries(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
-    const tenants = await database.xeroTenant.findMany({
-      include: {
-        xero_connection: {
-          select: {
-            disconnected_at: true,
-            last_refreshed_at: true,
-            revoked_at: true,
-            status: true,
-          },
-        },
-      },
+    const tenants = await database.xeroConnection.findMany({
+      include: { authorisation: { select: { last_refreshed_at: true } } },
       orderBy: { tenant_name: "asc" },
       where: scoped(parsed.data),
     });
@@ -270,7 +270,6 @@ export async function listTenantSummaries(
     if (tenantIds.length === 0) {
       return { ok: true, value: [] };
     }
-
     const since = daysAgo(30);
     const summarySelect = {
       completed_at: true,
@@ -280,7 +279,7 @@ export async function listTenantSummaries(
       run_type: true,
       started_at: true,
       status: true,
-      xero_tenant_id: true,
+      xero_connection_id: true,
     } as const;
     const [latestCompleted, latestSuccessful, currentRuns, runCounts] =
       await Promise.all([
@@ -294,7 +293,7 @@ export async function listTenantSummaries(
                   ...scoped(parsed.data),
                   run_type: runType,
                   status: { not: "running" },
-                  xero_tenant_id: tenant.id,
+                  xero_connection_id: tenant.id,
                 },
               })
             )
@@ -310,7 +309,7 @@ export async function listTenantSummaries(
                   ...scoped(parsed.data),
                   run_type: runType,
                   status: { in: SUCCESS_STATUSES },
-                  xero_tenant_id: tenant.id,
+                  xero_connection_id: tenant.id,
                 },
               })
             )
@@ -324,28 +323,27 @@ export async function listTenantSummaries(
               where: {
                 ...scoped(parsed.data),
                 status: "running",
-                xero_tenant_id: tenant.id,
+                xero_connection_id: tenant.id,
               },
             })
           )
         ).then(nonNullRows),
         database.syncRun.groupBy({
           _count: { _all: true },
-          by: ["xero_tenant_id", "status"],
+          by: ["xero_connection_id", "status"],
           where: {
             ...scoped(parsed.data),
             started_at: { gte: since },
-            xero_tenant_id: { in: tenantIds },
+            xero_connection_id: { in: tenantIds },
           },
         }),
       ]);
-
     const pendingCounts = await Promise.all(
       tenants.flatMap((tenant) =>
         syncRunTypes.map(async (runType) => {
           const success = latestSuccessful.find(
             (run) =>
-              run.xero_tenant_id === tenant.id && run.run_type === runType
+              run.xero_connection_id === tenant.id && run.run_type === runType
           );
           const count = await database.failedRecord.count({
             where: {
@@ -353,7 +351,7 @@ export async function listTenantSummaries(
               ...(success ? { created_at: { gt: success.started_at } } : {}),
               sync_run: {
                 run_type: runType,
-                xero_tenant_id: tenant.id,
+                xero_connection_id: tenant.id,
               },
             },
           });
@@ -361,15 +359,14 @@ export async function listTenantSummaries(
         })
       )
     );
-
     return {
       ok: true,
       value: tenants.map((tenant) => {
         const completedRuns = latestCompletedRunsByType(
-          latestCompleted.filter((run) => run.xero_tenant_id === tenant.id)
+          latestCompleted.filter((run) => run.xero_connection_id === tenant.id)
         );
         const currentRun = currentRuns.find(
-          (run) => run.xero_tenant_id === tenant.id
+          (run) => run.xero_connection_id === tenant.id
         );
         const lastRun = completedRuns.reduce<
           (typeof completedRuns)[number] | undefined
@@ -379,7 +376,7 @@ export async function listTenantSummaries(
           undefined
         );
         const counts = runCounts.filter(
-          (row) => row.xero_tenant_id === tenant.id
+          (row) => row.xero_connection_id === tenant.id
         );
         const totalRunsLast30Days = counts.reduce(
           (total, row) => total + row._count._all,
@@ -390,12 +387,9 @@ export async function listTenantSummaries(
         const pendingFailedRecords = pendingCounts
           .filter((entry) => entry.tenantId === tenant.id)
           .reduce((total, entry) => total + entry.count, 0);
-
         return {
-          connectionStatus: connectionStatus(
-            tenant.xero_connection,
-            displayState
-          ),
+          connectionId: tenant.id,
+          connectionStatus: connectionStatus(tenant, displayState),
           currentFailedRuns: completedRuns.filter(
             (run) => run.status === "failed"
           ).length,
@@ -423,7 +417,7 @@ export async function listTenantSummaries(
             "leave_records"
           ),
           lastPeopleSync: latestCompletedRunAt(completedRuns, "people"),
-          lastRefreshedAt: tenant.xero_connection.last_refreshed_at,
+          lastRefreshedAt: tenant.authorisation?.last_refreshed_at ?? null,
           lastRun: lastRun
             ? {
                 completedAt: lastRun.completed_at,
@@ -438,9 +432,8 @@ export async function listTenantSummaries(
           payrollRegion: tenant.payroll_region,
           pendingFailedRecords,
           syncPausedAt: tenant.sync_paused_at,
-          tenantName: tenant.tenant_name ?? tenant.xero_tenant_id,
+          tenantName: tenant.tenant_name ?? tenant.id,
           totalRunsLast30Days,
-          xeroTenantId: tenant.id,
         };
       }),
     };
@@ -448,11 +441,14 @@ export async function listTenantSummaries(
     return unknownError("Failed to load sync tenant summaries.");
   }
 }
-
-export async function listRuns(
-  input: z.input<typeof ListRunsSchema>
-): Promise<
-  Result<{ nextCursor: string | null; runs: RunListItem[] }, SyncMonitorError>
+export async function listRuns(input: z.input<typeof ListRunsSchema>): Promise<
+  Result<
+    {
+      nextCursor: string | null;
+      runs: RunListItem[];
+    },
+    SyncMonitorError
+  >
 > {
   const parsed = ListRunsSchema.safeParse(input);
   if (!parsed.success) {
@@ -461,7 +457,6 @@ export async function listRuns(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
     const pageSize = parsed.data.pagination?.pageSize ?? 50;
     const cursor = decodeCursor(parsed.data.pagination?.cursor ?? null);
@@ -469,7 +464,7 @@ export async function listRuns(
     const rows = await database.syncRun.findMany({
       include: {
         _count: { select: { failed_records: true } },
-        xero_tenant: { select: { id: true, tenant_name: true } },
+        xero_connection: { select: { id: true, tenant_name: true } },
       },
       orderBy: [{ started_at: "desc" }, { id: "desc" }],
       take: pageSize + 1,
@@ -479,7 +474,6 @@ export async function listRuns(
     const people = await loadTriggeredByPeople(parsed.data, page);
     const runs = page.map((run) => toRunListItem(run, people));
     const last = page.at(-1);
-
     return {
       ok: true,
       value: {
@@ -494,7 +488,6 @@ export async function listRuns(
     return unknownError("Failed to load sync run history.");
   }
 }
-
 export async function getRunDetail(
   input: z.input<typeof GetRunDetailSchema>
 ): Promise<Result<RunDetail, SyncMonitorError>> {
@@ -505,12 +498,11 @@ export async function getRunDetail(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
     const run = await database.syncRun.findFirst({
       include: {
         _count: { select: { failed_records: true } },
-        xero_tenant: { select: { id: true, tenant_name: true } },
+        xero_connection: { select: { id: true, tenant_name: true } },
       },
       where: {
         ...scoped(parsed.data),
@@ -520,7 +512,6 @@ export async function getRunDetail(
     if (!run) {
       return await runNotFound(parsed.data);
     }
-
     const [people, failedRecords, timeline] = await Promise.all([
       loadTriggeredByPeople(parsed.data, [run]),
       database.failedRecord.findMany({
@@ -557,7 +548,6 @@ export async function getRunDetail(
         },
       }),
     ]);
-
     const failurePage = failedRecords.slice(0, DETAIL_PAGE_SIZE);
     const timelinePage = timeline.slice(0, DETAIL_PAGE_SIZE);
     return {
@@ -586,7 +576,6 @@ export async function getRunDetail(
     return unknownError("Failed to load sync run detail.");
   }
 }
-
 export async function listRunFailedRecords(
   input: z.input<typeof DetailPageSchema>
 ): Promise<Result<RunDetailPage, SyncMonitorError>> {
@@ -644,7 +633,6 @@ export async function listRunFailedRecords(
     return unknownError("Failed to load failed records.");
   }
 }
-
 export async function listRunTimeline(
   input: z.input<typeof DetailPageSchema>
 ): Promise<Result<TimelinePage, SyncMonitorError>> {
@@ -696,10 +684,16 @@ export async function listRunTimeline(
     return unknownError("Failed to load sync timeline.");
   }
 }
-
 export async function getRedactedFailedRecordPayload(
   input: z.input<typeof GetRawFailureSchema>
-): Promise<Result<{ payload: unknown }, SyncMonitorError>> {
+): Promise<
+  Result<
+    {
+      payload: unknown;
+    },
+    SyncMonitorError
+  >
+> {
   const parsed = GetRawFailureSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -744,12 +738,15 @@ export async function getRedactedFailedRecordPayload(
     return unknownError("Failed to load failed record payload.");
   }
 }
-
 export async function dispatchManualSync(
   input: z.input<typeof DispatchManualSyncSchema>
 ): Promise<
   Result<
-    { eventName: string; queued: boolean; reason?: string },
+    {
+      eventName: string;
+      queued: boolean;
+      reason?: string;
+    },
     SyncMonitorError
   >
 > {
@@ -760,28 +757,17 @@ export async function dispatchManualSync(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
-    const tenant = await database.xeroTenant.findFirst({
-      include: {
-        xero_connection: {
-          select: {
-            disconnected_at: true,
-            last_refreshed_at: true,
-            revoked_at: true,
-            status: true,
-          },
-        },
-      },
+    const tenant = await database.xeroConnection.findFirst({
+      include: { authorisation: { select: { last_refreshed_at: true } } },
       where: {
         ...scoped(parsed.data),
-        id: parsed.data.xeroTenantId,
+        id: parsed.data.connectionId,
       },
     });
     if (!tenant) {
       return await tenantNotFound(parsed.data);
     }
-
     const eventName = syncEventNames[parsed.data.runType];
     if (tenant.sync_paused_at) {
       return {
@@ -803,7 +789,6 @@ export async function dispatchManualSync(
         },
       };
     }
-
     const stateResult = await getXeroConnectionStateForScope(parsed.data);
     if (!stateResult.ok) {
       return {
@@ -815,10 +800,7 @@ export async function dispatchManualSync(
         ok: false,
       };
     }
-    if (
-      stateResult.value.state === "disconnect_pending" ||
-      stateResult.value.state === "reauthorisation_required"
-    ) {
+    if (stateResult.value.state === "reauthorisation_required") {
       return {
         error: {
           code: "connection_not_active",
@@ -827,10 +809,7 @@ export async function dispatchManualSync(
         ok: false,
       };
     }
-    if (
-      stateResult.value.state !== "connected" ||
-      stateResult.value.bindingGeneration === null
-    ) {
+    if (stateResult.value.state !== "connected") {
       return {
         ok: true,
         value: {
@@ -840,15 +819,13 @@ export async function dispatchManualSync(
         },
       };
     }
-
     const dispatched = await dispatchSyncEvent({
-      bindingGeneration: stateResult.value.bindingGeneration,
       clerkOrgId: parsed.data.clerkOrgId,
+      connectionId: parsed.data.connectionId,
       organisationId: parsed.data.organisationId,
       runType: parsed.data.runType,
       triggeredByUserId: parsed.data.actingUserId,
       triggerType: "manual",
-      xeroTenantId: parsed.data.xeroTenantId,
     });
     if (!dispatched.ok) {
       return {
@@ -862,22 +839,20 @@ export async function dispatchManualSync(
         ok: false,
       };
     }
-
     await database.auditEvent.create({
       data: {
         ...auditBase(parsed.data, parsed.data.actingUserId),
         action: "sync.manual_dispatched",
         payload: {
           actingUserId: parsed.data.actingUserId,
+          connectionId: parsed.data.connectionId,
           eventName,
           runType: parsed.data.runType,
-          xeroTenantId: parsed.data.xeroTenantId,
         },
-        resource_id: parsed.data.xeroTenantId,
+        resource_id: parsed.data.connectionId,
         resource_type: "xero_tenant",
       },
     });
-
     return {
       ok: true,
       value: { eventName, queued: true },
@@ -886,10 +861,17 @@ export async function dispatchManualSync(
     return unknownError("Failed to dispatch the manual sync.");
   }
 }
-
 export async function exportFailedRecordsCsv(
   input: z.input<typeof ExportFailedRecordsCsvSchema>
-): Promise<Result<{ csvContent: string; filename: string }, SyncMonitorError>> {
+): Promise<
+  Result<
+    {
+      csvContent: string;
+      filename: string;
+    },
+    SyncMonitorError
+  >
+> {
   const parsed = ExportFailedRecordsCsvSchema.safeParse(input);
   if (!parsed.success) {
     return validationError(parsed.error);
@@ -897,7 +879,6 @@ export async function exportFailedRecordsCsv(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
     const run = await database.syncRun.findFirst({
       select: { id: true },
@@ -909,7 +890,6 @@ export async function exportFailedRecordsCsv(
     if (!run) {
       return await runNotFound(parsed.data);
     }
-
     const failedRecords = await database.failedRecord.findMany({
       orderBy: { created_at: "asc" },
       select: {
@@ -954,7 +934,6 @@ export async function exportFailedRecordsCsv(
       ],
       ...rows,
     ]);
-
     await database.auditEvent.create({
       data: {
         ...auditBase(parsed.data, parsed.data.actingUserId),
@@ -968,7 +947,6 @@ export async function exportFailedRecordsCsv(
         resource_type: "sync_run",
       },
     });
-
     return {
       ok: true,
       value: {
@@ -980,12 +958,14 @@ export async function exportFailedRecordsCsv(
     return unknownError("Failed to export failed records.");
   }
 }
-
 export async function cancelRun(
   input: z.input<typeof CancelRunSchema>
 ): Promise<
   Result<
-    { cancellationRequested: true; eventQueued: boolean },
+    {
+      cancellationRequested: true;
+      eventQueued: boolean;
+    },
     SyncMonitorError
   >
 > {
@@ -996,7 +976,6 @@ export async function cancelRun(
   if (!canUseSyncMonitor(parsed.data.actingRole)) {
     return notAuthorised();
   }
-
   try {
     const run = await database.syncRun.findFirst({
       select: { id: true },
@@ -1009,7 +988,6 @@ export async function cancelRun(
     if (!run) {
       return await runNotFound(parsed.data);
     }
-
     await database.syncRun.update({
       data: { cancel_requested_at: new Date() },
       where: { id: run.id },
@@ -1032,7 +1010,6 @@ export async function cancelRun(
         resource_type: "sync_run",
       },
     });
-
     return {
       ok: true,
       value: { cancellationRequested: true, eventQueued: queued.ok },
@@ -1041,11 +1018,9 @@ export async function cancelRun(
     return unknownError("Failed to request sync cancellation.");
   }
 }
-
 function canUseSyncMonitor(role: SyncMonitorRole): boolean {
   return role === "admin" || role === "owner";
 }
-
 function auditBase(input: BaseInput, actingUserId: string) {
   return {
     actor_user_id: actingUserId,
@@ -1053,28 +1028,28 @@ function auditBase(input: BaseInput, actingUserId: string) {
     organisation_id: input.organisationId,
   };
 }
-
 function connectionStatus(
   connection: {
     disconnected_at: Date | null;
-    last_refreshed_at: Date | null;
     status?: string;
-    revoked_at: Date | null;
   },
   state: import("@repo/core").XeroConnectionDisplayState
 ): TenantSummary["connectionStatus"] {
-  if (state === "unavailable" || state === "disconnect_pending") {
+  if (state === "unavailable") {
     return state;
   }
-  if (connection.revoked_at) {
-    return "revoked";
+
+  if (
+    state === "reauthorisation_required" ||
+    connection.status === "reconnect_required"
+  ) {
+    return "reconnect_required";
   }
-  if (state === "reauthorisation_required" || connection.status === "stale") {
-    return "expired";
+  if (connection.status === "disconnected") {
+    return "disconnected";
   }
   return state === "connected" ? "active" : "not_configured";
 }
-
 function latestCompletedRunAt(
   runs: Array<{
     completed_at: Date | null;
@@ -1092,7 +1067,6 @@ function latestCompletedRunAt(
     )?.completed_at ?? null
   );
 }
-
 function latestCompletedRunsByType<
   T extends {
     run_type: SyncRunType;
@@ -1101,7 +1075,6 @@ function latestCompletedRunsByType<
   },
 >(runs: T[]): T[] {
   const latestRuns = new Map<SyncRunType, T>();
-
   for (const run of runs) {
     if (run.status === "cancelled" || run.status === "running") {
       continue;
@@ -1112,27 +1085,23 @@ function latestCompletedRunsByType<
     }
     latestRuns.set(run.run_type, run);
   }
-
   return [...latestRuns.values()];
 }
-
 function isSuccessStatus(status: SyncRunStatus): boolean {
   return SUCCESS_STATUSES.includes(status);
 }
-
 function daysAgo(days: number): Date {
   const date = new Date();
   date.setDate(date.getDate() - days);
   return date;
 }
-
 function nonNullRows<T>(rows: Array<T | null>): T[] {
   return rows.filter((row): row is T => row !== null);
 }
-
-function decodeCursor(
-  cursor: string | null
-): { id: string; startedAt: Date } | null {
+function decodeCursor(cursor: string | null): {
+  id: string;
+  startedAt: Date;
+} | null {
   if (!cursor) {
     return null;
   }
@@ -1148,21 +1117,19 @@ function decodeCursor(
     return null;
   }
 }
-
 const CursorSchema = z.object({
   id: z.string().uuid(),
   startedAt: z.coerce.date(),
 });
-
 function encodeCursor(input: { id: string; startedAt: Date }): string {
   return Buffer.from(
     JSON.stringify({ id: input.id, startedAt: input.startedAt.toISOString() })
   ).toString("base64url");
 }
-
-function decodeCreatedCursor(
-  cursor: string | null
-): { createdAt: Date; id: string } | null {
+function decodeCreatedCursor(cursor: string | null): {
+  createdAt: Date;
+  id: string;
+} | null {
   if (!cursor) {
     return null;
   }
@@ -1177,13 +1144,16 @@ function decodeCreatedCursor(
     return null;
   }
 }
-
 const CreatedCursorSchema = z.object({
   createdAt: z.coerce.date(),
   id: z.string().uuid(),
 });
-
-function createdCursorWhere(cursor: { createdAt: Date; id: string } | null) {
+function createdCursorWhere(
+  cursor: {
+    createdAt: Date;
+    id: string;
+  } | null
+) {
   return cursor
     ? {
         OR: [
@@ -1193,9 +1163,11 @@ function createdCursorWhere(cursor: { createdAt: Date; id: string } | null) {
       }
     : {};
 }
-
 function pageCursor(
-  rows: Array<{ created_at: Date; id: string }>,
+  rows: Array<{
+    created_at: Date;
+    id: string;
+  }>,
   pageSize: number
 ): string | null {
   if (rows.length <= pageSize) {
@@ -1209,10 +1181,12 @@ function pageCursor(
     JSON.stringify({ createdAt: last.created_at.toISOString(), id: last.id })
   ).toString("base64url");
 }
-
 function runWhere(
   input: ListRunsInput,
-  cursor: { id: string; startedAt: Date } | null
+  cursor: {
+    id: string;
+    startedAt: Date;
+  } | null
 ) {
   const filters = input.filters ?? {};
   return {
@@ -1224,8 +1198,8 @@ function runWhere(
     ...(filters.triggerType?.length
       ? { trigger_type: { in: filters.triggerType } }
       : {}),
-    ...(filters.xeroTenantId?.length
-      ? { xero_tenant_id: { in: filters.xeroTenantId } }
+    ...(filters.connectionId?.length
+      ? { xero_connection_id: { in: filters.connectionId } }
       : {}),
     ...(cursor
       ? {
@@ -1237,9 +1211,11 @@ function runWhere(
       : {}),
   };
 }
-
 async function loadTriggeredByPeople(
-  input: { clerkOrgId: string; organisationId: string },
+  input: {
+    clerkOrgId: string;
+    organisationId: string;
+  },
   runs: Array<{
     trigger_type: SyncTriggerType;
     triggered_by_user_id: string | null;
@@ -1281,10 +1257,11 @@ async function loadTriggeredByPeople(
     )
   );
 }
-
 function toRunListItem(
   run: {
-    _count: { failed_records: number };
+    _count: {
+      failed_records: number;
+    };
     completed_at: Date | null;
     error_summary: string | null;
     id: string;
@@ -1297,13 +1274,17 @@ function toRunListItem(
     status: SyncRunStatus;
     trigger_type: SyncTriggerType;
     triggered_by_user_id: string | null;
-    xero_tenant: { id: string; tenant_name: string | null } | null;
-    xero_tenant_id: string | null;
+    xero_connection: {
+      id: string;
+      tenant_name: string | null;
+    } | null;
+    xero_connection_id: string | null;
   },
   people: Map<string, string>
 ): RunListItem {
   return {
     completedAt: run.completed_at,
+    connectionId: run.xero_connection_id,
     durationSeconds: run.completed_at
       ? Math.max(
           0,
@@ -1323,16 +1304,16 @@ function toRunListItem(
     startedAt: run.started_at,
     status: run.status,
     tenantName:
-      run.xero_tenant?.tenant_name ?? run.xero_tenant_id ?? "Unknown tenant",
+      run.xero_connection?.tenant_name ??
+      run.xero_connection_id ??
+      "Unknown tenant",
     triggeredByUserDisplay:
       run.trigger_type === "scheduled"
         ? "System"
         : (people.get(run.triggered_by_user_id ?? "") ?? "User"),
     triggerType: run.trigger_type,
-    xeroTenantId: run.xero_tenant_id,
   };
 }
-
 async function runNotFound(
   input: GetRunDetailInput | ExportFailedRecordsCsvInput | CancelRunInput
 ): Promise<Result<never, SyncMonitorError>> {
@@ -1360,16 +1341,15 @@ async function runNotFound(
     ok: false,
   };
 }
-
 async function tenantNotFound(
   input: DispatchManualSyncInput
 ): Promise<Result<never, SyncMonitorError>> {
-  const existing = await database.xeroTenant.findUnique({
+  const existing = await database.xeroConnection.findUnique({
     select: {
       clerk_org_id: true,
       organisation_id: true,
     },
-    where: { id: input.xeroTenantId },
+    where: { id: input.connectionId },
   });
   if (
     existing &&
@@ -1379,7 +1359,7 @@ async function tenantNotFound(
     log.error("Cross-tenant resource access attempt", {
       actingClerkOrgId: input.clerkOrgId,
       actingOrganisationId: input.organisationId,
-      resourceId: input.xeroTenantId,
+      resourceId: input.connectionId,
       resourceType: "xero_tenant",
     });
   }
@@ -1388,22 +1368,18 @@ async function tenantNotFound(
     ok: false,
   };
 }
-
 function toCsv(rows: string[][]): string {
   return `${rows.map((row) => row.map(escapeCsvField).join(",")).join("\r\n")}\r\n`;
 }
-
 function escapeCsvField(value: string): string {
   if (CSV_ESCAPE_PATTERN.test(value)) {
     return `"${value.replaceAll('"', '""')}"`;
   }
   return value;
 }
-
 function dateStamp(date: Date): string {
   return date.toISOString().slice(0, 10).replaceAll("-", "");
 }
-
 function validationError(error: z.ZodError): Result<never, SyncMonitorError> {
   return {
     error: {
@@ -1413,20 +1389,17 @@ function validationError(error: z.ZodError): Result<never, SyncMonitorError> {
     ok: false,
   };
 }
-
 function validationErrorMessage(
   message: string
 ): Result<never, SyncMonitorError> {
   return { error: { code: "validation_error", message }, ok: false };
 }
-
 function runNotFoundResult(): Result<never, SyncMonitorError> {
   return {
     error: { code: "run_not_found", message: "Sync run not found." },
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, SyncMonitorError> {
   return {
     error: {
@@ -1436,7 +1409,6 @@ function notAuthorised(): Result<never, SyncMonitorError> {
     ok: false,
   };
 }
-
 function unknownError(message: string): Result<never, SyncMonitorError> {
   return {
     error: { code: "unknown_error", message },

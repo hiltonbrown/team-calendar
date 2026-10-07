@@ -577,7 +577,7 @@ async function transferCandidateBalancesAndScopes(
   for (const cb of candidateBalances) {
     const isConflict = xeroBalances.some(
       (xb) =>
-        xb.xero_tenant_id === cb.xero_tenant_id &&
+        xb.xero_connection_id === cb.xero_connection_id &&
         xb.leave_type_xero_id === cb.leave_type_xero_id
     );
     if (isConflict) {

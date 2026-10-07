@@ -25,17 +25,19 @@ import type {
   WithdrawLeaveApplicationInput,
   XeroWriteResult,
 } from "./types";
-
 export async function submitLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: SubmitLeaveApplicationInput
 ): Promise<
-  XeroWriteResult<{ rawResponse: unknown; xeroLeaveApplicationId: string }>
+  XeroWriteResult<{
+    rawResponse: unknown;
+    xeroLeaveApplicationId: string;
+  }>
 > {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await submitAuLeaveApplication(nextInput);
@@ -50,15 +52,18 @@ export async function submitLeaveApplicationForRegion(
     true
   );
 }
-
 export async function approveLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: ApproveLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await approveAuLeaveApplication(nextInput);
@@ -73,15 +78,18 @@ export async function approveLeaveApplicationForRegion(
     true
   );
 }
-
 export async function declineLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: DeclineLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await declineAuLeaveApplication(nextInput);
@@ -96,15 +104,18 @@ export async function declineLeaveApplicationForRegion(
     true
   );
 }
-
 export async function withdrawLeaveApplicationForRegion(
   payrollRegion: PayrollRegion | string,
   input: WithdrawLeaveApplicationInput
-): Promise<XeroWriteResult<{ rawResponse: unknown }>> {
+): Promise<
+  XeroWriteResult<{
+    rawResponse: unknown;
+  }>
+> {
   return await executeWithXeroAuthRecovery(
-    input.xeroTenant,
-    async (xeroTenant) => {
-      const nextInput = { ...input, xeroTenant };
+    input.xeroConnection,
+    async (xeroConnection) => {
+      const nextInput = { ...input, xeroConnection };
       switch (payrollRegion) {
         case "AU":
           return await withdrawAuLeaveApplication(nextInput);
@@ -119,7 +130,6 @@ export async function withdrawLeaveApplicationForRegion(
     true
   );
 }
-
 function unsupportedRegion(): XeroWriteResult<never> {
   return {
     error: {

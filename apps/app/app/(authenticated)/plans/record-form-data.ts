@@ -1,6 +1,5 @@
 import { toXeroConnectionDisplayState } from "@repo/core";
 import "server-only";
-
 import { auth, currentUser } from "@repo/auth/server";
 import {
   getRecord,
@@ -21,14 +20,12 @@ interface LoadPlanFormDataInput {
   recordId?: string;
   startsAt?: string;
 }
-
 const PrefillStartSchema = z.union([
   z.iso.date(),
   z.iso
     .datetime({ local: true, precision: -1 })
     .refine((value) => !value.endsWith("Z")),
 ]);
-
 export async function loadPlanFormData({
   org,
   personId,
@@ -40,7 +37,6 @@ export async function loadPlanFormData({
   if (!user) {
     redirect("/");
   }
-
   const { clerkOrgId, organisationId, orgQueryValue } =
     await requireActiveOrgPageContext(org);
   const currentPerson = await database.person.findFirst({
@@ -56,7 +52,6 @@ export async function loadPlanFormData({
       clerk_user_id: user.id,
     },
   });
-
   const canSelectPerson =
     orgRole === "org:admin" ||
     orgRole === "org:owner" ||
@@ -92,7 +87,6 @@ export async function loadPlanFormData({
   } else if (currentPerson) {
     people = [currentPerson];
   }
-
   const xeroStateResult = await getXeroConnectionStateForScope({
     clerkOrgId,
     organisationId,
@@ -107,11 +101,9 @@ export async function loadPlanFormData({
         recordId,
       })
     : null;
-
   if (recordResult && !recordResult.ok) {
     notFound();
   }
-
   const organisation = await database.organisation.findFirst({
     select: { timezone: true },
     where: { archived_at: null, clerk_org_id: clerkOrgId, id: organisationId },
@@ -127,7 +119,6 @@ export async function loadPlanFormData({
       personId,
       startsAt,
     });
-
   const balancePersonId = prefillRecord?.personId ?? people[0]?.id;
   const balanceRecordType = prefillRecord?.recordType ?? "annual_leave";
   const balance =
@@ -146,7 +137,6 @@ export async function loadPlanFormData({
           },
         })
       : null;
-
   return {
     balanceAvailable: balance ? Number(balance.balance) : null,
     balanceCurrencyCode: balance?.currency_code ?? null,
@@ -164,13 +154,14 @@ export async function loadPlanFormData({
     xeroConnectionState,
   };
 }
-
 function createPrefillRecord({
   people,
   personId,
   startsAt,
 }: {
-  people: Array<{ id: string }>;
+  people: Array<{
+    id: string;
+  }>;
   personId?: string;
   startsAt?: string;
 }) {
@@ -197,9 +188,13 @@ function createPrefillRecord({
     startTime,
   };
 }
-
 function toEditableRecord(
-  record: Extract<Awaited<ReturnType<typeof getRecord>>, { ok: true }>["value"],
+  record: Extract<
+    Awaited<ReturnType<typeof getRecord>>,
+    {
+      ok: true;
+    }
+  >["value"],
   timezone: string
 ) {
   const displayTimezone = record.allDay ? "UTC" : timezone;

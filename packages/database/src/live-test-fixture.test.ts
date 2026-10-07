@@ -16,15 +16,12 @@ const manifestPath = join(
   process.env.TMPDIR ?? "/tmp",
   `team-calendar-live-fixture-${process.pid}.json`
 );
-
 const organisationIds = Array.from(
   { length: REQUIRED_LIVE_FIXTURE_TENANT_SLOTS },
   (_, index) => `00000000-0000-4000-8000-${index.toString().padStart(12, "0")}`
 );
 const clerkOrgIds = organisationIds.map((_, index) => `org_release_${index}`);
-
 const environment = { ...process.env };
-
 const configureEnvironment = () => {
   delete process.env.TC_SOURCE_GATES;
   Object.assign(process.env, {
@@ -37,11 +34,9 @@ const configureEnvironment = () => {
     TC_RELEASE_RUN_ID: runId,
   });
 };
-
 afterEach(() => {
   process.env = { ...environment };
 });
-
 describe("live fixture registry", () => {
   it("allocates disjoint exact manifest slots for every reviewed suite", () => {
     writeFileSync(
@@ -53,11 +48,6 @@ describe("live fixture registry", () => {
         owned: {
           clerkOrgIds,
           globalKeys: [
-            ...Array.from(
-              { length: 13 },
-              (_, index) =>
-                `campaign_domain:11111111-1111-4111-8111-${String(index).padStart(12, "0")}`
-            ),
             ...Array.from(
               { length: 7 },
               (_, index) =>
@@ -73,31 +63,11 @@ describe("live fixture registry", () => {
             ),
             ...Array.from(
               { length: 6 },
-              (_, index) => `credential_owner:owner_release_${index}`
+              (_, index) => `authorisation:owner_release_${index}`
             ),
             ...Array.from(
               { length: 10 },
               (_, index) => `provider_app:app_release_${index}`
-            ),
-            ...Array.from(
-              { length: 25 },
-              (_, index) => `provider_connection:connection_release_${index}`
-            ),
-            ...Array.from(
-              { length: 3 },
-              (_, index) => `tenant_binding:binding_release_${index}`
-            ),
-            ...Array.from(
-              { length: 2 },
-              (_, index) => `oauth_attempt:oauth_release_${index}`
-            ),
-            ...Array.from(
-              { length: 40 },
-              (_, index) => `cleanup_request:request_release_${index}`
-            ),
-            ...Array.from(
-              { length: 40 },
-              (_, index) => `cleanup_attempt:attempt_release_${index}`
             ),
             ...Array.from(
               { length: 2 },
@@ -117,7 +87,6 @@ describe("live fixture registry", () => {
       })
     );
     configureEnvironment();
-
     const allocations = Object.keys(LIVE_FIXTURE_SUITES).map((suite) =>
       allocateLiveTestFixture(suite as keyof typeof LIVE_FIXTURE_SUITES)
     );
@@ -127,8 +96,7 @@ describe("live fixture registry", () => {
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(24);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
@@ -165,7 +133,6 @@ describe("live fixture registry", () => {
       "does not own"
     );
   });
-
   it("rejects a manifest without the complete disjoint allocation", () => {
     writeFileSync(
       manifestPath,
@@ -189,14 +156,12 @@ describe("live fixture registry", () => {
       })
     );
     configureEnvironment();
-
     expect(() =>
       allocateLiveTestFixture(
         "packages/database/availability_records.integration.test.ts"
       )
     ).toThrow("disjoint tenant slots");
   });
-
   it("rejects duplicate durable global ownership keys", () => {
     writeFileSync(
       manifestPath,
@@ -220,14 +185,12 @@ describe("live fixture registry", () => {
       })
     );
     configureEnvironment();
-
     expect(() =>
       allocateLiveTestFixture(
         "packages/database/availability_records.integration.test.ts"
       )
     ).toThrow("ownership slots must be unique");
   });
-
   it("rejects an unregistered suite", () => {
     configureEnvironment();
     expect(() =>
@@ -236,18 +199,15 @@ describe("live fixture registry", () => {
       )
     ).toThrow("not in the protected registry");
   });
-
   it("keeps global ownership kind-qualified during cleanup selection", () => {
     const manifestGlobalKeys = [
       "provider_app:shared-identifier",
-      "cleanup_request:owned-request",
       "shared_store_namespace:owned-store",
     ];
-
     expect(
       selectOwnedGlobalKeyValues({
         candidates: ["shared-identifier", "foreign-identifier"],
-        kind: "credential_owner",
+        kind: "authorisation",
         manifestGlobalKeys,
       })
     ).toEqual([]);
@@ -258,7 +218,6 @@ describe("live fixture registry", () => {
         manifestGlobalKeys,
       })
     ).toEqual(["shared-identifier"]);
-
     for (const kind of LIVE_FIXTURE_GLOBAL_KEY_KINDS.slice(3)) {
       const ownedValue = `owned-${kind}`;
       expect(
@@ -270,7 +229,6 @@ describe("live fixture registry", () => {
       ).toEqual([ownedValue]);
     }
   });
-
   it("rejects an allocation when a colliding identifier is owned under another kind", () => {
     writeFileSync(
       manifestPath,
@@ -290,26 +248,6 @@ describe("live fixture registry", () => {
             "provider_app:shared-identifier",
             "provider_app:app-2",
             ...Array.from(
-              { length: 25 },
-              (_, index) => `provider_connection:connection-${index}`
-            ),
-            ...Array.from(
-              { length: 3 },
-              (_, index) => `tenant_binding:binding-${index}`
-            ),
-            ...Array.from(
-              { length: 2 },
-              (_, index) => `oauth_attempt:oauth-${index}`
-            ),
-            ...Array.from(
-              { length: 40 },
-              (_, index) => `cleanup_request:request-${index}`
-            ),
-            ...Array.from(
-              { length: 40 },
-              (_, index) => `cleanup_attempt:attempt-${index}`
-            ),
-            ...Array.from(
               { length: 2 },
               (_, index) => `shared_store_namespace:store-${index}`
             ),
@@ -327,14 +265,12 @@ describe("live fixture registry", () => {
       })
     );
     configureEnvironment();
-
     expect(() =>
       allocateLiveTestFixture(
-        "packages/database/xero-lifecycle-migration.integration.test.ts"
+        "packages/xero/src/oauth/service.integration.test.ts"
       )
-    ).toThrow("credential_owner");
+    ).toThrow("authorisation");
   });
-
   it("allocates disjoint deterministic slots for every suite in local database mode", () => {
     delete process.env.TC_SOURCE_GATES;
     delete process.env.TC_RELEASE_MANIFEST;
@@ -346,7 +282,6 @@ describe("live fixture registry", () => {
         "postgresql://postgres:postgres@localhost:5432/team-calendar_test",
       NODE_ENV: "test",
     });
-
     const allocations = Object.keys(LIVE_FIXTURE_SUITES).map((suite) =>
       allocateLiveTestFixture(suite as keyof typeof LIVE_FIXTURE_SUITES)
     );
@@ -356,14 +291,12 @@ describe("live fixture registry", () => {
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(28);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(24);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
       allocatedOrganisationIds.length
     );
-
     const allocatedGlobalKeys = allocations.flatMap((allocation) => {
       const specification = LIVE_FIXTURE_SUITES[allocation.suite] as {
         globalKeys?: Partial<
@@ -379,8 +312,9 @@ describe("live fixture registry", () => {
     });
     expect(new Set(allocatedGlobalKeys).size).toBe(allocatedGlobalKeys.length);
     expect(allocations[0]?.id("person")).toMatch(fixtureUuidPattern);
-    expect(allocations[0]?.tenants[0]?.organisationId).toMatch(
-      fixtureUuidPattern
-    );
+    expect(
+      allocations.find((item) => item.tenants.length > 0)?.tenants[0]
+        ?.organisationId
+    ).toMatch(fixtureUuidPattern);
   });
 });

@@ -1,924 +1,611 @@
 // biome-ignore-all lint/style/useFilenamingConvention: Integration tests use the repository's .integration.test.ts convention.
-
-import {
-  initialiseLiveCampaignFixture,
-  isProtectedLiveRun,
-} from "@repo/database/live-campaign-fixture";
 import { allocateLiveTestFixture } from "@repo/database/live-test-fixture";
-import { xeroCampaignStoreCredentials } from "@repo/database/xero-campaign-store";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
-vi.hoisted(() => {
-  process.env.XERO_CLIENT_ID = "integration-client-id";
-  process.env.XERO_CLIENT_SECRET = "integration-client-secret";
+vi.mock("server-only", () => ({}));
+vi.mock("@repo/feeds", () => ({
+  ensureDefaultCalendarFeed: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+}));
+vi.mock("@repo/availability", () => ({
+  ensureDefaultPublicHolidaysForOrganisation: vi
+    .fn()
+    .mockResolvedValue({ ok: true, value: {} }),
+}));
+const identity = vi.hoisted(() => ({ verify: vi.fn() }));
+vi.mock("./identity", () => ({
+  verifyXeroAccessTokenIdentity: identity.verify,
+}));
+const allocation = allocateLiveTestFixture(
+  "packages/xero/src/oauth/service.integration.test.ts"
+);
+const primary = requireTenant(0);
+const secondary = requireTenant(1);
+function requireTenant(index: number) {
+  const slot = allocation.tenants[index];
+  if (!slot) {
+    throw new Error("Missing owned integration fixture slot");
+  }
+  return slot;
+}
+const fixture = {
+  ...primary,
+  authorisationId: allocation.id("authorisation"),
+  connectionId: allocation.id("connection"),
+  externalId: allocation.id("external"),
+  remoteId: allocation.id("remote"),
+  sessionId: allocation.id("session"),
+};
+const ownedScopes = {
+  clerk_org_id: { in: allocation.tenants.map((t) => t.clerkOrgId) },
+};
+const ownedGrants = [
+  fixture.authorisationId,
+  allocation.id("authorisation", 1),
+];
+const originalEnv = { ...process.env };
+let database: typeof import("@repo/database")["database"];
+let crypto: typeof import("../crypto/tokens");
+let service: typeof import("./service");
+let reencryptXeroTokens: typeof import("./reencrypt-tokens")["reencryptXeroTokens"];
+beforeAll(async () => {
+  process.env.XERO_CLIENT_ID = allocation.globalKey("provider_app");
+  process.env.XERO_CLIENT_SECRET = "integration-secret";
   process.env.XERO_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString(
     "base64"
   );
+  ({ database } = await import("@repo/database"));
+  crypto = await import("../crypto/tokens");
+  service = await import("./service");
+  ({ reencryptXeroTokens } = await import("./reencrypt-tokens"));
 });
-
-vi.mock("server-only", () => ({}));
-
-const FIXTURE_TRAILING_SLASHES = /\/+$/;
-
-describe.skipIf(!isProtectedLiveRun())("protected campaign integration", () => {
-  if (!isProtectedLiveRun()) {
-    it.skip("requires the protected live runner", () => {
-      /* Collection does not allocate fixtures outside protected runs. */
-    });
+beforeEach(async () => {
+  await clean();
+  vi.resetAllMocks();
+  process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION = "1";
+  delete process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
+  identity.verify.mockResolvedValue({
+    ok: true,
+    value: {
+      authEventId: null,
+      expiresAt: new Date(Date.now() + 1_800_000),
+      grantedScopes: ["payroll.employees"],
+      xeroUserId: allocation.id("xero-user"),
+    },
+  });
+});
+afterEach(() => vi.unstubAllGlobals());
+afterAll(async () => {
+  await clean();
+  await database.$disconnect();
+  process.env = { ...originalEnv };
+});
+async function clean() {
+  if (!database) {
     return;
   }
-
-  type CryptoModule = typeof import("../crypto/tokens");
-  type DatabaseModule = typeof import("@repo/database");
-  type ServiceModule = typeof import("./service");
-
-  let reencryptXeroTokens: typeof import("./reencrypt-tokens")["reencryptXeroTokens"];
-  let database: DatabaseModule["database"];
-  let decryptXeroToken: CryptoModule["decryptXeroToken"];
-  let encryptXeroToken: CryptoModule["encryptXeroToken"];
-  let completeXeroTenantSelection: ServiceModule["completeXeroTenantSelection"];
-  let disconnectXeroOAuthConnection: ServiceModule["disconnectXeroOAuthConnection"];
-  let ensureFreshXeroConnection: ServiceModule["ensureFreshXeroConnection"];
-  let scrubInactiveXeroOAuthSessionCredentials: ServiceModule["scrubInactiveXeroOAuthSessionCredentials"];
-
-  const allocation = allocateLiveTestFixture(
-    "packages/xero/src/oauth/service.integration.test.ts"
-  );
-  function requireFixtureTenant(index: number) {
-    const tenant = allocation.tenants[index];
-    if (!tenant) {
-      throw new Error(`Fixture tenant slot ${index} is missing`);
-    }
-    return tenant;
-  }
-
-  const primaryTenant = requireFixtureTenant(0);
-  const secondaryTenant = requireFixtureTenant(1);
-  const fixture = {
-    clerkOrgId: primaryTenant.clerkOrgId,
-    connectionId: allocation.id("connection"),
-    organisationId: primaryTenant.organisationId,
-    providerTenantId: allocation.id("provider-tenant", 0),
-    second: {
-      clerkOrgId: secondaryTenant.clerkOrgId,
-      connectionId: allocation.id("connection", 1),
-      organisationId: secondaryTenant.organisationId,
-      tenantId: allocation.id("tenant", 1),
+  await database.auditEvent.deleteMany({ where: ownedScopes });
+  await database.xeroOAuthSession.deleteMany({ where: ownedScopes });
+  await database.xeroSyncCursor.deleteMany({ where: ownedScopes });
+  await database.xeroConnection.deleteMany({ where: ownedScopes });
+  await database.organisation.deleteMany({ where: ownedScopes });
+  await database.xeroAuthorisation.deleteMany({
+    where: { id: { in: ownedGrants } },
+  });
+}
+function tokens(access = "expired-access-token", refresh = "refresh-token") {
+  const a = crypto.encryptXeroToken(access),
+    r = crypto.encryptXeroToken(refresh);
+  return {
+    access_token_auth_tag: a.authTag,
+    access_token_encrypted: a.encrypted,
+    access_token_iv: a.iv,
+    refresh_token_auth_tag: r.authTag,
+    refresh_token_encrypted: r.encrypted,
+    refresh_token_iv: r.iv,
+    token_encrypted_at: a.encryptedAt,
+    token_key_version: a.keyVersion,
+  };
+}
+async function grant(
+  expiresAt = new Date(Date.now() - 60_000),
+  id = fixture.authorisationId
+) {
+  return await database.xeroAuthorisation.create({
+    data: {
+      id,
+      provider_app_id: allocation.globalKey("provider_app"),
+      xero_user_id:
+        id === fixture.authorisationId
+          ? allocation.id("xero-user")
+          : allocation.id("xero-user", 1),
+      ...tokens(),
+      access_token_expires_at: expiresAt,
+      granted_scopes: ["payroll.employees"],
+      last_refreshed_at: new Date(),
     },
-    sessionId: allocation.id("session"),
-    tenantId: allocation.id("tenant"),
-  } as const;
-
-  describe("ensureFreshXeroConnection integration", () => {
-    beforeAll(async () => {
-      process.env.XERO_CLIENT_ID = allocation.globalKey("provider_app");
-      const [cryptoModule, databaseModule, serviceModule] = await Promise.all([
-        import("../crypto/tokens"),
-        import("@repo/database"),
-        import("./service"),
-      ]);
-      ({ reencryptXeroTokens } = await import("./reencrypt-tokens"));
-      ({ database } = databaseModule);
-      ({ decryptXeroToken, encryptXeroToken } = cryptoModule);
-      ({
-        completeXeroTenantSelection,
-        disconnectXeroOAuthConnection,
-        ensureFreshXeroConnection,
-        scrubInactiveXeroOAuthSessionCredentials,
-      } = serviceModule);
-    });
-
-    afterAll(async () => {
-      vi.unstubAllGlobals();
-      vi.unstubAllEnvs();
-      await cleanTestData();
-      await database.$disconnect();
-    });
-
-    it("refreshes an expired connection while holding a Prisma advisory lock", async () => {
-      await cleanTestData();
-      const accessToken = encryptXeroToken("expired-access-token");
-      const refreshToken = encryptXeroToken("refresh-token");
-
-      await database.organisation.create({
-        data: {
-          clerk_org_id: fixture.clerkOrgId,
-          country_code: "AU",
-          id: fixture.organisationId,
-          name: "Xero refresh lock integration fixture",
-        },
-      });
-      await database.xeroConnection.create({
-        data: {
-          access_token_auth_tag: accessToken.authTag,
-          access_token_encrypted: accessToken.encrypted,
-          access_token_iv: accessToken.iv,
-          clerk_org_id: fixture.clerkOrgId,
-          expires_at: new Date(Date.now() - 60_000),
-          id: fixture.connectionId,
-          organisation_id: fixture.organisationId,
-          refresh_token_auth_tag: refreshToken.authTag,
-          refresh_token_encrypted: refreshToken.encrypted,
-          refresh_token_iv: refreshToken.iv,
-          status: "active",
-          token_encrypted_at: accessToken.encryptedAt,
-          token_key_version: accessToken.keyVersion,
-        },
-      });
-
-      const fetchSpy = vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            access_token: "new-access-token",
-            expires_in: 1800,
-            refresh_token: "new-refresh-token",
-          }),
+  });
+}
+async function organisation(slot = primary) {
+  return await database.organisation.create({
+    data: {
+      clerk_org_id: slot.clerkOrgId,
+      country_code: "AU",
+      id: slot.organisationId,
+      name: "Owned OAuth integration payroll",
+    },
+  });
+}
+async function connection() {
+  await organisation();
+  await grant();
+  return database.xeroConnection.create({
+    data: {
+      clerk_org_id: fixture.clerkOrgId,
+      id: fixture.connectionId,
+      organisation_id: fixture.organisationId,
+      payroll_region: "AU",
+      remote_connection_id: fixture.remoteId,
+      tenant_name: "Payroll",
+      xero_authorisation_id: fixture.authorisationId,
+      xero_tenant_id: fixture.externalId,
+    },
+  });
+}
+const scope = () => ({
+  clerkOrgId: fixture.clerkOrgId,
+  connectionId: fixture.connectionId,
+  organisationId: fixture.organisationId,
+});
+function tokenResponse() {
+  return Response.json({
+    access_token: "new-access-token",
+    expires_in: 1800,
+    refresh_token: "new-refresh-token",
+    scope: "payroll.employees",
+  });
+}
+function tokenText(
+  row: Awaited<ReturnType<typeof grant>>,
+  prefix: "access" | "refresh"
+) {
+  return crypto.decryptXeroToken({
+    authTag: row[`${prefix}_token_auth_tag`],
+    encrypted: row[`${prefix}_token_encrypted`],
+    iv: row[`${prefix}_token_iv`],
+    keyVersion: row.token_key_version,
+  });
+}
+async function selection(
+  externalId = fixture.externalId,
+  organisationId: string | null = fixture.organisationId
+) {
+  if (
+    !(await database.xeroAuthorisation.findUnique({
+      where: { id: fixture.authorisationId },
+    }))
+  ) {
+    await grant(new Date(Date.now() + 1_800_000));
+  }
+  return database.xeroOAuthSession.create({
+    data: {
+      available_tenants_json: {
+        tenants: [
           {
-            headers: { "content-type": "application/json" },
-            status: 200,
-          }
-        )
-      );
-      vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
-
-      const result = await ensureFreshXeroConnection({
-        clerkOrgId: fixture.clerkOrgId,
-        connectionId: fixture.connectionId,
-        organisationId: fixture.organisationId,
-      });
-
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.value.refreshed).toBe(true);
-        expect(result.value.expiresAt.getTime()).toBeGreaterThan(Date.now());
-      }
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-
-      const persisted = await database.xeroConnection.findFirst({
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          expires_at: true,
-          last_error_code: true,
-          last_refreshed_at: true,
-          refresh_token_auth_tag: true,
-          refresh_token_encrypted: true,
-          refresh_token_iv: true,
-          status: true,
-          token_key_version: true,
-        },
-        where: {
-          clerk_org_id: fixture.clerkOrgId,
-          id: fixture.connectionId,
-          organisation_id: fixture.organisationId,
-        },
-      });
-      expect(persisted).toEqual(
-        expect.objectContaining({
-          last_error_code: null,
-          status: "active",
-        })
-      );
-      expect(persisted?.last_refreshed_at).toBeInstanceOf(Date);
-      expect(persisted?.expires_at.getTime()).toBeGreaterThan(Date.now());
-      expect(
-        decryptXeroToken({
-          authTag: persisted?.access_token_auth_tag ?? null,
-          encrypted: persisted?.access_token_encrypted ?? "",
-          iv: persisted?.access_token_iv ?? null,
-          keyVersion: persisted?.token_key_version ?? 1,
-        })
-      ).toBe("new-access-token");
-      expect(
-        decryptXeroToken({
-          authTag: persisted?.refresh_token_auth_tag ?? null,
-          encrypted: persisted?.refresh_token_encrypted ?? "",
-          iv: persisted?.refresh_token_iv ?? null,
-          keyVersion: persisted?.token_key_version ?? 1,
-        })
-      ).toBe("new-refresh-token");
-    });
-
-    it("serialises concurrent refreshes and persists exactly one rotated token pair", async () => {
-      await cleanTestData();
-      const accessToken = encryptXeroToken("expired-concurrent-access-token");
-      const refreshToken = encryptXeroToken("concurrent-refresh-token");
-      await createOrganisation();
-      await database.xeroConnection.create({
-        data: {
-          access_token_auth_tag: accessToken.authTag,
-          access_token_encrypted: accessToken.encrypted,
-          access_token_iv: accessToken.iv,
-          clerk_org_id: fixture.clerkOrgId,
-          expires_at: new Date(Date.now() - 60_000),
-          id: fixture.connectionId,
-          organisation_id: fixture.organisationId,
-          refresh_token_auth_tag: refreshToken.authTag,
-          refresh_token_encrypted: refreshToken.encrypted,
-          refresh_token_iv: refreshToken.iv,
-          status: "active",
-          token_encrypted_at: accessToken.encryptedAt,
-          token_key_version: accessToken.keyVersion,
-        },
-      });
-      const fetchSpy = vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            access_token: "concurrent-new-access-token",
-            expires_in: 1800,
-            refresh_token: "concurrent-new-refresh-token",
-          }),
-          { headers: { "content-type": "application/json" }, status: 200 }
-        )
-      );
-      vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
-
-      const results = await Promise.all([
-        ensureFreshXeroConnection({
-          clerkOrgId: fixture.clerkOrgId,
-          connectionId: fixture.connectionId,
-          organisationId: fixture.organisationId,
-        }),
-        ensureFreshXeroConnection({
-          clerkOrgId: fixture.clerkOrgId,
-          connectionId: fixture.connectionId,
-          organisationId: fixture.organisationId,
-        }),
-      ]);
-
-      expect(results.every((result) => result.ok)).toBe(true);
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-      const persisted = await database.xeroConnection.findUniqueOrThrow({
-        select: {
-          access_token_auth_tag: true,
-          access_token_encrypted: true,
-          access_token_iv: true,
-          refresh_token_auth_tag: true,
-          refresh_token_encrypted: true,
-          refresh_token_iv: true,
-          token_key_version: true,
-        },
-        where: { id: fixture.connectionId },
-      });
-      expect(
-        decryptXeroToken({
-          authTag: persisted.access_token_auth_tag,
-          encrypted: persisted.access_token_encrypted,
-          iv: persisted.access_token_iv,
-          keyVersion: persisted?.token_key_version ?? 1,
-        })
-      ).toBe("concurrent-new-access-token");
-      expect(
-        decryptXeroToken({
-          authTag: persisted.refresh_token_auth_tag,
-          encrypted: persisted.refresh_token_encrypted,
-          iv: persisted.refresh_token_iv,
-          keyVersion: persisted?.token_key_version ?? 1,
-        })
-      ).toBe("concurrent-new-refresh-token");
-    });
-
-    it("atomically claims and scrubs an OAuth tenant-selection session", async () => {
-      await cleanTestData();
-      await createOrganisation();
-      const accessToken = encryptXeroToken("selection-access-token");
-      const refreshToken = encryptXeroToken("selection-refresh-token");
-      await database.xeroOAuthSession.create({
-        data: {
-          access_token_auth_tag: accessToken.authTag,
-          access_token_encrypted: accessToken.encrypted,
-          access_token_iv: accessToken.iv,
-          available_tenants_json: {
-            tenants: [
-              {
-                connectionId: "xero-authorisation-1",
-                tenantId: fixture.providerTenantId,
-                tenantName: "Integration Payroll",
-              },
-            ],
-          },
-          clerk_org_id: fixture.clerkOrgId,
-          created_by_user_id: "user_integration_1",
-          expires_at: new Date("2099-01-01T00:30:00.000Z"),
-          id: fixture.sessionId,
-          organisation_id: fixture.organisationId,
-          refresh_token_auth_tag: refreshToken.authTag,
-          refresh_token_encrypted: refreshToken.encrypted,
-          refresh_token_iv: refreshToken.iv,
-          return_to: "/settings/integrations/xero",
-          token_encrypted_at: accessToken.encryptedAt,
-          token_expires_at: new Date("2099-01-01T00:20:00.000Z"),
-          token_key_version: accessToken.keyVersion,
-        },
-      });
-      vi.stubGlobal(
-        "fetch",
-        fixtureProviderFetch(
-          vi.fn().mockImplementation(
-            async () =>
-              new Response(
-                JSON.stringify({
-                  Organisations: [
-                    { CountryCode: "AU", Name: "Integration Payroll" },
-                  ],
-                }),
-                { headers: { "content-type": "application/json" }, status: 200 }
-              )
-          )
-        )
-      );
-      const input = {
-        clerkOrgId: fixture.clerkOrgId,
-        organisationId: fixture.organisationId,
-        sessionId: fixture.sessionId,
-        tenantId: fixture.providerTenantId,
-        userId: "user_integration_1",
-      };
-
-      const results = await Promise.all([
-        completeXeroTenantSelection(input),
-        completeXeroTenantSelection(input),
-      ]);
-
-      expect(results.filter((result) => result.ok)).toHaveLength(1);
-      expect(
-        results.filter(
-          (result) => !result.ok && result.error.code === "session_not_found"
-        )
-      ).toHaveLength(1);
-      const session = await database.xeroOAuthSession.findUniqueOrThrow({
-        where: { id: fixture.sessionId },
-      });
-      expect(session).toEqual(
-        expect.objectContaining({
-          access_token_auth_tag: null,
-          access_token_encrypted: "",
-          access_token_iv: null,
-          available_tenants_json: { tenants: [] },
-          refresh_token_auth_tag: null,
-          refresh_token_encrypted: "",
-          refresh_token_iv: null,
-          status: "completed",
-          token_encrypted_at: null,
-        })
-      );
-      expect(
-        await database.xeroConnection.count({
-          where: { clerk_org_id: fixture.clerkOrgId },
-        })
-      ).toBe(1);
-    });
-
-    it("scrubs expired pending and legacy terminal OAuth sessions", async () => {
-      await cleanTestData();
-      const accessToken = encryptXeroToken("cleanup-access-token");
-      const refreshToken = encryptXeroToken("cleanup-refresh-token");
-      const common = {
-        access_token_auth_tag: accessToken.authTag,
-        access_token_encrypted: accessToken.encrypted,
-        access_token_iv: accessToken.iv,
-        available_tenants_json: { tenants: [] },
-        clerk_org_id: fixture.clerkOrgId,
-        expires_at: new Date("2020-01-01T00:00:00.000Z"),
-        refresh_token_auth_tag: refreshToken.authTag,
-        refresh_token_encrypted: refreshToken.encrypted,
-        refresh_token_iv: refreshToken.iv,
-        return_to: "/settings/integrations/xero",
-        token_encrypted_at: accessToken.encryptedAt,
-        token_expires_at: new Date("2020-01-01T00:00:00.000Z"),
-        token_key_version: accessToken.keyVersion,
-      } as const;
-      await database.xeroOAuthSession.createMany({
-        data: [
-          { ...common, id: fixture.sessionId, status: "pending" },
-          {
-            ...common,
-            id: "75000000-0000-4000-8000-000000000005",
-            status: "completed",
+            connectionId: fixture.remoteId,
+            tenantId: externalId,
+            tenantName: "Payroll",
           },
         ],
-      });
-
-      const result = await scrubInactiveXeroOAuthSessionCredentials(
-        new Date("2026-08-29T00:00:00.000Z")
-      );
-
-      expect(result.ok).toBe(true);
-      const sessions = await database.xeroOAuthSession.findMany({
-        orderBy: { id: "asc" },
-        where: { clerk_org_id: fixture.clerkOrgId },
-      });
-      expect(sessions).toHaveLength(2);
-      expect(
-        sessions.every(
-          (session) =>
-            session.access_token_encrypted === "" &&
-            session.refresh_token_encrypted === "" &&
-            session.access_token_iv === null &&
-            session.refresh_token_iv === null
-        )
-      ).toBe(true);
-      expect(
-        sessions.find((session) => session.id === fixture.sessionId)?.status
-      ).toBe("expired");
-    });
-
-    it("disables orphan legacy connections locally with a truthful idempotent receipt and no HTTP", async () => {
-      await cleanTestData();
-      await createOrganisation();
-      const accessToken = encryptXeroToken("disconnect-access-token");
-      const refreshToken = encryptXeroToken("disconnect-refresh-token");
-      await database.xeroConnection.create({
-        data: {
-          access_token_auth_tag: accessToken.authTag,
-          access_token_encrypted: accessToken.encrypted,
-          access_token_iv: accessToken.iv,
-          clerk_org_id: fixture.clerkOrgId,
-          expires_at: new Date("2099-01-01T00:00:00.000Z"),
-          id: fixture.connectionId,
-          organisation_id: fixture.organisationId,
-          refresh_token_auth_tag: refreshToken.authTag,
-          refresh_token_encrypted: refreshToken.encrypted,
-          refresh_token_iv: refreshToken.iv,
-          status: "active",
-          token_encrypted_at: accessToken.encryptedAt,
-          token_key_version: accessToken.keyVersion,
-          xero_authorisation_connection_id: "xero-authorisation-1",
-        },
-      });
-      const fetchSpy = vi
-        .fn()
-        .mockRejectedValue(new Error("No provider request is authorised"));
-      vi.stubGlobal("fetch", fixtureProviderFetch(fetchSpy));
-      const input = {
-        clerkOrgId: fixture.clerkOrgId,
-        connectionId: fixture.connectionId,
-        destructive: false,
-        organisationId: fixture.organisationId,
-        performedByUserId: "user_integration_1",
-      };
-
-      const disconnected = await disconnectXeroOAuthConnection(input);
-      expect(disconnected).toEqual({
-        ok: true,
-        value: {
-          cleanupRequestId: null,
-          dataActionStatus: "not_requested",
-          localDisabled: true,
-          remoteStatus: "left_in_place",
-        },
-      });
-      const repeated = await disconnectXeroOAuthConnection(input);
-      expect(repeated).toEqual(disconnected);
-      expect(fetchSpy).not.toHaveBeenCalled();
-      const cleared = await database.xeroConnection.findUniqueOrThrow({
-        where: { id: fixture.connectionId },
-      });
-      expect(cleared).toEqual(
-        expect.objectContaining({
-          access_token_encrypted: "",
-          disconnected_by_user_id: "user_integration_1",
-          refresh_token_encrypted: "",
-          status: "disconnected",
+      },
+      clerk_org_id: fixture.clerkOrgId,
+      created_by_user_id: "user_integration_1",
+      expires_at: new Date(Date.now() + 600_000),
+      id: fixture.sessionId,
+      organisation_id: organisationId,
+      return_to: "/calendar",
+      status: "selecting",
+      xero_authorisation_id: fixture.authorisationId,
+    },
+  });
+}
+function stubPayroll(externalId = fixture.externalId, country = "AU") {
+  const fetchSpy = vi.fn(async (url: string | URL | Request) =>
+    String(url).endsWith("/connections")
+      ? Response.json([
+          {
+            id: fixture.remoteId,
+            tenantId: externalId,
+            tenantName: "Payroll",
+            tenantType: "ORGANISATION",
+          },
+        ])
+      : Response.json({
+          Organisations: [{ CountryCode: country, Name: "Payroll" }],
         })
-      );
+  );
+  vi.stubGlobal("fetch", fetchSpy);
+  return fetchSpy;
+}
+function select(externalId = fixture.externalId) {
+  return service.completeXeroTenantSelection({
+    clerkOrgId: fixture.clerkOrgId,
+    organisationId: fixture.organisationId,
+    sessionId: fixture.sessionId,
+    tenantId: externalId,
+    userId: "user_integration_1",
+  });
+}
+function versionTwo() {
+  process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION = "2";
+  process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON = JSON.stringify({
+    "2": Buffer.alloc(32, 8).toString("base64"),
+  });
+}
+
+describe("canonical OAuth persistence", () => {
+  it("refreshes expired canonical credentials under PostgreSQL advisory locking", async () => {
+    await connection();
+    const fetchSpy = vi.fn(async () => tokenResponse());
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(await service.ensureFreshXeroConnection(scope())).toMatchObject({
+      ok: true,
+      value: { expiresAt: expect.any(Date), refreshed: true },
     });
-
-    it("rolls back the session claim and credential update on wrong-file reconnect", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      const before = await database.xeroConnection.findUniqueOrThrow({
-        where: { id: fixture.connectionId },
-      });
-      const replacementId = allocation.id("provider-tenant", 1);
-      await createSelectionSession({ tenantId: replacementId });
-      stubAustralianPayroll();
-
-      const result = await selectTenant(replacementId);
-
-      expect(result).toMatchObject({
-        error: { code: "tenant_replacement_required" },
-        ok: false,
-      });
-      const tenant = await database.xeroTenant.findUniqueOrThrow({
-        where: { id: fixture.tenantId },
-      });
-      const after = await database.xeroConnection.findUniqueOrThrow({
-        where: { id: fixture.connectionId },
-      });
-      const session = await database.xeroOAuthSession.findUniqueOrThrow({
-        where: { id: fixture.sessionId },
-      });
-      expect(tenant.xero_tenant_id).toBe(fixture.providerTenantId);
-      expect(after).toMatchObject({
-        access_token_auth_tag: before.access_token_auth_tag,
-        access_token_encrypted: before.access_token_encrypted,
-        access_token_iv: before.access_token_iv,
-        refresh_token_auth_tag: before.refresh_token_auth_tag,
-        refresh_token_encrypted: before.refresh_token_encrypted,
-        refresh_token_iv: before.refresh_token_iv,
-        token_encrypted_at: before.token_encrypted_at,
-        token_key_version: before.token_key_version,
-      });
-      expect(session.status).toBe("pending");
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const saved = await database.xeroAuthorisation.findUniqueOrThrow({
+      where: { id: fixture.authorisationId },
     });
-
-    it("preserves tenant identity and advances generation on same-file reconnect", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      await createSelectionSession({ tenantId: fixture.providerTenantId });
-      stubAustralianPayroll();
-
-      const result = await selectTenant(fixture.providerTenantId);
-
-      expect(result.ok).toBe(true);
-      const tenant = await database.xeroTenant.findUniqueOrThrow({
-        where: { id: fixture.tenantId },
-      });
-      expect(tenant.id).toBe(fixture.tenantId);
-      expect(tenant.binding_generation).toBe(2);
-      expect(tenant.active_slot).toBe(1);
+    expect(tokenText(saved, "access")).toBe("new-access-token");
+    expect(tokenText(saved, "refresh")).toBe("new-refresh-token");
+    expect(saved.last_refreshed_at).toBeInstanceOf(Date);
+    expect(saved.last_refresh_error_code).toBeNull();
+    const persisted = await database.xeroConnection.findUniqueOrThrow({
+      where: { id: fixture.connectionId },
     });
-
-    it("rolls back a new payroll entity when another slot reserves the Xero file", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId, true);
-      await createSelectionSession({
-        clerkOrgId: fixture.clerkOrgId,
-        organisationId: null,
-        tenantId: fixture.providerTenantId,
-      });
-      stubAustralianPayroll();
-
-      const result = await completeXeroTenantSelection({
-        clerkOrgId: fixture.clerkOrgId,
-        sessionId: fixture.sessionId,
-        tenantId: fixture.providerTenantId,
-        userId: "user_integration_1",
-      });
-
-      expect(result).toMatchObject({
-        error: { code: "tenant_binding_conflict" },
-        ok: false,
-      });
-      expect(
-        await database.organisation.count({
-          where: { clerk_org_id: fixture.clerkOrgId },
-        })
-      ).toBe(0);
-      expect(
+    expect(persisted).not.toHaveProperty("access_token_encrypted");
+    expect(persisted.xero_authorisation_id).toBe(saved.id);
+  });
+  it("serialises concurrent refreshes and persists exactly one rotated token pair", async () => {
+    await connection();
+    const fetchSpy = vi.fn(async () => tokenResponse());
+    vi.stubGlobal("fetch", fetchSpy);
+    const results = await Promise.all([
+      service.ensureFreshXeroConnection(scope()),
+      service.ensureFreshXeroConnection(scope()),
+    ]);
+    expect(results.every((r) => r.ok)).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const saved = await database.xeroAuthorisation.findUniqueOrThrow({
+      where: { id: fixture.authorisationId },
+    });
+    expect(tokenText(saved, "access")).toBe("new-access-token");
+    expect(tokenText(saved, "refresh")).toBe("new-refresh-token");
+  });
+  it("scopes refresh access to both Clerk account and payroll organisation", async () => {
+    await connection();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    expect(
+      await service.ensureFreshXeroConnection({
+        ...scope(),
+        clerkOrgId: secondary.clerkOrgId,
+      })
+    ).toMatchObject({ ok: false });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it("atomically consumes the reference-only tenant selection and rejects replay", async () => {
+    await organisation();
+    await selection();
+    stubPayroll();
+    expect(await select()).toMatchObject({
+      ok: true,
+      value: { organisationId: fixture.organisationId },
+    });
+    const session = await database.xeroOAuthSession.findUniqueOrThrow({
+      where: { id: fixture.sessionId },
+    });
+    expect(session.status).toBe("completed");
+    expect(session.xero_authorisation_id).toBe(fixture.authorisationId);
+    expect(session).not.toHaveProperty("access_token_encrypted");
+    expect(await select()).toMatchObject({
+      error: { code: "session_not_found" },
+      ok: false,
+    });
+    expect(await database.xeroConnection.count({ where: ownedScopes })).toBe(1);
+  });
+  it("rolls back selection consumption and connection mutation for wrong-file reconnect", async () => {
+    await connection();
+    const original = await database.xeroConnection.findUniqueOrThrow({
+      where: { id: fixture.connectionId },
+    });
+    const other = allocation.id("other-file");
+    await selection(other);
+    stubPayroll(other);
+    expect(await select(other)).toMatchObject({
+      error: { code: "tenant_replacement_required" },
+      ok: false,
+    });
+    expect(
+      (
         await database.xeroOAuthSession.findUniqueOrThrow({
           where: { id: fixture.sessionId },
         })
-      ).toMatchObject({ status: "pending" });
-    });
-
-    it.each(["expired", "completed", "other-user"])(
-      "rejects a %s session without writing a binding",
-      async (kind) => {
-        await cleanTestData();
-        await createOrganisation();
-        await createSelectionSession({
-          expiresAt: kind === "expired" ? new Date("2020-01-01") : undefined,
-          status: kind === "completed" ? "completed" : "pending",
-          userId: kind === "other-user" ? "another-user" : undefined,
-        });
-        stubAustralianPayroll();
-
-        const result = await selectTenant(fixture.providerTenantId);
-
-        expect(result).toMatchObject({
-          error: { code: "session_not_found" },
-          ok: false,
-        });
-        expect(
-          await database.xeroConnection.count({
-            where: { clerk_org_id: fixture.clerkOrgId },
-          })
-        ).toBe(0);
-      }
-    );
-
-    it("revives a retired same-file binding and advances generation", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      await database.xeroTenant.update({
-        data: { active_slot: null, retired_at: new Date() },
-        where: { id: fixture.tenantId },
-      });
-      await createSelectionSession({ tenantId: fixture.providerTenantId });
-      stubAustralianPayroll();
-
-      expect((await selectTenant(fixture.providerTenantId)).ok).toBe(true);
-      expect(
-        await database.xeroTenant.findUniqueOrThrow({
-          where: { id: fixture.tenantId },
-        })
-      ).toMatchObject({
-        active_slot: 1,
-        binding_generation: 2,
-        retired_at: null,
-      });
-    });
-    it("re-encrypts connection and session tokens in pages and is idempotent", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      await createSelectionSession();
-      configureVersionTwo();
-      try {
-        const only = {
-          connectionIds: [fixture.connectionId],
-          sessionIds: [fixture.sessionId],
-        };
-        expect(await reencryptXeroTokens({ batchSize: 1, only })).toEqual({
-          ok: true,
-          value: { failed: 0, rewritten: 2, skipped: 0 },
-        });
-        const connection = await database.xeroConnection.findUniqueOrThrow({
-          where: { id: fixture.connectionId },
-        });
-        const session = await database.xeroOAuthSession.findUniqueOrThrow({
-          where: { id: fixture.sessionId },
-        });
-        expect(connection.token_key_version).toBe(2);
-        expect(session.token_key_version).toBe(2);
-        expect(
-          decryptXeroToken({
-            authTag: connection.access_token_auth_tag,
-            encrypted: connection.access_token_encrypted,
-            iv: connection.access_token_iv,
-            keyVersion: connection.token_key_version,
-          })
-        ).toBe("original-access-token");
-        expect(
-          decryptXeroToken({
-            authTag: session.refresh_token_auth_tag,
-            encrypted: session.refresh_token_encrypted,
-            iv: session.refresh_token_iv,
-            keyVersion: session.token_key_version,
-          })
-        ).toBe("selection-refresh-token");
-        expect(await reencryptXeroTokens({ batchSize: 1, only })).toEqual({
-          ok: true,
-          value: { failed: 0, rewritten: 0, skipped: 0 },
-        });
-      } finally {
-        vi.unstubAllEnvs();
-      }
-    });
-
-    it("skips compare-and-set conflicts rather than overwriting newer credentials", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      configureVersionTwo();
-      try {
-        const replacement = encryptXeroToken("concurrent-access-token");
-        const result = await reencryptXeroTokens(
-          { batchSize: 1, only: { connectionIds: [fixture.connectionId] } },
-          {
-            beforeWrite: async () => {
-              await database.xeroConnection.update({
-                data: {
-                  access_token_auth_tag: replacement.authTag,
-                  access_token_encrypted: replacement.encrypted,
-                  access_token_iv: replacement.iv,
-                },
-                where: { id: fixture.connectionId },
-              });
-            },
-          }
-        );
-        expect(result).toEqual({
-          ok: true,
-          value: { failed: 0, rewritten: 0, skipped: 1 },
-        });
-        const connection = await database.xeroConnection.findUniqueOrThrow({
-          where: { id: fixture.connectionId },
-        });
-        expect(connection.access_token_encrypted).toBe(replacement.encrypted);
-        expect(connection.token_key_version).toBe(1);
-      } finally {
-        vi.unstubAllEnvs();
-      }
-    });
-
-    it("preflights unknown session key versions before writing a connection", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      await createSelectionSession();
-      await database.xeroOAuthSession.update({
-        data: { token_key_version: 99 },
-        where: { id: fixture.sessionId },
-      });
-      configureVersionTwo();
-      try {
-        expect(
-          await reencryptXeroTokens({
-            batchSize: 1,
-            only: {
-              connectionIds: [fixture.connectionId],
-              sessionIds: [fixture.sessionId],
-            },
-          })
-        ).toEqual({
-          error: { code: "unknown_key_version_present" },
-          ok: false,
-        });
-        expect(
-          (
-            await database.xeroConnection.findUniqueOrThrow({
-              where: { id: fixture.connectionId },
-            })
-          ).token_key_version
-        ).toBe(1);
-      } finally {
-        vi.unstubAllEnvs();
-      }
-    });
-
-    it("counts corrupt ciphertext and continues to a valid session", async () => {
-      await cleanTestData();
-      await seedBoundTenant(fixture.providerTenantId);
-      await createSelectionSession();
-      await database.xeroConnection.update({
-        data: { access_token_auth_tag: Buffer.alloc(16).toString("base64") },
+      ).status
+    ).toBe("selecting");
+    expect(
+      await database.xeroConnection.findUniqueOrThrow({
         where: { id: fixture.connectionId },
-      });
-      configureVersionTwo();
-      try {
-        expect(
-          await reencryptXeroTokens({
-            batchSize: 1,
-            only: {
-              connectionIds: [fixture.connectionId],
-              sessionIds: [fixture.sessionId],
-            },
-          })
-        ).toEqual({ ok: true, value: { failed: 1, rewritten: 1, skipped: 0 } });
-        expect(
-          (
-            await database.xeroConnection.findUniqueOrThrow({
-              where: { id: fixture.connectionId },
-            })
-          ).token_key_version
-        ).toBe(1);
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      })
+    ).toEqual(original);
+  });
+  it("preserves connection and external file identity on same-file reconnect", async () => {
+    await connection();
+    const intentionalPause = new Date("2026-09-01");
+    await database.xeroConnection.update({
+      data: { sync_paused_at: intentionalPause },
+      where: { id: fixture.connectionId },
+    });
+    await selection();
+    stubPayroll();
+    expect(await select()).toMatchObject({
+      ok: true,
+      value: { connectionId: fixture.connectionId },
+    });
+    expect(
+      await database.xeroConnection.findUniqueOrThrow({
+        where: { id: fixture.connectionId },
+      })
+    ).toMatchObject({
+      remote_connection_id: fixture.remoteId,
+      sync_paused_at: intentionalPause,
+      xero_authorisation_id: fixture.authorisationId,
+      xero_tenant_id: fixture.externalId,
     });
   });
 
-  async function createOrganisation() {
-    await database.organisation.create({
-      data: {
-        clerk_org_id: fixture.clerkOrgId,
-        country_code: "AU",
-        id: fixture.organisationId,
-        name: "Xero refresh lock integration fixture",
-      },
+  it("rejects selection when disconnect commits after inventory validation", async () => {
+    await connection();
+    await database.xeroAuthorisation.update({
+      data: { access_token_expires_at: new Date(Date.now() + 1_800_000) },
+      where: { id: fixture.authorisationId },
     });
-  }
-
-  async function cleanTestData() {
-    if (!database) {
-      return;
-    }
-    const where = {
-      clerk_org_id: { in: [fixture.clerkOrgId, fixture.second.clerkOrgId] },
+    await selection();
+    let validated: () => void = () => {
+      throw new Error("uninitialised barrier");
     };
-    await database.xeroOAuthSession.deleteMany({ where });
-    await database.xeroTenant.deleteMany({ where });
-    await database.xeroConnection.deleteMany({ where });
-    await database.organisation.deleteMany({ where });
-  }
-
-  async function seedBoundTenant(providerTenantId: string, secondSlot = false) {
-    const slot = secondSlot ? fixture.second : fixture;
-    await database.organisation.create({
-      data: {
-        clerk_org_id: slot.clerkOrgId,
-        country_code: "AU",
-        id: slot.organisationId,
-        name: "Binding integration fixture",
-      },
+    const inventoryValidated = new Promise<void>((resolve) => {
+      validated = resolve;
     });
-    const accessToken = encryptXeroToken("original-access-token");
-    const refreshToken = encryptXeroToken("original-refresh-token");
-    await database.xeroConnection.create({
-      data: {
-        access_token_auth_tag: accessToken.authTag,
-        access_token_encrypted: accessToken.encrypted,
-        access_token_iv: accessToken.iv,
-        clerk_org_id: slot.clerkOrgId,
-        expires_at: new Date(Date.now() + 60_000),
-        id: slot.connectionId,
-        organisation_id: slot.organisationId,
-        refresh_token_auth_tag: refreshToken.authTag,
-        refresh_token_encrypted: refreshToken.encrypted,
-        refresh_token_iv: refreshToken.iv,
-        status: "active",
-      },
+    let resume: () => void = () => {
+      throw new Error("uninitialised barrier");
+    };
+    const continueSelection = new Promise<void>((resolve) => {
+      resume = resolve;
     });
-    await database.xeroTenant.create({
-      data: {
-        active_slot: 1,
-        clerk_org_id: slot.clerkOrgId,
-        id: slot.tenantId,
-        organisation_id: slot.organisationId,
-        payroll_region: "AU",
-        provider_app_id: allocation.globalKey("provider_app"),
-        xero_connection_id: slot.connectionId,
-        xero_tenant_id: providerTenantId,
-      },
-    });
-  }
-
-  async function createSelectionSession(
-    input: {
-      clerkOrgId?: string;
-      expiresAt?: Date;
-      organisationId?: null | string;
-      status?: "pending" | "completed";
-      tenantId?: string;
-      userId?: string;
-    } = {}
-  ) {
-    const accessToken = encryptXeroToken("selection-access-token");
-    const refreshToken = encryptXeroToken("selection-refresh-token");
-    await database.xeroOAuthSession.create({
-      data: {
-        access_token_auth_tag: accessToken.authTag,
-        access_token_encrypted: accessToken.encrypted,
-        access_token_iv: accessToken.iv,
-        available_tenants_json: {
-          tenants: [
-            {
-              connectionId: "xero-authorisation-1",
-              tenantId: input.tenantId ?? fixture.providerTenantId,
-              tenantName: "Integration Payroll",
-            },
-          ],
-        },
-        clerk_org_id: input.clerkOrgId ?? fixture.clerkOrgId,
-        created_by_user_id: input.userId ?? "user_integration_1",
-        expected_binding_generation: input.organisationId === null ? null : 1,
-        expires_at: input.expiresAt ?? new Date("2099-01-01T00:30:00.000Z"),
-        id: fixture.sessionId,
-        organisation_id:
-          input.organisationId === undefined
-            ? fixture.organisationId
-            : input.organisationId,
-        refresh_token_auth_tag: refreshToken.authTag,
-        refresh_token_encrypted: refreshToken.encrypted,
-        refresh_token_iv: refreshToken.iv,
-        return_to: "/settings/integrations/xero",
-        status: input.status ?? "pending",
-        token_expires_at: new Date("2099-01-01T00:20:00.000Z"),
-      },
-    });
-  }
-
-  function stubAustralianPayroll() {
     vi.stubGlobal(
       "fetch",
-      fixtureProviderFetch(
-        vi.fn().mockResolvedValue(
-          Response.json({
-            Organisations: [{ CountryCode: "AU", Name: "Integration Payroll" }],
-          })
-        )
-      )
+      vi.fn(async (url: string | URL | Request) => {
+        if (String(url).endsWith(`/connections/${fixture.remoteId}`)) {
+          return new Response(null, { status: 204 });
+        }
+        if (String(url).endsWith("/connections")) {
+          return Response.json([
+            {
+              id: fixture.remoteId,
+              tenantId: fixture.externalId,
+              tenantName: "Payroll",
+              tenantType: "ORGANISATION",
+            },
+          ]);
+        }
+        validated();
+        await continueSelection;
+        return Response.json({
+          Organisations: [{ CountryCode: "AU", Name: "Payroll" }],
+        });
+      })
     );
-  }
-
-  function selectTenant(tenantId: string) {
-    return completeXeroTenantSelection({
-      clerkOrgId: fixture.clerkOrgId,
-      organisationId: fixture.organisationId,
-      sessionId: fixture.sessionId,
-      tenantId,
-      userId: "user_integration_1",
+    const selecting = select();
+    await inventoryValidated;
+    try {
+      expect(
+        await service.disconnectXeroOAuthConnection({
+          ...scope(),
+          destructive: false,
+        })
+      ).toMatchObject({ ok: true });
+    } finally {
+      resume();
+    }
+    expect(await selecting).toMatchObject({
+      error: { code: "tenant_binding_conflict" },
+      ok: false,
     });
-  }
-
-  function configureVersionTwo() {
-    vi.stubEnv("XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION", "2");
-    vi.stubEnv(
-      "XERO_TOKEN_ENCRYPTION_KEYS_JSON",
-      JSON.stringify({ "2": Buffer.alloc(32, 8).toString("base64") })
-    );
-  }
-
-  // The protected runner owns this real isolated campaign control namespace.
-  beforeAll(() => initialiseLiveCampaignFixture(allocation));
-
-  const nativeFixtureFetch = globalThis.fetch;
-  function fixtureProviderFetch(provider: typeof fetch): typeof fetch {
-    return (url, init) =>
-      String(url) ===
-      xeroCampaignStoreCredentials().url.replace(FIXTURE_TRAILING_SLASHES, "")
-        ? nativeFixtureFetch(url, init)
-        : provider(url, init);
-  }
+    expect(
+      await database.xeroConnection.findUniqueOrThrow({
+        where: { id: fixture.connectionId },
+      })
+    ).toMatchObject({
+      remote_connection_id: null,
+      status: "disconnected",
+      xero_authorisation_id: null,
+    });
+    expect(
+      (
+        await database.xeroOAuthSession.findUniqueOrThrow({
+          where: { id: fixture.sessionId },
+        })
+      ).status
+    ).toBe("selecting");
+  });
+  it("revives a disconnected same-file connection without replacing its ID", async () => {
+    await connection();
+    await database.xeroConnection.update({
+      data: {
+        disconnected_at: new Date(),
+        remote_connection_id: null,
+        status: "disconnected",
+        sync_paused_at: new Date(),
+        xero_authorisation_id: null,
+      },
+      where: { id: fixture.connectionId },
+    });
+    await selection();
+    stubPayroll();
+    expect(await select()).toMatchObject({
+      ok: true,
+      value: { connectionId: fixture.connectionId },
+    });
+    expect(
+      await database.xeroConnection.findUniqueOrThrow({
+        where: { id: fixture.connectionId },
+      })
+    ).toMatchObject({
+      disconnected_at: null,
+      status: "active",
+      sync_paused_at: null,
+      xero_tenant_id: fixture.externalId,
+    });
+  });
+  it("rolls back a newly created organisation when another ordinary connection owns the external file", async () => {
+    await organisation(secondary);
+    await grant(new Date(Date.now() + 1_800_000));
+    await database.xeroConnection.create({
+      data: {
+        clerk_org_id: secondary.clerkOrgId,
+        organisation_id: secondary.organisationId,
+        payroll_region: "AU",
+        remote_connection_id: fixture.remoteId,
+        xero_authorisation_id: fixture.authorisationId,
+        xero_tenant_id: fixture.externalId,
+      },
+    });
+    await selection(fixture.externalId, null);
+    stubPayroll();
+    expect(await select()).toMatchObject({
+      error: { code: "tenant_binding_conflict" },
+      ok: false,
+    });
+    expect(
+      await database.organisation.count({
+        where: { clerk_org_id: fixture.clerkOrgId },
+      })
+    ).toBe(0);
+    expect(
+      (
+        await database.xeroOAuthSession.findUniqueOrThrow({
+          where: { id: fixture.sessionId },
+        })
+      ).status
+    ).toBe("selecting");
+  });
+  it("deletes expired and terminal sessions while retaining a live selection reference", async () => {
+    await organisation();
+    await selection();
+    const now = new Date();
+    await database.xeroOAuthSession.createMany({
+      data: [
+        {
+          clerk_org_id: fixture.clerkOrgId,
+          expires_at: new Date(now.getTime() - 1),
+          id: allocation.id("expired-session"),
+          return_to: "/calendar",
+          status: "pending",
+        },
+        {
+          clerk_org_id: fixture.clerkOrgId,
+          expires_at: new Date(now.getTime() + 60_000),
+          id: allocation.id("completed-session"),
+          return_to: "/calendar",
+          status: "completed",
+        },
+        {
+          clerk_org_id: fixture.clerkOrgId,
+          expires_at: new Date(now.getTime() + 60_000),
+          id: allocation.id("cancelled-session"),
+          return_to: "/calendar",
+          status: "cancelled",
+        },
+      ],
+    });
+    await service.purgeClosedXeroOAuthSessions(now);
+    expect(
+      await database.xeroOAuthSession.findMany({
+        select: { id: true },
+        where: ownedScopes,
+      })
+    ).toEqual([{ id: fixture.sessionId }]);
+    expect(
+      await database.xeroAuthorisation.count({
+        where: { id: fixture.authorisationId },
+      })
+    ).toBe(1);
+  });
+  it("re-encrypts only canonical tokens in pages and is idempotent", async () => {
+    await grant(new Date(Date.now() + 1_800_000));
+    await grant(new Date(Date.now() + 1_800_000), ownedGrants[1]);
+    versionTwo();
+    expect(
+      await reencryptXeroTokens({
+        batchSize: 1,
+        only: { authorisationIds: ownedGrants },
+      })
+    ).toEqual({ ok: true, value: { failed: 0, rewritten: 2, skipped: 0 } });
+    const saved = await database.xeroAuthorisation.findUniqueOrThrow({
+      where: { id: fixture.authorisationId },
+    });
+    expect(saved.token_key_version).toBe(2);
+    expect(tokenText(saved, "access")).toBe("expired-access-token");
+    expect(tokenText(saved, "refresh")).toBe("refresh-token");
+    expect(
+      await reencryptXeroTokens({
+        batchSize: 1,
+        only: { authorisationIds: ownedGrants },
+      })
+    ).toEqual({ ok: true, value: { failed: 0, rewritten: 0, skipped: 0 } });
+  });
+  it("preflights unknown canonical key versions before writing any grant", async () => {
+    const first = await grant();
+    await grant(new Date(Date.now() + 1_800_000), ownedGrants[1]);
+    await database.xeroAuthorisation.update({
+      data: { token_key_version: 99 },
+      where: { id: ownedGrants[1] },
+    });
+    versionTwo();
+    expect(
+      await reencryptXeroTokens({
+        batchSize: 1,
+        only: { authorisationIds: ownedGrants },
+      })
+    ).toEqual({ error: { code: "unknown_key_version_present" }, ok: false });
+    expect(
+      await database.xeroAuthorisation.findUniqueOrThrow({
+        where: { id: first.id },
+      })
+    ).toEqual(first);
+  });
+  it("counts corrupt ciphertext and continues to another valid canonical grant", async () => {
+    await grant();
+    await grant(new Date(Date.now() + 1_800_000), ownedGrants[1]);
+    await database.xeroAuthorisation.update({
+      data: { access_token_encrypted: "corrupt" },
+      where: { id: fixture.authorisationId },
+    });
+    versionTwo();
+    expect(
+      await reencryptXeroTokens({
+        batchSize: 1,
+        only: { authorisationIds: ownedGrants },
+      })
+    ).toEqual({ ok: true, value: { failed: 1, rewritten: 1, skipped: 0 } });
+  });
 });

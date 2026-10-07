@@ -1,5 +1,4 @@
 import "server-only";
-
 import type {
   ClerkOrgId,
   ExternalWritePort,
@@ -51,9 +50,7 @@ import {
   unclaimedOrExpiredXeroWriteWhere,
   XERO_WRITE_CLAIM_LEASE_MS,
 } from "../xero-write-claim";
-
 export type ApprovalRole = "admin" | "manager" | "owner";
-
 export type ApprovalAction =
   | "approve"
   | "decline"
@@ -62,33 +59,73 @@ export type ApprovalAction =
   | "retry_decline"
   | "revert_to_submitted"
   | "view_only";
-
 export type ApprovalServiceError =
   | {
       code: "approval_blocked_resolution";
       message: string;
       resolutionError: ProviderResolutionError;
     }
-  | { code: "approval_outcome_unknown"; message: string }
-  | { code: "dispatch_failed"; message: string }
-  | { code: "invalid_state_for_approve"; message: string }
-  | { code: "invalid_state_for_decline"; message: string }
-  | { code: "invalid_state_for_info_request"; message: string }
-  | { code: "invalid_state_for_revert"; message: string }
-  | { code: "invalid_state_for_retry"; message: string }
-  | { code: "missing_preserved_reason"; message: string }
-  | { code: "not_a_leave_type"; message: string }
-  | { code: "not_authorised"; message: string }
-  | { code: "record_not_found"; message: string }
-  | { code: "unknown_error"; message: string }
-  | { code: "validation_error"; message: string }
-  | { code: "xero_not_connected"; message: string }
+  | {
+      code: "approval_outcome_unknown";
+      message: string;
+    }
+  | {
+      code: "dispatch_failed";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_approve";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_decline";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_info_request";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_revert";
+      message: string;
+    }
+  | {
+      code: "invalid_state_for_retry";
+      message: string;
+    }
+  | {
+      code: "missing_preserved_reason";
+      message: string;
+    }
+  | {
+      code: "not_a_leave_type";
+      message: string;
+    }
+  | {
+      code: "not_authorised";
+      message: string;
+    }
+  | {
+      code: "record_not_found";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    }
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "xero_not_connected";
+      message: string;
+    }
   | {
       code: "xero_write_failed";
       message: string;
       xeroError: ProviderWriteError;
     };
-
 export interface ApprovalListItem {
   allDay: boolean;
   approvalNote: string | null;
@@ -129,7 +166,6 @@ export interface ApprovalListItem {
   submittedByUserId: string | null;
   xeroWriteError: string | null;
 }
-
 export interface ApprovalDetail extends ApprovalListItem {
   notesInternal: string | null;
   submissionHistory: Array<{
@@ -138,14 +174,12 @@ export interface ApprovalDetail extends ApprovalListItem {
     payload: unknown;
   }>;
 }
-
 export interface ApprovalSummaryCounts {
   approvedThisMonth: number;
   declinedThisMonth: number;
   failedSync: number;
   pending: number;
 }
-
 const ApprovalStatusSchema = z.enum([
   "submitted",
   "approved",
@@ -163,7 +197,6 @@ const RecordTypeSchema = z.enum([
 ]);
 const RoleSchema = z.enum(["admin", "manager", "owner"]);
 type ApprovalStatus = z.infer<typeof ApprovalStatusSchema>;
-
 const FiltersSchema = z.object({
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
@@ -171,7 +204,6 @@ const FiltersSchema = z.object({
   recordType: z.array(RecordTypeSchema).optional(),
   status: z.array(ApprovalStatusSchema).optional(),
 });
-
 const ListSchema = z.object({
   actingPersonId: z.string().uuid().nullable(),
   actingUserId: z.string().min(1),
@@ -182,7 +214,6 @@ const ListSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(200).optional(),
   role: RoleSchema,
 });
-
 const DetailSchema = z.object({
   actingPersonId: z.string().uuid().nullable(),
   actingUserId: z.string().min(1),
@@ -191,7 +222,6 @@ const DetailSchema = z.object({
   recordId: z.string().uuid(),
   role: RoleSchema,
 });
-
 const CommandSchema = DetailSchema;
 const DeclineReasonSchema = z
   .string()
@@ -210,7 +240,6 @@ const DispatchSchema = z.object({
   organisationId: z.string().uuid(),
   role: RoleSchema,
 });
-
 type ListInput = z.input<typeof ListSchema>;
 type ListData = z.infer<typeof ListSchema>;
 type CommandInput = z.infer<typeof CommandSchema>;
@@ -234,8 +263,9 @@ type JsonValue =
   | number
   | string
   | JsonValue[]
-  | { [key: string]: JsonValue };
-
+  | {
+      [key: string]: JsonValue;
+    };
 const HISTORY_ACTIONS = [
   "availability_records.submitted",
   "availability_records.submission_retry_succeeded",
@@ -243,16 +273,15 @@ const HISTORY_ACTIONS = [
   "availability_records.info_requested",
   "availability_records.reverted_to_draft",
 ];
-
 const TERMINAL_STATUS_WINDOW_DAYS = 90;
 const ACTIONABLE_STATUSES = ["submitted", "xero_sync_failed"] as const;
 const TERMINAL_STATUSES = ["approved", "withdrawn", "declined"] as const;
-
-export async function listForApprover(
-  input: ListInput
-): Promise<
+export async function listForApprover(input: ListInput): Promise<
   Result<
-    { items: ApprovalListItem[]; nextCursor: string | null },
+    {
+      items: ApprovalListItem[];
+      nextCursor: string | null;
+    },
     ApprovalServiceError
   >
 > {
@@ -266,7 +295,6 @@ export async function listForApprover(
   if (!canUseApprovals(parsed.data.role)) {
     return notAuthorised();
   }
-
   try {
     return await loadApproverPage(parsed.data);
   } catch (error) {
@@ -281,12 +309,12 @@ export async function listForApprover(
     );
   }
 }
-
-async function loadApproverPage(
-  data: ListData
-): Promise<
+async function loadApproverPage(data: ListData): Promise<
   Result<
-    { items: ApprovalListItem[]; nextCursor: string | null },
+    {
+      items: ApprovalListItem[];
+      nextCursor: string | null;
+    },
     ApprovalServiceError
   >
 > {
@@ -299,7 +327,6 @@ async function loadApproverPage(
     filters.status,
     hasExplicitDateFilter
   );
-
   const records = await database.availabilityRecord.findMany({
     cursor: cursor ? { id: cursor } : undefined,
     orderBy: [{ submitted_at: "asc" }, { starts_at: "asc" }, { id: "asc" }],
@@ -324,11 +351,9 @@ async function loadApproverPage(
         : {}),
     },
   });
-
   const hasNext = records.length > pageSize;
   const pageRecords = hasNext ? records.slice(0, pageSize) : records;
   const nextCursor = hasNext ? (pageRecords.at(-1)?.id ?? null) : null;
-
   const listContext = await loadApprovalListContext(
     pageRecords as unknown as LoadedApprovalRecord[]
   );
@@ -339,15 +364,15 @@ async function loadApproverPage(
   );
   return { ok: true, value: { items, nextCursor } };
 }
-
-async function resolveListFilters(
-  data: ListData
-): Promise<z.infer<typeof FiltersSchema> & { status: ApprovalStatus[] }> {
+async function resolveListFilters(data: ListData): Promise<
+  z.infer<typeof FiltersSchema> & {
+    status: ApprovalStatus[];
+  }
+> {
   const settingsResult = await getSettings({
     clerkOrgId: data.clerkOrgId,
     organisationId: data.organisationId,
   });
-
   if (!settingsResult.ok) {
     log.warn(
       "Failed to load organisation settings for list approvals, using default view",
@@ -358,7 +383,6 @@ async function resolveListFilters(
       }
     );
   }
-
   // On a settings read failure, keep the narrower default rather than
   // silently widening the queue. Logged so the outage is not invisible.
   const showDeclined = settingsResult.ok
@@ -367,13 +391,11 @@ async function resolveListFilters(
   const defaultStatus: ApprovalStatus[] = showDeclined
     ? ["submitted", "approved", "xero_sync_failed", "withdrawn", "declined"]
     : ["submitted", "approved", "xero_sync_failed", "withdrawn"];
-
   return {
     ...data.filters,
     status: data.filters?.status ?? defaultStatus,
   };
 }
-
 async function resolveManagedPersonIds(data: {
   actingPersonId: string | null;
   clerkOrgId: string;
@@ -390,7 +412,6 @@ async function resolveManagedPersonIds(data: {
   });
   return personIds.filter((personId) => personId !== data.actingPersonId);
 }
-
 function buildApprovalStatusWhere(
   status: ApprovalStatus[],
   hasExplicitDateFilter: boolean
@@ -401,23 +422,19 @@ function buildApprovalStatusWhere(
   const terminalInFilter = status.filter((s) =>
     (TERMINAL_STATUSES as readonly string[]).includes(s)
   );
-
   if (hasExplicitDateFilter || terminalInFilter.length === 0) {
     return { approval_status: { in: status as never[] } };
   }
-
   const terminalCutoff = new Date();
   terminalCutoff.setUTCDate(
     terminalCutoff.getUTCDate() - TERMINAL_STATUS_WINDOW_DAYS
   );
-
   if (actionableInFilter.length === 0) {
     return {
       approval_status: { in: terminalInFilter as never[] },
       ends_at: { gte: terminalCutoff },
     };
   }
-
   return {
     OR: [
       { approval_status: { in: actionableInFilter as never[] } },
@@ -428,7 +445,6 @@ function buildApprovalStatusWhere(
     ],
   };
 }
-
 export async function getApprovalDetail(
   input: CommandInput
 ): Promise<Result<ApprovalDetail, ApprovalServiceError>> {
@@ -436,7 +452,6 @@ export async function getApprovalDetail(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const authorised = await loadAndAuthorise(parsed.data);
     if (!authorised.ok) {
@@ -457,7 +472,6 @@ export async function getApprovalDetail(
         resource_type: "availability_record",
       },
     });
-
     return {
       ok: true,
       value: {
@@ -483,7 +497,6 @@ export async function getApprovalDetail(
     );
   }
 }
-
 export async function getApprovalSummaryCounts(input: {
   actingPersonId: string | null;
   actingUserId: string;
@@ -498,7 +511,6 @@ export async function getApprovalSummaryCounts(input: {
   if (parsed.data.role === "manager" && !parsed.data.actingPersonId) {
     return notAuthorised();
   }
-
   try {
     const managedPersonIds = await resolveManagedPersonIds(parsed.data);
     const startOfMonth = new Date();
@@ -512,7 +524,6 @@ export async function getApprovalSummaryCounts(input: {
         ? { person_id: { in: managedPersonIds } }
         : {}),
     } satisfies Prisma.AvailabilityRecordWhereInput;
-
     const [pending, failedSync, approvedThisMonth, declinedThisMonth] =
       await Promise.all([
         database.availabilityRecord.count({
@@ -536,7 +547,6 @@ export async function getApprovalSummaryCounts(input: {
           },
         }),
       ]);
-
     return {
       ok: true,
       value: { approvedThisMonth, declinedThisMonth, failedSync, pending },
@@ -553,7 +563,6 @@ export async function getApprovalSummaryCounts(input: {
     );
   }
 }
-
 export async function approve(
   input: CommandInput,
   externalWritePort: ExternalWritePort
@@ -564,7 +573,6 @@ export async function approve(
     successAuditAction: "availability_records.approved",
   });
 }
-
 export async function retryApproval(
   input: CommandInput,
   externalWritePort: ExternalWritePort
@@ -576,7 +584,6 @@ export async function retryApproval(
     successAuditAction: "availability_records.approval_retry_succeeded",
   });
 }
-
 export async function decline(
   input: DeclineInput,
   externalWritePort: ExternalWritePort
@@ -591,7 +598,6 @@ export async function decline(
     successAuditAction: "availability_records.declined",
   });
 }
-
 export async function retryDecline(
   input: CommandInput,
   externalWritePort: ExternalWritePort
@@ -600,7 +606,6 @@ export async function retryDecline(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const authorised = await loadAndAuthorise(parsed.data);
     if (!authorised.ok) {
@@ -623,12 +628,10 @@ export async function retryDecline(
         ok: false,
       };
     }
-
     const parsedReason = DeclineReasonSchema.safeParse(reason);
     if (!parsedReason.success) {
       return validationError(parsedReason.error);
     }
-
     return await performDecline(
       { ...parsed.data, reason: parsedReason.data },
       externalWritePort,
@@ -652,7 +655,6 @@ export async function retryDecline(
     );
   }
 }
-
 export async function requestMoreInfo(
   input: InfoInput
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
@@ -660,7 +662,6 @@ export async function requestMoreInfo(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const authorised = await loadAndAuthorise(parsed.data);
     if (!authorised.ok) {
@@ -670,7 +671,6 @@ export async function requestMoreInfo(
     if (record.approval_status !== "submitted") {
       return invalidState("invalid_state_for_info_request");
     }
-
     await database.$transaction(async (tx) => {
       await notifyUser(tx, parsed.data, record, {
         actionUrl: `/plans?recordId=${record.id}`,
@@ -684,7 +684,6 @@ export async function requestMoreInfo(
         }),
       });
     });
-
     return { ok: true, value: await toApprovalListItem(record) };
   } catch (error) {
     return logAndReturnUnknown(
@@ -699,7 +698,6 @@ export async function requestMoreInfo(
     );
   }
 }
-
 export async function revertApprovalAttempt(
   input: CommandInput
 ): Promise<Result<ApprovalListItem, ApprovalServiceError>> {
@@ -707,7 +705,6 @@ export async function revertApprovalAttempt(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   try {
     const authorised = await loadAndAuthorise(parsed.data);
     if (!authorised.ok) {
@@ -720,7 +717,6 @@ export async function revertApprovalAttempt(
     ) {
       return invalidState("invalid_state_for_revert");
     }
-
     await database.$transaction(async (tx) => {
       const update = await tx.availabilityRecord.updateMany({
         data: {
@@ -750,7 +746,6 @@ export async function revertApprovalAttempt(
         }),
       });
     });
-
     const updated = await loadRecord(parsed.data);
     if (!updated) {
       return recordNotFound();
@@ -773,10 +768,15 @@ export async function revertApprovalAttempt(
     );
   }
 }
-
-export function dispatchApprovalReconciliation(
-  input: DispatchInput
-): Promise<Result<{ queued: boolean; reason?: string }, ApprovalServiceError>> {
+export function dispatchApprovalReconciliation(input: DispatchInput): Promise<
+  Result<
+    {
+      queued: boolean;
+      reason?: string;
+    },
+    ApprovalServiceError
+  >
+> {
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
@@ -784,13 +784,19 @@ export function dispatchApprovalReconciliation(
   if (!(parsed.data.role === "admin" || parsed.data.role === "owner")) {
     return Promise.resolve(notAuthorised());
   }
-
   return dispatchXeroSyncInternal(parsed.data, "approval_state_reconciliation");
 }
-
 export function dispatchXeroLeaveSync(
   input: z.input<typeof DispatchSchema>
-): Promise<Result<{ queued: boolean; reason?: string }, ApprovalServiceError>> {
+): Promise<
+  Result<
+    {
+      queued: boolean;
+      reason?: string;
+    },
+    ApprovalServiceError
+  >
+> {
   const parsed = DispatchSchema.safeParse(input);
   if (!parsed.success) {
     return Promise.resolve(validationError(parsed.error));
@@ -798,15 +804,21 @@ export function dispatchXeroLeaveSync(
   if (!(parsed.data.role === "admin" || parsed.data.role === "owner")) {
     return Promise.resolve(notAuthorised());
   }
-
   return dispatchXeroSyncInternal(parsed.data, "leave_records");
 }
-
 async function dispatchXeroSyncInternal(
   input: DispatchInput,
   runType: "approval_state_reconciliation" | "leave_records"
-): Promise<Result<{ queued: boolean; reason?: string }, ApprovalServiceError>> {
-  const tenant = await database.xeroTenant.findFirst({
+): Promise<
+  Result<
+    {
+      queued: boolean;
+      reason?: string;
+    },
+    ApprovalServiceError
+  >
+> {
+  const tenant = await database.xeroConnection.findFirst({
     orderBy: { created_at: "asc" },
     where: {
       clerk_org_id: input.clerkOrgId,
@@ -816,7 +828,6 @@ async function dispatchXeroSyncInternal(
   if (!tenant) {
     return xeroNotConnected();
   }
-
   const xeroStateResult = await getXeroConnectionStateForScope({
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
@@ -845,18 +856,16 @@ async function dispatchXeroSyncInternal(
     };
   }
   const active = xeroConnectionState === "connected";
-  if (!active || xeroStateResult.value.bindingGeneration === null) {
+  if (!active) {
     return xeroNotConnected();
   }
-
   const dispatched = await dispatchSyncEvent({
-    bindingGeneration: xeroStateResult.value.bindingGeneration,
     clerkOrgId: input.clerkOrgId,
+    connectionId: tenant.id,
     organisationId: input.organisationId,
     runType,
     triggeredByUserId: input.actingUserId,
     triggerType: "manual",
-    xeroTenantId: tenant.id,
   });
   if (!dispatched.ok) {
     return {
@@ -867,10 +876,8 @@ async function dispatchXeroSyncInternal(
       ok: false,
     };
   }
-
   return { ok: true, value: { queued: true } };
 }
-
 async function performApproval(
   input: CommandInput,
   externalWritePort: ExternalWritePort,
@@ -885,7 +892,6 @@ async function performApproval(
   if (!parsed.success) {
     return validationError(parsed.error);
   }
-
   let failureStage: ApprovalFailureStage = "prepare";
   let xeroWriteSucceeded = false;
   let claimedAt: Date | null = null;
@@ -913,7 +919,6 @@ async function performApproval(
         options.retry
       );
     }
-
     claimedAt = await acquireXeroWriteClaim({
       ...parsed.data,
       expectedFailedAction: options.retry ? "approve" : null,
@@ -926,7 +931,6 @@ async function performApproval(
       );
     }
     const ownerClaim = claimedAt;
-
     failureStage = "xero_write";
     const response = await externalWritePort.approveLeaveApplication({
       clerkOrgId: parsed.data.clerkOrgId,
@@ -946,7 +950,6 @@ async function performApproval(
       });
     }
     xeroWriteSucceeded = true;
-
     failureStage = "local_transaction";
     const now = new Date();
     await database.$transaction(async (tx) => {
@@ -974,13 +977,11 @@ async function performApproval(
       });
     });
     claimedAt = null;
-
     failureStage = "notification";
     await notifyApprovalBestEffort(parsed.data, record, {
       actionUrl: `/plans?recordId=${record.id}`,
       type: "leave_approved",
     });
-
     failureStage = "reload";
     const updated = await loadRecord(parsed.data);
     if (!updated) {
@@ -1009,7 +1010,6 @@ async function performApproval(
     );
   }
 }
-
 async function performDecline(
   input: DeclineInput,
   externalWritePort: ExternalWritePort,
@@ -1046,7 +1046,6 @@ async function performDecline(
         message: "This record does not have a Xero leave application ID.",
       });
     }
-
     claimedAt = await acquireXeroWriteClaim({
       ...input,
       expectedFailedAction: options.retry ? "decline" : null,
@@ -1059,7 +1058,6 @@ async function performDecline(
       );
     }
     const ownerClaim = claimedAt;
-
     failureStage = "xero_write";
     const response = await declineRemoteIfPresent(
       input,
@@ -1081,7 +1079,6 @@ async function performDecline(
       });
     }
     xeroWriteSucceeded = xeroLeaveApplicationId !== null;
-
     failureStage = "local_transaction";
     const now = new Date();
     await database.$transaction(async (tx) => {
@@ -1111,14 +1108,12 @@ async function performDecline(
       });
     });
     claimedAt = null;
-
     failureStage = "notification";
     await notifyApprovalBestEffort(input, record, {
       actionUrl: `/plans?recordId=${record.id}`,
       payload: { body: options.reason },
       type: "leave_declined",
     });
-
     failureStage = "reload";
     const updated = await loadRecord(input);
     if (!updated) {
@@ -1147,7 +1142,6 @@ async function performDecline(
     );
   }
 }
-
 async function prepareApprovalWrite(
   input: CommandInput,
   externalWritePort: ExternalWritePort,
@@ -1190,7 +1184,6 @@ async function prepareApprovalWrite(
       ok: false,
     };
   }
-
   if (
     (await hasUnresolvedSubmitOperation({
       availabilityRecordId: record.id,
@@ -1274,13 +1267,11 @@ async function prepareApprovalWrite(
   if (!employee.ok) {
     return resolutionBlocked(employee.error);
   }
-
   return {
     ok: true,
     value: { record, xeroEmployeeId: employee.value },
   };
 }
-
 async function persistApprovalFailure(input: {
   approvalNote?: string;
   auditAction: string;
@@ -1315,21 +1306,18 @@ async function persistApprovalFailure(input: {
     if (update.count !== 1) {
       throw new OptimisticConflictError();
     }
-
     await tx.auditEvent.create({
       data: auditData(input.input, input.auditAction, {
         errorCode: input.error.code,
       }),
     });
   });
-
   // Notifications are at-most-once and must never roll back the failure state.
   // Without the persisted xero_sync_failed status and failed_action, the retry
   // and revert actions are unreachable and the failure has no diagnostic trail.
   await notifyApprovalFailureBestEffort(input.input, input.record, {
     actionUrl: `/leave-approvals?recordId=${input.record.id}`,
   });
-
   const updated = await loadRecord(input.input);
   if (!updated) {
     return recordNotFound();
@@ -1337,7 +1325,6 @@ async function persistApprovalFailure(input: {
   await materialiseApprovalPublication(input.input);
   return { ok: true, value: await toApprovalListItem(updated) };
 }
-
 function loadRecord(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -1351,7 +1338,6 @@ function loadRecord(input: {
     },
   });
 }
-
 async function materialiseApprovalPublication(input: {
   clerkOrgId: string;
   organisationId: string;
@@ -1374,7 +1360,6 @@ async function materialiseApprovalPublication(input: {
     });
   }
 }
-
 async function loadApprovalListContext(
   records: LoadedApprovalRecord[]
 ): Promise<ApprovalListContext> {
@@ -1389,7 +1374,6 @@ async function loadApprovalListContext(
       },
     };
   }
-
   const [firstRecord] = records;
   if (!firstRecord) {
     throw new Error("Approval records changed while loading list context");
@@ -1403,7 +1387,6 @@ async function loadApprovalListContext(
         .filter((locationId): locationId is string => locationId !== null)
     ),
   ];
-
   const [locations, organisation] = await Promise.all([
     cache.getOrLoad("approval-list:locations", () =>
       locationIds.length
@@ -1442,7 +1425,6 @@ async function loadApprovalListContext(
         : null;
     }),
   ]);
-
   const workingDaysReferenceData: WorkingDaysReferenceData = {
     holidaysByYear: new Map(),
     locationById: new Map(
@@ -1469,7 +1451,6 @@ async function loadApprovalListContext(
       }
     }
   }
-
   const holidayEntries = await Promise.all(
     [...years].map(
       async (year) =>
@@ -1486,7 +1467,6 @@ async function loadApprovalListContext(
     )
   );
   workingDaysReferenceData.holidaysByYear = new Map(holidayEntries);
-
   const personIds = [...new Set(records.map((record) => record.person_id))];
   const recordTypes = [
     ...new Set(
@@ -1529,13 +1509,11 @@ async function loadApprovalListContext(
       });
     }
   }
-
   return {
     balanceByPersonAndRecordType,
     workingDaysReferenceData,
   };
 }
-
 async function loadAndAuthorise(
   input: CommandInput
 ): Promise<Result<LoadedApprovalRecord, ApprovalServiceError>> {
@@ -1549,7 +1527,6 @@ async function loadAndAuthorise(
   }
   return { ok: true, value: record };
 }
-
 async function toApprovalListItem(
   record: LoadedApprovalRecord,
   context?: ApprovalListContext
@@ -1592,7 +1569,6 @@ async function toApprovalListItem(
     xeroWriteError: record.xero_write_error,
   };
 }
-
 async function computeDuration(
   record: LoadedApprovalRecord,
   context?: ApprovalListContext
@@ -1606,7 +1582,6 @@ async function computeDuration(
     : await computeWorkingDays(input);
   return duration.ok ? duration.value : null;
 }
-
 function workingDaysInputForRecord(record: LoadedApprovalRecord) {
   return {
     allDay: record.all_day,
@@ -1617,14 +1592,12 @@ function workingDaysInputForRecord(record: LoadedApprovalRecord) {
     startsAt: record.starts_at,
   };
 }
-
 function balanceKey(
   personId: string,
   recordType: availability_record_type
 ): string {
   return `${personId}:${recordType}`;
 }
-
 async function loadBalanceSnapshot(
   record: LoadedApprovalRecord,
   duration: number | null,
@@ -1675,7 +1648,6 @@ async function loadBalanceSnapshot(
     unit: balance.balance_unit,
   };
 }
-
 function canResumeUndispatchedApproval(record: LoadedApprovalRecord): boolean {
   const operations = record.outbound_operations;
   const operation = operations?.[0];
@@ -1691,7 +1663,6 @@ function canResumeUndispatchedApproval(record: LoadedApprovalRecord): boolean {
         Date.now() - XERO_WRITE_CLAIM_LEASE_MS)
   );
 }
-
 function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
   if (canResumeUndispatchedApproval(record)) {
     if (record.approval_status === "submitted") {
@@ -1732,7 +1703,6 @@ function actionsForRecord(record: LoadedApprovalRecord): ApprovalAction[] {
       return [];
   }
 }
-
 function mutedNoteForRecord(record: LoadedApprovalRecord): string | null {
   if (canResumeUndispatchedApproval(record)) {
     return "The previous approval stopped before contacting Xero. A manager can retry approval.";
@@ -1755,7 +1725,6 @@ function mutedNoteForRecord(record: LoadedApprovalRecord): string | null {
   }
   return null;
 }
-
 async function canActOnRecord(
   input: CommandInput,
   record: LoadedApprovalRecord
@@ -1766,21 +1735,17 @@ async function canActOnRecord(
   if (!(input.role === "manager" && input.actingPersonId)) {
     return false;
   }
-
   const visiblePersonIds = await managerScopePersonIds({
     actingPersonId: input.actingPersonId,
     clerkOrgId: input.clerkOrgId,
     excludeSelf: true,
     organisationId: input.organisationId,
   });
-
   return visiblePersonIds.includes(record.person_id);
 }
-
 function canUseApprovals(role: ApprovalRole): boolean {
   return role === "admin" || role === "owner" || role === "manager";
 }
-
 async function notifyUser(
   tx: NotificationDispatchDatabase,
   input: CommandInput,
@@ -1820,7 +1785,6 @@ async function notifyUser(
     throw new NotificationCreateError();
   }
 }
-
 async function notifyManagersIfEnabled(
   tx: NotificationDispatchDatabase,
   input: CommandInput,
@@ -1834,7 +1798,6 @@ async function notifyManagersIfEnabled(
     clerkOrgId: input.clerkOrgId,
     organisationId: input.organisationId,
   });
-
   if (!settingsResult.ok) {
     log.warn(
       "Failed to load organisation settings for manager notification, skipping notification",
@@ -1846,11 +1809,9 @@ async function notifyManagersIfEnabled(
     );
     return;
   }
-
   if (!settingsResult.value.notifyManagersOnStatusChange) {
     return;
   }
-
   const managerUserId = record.person.manager?.clerk_user_id;
   const managerPersonId = record.person.manager?.id ?? null;
   if (!managerUserId || managerUserId === input.actingUserId) {
@@ -1859,7 +1820,6 @@ async function notifyManagersIfEnabled(
   if (managerUserId === record.person.clerk_user_id) {
     return;
   }
-
   const personName = `${record.person.first_name} ${record.person.last_name}`;
   await notifyUser(tx, input, record, {
     actionUrl: options.actionUrl,
@@ -1874,7 +1834,6 @@ async function notifyManagersIfEnabled(
     type: options.type,
   });
 }
-
 async function notifyApprovalBestEffort(
   input: CommandInput,
   record: LoadedApprovalRecord,
@@ -1894,7 +1853,6 @@ async function notifyApprovalBestEffort(
   } catch (error) {
     logApprovalNotificationFailure(error, input, record, options.type);
   }
-
   try {
     await notifyManagersIfEnabled(database, input, record, {
       actionUrl: `/leave-approvals?recordId=${record.id}`,
@@ -1904,7 +1862,6 @@ async function notifyApprovalBestEffort(
     logApprovalNotificationFailure(error, input, record, options.type);
   }
 }
-
 function logApprovalNotificationFailure(
   error: unknown,
   input: CommandInput,
@@ -1919,11 +1876,12 @@ function logApprovalNotificationFailure(
     type,
   });
 }
-
 async function notifyApprovalFailureBestEffort(
   input: CommandInput,
   record: LoadedApprovalRecord,
-  options: { actionUrl: string }
+  options: {
+    actionUrl: string;
+  }
 ): Promise<void> {
   try {
     await notifyOwnerAndApprover(database, input, record, {
@@ -1938,19 +1896,24 @@ async function notifyApprovalFailureBestEffort(
     );
   }
 }
-
 async function notifyOwnerAndApprover(
   tx: NotificationDispatchDatabase,
   input: CommandInput,
   record: LoadedApprovalRecord,
-  options: { actionUrl: string }
+  options: {
+    actionUrl: string;
+  }
 ) {
   const recipientUserIds = [
     { personId: record.person.id, userId: record.person.clerk_user_id },
     { personId: input.actingPersonId, userId: input.actingUserId },
   ].filter(
-    (recipient): recipient is { personId: string | null; userId: string } =>
-      Boolean(recipient.userId)
+    (
+      recipient
+    ): recipient is {
+      personId: string | null;
+      userId: string;
+    } => Boolean(recipient.userId)
   );
   const seen = new Set<string>();
   for (const recipient of recipientUserIds) {
@@ -1966,7 +1929,6 @@ async function notifyOwnerAndApprover(
     });
   }
 }
-
 function notificationTitle(
   type:
     | "leave_approved"
@@ -1987,7 +1949,6 @@ function notificationTitle(
       return "Leave updated";
   }
 }
-
 function notificationBody(
   record: LoadedApprovalRecord,
   type:
@@ -2014,7 +1975,6 @@ function notificationBody(
       return "This leave request has been updated.";
   }
 }
-
 function auditData(
   input: CommandInput,
   action: string,
@@ -2034,7 +1994,6 @@ function auditData(
     resource_type: "availability_record",
   };
 }
-
 function transitionWhere(
   input: CommandInput,
   record: LoadedApprovalRecord,
@@ -2048,7 +2007,6 @@ function transitionWhere(
     xero_write_claimed_at: claimedAt,
   };
 }
-
 function validationError(
   error: z.ZodError
 ): Result<never, ApprovalServiceError> {
@@ -2060,7 +2018,6 @@ function validationError(
     ok: false,
   };
 }
-
 function invalidState(
   code:
     | "invalid_state_for_approve"
@@ -2080,7 +2037,6 @@ function invalidState(
   };
   return { error: { code, message: messages[code] }, ok: false };
 }
-
 function recordNotFound(): Result<never, ApprovalServiceError> {
   return {
     error: {
@@ -2090,7 +2046,6 @@ function recordNotFound(): Result<never, ApprovalServiceError> {
     ok: false,
   };
 }
-
 function notAuthorised(): Result<never, ApprovalServiceError> {
   return {
     error: {
@@ -2100,7 +2055,6 @@ function notAuthorised(): Result<never, ApprovalServiceError> {
     ok: false,
   };
 }
-
 function xeroNotConnected(): Result<never, ApprovalServiceError> {
   return {
     error: {
@@ -2111,7 +2065,6 @@ function xeroNotConnected(): Result<never, ApprovalServiceError> {
     ok: false,
   };
 }
-
 function resolutionBlocked(
   resolutionError: ProviderResolutionError
 ): Result<never, ApprovalServiceError> {
@@ -2124,7 +2077,6 @@ function resolutionBlocked(
     ok: false,
   };
 }
-
 type ApprovalFailureStage =
   | "prepare"
   | "xero_write"
@@ -2133,7 +2085,6 @@ type ApprovalFailureStage =
   | "reload"
   | "publication"
   | "projection";
-
 type ApprovalFailureOperation =
   | "list_for_approver"
   | "get_approval_detail"
@@ -2145,7 +2096,6 @@ type ApprovalFailureOperation =
   | "retry_approve"
   | "decline"
   | "retry_decline";
-
 interface ApprovalFailureContext {
   clerkOrgId: string;
   failureStage?: ApprovalFailureStage;
@@ -2154,7 +2104,6 @@ interface ApprovalFailureContext {
   recordId?: string;
   xeroWriteSucceeded?: boolean;
 }
-
 function logAndReturnUnknown(
   error: unknown,
   context: ApprovalFailureContext,
@@ -2163,7 +2112,6 @@ function logAndReturnUnknown(
   log.error("Unexpected approval service failure", { ...context, error });
   return unknownError(userMessage);
 }
-
 function handleApprovalWriteFailure(
   error: unknown,
   context: ApprovalFailureContext & {
@@ -2189,7 +2137,6 @@ function handleApprovalWriteFailure(
   }
   return logAndReturnUnknown(error, context, userMessage);
 }
-
 function unknownError(message: string): Result<never, ApprovalServiceError> {
   return {
     error: {
@@ -2199,7 +2146,6 @@ function unknownError(message: string): Result<never, ApprovalServiceError> {
     ok: false,
   };
 }
-
 function toJsonValue(value: unknown): JsonValue {
   if (value === null || value === undefined) {
     return null;
@@ -2226,7 +2172,6 @@ function toJsonValue(value: unknown): JsonValue {
   }
   return String(value);
 }
-
 const recordInclude = {
   outbound_operations: {
     select: { action: true, dispatch_started_at: true, status: true },
@@ -2258,7 +2203,6 @@ const recordInclude = {
     },
   },
 } satisfies Prisma.AvailabilityRecordInclude;
-
 // Explicit projection: source_payload_json and xero_write_error_raw are audit
 // data and must never cross the RSC boundary to a client component.
 const approvalRecordSelect = {
@@ -2292,19 +2236,16 @@ const approvalRecordSelect = {
   xero_write_claimed_at: true,
   xero_write_error: true,
 } satisfies Prisma.AvailabilityRecordSelect;
-
 class OptimisticConflictError extends Error {
   constructor() {
     super("Record changed before the state transition completed.");
   }
 }
-
 class NotificationCreateError extends Error {
   constructor() {
     super("Notification could not be created.");
   }
 }
-
 function approvalCreateError(error: SubmitServiceError): ApprovalServiceError {
   switch (error.code) {
     case "submission_outcome_unknown":
@@ -2327,7 +2268,6 @@ function approvalCreateError(error: SubmitServiceError): ApprovalServiceError {
       return error;
   }
 }
-
 async function approveLocalRequest(
   input: CommandInput,
   externalWritePort: ExternalWritePort,
@@ -2347,7 +2287,6 @@ async function approveLocalRequest(
   }
   return { ok: true, value: await toApprovalListItem(updated) };
 }
-
 async function declineRemoteIfPresent(
   input: CommandInput,
   port: ExternalWritePort,

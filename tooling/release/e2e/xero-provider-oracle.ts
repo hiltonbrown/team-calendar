@@ -76,7 +76,6 @@ export function matchRawProviderLeave(
 export async function readIndependentAuLeave(input: {
   clerkOrgId: string;
   organisationId: string;
-  bindingGeneration: number;
   expectedTenantId: string;
   providerAppId: string;
   remoteId: string | null;
@@ -108,7 +107,7 @@ export async function readIndependentAuLeave(input: {
   }
   const [{ resolveXeroAccess }, { createXeroDeadline }, { xeroFetch }] =
     await Promise.all([
-      import("../../../packages/xero/src/oauth/credential-owner.js"),
+      import("../../../packages/xero/src/oauth/authorisation.js"),
       import("../../../packages/xero/src/rate-limit/deadline.js"),
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
@@ -118,7 +117,6 @@ export async function readIndependentAuLeave(input: {
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
     deadline,
-    expectedBindingGeneration: input.bindingGeneration,
     organisationId: input.organisationId,
   });
   if (
@@ -187,7 +185,6 @@ export async function readIndependentAuLeave(input: {
 export async function readIndependentAuImport(input: {
   clerkOrgId: string;
   organisationId: string;
-  bindingGeneration: number;
   expectedTenantId: string;
   providerAppId: string;
   ownedEmployeeIds: readonly string[];
@@ -198,7 +195,7 @@ export async function readIndependentAuImport(input: {
   const leave = await readIndependentAuLeave({ ...input, remoteId: null });
   const [{ resolveXeroAccess }, { createXeroDeadline }, { xeroFetch }] =
     await Promise.all([
-      import("../../../packages/xero/src/oauth/credential-owner.js"),
+      import("../../../packages/xero/src/oauth/authorisation.js"),
       import("../../../packages/xero/src/rate-limit/deadline.js"),
       import("../../../packages/xero/src/rate-limit/xero-fetch.js"),
     ]);
@@ -208,7 +205,6 @@ export async function readIndependentAuImport(input: {
     capability: ["payroll.employees.read", "payroll.settings.read"],
     clerkOrgId: input.clerkOrgId,
     deadline,
-    expectedBindingGeneration: input.bindingGeneration,
     organisationId: input.organisationId,
   });
   if (

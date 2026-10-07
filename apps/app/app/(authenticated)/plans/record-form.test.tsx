@@ -14,16 +14,13 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   updateRecordAction: vi.fn(),
 }));
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
-
 vi.mock("./_actions", () => ({
   createRecordAction: (input: unknown) => mocks.createRecordAction(input),
   updateRecordAction: (input: unknown) => mocks.updateRecordAction(input),
 }));
-
 class ResizeObserverMock {
   disconnect() {
     // No-op: the form does not react to resize callbacks in this test.
@@ -35,9 +32,7 @@ class ResizeObserverMock {
     // No-op: the form does not react to resize callbacks in this test.
   }
 }
-
 globalThis.ResizeObserver = ResizeObserverMock;
-
 const renderForm = () =>
   render(
     <RecordForm
@@ -56,7 +51,6 @@ const renderForm = () =>
       xeroConnectionState="not_connected"
     />
   );
-
 const renderCrossFoldForm = () =>
   render(
     <RecordForm
@@ -89,19 +83,16 @@ const renderCrossFoldForm = () =>
       xeroConnectionState="not_connected"
     />
   );
-
 describe("RecordForm", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
-
   it.each([
     [
       "unavailable",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     ["reauthorisation_required", "Xero access needs to be renewed."],
   ] as const)("blocks the payroll leave path while %s", (state, message) => {
     const { container } = render(
@@ -136,10 +127,8 @@ describe("RecordForm", () => {
     fireEvent.submit(form);
     expect(mocks.createRecordAction).not.toHaveBeenCalled();
   });
-
   it("associates visible labels with the core controls", () => {
     renderForm();
-
     expect(screen.getByRole("radiogroup", { name: "Intent" })).toBeDefined();
     expect(screen.getByLabelText("Person")).toBeDefined();
     expect(screen.getByLabelText("Leave type")).toBeDefined();
@@ -149,23 +138,19 @@ describe("RecordForm", () => {
     expect(screen.getByLabelText("Privacy")).toBeDefined();
     expect(screen.getByLabelText("Notes")).toBeDefined();
   });
-
   it("focuses an announced error summary and preserves entered values", async () => {
     const { container } = renderForm();
     const notes = screen.getByLabelText("Notes") as HTMLTextAreaElement;
     fireEvent.change(notes, { target: { value: "Keep this note" } });
-
     const form = container.querySelector("form");
     if (!form) {
       throw new Error("Expected the record form to render.");
     }
     fireEvent.submit(form);
-
     const alert = await screen.findByRole("alert");
     expect(document.activeElement).toBe(alert);
     expect(notes.value).toBe("Keep this note");
   });
-
   it("submits note-only edits of a valid cross-fold interval to the server", async () => {
     mocks.updateRecordAction.mockResolvedValue({
       ok: true,
@@ -197,7 +182,6 @@ describe("RecordForm", () => {
     expect(mocks.push).toHaveBeenCalledWith("/plans");
     expect(screen.queryByRole("alert")).toBeNull();
   });
-
   it("shows authoritative server ordering errors and preserves the edited fields", async () => {
     mocks.updateRecordAction.mockResolvedValue({
       error: {
@@ -223,7 +207,6 @@ describe("RecordForm", () => {
     expect(mocks.push).not.toHaveBeenCalled();
     expect(mocks.refresh).not.toHaveBeenCalled();
   });
-
   it("renders formatted balance according to balanceUnit and balanceCurrencyCode", () => {
     const { rerender } = render(
       <RecordForm
@@ -243,11 +226,9 @@ describe("RecordForm", () => {
         xeroConnectionState="connected"
       />
     );
-
     expect(
       screen.getByText("Current Xero balance: 15 days before this request.")
     ).toBeDefined();
-
     rerender(
       <RecordForm
         balanceAvailable={37.5}
@@ -266,11 +247,9 @@ describe("RecordForm", () => {
         xeroConnectionState="connected"
       />
     );
-
     expect(
       screen.getByText("Current Xero balance: 37.5 hours before this request.")
     ).toBeDefined();
-
     rerender(
       <RecordForm
         balanceAvailable={1200}
@@ -290,7 +269,6 @@ describe("RecordForm", () => {
         xeroConnectionState="connected"
       />
     );
-
     expect(
       screen.getByText("Current Xero balance: $1,200.00 before this request.")
     ).toBeDefined();

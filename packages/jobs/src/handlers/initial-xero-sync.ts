@@ -1,7 +1,5 @@
 import "server-only";
-
 import type { Result } from "@repo/core";
-import { XeroCampaignEventSchema } from "@repo/database/xero-campaign-contract";
 import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
@@ -12,29 +10,29 @@ import { syncXeroPeople } from "./sync-xero-people";
 import { rejectRetryableSyncResult } from "./xero-sync-access";
 
 const InitialXeroSyncInputSchema = z.object({
-  bindingGeneration: z.number().int().nonnegative(),
-  campaign: XeroCampaignEventSchema.optional(),
   clerkOrgId: z.string().min(1),
+  connectionId: z.string().uuid(),
   organisationId: z.string().uuid(),
   runId: z.string().uuid().optional(),
   triggeredByUserId: z.string().min(1).nullable().optional(),
   triggerType: z.enum(["scheduled", "manual", "webhook"]).default("manual"),
-  xeroTenantId: z.string().uuid(),
 });
-
 export type InitialXeroSyncInput = z.infer<typeof InitialXeroSyncInputSchema>;
-
 export type InitialXeroSyncError =
-  | { code: "validation_error"; message: string }
-  | { code: "unknown_error"; message: string };
-
+  | {
+      code: "validation_error";
+      message: string;
+    }
+  | {
+      code: "unknown_error";
+      message: string;
+    };
 export interface InitialXeroSyncResult {
   completedAt: Date;
   leaveBalances: unknown;
   leaveRecords: unknown;
   people: unknown;
 }
-
 export const initialXeroSyncFunction: InngestFunction.Any =
   inngest.createFunction(
     {
@@ -47,31 +45,21 @@ export const initialXeroSyncFunction: InngestFunction.Any =
       id: "initial-xero-sync",
       triggers: { event: "initial-xero-sync" },
     },
-    async ({ event, step, runId: workerRunId }) => {
+    async ({ event, step }) => {
       const peopleResult = await step.run("sync-people", async () =>
-        rejectRetryableSyncResult(syncXeroPeople(event.data, workerRunId))
+        rejectRetryableSyncResult(syncXeroPeople(event.data))
       );
-
       const leaveRecordsResult = await step.run(
         "sync-leave-records",
-        async () =>
-          rejectRetryableSyncResult(
-            syncXeroLeaveRecords(event.data, workerRunId)
-          )
+        async () => rejectRetryableSyncResult(syncXeroLeaveRecords(event.data))
       );
-
       const leaveBalancesResult = await step.run(
         "sync-leave-balances",
-        async () =>
-          rejectRetryableSyncResult(
-            syncXeroLeaveBalances(event.data, workerRunId)
-          )
+        async () => rejectRetryableSyncResult(syncXeroLeaveBalances(event.data))
       );
-
       await step.run("finalise-activation", async () =>
         captureInitialSyncCompleted(event.data)
       );
-
       return {
         completedAt: new Date(),
         leaveBalances: leaveBalancesResult,
@@ -80,10 +68,8 @@ export const initialXeroSyncFunction: InngestFunction.Any =
       };
     }
   );
-
 export async function initialXeroSync(
-  input: unknown,
-  workerRunId: string | null = null
+  input: unknown
 ): Promise<Result<InitialXeroSyncResult, InitialXeroSyncError>> {
   const parsed = InitialXeroSyncInputSchema.safeParse(input);
   if (!parsed.success) {
@@ -96,19 +82,10 @@ export async function initialXeroSync(
       ok: false,
     };
   }
-
-  const peopleResult = await syncXeroPeople(parsed.data, workerRunId);
-  const leaveRecordsResult = await syncXeroLeaveRecords(
-    parsed.data,
-    workerRunId
-  );
-  const leaveBalancesResult = await syncXeroLeaveBalances(
-    parsed.data,
-    workerRunId
-  );
-
+  const peopleResult = await syncXeroPeople(parsed.data);
+  const leaveRecordsResult = await syncXeroLeaveRecords(parsed.data);
+  const leaveBalancesResult = await syncXeroLeaveBalances(parsed.data);
   await captureInitialSyncCompleted(parsed.data);
-
   return {
     ok: true,
     value: {

@@ -10,7 +10,6 @@ describe("SyncHealthCard connection recovery", () => {
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
     ["reauthorisation_required", "Xero access needs to be renewed."],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
   ] as const)(
     "preserves %s without reporting disconnection",
     (state, message) => {

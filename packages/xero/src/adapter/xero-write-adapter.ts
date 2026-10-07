@@ -10,7 +10,7 @@ import type {
 } from "@repo/core";
 import { availability_record_type } from "@repo/database/generated/enums";
 import { emitXeroMetric } from "../metrics";
-import { resolveXeroAccess } from "../oauth/credential-owner";
+import { resolveXeroAccess } from "../oauth/authorisation";
 import { createXeroDeadline } from "../rate-limit/deadline";
 import {
   fetchLeaveForEmployeeForRegion,
@@ -27,7 +27,7 @@ import {
 import { toPlainLanguageMessage, type XeroWriteError } from "../write/types";
 import { XERO_OPERATION_CAPABILITIES } from "./capabilities";
 import { classifyXeroFailure } from "./classify-xero-failure";
-import { toResolvedXeroTenant } from "./resolved-tenant";
+import { toResolvedXeroConnection } from "./resolved-tenant";
 
 function isAvailabilityRecordType(
   val: string
@@ -83,7 +83,7 @@ async function getTenant(
   }
   return {
     ok: true as const,
-    value: toResolvedXeroTenant(scope, resolved.value),
+    value: toResolvedXeroConnection(scope, resolved.value),
   };
 }
 
@@ -114,9 +114,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
     }
     const tenant = resolution.value;
     const res = await approveLeaveApplicationForRegion(tenant.payroll_region, {
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -141,9 +141,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const tenant = resolution.value;
     const res = await declineLeaveApplicationForRegion(tenant.payroll_region, {
       reason: input.reason,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -166,11 +166,11 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const result =
       tenant.payroll_region === "AU"
         ? await fetchLeaveRecordsForRegion(tenant.payroll_region, {
-            xeroTenant: tenant,
+            xeroConnection: tenant,
           })
         : await fetchLeaveForEmployeeForRegion(tenant.payroll_region, {
+            xeroConnection: tenant,
             xeroEmployeeId: input.employeeId,
-            xeroTenant: tenant,
           });
     if (!result.ok) {
       return {
@@ -222,7 +222,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const tenant = resolution.value;
     const res = await resolveXeroEmployeeId({
       personId: input.personId,
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
     if (!res.ok) {
       return {
@@ -268,7 +268,7 @@ export const XeroWriteAdapter: ExternalWritePort = {
     const res = await resolveXeroLeaveTypeId({
       personId: input.personId,
       recordType: input.recordType,
-      xeroTenant: tenant,
+      xeroConnection: tenant,
     });
     if (!res.ok) {
       return {
@@ -298,9 +298,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
       startsAt: input.startsAt,
       title: input.title,
       units: input.units,
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveTypeId: input.leaveTypeId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {
@@ -330,9 +330,9 @@ export const XeroWriteAdapter: ExternalWritePort = {
     }
     const tenant = resolution.value;
     const res = await withdrawLeaveApplicationForRegion(tenant.payroll_region, {
+      xeroConnection: tenant,
       xeroEmployeeId: input.employeeId,
       xeroLeaveApplicationId: input.remoteId,
-      xeroTenant: tenant,
     });
     if (!res.ok) {
       return {

@@ -6,7 +6,6 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   setFilterParams: vi.fn(),
 }));
-
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mocks.push }),
   useSearchParams: () => new URLSearchParams("org=org_1"),
@@ -14,13 +13,11 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/url-state/use-filter-params", () => ({
   useFilterParams: () => [{}, mocks.setFilterParams],
 }));
-
 describe("CalendarToolbar", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
-
   it.each([
     ["2026-01-31", "Next month", "2026-02-28"],
     ["2026-03-31", "Previous month", "2026-02-28"],
@@ -49,7 +46,6 @@ describe("CalendarToolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: label }));
     expect(mocks.setFilterParams).toHaveBeenCalledWith({ anchor: expected });
   });
-
   it("provides one desktop and one safe-area mobile Add affordance", () => {
     render(
       <CalendarToolbar
@@ -68,7 +64,6 @@ describe("CalendarToolbar", () => {
         teams={[]}
       />
     );
-
     const addButtons = screen.getAllByRole("button", {
       name: "Add leave or availability",
     });
@@ -76,7 +71,6 @@ describe("CalendarToolbar", () => {
     expect(addButtons[0]?.className).toContain("hidden md:inline-flex");
     expect(addButtons[1]?.className).toContain("safe-area-inset-bottom");
     expect(addButtons[1]?.className).toContain("md:hidden");
-
     if (!addButtons[1]) {
       throw new Error("Expected the mobile Add action.");
     }
@@ -86,7 +80,6 @@ describe("CalendarToolbar", () => {
     );
   });
 });
-
 function calendarRange() {
   return {
     days: [

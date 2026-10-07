@@ -68,7 +68,6 @@ describe("independent raw AU provider oracle", () => {
       await expect(
         readIndependentAuLeave({
           assertAuthority: () => Promise.reject(new Error("authority revoked")),
-          bindingGeneration: 1,
           clerkOrgId: "org-owned",
           expectedTenantId: "owned",
           organisationId: "owned",
@@ -89,7 +88,6 @@ describe("independent raw AU provider oracle", () => {
     await expect(
       readIndependentAuLeave({
         assertAuthority: vi.fn(),
-        bindingGeneration: 1,
         clerkOrgId: "org-owned",
         expectedTenantId: "owned",
         organisationId: "owned",

@@ -23,7 +23,6 @@ const mocks = vi.hoisted(() => ({
     Promise.resolve({ ok: true, value: undefined })
   ),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
@@ -45,13 +44,10 @@ vi.mock("@repo/feeds", () => ({
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },
 }));
-
 const { rebuildFeedCache } = await import("./rebuild-feed-cache");
-
 const CLERK_ORG_ID = "org_rebuild";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const FEED_ID = "20000000-0000-4000-8000-000000000001";
-
 function input(overrides: Record<string, unknown> = {}) {
   return {
     clerkOrgId: CLERK_ORG_ID,
@@ -60,9 +56,7 @@ function input(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
-
 const registeredHandler = mocks.createFunction.mock.calls[0]?.[1];
-
 it("throws execution failures with valid input at the queue boundary", async () => {
   const handler = registeredHandler;
   expect(handler).toBeTypeOf("function");
@@ -85,7 +79,6 @@ it("throws execution failures with valid input at the queue boundary", async () 
   ).rejects.toThrow();
   expect(mocks.renderFeedBody).toHaveBeenCalled();
 });
-
 describe("rebuildFeedCache", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -97,10 +90,8 @@ describe("rebuildFeedCache", () => {
       updated_at: new Date("2026-05-01T00:00:00.000Z"),
     });
   });
-
   it("scopes the feed lookup by both clerk org and organisation", async () => {
     await rebuildFeedCache(input());
-
     expect(mocks.feedFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -112,10 +103,8 @@ describe("rebuildFeedCache", () => {
       })
     );
   });
-
   it("invalidates then regenerates the cached body under the renderer key", async () => {
     const result = await rebuildFeedCache(input());
-
     expect(result).toEqual({
       ok: true,
       value: { feedId: FEED_ID, rebuilt: true, skipped: false },
@@ -137,12 +126,9 @@ describe("rebuildFeedCache", () => {
       })
     );
   });
-
   it("drops the cache and skips when the feed is not active in scope", async () => {
     mocks.feedFindFirst.mockResolvedValue(null);
-
     const result = await rebuildFeedCache(input());
-
     expect(result).toEqual({
       ok: true,
       value: { feedId: FEED_ID, rebuilt: false, skipped: true },
@@ -151,7 +137,6 @@ describe("rebuildFeedCache", () => {
     expect(mocks.renderFeedBody).not.toHaveBeenCalled();
     expect(mocks.setCachedFeedBody).not.toHaveBeenCalled();
   });
-
   it("reports rendering failure instead of a successful rebuild", async () => {
     mocks.renderFeedBody.mockResolvedValueOnce({
       error: {
@@ -163,7 +148,6 @@ describe("rebuildFeedCache", () => {
     expect(await rebuildFeedCache(input())).toMatchObject({ ok: false });
     expect(mocks.setCachedFeedBody).not.toHaveBeenCalled();
   });
-
   it("reports KV failure instead of claiming the body was cached", async () => {
     mocks.setCachedFeedBody.mockResolvedValueOnce({
       error: {
@@ -174,36 +158,11 @@ describe("rebuildFeedCache", () => {
     });
     expect(await rebuildFeedCache(input())).toMatchObject({ ok: false });
   });
-
   it("rejects payloads missing a scope key", async () => {
     const result = await rebuildFeedCache(input({ organisationId: undefined }));
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

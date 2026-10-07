@@ -2,7 +2,6 @@ import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
 import { appError } from "@repo/core";
 import { database } from "../client";
 import { scopedQuery } from "../tenant-query";
-
 export async function listOrganisationsByClerkOrg(
   clerkOrgId: ClerkOrgId
 ): Promise<
@@ -40,7 +39,6 @@ export async function listOrganisationsByClerkOrg(
       },
       where: { archived_at: null, clerk_org_id: clerkOrgId },
     });
-
     return {
       ok: true,
       value: organisations.map((o) => ({
@@ -67,7 +65,6 @@ export async function listOrganisationsByClerkOrg(
     };
   }
 }
-
 export async function getOrganisationById(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId
@@ -107,14 +104,12 @@ export async function getOrganisationById(
         id: organisationId,
       },
     });
-
     if (!organisation) {
       return {
         error: appError("not_found", "Organisation not found"),
         ok: false,
       };
     }
-
     return {
       ok: true,
       value: {
@@ -141,7 +136,6 @@ export async function getOrganisationById(
     };
   }
 }
-
 export async function hasXeroConnection(
   clerkOrgId: ClerkOrgId,
   organisationId: OrganisationId
@@ -151,7 +145,6 @@ export async function hasXeroConnection(
       select: { id: true },
       where: scopedQuery(clerkOrgId, organisationId),
     });
-
     return {
       ok: true,
       value: !!connection,

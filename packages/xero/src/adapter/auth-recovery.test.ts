@@ -1,24 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { XeroTenantForWrite, XeroWriteError } from "../write/types";
+import type { XeroAccessContext, XeroWriteError } from "../write/types";
 
 const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
-vi.mock("../oauth/credential-owner", () => ({
+vi.mock("../oauth/authorisation", () => ({
   resolveXeroAccess: mocks.resolve,
 }));
 
 import { executeWithXeroAuthRecovery } from "./auth-recovery";
 
-function tenant(): XeroTenantForWrite {
+function tenant(): XeroAccessContext {
   return {
     accessToken: "old-token",
-    bindingGeneration: 2,
     capability: "payroll.employees",
     clerk_org_id: "clerk",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id: "binding",
     organisation_id: "organisation",
     payroll_region: "AU",
-    tokenVersion: 1,
     xero_tenant_id: "payroll-file",
   };
 }
@@ -40,11 +38,9 @@ beforeEach(() => {
     ok: true,
     value: {
       accessToken: "new-token",
-      bindingGeneration: 2,
+      connectionId: "binding",
       deadline: input.deadline,
       payrollRegion: "AU",
-      tokenVersion: 2,
-      xeroTenantDatabaseId: "binding",
       xeroTenantId: "payroll-file",
     },
   }));
@@ -64,10 +60,8 @@ describe("bounded Xero auth recovery", () => {
       expect.objectContaining({
         clerkOrgId: "clerk",
         deadline: current.deadline,
-        expectedBindingGeneration: 2,
         forceRefresh: true,
         organisationId: "organisation",
-        previousTokenVersion: 1,
       })
     );
     expect(operation).toHaveBeenCalledTimes(2);
@@ -145,8 +139,8 @@ describe("bounded Xero auth recovery", () => {
     });
     expect(operation).toHaveBeenCalledOnce();
   });
-  it("uses rejected plaintext only for legacy concurrency comparison inside the resolver", async () => {
-    const current = { ...tenant(), tokenVersion: null };
+  it("passes the rejected token for canonical concurrent-refresh comparison", async () => {
+    const current = { ...tenant() };
     const operation = vi
       .fn()
       .mockResolvedValueOnce(rejected())
@@ -155,21 +149,7 @@ describe("bounded Xero auth recovery", () => {
     expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         previousAccessToken: "old-token",
-        previousTokenVersion: null,
       })
     );
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

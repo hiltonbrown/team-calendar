@@ -14,19 +14,17 @@ const scope = {
 };
 describe("getXeroConnectionStateForScope", () => {
   beforeEach(() => vi.clearAllMocks());
-  it.each([
-    "connected",
-    "not_connected",
-    "disconnect_pending",
-    "reauthorisation_required",
-  ])("preserves %s without credentials", async (state) => {
-    const result = { ok: true, value: { bindingGeneration: 7, state } };
-    mocks.query.mockResolvedValue(result);
-    await expect(getXeroConnectionStateForScope(scope)).resolves.toEqual(
-      result
-    );
-    expect(mocks.query).toHaveBeenCalledWith(scope);
-  });
+  it.each(["connected", "not_connected", "reauthorisation_required"])(
+    "preserves %s without credentials",
+    async (state) => {
+      const result = { ok: true, value: { state } };
+      mocks.query.mockResolvedValue(result);
+      await expect(getXeroConnectionStateForScope(scope)).resolves.toEqual(
+        result
+      );
+      expect(mocks.query).toHaveBeenCalledWith(scope);
+    }
+  );
   it("preserves query unavailability", async () => {
     mocks.query.mockResolvedValue({
       error: { code: "state_unavailable" },

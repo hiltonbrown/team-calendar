@@ -37,7 +37,7 @@ const {
 
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const runId = "00000000-0000-4000-8000-000000000002";
-const xeroTenantId = "00000000-0000-4000-8000-000000000003";
+const connectionId = "00000000-0000-4000-8000-000000000003";
 const clerkOrgId = "org_123";
 const userId = "user_456";
 
@@ -87,9 +87,9 @@ describe("sync server actions", () => {
     mocks.currentUser.mockResolvedValue(null);
 
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result).toEqual({
@@ -116,9 +116,9 @@ describe("sync server actions", () => {
 
   it("rejects malformed inputs before dispatch", async () => {
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId: "invalid-uuid",
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result.ok).toBe(false);
@@ -139,9 +139,9 @@ describe("sync server actions", () => {
 
   it("queues manual sync through the authenticated API endpoint", async () => {
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result).toEqual({
@@ -152,9 +152,9 @@ describe("sync server actions", () => {
       "https://api.example.com/api/sync/dispatch",
       {
         body: JSON.stringify({
+          connectionId,
           organisationId,
           runType: "people",
-          xeroTenantId,
         }),
         cache: "no-store",
         headers: {
@@ -170,9 +170,9 @@ describe("sync server actions", () => {
     mocks.getToken.mockResolvedValueOnce(null);
 
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result).toEqual({
@@ -191,9 +191,9 @@ describe("sync server actions", () => {
     );
 
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "leave_records",
-      xeroTenantId,
     });
 
     expect(result).toEqual({
@@ -220,9 +220,9 @@ describe("sync server actions", () => {
     );
 
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result).toEqual({
@@ -249,9 +249,9 @@ describe("sync server actions", () => {
     );
 
     const result = await dispatchManualSyncAction({
+      connectionId,
       organisationId,
       runType: "people",
-      xeroTenantId,
     });
 
     expect(result).toEqual({

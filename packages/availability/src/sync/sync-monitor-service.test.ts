@@ -20,7 +20,6 @@ const mocks = vi.hoisted(() => ({
   xeroTenantFindFirst: vi.fn(),
   xeroTenantFindMany: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.state,
@@ -44,7 +43,7 @@ vi.mock("@repo/database", () => ({
       findMany: mocks.syncRunFindMany,
       groupBy: mocks.syncRunGroupBy,
     },
-    xeroTenant: {
+    xeroConnection: {
       findFirst: mocks.xeroTenantFindFirst,
       findMany: mocks.xeroTenantFindMany,
     },
@@ -63,21 +62,18 @@ vi.mock("./sync-events", () => ({
     people: "availability.sync.people",
   },
 }));
-
 const {
   dispatchManualSync,
   getRedactedFailedRecordPayload,
   getRunDetail,
   listTenantSummaries,
 } = await import("./sync-monitor-service");
-
 const baseInput = {
   actingRole: "admin" as const,
   actingUserId: "user_1",
   clerkOrgId: "org_1",
   organisationId: "00000000-0000-4000-8000-000000000001",
 };
-
 function completedRunFixture(input: {
   completedAt?: Date;
   failedRecordIds?: string[];
@@ -98,10 +94,9 @@ function completedRunFixture(input: {
     run_type: input.runType,
     started_at: input.startedAt,
     status: input.status,
-    xero_tenant_id: "tenant_1",
+    xero_connection_id: "tenant_1",
   };
 }
-
 function failedRecordFixture(input: {
   createdAt: Date;
   id: string;
@@ -114,14 +109,20 @@ function failedRecordFixture(input: {
     sync_run: {
       run_type: input.runType,
       started_at: input.startedAt,
-      xero_tenant_id: "tenant_1",
+      xero_connection_id: "tenant_1",
     },
   };
 }
-
 function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
   mocks.syncRunFindFirst.mockImplementation(
-    ({ where }: { where: { run_type?: SyncRunType; status?: unknown } }) => {
+    ({
+      where,
+    }: {
+      where: {
+        run_type?: SyncRunType;
+        status?: unknown;
+      };
+    }) => {
       if (where.status === "running") {
         return null;
       }
@@ -135,7 +136,11 @@ function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
             where.status &&
             "in" in where.status
           ) {
-            const statuses = (where.status as { in: SyncRunStatus[] }).in;
+            const statuses = (
+              where.status as {
+                in: SyncRunStatus[];
+              }
+            ).in;
             return statuses.includes(run.status);
           }
           return true;
@@ -144,17 +149,15 @@ function mockSummaryRuns(runs: ReturnType<typeof completedRunFixture>[]): void {
     }
   );
 }
-
 describe("sync-monitor-service", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
-
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.state.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: 1, state: "connected" },
+      value: { state: "connected" },
     });
     mocks.xeroTenantFindMany.mockResolvedValue([
       {
@@ -194,7 +197,6 @@ describe("sync-monitor-service", () => {
       value: undefined,
     });
   });
-
   it.each([
     ["update_permissions", "Update Xero permissions to continue."],
     ["retry_later", "Xero is temporarily unavailable. Try again later."],
@@ -202,7 +204,6 @@ describe("sync-monitor-service", () => {
       "operational_incident",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     ["Payroll NZ is not enabled.", "Payroll NZ is not enabled."],
   ])(
     "projects stored recovery summary %s into neutral DTO copy",
@@ -222,8 +223,8 @@ describe("sync-monitor-service", () => {
         status: "failed",
         trigger_type: "scheduled",
         triggered_by_user_id: null,
+        xero_connection_id: "tenant_1",
         xero_tenant: { id: "tenant_1", tenant_name: "Acme Payroll" },
-        xero_tenant_id: "tenant_1",
       });
       mocks.failedRecordFindMany.mockResolvedValue([
         {
@@ -246,7 +247,6 @@ describe("sync-monitor-service", () => {
       expect(mocks.auditCreate).not.toHaveBeenCalled();
     }
   );
-
   it("bounds initial detail and excludes raw or arbitrary audit payloads", async () => {
     mocks.syncRunFindFirst.mockResolvedValue({
       _count: { failed_records: 0 },
@@ -262,15 +262,13 @@ describe("sync-monitor-service", () => {
       status: "succeeded",
       trigger_type: "scheduled",
       triggered_by_user_id: null,
+      xero_connection_id: "tenant_1",
       xero_tenant: { id: "tenant_1", tenant_name: "Acme Payroll" },
-      xero_tenant_id: "tenant_1",
     });
-
     const result = await getRunDetail({
       ...baseInput,
       runId: "00000000-0000-4000-8000-000000000021",
     });
-
     expect(result.ok).toBe(true);
     expect(mocks.failedRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -290,19 +288,16 @@ describe("sync-monitor-service", () => {
       })
     );
   });
-
   it("loads and audits only a run-bound redacted failure payload", async () => {
     mocks.failedRecordFindFirst.mockResolvedValue({
       id: "00000000-0000-4000-8000-000000000031",
       raw_payload: { access_token: "secret", safe: "visible" },
     });
-
     const result = await getRedactedFailedRecordPayload({
       ...baseInput,
       failureId: "00000000-0000-4000-8000-000000000031",
       runId: "00000000-0000-4000-8000-000000000021",
     });
-
     expect(mocks.failedRecordFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -319,10 +314,8 @@ describe("sync-monitor-service", () => {
     });
     expect(mocks.auditCreate).toHaveBeenCalledOnce();
   });
-
   it("includes syncPausedAt in tenant summaries", async () => {
     const result = await listTenantSummaries(baseInput);
-
     expect(result).toMatchObject({
       ok: true,
       value: [
@@ -333,11 +326,9 @@ describe("sync-monitor-service", () => {
       ],
     });
   });
-
   it("bounds tenant summary run and failed-record queries to the 30-day window", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-20T12:00:00.000Z"));
-
     const startedAt = new Date("2026-04-19T12:00:00.000Z");
     const completedAt = new Date("2026-04-19T12:05:00.000Z");
     mockSummaryRuns([
@@ -367,19 +358,17 @@ describe("sync-monitor-service", () => {
       {
         _count: { _all: 1 },
         status: "partial_success",
-        xero_tenant_id: "tenant_1",
+        xero_connection_id: "tenant_1",
       },
     ]);
-
     try {
       const result = await listTenantSummaries(baseInput);
       const since = new Date("2026-03-21T12:00:00.000Z");
-
       expect(mocks.syncRunGroupBy).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
             started_at: { gte: since },
-            xero_tenant_id: { in: ["tenant_1"] },
+            xero_connection_id: { in: ["tenant_1"] },
           }),
         })
       );
@@ -409,11 +398,9 @@ describe("sync-monitor-service", () => {
       vi.useRealTimers();
     }
   });
-
   it("keeps failed runs as history after a later successful run resolves the current issue", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-20T12:00:00.000Z"));
-
     const failedAt = new Date("2026-04-18T12:00:00.000Z");
     const succeededAt = new Date("2026-04-19T12:00:00.000Z");
     mockSummaryRuns([
@@ -442,12 +429,14 @@ describe("sync-monitor-service", () => {
       }),
     ]);
     mocks.syncRunGroupBy.mockResolvedValue([
-      { _count: { _all: 1 }, status: "failed", xero_tenant_id: "tenant_1" },
-      { _count: { _all: 1 }, status: "succeeded", xero_tenant_id: "tenant_1" },
+      { _count: { _all: 1 }, status: "failed", xero_connection_id: "tenant_1" },
+      {
+        _count: { _all: 1 },
+        status: "succeeded",
+        xero_connection_id: "tenant_1",
+      },
     ]);
-
     const result = await listTenantSummaries(baseInput);
-
     expect(result).toMatchObject({
       ok: true,
       value: [
@@ -461,11 +450,9 @@ describe("sync-monitor-service", () => {
       ],
     });
   });
-
   it("tracks the latest completed outcome independently for each run type", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-04-20T12:00:00.000Z"));
-
     const oldestAt = new Date("2026-04-17T12:00:00.000Z");
     const failedAt = new Date("2026-04-18T12:00:00.000Z");
     const succeededAt = new Date("2026-04-19T12:00:00.000Z");
@@ -513,17 +500,19 @@ describe("sync-monitor-service", () => {
       where.sync_run.run_type === "people" ? 1 : 0
     );
     mocks.syncRunGroupBy.mockResolvedValue([
-      { _count: { _all: 1 }, status: "failed", xero_tenant_id: "tenant_1" },
-      { _count: { _all: 1 }, status: "succeeded", xero_tenant_id: "tenant_1" },
+      { _count: { _all: 1 }, status: "failed", xero_connection_id: "tenant_1" },
+      {
+        _count: { _all: 1 },
+        status: "succeeded",
+        xero_connection_id: "tenant_1",
+      },
       {
         _count: { _all: 1 },
         status: "partial_success",
-        xero_tenant_id: "tenant_1",
+        xero_connection_id: "tenant_1",
       },
     ]);
-
     const result = await listTenantSummaries(baseInput);
-
     expect(result).toMatchObject({
       ok: true,
       value: [
@@ -536,13 +525,11 @@ describe("sync-monitor-service", () => {
       ],
     });
   });
-
   it.each([
     [
       "unavailable",
       "We cannot reach Xero right now. Try again later or contact support.",
     ],
-    ["disconnect_pending", "Sync stopped. Xero disconnection is pending."],
     ["reauthorisation_required", "Xero access needs to be renewed."],
   ] as const)(
     "never dispatches or reports disconnection during %s",
@@ -562,18 +549,17 @@ describe("sync-monitor-service", () => {
       mocks.state.mockResolvedValue(
         state === "unavailable"
           ? { error: { code: "state_unavailable" }, ok: false }
-          : { ok: true, value: { bindingGeneration: 7, state } }
+          : { ok: true, value: { state } }
       );
       const result = await dispatchManualSync({
         ...baseInput,
+        connectionId: tenantId,
         runType: "people",
-        xeroTenantId: tenantId,
       });
       expect(result).toMatchObject({ error: { message }, ok: false });
       expect(mocks.dispatchSyncEvent).not.toHaveBeenCalled();
     }
   );
-
   it("dispatches manual sync for active connection even if access token expires_at is past", async () => {
     const validTenantId = "00000000-0000-4000-8000-000000000010";
     mocks.xeroTenantFindFirst.mockResolvedValue({
@@ -588,13 +574,11 @@ describe("sync-monitor-service", () => {
         status: "active",
       },
     });
-
     const result = await dispatchManualSync({
       ...baseInput,
+      connectionId: validTenantId,
       runType: "people",
-      xeroTenantId: validTenantId,
     });
-
     expect(result).toEqual({
       ok: true,
       value: {
@@ -605,30 +589,11 @@ describe("sync-monitor-service", () => {
     expect(mocks.dispatchSyncEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: baseInput.clerkOrgId,
+        connectionId: validTenantId,
         organisationId: baseInput.organisationId,
         runType: "people",
         triggerType: "manual",
-        xeroTenantId: validTenantId,
       })
     );
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

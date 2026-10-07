@@ -10,7 +10,6 @@ const ids = {
   person: "00000000-0000-4000-8000-000000000011",
   team: "00000000-0000-4000-8000-000000000100",
 };
-
 const mocks = vi.hoisted(() => ({
   availabilityFindFirst: vi.fn(),
   availabilityFindMany: vi.fn(),
@@ -28,7 +27,6 @@ const mocks = vi.hoisted(() => ({
     organisation_id: input.organisationId,
   })),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("@repo/database", () => ({
   database: {
@@ -51,16 +49,13 @@ vi.mock("../settings/organisation-settings-service", () => ({
 vi.mock("../xero-connection-state", () => ({
   getXeroConnectionStateForScope: mocks.getXeroConnectionStateForScope,
 }));
-
 const { getCalendarRange, getEventDetail } = await import("./calendar-service");
-
 const people = [
   person(ids.manager, "Morgan", "Manager", null),
   person(ids.person, "Ari", "Report", ids.manager),
   person(ids.indirect, "Indy", "Indirect", ids.person),
   person(ids.peer, "Pia", "Peer", null),
 ];
-
 const baseInput = {
   actingPersonId: ids.manager,
   actingUserId: "user_1",
@@ -72,7 +67,6 @@ const baseInput = {
   scope: { type: "my_team" },
   view: "week",
 } as const;
-
 describe("calendar-service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -106,7 +100,7 @@ describe("calendar-service", () => {
     });
     mocks.getXeroConnectionStateForScope.mockResolvedValue({
       ok: true,
-      value: { bindingGeneration: null, state: "not_connected" },
+      value: { state: "not_connected" },
     });
     mocks.listForOrganisation.mockResolvedValue({
       ok: true,
@@ -123,10 +117,8 @@ describe("calendar-service", () => {
       ],
     });
   });
-
   it("returns direct reports plus self for my_team and uses Monday week range", async () => {
     const result = await getCalendarRange(baseInput);
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -140,7 +132,6 @@ describe("calendar-service", () => {
       "2026-04-13"
     );
   });
-
   it.each(["all_teams", "my_team", "team"] as const)(
     "excludes indirect reports from %s under direct-only visibility",
     async (type) => {
@@ -172,7 +163,6 @@ describe("calendar-service", () => {
       );
     }
   );
-
   it("denies explicit indirect-person range under direct-only visibility", async () => {
     const result = await getCalendarRange({
       ...baseInput,
@@ -183,7 +173,6 @@ describe("calendar-service", () => {
       ok: false,
     });
   });
-
   it("preserves indirect reports and their manager details when all-team visibility is enabled", async () => {
     mocks.getSettings.mockResolvedValue({
       ok: true,
@@ -207,7 +196,6 @@ describe("calendar-service", () => {
       notesInternal: "Private note",
     });
   });
-
   it("fails closed to self when settings cannot be read", async () => {
     mocks.getSettings.mockResolvedValue({
       error: { code: "unknown_error" },
@@ -229,7 +217,6 @@ describe("calendar-service", () => {
       ok: false,
     });
   });
-
   it.each([null, ids.otherOrg])(
     "denies missing or inactive manager identity %s",
     async (actingPersonId) => {
@@ -238,7 +225,6 @@ describe("calendar-service", () => {
       ).toMatchObject({ error: { code: "not_authorised" }, ok: false });
     }
   );
-
   it("scopes range and detail people and records to both tenant boundaries", async () => {
     await getCalendarRange(baseInput);
     await getEventDetail(detailInput());
@@ -259,7 +245,6 @@ describe("calendar-service", () => {
       expect.objectContaining({ where: expect.objectContaining(scope) })
     );
   });
-
   it("denies detail for an archived or inactive person", async () => {
     mocks.personFindMany.mockResolvedValue(
       people.filter((candidate) => candidate.id !== ids.person)
@@ -269,7 +254,6 @@ describe("calendar-service", () => {
       ok: false,
     });
   });
-
   it.each([
     ["2026-03-15", "2026-02-23", "2026-04-05", 42],
     ["2026-09-15", "2026-08-31", "2026-10-04", 35],
@@ -294,7 +278,6 @@ describe("calendar-service", () => {
       );
     }
   );
-
   it.each([
     ["2026-04-05", "2026-04-04T13:00:00Z", "2026-04-05T14:00:00Z", 25],
     ["2026-10-04", "2026-10-03T14:00:00Z", "2026-10-04T13:00:00Z", 23],
@@ -346,13 +329,11 @@ describe("calendar-service", () => {
       ).toBe(hours);
     }
   );
-
   it("maps source category filters to source type predicates", async () => {
     await getCalendarRange({
       ...baseInput,
       filters: { recordTypeCategory: "xero_leave" },
     });
-
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -361,7 +342,6 @@ describe("calendar-service", () => {
       })
     );
   });
-
   it("includes own drafts only when includeDrafts is true", async () => {
     await getCalendarRange({
       ...baseInput,
@@ -369,7 +349,6 @@ describe("calendar-service", () => {
       filters: { includeDrafts: true },
       scope: { type: "my_self" },
     });
-
     expect(mocks.availabilityFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
@@ -380,7 +359,6 @@ describe("calendar-service", () => {
       })
     );
   });
-
   it("applies privacy transformation before returning events", async () => {
     const result = await getCalendarRange({
       ...baseInput,
@@ -388,9 +366,7 @@ describe("calendar-service", () => {
       role: "viewer",
       scope: { type: "all_teams" },
     });
-
     expect(result.ok).toBe(false);
-
     const detail = await getEventDetail({
       actingPersonId: ids.peer,
       actingUserId: "user_2",
@@ -406,14 +382,12 @@ describe("calendar-service", () => {
     expect(detail.value.displayName).toBe("Ari Report");
     expect(detail.value.notesInternal).toBe("Private note");
   });
-
   it("redacts private peer records in range output", async () => {
     const result = await getCalendarRange({
       ...baseInput,
       role: "owner",
       scope: { type: "all_teams" },
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -426,7 +400,6 @@ describe("calendar-service", () => {
       "Xero could not save this leave."
     );
   });
-
   it("withholds xero write errors from peers in all-team range output", async () => {
     mocks.getSettings.mockResolvedValue({
       ok: true,
@@ -439,7 +412,6 @@ describe("calendar-service", () => {
       ...baseInput,
       scope: { type: "team", value: ids.team },
     });
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
@@ -450,7 +422,6 @@ describe("calendar-service", () => {
     expect(peerEvent?.xeroWriteError).toBeNull();
     expect(peerEvent?.notesInternal).toBeNull();
   });
-
   it("detects cross-org record lookups", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce(null)
@@ -458,7 +429,6 @@ describe("calendar-service", () => {
         clerk_org_id: "org_2",
         organisation_id: ids.otherOrg,
       });
-
     const result = await getEventDetail({
       actingPersonId: ids.manager,
       actingUserId: "user_1",
@@ -467,28 +437,23 @@ describe("calendar-service", () => {
       recordId: "00000000-0000-4000-8000-000000000099",
       role: "manager",
     });
-
     expect(result.ok).toBe(false);
     if (result.ok) {
       return;
     }
     expect(result.error.code).toBe("invalid_scope");
   });
-
   it("denies indirect-report detail under direct-only manager visibility", async () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       record("indirect-detail", ids.indirect)
     );
-
     const result = await getEventDetail(detailInput());
-
     expect(result.ok).toBe(false);
     if (result.ok) {
       return;
     }
     expect(result.error.code).toBe("not_authorised");
   });
-
   it("allows indirect-report detail under all-team manager visibility", async () => {
     mocks.getSettings.mockResolvedValue({
       ok: true,
@@ -500,18 +465,13 @@ describe("calendar-service", () => {
     mocks.availabilityFindFirst.mockResolvedValue(
       record("indirect-detail", ids.indirect)
     );
-
     const result = await getEventDetail(detailInput());
-
     expect(result.ok).toBe(true);
   });
-
   it("allows direct-report detail under direct-only manager visibility", async () => {
     const result = await getEventDetail(detailInput());
-
     expect(result.ok).toBe(true);
   });
-
   it("applies centralised holiday applicability rules to calendar holiday cells", async () => {
     mocks.listForOrganisation.mockResolvedValue({
       ok: true,
@@ -577,18 +537,14 @@ describe("calendar-service", () => {
         },
       ],
     });
-
     const result = await getCalendarRange(baseInput);
-
     expect(result.ok).toBe(true);
     if (!result.ok) {
       return;
     }
-
     const holidayNames = result.value.days.flatMap((day) =>
       day.publicHolidays.map((h) => h.name)
     );
-
     expect(holidayNames).toContain("Location Override Picnic Day");
     expect(holidayNames).toContain("Custom Org Day");
     expect(holidayNames).not.toContain("Excluded by Override");
@@ -596,7 +552,6 @@ describe("calendar-service", () => {
     expect(holidayNames).not.toContain("Archived Holiday");
   });
 });
-
 function detailInput() {
   return {
     actingPersonId: ids.manager,
@@ -607,7 +562,6 @@ function detailInput() {
     role: "manager",
   } as const;
 }
-
 function person(
   id: string,
   firstName: string,
@@ -636,7 +590,6 @@ function person(
     team_id: ids.team,
   };
 }
-
 function records() {
   return [
     record("approved-record", ids.person),
@@ -652,7 +605,6 @@ function records() {
     },
   ];
 }
-
 function record(id: string, personId: string) {
   const recordPerson = people.find((item) => item.id === personId) ?? people[1];
   return {

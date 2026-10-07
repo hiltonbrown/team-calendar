@@ -274,13 +274,13 @@ export type FeedTokenOrderByWithRelationInput = {
 
 export type FeedTokenWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  feed_id?: string
   token_hash?: string
   AND?: Prisma.FeedTokenWhereInput | Prisma.FeedTokenWhereInput[]
   OR?: Prisma.FeedTokenWhereInput[]
   NOT?: Prisma.FeedTokenWhereInput | Prisma.FeedTokenWhereInput[]
   clerk_org_id?: Prisma.StringFilter<"FeedToken"> | string
   organisation_id?: Prisma.UuidFilter<"FeedToken"> | string
-  feed_id?: Prisma.UuidFilter<"FeedToken"> | string
   token_hint?: Prisma.StringFilter<"FeedToken"> | string
   status?: Prisma.Enumfeed_token_statusFilter<"FeedToken"> | $Enums.feed_token_status
   expires_at?: Prisma.DateTimeNullableFilter<"FeedToken"> | Date | string | null
@@ -293,7 +293,7 @@ export type FeedTokenWhereUniqueInput = Prisma.AtLeast<{
   feed?: Prisma.XOR<Prisma.FeedScalarRelationFilter, Prisma.FeedWhereInput>
   rotated_from_token?: Prisma.XOR<Prisma.FeedTokenNullableScalarRelationFilter, Prisma.FeedTokenWhereInput> | null
   rotated_tokens?: Prisma.FeedTokenListRelationFilter
-}, "id" | "token_hash">
+}, "id" | "token_hash" | "feed_id">
 
 export type FeedTokenOrderByWithAggregationInput = {
   id?: Prisma.SortOrder

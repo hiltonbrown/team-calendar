@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { XeroTenantForWrite, XeroWriteError } from "../write/types";
+import type { XeroAccessContext, XeroWriteError } from "../write/types";
 
 const mocks = vi.hoisted(() => ({
   approveLeaveApplicationForRegion: vi.fn(),
@@ -11,38 +11,31 @@ const mocks = vi.hoisted(() => ({
   tenantFindFirst: vi.fn(),
   withdrawLeaveApplicationForRegion: vi.fn(),
 }));
-
 vi.mock("@repo/observability/log", () => ({ log: { info: mocks.metricLog } }));
 beforeEach(() => {
   mocks.metricLog.mockReset();
 });
-
 vi.mock("@repo/database", () => ({
   database: {
-    xeroTenant: {
+    xeroConnection: {
       findFirst: mocks.tenantFindFirst,
     },
   },
 }));
-
 vi.mock("../oauth/service", () => ({
   ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
 }));
-
-vi.mock("../oauth/credential-owner", () => ({
+vi.mock("../oauth/authorisation", () => ({
   resolveXeroAccess: mocks.resolveXeroAccess,
 }));
-
 vi.mock("../write/dispatch", () => ({
   approveLeaveApplicationForRegion: mocks.approveLeaveApplicationForRegion,
   declineLeaveApplicationForRegion: mocks.declineLeaveApplicationForRegion,
   submitLeaveApplicationForRegion: mocks.submitLeaveApplicationForRegion,
   withdrawLeaveApplicationForRegion: mocks.withdrawLeaveApplicationForRegion,
 }));
-
 const { XeroWriteAdapter } = await import("./xero-write-adapter");
 const { toPlainLanguageMessage } = await import("../write/types");
-
 const submitInput = {
   clerkOrgId: "org_1",
   employeeId: "employee-1",
@@ -53,31 +46,26 @@ const submitInput = {
   title: "Annual leave",
   units: 7.6,
 };
-
 const approveInput = {
   clerkOrgId: "org_1",
   employeeId: "employee-1",
   organisationId: "00000000-0000-4000-8000-000000000001",
   remoteId: "leave-application-1",
 };
-
-function buildTenant(id: string): XeroTenantForWrite & {
+function buildTenant(id: string): XeroAccessContext & {
   xero_connection_id: string;
 } {
   return {
     accessToken: "access-token",
-    bindingGeneration: 1,
     clerk_org_id: "org_1",
     deadline: { expiresAtMs: Date.now() + 120_000 },
     id,
     organisation_id: "00000000-0000-4000-8000-000000000001",
     payroll_region: "AU",
-    tokenVersion: 1,
     xero_connection_id: "connection-1",
     xero_tenant_id: "xero-tenant-1",
   };
 }
-
 describe("XeroWriteAdapter", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,24 +73,19 @@ describe("XeroWriteAdapter", () => {
       ok: true,
       value: {
         accessToken: "access-token",
-        bindingGeneration: 1,
+        connectionId: "tenant-1",
         deadline: { expiresAtMs: Date.now() + 120_000 },
         payrollRegion: "AU",
-        tokenVersion: 1,
-        xeroTenantDatabaseId: "tenant-1",
         xeroTenantId: "xero-tenant-1",
       },
     });
   });
-
   it("returns auth_error when submit cannot find a connected Xero tenant", async () => {
     mocks.resolveXeroAccess.mockResolvedValueOnce({
       error: { code: "not_connected", message: "Xero is not connected." },
       ok: false,
     });
-
     const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
-
     expect(result).toEqual({
       error: {
         certainty: "definitive_failure",
@@ -117,15 +100,12 @@ describe("XeroWriteAdapter", () => {
     });
     expect(mocks.submitLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("returns auth_error when approve cannot find a connected Xero tenant", async () => {
     mocks.resolveXeroAccess.mockResolvedValueOnce({
       error: { code: "not_connected", message: "Xero is not connected." },
       ok: false,
     });
-
     const result = await XeroWriteAdapter.approveLeaveApplication(approveInput);
-
     expect(result).toEqual({
       error: {
         certainty: "definitive_failure",
@@ -140,7 +120,6 @@ describe("XeroWriteAdapter", () => {
     });
     expect(mocks.approveLeaveApplicationForRegion).not.toHaveBeenCalled();
   });
-
   it("uses resolved access and the operation capability without selecting credentials", async () => {
     mocks.submitLeaveApplicationForRegion.mockResolvedValueOnce({
       ok: true,
@@ -161,14 +140,12 @@ describe("XeroWriteAdapter", () => {
     expect(mocks.submitLeaveApplicationForRegion).toHaveBeenCalledWith(
       "AU",
       expect.objectContaining({
-        xeroTenant: expect.objectContaining({
+        xeroConnection: expect.objectContaining({
           accessToken: "access-token",
-          bindingGeneration: 1,
         }),
       })
     );
   });
-
   it("translates submit errors into plain-language user messages without raw Xero details", async () => {
     const tenant = buildTenant("tenant-1");
     const xeroError: XeroWriteError = {
@@ -186,9 +163,7 @@ describe("XeroWriteAdapter", () => {
       error: xeroError,
       ok: false,
     });
-
     const result = await XeroWriteAdapter.submitLeaveApplication(submitInput);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.userMessage).toBe(toPlainLanguageMessage(xeroError));
@@ -199,7 +174,6 @@ describe("XeroWriteAdapter", () => {
       expect(result.error.rawPayload).toEqual(xeroError.rawPayload);
     }
   });
-
   it("translates approve errors into plain-language user messages without raw Xero details", async () => {
     const tenant = buildTenant("tenant-1");
     const xeroError: XeroWriteError = {
@@ -216,9 +190,7 @@ describe("XeroWriteAdapter", () => {
       error: xeroError,
       ok: false,
     });
-
     const result = await XeroWriteAdapter.approveLeaveApplication(approveInput);
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.userMessage).toBe(toPlainLanguageMessage(xeroError));
@@ -230,7 +202,6 @@ describe("XeroWriteAdapter", () => {
     }
   });
 });
-
 describe("161g recovery regression", () => {
   it.each([
     ["admission_unavailable", "operational_incident"],
@@ -266,7 +237,6 @@ describe("161g recovery regression", () => {
     }
   );
 });
-
 describe("safe neutral resolution failures", () => {
   it.each(["resolveEmployeeId", "resolveLeaveTypeId"] as const)(
     "returns safe recovery copy from %s without diagnostics",
@@ -307,7 +277,6 @@ describe("safe neutral resolution failures", () => {
     }
   );
 });
-
 describe("permission metric outcome safety", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -344,11 +313,9 @@ describe("permission metric outcome safety", () => {
       ok: true,
       value: {
         accessToken: "synthetic-access",
-        bindingGeneration: 1,
+        connectionId: "tenant",
         deadline: { expiresAtMs: Date.now() + 120_000 },
         payrollRegion: "AU",
-        tokenVersion: 1,
-        xeroTenantDatabaseId: "tenant",
         xeroTenantId: "external-tenant",
       },
     });
@@ -382,16 +349,3 @@ describe("permission metric outcome safety", () => {
     );
   });
 });
-
-// These tests isolate provider behaviour; runtime fencing is tested in the database protocol suite.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  withXeroCampaignCredentialScope: (
-    _scope: unknown,
-    _tenant: string,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignProviderEffect: (
-    _target: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-}));

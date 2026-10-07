@@ -1,7 +1,6 @@
 export type XeroConnectionState =
   | "connected"
   | "not_connected"
-  | "disconnect_pending"
   | "reauthorisation_required";
 
 export type XeroConnectionDisplayState = XeroConnectionState | "unavailable";
@@ -43,8 +42,6 @@ export function xeroRecoveryMessage(
     case "operational_incident":
     case "unavailable":
       return "We cannot reach Xero right now. Try again later or contact support.";
-    case "disconnect_pending":
-      return "Sync stopped. Xero disconnection is pending.";
     case "not_connected":
       return "Connect Xero to sync your payroll data.";
     default: {
@@ -70,7 +67,6 @@ export function xeroRecoveryMessageFromCode(
   switch (value) {
     case "connected":
     case "not_connected":
-    case "disconnect_pending":
     case "reauthorisation_required":
     case "update_permissions":
     case "reauthorise":

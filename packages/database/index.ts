@@ -10,7 +10,7 @@ export {
 export * from "./src/queries/activation-dashboard";
 export * from "./src/queries/billing";
 export * from "./src/queries/outbound-operations";
-export * from "./src/queries/schedulable-xero-tenants";
+export * from "./src/queries/schedulable-xero-connections";
 export * from "./src/seed/plan-sync";
 export * from "./src/seed/plans";
 export {
@@ -18,5 +18,4 @@ export {
   scopedQuery,
   scopedTo,
 } from "./src/tenant-query";
-export { withDatabaseWriteGuard } from "./src/write-guard";
-export { lockXeroCampaign } from "./src/xero-campaign-lock";
+export * from "./src/xero-locks";

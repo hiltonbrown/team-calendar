@@ -4,12 +4,16 @@ const mocks = vi.hoisted(() => ({
   availabilityRecordFindMany: vi.fn(),
   createFunction: vi.fn(),
   feedIdsForPeople: vi.fn(() =>
-    Promise.resolve<Array<{ id: string; privacyMode: string }>>([])
+    Promise.resolve<
+      Array<{
+        id: string;
+        privacyMode: string;
+      }>
+    >([])
   ),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   materialiseAvailabilityPublication: vi.fn(),
 }));
-
 vi.mock("server-only", () => ({}));
 vi.mock("../client", () => ({
   inngest: {
@@ -29,21 +33,17 @@ vi.mock("@repo/feeds", () => ({
 vi.mock("@repo/observability/log", () => ({
   log: { error: vi.fn(), info: vi.fn() },
 }));
-
 const { reconcileFeedPublications } = await import(
   "./reconcile-feed-publications"
 );
-
 const CLERK_ORG_ID = "org_reconcile";
 const ORGANISATION_ID = "30000000-0000-4000-8000-000000000001";
 const PERSON_ID = "10000000-0000-4000-8000-000000000001";
 const RECORD_A = "40000000-0000-4000-8000-000000000001";
 const RECORD_B = "40000000-0000-4000-8000-000000000002";
-
 function input() {
   return { clerkOrgId: CLERK_ORG_ID, organisationId: ORGANISATION_ID };
 }
-
 function materialised(changed: boolean) {
   return {
     ok: true,
@@ -59,9 +59,7 @@ function materialised(changed: boolean) {
     },
   };
 }
-
 const registeredHandler = mocks.createFunction.mock.calls[0]?.[1];
-
 it("throws execution failures with valid input at the queue boundary", async () => {
   const handler = registeredHandler;
   expect(handler).toBeTypeOf("function");
@@ -78,7 +76,6 @@ it("throws execution failures with valid input at the queue boundary", async () 
   ).rejects.toThrow();
   expect(mocks.availabilityRecordFindMany).toHaveBeenCalled();
 });
-
 describe("reconcileFeedPublications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -90,14 +87,11 @@ describe("reconcileFeedPublications", () => {
       { id: "20000000-0000-4000-8000-000000000001", privacyMode: "named" },
     ]);
   });
-
   it("materialises every record with both scope keys and no per-record invalidation", async () => {
     mocks.materialiseAvailabilityPublication.mockResolvedValue(
       materialised(false)
     );
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({ failed: 0, scanned: 2 });
@@ -119,14 +113,11 @@ describe("reconcileFeedPublications", () => {
       })
     );
   });
-
   it("is idempotent: no rebuilds enqueued when nothing materially changed", async () => {
     mocks.materialiseAvailabilityPublication.mockResolvedValue(
       materialised(false)
     );
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({ changed: 0, feedsQueued: 0 });
@@ -134,14 +125,11 @@ describe("reconcileFeedPublications", () => {
     expect(mocks.feedIdsForPeople).not.toHaveBeenCalled();
     expect(mocks.inngestSend).not.toHaveBeenCalled();
   });
-
   it("enqueues one rebuild per affected feed when records change", async () => {
     mocks.materialiseAvailabilityPublication.mockResolvedValue(
       materialised(true)
     );
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({ changed: 2, feedsQueued: 1 });
@@ -171,7 +159,6 @@ describe("reconcileFeedPublications", () => {
       },
     ]);
   });
-
   it("isolates record-level failures and keeps reconciling", async () => {
     mocks.materialiseAvailabilityPublication
       .mockResolvedValueOnce({
@@ -179,9 +166,7 @@ describe("reconcileFeedPublications", () => {
         ok: false,
       })
       .mockResolvedValueOnce(materialised(true));
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({
@@ -192,14 +177,11 @@ describe("reconcileFeedPublications", () => {
     }
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledTimes(2);
   });
-
   it("isolates record-level thrown errors during concurrent reconciliation", async () => {
     mocks.materialiseAvailabilityPublication
       .mockRejectedValueOnce(new Error("unexpected exception"))
       .mockResolvedValueOnce(materialised(true));
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({
@@ -210,7 +192,6 @@ describe("reconcileFeedPublications", () => {
     }
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledTimes(2);
   });
-
   it("isolates record-level failed results during concurrent reconciliation", async () => {
     mocks.materialiseAvailabilityPublication
       .mockResolvedValueOnce({
@@ -218,9 +199,7 @@ describe("reconcileFeedPublications", () => {
         ok: false,
       })
       .mockResolvedValueOnce(materialised(true));
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({
@@ -231,7 +210,6 @@ describe("reconcileFeedPublications", () => {
     }
     expect(mocks.materialiseAvailabilityPublication).toHaveBeenCalledTimes(2);
   });
-
   it("pages through records using cursor pagination when count exceeds PAGE_SIZE", async () => {
     const page1 = Array.from({ length: 500 }, (_, i) => ({
       id: `rec-1-${i.toString().padStart(4, "0")}`,
@@ -241,22 +219,17 @@ describe("reconcileFeedPublications", () => {
       id: `rec-2-${i.toString().padStart(4, "0")}`,
       person_id: PERSON_ID,
     }));
-
     mocks.availabilityRecordFindMany
       .mockResolvedValueOnce(page1)
       .mockResolvedValueOnce(page2);
-
     mocks.materialiseAvailabilityPublication.mockResolvedValue(
       materialised(false)
     );
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({ failed: 0, scanned: 550 });
     }
-
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledTimes(2);
     expect(mocks.availabilityRecordFindMany).toHaveBeenNthCalledWith(
       1,
@@ -275,12 +248,9 @@ describe("reconcileFeedPublications", () => {
       })
     );
   });
-
   it("handles zero records cleanly without enqueuing rebuilds", async () => {
     mocks.availabilityRecordFindMany.mockResolvedValueOnce([]);
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({
@@ -291,61 +261,31 @@ describe("reconcileFeedPublications", () => {
     }
     expect(mocks.inngestSend).not.toHaveBeenCalled();
   });
-
   it("terminates when last page returns zero records", async () => {
     const fullPage = Array.from({ length: 500 }, (_, i) => ({
       id: `rec-${i.toString().padStart(4, "0")}`,
       person_id: PERSON_ID,
     }));
-
     mocks.availabilityRecordFindMany
       .mockResolvedValueOnce(fullPage)
       .mockResolvedValueOnce([]);
-
     mocks.materialiseAvailabilityPublication.mockResolvedValue(
       materialised(false)
     );
-
     const result = await reconcileFeedPublications(input());
-
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value).toMatchObject({ scanned: 500 });
     }
     expect(mocks.availabilityRecordFindMany).toHaveBeenCalledTimes(2);
   });
-
   it("rejects payloads missing a scope key", async () => {
     const result = await reconcileFeedPublications({
       clerkOrgId: CLERK_ORG_ID,
     });
-
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("validation_error");
     }
   });
 });
-
-// Campaign authority is verified in database runtime protocol tests; these tests isolate handler behaviour.
-vi.mock("@repo/database/xero-campaign-access", () => ({
-  assertXeroCampaignAccess: vi.fn(() => Promise.resolve()),
-  assertXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  claimXeroCampaignScheduledDispatch: vi.fn(() => Promise.resolve(undefined)),
-  currentXeroCampaignInvocation: vi.fn(() => undefined),
-  lockXeroCampaignPersistence: vi.fn(() => Promise.resolve()),
-  recordXeroCampaignDispatch: vi.fn(() => Promise.resolve()),
-  withXeroCampaignInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  withXeroCampaignScopedEffect: (
-    _scope: unknown,
-    operation: () => Promise<unknown>
-  ) => operation(),
-  withXeroCampaignScopedInvocation: vi.fn(
-    (_functionId: string, _input: unknown, operation: () => Promise<unknown>) =>
-      operation()
-  ),
-  xeroCampaignAllowsOrdinaryMaintenance: vi.fn(() => Promise.resolve(true)),
-}));

@@ -1,5 +1,4 @@
 import "server-only";
-
 import { createActivationEvent } from "@repo/analytics/activation-events";
 import { analytics } from "@repo/analytics/server";
 import { database } from "@repo/database";
@@ -11,61 +10,38 @@ const INITIAL_RUN_TYPES = [
   "leave_records",
   "leave_balances",
 ] satisfies sync_run_type[];
-
 export interface CaptureInitialSyncCompletedInput {
-  bindingGeneration?: number;
   clerkOrgId: string;
+  connectionId?: string;
   organisationId: string;
-  xeroTenantId?: string;
 }
-
 export interface XeroImportReadiness {
   completedAt: Date | null;
   hasUnresolvedPeople: boolean;
   isInitialSyncCompleted: boolean;
   unresolvedPeopleCount: number;
 }
-
 export async function captureInitialSyncCompleted(
   input: CaptureInitialSyncCompletedInput
 ): Promise<void> {
   try {
     let tenant: {
-      binding_generation: number;
       created_at: Date;
       id: string;
     } | null = null;
-
-    if (database.xeroTenant?.findFirst) {
-      tenant = await database.xeroTenant.findFirst({
+    if (database.xeroConnection?.findFirst) {
+      tenant = await database.xeroConnection.findFirst({
         select: {
-          binding_generation: true,
           created_at: true,
           id: true,
         },
         where: {
           clerk_org_id: input.clerkOrgId,
           organisation_id: input.organisationId,
-          ...(input.xeroTenantId
-            ? { id: input.xeroTenantId }
-            : { active_slot: 1 }),
+          ...(input.connectionId ? { id: input.connectionId } : {}),
         },
       });
-
-      if (
-        input.bindingGeneration !== undefined &&
-        tenant &&
-        tenant.binding_generation !== input.bindingGeneration
-      ) {
-        log.warn("Skipping activation capture for changed binding generation", {
-          currentGeneration: tenant.binding_generation,
-          expectedGeneration: input.bindingGeneration,
-          xeroTenantId: tenant.id,
-        });
-        return;
-      }
     }
-
     const runs = await Promise.all(
       INITIAL_RUN_TYPES.map((runType) =>
         database.syncRun.findFirst({
@@ -77,7 +53,7 @@ export async function captureInitialSyncCompleted(
             organisation_id: input.organisationId,
             run_type: runType,
             status: "succeeded",
-            ...tenantRunFilter(tenant, input.xeroTenantId),
+            ...tenantRunFilter(tenant, input.connectionId),
           },
         })
       )
@@ -104,49 +80,28 @@ export async function captureInitialSyncCompleted(
     });
   }
 }
-
 export async function checkXeroImportReadiness(input: {
-  bindingGeneration?: number;
   clerkOrgId: string;
   organisationId: string;
-  xeroTenantId?: string;
+  connectionId?: string;
 }): Promise<XeroImportReadiness> {
   let tenant: {
-    binding_generation: number;
     created_at: Date;
     id: string;
   } | null = null;
-
-  if (database.xeroTenant?.findFirst) {
-    tenant = await database.xeroTenant.findFirst({
+  if (database.xeroConnection?.findFirst) {
+    tenant = await database.xeroConnection.findFirst({
       select: {
-        binding_generation: true,
         created_at: true,
         id: true,
       },
       where: {
         clerk_org_id: input.clerkOrgId,
         organisation_id: input.organisationId,
-        ...(input.xeroTenantId
-          ? { id: input.xeroTenantId }
-          : { active_slot: 1 }),
+        ...(input.connectionId ? { id: input.connectionId } : {}),
       },
     });
-
-    if (
-      input.bindingGeneration !== undefined &&
-      tenant &&
-      tenant.binding_generation !== input.bindingGeneration
-    ) {
-      return {
-        completedAt: null,
-        hasUnresolvedPeople: false,
-        isInitialSyncCompleted: false,
-        unresolvedPeopleCount: 0,
-      };
-    }
   }
-
   const [runs, pendingMatchesCount] = await Promise.all([
     Promise.all(
       INITIAL_RUN_TYPES.map((runType) =>
@@ -159,7 +114,7 @@ export async function checkXeroImportReadiness(input: {
             organisation_id: input.organisationId,
             run_type: runType,
             status: "succeeded",
-            ...tenantRunFilter(tenant, input.xeroTenantId),
+            ...tenantRunFilter(tenant, input.connectionId),
           },
         })
       )
@@ -174,14 +129,12 @@ export async function checkXeroImportReadiness(input: {
         })
       : Promise.resolve(0),
   ]);
-
   const isInitialSyncCompleted = !runs.some((run) => !run?.completed_at);
   const completedAt = isInitialSyncCompleted
     ? new Date(
         Math.max(...runs.map((run) => run?.completed_at?.getTime() ?? 0))
       )
     : null;
-
   return {
     completedAt,
     hasUnresolvedPeople: pendingMatchesCount > 0,
@@ -189,19 +142,21 @@ export async function checkXeroImportReadiness(input: {
     unresolvedPeopleCount: pendingMatchesCount,
   };
 }
-
 function tenantRunFilter(
-  tenant: { created_at: Date; id: string } | null,
-  xeroTenantId: string | null | undefined
+  tenant: {
+    created_at: Date;
+    id: string;
+  } | null,
+  connectionId: string | null | undefined
 ) {
   if (tenant) {
     return {
       started_at: { gte: tenant.created_at },
-      xero_tenant_id: tenant.id,
+      xero_connection_id: tenant.id,
     };
   }
-  if (xeroTenantId) {
-    return { xero_tenant_id: xeroTenantId };
+  if (connectionId) {
+    return { xero_connection_id: connectionId };
   }
   return {};
 }

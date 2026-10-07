@@ -143,9 +143,9 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 | Concept | Role |
 |---|---|
 | Clerk Organisation | Top-level tenant boundary; billing anchor. Identified by Clerk's `org_id` (stored as `clerk_org_id`). One Clerk Organisation = one country code. |
-| Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns one XeroConnection, one XeroTenant, its own People and Feeds. |
-| XeroConnection | One per Organisation. Holds local connection state and transitional credential mirrors; lifecycle history in `audit_events`. |
-| XeroTenant | One per XeroConnection. Owns the immutable external payroll binding, reserved slot and generation, and links its verified credential owner and provider connection. |
+| Organisation | Legal or payroll entity within a Clerk Organisation (e.g. "Acme Restaurants Pty Ltd", "Acme Hotels Pty Ltd"). Owns at most one XeroConnection, its own People and Feeds. |
+| XeroConnection | One per Organisation. Contains both tenancy keys, external tenant and remote connection IDs, payroll region, status and sync health/progress; references its canonical authorisation. |
+| XeroAuthorisation | One per verified Xero user and provider app. Sole AES-256-GCM encrypted token owner; may support several scoped connections. |
 | User | Authenticated identity via Clerk. Managed entirely by Clerk; no local users table. |
 | Membership | User-to-Clerk-Organisation relationship. Managed entirely by Clerk; no custom membership table. |
 | Team | Grouping of people within an Organisation. |
@@ -154,9 +154,9 @@ Multi-entity groups are a supported capability, not the primary case. The typica
 ### Key invariants
 
 - One Clerk Organisation maps to exactly one country code. A Clerk Organisation will never span AU, NZ, and UK simultaneously. This is enforced at the application layer, not via a database constraint.
-- One Organisation owns exactly one XeroConnection (`UNIQUE` on `organisation_id`).
-- One XeroConnection owns exactly one XeroTenant (`UNIQUE` on `xero_connection_id`).
-- A Clerk Organisation with multiple payroll entities (e.g. two AU Xero files) has multiple Organisation rows, each with its own XeroConnection and XeroTenant.
+- One Organisation owns at most one XeroConnection (`UNIQUE` on `organisation_id`).
+- Every active XeroConnection references a canonical XeroAuthorisation; one verified grant may support multiple scoped connections.
+- A Clerk Organisation with multiple payroll entities (e.g. two AU Xero files) has multiple Organisation rows, each with its own scoped XeroConnection.
 - Billing, plan limits, and usage are enforced at the Clerk Organisation level.
 - **All database queries must filter by `clerk_org_id`**, sourced from `auth().orgId` in server context.
 
@@ -340,7 +340,8 @@ The primary object is an **AvailabilityRecord**, not a "leave application". This
 ```text
 Organisation
 XeroConnection
-XeroTenant
+XeroAuthorisation
+XeroOAuthSession
 XeroSyncCursor
 Team
 Location
@@ -396,17 +397,21 @@ Employees, contractors, directors, and offshore staff. `source_system` distingui
 
 Contact alternatives for a person when they are unavailable. Ordered by `priority`.
 
+### `xero_authorisations`
+
+System grant rows, unique on `(provider_app_id, xero_user_id)`. Hold the encrypted access and refresh tokens, expiry, granted scopes, refresh health and encryption version. Customer access is authorised through a scoped connection.
+
 ### `xero_connections`
 
-One row per Organisation. Current-state only (Scenario A): the row is updated in place when a token is refreshed or a connection is revoked. Historical lifecycle is captured in `audit_events`. Unique on `organisation_id`. Tokens stored AES-256-GCM encrypted using `XERO_TOKEN_ENCRYPTION_KEY`; never in plaintext.
+One row per Organisation, with both tenancy keys and a scoped Organisation FK. Contains the unique external Xero tenant ID, remote connection ID, region, connection status, sync health timestamps and roster progress. References the canonical authorisation. Lifecycle history remains in `audit_events`; tokens are not copied here.
 
-### `xero_tenants`
+### `xero_oauth_sessions`
 
-One row per XeroConnection (one per Xero file). Unique on `xero_connection_id`. Carries `payroll_region` (AU, NZ, UK) which determines which Xero Payroll API is used for all sync and write operations. Has an explicit FK to `organisations` via `organisation_id`, declared as a Prisma relation.
+Short-lived, scoped OAuth state and canonical authorisation reference, plus safe selection context. Contains no token envelopes or lifecycle generations.
 
 ### `xero_sync_cursors`
 
-Tracks incremental sync state per entity type per Xero tenant. One row per `(xero_tenant_id, entity_type)` pair; updated in place.
+Completed provider timestamp watermarks for people and leave records, unique on `(xero_connection_id, entity_type)` with both tenancy keys. Roster position for balances and regional leave polling resides on the connection.
 
 ### `availability_records`
 
@@ -422,9 +427,9 @@ Materialised publishing state per AvailabilityRecord. Decouples raw data from wh
 
 ### `leave_balances`
 
-Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_tenant_id` is nullable to support admin-managed manual balances. Never calculated by Team Calendar. Updated in place. Unique on `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows.
+Fetched from Xero per person per leave type during normal operation, or managed manually by admins when Xero is not connected. `xero_connection_id` is nullable to support admin-managed manual balances. Never calculated by Team Calendar. Updated in place. Unique on `(person_id, xero_connection_id, leave_type_xero_id)` for Xero-sourced rows.
 
-**Note on the unique constraint:** PostgreSQL treats each NULL value as distinct, so the composite unique above does not prevent duplicate manual balances where `xero_tenant_id IS NULL`. A partial unique index on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` guards the manual case so create-or-update can target a single row.
+**Note on the unique constraint:** PostgreSQL treats each NULL value as distinct, so the composite unique above does not prevent duplicate manual balances where `xero_connection_id IS NULL`. A partial unique index on `(person_id, leave_type_xero_id) WHERE xero_connection_id IS NULL` guards the manual case so create-or-update can target a single row.
 
 **Balance unit and currency:** `balance_unit` is `hours | days | currency`. `currency_code` is nullable and holds an ISO 4217 code (e.g. `NZD`) for NZ Payroll balances such as Holiday Pay that Xero exposes in dollars rather than hours or days. The unit/code pairing is enforced at the application layer, not by a database constraint: a `currency` balance requires a code from `SupportedCurrencyCodeSchema` (`packages/xero/src/read/leave-balances.ts`, currently `["NZD"]`, extended only alongside a documented provider mapping); an `hours` or `days` balance must never carry a code. Manual balances are always hours or days and always carry a null `currency_code`. `source_payload_json` retains the raw Xero balance payload for admin audit only, validated as Prisma-safe JSON via `LeaveBalanceRawPayloadSchema` in the same file; it is always null for manual balances, which have no Xero-provided payload. Team Calendar stores and displays these provider values as given; it never calculates accruals, converts currency, or subtracts a duration from a monetary balance.
 
@@ -466,7 +471,7 @@ Cryptographic hashes and signing material may be used internally for validation 
 
 ### `sync_runs`
 
-One row per sync execution. Pinned to `Organisation` via UUID FK and to `XeroTenant` for the specific Xero file synced.
+One row per sync execution. Pinned to `Organisation` via UUID FK and to its scoped `XeroConnection` for the specific Xero file synced.
 
 ### `failed_records`
 
@@ -489,12 +494,12 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 | Table | Constraint |
 |---|---|
 | `xero_connections` | `organisation_id` |
-| `xero_tenants` | `xero_connection_id` |
-| `xero_sync_cursors` | `(xero_tenant_id, entity_type)` |
+| `xero_authorisations` | `(provider_app_id, xero_user_id)` |
+| `xero_sync_cursors` | `(xero_connection_id, entity_type)` |
 | `people` | `(organisation_id, source_system, source_person_key)` |
 | `availability_records` | `(organisation_id, source_type, source_remote_id)`; NULL-distinct, app-layer guard required for manual records |
 | `availability_publications` | `availability_record_id` |
-| `leave_balances` | `(person_id, xero_tenant_id, leave_type_xero_id)` for Xero-sourced rows; partial unique on `(person_id, leave_type_xero_id) WHERE xero_tenant_id IS NULL` for manual balances |
+| `leave_balances` | `(person_id, xero_connection_id, leave_type_xero_id)` for Xero-sourced rows; partial unique on `(person_id, leave_type_xero_id) WHERE xero_connection_id IS NULL` for manual balances |
 | `public_holidays` | `(organisation_id, source, source_remote_id)` |
 | `notification_preferences` | `(user_id, organisation_id, notification_type)` |
 | `feeds` | `(clerk_org_id, slug)` |
@@ -511,11 +516,11 @@ Full lifecycle audit log. `organisation_id` is nullable to cover Clerk-Org-level
 - `availability_records(source_type, source_last_modified_at)`
 - `feed_scopes(feed_id, rule_type, rule_value)`
 - `audit_events(entity_type, entity_id, created_at)`
-- `xero_sync_cursors(xero_tenant_id, entity_type)`
+- `xero_sync_cursors(xero_connection_id, entity_type)`
 - `notifications(recipient_user_id, is_read)`
 - `notifications(recipient_user_id, created_at)`
 - `sync_runs(organisation_id)`
-- `sync_runs(xero_tenant_id)`
+- `sync_runs(xero_connection_id)`
 
 ---
 
@@ -538,7 +543,7 @@ uid = sha256(
 
 Where `stable_source_key` is:
 
-- for Xero records: `xero_tenant_id + employee_id + leave_type + start + end + units`
+- for Xero records: `xero_connection_id + employee_id + leave_type + start + end + units`
 - for manual records: the `availability_records.id`
 
 The formula assigns creation identity. Manual date, type and title edits preserve the assigned UID. Existing publication UIDs remain authoritative for upgraded feed events.
@@ -566,7 +571,6 @@ Outbound: synchronous API write triggered by user action. No background queue fo
 | `reconcile-feed-publications` | Internal | Ensure `availability_publications` match current records |
 | `rebuild-feed-cache` | Internal | Regenerate cached ICS feed bodies in Vercel KV |
 | `reconcile-xero-approval-state` | Bidirectional | Detect and resolve approval state drift |
-| `reconcile-xero-connections` | Internal | Sweep frozen, scoped remote-cleanup attempts; report-only unless explicitly enabled |
 
 All jobs carry `clerk_org_id` and `organisation_id` in their event payloads. Never rely on session context inside a job handler.
 
@@ -591,7 +595,7 @@ All provider mutations are synchronous and user-triggered. Failures are surfaced
 
 ### Inbound sync flow
 
-1. Load active XeroTenant. Verify `clerk_org_id` matches session context.
+1. Resolve the active XeroConnection with both tenancy keys and its canonical authorisation.
 2. Fetch employees for the tenant's payroll region.
 3. Upsert `people` records scoped to the Organisation.
 4. Fetch leave records and supporting leave metadata.
@@ -676,7 +680,7 @@ Revoked or expired tokens return `410 Gone`.
 ## Build order
 
 1. Organisation, people, team, location schema and seed data (keyed by `clerk_org_id`)
-2. Xero OAuth and tenant persistence (XeroConnection + XeroTenant per Organisation)
+2. Xero OAuth and tenant persistence (scoped XeroConnection + canonical XeroAuthorisation)
 3. Xero employee sync (AU, NZ, UK)
 4. Xero leave inbound normalisation into `availability_records`
 5. Leave balance sync from Xero
@@ -703,8 +707,8 @@ Each step produces a deployable, testable vertical slice.
 - Clean separation between Xero-specific logic (`packages/xero`) and canonical domain logic (`packages/availability`).
 - No custom workspace table; tenant isolation is via Clerk `org_id`.
 - No custom membership or role tables; managed entirely by Clerk.
-- One Organisation owns exactly one XeroConnection (unique on `organisation_id`).
-- One XeroConnection owns exactly one XeroTenant (unique on `xero_connection_id`).
+- One Organisation owns at most one XeroConnection (unique on `organisation_id`).
+- An active XeroConnection references its canonical verified XeroAuthorisation; connection and session rows contain no credentials.
 - `clerk_org_id` must be present on every query that touches tenant data.
 - Stable ICS UIDs derived from business identity, not provider IDs alone.
 - Result pattern for service-layer errors.
@@ -719,12 +723,4 @@ Each step produces a deployable, testable vertical slice.
 - Xero OAuth tokens are encrypted at rest using AES-256-GCM. The `XERO_TOKEN_ENCRYPTION_KEY` environment variable must be present and validated on startup in `packages/xero`. An absent or malformed key must prevent the application from starting, not fail silently at token access time.
 - The `AvailabilityRecord` unique constraint `(organisation_id, source_type, source_remote_id)` is NULL-distinct in PostgreSQL. Application-layer guards in `packages/availability` must prevent duplicate manual records (`source_remote_id IS NULL`). Tests must assert this guard is enforced.
 
-The system infrastructure tables `xero_credential_owners`, `xero_refresh_attempts` and `xero_provider_connections` deliberately have no `clerk_org_id`. They coordinate one verified Xero authoriser across payroll bindings and customer accounts. Customer visibility and access remain scoped through `XeroTenant` by Clerk organisation and payroll organisation.
-
-## Xero lifecycle ownership and operational reporting
-
-`XeroCredentialOwner` coordinates one verified Xero authoriser per provider app. It owns the encrypted versioned credential set and refresh-attempt history across payroll bindings, without granting payroll access across Clerk accounts. `XeroProviderConnection` records the exact remote connection provenance. The reserved binding stays on the existing `XeroTenant` row, with `active_slot = 1`, `retired_at = null` and a generation fence. Reconnect cannot silently replace its external payroll file. Customer visibility remains scoped by both Clerk organisation and payroll organisation.
-
-Unbackfilled bindings retain the existing legacy access fallback. Transitional `XeroConnection` credential mirrors remain until every reserved binding has a verified owner and no reader remains. A shared immutable credential-domain UUID in the rate namespace prevents deployments using different credential databases from competing over one refresh token. Missing, legacy or foreign sentinel values deny admission.
-
-`xero_inactivity_classifications` is a child of Organisation and XeroTenant containing versioned report classifications and bounded review status. The manually invoked report requires both scope IDs, selects timestamps/status only and never sends notices, disables service or deletes provider connections. Active feed use, recent human activity, paused sync and active subscriptions prove activity. Missing subscription, feed or human evidence remains unknown. Historical recent token use survives rotation for active feeds. Onboarding remains informational and unknown. Archive cannot replace unknown evidence. Scheduled sync is never evidence of human use or abandonment.
+`xero_authorisations` deliberately has no tenancy keys because one verified provider grant can support several payroll organisations. Every customer-facing resolution first selects `XeroConnection` using both `clerk_org_id` and `organisation_id`. The grant is the only persisted credential owner; there are no mirrors, legacy fallbacks, backfills, or parallel lifecycle structures.

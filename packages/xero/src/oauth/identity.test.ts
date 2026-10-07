@@ -7,7 +7,6 @@ import {
 } from "jose";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import {
-  verifyLegacyXeroAccessTokenIdentity,
   verifyXeroAccessTokenIdentity,
   XERO_IDENTITY_AUDIENCE,
   XERO_IDENTITY_ISSUER,
@@ -46,6 +45,7 @@ describe("Xero access token identity", () => {
       value: {
         authEventId: "auth-event",
         expiresAt: new Date(now.getTime() + 1_800_000),
+        grantedScopes: [],
         xeroUserId: "xero-user-one",
       },
     });
@@ -62,22 +62,11 @@ describe("Xero access token identity", () => {
     expect(
       (await verifyXeroAccessTokenIdentity(await token(overrides), deps())).ok
     ).toBe(false);
-    expect(
-      (
-        await verifyLegacyXeroAccessTokenIdentity(
-          await token(overrides),
-          deps()
-        )
-      ).ok
-    ).toBe(false);
   });
-  it("rejects a bad signature in both variants", async () => {
+  it("rejects a bad signature", async () => {
     const other = await generateKeyPair("RS256");
     const signed = await token({}, other.privateKey);
     expect((await verifyXeroAccessTokenIdentity(signed, deps())).ok).toBe(
-      false
-    );
-    expect((await verifyLegacyXeroAccessTokenIdentity(signed, deps())).ok).toBe(
       false
     );
   });
@@ -86,9 +75,6 @@ describe("Xero access token identity", () => {
       .setProtectedHeader({ alg: "HS256" })
       .sign(new Uint8Array(32));
     expect((await verifyXeroAccessTokenIdentity(signed, deps())).ok).toBe(
-      false
-    );
-    expect((await verifyLegacyXeroAccessTokenIdentity(signed, deps())).ok).toBe(
       false
     );
   });
@@ -103,30 +89,15 @@ describe("Xero access token identity", () => {
       (await verifyXeroAccessTokenIdentity(await token(), failing)).ok
     ).toBe(false);
   });
-  it("accepts expired tokens only for migration", async () => {
-    const signed = await token({ exp: seconds - 1 });
-    expect((await verifyXeroAccessTokenIdentity(signed, deps())).ok).toBe(
-      false
-    );
-    const result = await verifyLegacyXeroAccessTokenIdentity(signed, deps());
-    expect(result.ok && result.value.expired).toBe(true);
-  });
-  it("does not relax identity or not-before checks on expired tokens", async () => {
-    for (const overrides of [
-      { client_id: "wrong" },
-      { nbf: seconds + 60 },
-      { iss: "wrong" },
-      { aud: "wrong" },
-    ]) {
-      expect(
-        (
-          await verifyLegacyXeroAccessTokenIdentity(
-            await token({ exp: seconds - 1, ...overrides }),
-            deps()
-          )
-        ).ok
-      ).toBe(false);
-    }
+  it("rejects expired access tokens", async () => {
+    expect(
+      (
+        await verifyXeroAccessTokenIdentity(
+          await token({ exp: seconds - 1 }),
+          deps()
+        )
+      ).ok
+    ).toBe(false);
   });
   it("keeps different user IDs distinct despite equal email", async () => {
     const first = await verifyXeroAccessTokenIdentity(
