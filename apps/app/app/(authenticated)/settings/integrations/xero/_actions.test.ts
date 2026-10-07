@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
     $transaction: vi.fn(),
     auditEvent: { create: vi.fn() },
     organisation: { findFirst: vi.fn() },
-    xeroConnection: { updateMany: vi.fn() },
+    xeroConnection: { findFirst: vi.fn(), updateMany: vi.fn() },
   },
   disconnectXeroOAuthConnection: vi.fn(),
   getActiveOrgContext: vi.fn(),
@@ -75,6 +75,9 @@ describe("xero settings integration server actions", () => {
       NEXT_PUBLIC_API_URL: "https://api.example.com",
     });
     mocks.database.organisation.findFirst.mockResolvedValue({ name: orgName });
+    mocks.database.xeroConnection.findFirst.mockResolvedValue({
+      id: connectionId,
+    });
     mocks.database.auditEvent.create.mockResolvedValue({});
     mocks.transaction.auditEvent.create.mockResolvedValue({});
     mocks.transaction.xeroConnection.updateMany.mockResolvedValue({ count: 1 });
@@ -107,21 +110,39 @@ describe("xero settings integration server actions", () => {
       expect(resDisconnect.ok).toBe(false);
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
-    it("rejects non-admin roles (manager, viewer) and asserts no service call was made", async () => {
-      mocks.auth.mockResolvedValue({ orgRole: "org:manager" });
-      const resDisconnect = await disconnectXeroAction({
-        confirmationText: orgName,
-        connectionId,
-        mode: "destructive",
-        organisationId,
-      });
-      expect(resDisconnect).toEqual({
-        error: {
-          code: "not_authorised",
-          message: "Only admins and owners can manage Xero settings.",
-        },
+    it.each(["org:manager", "org:viewer", "org:member", null])(
+      "rejects role %s without calling the disconnect service",
+      async (orgRole) => {
+        mocks.auth.mockResolvedValue({ orgRole });
+        const resDisconnect = await disconnectXeroAction({
+          confirmationText: orgName,
+          connectionId,
+          mode: "destructive",
+          organisationId,
+        });
+        expect(resDisconnect).toEqual({
+          error: {
+            code: "not_authorised",
+            message: "Only admins and owners can manage Xero settings.",
+          },
+          ok: false,
+        });
+        expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+      }
+    );
+    it("rejects an organisation outside the active Clerk account without calling the service", async () => {
+      mocks.getActiveOrgContext.mockResolvedValue({
+        error: { code: "not_found" },
         ok: false,
       });
+      const result = await disconnectXeroAction({
+        confirmationText: orgName,
+        connectionId,
+        mode: "soft",
+        organisationId,
+      });
+      expect(result.ok).toBe(false);
+      expect(mocks.database.organisation.findFirst).not.toHaveBeenCalled();
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
     it("rejects malformed inputs for actions", async () => {
@@ -162,6 +183,33 @@ describe("xero settings integration server actions", () => {
         organisationId,
         performedByUserId: "user_456",
       });
+      expect(mocks.database.xeroConnection.findFirst).toHaveBeenCalledWith({
+        select: { id: true },
+        where: {
+          clerk_org_id: clerkOrgId,
+          id: connectionId,
+          organisation_id: organisationId,
+        },
+      });
+    });
+    it("rejects a connection outside the scoped organisation before delegating disconnect", async () => {
+      mocks.database.xeroConnection.findFirst.mockResolvedValue(null);
+      const result = await disconnectXeroAction({
+        confirmationText: orgName,
+        connectionId,
+        mode: "soft",
+        organisationId,
+      });
+      expect(result).toEqual({
+        error: {
+          code: "validation_error",
+          message: "Xero connection was not found in this organisation.",
+        },
+        ok: false,
+      });
+      expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+      expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
     });
   });
   describe("action specific functionality", () => {
@@ -181,7 +229,10 @@ describe("xero settings integration server actions", () => {
       });
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
     });
-    it("returns the safe disconnect result and audits confirmed state", async () => {
+    it("returns the committed disconnect result without a second fallible audit write", async () => {
+      mocks.database.auditEvent.create.mockRejectedValue(
+        new Error("Audit unavailable")
+      );
       const result = await disconnectXeroAction({
         confirmationText: orgName,
         connectionId,
@@ -195,11 +246,55 @@ describe("xero settings integration server actions", () => {
           result: { connectionId, state: "disconnected" },
         },
       });
-      expect(mocks.database.auditEvent.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          metadata: { mode: "soft", state: "disconnected" },
-        }),
+      expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).toHaveBeenCalledWith(
+        "/settings/integrations/xero"
+      );
+    });
+    it.each(["org:owner", "org:admin"])(
+      "allows %s to confirm disconnect using the existing trimmed organisation name",
+      async (orgRole) => {
+        mocks.auth.mockResolvedValue({ orgRole });
+        const result = await disconnectXeroAction({
+          confirmationText: ` ${orgName} `,
+          connectionId,
+          mode: "soft",
+          organisationId,
+        });
+        expect(result.ok).toBe(true);
+      }
+    );
+    it.each(["acme corp", "Acme", "", "Wrong Name"])(
+      "rejects nonmatching confirmation %s before disconnect",
+      async (confirmationText) => {
+        const result = await disconnectXeroAction({
+          confirmationText,
+          connectionId,
+          mode: "soft",
+          organisationId,
+        });
+        expect(result.ok).toBe(false);
+        expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
+      }
+    );
+    it("does not audit, revalidate, or return success when the provider DELETE fails", async () => {
+      const message = "Xero could not be disconnected. Try again.";
+      mocks.disconnectXeroOAuthConnection.mockResolvedValue({
+        error: { message },
+        ok: false,
       });
+      const result = await disconnectXeroAction({
+        confirmationText: orgName,
+        connectionId,
+        mode: "soft",
+        organisationId,
+      });
+      expect(result).toEqual({
+        error: { code: "unknown_error", message },
+        ok: false,
+      });
+      expect(mocks.database.auditEvent.create).not.toHaveBeenCalled();
+      expect(mocks.revalidatePath).not.toHaveBeenCalled();
     });
     it("passes destructive flag correctly to disconnect service", async () => {
       const resDestructive = await disconnectXeroAction({

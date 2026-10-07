@@ -1,5 +1,61 @@
 # Current work
 
+## Xero disconnect lifecycle, 8 October 2026
+
+- [x] Verify official user-authorisation DELETE and absent-connection contracts; map current lifecycle consumers.
+- [x] Test and implement scoped remote-first disconnect, required atomic audit and safe unreferenced-authorisation pruning.
+- [x] Preserve imported data on soft disconnect; verify explicit purge preserves manual data and consistent feed publication.
+- [x] Test provider-confirmed disconnection, stale-response protection and scheduled-sync exclusion; remove obsolete cleanup configuration.
+- [x] Pass targeted tests and repository check/typecheck/test/integration gates.
+- [x] Resolve independent code review and commit this phase in the existing branch/worktree.
+
+Stopping condition: the requested disconnect lifecycle is implemented, verified,
+reviewed and committed. Do not redesign OAuth, refresh, incremental sync or Xero
+writes; add only the small connection guard required by an observed disconnect
+versus write race. No new schema, lifecycle worker or management credentials.
+
+Official Xero Identity OpenAPI specifies user OAuth DELETE /Connections/{id}:
+204 removes the selected connection, 404 confirms it is already absent. Never
+revoke the shared user grant to delete a single connection. Retain local state
+on uncertain/transient failure. Preserve grants referenced by another connection
+or a live short-lived selecting OAuth session. Authoritative provider inventory
+and existing identities/timestamps protect reconnect state from stale responses;
+do not infer lifecycle from activity or add generation state.
+The current product has no Organisation deletion/archive action requiring remote
+removal; the Clerk user-deleted webhook records analytics only. Do not introduce
+a new account deletion workflow in this phase.
+
+Verification: repository check passed for 1141 files; typecheck passed all 19
+tasks; unit tests passed all 18 tasks (2903 tests, including 564 Xero and 514
+availability tests); integration passed all 6 packages (247 tests) against
+local PostgreSQL and Redis. Focused disconnect/service verification passed
+206 units and 54 PostgreSQL tests; provider handling passed 13 additional
+PostgreSQL tests. Release tooling passed 179 tests with 4 existing skips and
+its typecheck passed. Source and filename audits find no obsolete cleanup,
+inactivity, management-client or stale-marker runtime implementation. One
+canonical refresh implementation remains. No schema/generated changes.
+
+Independent review approved the final candidate after test-first fixes for
+local-only decline/withdraw after disconnect, persisted uncertain payroll
+outcomes, expired-session credential pruning and retry, and run-isolated
+provider fixture identities. Remote deletion precedes local teardown; required
+audit and pruning are transactional. Transient failure retains the local link;
+404 supports safe recovery after remote success and local rollback. Explicit
+purge preserves manual entries and their people's stable identity and feed.
+Actual waiting write claims/preparation are fenced by the existing connection
+row; this adds no cleanup lease, generation or payroll algorithm redesign.
+
+Gate failures caused by this change were fixed: package-default server-only
+mocks, claim transaction fixtures and the database preparation fixture's active
+canonical connection prerequisite. An unchanged 25ms AU scope/deadline test
+failed under concurrent compilation and passed in the complete unit gate once
+that load ended; its assertions and provider bounds were not weakened. The
+final complete unit and integration gates pass. Provider HTTP/token identity
+were mocked; official provider documentation supplies the DELETE/inventory
+contracts. No live Xero, browser, deployed application or remote database
+verification is claimed. All source changes are frozen, verified and reviewed
+for the focused phase commit in the existing branch/worktree.
+
 ## Xero OAuth and automatic refresh, 7 October 2026
 
 - [x] Verify current official Xero code-flow, inventory, scope and refresh-grace contracts; map current consumers.

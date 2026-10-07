@@ -43,7 +43,14 @@ vi.mock("@repo/database", () => ({
     $transaction: async (callback: (tx: unknown) => unknown) =>
       await callback({
         auditEvent: { create: mocks.auditCreate },
-        availabilityRecord: { updateMany: mocks.availabilityUpdateMany },
+        availabilityRecord: {
+          updateMany: (mutation: {
+            data: { xero_write_claimed_at?: Date | null };
+          }) =>
+            mutation.data.xero_write_claimed_at
+              ? mocks.availabilityClaimUpdateMany(mutation)
+              : mocks.availabilityUpdateMany(mutation),
+        },
       }),
     auditEvent: { findMany: mocks.auditCreate },
     availabilityRecord: {
@@ -64,6 +71,7 @@ vi.mock("@repo/database", () => ({
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
+  lockActiveScopedXeroConnection: vi.fn(async () => true),
   scopedTo: mocks.scopedTo,
 }));
 vi.mock("../duration/working-days", () => ({

@@ -10,21 +10,22 @@ export {
   refreshDormantXeroAuthorisations,
   resolveXeroAccess,
 } from "./src/oauth/authorisation";
+export {
+  disconnectXeroOAuthConnection,
+  type XeroDisconnectResult,
+} from "./src/oauth/disconnect";
 export { hasXeroCapability, XERO_SCOPES } from "./src/oauth/scopes";
 export {
   buildXeroOAuthStartUrl,
   cancelXeroOAuth,
   completeXeroOAuth,
   completeXeroTenantSelection,
-  disconnectXeroOAuthConnection,
   getPendingXeroOAuthSession,
   isLocalApplicationPath,
   isPreviewDeployment,
-  markXeroConnectionStale,
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,
   purgeClosedXeroOAuthSessions,
-  type XeroDisconnectResult,
   type XeroOAuthError,
 } from "./src/oauth/service";
 export {

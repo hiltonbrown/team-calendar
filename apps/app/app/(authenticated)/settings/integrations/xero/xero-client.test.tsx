@@ -17,6 +17,15 @@ const mocks = vi.hoisted(() => ({
   pauseTenantSyncAction: vi.fn(),
   refresh: vi.fn(),
   resumeTenantSyncAction: vi.fn(),
+  toastError: vi.fn(),
+  toastMessage: vi.fn(),
+}));
+vi.mock("@repo/design-system/components/ui/sonner", () => ({
+  toast: {
+    error: mocks.toastError,
+    message: mocks.toastMessage,
+    success: vi.fn(),
+  },
 }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: mocks.refresh }),
@@ -353,6 +362,72 @@ describe("XeroClient component", () => {
     );
     expect(mocks.refresh).toHaveBeenCalled();
   });
+  it.each([
+    {
+      confirmLabel: "Disconnect Xero",
+      mode: "soft",
+      openLabel: "Disconnect Xero",
+      title: "Disconnect Xero?",
+    },
+    {
+      confirmLabel: "Disconnect and purge",
+      mode: "destructive",
+      openLabel: "Disconnect and purge data",
+      title: "Disconnect Xero and purge data?",
+    },
+  ])(
+    "keeps connection history and a retry available after $mode disconnect fails",
+    async ({ mode, openLabel, title, confirmLabel }) => {
+      const message = "Xero could not be disconnected. Try again.";
+      mocks.disconnectXeroAction.mockResolvedValueOnce({
+        error: { message },
+        ok: false,
+      });
+      render(<XeroClient organisations={[baseOrg]} />);
+      fireEvent.click(screen.getByText("Connection controls"));
+      fireEvent.click(screen.getByRole("button", { name: openLabel }));
+      const dialog = screen.getByRole("alertdialog", { name: title });
+      fireEvent.change(
+        within(dialog).getByLabelText(DISCONNECT_CONFIRMATION_REGEX),
+        { target: { value: "Acme Corp" } }
+      );
+      fireEvent.click(
+        within(dialog).getByRole("button", { name: confirmLabel })
+      );
+      await waitFor(() =>
+        expect(mocks.toastError).toHaveBeenCalledWith(message)
+      );
+      expect(mocks.disconnectXeroAction).toHaveBeenCalledWith({
+        confirmationText: "Acme Corp",
+        connectionId: baseConnection.id,
+        mode,
+        organisationId: baseOrg.id,
+      });
+      expect(screen.getByText("Connection controls")).toBeDefined();
+      expect(screen.getByText("Latest balance page")).toBeDefined();
+      expect(screen.getByText("Pause automatic sync")).toBeDefined();
+      expect(screen.queryByText("Disconnected from Xero.")).toBeNull();
+      expect(mocks.toastMessage).not.toHaveBeenCalled();
+      expect(mocks.refresh).not.toHaveBeenCalled();
+      const retry = within(dialog).getByRole("button", { name: confirmLabel });
+      expect(retry.hasAttribute("disabled")).toBe(false);
+      mocks.disconnectXeroAction.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          disconnected: true,
+          result: { connectionId: baseConnection.id, state: "disconnected" },
+        },
+      });
+      fireEvent.click(retry);
+      await waitFor(() =>
+        expect(screen.getByRole("status").textContent).toBe(
+          "Disconnected from Xero."
+        )
+      );
+      expect(mocks.disconnectXeroAction).toHaveBeenCalledTimes(2);
+      expect(mocks.refresh).toHaveBeenCalledTimes(1);
+    }
+  );
   it("exposes the existing audited pause action", async () => {
     mocks.pauseTenantSyncAction.mockResolvedValue({
       ok: true,

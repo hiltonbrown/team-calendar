@@ -70,6 +70,7 @@ function grant(expiry = Date.now() + 3_600_000) {
     status: "active",
     token_encrypted_at: access.encryptedAt,
     token_key_version: access.keyVersion,
+    updated_at: new Date("2026-10-07T00:00:00Z"),
     xero_user_id: "user",
   };
 }
@@ -89,7 +90,9 @@ beforeEach(() => {
     value: {
       authorisation: current,
       id: "connection",
+      last_connected_at: new Date("2026-10-06T00:00:00Z"),
       payroll_region: "AU",
+      remote_connection_id: "remote",
       status: "active",
       xero_authorisation_id: "grant",
       xero_tenant_id: "external",
@@ -124,6 +127,32 @@ beforeEach(() => {
   );
 });
 describe("one scoped canonical access resolver", () => {
+  it("captures the selected link and canonical freshness for provider failure verification", async () => {
+    expect(await resolveXeroAccess(input())).toMatchObject({
+      ok: true,
+      value: {
+        providerConnection: {
+          authorisationId: "grant",
+          authorisationUpdatedAt: current.updated_at,
+          lastConnectedAt: new Date("2026-10-06T00:00:00Z"),
+          remoteConnectionId: "remote",
+        },
+      },
+    });
+  });
+  it("stops repeated provider refresh after shared invalid_grant", async () => {
+    current = grant(Date.now() - 1000);
+    mocks.http.mockResolvedValueOnce(
+      Response.json({ error: "invalid_grant" }, { status: 400 })
+    );
+    expect(await resolveXeroAccess(input())).toMatchObject({ ok: false });
+    expect(await resolveXeroAccess(input())).toMatchObject({
+      error: { code: "reauthorisation_required" },
+      ok: false,
+    });
+    expect(mocks.http).toHaveBeenCalledTimes(1);
+  });
+
   it("uses a valid token without taking a refresh lock", async () => {
     const result = await resolveXeroAccess(input());
     expect(result).toMatchObject({

@@ -27,6 +27,10 @@ vi.mock("../client", () => ({
   },
 }));
 
+vi.mock("../xero-locks", () => ({
+  lockActiveScopedXeroConnection: vi.fn(async () => true),
+}));
+
 const {
   hasUnresolvedSubmitOperation,
   markSubmitDispatchStarted,

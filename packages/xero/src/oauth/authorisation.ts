@@ -16,6 +16,7 @@ import type {
   Prisma,
   XeroAuthorisation,
 } from "@repo/database/generated/client";
+import type { XeroProviderConnectionCapture } from "@repo/database/queries/xero-connections";
 import { getScopedXeroConnection } from "@repo/database/queries/xero-connections";
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
@@ -279,6 +280,7 @@ export async function resolveXeroAccess(input: {
   Result<
     {
       accessToken: string;
+      providerConnection?: XeroProviderConnectionCapture;
       connectionId: string;
       xeroTenantId: string;
       payrollRegion: "AU" | "NZ" | "UK";
@@ -370,6 +372,16 @@ export async function resolveXeroAccess(input: {
       connectionId: connection.id,
       deadline,
       payrollRegion: connection.payroll_region,
+      ...(current.value.remote_connection_id
+        ? {
+            providerConnection: Object.freeze({
+              authorisationId: grant.value.id,
+              authorisationUpdatedAt: grant.value.updated_at,
+              lastConnectedAt: current.value.last_connected_at,
+              remoteConnectionId: current.value.remote_connection_id,
+            }),
+          }
+        : {}),
       xeroTenantId: connection.xero_tenant_id,
     }),
   };

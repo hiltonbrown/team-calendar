@@ -413,7 +413,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 ## Inngest job rules
 
 - Job definitions in `packages/jobs`. Handlers registered in `apps/api`.
-- Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`, `reconcile-xero-connections`.
+- Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`.
 - Inngest handles retries with exponential backoff for inbound sync failures.
 - Outbound write failures are not retried automatically; they are surfaced to the user.
 - Record-level inbound failures do not fail the entire sync run.
@@ -476,7 +476,6 @@ Optional variables with format constraints must be absent (commented out), not `
 | `XERO_RATE_NAMESPACE_EPOCH` | `packages/xero` | Required shared namespace epoch; initialise conservatively before traffic |
 | `XERO_CREDENTIAL_DOMAIN_ID` | `packages/xero` | UUID identifying the canonical credential database; immutable per store epoch |
 | `XERO_REDIRECT_URI` | `packages/xero` | Registered HTTPS OAuth callback, required by production preflight |
-| `XERO_REMOTE_CLEANUP_MODE` | `packages/xero` | Absent defaults to `report_only`; enable only after reviewed provider evidence |
 | `XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION` | `packages/xero` | Positive version for new envelopes; preserve referenced old keys |
 | `XERO_TOKEN_ENCRYPTION_KEYS_JSON` | `packages/xero` | Server-only versioned encryption key map, never print values |
 | `INNGEST_EVENT_KEY` | `packages/jobs` | Inngest event key |

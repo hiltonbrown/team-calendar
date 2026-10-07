@@ -1,7 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
 const findFirst = vi.fn();
-vi.mock("../client", () => ({ database: { xeroConnection: { findFirst } } }));
+const updateMany = vi.fn();
+vi.mock("../client", () => ({
+  database: { xeroConnection: { findFirst, updateMany } },
+}));
 const module = await import("./xero-connections").catch(() => null);
 describe("canonical scoped connections", () => {
   test("does not reveal sibling account metadata", async () => {
@@ -23,6 +26,50 @@ describe("canonical scoped connections", () => {
     expect(result).toEqual({
       error: { code: "not_connected", message: "Xero is not connected." },
       ok: false,
+    });
+  });
+});
+
+describe("provider disconnect compare-and-set", () => {
+  test("marks only the scoped captured link and grant, retaining all provider data", async () => {
+    expect(module?.markScopedXeroConnectionReconnectRequired).toBeTypeOf(
+      "function"
+    );
+    updateMany.mockResolvedValue({ count: 1 });
+    const captured = {
+      authorisationId: "grant",
+      authorisationUpdatedAt: new Date("2026-10-07T00:00:00Z"),
+      clerkOrgId: "account",
+      connectionId: "connection",
+      lastConnectedAt: new Date("2026-10-06T00:00:00Z"),
+      organisationId: "payroll",
+      remoteConnectionId: "remote",
+      xeroTenantId: "tenant",
+    };
+    expect(
+      await module?.markScopedXeroConnectionReconnectRequired(captured)
+    ).toBe(true);
+    expect(updateMany).toHaveBeenCalledWith({
+      data: {
+        last_error_code: "reauthorisation_required",
+        last_error_message: "Reconnect Xero to continue.",
+        status: "reconnect_required",
+      },
+      where: {
+        authorisation: {
+          status: "active",
+          updated_at: captured.authorisationUpdatedAt,
+        },
+        clerk_org_id: "account",
+        disconnected_at: null,
+        id: "connection",
+        last_connected_at: captured.lastConnectedAt,
+        organisation_id: "payroll",
+        remote_connection_id: "remote",
+        status: "active",
+        xero_authorisation_id: "grant",
+        xero_tenant_id: "tenant",
+      },
     });
   });
 });

@@ -96,7 +96,7 @@ describe("live fixture registry", () => {
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(24);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(25);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(
@@ -291,7 +291,7 @@ describe("live fixture registry", () => {
     const allocatedOrganisationIds = allocations.flatMap((item) =>
       item.tenants.map((tenant) => tenant.organisationId)
     );
-    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(24);
+    expect(Object.keys(LIVE_FIXTURE_SUITES)).toHaveLength(25);
     expect(allocatedClerkIds).toHaveLength(REQUIRED_LIVE_FIXTURE_TENANT_SLOTS);
     expect(new Set(allocatedClerkIds).size).toBe(allocatedClerkIds.length);
     expect(new Set(allocatedOrganisationIds).size).toBe(

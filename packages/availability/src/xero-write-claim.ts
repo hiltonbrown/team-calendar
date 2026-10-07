@@ -1,6 +1,10 @@
 import "server-only";
 
-import { database, scopedTo as scoped } from "@repo/database";
+import {
+  database,
+  lockActiveScopedXeroConnection,
+  scopedTo as scoped,
+} from "@repo/database";
 import type { Prisma } from "@repo/database/generated/client";
 import type {
   availability_approval_status,
@@ -20,6 +24,7 @@ export interface AcquireXeroWriteClaimInput extends ClaimScope {
   expectedFailedAction?: availability_failed_action | null;
   expectedSequence: number;
   expectedStatus: availability_approval_status;
+  localAction?: "decline" | "withdraw";
   now?: Date;
 }
 
@@ -29,25 +34,34 @@ export async function acquireXeroWriteClaim(
   const now = input.now ?? new Date();
   const claimedAt = input.claimedAt ?? now;
   const staleBefore = new Date(now.getTime() - XERO_WRITE_CLAIM_LEASE_MS);
-  const result = await database.availabilityRecord.updateMany({
-    data: { xero_write_claimed_at: claimedAt },
-    where: {
-      ...scoped(input),
-      ...noUnresolvedSubmitOperationWhere(),
-      approval_status: input.expectedStatus,
-      archived_at: null,
-      derived_sequence: input.expectedSequence,
-      ...(input.expectedFailedAction !== undefined && {
-        failed_action: input.expectedFailedAction,
-      }),
-      id: input.recordId,
-      OR: [
-        { xero_write_claimed_at: null },
-        { xero_write_claimed_at: { lt: staleBefore } },
-      ],
-    },
+  return await database.$transaction(async (tx) => {
+    const activeConnection = await lockActiveScopedXeroConnection(tx, input);
+    if (!(activeConnection || input.localAction)) {
+      return null;
+    }
+    const result = await tx.availabilityRecord.updateMany({
+      data: { xero_write_claimed_at: claimedAt },
+      where: {
+        ...scoped(input),
+        ...noUnresolvedSubmitOperationWhere(),
+        ...(input.localAction
+          ? { source_remote_id: null, source_type: "team_calendar_leave" }
+          : {}),
+        approval_status: input.expectedStatus,
+        archived_at: null,
+        derived_sequence: input.expectedSequence,
+        ...(input.expectedFailedAction !== undefined && {
+          failed_action: input.expectedFailedAction,
+        }),
+        id: input.recordId,
+        OR: [
+          { xero_write_claimed_at: null },
+          { xero_write_claimed_at: { lt: staleBefore } },
+        ],
+      },
+    });
+    return result.count === 1 ? claimedAt : null;
   });
-  return result.count === 1 ? claimedAt : null;
 }
 
 export async function releaseXeroWriteClaim(

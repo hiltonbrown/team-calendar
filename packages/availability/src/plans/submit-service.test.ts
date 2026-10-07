@@ -3,9 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   acquireSideEffects: vi.fn(),
   auditCreate: vi.fn(),
-  // The xero-write claim/release helpers call database.availabilityRecord.
-  // updateMany directly (outside any $transaction), so they need their own
-  // mock handle distinct from the transaction-scoped updateMany below.
+  // Claim acquisition and release have their own CAS responses; transaction
+  // writes below route non-null claim acquisition to this same handle.
   availabilityClaimUpdateMany: vi.fn(),
   availabilityFindFirst: vi.fn(),
   availabilityUpdateMany: vi.fn(),
@@ -45,7 +44,14 @@ vi.mock("@repo/database", () => ({
     $transaction: async (callback: (tx: unknown) => unknown) => {
       const result = await callback({
         auditEvent: { create: mocks.auditCreate },
-        availabilityRecord: { updateMany: mocks.availabilityUpdateMany },
+        availabilityRecord: {
+          updateMany: (mutation: {
+            data: { xero_write_claimed_at?: Date | null };
+          }) =>
+            mutation.data.xero_write_claimed_at
+              ? mocks.availabilityClaimUpdateMany(mutation)
+              : mocks.availabilityUpdateMany(mutation),
+        },
       });
       mocks.transactionCommitted();
       return result;
@@ -59,6 +65,7 @@ vi.mock("@repo/database", () => ({
     xeroConnection: { findFirst: mocks.xeroTenantFindFirst },
   },
   hasUnresolvedSubmitOperation: mocks.hasUnresolved,
+  lockActiveScopedXeroConnection: vi.fn(async () => true),
   markSubmitCompleted: mocks.markSubmitCompleted,
   markSubmitDefinitiveFailure: mocks.markSubmitDefinitiveFailure,
   markSubmitDispatchStarted: mocks.markSubmitDispatchStarted,

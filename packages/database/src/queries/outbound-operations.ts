@@ -1,6 +1,7 @@
 import type { Prisma } from "../../generated/client";
 import { type Database, database } from "../client";
 import { scopedTo } from "../tenant-query";
+import { lockActiveScopedXeroConnection } from "../xero-locks";
 
 type OperationClient = Database | Prisma.TransactionClient;
 
@@ -53,7 +54,11 @@ export const prepareAndClaimSubmitOperation = async (
   input: PrepareSubmitOperationInput
 ): Promise<PreparedSubmitOperation | null> => {
   try {
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep the connection guard and payroll operation claim in one atomic transaction.
     return await database.$transaction(async (tx) => {
+      if (!(await lockActiveScopedXeroConnection(tx, input))) {
+        throw new SubmitClaimConflictError();
+      }
       const existing = await getSubmitOperation(input, tx);
       let attemptGeneration = 1;
       if (existing) {

@@ -385,6 +385,7 @@ export async function withdrawSubmission(
       expectedFailedAction: record.failed_action,
       expectedSequence: record.derived_sequence,
       expectedStatus: record.approval_status,
+      localAction: record.source_remote_id ? undefined : "withdraw",
     });
     if (!claimedAt) {
       return invalidState("invalid_state_for_withdraw");
@@ -898,6 +899,9 @@ async function persistXeroFailure(input: {
         xero_write_claimed_at: null,
         xero_write_error: plainMessage,
         xero_write_error_raw: {
+          ...(input.error.certainty
+            ? { certainty: input.error.certainty }
+            : {}),
           code: input.error.code,
           correlationId: input.error.correlationId ?? null,
           httpStatus: input.error.httpStatus ?? null,

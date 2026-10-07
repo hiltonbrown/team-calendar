@@ -1,4 +1,5 @@
 import { type Result, xeroRecoveryMessage } from "@repo/core";
+import type { XeroProviderConnectionCapture } from "@repo/database/queries/xero-connections";
 import type { XeroDeadline } from "../rate-limit/deadline";
 
 export type XeroWriteError =
@@ -48,6 +49,7 @@ export interface XeroAccessContext {
   id: string;
   organisation_id: string;
   payroll_region: PayrollRegion;
+  providerConnection?: XeroProviderConnectionCapture;
   xero_tenant_id: string;
 }
 

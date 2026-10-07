@@ -35,6 +35,7 @@ const tenantB = {
   teamId: fixture.id("team", 1),
 } as const;
 const testClerkOrgIds = [tenantA.clerkOrgId, tenantB.clerkOrgId] as const;
+const approvalAuthorisationId = fixture.id("approval-authorisation");
 interface Tenant {
   clerkOrgId: string;
   locationId: string;
@@ -139,7 +140,9 @@ const cleanTestData = async () => {
   await database.xeroSyncCursor.deleteMany({ where: scope });
   await database.syncRun.deleteMany({ where: scope });
   await database.xeroConnection.deleteMany({ where: scope });
-  await database.xeroConnection.deleteMany({ where: scope });
+  await database.xeroAuthorisation.deleteMany({
+    where: { id: approvalAuthorisationId },
+  });
   await database.publicHolidayAssignment.deleteMany({ where: scope });
   await database.publicHoliday.deleteMany({ where: scope });
   await database.publicHolidayJurisdiction.deleteMany({ where: scope });
@@ -231,6 +234,36 @@ describe("availability_records", () => {
   });
   test("fences concurrent approval creates and preserves uncertainty after the worker lease expires", async () => {
     await createTenant(tenantA);
+    // Provider-write preparation requires the same active canonical connection
+    // as the real approval flow; this test never decrypts or uses these tokens.
+    await database.xeroAuthorisation.create({
+      data: {
+        access_token_auth_tag: "fixture-tag",
+        access_token_encrypted: "fixture-ciphertext",
+        access_token_expires_at: new Date(Date.now() + 3_600_000),
+        access_token_iv: "fixture-iv",
+        granted_scopes: ["payroll.employees"],
+        id: approvalAuthorisationId,
+        last_refreshed_at: new Date(),
+        provider_app_id: fixture.id("approval-provider-app"),
+        refresh_token_auth_tag: "fixture-refresh-tag",
+        refresh_token_encrypted: "fixture-refresh-ciphertext",
+        refresh_token_iv: "fixture-refresh-iv",
+        token_encrypted_at: new Date(),
+        token_key_version: 1,
+        xero_user_id: fixture.id("approval-xero-user"),
+      },
+    });
+    await database.xeroConnection.create({
+      data: {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        payroll_region: "AU",
+        remote_connection_id: fixture.id("approval-remote-connection"),
+        xero_authorisation_id: approvalAuthorisationId,
+        xero_tenant_id: fixture.id("approval-tenant"),
+      },
+    });
     const record = await createAvailabilityRecord({
       id: availabilityRecordIds.scoped,
       tenant: tenantA,

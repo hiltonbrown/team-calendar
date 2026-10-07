@@ -61,6 +61,9 @@ export const LIVE_FIXTURE_SUITES = {
     globalKeys: {},
     tenants: 2,
   },
+  "packages/xero/src/oauth/provider-connection.integration.test.ts": {
+    tenants: 2,
+  },
   "packages/xero/src/oauth/service.integration.test.ts": {
     globalKeys: { authorisation: 1, provider_app: 1 },
     tenants: 2,

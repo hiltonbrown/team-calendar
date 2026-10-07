@@ -750,3 +750,26 @@ Each step produces a deployable, testable vertical slice.
 - The `AvailabilityRecord` unique constraint `(organisation_id, source_type, source_remote_id)` is NULL-distinct in PostgreSQL. Application-layer guards in `packages/availability` must prevent duplicate manual records (`source_remote_id IS NULL`). Tests must assert this guard is enforced.
 
 `xero_authorisations` deliberately has no tenancy keys because one verified provider grant can support several payroll organisations. Every customer-facing resolution first selects `XeroConnection` using both `clerk_org_id` and `organisation_id`. The grant is the only persisted credential owner; there are no mirrors, legacy fallbacks, backfills, or parallel lifecycle structures.
+
+
+### Xero disconnection lifecycle
+
+Connection states are `active`, `reconnect_required` and `disconnected`.
+An owner or admin confirms the target Organisation before disconnecting its
+Xero connection. The scoped canonical user authorisation deletes that specific
+remote connection first. HTTP 204 or 404 permits local teardown; a transient or
+uncertain provider failure retains the connection and credentials for retry.
+Local teardown and its required audit commit together. Remove the authorisation
+only when no other connection or live selecting OAuth session references it.
+The existing closed-session purge removes credentials once that final temporary
+reference expires; session deletion and grant pruning commit under the same
+authorisation lock so a failed cleanup can be retried.
+
+A soft disconnect preserves imported history. An explicitly requested purge
+archives Xero-imported entries and removes imported balances and mappings while
+preserving manual entries, their people and stable calendar identities. Reject
+disconnect while a live payroll write or unresolved outbound operation exists.
+Provider-confirmed loss of a connection requires reconnect and stops scheduled
+sync; a permission error or unavailable inventory does not prove revocation.
+Lifecycle follows explicit customer actions and authoritative provider events,
+with no activity heuristics, separate remote-cleanup worker or management token.

@@ -33,6 +33,7 @@ export const EXPECTED_INTEGRATION_TESTS = [
   "packages/jobs/src/handlers/sync-xero-leave-records.integration.test.ts",
   "packages/jobs/src/handlers/sync-xero-people.integration.test.ts",
   "packages/xero/src/oauth/disconnect.integration.test.ts",
+  "packages/xero/src/oauth/provider-connection.integration.test.ts",
   "packages/xero/src/oauth/service.integration.test.ts",
   "packages/xero/src/rate-limit/shared-store.integration.test.ts",
 ] as const;

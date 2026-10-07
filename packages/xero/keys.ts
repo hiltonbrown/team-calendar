@@ -83,7 +83,6 @@ export const keys = () =>
       XERO_CREDENTIAL_DOMAIN_ID: process.env.XERO_CREDENTIAL_DOMAIN_ID,
       XERO_RATE_NAMESPACE_EPOCH: process.env.XERO_RATE_NAMESPACE_EPOCH,
       XERO_REDIRECT_URI: process.env.XERO_REDIRECT_URI,
-      XERO_REMOTE_CLEANUP_MODE: process.env.XERO_REMOTE_CLEANUP_MODE,
       XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION:
         process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION,
       XERO_TOKEN_ENCRYPTION_KEY: process.env.XERO_TOKEN_ENCRYPTION_KEY,
@@ -109,9 +108,6 @@ export const keys = () =>
       // the callback to the registered production URL regardless of the
       // per-deployment public URLs.
       XERO_REDIRECT_URI: z.string().url().optional(),
-      XERO_REMOTE_CLEANUP_MODE: z
-        .enum(["report_only", "enabled"])
-        .default("report_only"),
       XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION: z
         .string()
         .regex(

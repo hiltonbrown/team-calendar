@@ -94,6 +94,19 @@ export async function disconnectXeroAction(input: {
   if (!organisation || organisation.name !== parsed.data.confirmationText) {
     return validationError("Type the organisation name to confirm disconnect.");
   }
+  const connection = await database.xeroConnection.findFirst({
+    select: { id: true },
+    where: {
+      clerk_org_id: context.value.clerkOrgId,
+      id: parsed.data.connectionId,
+      organisation_id: context.value.organisationId,
+    },
+  });
+  if (!connection) {
+    return validationError(
+      "Xero connection was not found in this organisation."
+    );
+  }
   return await (async () => {
     const result = await disconnectXeroOAuthConnection({
       clerkOrgId: context.value.clerkOrgId,
@@ -105,23 +118,6 @@ export async function disconnectXeroAction(input: {
     if (!result.ok) {
       return unknownError(result.error.message);
     }
-    await database.auditEvent.create({
-      data: {
-        ...auditBase(context.value),
-        action:
-          parsed.data.mode === "destructive"
-            ? "xero.connection_disconnected_destructive"
-            : "xero.connection_disconnected_soft",
-        entity_id: parsed.data.connectionId,
-        entity_type: "xero_connection",
-        metadata: {
-          mode: parsed.data.mode,
-          state: result.value.state,
-        },
-        resource_id: parsed.data.connectionId,
-        resource_type: "xero_connection",
-      },
-    });
     revalidate();
     return {
       ok: true,

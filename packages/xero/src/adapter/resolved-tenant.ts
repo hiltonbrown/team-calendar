@@ -20,6 +20,7 @@ export function toResolvedXeroConnection(
     id: access.connectionId,
     organisation_id: scope.organisationId,
     payroll_region: access.payrollRegion,
+    providerConnection: access.providerConnection,
     xero_tenant_id: access.xeroTenantId,
   };
 }

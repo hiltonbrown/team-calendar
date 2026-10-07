@@ -1010,6 +1010,7 @@ async function performApproval(
     );
   }
 }
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keep the local-only guard and provider failure persistence beside the scoped claim and transition.
 async function performDecline(
   input: DeclineInput,
   externalWritePort: ExternalWritePort,
@@ -1051,6 +1052,7 @@ async function performDecline(
       expectedFailedAction: options.retry ? "decline" : null,
       expectedSequence: record.derived_sequence,
       expectedStatus: options.retry ? "xero_sync_failed" : "submitted",
+      localAction: xeroLeaveApplicationId ? undefined : "decline",
     });
     if (!claimedAt) {
       return invalidState(
@@ -1293,6 +1295,9 @@ async function persistApprovalFailure(input: {
         xero_write_error: plainMessage,
         xero_write_error_raw: {
           attemptedAction: input.failedAction,
+          ...(input.error.certainty
+            ? { certainty: input.error.certainty }
+            : {}),
           code: input.error.code,
           correlationId: input.error.correlationId ?? null,
           httpStatus: input.error.httpStatus ?? null,

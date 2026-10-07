@@ -45,3 +45,44 @@ export async function getScopedXeroConnection(
   }
   return { ok: true, value: connection };
 }
+
+export interface XeroProviderConnectionCapture {
+  authorisationId: string;
+  authorisationUpdatedAt: Date;
+  lastConnectedAt: Date | null;
+  remoteConnectionId: string;
+}
+
+// Provider I/O happens before this atomic update. A fresh reconnect or changed
+// authorisation must invalidate the old probe even when its tenant is unchanged.
+export async function markScopedXeroConnectionReconnectRequired(
+  input: XeroScope &
+    XeroProviderConnectionCapture & {
+      connectionId: string;
+      xeroTenantId: string;
+    },
+  tx: Prisma.TransactionClient = database
+): Promise<boolean> {
+  const changed = await tx.xeroConnection.updateMany({
+    data: {
+      last_error_code: "reauthorisation_required",
+      last_error_message: "Reconnect Xero to continue.",
+      status: "reconnect_required",
+    },
+    where: {
+      ...xeroScope(input),
+      authorisation: {
+        status: "active",
+        updated_at: input.authorisationUpdatedAt,
+      },
+      disconnected_at: null,
+      id: input.connectionId,
+      last_connected_at: input.lastConnectedAt,
+      remote_connection_id: input.remoteConnectionId,
+      status: "active",
+      xero_authorisation_id: input.authorisationId,
+      xero_tenant_id: input.xeroTenantId,
+    },
+  });
+  return changed.count === 1;
+}

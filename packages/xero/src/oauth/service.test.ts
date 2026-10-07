@@ -23,6 +23,7 @@ const dbMock = vi.hoisted(() => ({
     create: vi.fn(),
     deleteMany: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
     updateMany: vi.fn(),
   },
 }));
@@ -77,7 +78,6 @@ const {
   completeXeroTenantSelection,
   isLocalApplicationPath,
   isPreviewDeployment,
-  markXeroConnectionStale,
   purgeClosedXeroOAuthSessions,
 } = await import("./service");
 const { resolveXeroAccess } = await import("./authorisation");
@@ -140,6 +140,7 @@ beforeEach(() => {
   delete process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
   delete process.env.VERCEL_ENV;
   dbMock.organisation.findMany.mockResolvedValue([]);
+  dbMock.xeroOAuthSession.findMany.mockResolvedValue([]);
   dbMock.$queryRaw.mockResolvedValue([]);
   dbMock.$transaction.mockImplementation((callback) => callback(dbMock));
   lockMock.grant.mockImplementation((_input, callback) => callback(dbMock));
@@ -1062,6 +1063,7 @@ describe("canonical tenant selection", () => {
     });
     dbMock.xeroAuthorisation.findUnique.mockResolvedValue(canonicalGrant());
     dbMock.organisation.findMany.mockResolvedValue([]);
+    dbMock.xeroOAuthSession.findMany.mockResolvedValue([]);
     dbMock.organisation.create.mockResolvedValue({ id: "payroll_1" });
     dbMock.xeroConnection.create.mockResolvedValue({
       id: "conn_1",
@@ -1372,22 +1374,8 @@ describe("canonical housekeeping", () => {
           { expires_at: { lte: now } },
           { status: { in: ["cancelled", "completed"] } },
         ],
+        xero_authorisation_id: null,
       },
-    });
-  });
-  it("cannot mark a disconnected connection reconnect-required", async () => {
-    await markXeroConnectionStale({
-      clerkOrgId: "org_1",
-      connectionId: "conn_1",
-      organisationId: "payroll_1",
-    });
-    expect(
-      dbMock.xeroConnection.updateMany.mock.calls[0]?.[0].where
-    ).toMatchObject({
-      clerk_org_id: "org_1",
-      id: "conn_1",
-      organisation_id: "payroll_1",
-      status: "active",
     });
   });
 });
@@ -1425,6 +1413,7 @@ describe("straight protected OAuth connection", () => {
     });
   beforeEach(() => {
     dbMock.organisation.findMany.mockResolvedValue([]);
+    dbMock.xeroOAuthSession.findMany.mockResolvedValue([]);
     dbMock.organisation.create.mockResolvedValue({ id: "payroll_1" });
     dbMock.xeroConnection.create.mockResolvedValue({
       id: "conn_1",

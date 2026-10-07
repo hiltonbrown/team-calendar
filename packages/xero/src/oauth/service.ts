@@ -8,18 +8,13 @@ import {
 } from "node:crypto";
 import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
 import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
-import {
-  database,
-  withScopedXeroConnectionLock,
-  withXeroGrantLock,
-} from "@repo/database";
+import { database, withXeroGrantLock } from "@repo/database";
 import type {
   XeroAuthorisation,
   XeroConnection,
   XeroOAuthSession,
 } from "@repo/database/generated/client";
 import { Prisma } from "@repo/database/generated/client";
-import { getScopedXeroConnection } from "@repo/database/queries/xero-connections";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { log } from "@repo/observability/log";
 import { z } from "zod";
@@ -31,7 +26,6 @@ import { xeroFetch } from "../rate-limit/xero-fetch";
 import {
   adoptXeroAuthorisation,
   authorisationAccessToken,
-  refreshXeroAuthorisation,
   resolveXeroAccess,
 } from "./authorisation";
 import {
@@ -1471,163 +1465,48 @@ export async function completeXeroTenantSelection(input: {
 export async function purgeClosedXeroOAuthSessions(
   now = new Date()
 ): Promise<void> {
-  await database.xeroOAuthSession.deleteMany({
-    where: {
-      OR: [
-        { expires_at: { lte: now } },
-        { status: { in: ["cancelled", "completed"] } },
-      ],
-    },
-  });
-}
-export async function markXeroConnectionStale(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  connectionId: string;
-  errorCode?: string;
-  errorMessage?: string;
-}): Promise<void> {
-  await database.xeroConnection.updateMany({
-    data: {
-      last_error_code: input.errorCode ?? "access_failed",
-      last_error_message: input.errorMessage ?? "Reconnect Xero.",
-      status: "reconnect_required",
-    },
-    where: {
-      clerk_org_id: input.clerkOrgId,
-      id: input.connectionId,
-      organisation_id: input.organisationId,
-      status: "active",
-    },
-  });
-}
-export interface XeroDisconnectResult {
-  connectionId: string;
-  state: "disconnected";
-}
-export async function disconnectXeroOAuthConnection(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  connectionId: string;
-  destructive: boolean;
-  performedByUserId?: string | null;
-}): Promise<Result<XeroDisconnectResult, XeroOAuthError>> {
-  const scoped = await getScopedXeroConnection(input);
-  if (
-    !(
-      scoped.ok &&
-      scoped.value.authorisation &&
-      scoped.value.remote_connection_id
-    )
-  ) {
-    return {
-      error: {
-        code: "connection_inactive",
-        message: "Reconnect Xero before disconnecting.",
+  const closed: Prisma.XeroOAuthSessionWhereInput = {
+    OR: [
+      { expires_at: { lte: now } },
+      { status: { in: ["cancelled", "completed"] } },
+    ],
+  };
+  const sessions = await database.xeroOAuthSession.findMany({
+    select: {
+      authorisation: {
+        select: { id: true, provider_app_id: true, xero_user_id: true },
       },
-      ok: false,
-    };
-  }
-  const grant = await refreshXeroAuthorisation({
-    authorisationId: scoped.value.authorisation.id,
-    deadline: createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
+    },
+    where: closed,
   });
-  if (!grant.ok) {
-    return grant;
-  }
-  try {
-    return await withScopedXeroConnectionLock(
-      input,
-      Date.now() + 15_000,
+  const candidates = sessions.flatMap((session) =>
+    session.authorisation ? [session.authorisation] : []
+  );
+  for (const grant of new Map(
+    candidates.map((candidate) => [candidate.id, candidate])
+  ).values()) {
+    await withXeroGrantLock(
+      {
+        deadlineAt: Date.now() + 15_000,
+        mode: "refresh",
+        providerAppId: grant.provider_app_id,
+        xeroUserId: grant.xero_user_id,
+      },
       async (tx) => {
-        const scope = {
-          clerk_org_id: input.clerkOrgId,
-          organisation_id: input.organisationId,
-        };
-        const connection = await tx.xeroConnection.findFirstOrThrow({
-          where: { ...scope, id: input.connectionId },
+        await tx.xeroOAuthSession.deleteMany({
+          where: { ...closed, xero_authorisation_id: grant.id },
         });
-        if (
-          connection.xero_authorisation_id !== grant.value.id ||
-          connection.remote_connection_id !== scoped.value.remote_connection_id
-        ) {
-          throw new Error("connection_changed");
-        }
-        const response = await xeroFetch({
-          deadline: createXeroDeadline(10_000),
-          init: {
-            headers: {
-              Authorization: `Bearer ${authorisationAccessToken(grant.value)}`,
-            },
-            method: "DELETE",
+        await tx.xeroAuthorisation.deleteMany({
+          where: {
+            connections: { none: {} },
+            id: grant.id,
+            sessions: { none: {} },
           },
-          rateClass: {
-            kind: "user_inventory",
-            providerAppId: grant.value.provider_app_id,
-          },
-          url: `${XERO_CONNECTIONS_URL}/${encodeURIComponent(connection.remote_connection_id ?? "")}`,
         });
-        if (response.status !== 204 && response.status !== 404) {
-          return {
-            error: {
-              code: "unknown_error",
-              message: "Xero could not be disconnected. Try again.",
-            },
-            ok: false,
-          };
-        }
-        const now = new Date();
-        await tx.xeroSyncCursor.deleteMany({
-          where: { ...scope, xero_connection_id: connection.id },
-        });
-        await tx.xeroConnection.updateMany({
-          data: {
-            balance_next_person_id: null,
-            disconnected_at: now,
-            disconnected_by_user_id: input.performedByUserId,
-            last_disconnected_at: now,
-            leave_next_person_id: null,
-            remote_connection_id: null,
-            status: "disconnected",
-            sync_paused_at: now,
-            xero_authorisation_id: null,
-          },
-          where: { ...scope, id: connection.id },
-        });
-        if (input.destructive) {
-          await tx.syncRun.deleteMany({
-            where: { ...scope, xero_connection_id: connection.id },
-          });
-          await tx.leaveBalance.deleteMany({
-            where: { ...scope, xero_connection_id: connection.id },
-          });
-          await tx.xeroPersonMatch.deleteMany({ where: scope });
-          await tx.person.updateMany({
-            data: { archived_at: now, clerk_user_id: null },
-            where: { ...scope, source_system: "XERO" },
-          });
-          await tx.person.updateMany({
-            data: { xero_employee_id: null },
-            where: scope,
-          });
-          await tx.availabilityRecord.updateMany({
-            data: { archived_at: now, publish_status: "archived" },
-            where: { ...scope, source_type: { in: ["xero", "xero_leave"] } },
-          });
-        }
-        return {
-          ok: true,
-          value: { connectionId: connection.id, state: "disconnected" },
-        };
       }
     );
-  } catch {
-    return {
-      error: {
-        code: "unknown_error",
-        message: "Xero could not be disconnected. Try again.",
-      },
-      ok: false,
-    };
   }
+  await database.xeroOAuthSession.deleteMany({
+    where: { ...closed, xero_authorisation_id: null },
+  });
 }

@@ -682,7 +682,7 @@ sidebar width on small screens.
 
 **Purpose:** Xero OAuth management and per-tenant sync configuration, one card per payroll Organisation.
 
-**User interactions, as-built:** Per-org card: connection and paused-state badges, plain-language error banner, payroll region text and a four-stat sync-timestamp grid. The oldest or never-run sync is promoted as the one recommended action. Other manual sync types live under a native disclosure. Token refresh, audited pause/resume and both disconnect modes live under a separate Connection controls disclosure. Disconnect opens `ConfirmActionDialog`, previews soft versus destructive consequences, requires the exact organisation name and prevents duplicate submission while pending.
+**User interactions, as-built:** Per-org card: connection and paused-state badges, plain-language error banner, payroll region text and a four-stat sync-timestamp grid. The oldest or never-run sync is promoted as the one recommended action. Other manual sync types live under a native disclosure. Audited pause/resume and both disconnect modes live under a separate Connection controls disclosure. Disconnect opens `ConfirmActionDialog`, previews soft versus destructive consequences, requires the exact organisation name and prevents duplicate submission while pending.
 
 **Design requirements:** Routine health and one recommended sync remain primary; manual and high-risk connection controls use progressive disclosure. Destructive purge keeps explicit destructive emphasis inside its confirmation flow.
 
