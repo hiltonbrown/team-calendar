@@ -398,6 +398,12 @@ export function PlansClient({
               {records.map((record) => {
                 const status = planStatusForRecord(record);
                 const rowPending = pendingRecordId === record.id;
+                const actionError =
+                  inlineError[record.id] ||
+                  (record.approvalStatus === "approved" &&
+                  record.failedAction === "withdraw"
+                    ? record.xeroWriteError
+                    : null);
                 return (
                   <tr
                     aria-busy={rowPending}
@@ -497,13 +503,13 @@ export function PlansClient({
                           </div>
                         </dl>
                       </details>
-                      {inlineError[record.id] ? (
+                      {actionError ? (
                         <div
                           className={`mt-3 flex items-start gap-2 rounded-2xl p-3 text-label-lg ${statusToneClasses.failed}`}
                           role="alert"
                         >
                           <AlertCircleIcon className="mt-0.5 size-4 shrink-0" />
-                          <span>{inlineError[record.id]}</span>
+                          <span>{actionError}</span>
                         </div>
                       ) : null}
                       {record.submissionResolutionPending ? (

@@ -190,6 +190,13 @@ export function mapXeroTransportError(
   return {
     ...classifyXeroFailure({ dispatched, error, isMutation }),
     dispatchPhase: dispatched ? "after_dispatch" : "before_dispatch",
+    ...(error instanceof XeroFetchError
+      ? {
+          correlationId: error.correlationId,
+          httpStatus: error.httpStatus,
+          retryAfterMs: error.retryAfterMs,
+        }
+      : {}),
     message: "Xero request could not be completed.",
   };
 }

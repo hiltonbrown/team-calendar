@@ -635,6 +635,63 @@ describe("submit-service", () => {
     }
     expect(mocks.availabilityUpdateMany).not.toHaveBeenCalled();
   });
+  it("retains create uncertainty when a code-only conflict requires outcome recovery", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+      error: {
+        code: "conflict_error",
+        message: "Outcome unresolved",
+        recoveryReason: "outcome_unknown",
+        userMessage: "Xero may have received this approval.",
+      },
+      ok: false,
+    });
+    await createLeaveOnApproval(input, mockPort);
+    expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
+      "conflict_error"
+    );
+    expect(mocks.markSubmitDefinitiveFailure).not.toHaveBeenCalled();
+  });
+  it("allows a fresh create attempt after its first write stops before dispatch", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+      error: {
+        code: "network_error",
+        dispatchPhase: "before_dispatch",
+        message: "Preflight unavailable",
+        userMessage: "Xero was not called.",
+      },
+      ok: false,
+    });
+    await createLeaveOnApproval(input, mockPort);
+    expect(mocks.markSubmitDefinitiveFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "approve", attemptGeneration: 1 }),
+      "network_error"
+    );
+    expect(mocks.markSubmitOutcomeUnknown).not.toHaveBeenCalled();
+  });
+  it("does not resolve an uncertain create when replay stops before dispatch", async () => {
+    mocks.availabilityFindFirst.mockResolvedValue(record);
+    const operation = await mocks.prepareAndClaimSubmitOperation();
+    mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+      ...operation,
+      replayedUnknown: true,
+    });
+    mocks.submitLeaveApplicationForRegion.mockResolvedValue({
+      error: {
+        certainty: "definitive_failure",
+        code: "auth_error",
+        dispatchPhase: "before_dispatch",
+        message: "Preflight unavailable",
+        userMessage: "The replay was not sent.",
+      },
+      ok: false,
+    });
+    await createLeaveOnApproval(input, mockPort);
+    expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalled();
+    expect(mocks.markSubmitDefinitiveFailure).not.toHaveBeenCalled();
+  });
   it("reverts only failed records to draft", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
@@ -693,7 +750,7 @@ describe("submit-service", () => {
       })
     );
   });
-  it("moves an owner's approved leave to the Xero failure state when withdrawal fails", async () => {
+  it("retains approved leave and diagnostics when Xero definitively refuses withdrawal", async () => {
     mocks.availabilityFindFirst
       .mockResolvedValueOnce({
         ...record,
@@ -702,12 +759,13 @@ describe("submit-service", () => {
       })
       .mockResolvedValueOnce({
         ...record,
-        approval_status: "xero_sync_failed",
+        approval_status: "approved",
         failed_action: "withdraw",
         source_remote_id: "xero-leave-1",
       });
     mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
       error: {
+        certainty: "definitive_failure",
         code: "validation_error",
         message: "Scheduled leave cannot be withdrawn",
         userMessage: "This leave could not be withdrawn in Xero.",
@@ -722,13 +780,74 @@ describe("submit-service", () => {
     expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          approval_status: "xero_sync_failed",
+          approval_status: "approved",
           failed_action: "withdraw",
+          xero_write_claimed_at: null,
+          xero_write_error: "This leave could not be withdrawn in Xero.",
         }),
         where: expect.objectContaining({ approval_status: "approved" }),
       })
     );
+    expect(mocks.markSubmitDefinitiveFailure).toHaveBeenCalled();
+    expect(mocks.markSubmitOutcomeUnknown).not.toHaveBeenCalled();
+    expect(
+      mocks.availabilityUpdateMany.mock.calls[0][0].data
+    ).not.toHaveProperty("derived_sequence");
+    expect(mocks.auditCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "availability_records.withdrawal_failed",
+        }),
+      })
+    );
   });
+  it.each([
+    {
+      certainty: "outcome_unknown",
+      dispatchPhase: "after_dispatch",
+      replayedUnknown: false,
+    },
+    {
+      certainty: "definitive_failure",
+      dispatchPhase: "before_dispatch",
+      replayedUnknown: true,
+    },
+  ])(
+    "keeps an approved withdrawal unresolved after $dispatchPhase with replayedUnknown=$replayedUnknown",
+    async ({ certainty, dispatchPhase, replayedUnknown }) => {
+      mocks.availabilityFindFirst.mockResolvedValue({
+        ...record,
+        approval_status: "approved",
+        source_remote_id: "xero-leave-1",
+      });
+      const operation = await mocks.prepareAndClaimSubmitOperation();
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+        ...operation,
+        replayedUnknown,
+      });
+      mocks.withdrawLeaveApplicationForRegion.mockResolvedValue({
+        error: {
+          certainty,
+          code: "network_error",
+          dispatchPhase,
+          message: "Response lost",
+          userMessage: "Xero may have received this withdrawal.",
+        },
+        ok: false,
+      });
+      await withdrawSubmission(input, mockPort);
+      expect(mocks.markSubmitOutcomeUnknown).toHaveBeenCalled();
+      expect(mocks.markSubmitDefinitiveFailure).not.toHaveBeenCalled();
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            approval_status: "xero_sync_failed",
+            failed_action: "withdraw",
+          }),
+        })
+      );
+    }
+  );
   it("allows an admin to withdraw another person's approved leave", async () => {
     const adminInput = {
       ...input,

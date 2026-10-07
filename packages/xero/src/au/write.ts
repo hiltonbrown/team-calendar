@@ -9,6 +9,7 @@ import {
   classifyXeroHttpFailure,
   mapXeroTransportError,
 } from "../adapter/classify-xero-failure";
+import { getXeroCorrelationId } from "../rate-limit/response-diagnostics";
 import { xeroFetch } from "../rate-limit/xero-fetch";
 import type {
   ApproveLeaveApplicationInput,
@@ -27,12 +28,23 @@ const LeaveApplicationResponseSchema = z
       .array(
         z
           .object({
+            // This flag is outside the AU contract; reject an unexpected error indicator.
+            HasErrors: z.boolean().optional(),
             LeaveApplicationID: z.string().trim().min(1).optional(),
             LeaveApplicationId: z.string().trim().min(1).optional(),
+            ValidationErrors: z
+              .array(z.object({ Message: z.string().optional() }).passthrough())
+              .optional(),
           })
+          .refine(
+            (application) =>
+              application.LeaveApplicationID === undefined ||
+              application.LeaveApplicationId === undefined ||
+              application.LeaveApplicationID === application.LeaveApplicationId
+          )
           .passthrough()
       )
-      .optional(),
+      .length(1),
   })
   .passthrough();
 export async function submitLeaveApplication(
@@ -64,28 +76,11 @@ export async function submitLeaveApplication(
   if (!response.ok) {
     return response;
   }
-  const parsed = LeaveApplicationResponseSchema.safeParse(response.value);
-  const xeroLeaveApplicationId = parsed.success
-    ? (parsed.data.LeaveApplications?.[0]?.LeaveApplicationID ??
-      parsed.data.LeaveApplications?.[0]?.LeaveApplicationId)
-    : null;
-  if (!xeroLeaveApplicationId) {
-    return {
-      error: {
-        code: "unknown_error",
-        dispatchPhase: "after_dispatch",
-        message: "Xero did not return a leave application ID.",
-        rawPayload: response.value,
-        recoveryReason: "outcome_unknown",
-      },
-      ok: false,
-    };
-  }
   return {
     ok: true,
     value: {
-      rawResponse: response.value,
-      xeroLeaveApplicationId,
+      rawResponse: response.value.rawResponse,
+      xeroLeaveApplicationId: response.value.remoteId,
     },
   };
 }
@@ -99,13 +94,14 @@ export async function approveLeaveApplication(
   const response = await xeroRequest(
     input.xeroConnection,
     {
+      expectedRemoteId: input.xeroLeaveApplicationId,
       method: "POST",
       path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/approve`,
     },
     input.mutation
   );
   return response.ok
-    ? { ok: true, value: { rawResponse: response.value } }
+    ? { ok: true, value: { rawResponse: response.value.rawResponse } }
     : response;
 }
 export async function declineLeaveApplication(
@@ -121,13 +117,14 @@ export async function declineLeaveApplication(
       body: {
         Reason: input.reason,
       },
+      expectedRemoteId: input.xeroLeaveApplicationId,
       method: "POST",
       path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
     },
     input.mutation
   );
   return response.ok
-    ? { ok: true, value: { rawResponse: response.value } }
+    ? { ok: true, value: { rawResponse: response.value.rawResponse } }
     : response;
 }
 export async function withdrawLeaveApplication(
@@ -143,24 +140,26 @@ export async function withdrawLeaveApplication(
       body: {
         Reason: "Withdrawn by employee in Team Calendar.",
       },
+      expectedRemoteId: input.xeroLeaveApplicationId,
       method: "POST",
       path: `/payroll.xro/1.0/LeaveApplications/${encodeURIComponent(input.xeroLeaveApplicationId)}/reject`,
     },
     input.mutation
   );
   return response.ok
-    ? { ok: true, value: { rawResponse: response.value } }
+    ? { ok: true, value: { rawResponse: response.value.rawResponse } }
     : response;
 }
 async function xeroRequest(
   xeroConnection: XeroAccessContext,
   request: {
     body?: unknown;
+    expectedRemoteId?: string;
     method: "POST" | "PUT";
     path: string;
   },
   mutation?: XeroMutationIdentity
-): Promise<XeroWriteResult<unknown>> {
+): Promise<XeroWriteResult<{ rawResponse: unknown; remoteId: string }>> {
   if (!mutation) {
     return {
       error: {
@@ -237,11 +236,21 @@ async function xeroRequest(
     const application = parsed.success
       ? parsed.data.LeaveApplications?.[0]
       : undefined;
-    if (!(application?.LeaveApplicationID || application?.LeaveApplicationId)) {
+    const remoteId =
+      application?.LeaveApplicationID ?? application?.LeaveApplicationId;
+    if (
+      !remoteId ||
+      (request.expectedRemoteId !== undefined &&
+        remoteId !== request.expectedRemoteId) ||
+      application?.HasErrors === true ||
+      (application?.ValidationErrors?.length ?? 0) > 0
+    ) {
       return {
         error: {
           code: "unknown_error",
+          correlationId: getXeroCorrelationId(response.headers),
           dispatchPhase: "after_dispatch",
+          httpStatus: response.status,
           message: "Xero response could not be confirmed.",
           rawPayload,
           recoveryReason: "outcome_unknown",
@@ -249,7 +258,7 @@ async function xeroRequest(
         ok: false,
       };
     }
-    return { ok: true, value: rawPayload };
+    return { ok: true, value: { rawResponse: rawPayload, remoteId } };
   } catch (error) {
     return {
       error: mapXeroTransportError(error, true),
@@ -270,7 +279,7 @@ async function readPayload(response: Response): Promise<unknown> {
 }
 function mapHttpError(response: Response, rawPayload: unknown): XeroWriteError {
   const details = {
-    correlationId: response.headers.get("xero-correlation-id") ?? undefined,
+    correlationId: getXeroCorrelationId(response.headers),
     httpStatus: response.status,
     message: messageFromPayload(rawPayload) ?? response.statusText,
     rawPayload,

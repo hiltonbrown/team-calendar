@@ -150,7 +150,7 @@ it("shares at most four payroll attempts across a definite401 credential replay"
   const fetchMock = vi.fn(() => {
     calls += 1;
     return Promise.resolve(
-      new Response("", { status: calls === 3 ? 401 : 503 })
+      new Response("", { status: calls === 1 ? 401 : 503 })
     );
   });
   vi.stubGlobal("fetch", fetchMock);
@@ -160,6 +160,37 @@ it("shares at most four payroll attempts across a definite401 credential replay"
       false
     );
     expect(fetchMock).toHaveBeenCalledTimes(4);
+    const keys = fetchMock.mock.calls.map(([, init]) =>
+      new Headers(init.headers).get("Idempotency-Key")
+    );
+    expect(new Set(keys).size).toBe(1);
+  } finally {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  }
+});
+
+it("keeps earlier ambiguous dispatches unresolved when a later retry returns401", async () => {
+  let calls = 0;
+  const fetchMock = vi.fn(() => {
+    calls += 1;
+    return Promise.resolve(
+      new Response("", { status: calls === 3 ? 401 : 503 })
+    );
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  try {
+    expect(await approveLeaveApplicationForRegion("AU", input())).toMatchObject(
+      {
+        error: {
+          dispatchPhase: "after_dispatch",
+          recoveryReason: "outcome_unknown",
+        },
+        ok: false,
+      }
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(mocks.resolveXeroAccess).not.toHaveBeenCalled();
     const keys = fetchMock.mock.calls.map(([, init]) =>
       new Headers(init.headers).get("Idempotency-Key")
     );

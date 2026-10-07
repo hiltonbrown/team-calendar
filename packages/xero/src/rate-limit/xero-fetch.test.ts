@@ -8,6 +8,7 @@ beforeEach(() => {
   metricLog.mockReset();
 });
 
+import { mapXeroTransportError } from "../adapter/classify-xero-failure";
 import { XeroRateLimiter } from "./limiter";
 import { MemorySharedXeroRateStore } from "./memory-store";
 import { xeroRateKeys } from "./shared-store";
@@ -650,6 +651,84 @@ describe("recorded mutation replay", () => {
       url: identity.request.url,
     };
   }
+  it.each(["response_lost", "provider_503"])(
+    "retains %s uncertainty when the retry cannot obtain admission",
+    async (firstOutcome) => {
+      const limiter = permissiveLimiter();
+      const acquire = vi.spyOn(limiter, "acquire");
+      acquire.mockResolvedValueOnce({
+        ok: true,
+        release: () => Promise.resolve(),
+      });
+      acquire.mockResolvedValueOnce({ ok: false, reason: "infrastructure" });
+      const fetchImpl = vi.fn(() => {
+        if (firstOutcome === "response_lost") {
+          return Promise.reject(new TypeError("response lost"));
+        }
+        return Promise.resolve(new Response(null, { status: 503 }));
+      });
+      const result = await xeroFetch(input(), {
+        fetchImpl,
+        limiter,
+        sleep: () => Promise.resolve(),
+      }).catch((error: unknown) => mapXeroTransportError(error, true));
+      expect(result).toMatchObject({
+        dispatchPhase: "after_dispatch",
+        recoveryReason: "outcome_unknown",
+      });
+      expect(fetchImpl).toHaveBeenCalledOnce();
+    }
+  );
+  it.each([400, 401, 403, 404, 409, 429])(
+    "retains a lost-response outcome when a later retry returns %s",
+    async (status) => {
+      const fetchImpl = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError("response lost"))
+        .mockResolvedValueOnce(
+          new Response(null, {
+            headers: {
+              "Retry-After": "999",
+              "xero-correlation-id": "retry-correlation",
+            },
+            status,
+          })
+        );
+      const result = await xeroFetch(input(), {
+        fetchImpl,
+        limiter: permissiveLimiter(),
+        sleep: () => Promise.resolve(),
+      }).catch((error: unknown) => mapXeroTransportError(error, true));
+      expect(result).toMatchObject({
+        correlationId: "retry-correlation",
+        dispatchPhase: "after_dispatch",
+        httpStatus: status,
+        recoveryReason: "outcome_unknown",
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    }
+  );
+  it("retains uncertainty when admission returns a synthetic 429 after dispatch", async () => {
+    const limiter = permissiveLimiter();
+    const acquire = vi.spyOn(limiter, "acquire");
+    acquire.mockResolvedValueOnce({
+      ok: true,
+      release: () => Promise.resolve(),
+    });
+    acquire.mockResolvedValueOnce({ ok: false, reason: "minute" });
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("response lost"));
+    const result = await xeroFetch(input(), {
+      fetchImpl,
+      limiter,
+      sleep: () => Promise.resolve(),
+    }).catch((error: unknown) => mapXeroTransportError(error, true));
+    expect(result).toMatchObject({
+      dispatchPhase: "after_dispatch",
+      httpStatus: 429,
+      recoveryReason: "outcome_unknown",
+    });
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
   it("freezes the original request across retries", async () => {
     const request = input();
     const fetchImpl = vi

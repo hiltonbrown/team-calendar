@@ -146,24 +146,25 @@ export async function recordXeroWriteOutcome(
   if (preserveUncertainty) {
     return await markSubmitOutcomeUnknown(scope, error.code);
   }
-  const definitive =
-    error.certainty === "definitive_failure" ||
-    error.dispatchPhase === "before_dispatch" ||
-    (error.certainty === undefined &&
-      error.recoveryReason !== "outcome_unknown" &&
-      [
-        "auth_error",
-        "conflict_error",
-        "not_found_error",
-        "permission_error",
-        "rate_limit_error",
-        "region_not_supported_error",
-        "validation_error",
-      ].includes(error.code));
-  return definitive
+  return isDefinitiveWriteFailure(error)
     ? await markSubmitDefinitiveFailure(scope, error.code)
     : await markSubmitOutcomeUnknown(scope, error.code);
 }
+
+export const isDefinitiveWriteFailure = (error: ProviderWriteError): boolean =>
+  error.certainty === "definitive_failure" ||
+  error.dispatchPhase === "before_dispatch" ||
+  (error.certainty === undefined &&
+    error.recoveryReason !== "outcome_unknown" &&
+    [
+      "auth_error",
+      "conflict_error",
+      "not_found_error",
+      "permission_error",
+      "rate_limit_error",
+      "region_not_supported_error",
+      "validation_error",
+    ].includes(error.code));
 
 export async function completeXeroWriteSideEffects(input: {
   actorUserId: string;

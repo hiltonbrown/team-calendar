@@ -362,7 +362,10 @@ describe("canonical disconnect isolation", () => {
           where: { id: tenantA.availabilityRecordId },
         })
       ).toMatchObject({
-        approval_status: "xero_sync_failed",
+        approval_status:
+          action === "withdraw" && certainty === "definitive_failure"
+            ? "approved"
+            : "xero_sync_failed",
         failed_action: action,
         xero_write_claimed_at: null,
         xero_write_error_raw: { certainty },

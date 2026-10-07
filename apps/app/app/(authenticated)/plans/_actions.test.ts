@@ -477,6 +477,30 @@ describe("plans actions", () => {
       ok: true,
     });
   });
+  it("returns an inline failure when Xero refuses withdrawal and approval is retained", async () => {
+    mocks.withdrawSubmission.mockResolvedValue({
+      ok: true,
+      value: {
+        approval_status: "approved",
+        id: "00000000-0000-4000-8000-000000000099",
+        xero_write_error:
+          "Xero cannot withdraw leave already included in a pay run.",
+      },
+    });
+    await expect(
+      withdrawSubmissionAction({
+        organisationId: validInput.organisationId,
+        recordId: "00000000-0000-4000-8000-000000000099",
+      })
+    ).resolves.toMatchObject({
+      error: {
+        code: "xero_write_failed",
+        message: "Xero cannot withdraw leave already included in a pay run.",
+      },
+      ok: false,
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/plans");
+  });
   it("returns validation errors for malformed submission action input", async () => {
     const result = await submitForApprovalAction({
       organisationId: validInput.organisationId,

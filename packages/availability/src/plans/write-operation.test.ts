@@ -129,3 +129,37 @@ it("retains an earlier uncertain write when its replay is stopped before dispatc
   expect(mocks.unknown).toHaveBeenCalled();
   expect(mocks.failure).not.toHaveBeenCalled();
 });
+
+it("does not treat a code-only conflict requiring recovery as definitive", async () => {
+  await recordXeroWriteOutcome(
+    { ...input, attemptGeneration: 1, availabilityRecordId: input.recordId },
+    {
+      error: {
+        code: "conflict_error",
+        message: "Unresolved",
+        recoveryReason: "outcome_unknown",
+        userMessage: "Unresolved",
+      },
+      ok: false,
+    }
+  );
+  expect(mocks.unknown).toHaveBeenCalled();
+  expect(mocks.failure).not.toHaveBeenCalled();
+});
+
+it("marks a first write stopped before dispatch as definitively unprocessed", async () => {
+  await recordXeroWriteOutcome(
+    { ...input, attemptGeneration: 1, availabilityRecordId: input.recordId },
+    {
+      error: {
+        code: "network_error",
+        dispatchPhase: "before_dispatch",
+        message: "Preflight failed",
+        userMessage: "Not sent",
+      },
+      ok: false,
+    }
+  );
+  expect(mocks.failure).toHaveBeenCalled();
+  expect(mocks.unknown).not.toHaveBeenCalled();
+});

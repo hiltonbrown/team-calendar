@@ -619,6 +619,16 @@ The create on approval uses a durable `approve` outbound operation, immutable re
 
 Remote approve, decline and withdraw reuse `OutboundOperation`; local submit/decline/withdraw create no provider journal entry. Persist one immutable UUID idempotency key and the exact tenant, method, URL/body identity before dispatch. Short in-request retries reuse that request and key only within five minutes of first dispatch, conservatively inside Xero's six-minute retention. Retries never extend the cutoff. A changed request, cached 5xx or expired uncertain result cannot justify a new key. After the cutoff, authoritative provider reads and administrator recovery precede another mutation. Completed operations return the stored result and apply audit, notifications and publication once.
 
+Native idempotency handles provider duplicate prevention. The local write claim
+and journal fence business transitions, original actors and local side effects.
+A later admission failure or rejection cannot erase an earlier uncertain
+dispatch. Successful AU writes require one confirmed result, the expected remote
+ID for transitions and no provider validation errors. Diagnostics retain only
+safe correlation identifiers. An imported operation prepared but never
+dispatched exposes its original action after claim expiry; it keeps the same
+operation, key and actor. A definitive refusal to withdraw approved leave keeps
+the record approved with a plain-language error.
+
 All provider mutations are synchronous and user-triggered. Failures are surfaced inline; outbound writes have no automatic background retry. NZ and UK submission remain unavailable.
 
 ### Inbound sync flow

@@ -46,6 +46,7 @@ import {
 import { completeSubmitSideEffects } from "./submit-side-effects";
 import {
   completeXeroWriteSideEffects,
+  isDefinitiveWriteFailure,
   prepareXeroWrite as prepareJournaledWrite,
   recordXeroWriteOutcome,
 } from "./write-operation";
@@ -481,6 +482,10 @@ export async function withdrawSubmission(
           expectedStatus: record.approval_status,
           failedAction: "withdraw",
           input: parsed.data,
+          preserveApproved:
+            record.approval_status === "approved" &&
+            !(journal?.ok && journal.value.replayedUnknown) &&
+            isDefinitiveWriteFailure(response.error),
           record,
         });
       }
@@ -930,18 +935,6 @@ const submissionOutcomeUnknown = (): Result<never, SubmitServiceError> => ({
   },
   ok: false,
 });
-const isDefinitiveWriteFailure = (error: ProviderWriteError): boolean =>
-  error.certainty === "definitive_failure" ||
-  (error.certainty === undefined &&
-    [
-      "auth_error",
-      "conflict_error",
-      "not_found_error",
-      "permission_error",
-      "rate_limit_error",
-      "region_not_supported_error",
-      "validation_error",
-    ].includes(error.code));
 async function prepareXeroWrite(
   input: RecordActionInput,
   record: LoadedRecord,
@@ -1035,6 +1028,7 @@ async function persistXeroFailure(input: {
   failedAction: "submit" | "approve" | "withdraw";
   input: RecordActionInput;
   claimedAt: Date;
+  preserveApproved?: boolean;
   record: LoadedRecord;
   error: ProviderWriteError;
 }): Promise<Result<AvailabilityRecord, SubmitServiceError>> {
@@ -1042,7 +1036,9 @@ async function persistXeroFailure(input: {
   await database.$transaction(async (tx) => {
     const update = await tx.availabilityRecord.updateMany({
       data: {
-        approval_status: "xero_sync_failed",
+        approval_status: input.preserveApproved
+          ? "approved"
+          : "xero_sync_failed",
         failed_action: input.failedAction,
         updated_by_user_id: input.input.actingUserId,
         xero_write_claimed_at: null,

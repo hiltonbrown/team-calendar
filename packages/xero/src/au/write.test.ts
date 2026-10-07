@@ -487,6 +487,204 @@ it.each([
   }
 });
 
+describe("AU successful mutation confirmation", () => {
+  const invalidApplications = [
+    [
+      "multiple results",
+      [{ LeaveApplicationID: "leave-1" }, { LeaveApplicationID: "leave-2" }],
+    ],
+    [
+      "contradictory aliases",
+      [{ LeaveApplicationID: "leave-1", LeaveApplicationId: "leave-2" }],
+    ],
+    ["malformed ID", [{ LeaveApplicationID: 42 }]],
+    [
+      "blank alias",
+      [{ LeaveApplicationID: "leave-1", LeaveApplicationId: " " }],
+    ],
+    [
+      "documented validation errors",
+      [
+        {
+          LeaveApplicationID: "leave-1",
+          ValidationErrors: [{ Message: "Leave rejected" }],
+        },
+      ],
+    ],
+    [
+      "malformed validation errors",
+      [{ LeaveApplicationID: "leave-1", ValidationErrors: "invalid" }],
+    ],
+    // HasErrors is not part of the AU contract; an unexpected explicit error must fail closed.
+    [
+      "unexpected explicit error flag",
+      [{ HasErrors: true, LeaveApplicationID: "leave-1" }],
+    ],
+  ] as const;
+
+  describe.each(["create", "approve", "decline", "withdraw"] as const)(
+    "%s confirmation",
+    (action) => {
+      it.each(invalidApplications)(
+        "keeps %s uncertain",
+        async (_scenario, applications) => {
+          const rawPayload = { LeaveApplications: applications };
+          const fetchMock = vi
+            .fn()
+            .mockResolvedValue(Response.json(rawPayload));
+          vi.stubGlobal("fetch", fetchMock);
+          const result = await confirmedMutation(action);
+          expect(result).toMatchObject({
+            error: {
+              dispatchPhase: "after_dispatch",
+              rawPayload,
+              recoveryReason: "outcome_unknown",
+            },
+            ok: false,
+          });
+          expect(fetchMock).toHaveBeenCalledOnce();
+        }
+      );
+    }
+  );
+
+  it.each(["approve", "decline", "withdraw"] as const)(
+    "keeps a different %s response target uncertain",
+    async (action) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response(
+              '{"LeaveApplications":[{"LeaveApplicationID":"leave-2"}]}'
+            )
+          )
+      );
+      expect(await confirmedMutation(action)).toMatchObject({
+        error: {
+          dispatchPhase: "after_dispatch",
+          recoveryReason: "outcome_unknown",
+        },
+        ok: false,
+      });
+    }
+  );
+
+  it.each(["create", "approve", "decline", "withdraw"] as const)(
+    "confirms one matching %s result with empty validation errors",
+    async (action) => {
+      const rawPayload = {
+        LeaveApplications: [
+          {
+            LeaveApplicationID: "leave-1",
+            LeaveApplicationId: "leave-1",
+            ValidationErrors: [],
+          },
+        ],
+      };
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(Response.json(rawPayload))
+      );
+      expect(await confirmedMutation(action)).toMatchObject({
+        ok: true,
+        value: { rawResponse: rawPayload },
+      });
+    }
+  );
+});
+
+function confirmedMutation(
+  action: "create" | "approve" | "decline" | "withdraw"
+) {
+  const input = withAuMutation(action, {
+    endsAt: new Date("2026-05-05T00:00:00Z"),
+    reason: "Leave no longer required",
+    startsAt: new Date("2026-05-04T00:00:00Z"),
+    units: 2,
+    xeroConnection: buildXeroTenant(),
+    xeroEmployeeId: "employee-1",
+    xeroLeaveApplicationId: "leave-1",
+    xeroLeaveTypeId: "type-1",
+  });
+  switch (action) {
+    case "create":
+      return submitLeaveApplication(input);
+    case "approve":
+      return approveLeaveApplication(input);
+    case "decline":
+      return declineLeaveApplication(input);
+    case "withdraw":
+      return withdrawLeaveApplication(input);
+    default: {
+      const exhaustive: never = action;
+      return exhaustive;
+    }
+  }
+}
+
+describe("AU provider correlation diagnostics", () => {
+  it.each([
+    [{ "xero-correlation-id": "correlation-1" }, "correlation-1"],
+    [{ "x-correlation-id": "correlation-2" }, "correlation-2"],
+    [{ "xero-correlation-id": "<unsafe>" }, undefined],
+    [
+      { "x-correlation-id": "safe-id", "xero-correlation-id": "<unsafe>" },
+      "safe-id",
+    ],
+  ])(
+    "captures only safe provider error IDs from %j",
+    async (headers, expected) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(
+            new Response('{"Message":"Rejected"}', { headers, status: 400 })
+          )
+      );
+      const result = await approveLeaveApplication(
+        withAuMutation("approve", {
+          xeroConnection: buildXeroTenant(),
+          xeroEmployeeId: "employee-1",
+          xeroLeaveApplicationId: "leave-1",
+        })
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.correlationId).toBe(expected);
+      }
+    }
+  );
+  it("retains a correlation ID when a success envelope cannot be confirmed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response('{"LeaveApplications":[]}', {
+          headers: { "xero-correlation-id": "parse-correlation" },
+        })
+      )
+    );
+    expect(
+      await approveLeaveApplication(
+        withAuMutation("approve", {
+          xeroConnection: buildXeroTenant(),
+          xeroEmployeeId: "employee-1",
+          xeroLeaveApplicationId: "leave-1",
+        })
+      )
+    ).toMatchObject({
+      error: {
+        correlationId: "parse-correlation",
+        httpStatus: 200,
+        recoveryReason: "outcome_unknown",
+      },
+      ok: false,
+    });
+  });
+});
+
 describe("AU provider-native mutation identity", () => {
   afterEach(() => {
     vi.unstubAllGlobals();

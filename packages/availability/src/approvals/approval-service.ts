@@ -2525,13 +2525,22 @@ function remoteReplayActions(
   record: LoadedApprovalRecord
 ): ApprovalAction[] | null {
   const operation = record.outbound_operations?.[0];
-  if (
-    record.source_remote_id &&
-    record.outbound_operations?.length === 1 &&
+  const undispatched =
+    operation?.status === "prepared" &&
+    operation.dispatch_started_at === null &&
+    (operation.action === "approve" || operation.action === "decline") &&
+    (!record.xero_write_claimed_at ||
+      record.xero_write_claimed_at.getTime() <
+        Date.now() - XERO_WRITE_CLAIM_LEASE_MS);
+  const replayableUnknown =
     operation?.status === "outcome_unknown" &&
     operation.idempotency_replay_before &&
     Date.now() < operation.idempotency_replay_before.getTime() &&
-    !record.xero_write_claimed_at
+    !record.xero_write_claimed_at;
+  if (
+    record.source_remote_id &&
+    record.outbound_operations?.length === 1 &&
+    (undispatched || replayableUnknown)
   ) {
     if (record.approval_status === "submitted") {
       return [operation.action === "approve" ? "approve" : "decline"];

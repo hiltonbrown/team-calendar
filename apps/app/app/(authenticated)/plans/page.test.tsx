@@ -62,6 +62,33 @@ function planRecord(
 }
 describe("Plans page client surface", () => {
   afterEach(() => cleanup());
+  it("shows a persisted withdrawal refusal while the leave remains approved", () => {
+    render(
+      <PlansClient
+        canViewTeam={false}
+        filters={baseFilters}
+        organisationId="00000000-0000-4000-8000-000000000001"
+        orgQueryValue={null}
+        records={[
+          planRecord({
+            approvalStatus: "approved",
+            editableActions: ["withdraw"],
+            failedAction: "withdraw",
+            xeroWriteError:
+              "Xero cannot withdraw leave already included in a pay run.",
+          }),
+        ]}
+        xeroConnectionState="connected"
+      />
+    );
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Xero cannot withdraw leave already included in a pay run."
+    );
+    expect(screen.getAllByText("Approved").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole("button", { name: "Retry failed action" })
+    ).toBeNull();
+  });
   it("does not expose the team tab to viewers", () => {
     render(
       <PlansClient

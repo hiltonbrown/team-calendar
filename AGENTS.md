@@ -420,7 +420,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Job definitions in `packages/jobs`. Handlers registered in `apps/api`.
 - Jobs: `sync-xero-people`, `sync-xero-leave-records`, `sync-xero-leave-balances`, `reconcile-feed-publications`, `rebuild-feed-cache`, `reconcile-xero-approval-state`.
 - Inngest handles retries with exponential backoff for inbound sync failures.
-- Outbound write failures are not retried automatically; they are surfaced to the user.
+- Outbound writes have no background retry. Supported synchronous retries reuse the exact provider idempotency key/request within the fixed replay cutoff; unresolved failures are surfaced to the user.
 - Record-level inbound failures are isolated and captured, but prevent traversal completeness, watermark advancement and absent-row archival.
 - All inbound upserts must be idempotent.
 - Jobs carry both `clerk_org_id` and `organisation_id` in their event payload. Never rely on session context inside a job handler.

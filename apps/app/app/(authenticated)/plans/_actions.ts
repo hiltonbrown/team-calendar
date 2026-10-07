@@ -40,6 +40,10 @@ export type PlanActionError =
   | SubmitRecoveryError
   | SubmitServiceError
   | {
+      code: "xero_write_failed";
+      message: string;
+    }
+  | {
       code: "not_authorised";
       message: string;
     }
@@ -367,6 +371,18 @@ export async function withdrawSubmissionAction(
     revalidatePath("/calendar");
     revalidatePath("/leave-approvals");
     revalidatePath("/notifications");
+    if (
+      result.value.approval_status !== "withdrawn" &&
+      result.value.xero_write_error
+    ) {
+      return {
+        error: {
+          code: "xero_write_failed",
+          message: result.value.xero_write_error,
+        },
+        ok: false,
+      };
+    }
     return submissionValue(result.value);
   })();
 }

@@ -311,6 +311,106 @@ describe("approval-service", () => {
     });
     mocks.xeroTenantFindFirst.mockResolvedValue(xeroConnection);
   });
+  it.each(["approve", "decline"] as const)(
+    "exposes only an expired undispatched imported %s and retains its journal identity on retry",
+    async (action) => {
+      const idempotencyKey = "11111111-1111-4111-8111-111111111111";
+      const pendingRecord = {
+        ...record,
+        outbound_operations: [
+          {
+            action,
+            dispatch_started_at: null,
+            status: "prepared",
+          },
+        ],
+        xero_write_claimed_at: new Date(0),
+      };
+      mocks.availabilityFindMany.mockResolvedValue([pendingRecord]);
+      const listed = await listForApprover(input);
+      expect(listed).toMatchObject({
+        ok: true,
+        value: { items: [{ availableActions: [action] }] },
+      });
+
+      const mutation = { idempotencyKey };
+      mocks.availabilityFindFirst.mockResolvedValue(pendingRecord);
+      mocks.prepareAndClaimSubmitOperation.mockResolvedValue({
+        actorUserId: "original_actor",
+        attemptGeneration: 2,
+        claimedAt: new Date(),
+        mutation,
+        providerAccepted: false,
+      });
+      const write =
+        action === "approve"
+          ? mocks.approveLeaveApplicationForRegion
+          : mocks.declineLeaveApplicationForRegion;
+      write.mockResolvedValue({ ok: true, value: undefined });
+      const retried =
+        action === "approve"
+          ? await approve(input, mockPort)
+          : await decline(
+              { ...input, reason: "Coverage unavailable" },
+              mockPort
+            );
+      expect(retried.ok).toBe(true);
+      expect(write).toHaveBeenCalledWith(
+        expect.objectContaining({ mutation, remoteId: record.source_remote_id })
+      );
+      expect(mocks.prepareAndClaimSubmitOperation).toHaveBeenCalledWith(
+        expect.objectContaining({ action, remoteId: record.source_remote_id })
+      );
+      expect(mocks.availabilityUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            updated_by_user_id: "original_actor",
+          }),
+        })
+      );
+    }
+  );
+  it.each([
+    {
+      claim: new Date(),
+      dispatch_started_at: null,
+      label: "live undispatched claim",
+      status: "prepared",
+    },
+    {
+      claim: new Date(0),
+      dispatch_started_at: new Date(),
+      label: "dispatched prepared operation",
+      status: "prepared",
+    },
+    {
+      claim: null,
+      dispatch_started_at: new Date(0),
+      label: "expired uncertain operation",
+      status: "outcome_unknown",
+    },
+  ])("keeps an imported $label read-only", async (operation) => {
+    mocks.availabilityFindMany.mockResolvedValue([
+      {
+        ...record,
+        outbound_operations: [
+          {
+            action: "approve",
+            dispatch_started_at: operation.dispatch_started_at,
+            idempotency_replay_before: new Date(0),
+            status: operation.status,
+          },
+        ],
+        xero_write_claimed_at: operation.claim,
+      },
+    ]);
+    expect(await listForApprover(input)).toMatchObject({
+      ok: true,
+      value: { items: [{ availableActions: ["view_only"] }] },
+    });
+    expect(mockPort.approveLeaveApplication).not.toHaveBeenCalled();
+    expect(mockPort.declineLeaveApplication).not.toHaveBeenCalled();
+  });
   it("journals an imported approval before dispatch and retains accepted outcome when the local save fails", async () => {
     mocks.availabilityFindFirst.mockResolvedValue(record);
     mocks.approveLeaveApplicationForRegion.mockResolvedValue({

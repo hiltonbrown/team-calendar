@@ -9,6 +9,7 @@ import {
   XERO_DEFAULT_OPERATION_BUDGET_MS,
   XERO_MAX_RESPONSE_BYTES,
 } from "./limits";
+import { getXeroCorrelationId } from "./response-diagnostics";
 import type { XeroRateClass } from "./shared-store";
 
 // Default reactive-retry budget for transient failures (429 and 5xx). The first
@@ -19,7 +20,6 @@ const RETRY_DATE_REGEX =
 const DEFAULT_MAX_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_CAP_MS = 8000;
-const SAFE_CORRELATION_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 export interface XeroFetchDeps {
   fetchImpl: typeof fetch;
   limiter: XeroRateLimiter;
@@ -38,12 +38,8 @@ export interface XeroFetchInput {
   // Identity the limiter buckets are keyed by. Built from the connected
   // organisation so one org cannot starve another.
   rateClass: XeroRateClass;
-  // Set false for requests that create something in Xero. A 429 is still
-  // retried because Xero rejected the request before processing it, but a 5xx
-  // or a dropped connection is ambiguous: Xero may have completed the write and
-  // only the response was lost. Retrying then creates a duplicate leave
-  // application in the customer's payroll file, which cannot be repaired from
-  // this side.
+  // Ambiguous mutations require a recorded provider-supported idempotency key.
+  // Unsupported mutations retry only definite throttling, never lost responses.
   retryOnAmbiguousFailure?: boolean;
   url: string;
 }
@@ -86,6 +82,7 @@ export async function xeroFetch(
   const retryOnAmbiguousFailure = permitsAmbiguousRetry(requestInput);
   const deadline = resolveDeadline(requestInput);
   assertOrigin(requestInput.url);
+  let mutationOutcomeUnknown = false;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     let response: Response;
     try {
@@ -96,6 +93,11 @@ export async function xeroFetch(
         fetchImpl
       );
     } catch (error) {
+      mutationOutcomeUnknown = retainMutationUncertainty(
+        requestInput,
+        error,
+        mutationOutcomeUnknown
+      );
       if (
         !canRetryError(
           error,
@@ -115,6 +117,9 @@ export async function xeroFetch(
       await sleep(waitMs);
       continue;
     }
+    assertRetryResponse(requestInput, response, mutationOutcomeUnknown);
+    mutationOutcomeUnknown ||=
+      Boolean(requestInput.mutation) && response.status >= 500;
     if (
       attempt >= maxAttempts ||
       !isRetryableStatus(response.status, retryOnAmbiguousFailure)
@@ -131,6 +136,29 @@ export async function xeroFetch(
     await sleep(waitMs);
   }
   return rateLimitedResponse("minute");
+}
+function retainMutationUncertainty(
+  input: XeroFetchInput,
+  error: unknown,
+  earlierUnknown: boolean
+): boolean {
+  const undispatched = error instanceof XeroFetchError && !error.dispatched;
+  if (earlierUnknown && undispatched) {
+    throw new XeroFetchError("mutation_outcome_unknown", true);
+  }
+  return earlierUnknown || (Boolean(input.mutation) && !undispatched);
+}
+function assertRetryResponse(
+  input: XeroFetchInput,
+  response: Response,
+  earlierUnknown: boolean
+): void {
+  // A later rejection does not prove that an earlier ambiguous dispatch did
+  // not commit. Keep the same journal/key rather than authorise a new write.
+  if (earlierUnknown && response.status >= 400 && response.status < 500) {
+    logResponse(input, response, 0);
+    throw new XeroFetchError("mutation_outcome_unknown", true, response);
+  }
 }
 function snapshotInput(input: XeroFetchInput): XeroFetchInput {
   // One snapshot retains exact bytes and identity despite caller changes.
@@ -192,14 +220,8 @@ function logResponse(
 ): void {
   try {
     const method = input.init?.method ?? "GET";
-    const correlationId =
-      response.headers.get("xero-correlation-id") ??
-      response.headers.get("x-correlation-id");
     log.info("xero.http.response", {
-      correlationId:
-        correlationId && SAFE_CORRELATION_ID.test(correlationId)
-          ? correlationId
-          : null,
+      correlationId: getXeroCorrelationId(response.headers) ?? null,
       endpoint: new URL(input.url).pathname,
       method: [
         "GET",
@@ -357,14 +379,30 @@ export class XeroFetchError extends Error {
     | "body_too_large"
     | "deadline_exceeded"
     | "mutation_identity_rejected"
+    | "mutation_outcome_unknown"
     | "origin_rejected"
     | "redirect_rejected";
   readonly dispatched: boolean;
-  constructor(code: XeroFetchError["code"], dispatched: boolean) {
+  readonly correlationId?: string;
+  readonly httpStatus?: number;
+  readonly retryAfterMs?: number;
+  constructor(
+    code: XeroFetchError["code"],
+    dispatched: boolean,
+    response?: Response
+  ) {
     super(`Xero transport failed: ${code}`);
     this.name = "XeroFetchError";
     this.code = code;
     this.dispatched = dispatched;
+    if (response) {
+      this.correlationId = getXeroCorrelationId(response.headers);
+      this.httpStatus = response.status;
+      this.retryAfterMs =
+        response.status === 429
+          ? (parseRetryAfter(response.headers.get("Retry-After")) ?? undefined)
+          : undefined;
+    }
     if (code === "deadline_exceeded") {
       emitXeroMetric("xero.fetch.deadline_exceeded", 1);
     }

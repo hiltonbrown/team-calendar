@@ -1,5 +1,30 @@
 # Current work
 
+## Xero native idempotent outbound writes, Prompt 6
+
+- [x] Recheck exact AU mutation headers and regional differences against current official OpenAPI; inspect Plan 160, transport and approval recovery.
+- [x] Use TDD to retain earlier ambiguous dispatch evidence across retries without adding durable provider recovery state.
+- [x] Simplify common AU response parsing, reject unconfirmed provider outcomes and capture safe correlation IDs consistently.
+- [x] Preserve Plan 160 state on definitively refused withdrawal and centralise existing domain failure classification.
+- [x] Run targeted and fresh check/typecheck/test/integration gates, resolve independent review and commit on `work`.
+
+Stopping condition: supported writes use one stable native key and bounded
+synchronous retries; domain transitions remain safe, duplicated handling is
+removed, required gates pass and the focused phase is reviewed and committed.
+Reuse the approved design and existing journal/native-key implementation from
+`e875525d`. Preserve the five-minute replay cutoff and approval recovery beyond
+Xero's six-minute cache. Do not introduce outbound jobs, new journals,
+dependencies, worktrees or NZ/UK activation.
+
+Verification: 1,155 linted files, all 19 typecheck tasks, 3,038 unit tests across
+18 tasks and 259 owned-local PostgreSQL/Redis integration tests across 6 tasks
+passed. Changed packages reran after final corrections; unchanged task evidence
+was reused. Prisma generated with no DDL change. Fresh independent review's sole
+Important withdrawal-result finding was reproduced, corrected and closed;
+remaining Critical/Important/Minor findings are zero. No live Xero mutation or
+application-browser verification is claimed. Evidence and scope are recorded
+in `docs/reports/2026-10-07-xero-idempotent-writes.md`.
+
 ## Xero incremental inbound sync, Prompt 5
 
 - [x] Recheck official AU employee/V2 leave modification filters and balance retrieval contracts; inspect current implementation against Prompt 5.

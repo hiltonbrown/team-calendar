@@ -156,6 +156,39 @@ describe("outbound operation repository", () => {
     );
   });
 
+  it("assigns different bounded provider keys to separate logical mutations", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    mocks.create.mockResolvedValueOnce({ id: "operation_1" });
+    mocks.create.mockResolvedValueOnce({ id: "operation_2" });
+    mocks.availabilityUpdateMany.mockResolvedValue({ count: 1 });
+    const input = {
+      ...scope,
+      actorUserId: "manager_1",
+      claimableBefore: new Date(),
+      expectedFailedAction: null,
+      expectedSequence: 2,
+      expectedStatus: "submitted" as const,
+      request,
+      requestEmployeeId: "employee_1",
+      requestEndsAt: new Date("2026-05-02T00:00:00.000Z"),
+      requestFingerprint: "immutable",
+      requestLeaveTypeId: "leave_type_1",
+      requestStartsAt: new Date("2026-05-01T00:00:00.000Z"),
+      requestTitle: "Annual leave",
+      requestUnits: 2,
+    };
+    const first = await prepareAndClaimSubmitOperation(input);
+    const second = await prepareAndClaimSubmitOperation({
+      ...input,
+      availabilityRecordId: "00000000-0000-4000-8000-000000000100",
+    });
+    expect(first?.mutation.idempotencyKey).toHaveLength(36);
+    expect(second?.mutation.idempotencyKey).toHaveLength(36);
+    expect(second?.mutation.idempotencyKey).not.toBe(
+      first?.mutation.idempotencyKey
+    );
+  });
+
   it("blocks a second create while the existing outcome is unresolved", async () => {
     mocks.findFirst.mockResolvedValue({
       id: "operation_1",
