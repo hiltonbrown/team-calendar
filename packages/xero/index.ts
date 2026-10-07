@@ -7,16 +7,16 @@ export { XeroWriteAdapter } from "./src/adapter/xero-write-adapter";
 export type { XeroEmployeesFetchResult } from "./src/au/read";
 export { emitXeroMetric } from "./src/metrics";
 export {
-  refreshXeroAuthorisation,
+  refreshDormantXeroAuthorisations,
   resolveXeroAccess,
 } from "./src/oauth/authorisation";
+export { hasXeroCapability, XERO_SCOPES } from "./src/oauth/scopes";
 export {
   buildXeroOAuthStartUrl,
   cancelXeroOAuth,
   completeXeroOAuth,
   completeXeroTenantSelection,
   disconnectXeroOAuthConnection,
-  ensureFreshXeroConnection,
   getPendingXeroOAuthSession,
   isLocalApplicationPath,
   isPreviewDeployment,
@@ -24,7 +24,6 @@ export {
   type PendingXeroSessionOrganisation,
   type PendingXeroSessionTenant,
   purgeClosedXeroOAuthSessions,
-  refreshXeroOAuthConnection,
   type XeroDisconnectResult,
   type XeroOAuthError,
 } from "./src/oauth/service";

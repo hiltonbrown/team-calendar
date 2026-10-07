@@ -37,6 +37,7 @@ describe("canonical OAuth sessions", () => {
         tenants: [
           {
             connectionId: "remote-link",
+            isCurrentConsent: true,
             tenantId: "external-file",
             tenantName: "Payroll",
           },
@@ -63,6 +64,7 @@ describe("canonical OAuth sessions", () => {
       expect(result.value.tenants).toEqual([
         {
           connectionId: "remote-link",
+          isCurrentConsent: true,
           tenantId: "external-file",
           tenantName: "Payroll",
         },

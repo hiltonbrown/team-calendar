@@ -1,5 +1,58 @@
 # Current work
 
+## Xero OAuth and automatic refresh, 7 October 2026
+
+- [x] Verify current official Xero code-flow, inventory, scope and refresh-grace contracts; map current consumers.
+- [x] Test and implement exact least-privilege scopes and protected, single-exchange OAuth with eligible-tenant selection and initial sync.
+- [x] Test and implement one canonical scoped access resolver, automatic rotation, concurrency and next-attempt grace recovery.
+- [x] Refresh dormant authorisations once per grant, including paused connections; remove customer token controls and obsolete refresh wrappers.
+- [x] Pass targeted OAuth/concurrency/database tests and repository check/typecheck/test/integration gates.
+- [x] Resolve independent code review and commit this phase on the existing branch.
+
+Stopping condition: the requested OAuth/token lifecycle is implemented, verified,
+reviewed and committed. Inbound sync and payroll mutation redesign are separate
+phases. Existing canonical persistence remains the only token owner.
+
+Provider verification: current official OAuth FAQ confirms 60-day unused refresh
+expiry and 30-minute retry grace after a lost response; the tenants guide confirms
+`authEventId` filters the current authorisation event and the unfiltered inventory
+contains all tenants authorised by that Xero user. Official Identity, Accounting
+and AU Payroll OpenAPI documents were downloaded again. Current code requires
+exactly `offline_access accounting.settings.read payroll.employees
+payroll.settings.read`; no Pay Runs endpoint or settings mutation exists.
+
+Use the existing PostgreSQL canonical app/user refresh lock and narrow grant
+issuance barrier to prevent a new unknown-user code exchange from superseding a
+concurrent rotation; add no connection/binding/owner refresh locks. Valid access
+and missing permissions return before locking. Token HTTP exchanges make one
+attempt; uncertain refresh preserves the stored pair for the next normal retry
+within documented grace. Reuse the 15-minute scheduler for due grants at 45 days;
+a daily-only retry gate would miss that grace window after an uncertain response.
+
+Verification: repository check passed for 1137 files; typecheck passed all 19
+tasks; unit tests passed all 18 tasks (2859 tests, including 535 Xero tests);
+integration passed all 6 packages (204 tests) against disposable local PostgreSQL
+and Redis. Focused core verification passed 167 units and 27 real PostgreSQL
+tests, including concurrent refresh, callback versus rotation, lost response,
+actual save rollback, shared invalid grant and paused dormant grant maintenance.
+Provider HTTP was mocked; official current documentation supplied the provider
+contracts. No live Xero, browser or deployment verification is claimed. Prisma
+generated successfully during typecheck; this phase changes no schema or
+generated output. Runtime legacy-refresh/manual-control audit and diff check
+are clean.
+
+Independent review approved spec compliance and code quality after corrections
+to preserve every authorised file while highlighting current consent, and to
+share the existing best-effort activation capture between both connection paths.
+The ancillary post-commit audit cannot prevent initial-sync dispatch; the
+canonical transactional audit remains required. Test-first failure/passing
+evidence covers these corrections. Compile failures were fixed with an explicit
+missing-app configuration result, plain JSON session tuples and a typed callback
+result. The existing analytics workspace dependency is declared for its extracted
+helper; regenerated lock metadata matches existing manifests without upgrading
+installed packages. The focused phase is committed on the existing branch;
+incremental sync, central HTTP policy and payroll writes remain later phases.
+
 ## Xero persistence simplification, 7 October 2026
 
 - [x] Establish failing real-database assertions for canonical credentials, connection ownership, cursor scope and manual balance uniqueness.

@@ -75,13 +75,12 @@ const {
   completeXeroOAuth,
   cancelXeroOAuth,
   completeXeroTenantSelection,
-  ensureFreshXeroConnection,
   isLocalApplicationPath,
   isPreviewDeployment,
   markXeroConnectionStale,
-  refreshXeroOAuthConnection,
   purgeClosedXeroOAuthSessions,
 } = await import("./service");
+const { resolveXeroAccess } = await import("./authorisation");
 const ORIGINAL_ENV = { ...process.env };
 interface OAuthTestStatePayload {
   clerkOrgId: string;
@@ -140,6 +139,7 @@ beforeEach(() => {
   delete process.env.XERO_TOKEN_ENCRYPTION_ACTIVE_VERSION;
   delete process.env.XERO_TOKEN_ENCRYPTION_KEYS_JSON;
   delete process.env.VERCEL_ENV;
+  dbMock.organisation.findMany.mockResolvedValue([]);
   dbMock.$queryRaw.mockResolvedValue([]);
   dbMock.$transaction.mockImplementation((callback) => callback(dbMock));
   lockMock.grant.mockImplementation((_input, callback) => callback(dbMock));
@@ -198,6 +198,38 @@ describe("isPreviewDeployment", () => {
 });
 
 describe("buildXeroOAuthStartUrl", () => {
+  it("uses business actions for state and configuration failures", async () => {
+    expect(
+      await completeXeroOAuth({
+        authenticatedClerkOrgId: "org_1",
+        authenticatedUserId: "user_1",
+        code: "code",
+        nonce: "nonce",
+        state: "invalid",
+      })
+    ).toMatchObject({
+      error: { message: "Start connecting Xero again." },
+      ok: false,
+    });
+    delete process.env.XERO_CLIENT_SECRET;
+    expect(
+      await buildXeroOAuthStartUrl({ clerkOrgId: "org_1", userId: "user_1" })
+    ).toMatchObject({
+      error: { message: "Connecting Xero is unavailable. Contact support." },
+      ok: false,
+    });
+  });
+  it("requests exactly the minimal four scopes", async () => {
+    const result = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
+    expect(
+      result.ok && new URL(result.value.redirectUrl).searchParams.get("scope")
+    ).toBe(
+      "offline_access accounting.settings.read payroll.employees payroll.settings.read"
+    );
+  });
   it("disables Xero connect on preview deployments", async () => {
     process.env.VERCEL_ENV = "preview";
 
@@ -222,7 +254,10 @@ describe("buildXeroOAuthStartUrl", () => {
   });
 
   it("fails closed when verifying state without the client secret", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -310,7 +345,10 @@ describe("buildXeroOAuthStartUrl", () => {
 
 describe("completeXeroOAuth", () => {
   it("returns and logs no code, token, state or nonce when the exchange fails", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     if (!start.ok) {
       throw new Error("Expected start");
     }
@@ -330,6 +368,8 @@ describe("completeXeroOAuth", () => {
       )
     );
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code,
       nonce: start.value.nonce,
       state,
@@ -354,7 +394,10 @@ describe("completeXeroOAuth", () => {
   });
 
   it("stores the exact remote connection tuple in the reference-only selection session", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -381,6 +424,13 @@ describe("completeXeroOAuth", () => {
               id: "xero-connection-1",
               tenantId: "xero-tenant-1",
               tenantName: "Acme Payroll",
+              tenantType: "ORGANISATION",
+            },
+            {
+              id: "xero-connection-2",
+              tenantId: "xero-tenant-2",
+              tenantName: "Second Payroll",
+              tenantType: "ORGANISATION",
             },
           ]),
           { headers: { "Content-Type": "application/json" }, status: 200 }
@@ -389,6 +439,8 @@ describe("completeXeroOAuth", () => {
     vi.stubGlobal("fetch", fetchSpy);
 
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
       state: state ?? "",
@@ -402,11 +454,17 @@ describe("completeXeroOAuth", () => {
       expect.objectContaining({
         data: expect.objectContaining({
           available_tenants_json: {
+            authEventId: null,
             tenants: [
               {
                 connectionId: "xero-connection-1",
                 tenantId: "xero-tenant-1",
                 tenantName: "Acme Payroll",
+              },
+              {
+                connectionId: "xero-connection-2",
+                tenantId: "xero-tenant-2",
+                tenantName: "Second Payroll",
               },
             ],
           },
@@ -416,7 +474,10 @@ describe("completeXeroOAuth", () => {
   });
 
   it("rejects a missing nonce before exchanging the authorisation code", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -425,6 +486,8 @@ describe("completeXeroOAuth", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: null,
       state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
@@ -438,7 +501,10 @@ describe("completeXeroOAuth", () => {
   });
 
   it("rejects a mismatched nonce before exchanging the authorisation code", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -447,6 +513,8 @@ describe("completeXeroOAuth", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: "mismatched-nonce",
       state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
@@ -488,7 +556,10 @@ describe("Xero OAuth state", () => {
   it("rejects an eleven-minute-old state before exchanging the authorisation code", async () => {
     const nowSpy = vi.spyOn(Date, "now");
     nowSpy.mockReturnValue(1_000_000);
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -498,6 +569,8 @@ describe("Xero OAuth state", () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
       state: new URL(start.value.redirectUrl).searchParams.get("state") ?? "",
@@ -511,7 +584,10 @@ describe("Xero OAuth state", () => {
   });
 
   it("rejects a tampered state", async () => {
-    const start = await buildXeroOAuthStartUrl({ clerkOrgId: "org_1" });
+    const start = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      userId: "user_1",
+    });
     expect(start.ok).toBe(true);
     if (!start.ok) {
       return;
@@ -521,6 +597,8 @@ describe("Xero OAuth state", () => {
       new URL(start.value.redirectUrl).searchParams.get("state") ?? "";
     const [encoded, signature] = state.split(".");
     const result = await completeXeroOAuth({
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
       code: "authorisation-code",
       nonce: start.value.nonce,
       state: `${encoded.slice(0, -1)}x.${signature}`,
@@ -606,7 +684,12 @@ describe("canonical callback security", () => {
     });
     expect(dbMock.xeroOAuthSession.updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        data: { status: "cancelled" },
+        data: expect.objectContaining({
+          nonce_hash: null,
+          state_hash: null,
+          status: "cancelled",
+          xero_authorisation_id: null,
+        }),
         where: expect.objectContaining({
           clerk_org_id: "org_1",
           created_by_user_id: "user_1",
@@ -615,6 +698,39 @@ describe("canonical callback security", () => {
       })
     );
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it("cannot adopt a grant without a configured provider app identity", async () => {
+    const input = await startCallback();
+    const provider = vi.fn((url) => {
+      if (String(url).endsWith("/connect/token")) {
+        delete process.env.XERO_CLIENT_ID;
+        return Response.json({
+          access_token: "access-token",
+          expires_in: 1800,
+          refresh_token: "refresh-token",
+        });
+      }
+      return Response.json([
+        {
+          id: "link_1",
+          tenantId: "file_1",
+          tenantName: "Payroll",
+          tenantType: "ORGANISATION",
+        },
+        {
+          id: "link_2",
+          tenantId: "file_2",
+          tenantName: "Other",
+          tenantType: "ORGANISATION",
+        },
+      ]);
+    });
+    vi.stubGlobal("fetch", provider);
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      error: { code: "oauth_not_configured" },
+      ok: false,
+    });
+    expect(dbMock.xeroAuthorisation.upsert).not.toHaveBeenCalled();
   });
   it("adopts encrypted credentials in the canonical grant and leaves the session reference-only", async () => {
     const input = await startCallback();
@@ -628,7 +744,22 @@ describe("canonical callback security", () => {
           scope: "payroll.employees",
         })
       )
-      .mockResolvedValueOnce(Response.json([]));
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: "link_1",
+            tenantId: "file_1",
+            tenantName: "Payroll",
+            tenantType: "ORGANISATION",
+          },
+          {
+            id: "link_2",
+            tenantId: "file_2",
+            tenantName: "Other",
+            tenantType: "ORGANISATION",
+          },
+        ])
+      );
     vi.stubGlobal("fetch", fetchSpy);
     expect(await completeXeroOAuth(input)).toMatchObject({ ok: true });
     const saved = dbMock.xeroAuthorisation.upsert.mock.calls[0]?.[0].create;
@@ -651,7 +782,10 @@ describe("canonical callback security", () => {
     }
     expect(dbMock.xeroOAuthSession.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { status: "selecting", xero_authorisation_id: "grant_1" },
+        data: expect.objectContaining({
+          status: "selecting",
+          xero_authorisation_id: "grant_1",
+        }),
       })
     );
     const [url, init] = fetchSpy.mock.calls[0] ?? [];
@@ -676,7 +810,10 @@ describe("canonical refresh", () => {
     dbMock.xeroConnection.findFirst.mockResolvedValue({
       authorisation: grant,
       id: input.connectionId,
+      payroll_region: "AU",
       status: "active",
+      xero_authorisation_id: grant.id,
+      xero_tenant_id: "file_1",
     });
     dbMock.xeroAuthorisation.findUnique.mockResolvedValue(grant);
     dbMock.xeroAuthorisation.findUniqueOrThrow.mockResolvedValue(grant);
@@ -690,9 +827,9 @@ describe("canonical refresh", () => {
     setup(new Date(Date.now() + 1_800_000));
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    expect(await ensureFreshXeroConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       ok: true,
-      value: { refreshed: false },
+      value: { accessToken: "access-token" },
     });
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(dbMock.xeroAuthorisation.update).not.toHaveBeenCalled();
@@ -708,9 +845,9 @@ describe("canonical refresh", () => {
       })
     );
     vi.stubGlobal("fetch", fetchSpy);
-    expect(await ensureFreshXeroConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       ok: true,
-      value: { refreshed: true },
+      value: { accessToken: "new-access" },
     });
     expect(lockMock.grant).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -750,7 +887,7 @@ describe("canonical refresh", () => {
     );
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    expect(await ensureFreshXeroConnection(input)).toMatchObject({ ok: true });
+    expect(await resolveXeroAccess(input)).toMatchObject({ ok: true });
     expect(fetchSpy).not.toHaveBeenCalled();
   });
   it.each(["disconnected", "reconnect_required"])(
@@ -763,8 +900,13 @@ describe("canonical refresh", () => {
       });
       const fetchSpy = vi.fn();
       vi.stubGlobal("fetch", fetchSpy);
-      expect(await ensureFreshXeroConnection(input)).toMatchObject({
-        error: { code: "connection_inactive" },
+      expect(await resolveXeroAccess(input)).toMatchObject({
+        error: {
+          code:
+            status === "disconnected"
+              ? "disconnected"
+              : "reauthorisation_required",
+        },
         ok: false,
       });
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -775,7 +917,7 @@ describe("canonical refresh", () => {
     lockMock.grant.mockRejectedValueOnce(new Error("lock unavailable"));
     const provider = vi.fn();
     vi.stubGlobal("fetch", provider);
-    await expect(ensureFreshXeroConnection(input)).resolves.toMatchObject({
+    await expect(resolveXeroAccess(input)).resolves.toMatchObject({
       error: { code: "unknown_error" },
       ok: false,
     });
@@ -783,7 +925,7 @@ describe("canonical refresh", () => {
   });
   it("scopes connection retrieval with both tenant keys and connection ID", async () => {
     dbMock.xeroConnection.findFirst.mockResolvedValue(null);
-    expect(await ensureFreshXeroConnection(input)).toMatchObject({ ok: false });
+    expect(await resolveXeroAccess(input)).toMatchObject({ ok: false });
     expect(dbMock.xeroConnection.findFirst).toHaveBeenCalledWith({
       include: { authorisation: true },
       where: {
@@ -801,7 +943,7 @@ describe("canonical refresh", () => {
   ])("rejects invalid token response %j", async (body) => {
     setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json(body)));
-    expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       error: { code: "invalid_token_response" },
       ok: false,
     });
@@ -816,7 +958,7 @@ describe("canonical refresh", () => {
   it("rejects non-JSON success without replacing canonical tokens", async () => {
     setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("not-json")));
-    expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       error: { code: "invalid_token_response" },
       ok: false,
     });
@@ -829,7 +971,7 @@ describe("canonical refresh", () => {
         "fetch",
         vi.fn().mockResolvedValue(Response.json({ error }, { status: 400 }))
       );
-      expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+      expect(await resolveXeroAccess(input)).toMatchObject({
         error: { code: "refresh_token_invalid" },
         ok: false,
       });
@@ -852,7 +994,7 @@ describe("canonical refresh", () => {
         "fetch",
         vi.fn().mockResolvedValue(Response.json({ error }, { status: 401 }))
       );
-      expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+      expect(await resolveXeroAccess(input)).toMatchObject({
         error: { code: "client_credentials_invalid" },
         ok: false,
       });
@@ -871,7 +1013,7 @@ describe("canonical refresh", () => {
           Response.json({ error: "temporary" }, { status: 503 })
         )
     );
-    expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       error: { code: "network_error" },
       ok: false,
     });
@@ -885,7 +1027,7 @@ describe("canonical refresh", () => {
       "fetch",
       vi.fn().mockRejectedValue(new Error("network down"))
     );
-    expect(await refreshXeroOAuthConnection(input)).toMatchObject({
+    expect(await resolveXeroAccess(input)).toMatchObject({
       error: { code: "network_error" },
       ok: false,
     });
@@ -943,6 +1085,28 @@ describe("canonical tenant selection", () => {
       )
     );
   });
+  it("returns a safe error for malformed organisation metadata before saving a connection", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) =>
+        String(url).endsWith("/connections")
+          ? Response.json([
+              {
+                id: "remote_1",
+                tenantId: "file_1",
+                tenantName: "Payroll",
+                tenantType: "ORGANISATION",
+              },
+            ])
+          : Response.json({ Organisations: [{ CountryCode: 42 }] })
+      )
+    );
+    await expect(completeXeroTenantSelection(input)).resolves.toMatchObject({
+      error: { code: "invalid_token_response" },
+      ok: false,
+    });
+    expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+  });
   it("creates one merged connection, completes the session and provisions defaults", async () => {
     expect(await completeXeroTenantSelection(input)).toEqual({
       ok: true,
@@ -994,13 +1158,16 @@ describe("canonical tenant selection", () => {
   it("reloads the exact remote tuple rather than accepting stale inventory", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json([
-            { id: "other_remote", tenantId: "file_1", tenantName: "Acme" },
-          ])
-        )
+      vi.fn().mockResolvedValue(
+        Response.json([
+          {
+            id: "other_remote",
+            tenantId: "file_1",
+            tenantName: "Acme",
+            tenantType: "ORGANISATION",
+          },
+        ])
+      )
     );
     expect(await completeXeroTenantSelection(input)).toMatchObject({
       error: { code: "tenant_not_found" },
@@ -1016,7 +1183,12 @@ describe("canonical tenant selection", () => {
         vi.fn(async (url) =>
           String(url).endsWith("/connections")
             ? Response.json([
-                { id: "remote_1", tenantId: "file_1", tenantName: "Acme" },
+                {
+                  id: "remote_1",
+                  tenantId: "file_1",
+                  tenantName: "Acme",
+                  tenantType: "ORGANISATION",
+                },
               ])
             : Response.json({ Organisations: [{ CountryCode: country }] })
         )
@@ -1120,6 +1292,55 @@ describe("canonical tenant selection", () => {
       dbMock.xeroConnection.update.mock.calls[0]?.[0].data
     ).not.toHaveProperty("xero_tenant_id");
   });
+  it("refuses to overwrite an unresolved remote link owned by a different authoriser", async () => {
+    dbMock.organisation.findMany.mockResolvedValue([
+      { country_code: "AU", id: "payroll_1" },
+    ]);
+    dbMock.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      id: "payroll_1",
+    });
+    const old = { ...canonicalGrant(), id: "old_grant" };
+    dbMock.xeroConnection.findFirst.mockResolvedValue({
+      authorisation: old,
+      id: "conn_1",
+      payroll_region: "AU",
+      remote_connection_id: "old_remote",
+      status: "active",
+      updated_at: new Date(),
+      xero_authorisation_id: "old_grant",
+      xero_tenant_id: "file_1",
+    });
+    dbMock.xeroAuthorisation.findUnique.mockResolvedValue(canonicalGrant());
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url) =>
+        String(url).includes("/connections")
+          ? Response.json([
+              {
+                id: "remote_1",
+                tenantId: "file_1",
+                tenantName: "Payroll",
+                tenantType: "ORGANISATION",
+              },
+              {
+                id: "old_remote",
+                tenantId: "file_1",
+                tenantName: "Payroll",
+                tenantType: "ORGANISATION",
+              },
+            ])
+          : Response.json({ Organisations: [{ CountryCode: "AU" }] })
+      )
+    );
+    expect(
+      await completeXeroTenantSelection({
+        ...input,
+        organisationId: "payroll_1",
+      })
+    ).toMatchObject({ error: { code: "tenant_binding_conflict" }, ok: false });
+    expect(dbMock.xeroConnection.update).not.toHaveBeenCalled();
+  });
   it("keeps completed selection when default feed setup fails", async () => {
     feedMock.ensureDefaultCalendarFeed.mockResolvedValue({
       error: { code: "unknown_error" },
@@ -1168,5 +1389,360 @@ describe("canonical housekeeping", () => {
       organisation_id: "payroll_1",
       status: "active",
     });
+  });
+});
+
+describe("straight protected OAuth connection", () => {
+  async function callbackInput() {
+    const started = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      returnTo: "/calendar#upcoming",
+      userId: "user_1",
+    });
+    if (!started.ok) {
+      throw new Error("Expected OAuth start");
+    }
+    return {
+      authenticatedClerkOrgId: "org_1",
+      authenticatedUserId: "user_1",
+      code: "code",
+      nonce: started.value.nonce,
+      state: new URL(started.value.redirectUrl).searchParams.get("state") ?? "",
+    };
+  }
+  const inventory = (id = "remote_1", tenantId = "file_1") => ({
+    id,
+    tenantId,
+    tenantName: "Payroll",
+    tenantType: "ORGANISATION",
+  });
+  const token = () =>
+    Response.json({
+      access_token: "access-token",
+      expires_in: 1800,
+      refresh_token: "refresh-token",
+      scope: "payroll.employees payroll.settings.read accounting.settings.read",
+    });
+  beforeEach(() => {
+    dbMock.organisation.findMany.mockResolvedValue([]);
+    dbMock.organisation.create.mockResolvedValue({ id: "payroll_1" });
+    dbMock.xeroConnection.create.mockResolvedValue({
+      id: "conn_1",
+      organisation_id: "payroll_1",
+    });
+    dbMock.xeroAuthorisation.findUnique.mockImplementation(async () =>
+      canonicalGrant()
+    );
+    dbMock.xeroOAuthSession.updateMany.mockImplementation(({ data }) => {
+      if (data.status === "selecting") {
+        dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+          id: "session_1",
+          organisation_id: null,
+          return_to: "/calendar#upcoming",
+          ...data,
+        });
+      }
+      return { count: 1 };
+    });
+  });
+  it("automatically attaches the only authorised payroll file and clears temporary session state", async () => {
+    const input = await callbackInput();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(token())
+        .mockResolvedValueOnce(Response.json([inventory()]))
+        .mockResolvedValueOnce(Response.json([inventory()]))
+        .mockResolvedValueOnce(
+          Response.json({ Organisations: [{ CountryCode: "AU" }] })
+        )
+    );
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      ok: true,
+      value: {
+        connected: { connectionId: "conn_1", organisationId: "payroll_1" },
+        redirectTo: "/calendar?org=payroll_1#upcoming",
+      },
+    });
+    expect(dbMock.xeroOAuthSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          available_tenants_json: expect.anything(),
+          nonce_hash: null,
+          state_hash: null,
+          status: "completed",
+          xero_authorisation_id: null,
+        }),
+      })
+    );
+  });
+  it("shows selection only when more than one eligible payroll file exists", async () => {
+    const input = await callbackInput();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(token())
+        .mockResolvedValueOnce(
+          Response.json([inventory(), inventory("remote_2", "file_2")])
+        )
+    );
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      ok: true,
+      value: {
+        redirectTo: "/settings/integrations/xero/connect?session=session_1",
+      },
+    });
+    expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+  });
+  it("describes exchange unavailability without exposing token mechanics", async () => {
+    const input = await callbackInput();
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          Response.json({ error: "temporary" }, { status: 503 })
+        )
+    );
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      error: { message: "Xero is temporarily unavailable. Try again." },
+      ok: false,
+    });
+  });
+  it("retains target selection for one Xero file and multiple local payroll organisations", async () => {
+    const input = await callbackInput();
+    dbMock.organisation.findMany.mockResolvedValue([
+      { id: "payroll_1" },
+      { id: "payroll_2" },
+    ]);
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(token())
+        .mockResolvedValueOnce(Response.json([inventory()]))
+    );
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      ok: true,
+      value: {
+        redirectTo: "/settings/integrations/xero/connect?session=session_1",
+      },
+    });
+    expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+  });
+  it.each([503, 429])(
+    "never replays a code exchange after %s",
+    async (status) => {
+      const input = await callbackInput();
+      const provider = vi
+        .fn()
+        .mockResolvedValue(Response.json({ error: "temporary" }, { status }));
+      vi.stubGlobal("fetch", provider);
+      expect(await completeXeroOAuth(input)).toMatchObject({ ok: false });
+      expect(provider).toHaveBeenCalledTimes(1);
+    }
+  );
+  it("rejects missing authenticated actor before code exchange", async () => {
+    const input = await callbackInput();
+    const provider = vi.fn();
+    vi.stubGlobal("fetch", provider);
+    expect(
+      await completeXeroOAuth({ ...input, authenticatedUserId: undefined })
+    ).toMatchObject({ error: { code: "invalid_state" }, ok: false });
+    expect(provider).not.toHaveBeenCalled();
+  });
+  it.each([
+    [{ id: "remote", tenantId: "file", tenantName: "Missing type" }],
+    [
+      {
+        id: "",
+        tenantId: "file",
+        tenantName: "Payroll",
+        tenantType: "ORGANISATION",
+      },
+    ],
+    { connections: [] },
+  ])(
+    "rejects malformed inventory without storing a partial selection",
+    async (rows) => {
+      const input = await callbackInput();
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce(token())
+          .mockResolvedValueOnce(Response.json(rows))
+      );
+      expect(await completeXeroOAuth(input)).toMatchObject({
+        error: { code: "invalid_token_response" },
+        ok: false,
+      });
+      expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+    }
+  );
+  it("highlights current consent without hiding previously authorised files from new attachment", async () => {
+    const input = await callbackInput();
+    identityMock.verify.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        authEventId: "event_1",
+        expiresAt: new Date(Date.now() + 1_800_000),
+        grantedScopes: ["payroll.employees"],
+        xeroUserId: "user1",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(token())
+        .mockResolvedValueOnce(
+          Response.json([inventory(), inventory("remote_2", "file_2")])
+        )
+        .mockResolvedValueOnce(Response.json([inventory("remote_2", "file_2")]))
+    );
+    expect(await completeXeroOAuth(input)).toMatchObject({
+      ok: true,
+      value: {
+        redirectTo: "/settings/integrations/xero/connect?session=session_1",
+      },
+    });
+    expect(dbMock.xeroConnection.create).not.toHaveBeenCalled();
+    expect(dbMock.xeroOAuthSession.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          available_tenants_json: {
+            authEventId: "event_1",
+            tenants: [
+              {
+                connectionId: "remote_2",
+                isCurrentConsent: true,
+                tenantId: "file_2",
+                tenantName: "Payroll",
+              },
+              {
+                connectionId: "remote_1",
+                isCurrentConsent: false,
+                tenantId: "file_1",
+                tenantName: "Payroll",
+              },
+            ],
+          },
+        }),
+      })
+    );
+  });
+  it("keeps an authorised same-file reconnect available outside the current consent event", async () => {
+    dbMock.organisation.findFirst.mockResolvedValue({
+      country_code: "AU",
+      id: "payroll_1",
+    });
+    dbMock.organisation.findMany.mockResolvedValue([
+      { country_code: "AU", id: "payroll_1" },
+    ]);
+    const started = await buildXeroOAuthStartUrl({
+      clerkOrgId: "org_1",
+      organisationId: "payroll_1",
+      userId: "user_1",
+    });
+    if (!started.ok) {
+      throw new Error("Expected scoped start");
+    }
+    const current = {
+      id: "conn_1",
+      remote_connection_id: "remote_1",
+      status: "active",
+      sync_paused_at: null,
+      updated_at: new Date(),
+      xero_authorisation_id: "grant_1",
+      xero_tenant_id: "file_1",
+    };
+    dbMock.xeroOAuthSession.updateMany.mockImplementation(({ data }) => {
+      if (data.status === "selecting") {
+        dbMock.xeroOAuthSession.findFirst.mockResolvedValue({
+          id: "session_1",
+          organisation_id: "payroll_1",
+          return_to: "/calendar",
+          ...data,
+        });
+      }
+      return { count: 1 };
+    });
+    dbMock.xeroConnection.findFirst.mockResolvedValue(current);
+    dbMock.xeroConnection.update.mockResolvedValue({
+      id: "conn_1",
+      organisation_id: "payroll_1",
+    });
+    identityMock.verify.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        authEventId: "event_1",
+        expiresAt: new Date(Date.now() + 1_800_000),
+        grantedScopes: ["payroll.employees"],
+        xeroUserId: "user1",
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(token())
+        .mockResolvedValueOnce(
+          Response.json([inventory(), inventory("remote_2", "file_2")])
+        )
+        .mockResolvedValueOnce(Response.json([inventory("remote_2", "file_2")]))
+        .mockResolvedValueOnce(
+          Response.json([inventory(), inventory("remote_2", "file_2")])
+        )
+        .mockResolvedValueOnce(
+          Response.json({ Organisations: [{ CountryCode: "AU" }] })
+        )
+    );
+    expect(
+      await completeXeroOAuth({
+        authenticatedClerkOrgId: "org_1",
+        authenticatedUserId: "user_1",
+        code: "code",
+        nonce: started.value.nonce,
+        state:
+          new URL(started.value.redirectUrl).searchParams.get("state") ?? "",
+      })
+    ).toMatchObject({
+      ok: true,
+      value: {
+        connected: { connectionId: "conn_1", organisationId: "payroll_1" },
+      },
+    });
+    expect(
+      dbMock.xeroConnection.update.mock.calls[0]?.[0].data.remote_connection_id
+    ).toBe("remote_1");
+  });
+  it("uses the verified auth event for current consent and keeps the complete authorised inventory", async () => {
+    const input = await callbackInput();
+    identityMock.verify.mockResolvedValue({
+      ok: true,
+      value: {
+        authEventId: "event_1",
+        expiresAt: new Date(Date.now() + 1_800_000),
+        grantedScopes: ["payroll.employees"],
+        xeroUserId: "user1",
+      },
+    });
+    const provider = vi
+      .fn()
+      .mockResolvedValueOnce(token())
+      .mockResolvedValueOnce(
+        Response.json([inventory(), inventory("remote_2", "file_2")])
+      )
+      .mockResolvedValueOnce(
+        Response.json([inventory(), inventory("remote_2", "file_2")])
+      );
+    vi.stubGlobal("fetch", provider);
+    expect(await completeXeroOAuth(input)).toMatchObject({ ok: true });
+    expect(provider.mock.calls.map(([url]) => String(url))).toContain(
+      "https://api.xero.com/connections?authEventId=event_1"
+    );
   });
 });

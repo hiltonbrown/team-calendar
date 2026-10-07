@@ -5,7 +5,6 @@ import { database } from "@repo/database";
 import { keys as coreKeys } from "@repo/next-config/keys";
 import {
   disconnectXeroOAuthConnection,
-  refreshXeroOAuthConnection,
   type XeroDisconnectResult,
 } from "@repo/xero";
 import { revalidatePath } from "next/cache";
@@ -65,46 +64,6 @@ export async function connectXeroAction(input: {
   redirectUrl.searchParams.set("returnTo", "/settings/integrations/xero");
   redirectUrl.searchParams.set("userId", context.value.actingUserId);
   return { ok: true, value: { redirectUrl: redirectUrl.toString() } };
-}
-export async function refreshXeroConnectionAction(input: {
-  connectionId: string;
-  organisationId: string;
-}): Promise<
-  ActionResult<{
-    refreshed: true;
-  }>
-> {
-  const parsed = ConnectionSchema.safeParse(input);
-  if (!parsed.success) {
-    return validationError(parsed.error.issues[0]?.message);
-  }
-  const context = await resolveAdminContext(parsed.data.organisationId);
-  if (!context.ok) {
-    return context;
-  }
-  return await (async () => {
-    const result = await refreshXeroOAuthConnection({
-      clerkOrgId: context.value.clerkOrgId,
-      connectionId: parsed.data.connectionId,
-      organisationId: context.value.organisationId,
-    });
-    if (!result.ok) {
-      return unknownError(result.error.message);
-    }
-    await database.auditEvent.create({
-      data: {
-        ...auditBase(context.value),
-        action: "xero.connection_refreshed",
-        entity_id: parsed.data.connectionId,
-        entity_type: "xero_connection",
-        metadata: { refreshedAt: new Date().toISOString() },
-        resource_id: parsed.data.connectionId,
-        resource_type: "xero_connection",
-      },
-    });
-    revalidate();
-    return { ok: true, value: { refreshed: true } };
-  })();
 }
 export async function disconnectXeroAction(input: {
   confirmationText: string;

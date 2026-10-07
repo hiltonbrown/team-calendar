@@ -3,23 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 const mocks = vi.hoisted(() => ({
   dispatchSyncEvent: vi.fn(),
-  findConnectionsNeedingTokenRotation: vi.fn(),
   listSchedulableXeroConnections: vi.fn(),
   purgeClosedXeroOAuthSessions: vi.fn(),
   recoverXeroImportDispatch: vi.fn(),
-  resolveXeroAccess: vi.fn(),
+  refreshDormantXeroAuthorisations: vi.fn(),
 }));
 vi.mock("./recover-xero-import-dispatch", () => ({
   recoverXeroImportDispatch: mocks.recoverXeroImportDispatch,
 }));
 vi.mock("@repo/database", () => ({
-  findConnectionsNeedingTokenRotation:
-    mocks.findConnectionsNeedingTokenRotation,
   listSchedulableXeroConnections: mocks.listSchedulableXeroConnections,
 }));
 vi.mock("@repo/xero", () => ({
   purgeClosedXeroOAuthSessions: mocks.purgeClosedXeroOAuthSessions,
-  resolveXeroAccess: mocks.resolveXeroAccess,
+  refreshDormantXeroAuthorisations: mocks.refreshDormantXeroAuthorisations,
 }));
 vi.mock("../events", async (importOriginal) => {
   const mod = await importOriginal<typeof import("../events")>();
@@ -32,12 +29,8 @@ vi.mock("../events", async (importOriginal) => {
 import type { SchedulableXeroConnection } from "@repo/database";
 import { getScheduledSyncEventId, type RegisteredSyncRunType } from "../events";
 
-const {
-  dueRunTypes,
-  rotateDormantXeroConnections,
-  scheduleXeroSyncsFunction,
-  scheduleXeroSyncsPage,
-} = await import("./schedule-xero-syncs");
+const { dueRunTypes, scheduleXeroSyncsFunction, scheduleXeroSyncsPage } =
+  await import("./schedule-xero-syncs");
 const { functions } = await import("../functions");
 describe("scheduleXeroSyncs Coordinator", () => {
   const providerTenantId = "00000000-0000-4000-8000-000000000099";
@@ -60,82 +53,6 @@ describe("scheduleXeroSyncs Coordinator", () => {
     mocks.purgeClosedXeroOAuthSessions.mockResolvedValue({
       ok: true,
       value: { scrubbed: 0 },
-    });
-  });
-  describe("rotateDormantXeroConnections", () => {
-    it("refreshes active connections whose refresh tokens are older than 45 days", async () => {
-      const now = new Date("2026-08-23T00:00:00.000Z");
-      mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            authorisationId: "authorisation_1",
-            clerkOrgId: "org_clerk_1",
-            connectionId: baseTenant.connectionId,
-            lastRefreshedAt: new Date("2026-07-01T00:00:00.000Z"),
-            organisationId: baseTenant.organisationId,
-          },
-        ],
-      });
-      mocks.resolveXeroAccess.mockResolvedValue({
-        ok: true,
-        value: {
-          expiresAt: new Date("2026-08-23T00:30:00.000Z"),
-          refreshed: true,
-        },
-      });
-      const result = await rotateDormantXeroConnections(now);
-      expect(result).toEqual({
-        ok: true,
-        value: { failed: 0, rotated: 1, scanned: 1 },
-      });
-      expect(mocks.resolveXeroAccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          capability: ["payroll.employees", "payroll.employees.read"],
-          clerkOrgId: "org_clerk_1",
-          deadline: expect.objectContaining({
-            expiresAtMs: expect.any(Number),
-          }),
-          forceRefresh: true,
-          organisationId: baseTenant.organisationId,
-        })
-      );
-    });
-    it("isolates a failed rotation so remaining connections are still refreshed", async () => {
-      mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
-        ok: true,
-        value: [
-          {
-            authorisationId: "authorisation_1",
-            clerkOrgId: "org_clerk_1",
-            connectionId: baseTenant.connectionId,
-            lastRefreshedAt: new Date("2026-07-01T00:00:00.000Z"),
-            organisationId: baseTenant.organisationId,
-          },
-          {
-            authorisationId: "authorisation_2",
-            clerkOrgId: "org_clerk_2",
-            connectionId: "tenant_2",
-            lastRefreshedAt: new Date("2026-07-02T00:00:00.000Z"),
-            organisationId: "00000000-0000-4000-8000-000000000002",
-          },
-        ],
-      });
-      mocks.resolveXeroAccess
-        .mockResolvedValueOnce({
-          error: { code: "network_error", message: "Xero unavailable." },
-          ok: false,
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          value: { expiresAt: new Date(), refreshed: true },
-        });
-      const result = await rotateDormantXeroConnections();
-      expect(result).toEqual({
-        ok: true,
-        value: { failed: 1, rotated: 1, scanned: 2 },
-      });
-      expect(mocks.resolveXeroAccess).toHaveBeenCalledTimes(2);
     });
   });
   describe("dueRunTypes decision function", () => {
@@ -320,21 +237,21 @@ describe("scheduleXeroSyncs Coordinator", () => {
     });
   });
   describe("scheduleXeroSyncsFunction registration", () => {
-    it("runs session cleanup and import recovery before token rotation and scheduled dispatch", async () => {
-      mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
+    it("runs canonical grant maintenance once after cleanup and recovery before sync dispatch", async () => {
+      mocks.refreshDormantXeroAuthorisations.mockResolvedValue({
         ok: true,
-        value: [],
+        value: { failed: 1, refreshed: 1, scanned: 3, skipped: 1 },
       });
       mocks.listSchedulableXeroConnections.mockResolvedValue({
         ok: true,
         value: { connections: [] },
       });
+      const steps: string[] = [];
       const handler: unknown = Reflect.get(scheduleXeroSyncsFunction, "fn");
       if (typeof handler !== "function") {
         throw new Error("Expected registered Inngest handler");
       }
-      const steps: string[] = [];
-      await handler({
+      const result = await handler({
         step: {
           run: (id: string, operation: () => Promise<unknown>) => {
             steps.push(id);
@@ -342,12 +259,45 @@ describe("scheduleXeroSyncs Coordinator", () => {
           },
         },
       });
+      expect(mocks.purgeClosedXeroOAuthSessions).toHaveBeenCalledTimes(1);
       expect(mocks.recoverXeroImportDispatch).toHaveBeenCalledExactlyOnceWith({
         now: expect.any(Date),
       });
-      expect(steps.indexOf("recover-xero-import-dispatch")).toBeLessThan(
-        steps.indexOf("rotate-dormant-connections")
-      );
+      expect(
+        mocks.refreshDormantXeroAuthorisations
+      ).toHaveBeenCalledExactlyOnceWith(expect.any(Date));
+      expect(steps).toEqual([
+        "cleanup-xero-oauth-sessions",
+        "recover-xero-import-dispatch",
+        "refresh-dormant-authorisations",
+        "process-page-0",
+      ]);
+      expect(result).toEqual({
+        authorisations: { failed: 1, refreshed: 1, scanned: 3, skipped: 1 },
+        dispatched: 0,
+        invalidTimezone: 0,
+        scanned: 0,
+        skipped: 0,
+      });
+      expect(JSON.stringify(result)).not.toContain("token");
+    });
+    it("retries failed grant enumeration instead of reporting maintenance success", async () => {
+      mocks.refreshDormantXeroAuthorisations.mockResolvedValue({
+        error: { code: "internal", message: "Could not list due grants." },
+        ok: false,
+      });
+      const handler: unknown = Reflect.get(scheduleXeroSyncsFunction, "fn");
+      if (typeof handler !== "function") {
+        throw new Error("Expected registered Inngest handler");
+      }
+      await expect(
+        handler({
+          step: {
+            run: (_: string, operation: () => Promise<unknown>) => operation(),
+          },
+        })
+      ).rejects.toThrow("Could not list due grants.");
+      expect(mocks.listSchedulableXeroConnections).not.toHaveBeenCalled();
     });
     it("registers scheduleXeroSyncsFunction with id schedule-xero-syncs and 15-min cron", () => {
       expect(functions).toContain(scheduleXeroSyncsFunction);
@@ -360,30 +310,4 @@ describe("scheduleXeroSyncs Coordinator", () => {
       expect(coordinators).toHaveLength(1);
     });
   });
-});
-it("rotates once for a shared authorisation across sibling payroll connections", async () => {
-  vi.clearAllMocks();
-  mocks.findConnectionsNeedingTokenRotation.mockResolvedValue({
-    ok: true,
-    value: [
-      {
-        authorisationId: "shared",
-        clerkOrgId: "org_a",
-        connectionId: "t_a",
-        organisationId: "o_a",
-      },
-      {
-        authorisationId: "shared",
-        clerkOrgId: "org_b",
-        connectionId: "t_b",
-        organisationId: "o_b",
-      },
-    ],
-  });
-  mocks.resolveXeroAccess.mockResolvedValue({ ok: true, value: {} });
-  expect(await rotateDormantXeroConnections()).toMatchObject({
-    ok: true,
-    value: { failed: 0, rotated: 1, scanned: 2 },
-  });
-  expect(mocks.resolveXeroAccess).toHaveBeenCalledTimes(1);
 });

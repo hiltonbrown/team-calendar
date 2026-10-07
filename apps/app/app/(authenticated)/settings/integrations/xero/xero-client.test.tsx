@@ -16,7 +16,6 @@ const mocks = vi.hoisted(() => ({
   dispatchManualSyncAction: vi.fn(),
   pauseTenantSyncAction: vi.fn(),
   refresh: vi.fn(),
-  refreshXeroConnectionAction: vi.fn(),
   resumeTenantSyncAction: vi.fn(),
 }));
 vi.mock("next/navigation", () => ({
@@ -29,7 +28,6 @@ vi.mock("./_actions", () => ({
   connectXeroAction: mocks.connectXeroAction,
   disconnectXeroAction: mocks.disconnectXeroAction,
   pauseTenantSyncAction: mocks.pauseTenantSyncAction,
-  refreshXeroConnectionAction: mocks.refreshXeroConnectionAction,
   resumeTenantSyncAction: mocks.resumeTenantSyncAction,
 }));
 const OAUTH_ACTION_REGEX = /^(Connect|Reconnect) Xero$/;
@@ -108,7 +106,6 @@ describe("XeroClient component", () => {
         screen.queryByRole("button", { name: OAUTH_ACTION_REGEX })
       ).toBeNull();
       expect(mocks.connectXeroAction).not.toHaveBeenCalled();
-      expect(mocks.refreshXeroConnectionAction).not.toHaveBeenCalled();
       expect(mocks.dispatchManualSyncAction).not.toHaveBeenCalled();
     }
   );
@@ -165,18 +162,13 @@ describe("XeroClient component", () => {
       expect(mocks.connectXeroAction).toHaveBeenCalledWith({
         organisationId: baseOrg.id,
       });
-      expect(mocks.refreshXeroConnectionAction).not.toHaveBeenCalled();
       expect(mocks.dispatchManualSyncAction).not.toHaveBeenCalled();
     }
   );
-  it("keeps active sync and token refresh actions without an OAuth prompt", async () => {
+  it("keeps active manual sync without an OAuth prompt", async () => {
     mocks.dispatchManualSyncAction.mockResolvedValue({
       ok: true,
       value: { queued: true },
-    });
-    mocks.refreshXeroConnectionAction.mockResolvedValue({
-      ok: true,
-      value: {},
     });
     render(<XeroClient organisations={[baseOrg]} />);
     expect(
@@ -190,24 +182,6 @@ describe("XeroClient component", () => {
       connectionId: baseTenant.id,
       organisationId: baseOrg.id,
       runType: "people",
-    });
-    fireEvent.click(screen.getByText("Connection controls"));
-    const refreshButton = screen.getByRole("button", {
-      name: "Refresh tokens",
-    });
-    await waitFor(() =>
-      expect(refreshButton.hasAttribute("disabled")).toBe(false)
-    );
-    fireEvent.click(refreshButton);
-    await waitFor(() =>
-      expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledTimes(1)
-    );
-    await waitFor(() =>
-      expect(refreshButton.hasAttribute("disabled")).toBe(false)
-    );
-    expect(mocks.refreshXeroConnectionAction).toHaveBeenCalledWith({
-      connectionId: baseConnection.id,
-      organisationId: baseOrg.id,
     });
     expect(mocks.connectXeroAction).not.toHaveBeenCalled();
   });
@@ -280,28 +254,29 @@ describe("XeroClient component", () => {
     render(<XeroClient organisations={[baseOrg]} />);
     expect(screen.queryByText(ROLLING_REFRESH_REGEX)).toBeNull();
   });
-  it("offers manual token refresh only for an active connection", () => {
-    render(<XeroClient organisations={[baseOrg]} />);
-    fireEvent.click(screen.getByText("Connection controls"));
-    expect(
-      screen.getByRole("button", { name: "Refresh tokens" })
-    ).toBeDefined();
-  });
-  it.each([
-    { disconnected_at: null, status: "reconnect_required" as const },
-    {
-      disconnected_at: new Date("2026-08-29T00:00:00.000Z"),
-      status: "disconnected" as const,
-    },
-  ])("hides manual token refresh for inactive connection state %#", (state) => {
-    const organisation: OrganisationWithConnectionView = {
-      ...baseOrg,
-      xero_connection: { ...baseConnection, ...state },
-    };
-    render(<XeroClient organisations={[organisation]} />);
-    fireEvent.click(screen.getByText("Connection controls"));
-    expect(screen.queryByRole("button", { name: "Refresh tokens" })).toBeNull();
-  });
+  it.each([null, new Date("2026-09-27T00:00:00Z")])(
+    "settings has no manual token refresh when sync_paused_at is %s",
+    (syncPausedAt) => {
+      render(
+        <XeroClient
+          organisations={[
+            {
+              ...baseOrg,
+              xero_connection: {
+                ...baseConnection,
+                sync_paused_at: syncPausedAt,
+              },
+            },
+          ]}
+        />
+      );
+      fireEvent.click(screen.getByText("Connection controls"));
+      expect(
+        screen.queryByRole("button", { name: "Refresh tokens" })
+      ).toBeNull();
+      expect(screen.queryByText("Refresh tokens")).toBeNull();
+    }
+  );
   it("promotes one recommended sync and progressively discloses the rest", () => {
     render(<XeroClient organisations={[baseOrg]} />);
     expect(

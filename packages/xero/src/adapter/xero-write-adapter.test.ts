@@ -4,7 +4,6 @@ import type { XeroAccessContext, XeroWriteError } from "../write/types";
 const mocks = vi.hoisted(() => ({
   approveLeaveApplicationForRegion: vi.fn(),
   declineLeaveApplicationForRegion: vi.fn(),
-  ensureFreshXeroConnection: vi.fn(),
   metricLog: vi.fn(),
   resolveXeroAccess: vi.fn(),
   submitLeaveApplicationForRegion: vi.fn(),
@@ -21,9 +20,6 @@ vi.mock("@repo/database", () => ({
       findFirst: mocks.tenantFindFirst,
     },
   },
-}));
-vi.mock("../oauth/service", () => ({
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
 }));
 vi.mock("../oauth/authorisation", () => ({
   resolveXeroAccess: mocks.resolveXeroAccess,
@@ -211,10 +207,6 @@ describe("161g recovery regression", () => {
     "preserves %s rather than reporting not connected",
     async (code, recoveryReason) => {
       mocks.tenantFindFirst.mockResolvedValue(buildTenant("tenant-1"));
-      mocks.ensureFreshXeroConnection.mockResolvedValue({
-        error: { code, message: "safe failure" },
-        ok: false,
-      });
       mocks.resolveXeroAccess.mockResolvedValue({
         error: { code, message: "safe failure" },
         ok: false,

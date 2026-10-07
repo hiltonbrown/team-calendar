@@ -63,6 +63,17 @@ describe("Xero access token identity", () => {
       (await verifyXeroAccessTokenIdentity(await token(overrides), deps())).ok
     ).toBe(false);
   });
+  it("distinguishes an explicitly supplied empty scope claim from an omitted claim", async () => {
+    expect(
+      await verifyXeroAccessTokenIdentity(await token({ scope: [] }), deps())
+    ).toMatchObject({
+      ok: true,
+      value: { grantedScopes: [], scopeProvided: true },
+    });
+    expect(
+      await verifyXeroAccessTokenIdentity(await token(), deps())
+    ).toMatchObject({ ok: true, value: { grantedScopes: [] } });
+  });
   it("rejects a bad signature", async () => {
     const other = await generateKeyPair("RS256");
     const signed = await token({}, other.privateKey);

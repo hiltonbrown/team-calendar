@@ -1,15 +1,23 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, expect, test } from "vitest";
 import type { Prisma } from "./generated/client";
-import { saveXeroAuthorisation } from "./src/queries/xero-authorisation";
+import {
+  listDueXeroAuthorisations,
+  saveXeroAuthorisation,
+} from "./src/queries/xero-authorisation";
 import { getScopedXeroConnection } from "./src/queries/xero-connections";
 import { advanceXeroSyncCursor } from "./src/queries/xero-sync-cursors";
 import {
+  createXeroAuthorisationFixture,
   createXeroConnectionFixture,
   xeroSimplificationFixture,
 } from "./src/test-fixtures/xero-simplification-fixture";
 
 const { database } = xeroSimplificationFixture();
+const maintenanceNow = new Date("2026-10-07T00:00:00.000Z");
+const fortyFiveDaysAgo = new Date(
+  maintenanceNow.getTime() - 45 * 24 * 60 * 60 * 1000
+);
 afterAll(() => database.$disconnect());
 async function rolledBack(
   work: (tx: Prisma.TransactionClient) => Promise<void>
@@ -25,6 +33,127 @@ async function rolledBack(
       }
     });
 }
+
+test("dormant maintenance becomes due exactly 45 days after successful rotation", async () => {
+  await rolledBack(async (tx) => {
+    const fixtures = await Promise.all([
+      createXeroConnectionFixture(tx),
+      createXeroConnectionFixture(tx),
+      createXeroConnectionFixture(tx),
+    ]);
+    for (const [index, fixture] of fixtures.entries()) {
+      await tx.xeroAuthorisation.update({
+        data: {
+          last_refreshed_at: new Date(fortyFiveDaysAgo.getTime() + 1 - index),
+        },
+        where: { id: fixture.authorisation.id },
+      });
+    }
+    const result = await listDueXeroAuthorisations(maintenanceNow, tx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    const ids = result.value.map((grant) => grant.id);
+    expect(ids).not.toContain(fixtures[0]?.authorisation.id);
+    expect(ids).toContain(fixtures[1]?.authorisation.id);
+    expect(ids).toContain(fixtures[2]?.authorisation.id);
+  });
+});
+
+test("paused active connections in two accounts select their shared grant once", async () => {
+  await rolledBack(async (tx) => {
+    const first = await createXeroConnectionFixture(tx);
+    const second = await createXeroConnectionFixture(tx);
+    await tx.xeroAuthorisation.update({
+      data: { last_refreshed_at: fortyFiveDaysAgo },
+      where: { id: first.authorisation.id },
+    });
+    await tx.xeroConnection.update({
+      data: { sync_paused_at: maintenanceNow },
+      where: { id: first.connection.id },
+    });
+    await tx.xeroConnection.update({
+      data: {
+        sync_paused_at: maintenanceNow,
+        xero_authorisation_id: first.authorisation.id,
+      },
+      where: { id: second.connection.id },
+    });
+    const result = await listDueXeroAuthorisations(maintenanceNow, tx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(
+      result.value.filter((grant) => grant.id === first.authorisation.id)
+    ).toEqual([
+      {
+        id: first.authorisation.id,
+        last_refreshed_at: fortyFiveDaysAgo,
+        provider_app_id: first.authorisation.provider_app_id,
+        xero_user_id: first.authorisation.xero_user_id,
+      },
+    ]);
+  });
+});
+
+test("maintenance excludes grants without a live active connection or with revoked access", async () => {
+  await rolledBack(async (tx) => {
+    const inactive = await createXeroConnectionFixture(tx);
+    const archived = await createXeroConnectionFixture(tx);
+    const disconnected = await createXeroConnectionFixture(tx);
+    const disconnectedAt = await createXeroConnectionFixture(tx);
+    const reconnect = await createXeroConnectionFixture(tx);
+    const revoked = await createXeroConnectionFixture(tx);
+    const unlinked = await createXeroAuthorisationFixture(tx);
+    const fixtureIds = [
+      inactive,
+      archived,
+      disconnected,
+      disconnectedAt,
+      reconnect,
+      revoked,
+    ].map((fixture) => fixture.authorisation.id);
+    fixtureIds.push(unlinked.id);
+    await tx.xeroAuthorisation.updateMany({
+      data: { last_refreshed_at: fortyFiveDaysAgo },
+      where: { id: { in: fixtureIds } },
+    });
+    await tx.organisation.update({
+      data: { is_active: false },
+      where: { id: inactive.organisation.id },
+    });
+    await tx.organisation.update({
+      data: { archived_at: maintenanceNow },
+      where: { id: archived.organisation.id },
+    });
+    await tx.xeroConnection.update({
+      data: { status: "disconnected" },
+      where: { id: disconnected.connection.id },
+    });
+    await tx.xeroConnection.update({
+      data: { disconnected_at: maintenanceNow },
+      where: { id: disconnectedAt.connection.id },
+    });
+    await tx.xeroConnection.update({
+      data: { status: "reconnect_required" },
+      where: { id: reconnect.connection.id },
+    });
+    await tx.xeroAuthorisation.update({
+      data: { status: "reconnect_required" },
+      where: { id: revoked.authorisation.id },
+    });
+    const result = await listDueXeroAuthorisations(maintenanceNow, tx);
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+    expect(
+      result.value.filter((grant) => fixtureIds.includes(grant.id))
+    ).toEqual([]);
+  });
+});
 test("rejects duplicate canonical app and verified user", async () => {
   await rolledBack(async (tx) => {
     const { authorisation } = await createXeroConnectionFixture(tx);

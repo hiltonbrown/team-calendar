@@ -561,6 +561,32 @@ The feed representation hash covers its name and ordered serialised events. `fee
 Inbound: pull-first polling. Xero does not provide webhooks for leave data.
 Outbound: synchronous API write triggered by user action. No background queue for outbound writes.
 
+### OAuth and automatic access
+
+Connect Xero validates the current account, user, management role and short-lived
+state before exchanging its code once. Only authorised organisation tenants are
+eligible; the verified authorisation event highlights current consent while
+earlier authorised files remain available.
+A single eligible Xero organisation connects directly when its Team Calendar
+target is known or unambiguous. Multiple eligible Xero organisations use the
+scoped selection page; a single file needs only a Team Calendar target choice
+when that account has several payroll organisations. Completing connection
+consumes the temporary session and dispatches one durable initial import.
+
+The requested scopes are exactly `offline_access accounting.settings.read
+payroll.employees payroll.settings.read`. Organisation country discovery requires
+accounting settings reads; employee/leave reads and leave writes require employee
+access; PayItems metadata requires payroll settings reads. Write scopes satisfy
+their matching read capability, and every required capability must be present.
+
+One server-only scoped access resolver performs automatic refresh near expiry,
+rechecks canonical credentials under the authorisation lock and saves the rotated
+pair atomically. Dormant grants with active connections, including paused sync,
+are refreshed at 45 days through the same implementation. An uncertain response
+keeps the stored pair for the next normal attempt within Xero's documented
+30-minute grace period. Invalid grants require reconnect. Token refresh has no
+customer control or manual server action.
+
 ### Sync jobs (Inngest)
 
 | Job | Direction | Purpose |

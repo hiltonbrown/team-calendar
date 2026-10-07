@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   deriveXeroStableSourceKey: vi.fn(),
-  ensureFreshXeroConnection: vi.fn(),
   fetchLeaveRecordsForRegion: vi.fn(),
   inngestSend: vi.fn(() => Promise.resolve({ ids: ["event_1"] })),
   materialiseAvailabilityPublication: vi.fn(),
@@ -51,7 +50,6 @@ vi.mock("@repo/observability/log", () => ({
 }));
 vi.mock("@repo/xero", () => ({
   deriveXeroStableSourceKey: mocks.deriveXeroStableSourceKey,
-  ensureFreshXeroConnection: mocks.ensureFreshXeroConnection,
   fetchLeaveRecordsForRegion: mocks.fetchLeaveRecordsForRegion,
   toPlainLanguageMessage: mocks.toPlainLanguageMessage,
 }));

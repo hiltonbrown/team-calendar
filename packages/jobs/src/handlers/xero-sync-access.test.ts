@@ -115,21 +115,28 @@ describe("Xero sync connection lock", () => {
       resolveSyncTenant(scope, "payroll.employees.read")
     ).rejects.toBeInstanceOf(XeroBindingChangedError);
   });
-  it("passes exact scope capability and one absolute deadline to resolution", async () => {
-    mocks.resolve.mockResolvedValue({
-      ok: true,
-      value: { connectionId: scope.connectionId },
-    });
-    await resolveSyncTenant(scope, "payroll.employees.read");
-    expect(mocks.resolve).toHaveBeenCalledWith(
-      expect.objectContaining({
-        capability: "payroll.employees.read",
-        clerkOrgId: scope.clerkOrgId,
-        deadline: { expiresAtMs: expect.any(Number) },
-        organisationId: scope.organisationId,
-      })
-    );
-  });
+  it.each([
+    { capability: "payroll.employees.read" },
+    { capability: ["payroll.employees", "payroll.employees.read"] },
+  ])(
+    "passes exact connection and capability $capability with one absolute deadline",
+    async ({ capability }) => {
+      mocks.resolve.mockResolvedValue({
+        ok: true,
+        value: { connectionId: scope.connectionId },
+      });
+      await resolveSyncTenant(scope, capability);
+      expect(mocks.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          capability,
+          clerkOrgId: scope.clerkOrgId,
+          connectionId: scope.connectionId,
+          deadline: { expiresAtMs: expect.any(Number) },
+          organisationId: scope.organisationId,
+        })
+      );
+    }
+  );
   it("rejects retryable service Results at the registered job boundary", async () => {
     await expect(
       rejectRetryableSyncResult(

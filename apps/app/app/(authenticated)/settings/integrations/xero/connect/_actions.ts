@@ -1,11 +1,10 @@
 "use server";
-import { createActivationEvent } from "@repo/analytics/activation-events";
-import { analytics } from "@repo/analytics/server";
 import { auth, currentUser } from "@repo/auth/server";
 import type { Result } from "@repo/core";
 import { database } from "@repo/database";
 import { dispatchInitialXeroSync } from "@repo/jobs";
 import { completeXeroTenantSelection } from "@repo/xero";
+import { captureXeroConnected } from "@repo/xero/activation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -87,33 +86,37 @@ export async function completeTenantSelectionAction(input: {
         ok: false,
       };
     }
-    await database.auditEvent.create({
-      data: {
-        action: existingConnection
-          ? "xero.connection_reconnected"
-          : "xero.connection_connected",
-        actor_display:
-          [user.firstName, user.lastName].filter(Boolean).join(" ") ||
-          user.emailAddresses[0]?.emailAddress ||
-          user.id,
-        actor_user_id: user.id,
-        clerk_org_id: orgId,
-        entity_id: result.value.connectionId,
-        entity_type: "xero_connection",
-        metadata: {
-          connectionId: result.value.connectionId,
-          organisationId: result.value.organisationId,
+    try {
+      await database.auditEvent.create({
+        data: {
+          action: existingConnection
+            ? "xero.connection_reconnected"
+            : "xero.connection_connected",
+          actor_display:
+            [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+            user.emailAddresses[0]?.emailAddress ||
+            user.id,
+          actor_user_id: user.id,
+          clerk_org_id: orgId,
+          entity_id: result.value.connectionId,
+          entity_type: "xero_connection",
+          metadata: {
+            connectionId: result.value.connectionId,
+            organisationId: result.value.organisationId,
+          },
+          organisation_id: result.value.organisationId,
+          resource_id: result.value.connectionId,
+          resource_type: "xero_connection",
         },
-        organisation_id: result.value.organisationId,
-        resource_id: result.value.connectionId,
-        resource_type: "xero_connection",
-      },
+      });
+    } catch {
+      // Canonical connection audit is committed; ancillary audit must not block initial sync.
+    }
+    await captureXeroConnected({
+      clerkOrgId: orgId,
+      connectionId: result.value.connectionId,
+      organisationId: result.value.organisationId,
     });
-    await captureXeroConnected(
-      orgId,
-      result.value.organisationId,
-      result.value.connectionId
-    );
     // Dispatch durable initial sync (people, leave-records, leave-balances).
     // Best effort: the connection is already persisted and scheduled recovery will catch up if
     // dispatch fails, so a dispatch error must not fail the connection itself.
@@ -169,38 +172,4 @@ function validationError(message?: string): ActionResult<never> {
     },
     ok: false,
   };
-}
-async function captureXeroConnected(
-  orgId: string,
-  organisationId: string,
-  connectionId: string
-): Promise<void> {
-  try {
-    const durableConnection = await database.xeroConnection.findFirst({
-      select: { created_at: true },
-      where: {
-        clerk_org_id: orgId,
-        id: connectionId,
-        organisation_id: organisationId,
-      },
-    });
-    if (durableConnection) {
-      const connectedEvent = createActivationEvent({
-        deduplicationKey: `${orgId}:${organisationId}`,
-        name: "Xero Connected",
-        occurredAt: durableConnection.created_at,
-        subjectId: orgId,
-      });
-      analytics?.capture({
-        distinctId: connectedEvent.distinctId,
-        event: connectedEvent.event,
-        properties: connectedEvent.properties,
-        timestamp: connectedEvent.timestamp,
-        uuid: connectedEvent.uuid,
-      });
-      await analytics?.flush();
-    }
-  } catch {
-    // The connection is durable; analytics must not turn it into a user-visible failure.
-  }
 }

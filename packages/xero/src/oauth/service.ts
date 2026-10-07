@@ -13,7 +13,12 @@ import {
   withScopedXeroConnectionLock,
   withXeroGrantLock,
 } from "@repo/database";
-import type { XeroOAuthSession } from "@repo/database/generated/client";
+import type {
+  XeroAuthorisation,
+  XeroConnection,
+  XeroOAuthSession,
+} from "@repo/database/generated/client";
+import { Prisma } from "@repo/database/generated/client";
 import { getScopedXeroConnection } from "@repo/database/queries/xero-connections";
 import { ensureDefaultCalendarFeed } from "@repo/feeds";
 import { log } from "@repo/observability/log";
@@ -22,31 +27,23 @@ import { keys } from "../../keys";
 import { createXeroDeadline, type XeroDeadline } from "../rate-limit/deadline";
 import { XERO_TOKEN_OPERATION_BUDGET_MS } from "../rate-limit/limits";
 import type { XeroRateClass } from "../rate-limit/shared-store";
-import {
-  parseRetryAfter,
-  XeroFetchError,
-  xeroFetch,
-} from "../rate-limit/xero-fetch";
+import { xeroFetch } from "../rate-limit/xero-fetch";
 import {
   adoptXeroAuthorisation,
   authorisationAccessToken,
   refreshXeroAuthorisation,
+  resolveXeroAccess,
 } from "./authorisation";
+import {
+  verifyXeroAccessTokenIdentity,
+  type XeroAccessTokenIdentity,
+} from "./identity";
+import { XERO_SCOPES } from "./scopes";
+import { callbackUrl, exchangeToken } from "./token";
 
 const XERO_AUTHORISE_URL = "https://login.xero.com/identity/connect/authorize";
 const XERO_CONNECTIONS_URL = "https://api.xero.com/connections";
 const XERO_ORGANISATION_URL = "https://api.xero.com/api.xro/2.0/Organisation";
-const XERO_TOKEN_URL = "https://identity.xero.com/connect/token";
-const XERO_SCOPES = [
-  "offline_access",
-  "accounting.settings.read",
-  "payroll.employees",
-  "payroll.employees.read",
-  "payroll.payruns",
-  "payroll.payruns.read",
-  "payroll.settings",
-  "payroll.settings.read",
-].join(" ");
 const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 const DEFAULT_XERO_RETURN_TO = "/settings/integrations/xero";
 
@@ -60,31 +57,11 @@ interface OAuthStatePayload {
   userId: null | string;
 }
 
-const TokenResponseSchema = z.object({
-  access_token: z.string().trim().min(1),
-  expires_in: z.number().finite().int().positive(),
-  refresh_token: z.string().trim().min(1),
-  scope: z.string().optional(),
-});
-
-type TokenResponse = z.infer<typeof TokenResponseSchema>;
-
-const OAuthErrorResponseSchema = z.object({
-  error: z.string().trim().min(1),
-});
-
 interface ConnectionResponse {
   connectionId: string;
+  isCurrentConsent?: boolean;
   tenantId: string;
   tenantName: string;
-}
-
-interface XeroOrganisationResponse {
-  Organisations?: Array<{
-    CountryCode?: string;
-    Name?: string;
-    ShortCode?: string;
-  }>;
 }
 
 export interface PendingXeroSessionOrganisation {
@@ -95,6 +72,7 @@ export interface PendingXeroSessionOrganisation {
 
 export interface PendingXeroSessionTenant {
   connectionId: string;
+  isCurrentConsent?: boolean;
   tenantId: string;
   tenantName: string;
 }
@@ -105,7 +83,6 @@ export type XeroOAuthError = {
   httpStatus?: number;
   retryAfterMs?: number;
 } & (
-  | { code: "already_refreshed"; message: string }
   | { code: "connect_disabled"; message: string }
   | { code: "client_credentials_invalid"; message: string }
   | { code: "connection_changed"; message: string }
@@ -313,9 +290,24 @@ async function inferPayrollRegionForTenant(input: {
     };
   }
 
-  const payload = (await response.json()) as XeroOrganisationResponse;
+  const payload = z
+    .object({
+      Organisations: z
+        .array(z.object({ CountryCode: z.string().trim().min(1) }))
+        .min(1),
+    })
+    .safeParse(await response.json().catch(() => null));
+  if (!payload.success) {
+    return {
+      error: {
+        code: "invalid_token_response",
+        message: "Xero organisation details could not be read. Try again.",
+      },
+      ok: false,
+    };
+  }
   const countryCode =
-    payload.Organisations?.[0]?.CountryCode?.trim().toUpperCase() ?? "";
+    payload.data.Organisations[0]?.CountryCode.toUpperCase() ?? "";
   const payrollRegion = payrollRegionForCountry(countryCode);
   if (!payrollRegion) {
     return {
@@ -366,151 +358,19 @@ function readAvailableTenants(payload: unknown): PendingXeroSessionTenant[] {
         : null;
 
     return connectionId && tenantId && tenantName
-      ? [{ connectionId, tenantId, tenantName }]
+      ? [
+          {
+            connectionId,
+            tenantId,
+            tenantName,
+            ...("isCurrentConsent" in tenant &&
+            typeof tenant.isCurrentConsent === "boolean"
+              ? { isCurrentConsent: tenant.isCurrentConsent }
+              : {}),
+          },
+        ]
       : [];
   });
-}
-
-export async function exchangeToken(input: {
-  code?: string;
-  grantType: "authorization_code" | "refresh_token";
-  deadline?: XeroDeadline;
-  onResponseAccepted?: () => void;
-  rateClass: XeroRateClass;
-  refreshToken?: string;
-}): Promise<Result<TokenResponse, XeroOAuthError>> {
-  const clientId = keys().XERO_CLIENT_ID;
-  const clientSecret = keys().XERO_CLIENT_SECRET;
-  if (!(clientId && clientSecret)) {
-    return oauthNotConfigured();
-  }
-
-  const body = new URLSearchParams();
-  body.set("grant_type", input.grantType);
-  if (input.grantType === "authorization_code") {
-    body.set("code", input.code ?? "");
-    body.set("redirect_uri", callbackUrl());
-  } else {
-    body.set("refresh_token", input.refreshToken ?? "");
-  }
-
-  let response: Response;
-  try {
-    response = await xeroFetch({
-      deadline:
-        input.deadline ?? createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
-      init: {
-        body,
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        method: "POST",
-      },
-      rateClass: input.rateClass,
-      url: XERO_TOKEN_URL,
-    });
-  } catch (error) {
-    return {
-      error: {
-        code: "network_error",
-        dispatched: error instanceof XeroFetchError ? error.dispatched : true,
-        message: "Xero token exchange could not reach Xero. Try again.",
-        transportCode: error instanceof XeroFetchError ? error.code : undefined,
-      },
-      ok: false,
-    };
-  }
-  if (!response.ok) {
-    return {
-      error: await classifyTokenExchangeFailure(response, input.grantType),
-      ok: false,
-    };
-  }
-
-  input.onResponseAccepted?.();
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return {
-      error: {
-        code: "invalid_token_response",
-        message: "Xero token response was invalid.",
-      },
-      ok: false,
-    };
-  }
-
-  const parsed = TokenResponseSchema.safeParse(payload);
-  if (!parsed.success) {
-    return {
-      error: {
-        code: "invalid_token_response",
-        message: "Xero token response was invalid.",
-      },
-      ok: false,
-    };
-  }
-
-  return { ok: true, value: parsed.data };
-}
-
-async function classifyTokenExchangeFailure(
-  response: Response,
-  grantType: "authorization_code" | "refresh_token"
-): Promise<XeroOAuthError> {
-  if (response.status === 429) {
-    return {
-      code: "network_error",
-      dispatched: false,
-      httpStatus: 429,
-      message: "Xero token exchange is temporarily unavailable. Try again.",
-      retryAfterMs:
-        parseRetryAfter(response.headers.get("Retry-After")) ?? undefined,
-    };
-  }
-  if (response.status >= 500 && response.status < 600) {
-    return {
-      code: "network_error",
-      dispatched: true,
-      message: "Xero token exchange is temporarily unavailable. Try again.",
-    };
-  }
-  if (grantType !== "refresh_token") {
-    return {
-      code: "unknown_error",
-      message: "Xero token exchange failed.",
-    };
-  }
-
-  const errorCode = await readOAuthErrorCode(response);
-  if (errorCode === "invalid_grant" || errorCode === "refresh_token_invalid") {
-    return {
-      code: "refresh_token_invalid",
-      message: "The Xero refresh token is no longer valid. Reconnect Xero.",
-    };
-  }
-  if (errorCode === "unauthorized_client" || errorCode === "invalid_client") {
-    return {
-      code: "client_credentials_invalid",
-      message:
-        "The Xero client credentials are no longer valid. Contact support.",
-    };
-  }
-  return {
-    code: "unknown_error",
-    message: "Xero token exchange failed.",
-  };
-}
-
-async function readOAuthErrorCode(response: Response): Promise<null | string> {
-  try {
-    const parsed = OAuthErrorResponseSchema.safeParse(await response.json());
-    return parsed.success ? parsed.data.error : null;
-  } catch {
-    return null;
-  }
 }
 
 function organisationDefaultsForRegion(payrollRegion: "AU" | "NZ" | "UK") {
@@ -549,21 +409,6 @@ function organisationDefaultsForRegion(payrollRegion: "AU" | "NZ" | "UK") {
 // from the API (or app) public URL. Preview deployments do not register their
 // own callback: Xero connect is gated off on preview, so this only ever runs
 // in production or local development.
-function callbackUrl(): string {
-  const registeredUri = keys().XERO_REDIRECT_URI;
-  if (registeredUri) {
-    return registeredUri;
-  }
-  const baseUrl =
-    process.env.NEXT_PUBLIC_API_URL ?? process.env.NEXT_PUBLIC_APP_URL;
-  if (!baseUrl) {
-    throw new Error(
-      "XERO_REDIRECT_URI, NEXT_PUBLIC_API_URL or NEXT_PUBLIC_APP_URL is required for Xero OAuth."
-    );
-  }
-  return `${baseUrl}/api/xero/oauth/callback`;
-}
-
 // Preview deployments get a fresh, unregistered Vercel URL, so the Xero OAuth
 // redirect would never match a pre-registered callback. The launch strategy is
 // to register a single production callback and disable Xero connect on preview
@@ -676,7 +521,7 @@ function invalidState(): Result<never, XeroOAuthError> {
   return {
     error: {
       code: "invalid_state",
-      message: "The Xero OAuth state was invalid.",
+      message: "Start connecting Xero again.",
     },
     ok: false,
   };
@@ -686,7 +531,7 @@ function oauthNotConfigured(): Result<never, XeroOAuthError> {
   return {
     error: {
       code: "oauth_not_configured",
-      message: "Xero OAuth is not configured for this environment.",
+      message: "Connecting Xero is unavailable. Contact support.",
     },
     ok: false,
   };
@@ -734,8 +579,7 @@ async function loadPendingSession(input: {
     : {
         error: {
           code: "session_not_found",
-          message:
-            "This Xero OAuth session has expired or is no longer available.",
+          message: "Start connecting Xero again.",
         },
         ok: false,
       };
@@ -793,7 +637,6 @@ export async function getPendingXeroOAuthSession(input: {
   };
 }
 
-export const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 export async function buildXeroOAuthStartUrl(input: {
   clerkOrgId: string;
   organisationId?: string | null;
@@ -874,24 +717,166 @@ export async function buildXeroOAuthStartUrl(input: {
   }
   return { ok: true, value: { nonce, redirectUrl: url.toString() } };
 }
+async function prepareOAuthTenantSelection(
+  token: {
+    accessToken: string;
+    refreshToken: string;
+    scopes?: string;
+    identity: XeroAccessTokenIdentity;
+  },
+  signed: OAuthStatePayload,
+  scope: {
+    clerk_org_id: string;
+    created_by_user_id: string | null;
+    organisation_id: string | null;
+    id: string;
+  },
+  deadline: XeroDeadline,
+  tx: Prisma.TransactionClient
+): Promise<Result<{ tenants: ConnectionResponse[] }, XeroOAuthError>> {
+  const rateClass = {
+    kind: "user_inventory" as const,
+    providerAppId: keys().XERO_CLIENT_ID ?? "",
+  };
+  const inventory = await fetchConnections(
+    token.accessToken,
+    rateClass,
+    undefined,
+    deadline
+  );
+  const currentConsent =
+    inventory.ok && token.identity.authEventId
+      ? await fetchConnections(
+          token.accessToken,
+          rateClass,
+          token.identity.authEventId,
+          deadline
+        )
+      : inventory;
+  // A new grant supersedes the old app/user grant. Preserve it for existing
+  // consumers even if inventory is temporarily unavailable.
+  const inventoryError = inventory.ok ? null : inventory;
+  const consentError = currentConsent.ok ? null : currentConsent;
+  const failedInventory = inventoryError ?? consentError;
+  if (
+    failedInventory &&
+    !(await tx.xeroAuthorisation.findUnique({
+      where: {
+        provider_app_id_xero_user_id: {
+          provider_app_id: rateClass.providerAppId,
+          xero_user_id: token.identity.xeroUserId,
+        },
+      },
+    }))
+  ) {
+    return failedInventory;
+  }
+  const adopted = await adoptXeroAuthorisation(
+    {
+      accessToken: token.accessToken,
+      identity: token.identity,
+      refreshToken: token.refreshToken,
+      scopes: token.scopes,
+    },
+    tx
+  );
+  if (!adopted.ok) {
+    return adopted;
+  }
+  if (failedInventory) {
+    return failedInventory;
+  }
+  if (!(inventory.ok && currentConsent.ok)) {
+    return invalidState();
+  }
+  const existing = signed.organisationId
+    ? await tx.xeroConnection.findFirst({
+        where: {
+          clerk_org_id: signed.clerkOrgId,
+          organisation_id: signed.organisationId,
+        },
+      })
+    : null;
+  const eligible = existing
+    ? inventory.value.filter(
+        (tenant) => tenant.tenantId === existing.xero_tenant_id
+      )
+    : inventory.value;
+  const tenants = eligible
+    .map((tenant) =>
+      token.identity.authEventId
+        ? {
+            ...tenant,
+            isCurrentConsent: currentConsent.value.some(
+              (consented) =>
+                consented.connectionId === tenant.connectionId &&
+                consented.tenantId === tenant.tenantId
+            ),
+          }
+        : tenant
+    )
+    .sort(
+      (left, right) =>
+        Number(right.isCurrentConsent ?? false) -
+        Number(left.isCurrentConsent ?? false)
+    );
+  const sessionUpdate = await tx.xeroOAuthSession.updateMany({
+    data: {
+      available_tenants_json: {
+        authEventId: token.identity.authEventId,
+        tenants: tenants.map((tenant) => ({
+          connectionId: tenant.connectionId,
+          tenantId: tenant.tenantId,
+          tenantName: tenant.tenantName,
+          ...(tenant.isCurrentConsent === undefined
+            ? {}
+            : { isCurrentConsent: tenant.isCurrentConsent }),
+        })),
+      },
+      status: "selecting",
+      xero_authorisation_id: adopted.value.id,
+    },
+    where: { ...scope, status: "exchanging" },
+  });
+  if (sessionUpdate.count !== 1) {
+    throw new Error("OAuth session changed");
+  }
+  return {
+    ok: true as const,
+    value: { tenants },
+  };
+}
+
 export async function completeXeroOAuth(input: {
   authenticatedClerkOrgId?: string | null;
   authenticatedUserId?: string | null;
   code: string;
   nonce: string | null;
   state: string;
-}): Promise<Result<{ redirectTo: string; sessionId: string }, XeroOAuthError>> {
+}): Promise<
+  Result<
+    {
+      redirectTo: string;
+      sessionId: string;
+      connected?: { connectionId: string; organisationId: string };
+    },
+    XeroOAuthError
+  >
+> {
   const state = verifyState(input.state);
   if (!state.ok) {
     return state;
   }
   const signed = state.value;
   if (
-    !(input.nonce && constantTimeStringEqual(input.nonce, signed.nonce)) ||
-    (input.authenticatedClerkOrgId !== undefined &&
-      input.authenticatedClerkOrgId !== signed.clerkOrgId) ||
-    (input.authenticatedUserId !== undefined &&
-      input.authenticatedUserId !== signed.userId)
+    !(
+      input.nonce &&
+      input.authenticatedClerkOrgId &&
+      input.authenticatedUserId &&
+      constantTimeStringEqual(input.nonce, signed.nonce)
+    ) ||
+    input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+    input.authenticatedUserId !== signed.userId
   ) {
     return invalidState();
   }
@@ -935,48 +920,88 @@ export async function completeXeroOAuth(input: {
         if (!token.ok) {
           return token;
         }
-        const adopted = await adoptXeroAuthorisation(
+        const verified = await verifyXeroAccessTokenIdentity(
+          token.value.access_token
+        );
+        if (!verified.ok) {
+          return {
+            error: {
+              code: "invalid_token_response" as const,
+              message: verified.error.message,
+            },
+            ok: false as const,
+          };
+        }
+        return prepareOAuthTenantSelection(
           {
             accessToken: token.value.access_token,
+            identity: verified.value,
             refreshToken: token.value.refresh_token,
             scopes: token.value.scope,
           },
+          signed,
+          scope,
+          deadline,
           tx
         );
-        if (adopted.ok) {
-          await tx.xeroOAuthSession.updateMany({
-            data: {
-              status: "selecting",
-              xero_authorisation_id: adopted.value.id,
-            },
-            where: { ...scope, status: "exchanging" },
-          });
-        }
-        return adopted;
       }
     );
     if (!grant.ok) {
-      await database.xeroOAuthSession.updateMany({
-        data: { status: "cancelled" },
-        where: scope,
-      });
+      await closeOAuthSession(scope, "cancelled");
       return grant;
     }
-    const connections = await fetchConnections(
-      authorisationAccessToken(grant.value),
-      { kind: "user_inventory", providerAppId: grant.value.provider_app_id }
-    );
-    if (!connections.ok) {
-      return connections;
-    }
-    await database.xeroOAuthSession.updateMany({
-      data: {
-        available_tenants_json: {
-          tenants: connections.value.map((t) => ({ ...t })),
+    if (grant.value.tenants.length === 0) {
+      await closeOAuthSession(scope, "cancelled");
+      return {
+        error: {
+          code: "tenant_not_found",
+          message:
+            "No authorised Xero payroll organisation is available. Start again.",
         },
+        ok: false,
+      };
+    }
+    const organisations = await database.organisation.findMany({
+      select: { id: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: signed.clerkOrgId,
+        is_active: true,
       },
-      where: { ...scope, status: "selecting" },
     });
+    const [onlyTenant] = grant.value.tenants;
+    if (
+      grant.value.tenants.length === 1 &&
+      onlyTenant &&
+      (signed.organisationId || organisations.length <= 1)
+    ) {
+      const selected = await completeXeroTenantSelection({
+        clerkOrgId: signed.clerkOrgId,
+        organisationId: signed.organisationId ?? organisations[0]?.id ?? null,
+        sessionId: signed.sessionId,
+        tenantId: onlyTenant.tenantId,
+        userId: input.authenticatedUserId,
+      });
+      if (!selected.ok) {
+        return selected;
+      }
+      const redirect = new URL(
+        selected.value.returnTo,
+        "https://teamcalendar.local"
+      );
+      redirect.searchParams.set("org", selected.value.organisationId);
+      return {
+        ok: true,
+        value: {
+          connected: {
+            connectionId: selected.value.connectionId,
+            organisationId: selected.value.organisationId,
+          },
+          redirectTo: redirect.pathname + redirect.search + redirect.hash,
+          sessionId: signed.sessionId,
+        },
+      };
+    }
     return {
       ok: true,
       value: {
@@ -985,10 +1010,7 @@ export async function completeXeroOAuth(input: {
       },
     };
   } catch {
-    await database.xeroOAuthSession.updateMany({
-      data: { status: "cancelled" },
-      where: scope,
-    });
+    await closeOAuthSession(scope, "cancelled");
     return {
       error: {
         code: "unknown_error",
@@ -1010,16 +1032,25 @@ export async function cancelXeroOAuth(input: {
   }
   const signed = state.value;
   if (
-    !(input.nonce && constantTimeStringEqual(input.nonce, signed.nonce)) ||
-    (input.authenticatedClerkOrgId !== undefined &&
-      input.authenticatedClerkOrgId !== signed.clerkOrgId) ||
-    (input.authenticatedUserId !== undefined &&
-      input.authenticatedUserId !== signed.userId)
+    !(
+      input.nonce &&
+      input.authenticatedClerkOrgId &&
+      input.authenticatedUserId &&
+      constantTimeStringEqual(input.nonce, signed.nonce)
+    ) ||
+    input.authenticatedClerkOrgId !== signed.clerkOrgId ||
+    input.authenticatedUserId !== signed.userId
   ) {
     return invalidState();
   }
   const cancelled = await database.xeroOAuthSession.updateMany({
-    data: { status: "cancelled" },
+    data: {
+      available_tenants_json: Prisma.DbNull,
+      nonce_hash: null,
+      state_hash: null,
+      status: "cancelled",
+      xero_authorisation_id: null,
+    },
     where: {
       clerk_org_id: signed.clerkOrgId,
       created_by_user_id: signed.userId,
@@ -1027,6 +1058,7 @@ export async function cancelXeroOAuth(input: {
       id: signed.sessionId,
       nonce_hash: createHash("sha256").update(input.nonce).digest("hex"),
       organisation_id: signed.organisationId,
+      state_hash: createHash("sha256").update(input.state).digest("hex"),
       status: "pending",
     },
   });
@@ -1043,54 +1075,163 @@ export async function cancelXeroOAuth(input: {
     },
   };
 }
+async function closeOAuthSession(
+  scope: {
+    clerk_org_id: string;
+    id: string;
+    created_by_user_id: string | null;
+    organisation_id: string | null;
+  },
+  status: "cancelled" | "completed"
+) {
+  await database.xeroOAuthSession.updateMany({
+    data: {
+      available_tenants_json: Prisma.DbNull,
+      nonce_hash: null,
+      state_hash: null,
+      status,
+      xero_authorisation_id: null,
+    },
+    where: scope,
+  });
+}
 async function fetchConnections(
   accessToken: string,
-  rateClass: XeroRateClass
+  rateClass: XeroRateClass,
+  authEventId?: string,
+  deadline?: XeroDeadline
 ): Promise<Result<ConnectionResponse[], XeroOAuthError>> {
-  const response = await xeroFetch({
-    init: {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      method: "GET",
-    },
-    rateClass,
-    url: XERO_CONNECTIONS_URL,
-  });
-  if (!response.ok) {
+  try {
+    const url = new URL(XERO_CONNECTIONS_URL);
+    if (authEventId) {
+      url.searchParams.set("authEventId", authEventId);
+    }
+    const response = await xeroFetch({
+      deadline,
+      init: {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        method: "GET",
+      },
+      rateClass,
+      url: url.toString(),
+    });
+    if (!response.ok) {
+      return {
+        error: {
+          code: "network_error",
+          message: "Failed to load Xero files. Try again.",
+        },
+        ok: false,
+      };
+    }
+    const rows = z
+      .array(
+        z.object({
+          id: z.string().trim().min(1),
+          tenantId: z.string().trim().min(1),
+          tenantName: z.string().trim().min(1),
+          tenantType: z.string().trim().min(1),
+        })
+      )
+      .safeParse(await response.json());
+    if (!rows.success) {
+      return {
+        error: {
+          code: "invalid_token_response",
+          message: "Xero file inventory was invalid.",
+        },
+        ok: false,
+      };
+    }
     return {
-      error: { code: "unknown_error", message: "Failed to load Xero files." },
-      ok: false,
+      ok: true,
+      value: rows.data
+        .filter((row) => row.tenantType === "ORGANISATION")
+        .map((row) => ({
+          connectionId: row.id,
+          tenantId: row.tenantId,
+          tenantName: row.tenantName,
+        })),
     };
-  }
-  const rows = z
-    .array(
-      z.object({
-        id: z.string(),
-        tenantId: z.string(),
-        tenantName: z.string(),
-        tenantType: z.string().optional(),
-      })
-    )
-    .safeParse(await response.json());
-  if (!rows.success) {
+  } catch {
     return {
       error: {
-        code: "invalid_token_response",
-        message: "Xero file inventory was invalid.",
+        code: "network_error",
+        message: "Failed to load Xero files. Try again.",
       },
       ok: false,
     };
   }
-  return {
-    ok: true,
-    value: rows.data
-      .filter((row) => !row.tenantType || row.tenantType === "ORGANISATION")
-      .map((row) => ({
-        connectionId: row.id,
-        tenantId: row.tenantId,
-        tenantName: row.tenantName,
-      })),
-  };
 }
+async function validatePreviousSelectedLink({
+  snapshot,
+  targetOrganisationId,
+  clerkOrgId,
+  grant,
+  selected,
+  inventory,
+}: {
+  snapshot: Pick<
+    XeroConnection,
+    "id" | "remote_connection_id" | "status" | "xero_authorisation_id"
+  > | null;
+  targetOrganisationId: string | null;
+  clerkOrgId: string;
+  grant: XeroAuthorisation;
+  selected: ConnectionResponse;
+  inventory: Result<ConnectionResponse[], XeroOAuthError>;
+}): Promise<Result<null, XeroOAuthError>> {
+  if (
+    snapshot?.remote_connection_id &&
+    snapshot.status !== "disconnected" &&
+    (snapshot.xero_authorisation_id !== grant.id ||
+      snapshot.remote_connection_id !== selected.connectionId)
+  ) {
+    let previousInventory = inventory;
+    if (snapshot.xero_authorisation_id !== grant.id && targetOrganisationId) {
+      const previousAccess = await resolveXeroAccess({
+        capability: [],
+        clerkOrgId,
+        connectionId: snapshot.id,
+        deadline: createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
+        organisationId: targetOrganisationId,
+      });
+      if (!previousAccess.ok) {
+        return {
+          error: {
+            code: "tenant_binding_conflict",
+            message:
+              "Reconnect with the previous Xero authoriser or remove the old connection in Xero before reconnecting.",
+          },
+          ok: false,
+        };
+      }
+      previousInventory = await fetchConnections(
+        previousAccess.value.accessToken,
+        { kind: "user_inventory", providerAppId: grant.provider_app_id }
+      );
+    }
+    if (!previousInventory.ok) {
+      return previousInventory;
+    }
+    if (
+      previousInventory.value.some(
+        (tenant) => tenant.connectionId === snapshot.remote_connection_id
+      )
+    ) {
+      return {
+        error: {
+          code: "tenant_binding_conflict",
+          message:
+            "Remove the previous connection in Xero before connecting with a different authoriser or remote link.",
+        },
+        ok: false,
+      };
+    }
+  }
+  return { ok: true, value: null };
+}
+
 export async function completeXeroTenantSelection(input: {
   clerkOrgId: string;
   organisationId?: string | null;
@@ -1127,6 +1268,7 @@ export async function completeXeroTenantSelection(input: {
           status: true,
           updated_at: true,
           xero_authorisation_id: true,
+          xero_tenant_id: true,
         },
         where: {
           clerk_org_id: input.clerkOrgId,
@@ -1157,6 +1299,17 @@ export async function completeXeroTenantSelection(input: {
       },
       ok: false,
     };
+  }
+  const previousLink = await validatePreviousSelectedLink({
+    clerkOrgId: input.clerkOrgId,
+    grant,
+    inventory: connections,
+    selected,
+    snapshot: connectionSnapshot,
+    targetOrganisationId,
+  });
+  if (!previousLink.ok) {
+    return previousLink;
   }
   const region = await inferPayrollRegionForTenant({
     accessToken: authorisationAccessToken(grant),
@@ -1200,10 +1353,14 @@ export async function completeXeroTenantSelection(input: {
     const connection = await database.$transaction(async (tx) => {
       const claimed = await tx.xeroOAuthSession.updateMany({
         data: {
+          available_tenants_json: Prisma.DbNull,
+          nonce_hash: null,
           selected_payroll_region: region.value.payrollRegion,
           selected_tenant_id: selected.tenantId,
           selected_tenant_name: selected.tenantName,
+          state_hash: null,
           status: "completed",
+          xero_authorisation_id: null,
         },
         where: {
           clerk_org_id: input.clerkOrgId,
@@ -1322,52 +1479,6 @@ export async function purgeClosedXeroOAuthSessions(
       ],
     },
   });
-}
-export async function ensureFreshXeroConnection(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  connectionId: string;
-  deadline?: XeroDeadline;
-  forceRefresh?: boolean;
-  now?: Date;
-}): Promise<Result<{ expiresAt: Date; refreshed: boolean }, XeroOAuthError>> {
-  const scoped = await getScopedXeroConnection(input);
-  if (
-    !scoped.ok ||
-    scoped.value.status !== "active" ||
-    !scoped.value.authorisation
-  ) {
-    return {
-      error: { code: "connection_inactive", message: "Reconnect Xero." },
-      ok: false,
-    };
-  }
-  const before = scoped.value.authorisation;
-  const refreshed = await refreshXeroAuthorisation({
-    authorisationId: before.id,
-    deadline:
-      input.deadline ?? createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
-    forceRefresh: input.forceRefresh,
-  });
-  return refreshed.ok
-    ? {
-        ok: true,
-        value: {
-          expiresAt: refreshed.value.access_token_expires_at,
-          refreshed:
-            before.access_token_encrypted !==
-            refreshed.value.access_token_encrypted,
-        },
-      }
-    : refreshed;
-}
-export async function refreshXeroOAuthConnection(input: {
-  clerkOrgId: string;
-  organisationId: string;
-  connectionId: string;
-  deadline?: XeroDeadline;
-}): Promise<Result<{ expiresAt: Date }, XeroOAuthError>> {
-  return await ensureFreshXeroConnection({ ...input, forceRefresh: true });
 }
 export async function markXeroConnectionStale(input: {
   clerkOrgId: string;

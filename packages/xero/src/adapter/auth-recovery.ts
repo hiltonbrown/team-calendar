@@ -32,8 +32,8 @@ export async function executeWithXeroAuthRecovery<T>(
   };
   const refreshed = await resolveXeroAccess({
     ...scope,
+    connectionId: xeroConnection.id,
     deadline: xeroConnection.deadline,
-    forceRefresh: true,
     previousAccessToken: xeroConnection.accessToken,
   });
   if (!refreshed.ok) {

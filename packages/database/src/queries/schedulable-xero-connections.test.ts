@@ -2,8 +2,9 @@ import { beforeEach, expect, test, vi } from "vitest";
 
 const findMany = vi.fn();
 vi.mock("../client", () => ({ database: { xeroConnection: { findMany } } }));
-const { listSchedulableXeroConnections, findConnectionsNeedingTokenRotation } =
-  await import("./schedulable-xero-connections");
+const { listSchedulableXeroConnections } = await import(
+  "./schedulable-xero-connections"
+);
 beforeEach(() => {
   findMany.mockReset();
 });
@@ -42,13 +43,4 @@ test("scheduler returns a bounded continuation without provider data", async () 
   const result = await listSchedulableXeroConnections({ limit: 1 });
   expect(result.ok && result.value.nextCursor).toBe("first");
   expect(result.ok && result.value.connections).toHaveLength(1);
-});
-test("dormant grant maintenance includes paused connections and does not select ciphertext", async () => {
-  findMany.mockResolvedValue([]);
-  await findConnectionsNeedingTokenRotation({
-    now: new Date("2026-10-07T00:00:00Z"),
-  });
-  const args = findMany.mock.calls[0]?.[0];
-  expect(args.where).not.toHaveProperty("sync_paused_at");
-  expect(JSON.stringify(args.select)).not.toContain("token");
 });

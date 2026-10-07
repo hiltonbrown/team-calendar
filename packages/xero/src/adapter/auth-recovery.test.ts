@@ -59,8 +59,8 @@ describe("bounded Xero auth recovery", () => {
     expect(mocks.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         clerkOrgId: "clerk",
+        connectionId: "binding",
         deadline: current.deadline,
-        forceRefresh: true,
         organisationId: "organisation",
       })
     );

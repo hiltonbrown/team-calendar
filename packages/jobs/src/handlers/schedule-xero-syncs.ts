@@ -1,12 +1,14 @@
 import "server-only";
 import type { Result } from "@repo/core";
 import {
-  findConnectionsNeedingTokenRotation,
   listSchedulableXeroConnections,
   type SchedulableXeroConnection,
 } from "@repo/database";
 import { log } from "@repo/observability/log";
-import { purgeClosedXeroOAuthSessions, resolveXeroAccess } from "@repo/xero";
+import {
+  purgeClosedXeroOAuthSessions,
+  refreshDormantXeroAuthorisations,
+} from "@repo/xero";
 import type { InngestFunction } from "inngest";
 import { inngest } from "../client";
 import {
@@ -182,58 +184,6 @@ export interface ScheduleXeroSyncsPageResult {
   scanned: number;
   skipped: number;
 }
-export interface RotateDormantXeroConnectionsResult {
-  failed: number;
-  rotated: number;
-  scanned: number;
-}
-export async function rotateDormantXeroConnections(
-  now: Date = new Date()
-): Promise<Result<RotateDormantXeroConnectionsResult>> {
-  const connectionsResult = await findConnectionsNeedingTokenRotation({
-    now,
-  });
-  let failed = 0;
-  let rotated = 0;
-  const seenOwners = new Set<string>();
-  for (const connection of connectionsResult.value) {
-    if (
-      connection.authorisationId &&
-      seenOwners.has(connection.authorisationId)
-    ) {
-      continue;
-    }
-    if (connection.authorisationId) {
-      seenOwners.add(connection.authorisationId);
-    }
-    const refreshResult = await resolveXeroAccess({
-      capability: ["payroll.employees", "payroll.employees.read"],
-      clerkOrgId: connection.clerkOrgId,
-      deadline: { expiresAtMs: Date.now() + 30_000 },
-      forceRefresh: true,
-      organisationId: connection.organisationId,
-    });
-    if (refreshResult.ok) {
-      rotated += 1;
-      continue;
-    }
-    failed += 1;
-    log.error("Failed to rotate dormant Xero refresh token", {
-      clerkOrgId: connection.clerkOrgId,
-      connectionId: connection.connectionId,
-      error: refreshResult.error,
-      organisationId: connection.organisationId,
-    });
-  }
-  return {
-    ok: true,
-    value: {
-      failed,
-      rotated,
-      scanned: connectionsResult.value.length,
-    },
-  };
-}
 export async function scheduleXeroSyncsPage(
   options: ScheduleXeroSyncsPageOptions = {}
 ): Promise<Result<ScheduleXeroSyncsPageResult>> {
@@ -337,8 +287,15 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
       await step.run("recover-xero-import-dispatch", () =>
         recoverXeroImportDispatch({ now: new Date() })
       );
-      await step.run("rotate-dormant-connections", () =>
-        rotateDormantXeroConnections()
+      const authorisations = await step.run(
+        "refresh-dormant-authorisations",
+        async () => {
+          const result = await refreshDormantXeroAuthorisations(new Date());
+          if (!result.ok) {
+            throw new Error(result.error.message);
+          }
+          return result.value;
+        }
       );
       while (hasMorePages) {
         const pageResult = await step.run(
@@ -364,12 +321,14 @@ export const scheduleXeroSyncsFunction: InngestFunction.Any =
         }
       }
       log.info("Completed scheduled Xero syncs coordinator run", {
+        authorisations,
         dispatched: totalDispatched,
         invalidTimezone: totalInvalidTimezone,
         scanned: totalScanned,
         skipped: totalSkipped,
       });
       return {
+        authorisations,
         dispatched: totalDispatched,
         invalidTimezone: totalInvalidTimezone,
         scanned: totalScanned,

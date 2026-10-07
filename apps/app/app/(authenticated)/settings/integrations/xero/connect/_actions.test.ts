@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 const mocks = vi.hoisted(() => ({
   analyticsCapture: vi.fn(),
   analyticsFlush: vi.fn(),
@@ -156,6 +158,17 @@ describe("completeTenantSelectionAction", () => {
     if (result.ok) {
       expect(result.value.redirectTo).toContain("/settings/integrations/xero");
     }
+  });
+  it("dispatches initial sync when the ancillary connection audit fails", async () => {
+    mocks.auditEventCreate.mockRejectedValue(new Error("audit unavailable"));
+    await expect(completeTenantSelectionAction(validInput)).resolves.toEqual({
+      ok: true,
+      value: {
+        redirectTo:
+          "/settings/integrations/xero?org=33333333-3333-4333-8333-333333333333",
+      },
+    });
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledTimes(1);
   });
   it("keeps a durable connection successful when analytics flush fails", async () => {
     mocks.analyticsFlush.mockRejectedValue(new Error("analytics unavailable"));

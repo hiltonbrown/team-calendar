@@ -11,6 +11,7 @@ export * from "./src/queries/activation-dashboard";
 export * from "./src/queries/billing";
 export * from "./src/queries/outbound-operations";
 export * from "./src/queries/schedulable-xero-connections";
+export * from "./src/queries/xero-authorisation";
 export * from "./src/seed/plan-sync";
 export * from "./src/seed/plans";
 export {

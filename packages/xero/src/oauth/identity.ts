@@ -35,6 +35,7 @@ export interface XeroAccessTokenIdentity {
   authEventId: string | null;
   expiresAt: Date;
   grantedScopes: string[];
+  scopeProvided?: boolean;
   xeroUserId: string;
 }
 interface IdentityDependencies {
@@ -44,7 +45,7 @@ interface IdentityDependencies {
 const failed = (): Result<never, XeroIdentityError> => ({
   error: {
     code: "identity_verification_failed",
-    message: "Xero authoriser identity could not be verified.",
+    message: "Connecting Xero failed. Start again.",
   },
   ok: false,
 });
@@ -88,6 +89,7 @@ async function verifyIdentity(
       ok: true,
       value: {
         authEventId: claims.data.authentication_event_id ?? null,
+        ...(claims.data.scope === undefined ? {} : { scopeProvided: true }),
         expired,
         expiresAt,
         grantedScopes:

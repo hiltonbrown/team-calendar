@@ -47,6 +47,7 @@ export function XeroConnectClient({
 
   const selectedTenant =
     tenants.find((tenant) => tenant.tenantId === selectedTenantId) ?? null;
+  const requiresTenantSelection = tenants.length > 1;
 
   const requiresOrganisationSelection =
     organisations.length > 0 && !presetOrganisationId;
@@ -74,30 +75,49 @@ export function XeroConnectClient({
     <div className="space-y-6">
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Select a Xero tenant</CardTitle>
+          <CardTitle>
+            {requiresTenantSelection
+              ? "Select a Xero tenant"
+              : "Xero payroll file"}
+          </CardTitle>
           <CardDescription>
-            Choose the payroll file to connect. Team Calendar will detect its
-            payroll region after selection.
+            {requiresTenantSelection
+              ? "Choose the payroll file to connect. Team Calendar will detect its payroll region after selection."
+              : "Team Calendar will detect this file's payroll region when connected."}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {tenants.map((tenant) => (
-            <button
-              className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                tenant.tenantId === selectedTenantId
-                  ? "border-primary bg-primary/5"
-                  : "border-border bg-background"
-              }`}
-              key={tenant.tenantId}
-              onClick={() => setSelectedTenantId(tenant.tenantId)}
-              type="button"
-            >
-              <p className="font-medium">{tenant.tenantName}</p>
+          {requiresTenantSelection ? (
+            tenants.map((tenant) => (
+              <button
+                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                  tenant.tenantId === selectedTenantId
+                    ? "border-primary bg-primary/5"
+                    : "border-border bg-background"
+                }`}
+                key={tenant.tenantId}
+                onClick={() => setSelectedTenantId(tenant.tenantId)}
+                type="button"
+              >
+                <p className="font-medium">{tenant.tenantName}</p>
+                {tenant.isCurrentConsent ? (
+                  <p className="text-body-sm text-muted-foreground">
+                    Authorised just now
+                  </p>
+                ) : null}
+                <p className="text-body-sm text-muted-foreground">
+                  {tenant.tenantId}
+                </p>
+              </button>
+            ))
+          ) : (
+            <div>
+              <p className="font-medium">{selectedTenant?.tenantName}</p>
               <p className="text-body-sm text-muted-foreground">
-                {tenant.tenantId}
+                {selectedTenant?.tenantId}
               </p>
-            </button>
-          ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

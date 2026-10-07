@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   disconnectXeroOAuthConnection: vi.fn(),
   getActiveOrgContext: vi.fn(),
   headers: vi.fn(),
-  refreshXeroOAuthConnection: vi.fn(),
   revalidatePath: vi.fn(),
   transaction: {
     auditEvent: { create: vi.fn() },
@@ -32,7 +31,6 @@ vi.mock("@repo/next-config/keys", () => ({
 }));
 vi.mock("@repo/xero", () => ({
   disconnectXeroOAuthConnection: mocks.disconnectXeroOAuthConnection,
-  refreshXeroOAuthConnection: mocks.refreshXeroOAuthConnection,
 }));
 vi.mock("next/cache", () => ({
   revalidatePath: mocks.revalidatePath,
@@ -43,19 +41,22 @@ vi.mock("next/headers", () => ({
 vi.mock("@/lib/server/get-active-org-context", () => ({
   getActiveOrgContext: mocks.getActiveOrgContext,
 }));
+const actions = await import("./_actions");
 const {
   connectXeroAction,
   disconnectXeroAction,
   pauseTenantSyncAction,
-  refreshXeroConnectionAction,
   resumeTenantSyncAction,
-} = await import("./_actions");
+} = actions;
 const organisationId = "00000000-0000-4000-8000-000000000001";
 const connectionId = "00000000-0000-4000-8000-000000000002";
 const clerkOrgId = "org_123";
 const userId = "user_456";
 const orgName = "Acme Corp";
 describe("xero settings integration server actions", () => {
+  it("does not expose a manual token refresh server action", () => {
+    expect("refreshXeroConnectionAction" in actions).toBe(false);
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
@@ -80,10 +81,6 @@ describe("xero settings integration server actions", () => {
     mocks.database.$transaction.mockImplementation((operation) =>
       operation(mocks.transaction)
     );
-    mocks.refreshXeroOAuthConnection.mockResolvedValue({
-      ok: true,
-      value: { expiresAt: new Date("2026-01-01") },
-    });
     mocks.disconnectXeroOAuthConnection.mockResolvedValue({
       ok: true,
       value: { connectionId, state: "disconnected" },
@@ -126,12 +123,6 @@ describe("xero settings integration server actions", () => {
         ok: false,
       });
       expect(mocks.disconnectXeroOAuthConnection).not.toHaveBeenCalled();
-      const resRefresh = await refreshXeroConnectionAction({
-        connectionId,
-        organisationId,
-      });
-      expect(resRefresh.ok).toBe(false);
-      expect(mocks.refreshXeroOAuthConnection).not.toHaveBeenCalled();
     });
     it("rejects malformed inputs for actions", async () => {
       const resConnect = await connectXeroAction({

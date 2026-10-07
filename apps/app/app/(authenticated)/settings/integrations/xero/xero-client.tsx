@@ -25,7 +25,6 @@ import {
   connectXeroAction,
   disconnectXeroAction,
   pauseTenantSyncAction,
-  refreshXeroConnectionAction,
   resumeTenantSyncAction,
 } from "./_actions";
 
@@ -52,17 +51,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         return;
       }
       window.location.href = result.value.redirectUrl;
-    });
-  };
-  const handleRefresh = (connectionId: string, organisationId: string) => {
-    startTransition(async () => {
-      const result = await refreshXeroConnectionAction({
-        connectionId,
-        organisationId,
-      });
-      toast[result.ok ? "success" : "error"](
-        result.ok ? "Connection refreshed." : result.error.message
-      );
     });
   };
   const handleDisconnect = () => {
@@ -168,10 +156,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
         const canConnect =
           state === "not_connected" || state === "reauthorisation_required";
         const canRecheck = state === "unavailable";
-        const canRefresh =
-          state === "connected" &&
-          connection?.status === "active" &&
-          connection.disconnected_at === null;
         const recommendedSync = tenant
           ? recommendedSyncForTenant(tenant)
           : null;
@@ -304,17 +288,6 @@ export const XeroClient = ({ organisations }: XeroClientProps) => {
                     Connection controls
                   </summary>
                   <div className="mt-4 flex flex-wrap gap-3">
-                    {canRefresh ? (
-                      <Button
-                        disabled={isPending}
-                        onClick={() =>
-                          handleRefresh(connection.id, organisation.id)
-                        }
-                        variant="outline"
-                      >
-                        Refresh tokens
-                      </Button>
-                    ) : null}
                     {tenant ? (
                       <Button
                         disabled={isPending}

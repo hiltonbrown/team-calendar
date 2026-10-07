@@ -1,14 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn().mockResolvedValue({ orgId: "org_1", userId: "user_1" }),
+  auth: vi.fn().mockResolvedValue({
+    orgId: "org_1",
+    orgRole: "org:admin",
+    userId: "user_1",
+  }),
   cancelXeroOAuth: vi.fn(),
+  captureXeroConnected: vi.fn(),
   completeXeroOAuth: vi.fn(),
+  dispatchInitialXeroSync: vi.fn(),
   isLocalApplicationPath: vi.fn(),
   isPreviewDeployment: vi.fn(),
 }));
 
+vi.mock("@repo/jobs", () => ({
+  dispatchInitialXeroSync: mocks.dispatchInitialXeroSync,
+}));
+
 vi.mock("@repo/auth/server", () => ({ auth: mocks.auth }));
+
+vi.mock("@repo/xero/activation", () => ({
+  captureXeroConnected: mocks.captureXeroConnected,
+}));
 
 vi.mock("@repo/xero", () => ({
   cancelXeroOAuth: mocks.cancelXeroOAuth,
@@ -25,6 +39,11 @@ describe("Xero OAuth callback route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.auth.mockResolvedValue({
+      orgId: "org_1",
+      orgRole: "org:admin",
+      userId: "user_1",
+    });
     mocks.isPreviewDeployment.mockReturnValue(false);
     mocks.isLocalApplicationPath.mockImplementation(
       (value: string) =>
@@ -166,5 +185,52 @@ describe("Xero OAuth callback route", () => {
 
     expect(response.status).toBe(403);
     expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+  });
+  it("rejects current role loss before exchanging and clears the nonce", async () => {
+    mocks.auth.mockResolvedValueOnce({
+      orgId: "org_1",
+      orgRole: "org:viewer",
+      userId: "user_1",
+    });
+    const response = await GET(new Request(callbackUrl));
+    expect(response.status).toBe(403);
+    expect(mocks.completeXeroOAuth).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
+  });
+  it("clears the nonce on terminal callback validation failure", async () => {
+    const response = await GET(
+      new Request("https://api.example.com/api/xero/oauth/callback?state=state")
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toContain("xero_oauth_nonce=;");
+  });
+  it("dispatches initial sync once for an automatically attached connection", async () => {
+    mocks.completeXeroOAuth.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        connected: { connectionId: "conn_1", organisationId: "payroll_1" },
+        redirectTo: "/calendar?org=payroll_1",
+        sessionId: "session_1",
+      },
+    });
+    mocks.dispatchInitialXeroSync.mockRejectedValueOnce(
+      new Error("queue unavailable")
+    );
+    const response = await GET(new Request(callbackUrl));
+    expect(response.status).toBe(307);
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledOnce();
+    expect(mocks.dispatchInitialXeroSync).toHaveBeenCalledWith({
+      clerkOrgId: "org_1",
+      connectionId: "conn_1",
+      organisationId: "payroll_1",
+      triggeredByUserId: "user_1",
+      triggerType: "manual",
+    });
+    expect(mocks.captureXeroConnected).toHaveBeenCalledOnce();
+    expect(mocks.captureXeroConnected).toHaveBeenCalledWith({
+      clerkOrgId: "org_1",
+      connectionId: "conn_1",
+      organisationId: "payroll_1",
+    });
   });
 });

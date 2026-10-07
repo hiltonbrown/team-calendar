@@ -1,4 +1,7 @@
-import { saveXeroAuthorisation } from "@repo/database/queries/xero-authorisation";
+import {
+  listDueXeroAuthorisations,
+  saveXeroAuthorisation,
+} from "@repo/database/queries/xero-authorisation";
 
 const SCOPE_SEPARATOR = /\s+/;
 
@@ -17,12 +20,20 @@ import { getScopedXeroConnection } from "@repo/database/queries/xero-connections
 import { keys } from "../../keys";
 import { decryptXeroToken, encryptXeroToken } from "../crypto/tokens";
 import type { XeroDeadline } from "../rate-limit/deadline";
-import { verifyXeroAccessTokenIdentity } from "./identity";
 import {
-  exchangeToken,
-  TOKEN_REFRESH_BUFFER_MS,
-  type XeroOAuthError,
-} from "./service";
+  verifyXeroAccessTokenIdentity,
+  type XeroAccessTokenIdentity,
+} from "./identity";
+import { hasXeroCapability } from "./scopes";
+import type { XeroOAuthError } from "./service";
+import { exchangeToken } from "./token";
+
+export const TOKEN_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+const DORMANT_REFRESH_MS = 45 * 24 * 60 * 60 * 1000;
+
+function tokenDeadline(deadline: XeroDeadline): XeroDeadline {
+  return { expiresAtMs: Math.min(deadline.expiresAtMs, Date.now() + 10_000) };
+}
 
 export function authorisationAccessToken(grant: XeroAuthorisation): string {
   return decryptXeroToken({
@@ -47,10 +58,17 @@ function encryptedTokens(accessToken: string, refreshToken: string) {
   };
 }
 export async function adoptXeroAuthorisation(
-  input: { accessToken: string; refreshToken: string; scopes?: string },
+  input: {
+    accessToken: string;
+    refreshToken: string;
+    scopes?: string;
+    identity?: XeroAccessTokenIdentity;
+  },
   tx: Prisma.TransactionClient
 ): Promise<Result<XeroAuthorisation, XeroOAuthError>> {
-  const verified = await verifyXeroAccessTokenIdentity(input.accessToken);
+  const verified = input.identity
+    ? { ok: true as const, value: input.identity }
+    : await verifyXeroAccessTokenIdentity(input.accessToken);
   if (!verified.ok) {
     return {
       error: {
@@ -60,7 +78,16 @@ export async function adoptXeroAuthorisation(
       ok: false,
     };
   }
-  const providerAppId = keys().XERO_CLIENT_ID ?? "";
+  const providerAppId = keys().XERO_CLIENT_ID;
+  if (!providerAppId) {
+    return {
+      error: {
+        code: "oauth_not_configured",
+        message: "Connecting Xero is unavailable. Contact support.",
+      },
+      ok: false,
+    };
+  }
   await lockXeroAuthorisation(tx, providerAppId, verified.value.xeroUserId);
   const data = {
     ...encryptedTokens(input.accessToken, input.refreshToken),
@@ -83,12 +110,40 @@ export async function adoptXeroAuthorisation(
   );
   return { ok: true, value: authorisation };
 }
-export async function refreshXeroAuthorisation(input: {
+interface XeroRefreshInput {
   authorisationId: string;
   deadline: XeroDeadline;
-  forceRefresh?: boolean;
+  now?: Date;
+  onRefreshed?: () => void;
   previousAccessToken?: string;
-}): Promise<Result<XeroAuthorisation, XeroOAuthError>> {
+  reason?: "expiry" | "401" | "dormant";
+}
+function needsRotation(
+  current: XeroAuthorisation,
+  input: XeroRefreshInput
+): boolean {
+  if (
+    input.previousAccessToken &&
+    authorisationAccessToken(current) !== input.previousAccessToken
+  ) {
+    return false;
+  }
+  if (input.reason === "dormant") {
+    return (
+      current.last_refreshed_at.getTime() <=
+      (input.now ?? new Date()).getTime() - DORMANT_REFRESH_MS
+    );
+  }
+  return (
+    input.reason === "401" ||
+    current.access_token_expires_at.getTime() <=
+      Date.now() + TOKEN_REFRESH_BUFFER_MS
+  );
+}
+export async function refreshXeroAuthorisation(
+  input: XeroRefreshInput
+): Promise<Result<XeroAuthorisation, XeroOAuthError>> {
+  const deadline = tokenDeadline(input.deadline);
   try {
     const initial = await database.xeroAuthorisation.findUnique({
       where: { id: input.authorisationId },
@@ -101,7 +156,7 @@ export async function refreshXeroAuthorisation(input: {
     }
     return await withXeroGrantLock(
       {
-        deadlineAt: input.deadline.expiresAtMs,
+        deadlineAt: deadline.expiresAtMs,
         mode: "refresh",
         providerAppId: initial.provider_app_id,
         xeroUserId: initial.xero_user_id,
@@ -119,15 +174,21 @@ export async function refreshXeroAuthorisation(input: {
             ok: false,
           };
         }
-        const replaced =
-          input.previousAccessToken &&
-          authorisationAccessToken(current) !== input.previousAccessToken;
         if (
-          replaced ||
-          (!input.forceRefresh &&
-            current.access_token_expires_at.getTime() >
-              Date.now() + TOKEN_REFRESH_BUFFER_MS)
+          input.reason === "dormant" &&
+          !(await tx.xeroConnection.findFirst({
+            select: { id: true },
+            where: {
+              disconnected_at: null,
+              organisation: { archived_at: null, is_active: true },
+              status: "active",
+              xero_authorisation_id: current.id,
+            },
+          }))
         ) {
+          return { ok: true, value: current };
+        }
+        if (!needsRotation(current, input)) {
           return { ok: true, value: current };
         }
         const refreshToken = decryptXeroToken({
@@ -137,7 +198,7 @@ export async function refreshXeroAuthorisation(input: {
           keyVersion: current.token_key_version,
         });
         const rotated = await exchangeToken({
-          deadline: input.deadline,
+          deadline,
           grantType: "refresh_token",
           rateClass: { kind: "token", providerAppId: current.provider_app_id },
           refreshToken,
@@ -165,7 +226,7 @@ export async function refreshXeroAuthorisation(input: {
           return {
             error: {
               code: "invalid_token_response",
-              message: "Xero returned an invalid authorisation.",
+              message: "Connecting Xero failed. Start again.",
             },
             ok: false,
           };
@@ -179,13 +240,16 @@ export async function refreshXeroAuthorisation(input: {
             access_token_expires_at: identity.value.expiresAt,
             granted_scopes:
               rotated.value.scope?.split(SCOPE_SEPARATOR).filter(Boolean) ??
-              identity.value.grantedScopes,
+              (identity.value.scopeProvided
+                ? identity.value.grantedScopes
+                : current.granted_scopes),
             last_refresh_error_at: null,
             last_refresh_error_code: null,
             last_refreshed_at: new Date(),
           },
           where: { id: current.id },
         });
+        input.onRefreshed?.();
         return { ok: true, value: updated };
       }
     );
@@ -193,7 +257,7 @@ export async function refreshXeroAuthorisation(input: {
     return {
       error: {
         code: "unknown_error",
-        message: "Xero authorisation could not be refreshed. Try again.",
+        message: "Xero is temporarily unavailable. Try again.",
       },
       ok: false,
     };
@@ -208,9 +272,8 @@ export async function resolveXeroAccess(input: {
   clerkOrgId: string;
   organisationId: string;
   connectionId?: string;
-  deadline: XeroDeadline;
+  deadline?: XeroDeadline;
   capability?: string | readonly string[];
-  forceRefresh?: boolean;
   previousAccessToken?: string;
 }): Promise<
   Result<
@@ -224,6 +287,7 @@ export async function resolveXeroAccess(input: {
     XeroAccessError
   >
 > {
+  const deadline = input.deadline ?? { expiresAtMs: Date.now() + 120_000 };
   const scoped = await getScopedXeroConnection(input);
   if (!scoped.ok) {
     return scoped;
@@ -244,26 +308,39 @@ export async function resolveXeroAccess(input: {
       ok: false,
     };
   }
-  const grant = await refreshXeroAuthorisation({
-    authorisationId: connection.authorisation.id,
-    deadline: input.deadline,
-    forceRefresh: input.forceRefresh,
-    previousAccessToken: input.previousAccessToken,
-  });
+  const required = input.capability ?? [];
+  if (!hasXeroCapability(connection.authorisation.granted_scopes, required)) {
+    return {
+      error: {
+        code: "capability_missing",
+        message: "Update Xero permissions.",
+      },
+      ok: false,
+    };
+  }
+  const rejectedCurrentToken =
+    input.previousAccessToken !== undefined &&
+    authorisationAccessToken(connection.authorisation) ===
+      input.previousAccessToken;
+  const needsRefresh =
+    rejectedCurrentToken ||
+    connection.authorisation.access_token_expires_at.getTime() <=
+      Date.now() + TOKEN_REFRESH_BUFFER_MS;
+  const grant = needsRefresh
+    ? await refreshXeroAuthorisation({
+        authorisationId: connection.authorisation.id,
+        deadline,
+        previousAccessToken: input.previousAccessToken,
+        reason: input.previousAccessToken ? "401" : "expiry",
+      })
+    : { ok: true as const, value: connection.authorisation };
   if (!grant.ok) {
     return grant;
   }
-  const required =
-    typeof input.capability === "string"
-      ? [input.capability]
-      : (input.capability ?? []);
-  if (
-    required.length &&
-    !required.some((scope) => grant.value.granted_scopes.includes(scope))
-  ) {
+  if (!hasXeroCapability(grant.value.granted_scopes, required)) {
     return {
       error: {
-        code: "permissions_required",
+        code: "capability_missing",
         message: "Update Xero permissions.",
       },
       ok: false,
@@ -274,7 +351,9 @@ export async function resolveXeroAccess(input: {
     !current.ok ||
     current.value.id !== connection.id ||
     current.value.status !== "active" ||
-    current.value.xero_authorisation_id !== grant.value.id
+    current.value.xero_authorisation_id !== grant.value.id ||
+    current.value.xero_tenant_id !== connection.xero_tenant_id ||
+    current.value.payroll_region !== connection.payroll_region
   ) {
     return {
       error: {
@@ -286,12 +365,55 @@ export async function resolveXeroAccess(input: {
   }
   return {
     ok: true,
-    value: {
+    value: Object.freeze({
       accessToken: authorisationAccessToken(grant.value),
       connectionId: connection.id,
-      deadline: input.deadline,
+      deadline,
       payrollRegion: connection.payroll_region,
       xeroTenantId: connection.xero_tenant_id,
-    },
+    }),
   };
+}
+
+// Internal scheduled maintenance. Customer actions cannot supply a grant ID.
+export async function refreshDormantXeroAuthorisations(
+  now = new Date()
+): Promise<
+  Result<{
+    scanned: number;
+    refreshed: number;
+    failed: number;
+    skipped: number;
+  }>
+> {
+  const due = await listDueXeroAuthorisations(now);
+  if (!due.ok) {
+    return due;
+  }
+  const counts = {
+    failed: 0,
+    refreshed: 0,
+    scanned: due.value.length,
+    skipped: 0,
+  };
+  for (const grant of due.value) {
+    let refreshed = false;
+    const result = await refreshXeroAuthorisation({
+      authorisationId: grant.id,
+      deadline: { expiresAtMs: Date.now() + 10_000 },
+      now,
+      onRefreshed: () => {
+        refreshed = true;
+      },
+      reason: "dormant",
+    });
+    if (!result.ok) {
+      counts.failed += 1;
+    } else if (refreshed) {
+      counts.refreshed += 1;
+    } else {
+      counts.skipped += 1;
+    }
+  }
+  return { ok: true, value: counts };
 }

@@ -6,9 +6,9 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
  * Contract pinned from reconcile-xero-approval-state.ts:
  * input requires clerkOrgId, organisationId, connectionId, optional triggerType
  * scheduled/manual/webhook defaulting to manual, and optional nullable
- * triggeredByUserId. @repo/xero imports are ensureFreshXeroConnection,
- * fetchLeaveApplicationStatusForRegion, toPlainLanguageMessage, and the
- * XeroLeaveApplicationStatus/XeroWriteError types. Xero APPROVED moves a
+ * triggeredByUserId. Access uses the canonical resolveXeroAccess through
+ * resolveSyncTenant. Regional provider status reads are mocked, while scoped
+ * credential resolution and persistence use real fixtures. Xero APPROVED moves a
  * submitted record to approved; REJECTED moves submitted to declined; WITHDRAWN
  * or DELETED moves any non-withdrawn active record to withdrawn; not_found_error
  * records a per-record failure and archives the record by setting archived_at
@@ -16,7 +16,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
  * failures that fail the run immediately.
  */
 vi.mock("server-only", () => ({}));
-const mockEnsureFreshXeroConnection = vi.fn();
+const mockResolveXeroAccess = vi.fn();
 const mockFetchLeaveApplicationStatusForRegion = vi.fn();
 const mockInngestSend = vi.fn(async () => ({ ids: ["event_1"] }));
 vi.mock("../client", () => ({
@@ -31,10 +31,14 @@ vi.mock("@repo/xero", async (importOriginal) => {
   const original = await importOriginal<typeof import("@repo/xero")>();
   return {
     ...original,
-    ensureFreshXeroConnection: (...args: unknown[]) =>
-      mockEnsureFreshXeroConnection(...args),
     fetchLeaveApplicationStatusForRegion: (...args: unknown[]) =>
       mockFetchLeaveApplicationStatusForRegion(...args),
+    resolveXeroAccess: (
+      ...args: Parameters<typeof original.resolveXeroAccess>
+    ) => {
+      mockResolveXeroAccess(...args);
+      return original.resolveXeroAccess(...args);
+    },
   };
 });
 describe("local persistence integration", async () => {
@@ -75,10 +79,6 @@ describe("local persistence integration", async () => {
   describe("reconcile-xero-approval-state database flow", () => {
     beforeEach(async () => {
       vi.clearAllMocks();
-      mockEnsureFreshXeroConnection.mockResolvedValue({
-        ok: true,
-        value: { refreshed: false },
-      });
       await cleanTestData();
     });
     afterAll(async () => {
@@ -695,7 +695,7 @@ describe("local persistence integration", async () => {
         error: { code: "validation_error" },
         ok: false,
       });
-      expect(mockEnsureFreshXeroConnection).not.toHaveBeenCalled();
+      expect(mockResolveXeroAccess).not.toHaveBeenCalled();
       expect(mockFetchLeaveApplicationStatusForRegion).not.toHaveBeenCalled();
     });
   });

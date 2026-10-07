@@ -107,6 +107,7 @@ export async function resolveSyncTenant(
   const resolved = await resolveXeroAccess({
     capability,
     clerkOrgId: scope.clerkOrgId,
+    connectionId: scope.connectionId,
     deadline: { expiresAtMs: Date.now() + 120_000 },
     organisationId: scope.organisationId,
   });
