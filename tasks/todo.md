@@ -1,5 +1,51 @@
 # Current work
 
+## Final completed-phase Xero audit, Prompt 8
+
+- [x] Independently review OAuth, canonical persistence, refresh, sync, writes, disconnect and security in fresh contexts.
+- [x] Recheck official provider contracts and classify every remaining obsolete reference across the repository.
+- [x] Correct verified defects with regression coverage and reconcile canonical documentation without speculative infrastructure.
+- [x] Run fresh complete check, typecheck, boundaries, unit, integration, build and necessary Xero/release checks.
+- [x] Record live connect/discovery/refresh/read/disconnect/reconnect/write availability and precise NOT VERIFIED outcomes.
+- [x] Resolve Critical/Important findings, report rulings/minors and finish the existing branch after verification.
+
+Stopping condition: the completed source implements the approved lifecycle,
+all required local gates are freshly green, review findings are resolved and
+the completion report records evidence and limits. Baseline `e5fe001f` on
+`work`; continue this worktree. The prior branch-retention choice remains in
+force. No new architecture phase, worktree, live fixture, deployment or push.
+
+Review: three Important defects were reproduced and corrected: old absent-link
+reconnect with a new authoriser, isolated malformed balance progress, and atomic
+concurrent sync admission. Two scoped reviewers and a third independent
+correction reviewer report no remaining Critical/Important/Minor findings.
+The deadline regression now uses a controlled clock while preserving and
+strengthening its dispatch/body/release assertions. No production HTTP change
+or generated-output edit was needed. Build and unit verification are sequenced
+after the initial concurrent regeneration/import failure.
+
+Verification: all final commands exited 0. Check covered 1,155 files;
+typecheck passed 19 uncached tasks; boundaries covered 1,084 files/21 packages;
+full unit rerun passed 3,045 tests/18 uncached tasks; integration passed 267
+owned-local tests/six uncached tasks; build passed all four uncached tasks,
+including Prisma generation. Release tools passed 196 tests with four existing
+Chromium-dependent static-browser skips; release typecheck passed. All 28
+migrations replayed in a fresh owned database with zero drift and no obsolete
+tables/columns/binding function. Additional OAuth/refresh/provider-loss140,
+HTTP56, jobs unit190 and jobs integration82 passed. No unit/integration skips.
+The first unit attempt's real-clock deadline failure and concurrent Prisma
+regeneration/import failure are recorded and corrected, followed by a full
+uncached rerun. Final review has no deferred minor findings.
+
+Live OAuth connect, discovery, automatic refresh, read sync, disconnect,
+reconnect and writes remain individually NOT VERIFIED because no configured
+Xero app/demo/payroll fixture exists. Actual authenticated browser, deployed
+scheduled jobs and Neon-adapter concurrency are NOT VERIFIED. No live provider
+call was made. The report is `docs/reports/2026-10-07-xero-final-architecture-audit.md`.
+Finish using the existing branch-retention choice: commit locally, preserve
+`work` and this workspace, stop owned fixtures and remove only the new replay
+database. No merge, push, deployment, PR or worktree creation.
+
 ## Xero HTTP and Plan 161 infrastructure simplification, Prompt 7
 
 - [x] Audit exact provider limits and remaining Plan 161 consumers.

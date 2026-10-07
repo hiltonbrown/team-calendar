@@ -74,7 +74,7 @@ Slack and Teams notifications, HTML calendar views, and additional payroll conne
 
 ## Current status
 
-Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate source and integration verification is recorded separately in `tasks/todo.md`. Live Xero credentials are unavailable in this simplification session, so every live OAuth, import, write, refresh and disconnect journey remains **NOT VERIFIED**.
+Team Calendar is under active development and pre-launch. Core infrastructure, Clerk multi-tenancy, the Prisma schema, and domain boundaries are established. Xero synchronisation, the leave submission and approval workflow with synchronous write-back, and the canonical ICS feed projection engine are implemented in their respective domain packages. Launch scope is AU-only, English-only, core loop. Current-candidate architecture, verification and review rulings are recorded in the [final Xero audit](docs/reports/2026-10-07-xero-final-architecture-audit.md) and `tasks/todo.md`. Live Xero credentials are unavailable in this simplification session, so every live OAuth, import, write, refresh and disconnect journey remains **NOT VERIFIED**.
 
 ## Production URLs
 

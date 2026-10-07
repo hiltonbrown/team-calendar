@@ -88,6 +88,7 @@ vi.mock("@repo/database", async (importOriginal) => {
 
 import { database, type Person } from "@repo/database";
 import { getRegisteredSyncEventName } from "../events";
+import { acquireSyncRun } from "./sync-run-lifecycle";
 import { syncXeroPeople } from "./sync-xero-people";
 
 // Mock fetchEmployeesForRegion and toPlainLanguageMessage from @repo/xero
@@ -199,6 +200,54 @@ describe("local persistence integration", () => {
     await database.$disconnect();
   });
   describe("sync-xero-people handler", () => {
+    it("admits one concurrent same-connection run and preserves duplicate delivery", async () => {
+      await setupTenant(tenantA);
+      const context = {
+        ...tenantA,
+        triggerType: "manual" as const,
+      };
+      const outcomes = await Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          acquireSyncRun(
+            {
+              ...context,
+              runId: fixture.id("concurrent-admission-run", index),
+            },
+            "people",
+            new Date()
+          )
+        )
+      );
+      expect(
+        outcomes.filter((outcome) => outcome.kind === "active")
+      ).toHaveLength(1);
+      expect(
+        outcomes.filter((outcome) => outcome.kind === "cancelled_competing")
+      ).toHaveLength(11);
+      const active = outcomes.find((outcome) => outcome.kind === "active");
+      expect(active).toBeDefined();
+      const runId = active?.run.id as string;
+      expect(
+        await acquireSyncRun({ ...context, runId }, "people", new Date())
+      ).toEqual({
+        kind: "active",
+        run: { id: runId },
+      });
+      await database.syncRun.updateMany({
+        data: { completed_at: new Date(), status: "succeeded" },
+        where: {
+          clerk_org_id: tenantA.clerkOrgId,
+          id: runId,
+          organisation_id: tenantA.organisationId,
+        },
+      });
+      expect(
+        await acquireSyncRun({ ...context, runId }, "people", new Date())
+      ).toMatchObject({
+        kind: "terminal",
+        run: { id: runId, status: "succeeded" },
+      });
+    });
     it("resolves registered event name correctly", () => {
       expect(getRegisteredSyncEventName("people")).toBe("sync-xero-people");
     });

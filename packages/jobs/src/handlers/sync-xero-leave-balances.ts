@@ -737,13 +737,14 @@ async function advanceCursor(params: {
   return result.count === 1;
 }
 function isBlanketFailure(error: XeroWriteError): boolean {
+  // Malformed employee responses are isolated by the adapter; keep their
+  // validation failures with the failed record while healthy balances persist.
   return (
     Boolean(error.recoveryReason) ||
     error.code === "auth_error" ||
     error.code === "rate_limit_error" ||
     error.code === "permission_error" ||
-    error.code === "network_error" ||
-    error.code === "validation_error"
+    error.code === "network_error"
   );
 }
 async function publishRunStatusChanged(

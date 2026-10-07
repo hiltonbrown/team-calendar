@@ -6,7 +6,7 @@ Index reconciled on 7 October 2026 with the approved Xero simplification. Produc
 
 | Plan | Remaining outcome | Status |
 | --- | --- | --- |
-| [Xero simplification implementation](../docs/superpowers/plans/2026-10-07-xero-simplification.md) | Complete the approved four-entity model and Tasks 12/13 documentation and verification | Current-candidate outcomes are recorded in `tasks/todo.md`; no gate PASS is asserted by this index |
+| [Xero simplification implementation](../docs/superpowers/plans/2026-10-07-xero-simplification.md) | Approved source model, documentation and local verification | Completed source/local audit: [final report](../docs/reports/2026-10-07-xero-final-architecture-audit.md); live journeys remain NOT VERIFIED |
 | [160: Prove the AU leave flow](160-xero-end-to-end-verification-and-report.md) | Prove the bounded nine-row AU flow through the real UI, independent provider reads, owned cleanup and a sanitised report | All live UI/provider rows NOT VERIFIED |
 | [000: Australian go-live](go-live.md) | Source, schema, release-tool, privacy, billing, deployed journey and rollback gates for one candidate | IN PROGRESS; production readiness NOT VERIFIED |
 

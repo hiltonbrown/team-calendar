@@ -1,3 +1,4 @@
+import { database } from "@repo/database";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -30,6 +31,9 @@ vi.mock("@repo/availability", () => ({
 }));
 vi.mock("@repo/database", () => ({
   database: {
+    $executeRaw: vi.fn(async () => 1),
+    $queryRaw: vi.fn(async () => []),
+    $transaction: vi.fn(async (callback) => callback(database)),
     syncRun: {
       create: mocks.syncRunCreate,
       findFirst: mocks.syncRunFindFirst,

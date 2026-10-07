@@ -651,6 +651,8 @@ A complete successful full employee reconciliation immediately archives absent X
 
 AU balances remain per-employee detail reads, without modification filters or calculated amounts. Invalid employee/balance envelopes and absent or nonnumeric amounts are recorded as failures, preventing successful initial import or whole-roster freshness. Genuine empty balances and numeric zero remain valid.
 
+Malformed individual balance responses are isolated: healthy employees persist and roster progress continues while the failed sweep remains stale. Sync admission checks and creation share the existing scoped connection row lock, preventing competing runs of the same type from applying overlapping snapshots.
+
 ### Failure rules
 
 - Inbound transient failures: exponential backoff via Inngest.

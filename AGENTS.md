@@ -4,7 +4,7 @@ This file is the single source of instructions for coding agents working in the 
 
 ## Project overview
 
-**Team Calendar** is a multi-tenant leave management and availability publishing platform. It connects to Xero Payroll (AU, NZ, UK) bidirectionally: employees submit and manage leave requests in Team Calendar, approved state is written back to Xero synchronously, and Xero-side leave data is pulled into the canonical availability model on a scheduled basis.
+**Team Calendar** is a multi-tenant leave management and availability publishing platform. It connects to Australian Xero Payroll bidirectionally: employees submit and manage leave requests in Team Calendar, approved state is written back to Xero synchronously, and Xero-side leave data is pulled into the canonical availability model on a scheduled basis. NZ and UK adapters remain future-release work; current onboarding and writes are AU-only.
 
 The architecture is: **Leave submission layer > bidirectional Xero sync layer > canonical availability model > feed projection layer > ICS publishing layer**.
 
@@ -376,6 +376,7 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 
 - Co-located: `foo.ts` has `foo.test.ts` in the same directory.
 - Vitest as runner. Tests from the first slice; every feature or fix includes corresponding tests. No deferring.
+- Finish Prisma generation before running checks that import generated source. The build regenerates the client; run it separately from unit/integration tests to avoid transient missing-module failures.
 - Factories or builders for test data, not repeated raw literals.
 - Fixture-based tests for Xero response mappers and region-specific parsers.
 - Explicitly test: ICS serialisation, UID generation, SEQUENCE incrementing, privacy transforms, Zod validators, feed token validation, `clerk_org_id` query isolation, XeroConnection/XeroAuthorisation uniqueness invariants, approval state transitions, decline-reason enforcement.

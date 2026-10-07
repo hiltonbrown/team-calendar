@@ -254,32 +254,49 @@ describe("parseRetryAfter", () => {
   });
 });
 it("holds and releases permit through a stalled body deadline", async () => {
-  const limiter = permissiveLimiter();
-  const release = vi.fn();
-  vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
-  const cancel = vi.fn();
-  const fetchImpl = vi.fn().mockResolvedValue(
-    new Response(
+  vi.useFakeTimers();
+  try {
+    const limiter = permissiveLimiter();
+    const release = vi.fn();
+    vi.spyOn(limiter, "acquire").mockResolvedValue({ ok: true, release });
+    const cancel = vi.fn();
+    let markDispatched: () => void = () => {
+      throw new Error("Dispatch observer was not initialised.");
+    };
+    const dispatched = new Promise<void>((resolve) => {
+      markDispatched = resolve;
+    });
+    const response = new Response(
       new ReadableStream({
         cancel,
         start() {
           /* Deliberately never produce body data. */
         },
       })
-    )
-  );
-  await expect(
-    xeroFetch(
-      {
-        deadline: { expiresAtMs: Date.now() + 30 },
-        rateClass,
-        url: "https://api.xero.com/x",
-      },
-      { fetchImpl, limiter }
-    )
-  ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: true });
-  expect(release).toHaveBeenCalledTimes(1);
-  expect(cancel).toHaveBeenCalledTimes(1);
+    );
+    const fetchImpl = vi.fn(() => {
+      markDispatched();
+      return Promise.resolve(response);
+    });
+    const failedRequest = expect(
+      xeroFetch(
+        {
+          deadline: { expiresAtMs: Date.now() + 30 },
+          rateClass,
+          url: "https://api.xero.com/x",
+        },
+        { fetchImpl, limiter }
+      )
+    ).rejects.toMatchObject({ code: "deadline_exceeded", dispatched: true });
+    await dispatched;
+    expect(release).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(30);
+    await failedRequest;
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 it("retains the last 429 when backoff exceeds remaining budget", async () => {
   const fetchImpl = vi

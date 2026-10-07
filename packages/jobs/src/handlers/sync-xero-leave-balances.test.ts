@@ -891,6 +891,68 @@ describe("leave balances sync run lifecycle", () => {
       )
     ).toHaveLength(1);
   });
+  it("isolates malformed employee responses while persisting healthy balances", async () => {
+    const people = Array.from({ length: 41 }, (_, index) => ({
+      id: `50000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      xero_employee_id: `60000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+    }));
+    mocks.personFindMany.mockResolvedValue(people);
+    mocks.fetchLeaveBalancesForRegion.mockResolvedValue({
+      ok: true,
+      value: {
+        failures: [
+          {
+            employeeId: people[0].xero_employee_id,
+            error: {
+              code: "validation_error",
+              message: "Xero returned invalid AU payroll leave balances.",
+              rawPayload: { Employees: [{ LeaveBalances: "malformed" }] },
+            },
+          },
+        ],
+        leaveBalances: [
+          {
+            balance: 12.5,
+            currencyCode: null,
+            employeeId: people[1].xero_employee_id,
+            leaveTypeId: "annual-leave",
+            leaveTypeName: "Annual Leave",
+            rawPayload: { LeaveType: "Annual Leave" },
+            unitType: "hours",
+          },
+        ],
+        rawResponses: [],
+      },
+    });
+    const result = await syncXeroLeaveBalances(input());
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        failed: 1,
+        hasMore: true,
+        status: "partial_success",
+        upserted: 1,
+      },
+    });
+    expect(mocks.leaveBalanceUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.failedRecordCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          error_code: "validation_error",
+          source_id: people[0].xero_employee_id,
+        }),
+      })
+    );
+    expect(mocks.xeroConnectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          balance_next_person_id: people[39].id,
+          balance_sweep_failed: true,
+          leave_balances_stale_since: expect.any(Date),
+        }),
+      })
+    );
+  });
   it("targeted person refresh bypasses shared cursor and does not alter tenant cycle timestamps", async () => {
     const personId = "50000000-0000-4000-8000-000000000099";
     const employeeId = "60000000-0000-4000-8000-000000000099";

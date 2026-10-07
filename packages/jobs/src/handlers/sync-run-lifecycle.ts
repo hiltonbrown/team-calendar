@@ -100,12 +100,13 @@ function toAcquireResult(existing: {
   return { kind: "active", run: { id: existing.id } };
 }
 async function findExistingRun(
-  context: AcquireSyncRunInput
+  context: AcquireSyncRunInput,
+  client: Prisma.TransactionClient = database
 ): Promise<AcquireRunResult | null> {
   if (!context.runId) {
     return null;
   }
-  const existing = await database.syncRun.findFirst({
+  const existing = await client.syncRun.findFirst({
     select: {
       id: true,
       records_failed: true,
@@ -127,13 +128,14 @@ async function checkCompetingRun(
   context: AcquireSyncRunInput,
   runType: SyncRunType,
   startedAt: Date,
-  stalenessFloor: Date
+  stalenessFloor: Date,
+  client: Prisma.TransactionClient
 ): Promise<AcquireRunResult | null> {
   const stalenessFilter =
     runType === "leave_balances"
       ? { updated_at: { gte: stalenessFloor } }
       : { started_at: { gte: stalenessFloor } };
-  const competingRun = await database.syncRun.findFirst({
+  const competingRun = await client.syncRun.findFirst({
     select: { id: true, started_at: true },
     where: {
       ...scoped(context),
@@ -148,7 +150,7 @@ async function checkCompetingRun(
     return null;
   }
   const label = runType.replace(/_/g, " ");
-  const cancelled = await database.syncRun.create({
+  const cancelled = await client.syncRun.create({
     data: {
       ...scoped(context),
       completed_at: new Date(),
@@ -168,14 +170,15 @@ async function checkCompetingRun(
 async function reclaimExpiredRuns(
   context: AcquireSyncRunInput,
   runType: SyncRunType,
-  stalenessFloor: Date
+  stalenessFloor: Date,
+  client: Prisma.TransactionClient
 ): Promise<void> {
   const expiredFilter =
     runType === "leave_balances"
       ? { updated_at: { lt: stalenessFloor } }
       : { started_at: { lt: stalenessFloor } };
   try {
-    await database.syncRun.updateMany({
+    await client.syncRun.updateMany({
       data: {
         completed_at: new Date(),
         error_summary: "lease_expired",
@@ -206,39 +209,17 @@ export async function acquireSyncRun(
   runType: SyncRunType,
   startedAt: Date
 ): Promise<AcquireRunResult> {
-  const existing = await findExistingRun(context);
-  if (existing) {
-    return existing;
-  }
-  const stalenessFloor = new Date(Date.now() - STALE_RUN_WINDOW_MS);
-  const competing = await checkCompetingRun(
-    context,
-    runType,
-    startedAt,
-    stalenessFloor
-  );
-  if (competing) {
-    return competing;
-  }
-  await reclaimExpiredRuns(context, runType, stalenessFloor);
-  const entityType =
-    runType === "approval_state_reconciliation" ? null : runType;
   try {
-    const run = await database.syncRun.create({
-      data: {
-        ...scoped(context),
-        ...(context.runId ? { id: context.runId } : {}),
-        entity_type: entityType,
-        run_type: runType,
-        started_at: startedAt,
-        status: "running",
-        trigger_type: context.triggerType,
-        triggered_by_user_id: context.triggeredByUserId ?? null,
-        xero_connection_id: context.connectionId,
+    return await database.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT set_config('lock_timeout', ${"10000ms"}, true)`;
+        // Share the existing connection lock with batch persistence and teardown;
+        // the competing-run check and admission must be one atomic operation.
+        await tx.$queryRaw`SELECT id FROM xero_connections WHERE id = ${context.connectionId}::uuid AND clerk_org_id = ${context.clerkOrgId} AND organisation_id = ${context.organisationId}::uuid FOR UPDATE`;
+        return await acquireSyncRunLocked(context, runType, startedAt, tx);
       },
-      select: { id: true },
-    });
-    return { kind: "active", run };
+      { maxWait: 10_000, timeout: 15_000 }
+    );
   } catch (error) {
     if (context.runId && isPrismaUniqueConstraintError(error)) {
       const recovered = await findExistingRun(context);
@@ -248,6 +229,46 @@ export async function acquireSyncRun(
     }
     throw error;
   }
+}
+async function acquireSyncRunLocked(
+  context: AcquireSyncRunInput,
+  runType: SyncRunType,
+  startedAt: Date,
+  tx: Prisma.TransactionClient
+): Promise<AcquireRunResult> {
+  const existing = await findExistingRun(context, tx);
+  if (existing) {
+    return existing;
+  }
+  const stalenessFloor = new Date(Date.now() - STALE_RUN_WINDOW_MS);
+  const competing = await checkCompetingRun(
+    context,
+    runType,
+    startedAt,
+    stalenessFloor,
+    tx
+  );
+  if (competing) {
+    return competing;
+  }
+  await reclaimExpiredRuns(context, runType, stalenessFloor, tx);
+  const entityType =
+    runType === "approval_state_reconciliation" ? null : runType;
+  const run = await tx.syncRun.create({
+    data: {
+      ...scoped(context),
+      ...(context.runId ? { id: context.runId } : {}),
+      entity_type: entityType,
+      run_type: runType,
+      started_at: startedAt,
+      status: "running",
+      trigger_type: context.triggerType,
+      triggered_by_user_id: context.triggeredByUserId ?? null,
+      xero_connection_id: context.connectionId,
+    },
+    select: { id: true },
+  });
+  return { kind: "active", run };
 }
 /**
  * Asserts that the run has not been cancelled or superseded.

@@ -845,12 +845,31 @@ describe("canonical OAuth persistence", () => {
     }
   );
 
-  it.each([false, true])(
-    "prunes a replaced authoriser only when no sibling still uses it: %s",
-    async (hasSibling) => {
+  it.each([
+    { expired: false, hasSibling: false, status: "active" },
+    { expired: false, hasSibling: true, status: "active" },
+    { expired: false, hasSibling: false, status: "reconnect_required" },
+    { expired: false, hasSibling: true, status: "reconnect_required" },
+    { expired: true, hasSibling: false, status: "reconnect_required" },
+    { expired: true, hasSibling: true, status: "reconnect_required" },
+  ] satisfies Array<{
+    expired: boolean;
+    hasSibling: boolean;
+    status: "active" | "reconnect_required";
+  }>)(
+    "replaces an absent old link with $status status, expired grant $expired and sibling usage $hasSibling",
+    async ({ expired, hasSibling, status }) => {
       await connection();
+      await database.xeroConnection.update({
+        data: { status },
+        where: { id: fixture.connectionId },
+      });
       await database.xeroAuthorisation.update({
-        data: { access_token_expires_at: new Date(Date.now() + 1_800_000) },
+        data: {
+          access_token_expires_at: new Date(
+            Date.now() + (expired ? -60_000 : 1_800_000)
+          ),
+        },
         where: { id: fixture.authorisationId },
       });
       if (hasSibling) {
@@ -894,11 +913,17 @@ describe("canonical OAuth persistence", () => {
       vi.stubGlobal(
         "fetch",
         vi.fn((url, init) => {
+          if (String(url).endsWith("/connect/token")) {
+            return Promise.resolve(tokenResponse());
+          }
           if (String(url).endsWith("/connections")) {
+            const bearer = new Headers(init?.headers).get("Authorization");
+            if (expired && bearer === "Bearer expired-access-token") {
+              return Promise.resolve(new Response(null, { status: 401 }));
+            }
             return Promise.resolve(
               Response.json(
-                new Headers(init?.headers).get("Authorization") ===
-                  "Bearer replacement-access"
+                bearer === "Bearer replacement-access"
                   ? [
                       {
                         id: replacementRemote,
@@ -927,7 +952,25 @@ describe("canonical OAuth persistence", () => {
         await database.xeroConnection.findUniqueOrThrow({
           where: { id: fixture.connectionId },
         })
-      ).toMatchObject({ xero_authorisation_id: replacement.id });
+      ).toMatchObject({
+        id: fixture.connectionId,
+        remote_connection_id: replacementRemote,
+        status: "active",
+        xero_authorisation_id: replacement.id,
+      });
+      if (hasSibling) {
+        expect(
+          await database.xeroConnection.findFirstOrThrow({
+            where: {
+              clerk_org_id: secondary.clerkOrgId,
+              organisation_id: secondary.organisationId,
+            },
+          })
+        ).toMatchObject({
+          status: "active",
+          xero_authorisation_id: fixture.authorisationId,
+        });
+      }
     }
   );
 

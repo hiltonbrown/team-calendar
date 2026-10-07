@@ -26,7 +26,8 @@ import { xeroFetch } from "../rate-limit/xero-fetch";
 import {
   adoptXeroAuthorisation,
   authorisationAccessToken,
-  resolveXeroAccess,
+  refreshXeroAuthorisation,
+  TOKEN_REFRESH_BUFFER_MS,
 } from "./authorisation";
 import {
   verifyXeroAccessTokenIdentity,
@@ -1186,14 +1187,35 @@ async function validatePreviousSelectedLink({
   ) {
     let previousInventory = inventory;
     if (snapshot.xero_authorisation_id !== grant.id && targetOrganisationId) {
-      const previousAccess = await resolveXeroAccess({
-        capability: [],
-        clerkOrgId,
-        connectionId: snapshot.id,
-        deadline: createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS),
-        organisationId: targetOrganisationId,
+      // A removed tenant blocks payroll access, but its still-valid user grant
+      // can prove the old link is absent before another authoriser replaces it.
+      const previousConnection = await database.xeroConnection.findFirst({
+        include: { authorisation: true },
+        where: {
+          clerk_org_id: clerkOrgId,
+          disconnected_at: null,
+          id: snapshot.id,
+          organisation_id: targetOrganisationId,
+          remote_connection_id: snapshot.remote_connection_id,
+          status: { in: ["active", "reconnect_required"] },
+          xero_authorisation_id: snapshot.xero_authorisation_id,
+        },
       });
-      if (!previousAccess.ok) {
+      const previousGrant = previousConnection?.authorisation;
+      const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
+      let previousAccess: Result<XeroAuthorisation, XeroOAuthError> | null =
+        null;
+      if (previousGrant?.status === "active") {
+        previousAccess =
+          previousGrant.access_token_expires_at.getTime() <=
+          Date.now() + TOKEN_REFRESH_BUFFER_MS
+            ? await refreshXeroAuthorisation({
+                authorisationId: previousGrant.id,
+                deadline,
+              })
+            : { ok: true, value: previousGrant };
+      }
+      if (!previousAccess?.ok) {
         return {
           error: {
             code: "tenant_binding_conflict",
@@ -1204,8 +1226,10 @@ async function validatePreviousSelectedLink({
         };
       }
       previousInventory = await fetchConnections(
-        previousAccess.value.accessToken,
-        { kind: "user_inventory", providerAppId: grant.provider_app_id }
+        authorisationAccessToken(previousAccess.value),
+        { kind: "user_inventory", providerAppId: grant.provider_app_id },
+        undefined,
+        deadline
       );
     }
     if (!previousInventory.ok) {
