@@ -6,6 +6,12 @@ const { database } = xeroSimplificationFixture();
 afterAll(() => database.$disconnect());
 
 describe("simplified Xero persistence", () => {
+  test("has no obsolete tenant-binding trigger function", async () => {
+    const functions = await database.$queryRaw<Array<{ proname: string }>>`
+      SELECT proname FROM pg_proc JOIN pg_namespace ON pg_proc.pronamespace = pg_namespace.oid
+      WHERE nspname = 'public' AND proname = 'prevent_xero_tenant_rebinding'`;
+    expect(functions).toEqual([]);
+  });
   test("has exactly four lifecycle models", async () => {
     const rows = await database.$queryRaw<Array<{ tablename: string }>>`
       SELECT tablename FROM pg_tables WHERE schemaname = 'public'

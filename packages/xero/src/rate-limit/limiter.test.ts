@@ -312,7 +312,6 @@ it("refreshes remaining operation lease with exactly one margin after waiting", 
       (
         await limiter.acquire(tenant("one"), {
           deadline: { expiresAtMs: 10_000 },
-          leaseMs: 14_000,
           maxWaitMs: 5000,
         })
       ).ok

@@ -141,7 +141,7 @@ export class RedisSharedXeroRateStore implements SharedXeroRateStore {
         ...xeroRateKeys(input.rateClass, this.options.namespace),
         operation,
         input.rateClass.kind,
-        input.rateClass.kind === "tenant" ? limits.callsPerMinutePerOrg : 60,
+        limits.callsPerMinutePerOrg,
         limits.callsPerDayPerOrg,
         limits.appCallsPerMinute,
         limits.concurrentRequestsPerOrg,

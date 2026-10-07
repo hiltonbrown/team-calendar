@@ -25,6 +25,23 @@ function reservation(rateClass: XeroRateClass = tenant) {
   return { leaseMs: 1000, rateClass, reservationId: crypto.randomUUID() };
 }
 describe("shared Xero rate budgets", () => {
+  it.each(["token", "user_inventory"] as const)(
+    "%s has no invented tenant minute quota",
+    async (kind) => {
+      const store = new MemorySharedXeroRateStore({
+        limits: { ...limits, appCallsPerMinute: 100 },
+      });
+      const rateClass = { kind, providerAppId: "app" };
+      await store.observe({
+        headers: new Headers({ "X-MinLimit-Remaining": "0" }),
+        rateClass,
+      });
+      for (let index = 0; index < 61; index += 1) {
+        expect((await store.reserve(reservation(rateClass))).ok).toBe(true);
+      }
+    }
+  );
+
   it("uses external tenant identity and prevents hash-tag injection", () => {
     expect(xeroRateKeys(tenant, "dev")).toEqual(
       xeroRateKeys({ ...tenant }, "dev")
@@ -229,8 +246,6 @@ describe("production shared-store selection", () => {
     vi.stubEnv("XERO_CLIENT_ID", "app");
     vi.stubEnv("KV_REST_API_URL", "https://invalid.example");
     vi.stubEnv("KV_REST_API_TOKEN", "test-token");
-    vi.stubEnv("XERO_RATE_NAMESPACE_EPOCH", undefined);
-    vi.stubEnv("XERO_CREDENTIAL_DOMAIN_ID", undefined);
     vi.stubGlobal("fetch", async () => Response.json({ result: ["admitted"] }));
     expect((await getSharedXeroRateStore().reserve(reservation())).ok).toBe(
       true

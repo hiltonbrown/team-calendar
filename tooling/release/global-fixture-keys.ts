@@ -1,5 +1,4 @@
 export const SUPPORTED_GLOBAL_KEY_PREFIXES = [
-  "fixture-namespace:",
   "plan_id:",
   "plan_key:",
   "stripe_event:",

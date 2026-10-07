@@ -24,7 +24,7 @@ if operation == 'observe' then
   local caps = {minuteCap, dayCap, appCap}
   local durations = {60000, 86400000, 60000}
   for i = 1, 3 do
-    if ceilings[i] and (i ~= 2 or tenant) then
+    if ceilings[i] and (i == 3 or tenant) then
       local required = caps[i] - math.max(0, math.min(caps[i], ceilings[i]))
       local existing = redis.call('ZCARD', windows[i])
       for n = existing + 1, required do redis.call('ZADD', windows[i], now, id .. ':header:' .. i .. ':' .. n) end
@@ -41,13 +41,13 @@ end
 if redis.call('ZSCORE', KEYS[1], id) then return {'admitted'} end
 if tonumber(redis.call('GET', KEYS[5]) or '0') > now then return {'cooldown'} end
 if tenant and redis.call('ZCARD', KEYS[3]) >= dayCap then return {'daily'} end
-if redis.call('ZCARD', KEYS[1]) >= appCap or redis.call('ZCARD', KEYS[2]) >= minuteCap then return {'minute'} end
+if redis.call('ZCARD', KEYS[1]) >= appCap or (tenant and redis.call('ZCARD', KEYS[2]) >= minuteCap) then return {'minute'} end
 if tenant and redis.call('ZCARD', KEYS[4]) >= concurrentCap then return {'concurrency'} end
 redis.call('ZADD', KEYS[1], now, id)
 redis.call('PEXPIRE', KEYS[1], 60000)
-redis.call('ZADD', KEYS[2], now, id)
-redis.call('PEXPIRE', KEYS[2], 60000)
 if tenant then
+  redis.call('ZADD', KEYS[2], now, id)
+  redis.call('PEXPIRE', KEYS[2], 60000)
   redis.call('ZADD', KEYS[3], now, id)
   redis.call('PEXPIRE', KEYS[3], 86400000)
   local lease = tonumber(ARGV[8])

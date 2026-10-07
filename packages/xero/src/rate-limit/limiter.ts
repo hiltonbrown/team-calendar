@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { emitXeroMetric } from "../metrics";
 import { remainingMs, type XeroDeadline } from "./deadline";
-import { DEFAULT_MAX_WAIT_MS } from "./limits";
+import {
+  DEFAULT_MAX_WAIT_MS,
+  XERO_DEFAULT_OPERATION_BUDGET_MS,
+} from "./limits";
 import {
   getSharedXeroRateStore,
   type SharedRateDeniedReason,
@@ -46,12 +49,10 @@ export class XeroRateLimiter {
     this.maxWaitMs = config.maxWaitMs ?? DEFAULT_MAX_WAIT_MS;
     this.store = deps.store ?? getSharedXeroRateStore(config);
   }
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Preserve atomic admission retry and absolute deadline decisions in one auditable loop.
   async acquire(
     rateClass: XeroRateClass,
     options: {
       maxWaitMs?: number;
-      leaseMs?: number;
       deadline?: XeroDeadline;
     } = {}
   ): Promise<RateLimitAcquireResult> {
@@ -82,7 +83,7 @@ export class XeroRateLimiter {
         deadline: admissionDeadline,
         leaseMs: options.deadline
           ? remainingMs(options.deadline) + 5000
-          : (options.leaseMs ?? 95_000),
+          : XERO_DEFAULT_OPERATION_BUDGET_MS + 5000,
         rateClass,
         reservationId,
       });

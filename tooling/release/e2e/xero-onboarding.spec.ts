@@ -11,7 +11,7 @@ const NO_MATCHES_COPY_REGEX = /No people need review|All people matched/i;
 const STATUS_COPY_REGEX = /Leave synced|Sync delayed|Xero is not connected/i;
 
 // Plan 159 Step 8: E2E assertions for guided Xero onboarding and shared connection.
-// Executed against deployed candidate during authorised release campaign.
+// Requires the deployed candidate and explicitly owned release fixtures.
 test("admin connects Xero Payroll and views durable import progress", async ({
   browser,
 }) => {

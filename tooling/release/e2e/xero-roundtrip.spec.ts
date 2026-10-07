@@ -9,7 +9,7 @@ const CONFIRM_BUTTON_REGEX = /Confirm|Approve/i;
 const APPROVED_STATUS_REGEX = /Approved|Leave approved/i;
 
 // Plan 159 Step 8: E2E assertions for two-way Xero leave lifecycle and approval workflow roundtrip.
-// Executed against deployed candidate during authorised release campaign.
+// Requires the deployed candidate and explicitly owned release fixtures.
 test("manager approves leave and verifies synchronous Xero creation", async ({
   browser,
 }) => {

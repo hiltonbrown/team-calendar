@@ -1,5 +1,44 @@
 # Current work
 
+## Xero HTTP and Plan 161 infrastructure simplification, Prompt 7
+
+- [x] Audit exact provider limits and remaining Plan 161 consumers.
+- [x] Replace fabricated local HTTP responses with structured, undispatched rate errors; retain earlier mutation uncertainty.
+- [x] Remove speculative non-tenant quota buckets, duplicated retry parsing and redundant lease options with RED/GREEN coverage.
+- [x] Remove remaining obsolete fixture authority and documentation; actively prohibit deleted lifecycle patterns.
+- [x] Run targeted tests, check, typecheck, boundaries, unit, integration, build and applicable release-tool gates.
+- [x] Resolve independent Critical/Important review findings and commit on `work`.
+
+Stopping condition: one bounded HTTP boundary enforces demonstrated quotas and
+security requirements, obsolete architecture is absent, required gates pass and
+the focused phase is reviewed and committed. Baseline `53a59df1`; reuse approved
+design and implementation plan Tasks 3, 11 and 12, without another worktree.
+
+Ruling: retain the small atomic Redis quota script and expiring concurrency slots.
+App/API/job workers share Xero's five-request tenant ceiling and rolling quotas;
+process-local limits would not enforce those requirements across deployments.
+Keep fixture-only namespace injection for owned test cleanup, no runtime
+namespace bootstrap or configuration. Keep the one-field deadline helper,
+bounded database transactions, 5 MiB buffered response cap and origin/redirect
+protections. They protect current synchronous writes, token grants and sync.
+Remove the undocumented token/inventory 60/minute policy, fabricated provider
+429s and duplicated parsing. Preserve Plan 160 domain recovery and generic
+non-local database safeguards. Historical migration bytes remain immutable;
+generate a narrow forward DROP from PostgreSQL's function catalogue because
+Prisma cannot express this standalone trigger function.
+
+Verification: 1,155 linted files, all 19 typecheck tasks, 1,084 boundary files
+in 21 packages, 3,044 unit tests across 18 tasks, 262 owned-local integration
+tests across six tasks and all four production build tasks passed. Initial
+whole-source unit/typecheck gates ran uncached; final affected tasks reran after
+removing two obsolete bootstrap-only assertions. Release tools passed 196 tests
+with four existing Chromium-dependent static-browser skips, plus typecheck.
+All 28 migrations replayed into a fresh owned database with zero schema drift;
+real PostgreSQL verifies the obsolete function is absent. Independent review
+has no Critical, Important or Minor findings. No live Xero, application-browser
+or deployment verification is claimed. Evidence and retained-control rationale
+are recorded in `docs/reports/2026-10-07-xero-http-simplification.md`.
+
 ## Xero native idempotent outbound writes, Prompt 6
 
 - [x] Recheck exact AU mutation headers and regional differences against current official OpenAPI; inspect Plan 160, transport and approval recovery.

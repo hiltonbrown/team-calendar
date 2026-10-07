@@ -66,7 +66,7 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       reason = "daily";
     } else if (
       app.size >= limits.appCallsPerMinute ||
-      minute.size >= (tenant ? limits.callsPerMinutePerOrg : 60)
+      (tenant && minute.size >= limits.callsPerMinutePerOrg)
     ) {
       reason = "minute";
     } else if (tenant && concurrent.size >= limits.concurrentRequestsPerOrg) {
@@ -76,8 +76,8 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       return { error: { reason }, ok: false };
     }
     app.set(input.reservationId, now);
-    minute.set(input.reservationId, now);
     if (tenant) {
+      minute.set(input.reservationId, now);
       day.set(input.reservationId, now);
       concurrent.set(input.reservationId, now + Math.max(1, input.leaseMs));
     }
@@ -99,12 +99,6 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
     const tenant = input.rateClass.kind === "tenant";
     const entries = [
       {
-        cap: tenant ? this.options.limits.callsPerMinutePerOrg : 60,
-        duration: 60_000,
-        header: "X-MinLimit-Remaining",
-        key: minuteKey,
-      },
-      {
         cap: this.options.limits.appCallsPerMinute,
         duration: 60_000,
         header: "X-AppMinLimit-Remaining",
@@ -112,6 +106,12 @@ export class MemorySharedXeroRateStore implements SharedXeroRateStore {
       },
       ...(tenant
         ? [
+            {
+              cap: this.options.limits.callsPerMinutePerOrg,
+              duration: 60_000,
+              header: "X-MinLimit-Remaining",
+              key: minuteKey,
+            },
             {
               cap: this.options.limits.callsPerDayPerOrg,
               duration: 86_400_000,

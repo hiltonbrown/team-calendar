@@ -40,6 +40,8 @@ Xero consent requests exactly `offline_access accounting.settings.read payroll.e
 
 Remote leave mutations reuse a durable UUID idempotency key for five minutes from first dispatch. Uncertain writes after that boundary require provider inspection and administrator recovery. Disconnect removes the selected remote connection before committing local teardown; failed or uncertain deletion preserves retryable state and sibling connections.
 
+Xero calls use small shared, atomic Redis quota counters and expiring concurrency leases across serverless app, API and job workers. They enforce the five-request tenant concurrency limit and documented tenant/app quotas; lease expiry restores capacity after a worker crash. Keys initialise on first use, with no namespace bootstrap. Store failures deny calls as infrastructure failures; provider 429 responses remain separate. Fixture namespaces isolate tests only.
+
 ## Covers everyone who affects cover, not just payroll
 
 Team Calendar is built for the whole team, not only the people on the pay run. Employees on Xero Payroll get the two-way sync and leave balances. Contractors, directors, and advisors who never appear in payroll can still be added by hand, so their availability shows on the same calendar as everyone else, without touching a pay run. Every entry is labelled by where it came from: synced from Xero, or added manually.
@@ -68,7 +70,7 @@ Team Calendar is a Turborepo monorepo built on modern serverless primitives:
 
 ## Roadmap
 
-The following are out of scope for the initial build and do not require structural change to add: Slack and Teams notifications, HTML calendar views, and additional payroll connectors (MYOB, Zoho People, QuickBooks). Team Calendar is deliberately Xero-only at this stage to deliver a flawless payroll-integrated experience before broadening.
+Slack and Teams notifications, HTML calendar views, and additional payroll connectors (MYOB, Zoho People, QuickBooks) are out of scope for the initial build. Team Calendar implements Xero directly. A future connector requires its own reviewed design; the current implementation does not introduce a multi-provider abstraction.
 
 ## Current status
 

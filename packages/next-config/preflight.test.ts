@@ -548,15 +548,3 @@ describe("complete Xero configuration preflight", () => {
     ).toEqual([]);
   });
 });
-
-it.each(["app", "api"] as const)(
-  "requires no retired quota bootstrap for %s",
-  (appName) => {
-    const envVars = {
-      ...(appName === "app" ? validAppVars : validApiVars),
-      XERO_CREDENTIAL_DOMAIN_ID: undefined,
-      XERO_RATE_NAMESPACE_EPOCH: undefined,
-    };
-    expect(runProductionPreflight({ appName, envVars }).ok).toBe(true);
-  }
-);

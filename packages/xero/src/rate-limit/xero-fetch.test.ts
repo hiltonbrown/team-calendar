@@ -55,6 +55,44 @@ function recordingSleep() {
   };
 }
 describe("xeroFetch", () => {
+  it.each([0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects an invalid attempt count %s before provider dispatch",
+    async (maxAttempts) => {
+      const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+      await expect(
+        xeroFetch(
+          {
+            deadline: { expiresAtMs: Date.now() + 20 },
+            maxAttempts,
+            rateClass,
+            url: "https://api.xero.com/x",
+          },
+          {
+            fetchImpl,
+            limiter: permissiveLimiter(),
+            sleep: () => Promise.resolve(),
+          }
+        )
+      ).rejects.toMatchObject({
+        code: "attempts_exhausted",
+        dispatched: false,
+      });
+      expect(fetchImpl).not.toHaveBeenCalled();
+    }
+  );
+  it("bounds read retries to four provider requests", async () => {
+    const fetchImpl = vi.fn(async () => new Response(null, { status: 503 }));
+    const response = await xeroFetch(
+      { maxAttempts: 5, rateClass, url: "https://api.xero.com/x" },
+      {
+        fetchImpl,
+        limiter: permissiveLimiter(),
+        sleep: () => Promise.resolve(),
+      }
+    );
+    expect(response.status).toBe(503);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
+  });
   it("honours Retry-After on a 429 then succeeds", async () => {
     const fetchImpl = vi
       .fn()
@@ -85,14 +123,19 @@ describe("xeroFetch", () => {
     expect(response.status).toBe(200);
     expect(calls).toEqual([500]);
   });
-  it("returns a synthetic 429 when the budget is exhausted", async () => {
+  it("reports local exhaustion without inventing a provider response", async () => {
     const fetchImpl = vi.fn();
     const exhausted = new XeroRateLimiter({ callsPerDayPerOrg: 0 });
-    const response = await xeroFetch(
+    const result = await xeroFetch(
       { rateClass, url: "https://api.xero.com/x" },
       { fetchImpl, limiter: exhausted }
-    );
-    expect(response.status).toBe(429);
+    ).catch((error: unknown) => mapXeroTransportError(error, true));
+    expect(result).toMatchObject({
+      code: "rate_limit_error",
+      dispatchPhase: "before_dispatch",
+      recoveryReason: "retry_later",
+    });
+    expect(result).not.toHaveProperty("httpStatus", 429);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
   it("stops retrying after exhausting the attempt budget", async () => {
@@ -708,7 +751,7 @@ describe("recorded mutation replay", () => {
       expect(fetchImpl).toHaveBeenCalledTimes(2);
     }
   );
-  it("retains uncertainty when admission returns a synthetic 429 after dispatch", async () => {
+  it("retains uncertainty when local admission denies a retry after dispatch", async () => {
     const limiter = permissiveLimiter();
     const acquire = vi.spyOn(limiter, "acquire");
     acquire.mockResolvedValueOnce({
@@ -724,9 +767,9 @@ describe("recorded mutation replay", () => {
     }).catch((error: unknown) => mapXeroTransportError(error, true));
     expect(result).toMatchObject({
       dispatchPhase: "after_dispatch",
-      httpStatus: 429,
       recoveryReason: "outcome_unknown",
     });
+    expect(result).not.toHaveProperty("httpStatus", 429);
     expect(fetchImpl).toHaveBeenCalledOnce();
   });
   it("freezes the original request across retries", async () => {

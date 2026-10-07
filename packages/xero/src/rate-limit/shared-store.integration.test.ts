@@ -99,6 +99,34 @@ describe("guarded shared-store integration", () => {
     expect(await countSharedStoreFixtureKeys(ownedStore)).toBe(0);
   });
   describe("owned Redis REST atomic admission", () => {
+    it.each(["token", "user_inventory"] as const)(
+      "%s uses only app limits and provider cooldowns",
+      async (kind) => {
+        const { appId, first, second } = application({
+          ...limits,
+          appCallsPerMinute: 100,
+        });
+        const rateClass = { kind, providerAppId: appId };
+        await first.observe({
+          headers: new Headers({
+            "X-DayLimit-Remaining": "0",
+            "X-MinLimit-Remaining": "0",
+          }),
+          rateClass,
+        });
+        for (let index = 0; index < 61; index += 1) {
+          expect((await reserve(second, rateClass)).ok).toBe(true);
+        }
+        await first.observe({
+          headers: new Headers({ "Retry-After": "2" }),
+          rateClass,
+        });
+        expect(await reserve(second, rateClass)).toMatchObject({
+          error: { reason: "cooldown" },
+          ok: false,
+        });
+      }
+    );
     it("allocates only owned quota keys and isolates application budgets", async () => {
       const config = { ...limits, callsPerMinutePerOrg: 1 };
       const firstApp = application(config);

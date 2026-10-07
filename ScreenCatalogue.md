@@ -686,6 +686,8 @@ sidebar width on small screens.
 
 **Design requirements:** Routine health and one recommended sync remain primary; manual and high-risk connection controls use progressive disclosure. Destructive purge keeps explicit destructive emphasis inside its confirmation flow.
 
+Automatic token refresh has no manual control. Normal disconnect completes synchronously after confirmed remote deletion; the UI exposes a retryable failure when deletion is uncertain. Behavioural inactivity reports and remote-cleanup receipts are outside this connection-management flow.
+
 **`[v5 proposal]` interaction improvements:**
 - ~~Wire "Pause sync"/"Resume sync" into the UI using the audited server actions.~~ **Done.**
 - ~~Move disconnect into `ConfirmActionDialog` with explicit consequence copy.~~ **Done.**

@@ -108,7 +108,7 @@ Team Calendar is not:
 
 ### Product boundaries (future)
 
-Slack notifications, Teams integration, HTML calendar views, and additional provider connectors (MYOB, Employment Hero, QuickBooks) are out of scope for the initial build. The architecture accommodates these without requiring structural changes.
+Slack notifications, Teams integration, HTML calendar views, and additional provider connectors (MYOB, Employment Hero, QuickBooks) are out of scope for the initial build. The current architecture implements Xero directly; a future connector requires its own reviewed design rather than a speculative multi-provider abstraction.
 
 ---
 
@@ -303,7 +303,9 @@ Outbound write failures are surfaced synchronously to the user in plain language
 - Five concurrent requests maximum per external Xero tenant and provider app
 - 10,000 calls per minute app-wide
 
-Rate limiting, backoff, and retry logic live inside this package. Admission uses a shared, atomic store across deployments. Ordinary quota keys initialise atomically on first use; store failures deny calls. Limits are five concurrent and 60/minute per external tenant, 1,000/day on Starter or 5,000/day on higher tiers, and 10,000/minute per provider app.
+Rate limiting, backoff, and retry logic live inside this package. A small shared, atomic Redis store coordinates serverless app, API and job workers so they collectively respect tenant quotas and the five-request concurrency limit. Successful requests release their concurrency leases; lease expiry recovers capacity after a crashed worker. Ordinary quota keys initialise atomically on first use, without a namespace bootstrap or manual admission command. A fixture namespace is test isolation only. Token and user-connection inventory calls conservatively share the app-wide counter as application policy, without an invented per-tenant or 60/minute non-tenant cap. Store failures deny calls as infrastructure failures; local admission failures do not manufacture provider HTTP 429 responses or rate-limit headers.
+
+The HTTP boundary retains an absolute deadline, a 5 MiB response-body cap, allowed-origin checks and redirect rejection to bound worker resource use and prevent credential disclosure. Provider responses, including real 429s and their `Retry-After` values, remain distinguishable from local admission failures.
 
 ### `packages/availability`
 

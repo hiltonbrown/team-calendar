@@ -388,13 +388,15 @@ Service functions return `Result`. Route handlers map errors to HTTP responses. 
 - Raw Xero responses stored in `source_payload_json` on `availability_records` for audit.
 - Raw Xero write error payloads stored in `xero_write_error_raw` for admin audit only. A plain-language version is stored in `xero_write_error` for display. Never expose raw Xero error codes or payloads to employees.
 - Xero-specific types never leak into `packages/availability` or `packages/feeds`.
-- Rate limiting uses a shared, atomic store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. Ordinary quota keys initialise atomically on first use. App-wide admission also enforces 10,000 calls/minute; store failure denies admission.
+- Rate limiting uses a small shared, atomic Redis store inside `packages/xero`, keyed by provider app and external Xero tenant: 60/minute, 1,000/day on Starter or 5,000/day on higher commercial tiers, and five concurrent. This coordinates serverless app/API/job workers; process-local counters cannot enforce cross-worker concurrency. Expiring concurrency leases recover capacity after worker crashes, and successful requests release their leases. Ordinary quota keys initialise atomically on first use; fixture namespaces isolate tests only and require no deployment namespace or bootstrap command. App-wide admission enforces 10,000 calls/minute; token and connection-inventory requests have no invented tenant quota. Store failure denies admission as an infrastructure failure. Only an actual provider response supplies an HTTP 429 or provider rate-limit headers.
+- Preserve the absolute request deadline, 5 MiB response-body cap, allowed-origin checks and redirect rejection. These bound worker resource use and prevent credentials reaching an unapproved host; they are ordinary transport safeguards.
 - Consent requests exactly `offline_access accounting.settings.read payroll.employees payroll.settings.read`; validate actual granted capabilities, accepting write permission for its corresponding reads.
 - Server-only scoped access refreshes within two minutes of expiry, serialises token rotation under the canonical authorisation lock and atomically saves both tokens. Dormant active grants, including paused connections, refresh at 45 days. Invalid grants require reconnect.
 - AU people and V2 leave deltas use completed provider watermarks with a two-minute overlap. Only complete successful full reads may archive absent Xero-owned rows. Manual and nightly reconciliation are full reads.
 - Complete successful full employee reconciliation archives missing Xero-owned people immediately, without snapshot thresholds or missing-marker delays. Deferred leave changes and cancelled/incomplete runs retain their watermarks. Balance reads validate provider amounts and never invent zero for missing data.
 - A single persisted initial full import sequences people, leave and the entire balance roster; completion requires the event `requestedAt` to match `initial_sync_requested_at`. Scheduler recovery redispatches pending imports.
 - Owner/admin disconnect deletes the exact remote connection before local teardown/audit; provider 204/404 permits completion, uncertain failure preserves retryable state and sibling connections.
+- Do not recreate mirrored credentials, manual token-refresh controls, asynchronous normal disconnect cleanup, behavioural inactivity classifications/reports, or multi-provider abstractions. Canonical authorisations, automatic refresh, synchronous remote-first disconnect and the existing Xero regional adapters are the approved model.
 - All Xero sync operations carry `clerk_org_id` and `organisation_id` in their context.
 - Resolve XeroConnection with both `clerk_org_id` and `organisation_id`, then its canonical authorisation.
 - Outbound writes return `Result<T, XeroWriteError>`. `XeroWriteError` variants: `validation_error`, `conflict_error`, `auth_error`, `permission_error`, `rate_limit_error`, `network_error`, `not_found_error`, `region_not_supported_error`, `unknown_error`.
@@ -483,8 +485,8 @@ Optional variables with format constraints must be absent (commented out), not `
 | `XERO_TOKEN_ENCRYPTION_KEYS_JSON` | `packages/xero` | Server-only versioned encryption key map, never print values |
 | `INNGEST_EVENT_KEY` | `packages/jobs` | Inngest event key |
 | `INNGEST_SIGNING_KEY` | `packages/jobs` | Inngest signing key |
-| `KV_REST_API_URL` | `packages/feeds` | Vercel KV endpoint |
-| `KV_REST_API_TOKEN` | `packages/feeds` | Vercel KV auth token |
+| `KV_REST_API_URL` | `packages/feeds`, `packages/xero` | Shared feed cache and Xero quota endpoint, required for production Xero calls |
+| `KV_REST_API_TOKEN` | `packages/feeds`, `packages/xero` | Shared KV authentication, configured together with its URL |
 
 ### Stripe billing environment
 

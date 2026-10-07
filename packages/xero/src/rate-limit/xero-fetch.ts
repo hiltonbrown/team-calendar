@@ -10,13 +10,14 @@ import {
   XERO_MAX_RESPONSE_BYTES,
 } from "./limits";
 import { getXeroCorrelationId } from "./response-diagnostics";
-import type { XeroRateClass } from "./shared-store";
+import {
+  parseRateCooldown,
+  type SharedRateDeniedReason,
+  type XeroRateClass,
+} from "./shared-store";
 
 // Default reactive-retry budget for transient failures (429 and 5xx). The first
 // attempt is the real call; the rest are backed-off retries.
-const RETRY_SECONDS_REGEX = /^\d+(\.\d+)?$/;
-const RETRY_DATE_REGEX =
-  /^[A-Za-z]{3}, \d{2} [A-Za-z]{3} \d{4} \d{2}:\d{2}:\d{2} GMT$/;
 const DEFAULT_MAX_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_CAP_MS = 8000;
@@ -64,8 +65,7 @@ function defaultSleep(ms: number): Promise<void> {
 // Single choke point for every Xero HTTP call. Acquires per-org budget through
 // the limiter, performs the fetch, honours Retry-After on 429, and applies
 // exponential backoff to transient failures. When the budget is genuinely
-// exhausted it returns a synthetic 429 so existing error mapping surfaces a
-// rate_limit_error to the caller.
+// exhausted it reports an undispatched local error, distinct from provider 429s.
 export async function xeroFetch(
   input: XeroFetchInput,
   deps: Partial<XeroFetchDeps> = {}
@@ -135,7 +135,7 @@ export async function xeroFetch(
     logResponse(requestInput, response, waitMs);
     await sleep(waitMs);
   }
-  return rateLimitedResponse("minute");
+  throw new XeroFetchError("attempts_exhausted", false);
 }
 function retainMutationUncertainty(
   input: XeroFetchInput,
@@ -186,13 +186,16 @@ function snapshotInput(input: XeroFetchInput): XeroFetchInput {
 }
 function resolveMaxAttempts(input: XeroFetchInput): number {
   const attempts = input.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const boundedAttempts = input.mutation
-    ? Math.min(attempts, DEFAULT_MAX_ATTEMPTS)
-    : attempts;
-  return Math.min(
-    boundedAttempts,
-    input.attemptBudget?.remaining ?? boundedAttempts
-  );
+  const remaining = input.attemptBudget?.remaining ?? DEFAULT_MAX_ATTEMPTS;
+  if (
+    !Number.isSafeInteger(attempts) ||
+    attempts < 1 ||
+    !Number.isSafeInteger(remaining) ||
+    remaining < 1
+  ) {
+    throw new XeroFetchError("attempts_exhausted", false);
+  }
+  return Math.min(attempts, remaining, DEFAULT_MAX_ATTEMPTS);
 }
 function permitsAmbiguousRetry(input: XeroFetchInput): boolean {
   const method = input.init?.method ?? "GET";
@@ -285,7 +288,6 @@ async function performAttempt(
   }
   const gate = await limiter.acquire(input.rateClass, {
     deadline,
-    leaseMs: remainingMs(deadline) + 5000,
     maxWaitMs: Math.min(DEFAULT_MAX_WAIT_MS, remainingMs(deadline)),
   });
   if (!gate.ok) {
@@ -295,7 +297,7 @@ async function performAttempt(
     if (gate.reason === "infrastructure") {
       throw new XeroFetchError("admission_unavailable", false);
     }
-    return rateLimitedResponse(gate.reason);
+    throw new XeroFetchError(gate.reason, false);
   }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), remainingMs(deadline));
@@ -374,6 +376,7 @@ async function bufferWithRejectionEvidence(
 }
 export class XeroFetchError extends Error {
   readonly code:
+    | Exclude<SharedRateDeniedReason, "infrastructure">
     | "admission_unavailable"
     | "attempts_exhausted"
     | "body_too_large"
@@ -552,32 +555,5 @@ function backoffMs(attempt: number): number {
 // Retry-After is either delta-seconds or an HTTP date. Returns milliseconds, or
 // null when the header is absent or unparseable.
 export function parseRetryAfter(headerValue: null | string): null | number {
-  if (!headerValue) {
-    return null;
-  }
-  const seconds = Number(headerValue);
-  if (RETRY_SECONDS_REGEX.test(headerValue) && Number.isFinite(seconds)) {
-    return Math.max(0, seconds * 1000);
-  }
-  if (!RETRY_DATE_REGEX.test(headerValue)) {
-    return null;
-  }
-  const dateMs = Date.parse(headerValue);
-  if (Number.isNaN(dateMs)) {
-    return null;
-  }
-  return Math.max(0, dateMs - Date.now());
-}
-function rateLimitedResponse(reason: string): Response {
-  return new Response(
-    JSON.stringify({
-      Message: "Xero rate limit reached for this organisation.",
-      ReasonCode: reason,
-    }),
-    {
-      headers: { "Content-Type": "application/json" },
-      status: 429,
-      statusText: "Too Many Requests",
-    }
-  );
+  return parseRateCooldown(headerValue, Date.now()) ?? null;
 }

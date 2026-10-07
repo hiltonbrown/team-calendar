@@ -22,4 +22,16 @@ describe("release global fixture keys", () => {
       unsupportedGlobalFixtureKeys(["provider_app:owned", "unsupported:value"])
     ).toEqual(["unsupported:value"]);
   });
+
+  it("rejects the retired fixture namespace ownership kind", () => {
+    expect(isSupportedGlobalFixtureKey("fixture-namespace:obsolete")).toBe(
+      false
+    );
+    expect(
+      unsupportedGlobalFixtureKeys([
+        "authorisation:owned",
+        "fixture-namespace:obsolete",
+      ])
+    ).toEqual(["fixture-namespace:obsolete"]);
+  });
 });
