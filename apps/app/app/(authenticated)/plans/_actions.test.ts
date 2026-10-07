@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   currentUser: vi.fn(),
   deleteDraftRecord: vi.fn(),
   getActiveOrgContext: vi.fn(),
+  listSubmitRecoveryCandidates: vi.fn(),
   organisationFindFirst: vi.fn(),
   restoreRecord: vi.fn(),
   retrySubmission: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock("@repo/availability", () => ({
   archiveRecord: mocks.archiveRecord,
   createRecord: mocks.createRecord,
   deleteDraftRecord: mocks.deleteDraftRecord,
+  listSubmitRecoveryCandidates: mocks.listSubmitRecoveryCandidates,
   restoreRecord: mocks.restoreRecord,
   retrySubmission: mocks.retrySubmission,
   revertToDraft: mocks.revertToDraft,
@@ -56,6 +58,7 @@ vi.mock("@/lib/server/get-active-org-context", () => ({
 }));
 const {
   createRecordAction,
+  listSubmitRecoveryCandidatesAction,
   retrySubmissionAction,
   revertToDraftAction,
   submitForApprovalAction,
@@ -109,6 +112,46 @@ describe("plans actions", () => {
       expect(result.error.code).toBe("not_authorised");
     }
   });
+  it.each(["org:viewer", "org:manager"])(
+    "denies imported recovery reads for %s",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      await expect(
+        listSubmitRecoveryCandidatesAction({
+          organisationId: validInput.organisationId,
+          recordId: "00000000-0000-4000-8000-000000000099",
+        })
+      ).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+      expect(mocks.listSubmitRecoveryCandidates).not.toHaveBeenCalled();
+    }
+  );
+  it.each(["org:admin", "org:owner"])(
+    "scopes imported recovery reads for %s",
+    async (orgRole) => {
+      mocks.auth.mockResolvedValue({ orgRole });
+      mocks.listSubmitRecoveryCandidates.mockResolvedValue({
+        ok: true,
+        value: { candidates: [] },
+      });
+      await listSubmitRecoveryCandidatesAction({
+        organisationId: validInput.organisationId,
+        recordId: "00000000-0000-4000-8000-000000000099",
+      });
+      expect(mocks.listSubmitRecoveryCandidates).toHaveBeenCalledWith(
+        {
+          actingOrgRole: orgRole,
+          actingUserId: "user_1",
+          clerkOrgId: "org_1",
+          organisationId: validInput.organisationId,
+          recordId: "00000000-0000-4000-8000-000000000099",
+        },
+        {}
+      );
+    }
+  );
   it("rejects malformed input", async () => {
     const result = await createRecordAction({
       ...validInput,

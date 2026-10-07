@@ -192,6 +192,28 @@ describe("Plans page server data", () => {
     expect(mocks.listTeamRecords).not.toHaveBeenCalled();
     expect(screen.getByText("Plans client: 0")).toBeDefined();
   });
+  it("passes the imported recovery filter through the scoped administrator Plans route", async () => {
+    mocks.auth.mockResolvedValue({ orgRole: "org:admin" });
+    render(
+      await PlansPage({
+        searchParams: Promise.resolve({
+          allHistory: "true",
+          sourceType: "xero_leave",
+          tab: "team",
+        }),
+      })
+    );
+    expect(mocks.listTeamRecords).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actingOrgRole: "org:admin",
+        allHistory: true,
+        clerkOrgId: "org_1",
+        filters: expect.objectContaining({ sourceType: ["xero_leave"] }),
+        organisationId: "00000000-0000-4000-8000-000000000001",
+      })
+    );
+    expect(mocks.listMyRecords).not.toHaveBeenCalled();
+  });
   it("computes working days once per returned record without amplification", async () => {
     const records = Array.from({ length: 25 }, (_, index) => ({
       allDay: true,

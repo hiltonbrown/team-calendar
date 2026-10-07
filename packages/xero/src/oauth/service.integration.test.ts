@@ -295,6 +295,36 @@ describe("canonical OAuth persistence", () => {
     expect(tokenText(saved, "access")).toBe("new-access-token");
     expect(tokenText(saved, "refresh")).toBe("new-refresh-token");
   });
+  it("saves rotated credentials without a post-refresh JWKS dependency", async () => {
+    await connection();
+    identity.verify.mockRejectedValue(new Error("JWKS unavailable"));
+    const provider = vi.fn<typeof fetch>(async () => tokenResponse());
+    vi.stubGlobal("fetch", provider);
+    expect(await canonical.resolveXeroAccess(scope())).toMatchObject({
+      ok: true,
+      value: { accessToken: "new-access-token" },
+    });
+    const saved = await database.xeroAuthorisation.findUniqueOrThrow({
+      where: { id: fixture.authorisationId },
+    });
+    expect(tokenText(saved, "refresh")).toBe("new-refresh-token");
+    expect(saved.xero_user_id).toBe(allocation.id("xero-user"));
+    expect(saved.status).toBe("active");
+    expect(saved.access_token_expires_at.getTime()).toBeGreaterThan(Date.now());
+    await database.xeroAuthorisation.update({
+      data: { access_token_expires_at: new Date(Date.now() - 1000) },
+      where: { id: saved.id },
+    });
+    expect(await canonical.resolveXeroAccess(scope())).toMatchObject({
+      ok: true,
+    });
+    expect(provider).toHaveBeenCalledTimes(2);
+    expect(
+      new URLSearchParams(String(provider.mock.calls[1]?.[1]?.body)).get(
+        "refresh_token"
+      )
+    ).toBe("new-refresh-token");
+  });
   it("recovers a lost provider response on the next normal attempt using grace", async () => {
     await connection();
     const before = await database.xeroAuthorisation.findUniqueOrThrow({

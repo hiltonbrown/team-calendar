@@ -45,6 +45,8 @@ const {
   listAvailabilityRecords,
   listPeople,
   listTeamRecordsPage,
+  listTeamRecords,
+  getRecord,
   updateManualAvailability,
 } = await import("./index");
 const { database } = await import("@repo/database");
@@ -120,6 +122,9 @@ const createTenant = async (tenant: TenantFixture) => {
   });
 };
 const cleanTestData = async () => {
+  await database.outboundOperation.deleteMany({
+    where: { clerk_org_id: { in: testClerkOrgIds } },
+  });
   await database.availabilityPublication.deleteMany({
     where: { clerk_org_id: { in: testClerkOrgIds } },
   });
@@ -898,6 +903,125 @@ describe("release list-query evidence", () => {
       },
     });
   });
+  test.each([
+    ["approve", "outcome_unknown"],
+    ["decline", "provider_accepted"],
+    ["withdraw", "prepared"],
+  ] as const)(
+    "exposes imported %s %s on Plans without editing provider records or crossing scope",
+    async (action, status) => {
+      const pendingId = fixture.id("imported-recovery-record", 0);
+      const completedId = fixture.id("imported-recovery-record", 1);
+      const foreignId = fixture.id("imported-recovery-record", 2);
+      await database.availabilityRecord.createMany({
+        data: [pendingId, completedId, foreignId].map((id, index) => {
+          const tenant = index === 2 ? tenantB : tenantA;
+          return {
+            approval_status: "submitted" as const,
+            clerk_org_id: tenant.clerkOrgId,
+            contactability: "limited" as const,
+            derived_uid_key: fixture.key("imported-recovery-uid", index),
+            ends_at: new Date("2026-11-06T00:00:00.000Z"),
+            id,
+            organisation_id: tenant.organisationId,
+            person_id: tenant.personId,
+            privacy_mode: "named" as const,
+            record_type: "annual_leave" as const,
+            source_remote_id: fixture.key("imported-recovery-remote", index),
+            source_type: "xero_leave" as const,
+            starts_at: new Date("2026-11-02T00:00:00.000Z"),
+          };
+        }),
+      });
+      await database.outboundOperation.createMany({
+        data: [pendingId, completedId, foreignId].map((id, index) => {
+          const tenant = index === 2 ? tenantB : tenantA;
+          return {
+            action,
+            actor_user_id: "recovery_actor",
+            availability_record_id: id,
+            clerk_org_id: tenant.clerkOrgId,
+            organisation_id: tenant.organisationId,
+            request_fingerprint: fixture.key(
+              "imported-recovery-fingerprint",
+              index
+            ),
+            status: index === 1 ? ("completed" as const) : status,
+          };
+        }),
+      });
+      const scope = {
+        actingOrgRole: "org:admin",
+        allHistory: true,
+        clerkOrgId: tenantA.clerkOrgId,
+        organisationId: tenantA.organisationId,
+      };
+      for (const filters of [undefined, { sourceType: ["xero_leave"] }]) {
+        const result = await listTeamRecordsPage({ ...scope, filters });
+        expect(result).toMatchObject({
+          ok: true,
+          value: {
+            items: [
+              {
+                editableActions: ["view"],
+                id: pendingId,
+                submissionResolutionPending: true,
+              },
+            ],
+            totalCount: 1,
+          },
+        });
+        await expect(
+          listTeamRecords({ ...scope, filters })
+        ).resolves.toMatchObject({
+          ok: true,
+          value: [
+            {
+              editableActions: ["view"],
+              id: pendingId,
+              submissionResolutionPending: true,
+            },
+          ],
+        });
+      }
+      await expect(
+        getRecord({
+          ...scope,
+          actingUserId: "recovery_actor",
+          recordId: pendingId,
+        })
+      ).resolves.toMatchObject({
+        ok: true,
+        value: {
+          editableActions: ["view"],
+          id: pendingId,
+          submissionResolutionPending: true,
+        },
+      });
+      for (const mismatchedScope of [
+        { ...scope, clerkOrgId: tenantB.clerkOrgId },
+        { ...scope, organisationId: tenantB.organisationId },
+      ]) {
+        await expect(
+          listTeamRecordsPage(mismatchedScope)
+        ).resolves.toMatchObject({
+          ok: true,
+          value: { items: [], totalCount: 0 },
+        });
+      }
+      await expect(
+        getRecord({
+          ...scope,
+          actingOrgRole: "org:viewer",
+          actingUserId: "unlinked_viewer",
+          recordId: pendingId,
+        })
+      ).resolves.toMatchObject({
+        error: { code: "not_authorised" },
+        ok: false,
+      });
+    }
+  );
   test("keeps plan query count constant at 1, 50, and 200 rows", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-06-01T12:00:00.000Z"));

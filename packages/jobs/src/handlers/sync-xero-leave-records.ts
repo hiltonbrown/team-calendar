@@ -425,7 +425,9 @@ async function syncXeroLeaveRecordsInternal(
             .map((record) => record.personId),
           ...stale.personIds,
         ]);
-        await enqueueFeedRebuilds(context, [...affectedPersonIds]);
+        await afterXeroBindingCommit(context, () =>
+          enqueueFeedRebuilds(context, [...affectedPersonIds])
+        );
         await assertRunActive(context, run.id, tx);
         await tx.xeroConnection.updateMany({
           data: {

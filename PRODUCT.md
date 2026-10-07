@@ -585,7 +585,9 @@ their matching read capability, and every required capability must be present.
 
 One server-only scoped access resolver performs automatic refresh within two minutes of expiry,
 rechecks canonical credentials under the authorisation lock and saves the rotated
-pair atomically. Dormant grants with active connections, including paused sync,
+pair atomically from the validated, authenticated token-endpoint response. Initial
+authorisation verifies Xero identity; refresh does not add another JWKS request
+after rotation. Dormant grants with active connections, including paused sync,
 are refreshed at 45 days through the same implementation. An uncertain response
 keeps the stored pair for the next normal attempt within Xero's documented
 30-minute grace period. Invalid grants require reconnect. Token refresh has no
@@ -630,6 +632,11 @@ safe correlation identifiers. An imported operation prepared but never
 dispatched exposes its original action after claim expiry; it keeps the same
 operation, key and actor. A definitive refusal to withdraw approved leave keeps
 the record approved with a plain-language error.
+
+Plans includes imported Xero leave only when an unresolved approve, decline or
+withdraw operation needs recovery. The Xero recovery source filter finds these
+records; imported records remain view-only and only owners/admins can recover
+them using authoritative provider evidence.
 
 All provider mutations are synchronous and user-triggered. Failures are surfaced inline; outbound writes have no automatic background retry. NZ and UK submission remain unavailable.
 

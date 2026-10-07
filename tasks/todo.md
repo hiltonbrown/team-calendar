@@ -1,5 +1,43 @@
 # Current work
 
+## PR129 review corrections
+
+- [x] Evaluate all review comments against explicit pre-production/no-recovery-architecture scope.
+- [x] Reproduce and fix imported leave recovery visibility and feed publication after archive commit.
+- [x] Correct verified refresh rotation issue without a new durable recovery model; remove duplicate classifier entry.
+- [x] Run relevant RED/GREEN and repository checks; obtain independent review.
+- [x] Prepare verified corrections and documented review rulings for the existing PR.
+
+Baseline22cefe59, PR129 main←work. Stopping condition: actionable findings
+fixed and verified, explicit scope conflicts explained, same PR updated. Do
+not backfill existing connections, add lifecycle recovery state, access live
+Xero, create a worktree or merge. Update the existing PR with verified fixes and
+record the review rulings in its description.
+
+Review: imported recovery discovery, pre-commit archive publication and discarded
+rotated tokens reproduced in failing regressions and were corrected. Plans stays
+scoped and imported records stay view-only; refresh saves the authenticated
+token-endpoint response without a redundant JWKS request or new durable state.
+The backfill request is inapplicable to the explicitly empty/pre-production Xero
+dataset. Removed the duplicate classifier entry and corrected imported recovery
+attestation wording. Fresh independent review has no remaining findings.
+
+Verification before the correction commit: `bun run check` passed (1,155 files);
+`bun run typecheck --force --concurrency=3` passed (19 uncached tasks);
+`bun run boundaries` passed (1,084 files, 21 packages);
+`bun run test --force --continue=always --concurrency=2 -- --maxWorkers=2`
+passed (3,054 tests, 18 uncached tasks); `bun run test:integration --force
+--continue=always --concurrency=2` passed (273 tests, six uncached tasks);
+`bun run build --force --concurrency=1` passed (four uncached tasks, including
+Prisma generation). Integration used only owned loopback PostgreSQL/Redis.
+
+The first full unit run exposed a real-time 25 ms AU stalled-body test deadline
+race. It now uses the existing transport tests' controlled-clock pattern, retains
+the exact permission error and single-dispatch assertions, and restores timers.
+The complete failed unit command was rerun successfully after this correction.
+Live provider/browser/Neon verification remains NOT VERIFIED; no new live
+verification or production operation was performed.
+
 ## Final completed-phase Xero audit, Prompt 8
 
 - [x] Independently review OAuth, canonical persistence, refresh, sync, writes, disconnect and security in fresh contexts.

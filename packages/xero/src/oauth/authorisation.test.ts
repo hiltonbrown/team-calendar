@@ -202,18 +202,56 @@ describe("one scoped canonical access resolver", () => {
       began + 10_050
     );
   });
-  it("honours narrower actual scopes supplied by the verified refreshed JWT", async () => {
+  it("persists the rotated pair when JWKS identity validation is unavailable", async () => {
     current = grant(Date.now() - 1000);
-    mocks.verify.mockResolvedValueOnce({
+    mocks.verify.mockRejectedValue(new Error("JWKS unavailable"));
+    const began = Date.now();
+    expect(await resolveXeroAccess(input())).toMatchObject({
+      ok: true,
+      value: { accessToken: "new-access" },
+    });
+    expect(current.xero_user_id).toBe("user");
+    expect(current.access_token_expires_at.getTime()).toBeGreaterThanOrEqual(
+      began + 1_800_000
+    );
+    expect(current.access_token_expires_at.getTime()).toBeLessThanOrEqual(
+      Date.now() + 1_800_000
+    );
+    expect(
+      decryptXeroToken({
+        authTag: current.refresh_token_auth_tag,
+        encrypted: current.refresh_token_encrypted,
+        iv: current.refresh_token_iv,
+        keyVersion: current.token_key_version,
+      })
+    ).toBe("new-refresh");
+  });
+  it("uses the authenticated refresh response expiry rather than another JWT lookup", async () => {
+    current = grant(Date.now() - 1000);
+    mocks.verify.mockResolvedValue({
       ok: true,
       value: {
-        authEventId: null,
-        expiresAt: new Date(Date.now() + 1_800_000),
-        grantedScopes: ["payroll.employees"],
-        scopeProvided: true,
+        expiresAt: new Date(0),
+        grantedScopes: [],
         xeroUserId: "user",
       },
     });
+    const began = Date.now();
+    expect(await resolveXeroAccess(input())).toMatchObject({ ok: true });
+    expect(current.access_token_expires_at.getTime()).toBeGreaterThanOrEqual(
+      began + 1_800_000
+    );
+  });
+  it("honours narrower actual scopes supplied by the authenticated refresh response", async () => {
+    current = grant(Date.now() - 1000);
+    mocks.http.mockResolvedValueOnce(
+      Response.json({
+        access_token: "new-access",
+        expires_in: 1800,
+        refresh_token: "new-refresh",
+        scope: "payroll.employees",
+      })
+    );
     expect(
       await resolveXeroAccess({
         ...input(),

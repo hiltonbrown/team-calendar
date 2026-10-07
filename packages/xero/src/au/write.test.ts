@@ -41,6 +41,7 @@ beforeEach(() => {
   );
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -353,6 +354,7 @@ describe("AU payroll write path", () => {
 describe("161g AU mutation evidence", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("keeps scope rejection through a stalled401 body without replay", async () => {
+    vi.useFakeTimers();
     const stream = new ReadableStream({
       pull() {
         return new Promise(() => {
@@ -371,15 +373,15 @@ describe("161g AU mutation evidence", () => {
       ...buildXeroTenant(),
       deadline: { expiresAtMs: Date.now() + 25 },
     };
-    expect(
-      await approveLeaveApplication(
-        withAuMutation("approve", {
-          xeroConnection: current,
-          xeroEmployeeId: "employee",
-          xeroLeaveApplicationId: "leave",
-        })
-      )
-    ).toMatchObject({
+    const result = approveLeaveApplication(
+      withAuMutation("approve", {
+        xeroConnection: current,
+        xeroEmployeeId: "employee",
+        xeroLeaveApplicationId: "leave",
+      })
+    );
+    await vi.advanceTimersByTimeAsync(25);
+    expect(await result).toMatchObject({
       error: { code: "permission_error", recoveryReason: "update_permissions" },
       ok: false,
     });

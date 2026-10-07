@@ -6,7 +6,10 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { archiveRecordAction } from "./_actions";
+import {
+  archiveRecordAction,
+  listSubmitRecoveryCandidatesAction,
+} from "./_actions";
 import PlansError from "./error";
 import { PlansClient } from "./plans-client";
 
@@ -27,6 +30,7 @@ vi.mock("@/components/plans/submit-confirmation-modal", () => ({
 vi.mock("./_actions", () => ({
   archiveRecordAction: vi.fn(),
   deleteDraftAction: vi.fn(),
+  listSubmitRecoveryCandidatesAction: vi.fn(),
   restoreRecordAction: vi.fn(),
   retrySubmissionAction: vi.fn(),
   revertToDraftAction: vi.fn(),
@@ -62,6 +66,52 @@ function planRecord(
 }
 describe("Plans page client surface", () => {
   afterEach(() => cleanup());
+  it.each([true, false])(
+    "gates imported recovery controls by administrator access %s",
+    async (canRecoverSubmit) => {
+      vi.mocked(listSubmitRecoveryCandidatesAction).mockResolvedValue({
+        ok: true,
+        value: { candidates: [], complete: true },
+      });
+      render(
+        <PlansClient
+          canRecoverSubmit={canRecoverSubmit}
+          canViewTeam
+          filters={{ ...baseFilters, sourceType: ["xero_leave"], tab: "team" }}
+          organisationId="00000000-0000-4000-8000-000000000001"
+          orgQueryValue={null}
+          records={[
+            planRecord({
+              approvalStatus: "submitted",
+              editableActions: ["view"],
+              sourceType: "xero_leave",
+              submissionResolutionPending: true,
+            }),
+          ]}
+          xeroConnectionState="connected"
+        />
+      );
+      expect(screen.queryByText("Resolve Xero leave action") !== null).toBe(
+        canRecoverSubmit
+      );
+      expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Withdraw" })).toBeNull();
+      if (canRecoverSubmit) {
+        fireEvent.change(screen.getByLabelText("Recovery reason"), {
+          target: { value: "Verify the imported approval outcome." },
+        });
+        fireEvent.click(
+          screen.getByRole("button", { name: "Check Xero candidates" })
+        );
+        await waitFor(() =>
+          expect(listSubmitRecoveryCandidatesAction).toHaveBeenCalledWith({
+            organisationId: "00000000-0000-4000-8000-000000000001",
+            recordId: "00000000-0000-4000-8000-000000000099",
+          })
+        );
+      }
+    }
+  );
   it("shows a persisted withdrawal refusal while the leave remains approved", () => {
     render(
       <PlansClient

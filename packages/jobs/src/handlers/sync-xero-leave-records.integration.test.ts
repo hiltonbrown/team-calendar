@@ -4,6 +4,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 const afterSnapshotRead = vi.fn<() => Promise<void>>();
+const beforeRunActiveCheck =
+  vi.fn<typeof import("./sync-run-lifecycle").assertRunActive>();
 const mockFetchLeaveForEmployeeForRegion = vi.fn();
 const mockFetchLeaveRecordsForRegion = vi.fn();
 const mockInngestSend = vi.fn(async () => ({ ids: ["event_1"] }));
@@ -56,6 +58,19 @@ vi.mock("@repo/xero", async (importOriginal) => {
       mockFetchLeaveRecordsForRegion(...args),
   };
 });
+vi.mock("./sync-run-lifecycle", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("./sync-run-lifecycle")>();
+  return {
+    ...original,
+    assertRunActive: async (
+      ...args: Parameters<typeof original.assertRunActive>
+    ) => {
+      await beforeRunActiveCheck(...args);
+      await original.assertRunActive(...args);
+    },
+  };
+});
 describe("local persistence integration", async () => {
   await import("./setup-env");
   const { getRegisteredSyncEventName } = await import("../events");
@@ -96,11 +111,109 @@ describe("local persistence integration", async () => {
     beforeEach(async () => {
       vi.clearAllMocks();
       afterSnapshotRead.mockReset();
+      beforeRunActiveCheck.mockReset();
       await cleanTestData();
     });
     afterAll(async () => {
       await cleanTestData();
       await database.$disconnect();
+    });
+    it("queues full AU feed rebuilds after stale archival is committed", async () => {
+      await setupTenant(tenantA);
+      await setupPerson(tenantA);
+      await setupFeed(tenantA);
+      await createStaleRecord(tenantA);
+      mockFetchLeaveRecordsForRegion.mockResolvedValue({
+        ok: true,
+        value: { complete: true, leaveRecords: [], rawResponse: {} },
+      });
+      let committedArchive: Date | null | undefined;
+      mockInngestSend.mockImplementationOnce(async () => {
+        const record = await database.availabilityRecord.findFirst({
+          select: { archived_at: true },
+          where: {
+            clerk_org_id: tenantA.clerkOrgId,
+            organisation_id: tenantA.organisationId,
+            source_remote_id: staleLeaveId(),
+          },
+        });
+        committedArchive = record?.archived_at;
+        return { ids: ["event_1"] };
+      });
+
+      const result = await syncXeroLeaveRecords(syncInput(tenantA));
+
+      expect(result.ok && result.value).toMatchObject({
+        archived: 1,
+        status: "succeeded",
+      });
+      expect(committedArchive).toBeInstanceOf(Date);
+      expect(mockInngestSend).toHaveBeenCalledWith([
+        {
+          data: {
+            clerkOrgId: tenantA.clerkOrgId,
+            feedId: "50000000-0000-4000-8000-000000000010",
+            organisationId: tenantA.organisationId,
+            reason: "xero_leave_records_synced",
+          },
+          name: "rebuild-feed-cache",
+        },
+      ]);
+    });
+    it("does not queue full AU feed rebuilds when stale archival rolls back", async () => {
+      await setupTenant(tenantA);
+      await setupPerson(tenantA);
+      await setupFeed(tenantA);
+      await createStaleRecord(tenantA);
+      mockFetchLeaveRecordsForRegion.mockResolvedValue({
+        ok: true,
+        value: { complete: true, leaveRecords: [], rawResponse: {} },
+      });
+      beforeRunActiveCheck.mockImplementation(async (context, runId, tx) => {
+        if (!tx) {
+          return;
+        }
+        const scope = {
+          clerk_org_id: context.clerkOrgId,
+          organisation_id: context.organisationId,
+        };
+        const archived = await tx.availabilityRecord.count({
+          where: {
+            ...scope,
+            archived_at: { not: null },
+            source_remote_id: staleLeaveId(),
+          },
+        });
+        if (archived > 0) {
+          await tx.syncRun.updateMany({
+            data: { cancel_requested_at: new Date() },
+            where: { ...scope, id: runId },
+          });
+        }
+      });
+
+      const result = await syncXeroLeaveRecords(syncInput(tenantA));
+
+      expect(result.ok && result.value.status).toBe("cancelled");
+      expect(
+        await database.availabilityRecord.findFirst({
+          where: {
+            clerk_org_id: tenantA.clerkOrgId,
+            organisation_id: tenantA.organisationId,
+            source_remote_id: staleLeaveId(),
+          },
+        })
+      ).toMatchObject({ archived_at: null, publish_status: "eligible" });
+      expect(
+        await database.xeroSyncCursor.count({
+          where: {
+            clerk_org_id: tenantA.clerkOrgId,
+            organisation_id: tenantA.organisationId,
+            xero_connection_id: tenantA.connectionId,
+          },
+        })
+      ).toBe(0);
+      expect(mockInngestSend).not.toHaveBeenCalled();
     });
     it("commits complete deltas but retains the watermark and imported rows after a malformed batch", async () => {
       await setupTenant(tenantA);
@@ -218,7 +331,7 @@ describe("local persistence integration", async () => {
       ).toMatchObject({ archived_at: null });
     });
     it.each(["fenced", "dispatch_failure"] as const)(
-      "retains full-reconciliation rows and cursor after %s finalisation",
+      "preserves coherent full-reconciliation state after %s finalisation",
       async (failure) => {
         await setupTenant(tenantA);
         await setupPerson(tenantA);
@@ -261,11 +374,17 @@ describe("local persistence integration", async () => {
         } else {
           expect(result.ok).toBe(false);
         }
-        expect(
-          await database.xeroSyncCursor.findFirst({ where: scope })
-        ).toMatchObject({
-          modified_since: failure === "fenced" ? newer : prior,
+        const cursor = await database.xeroSyncCursor.findFirst({
+          where: scope,
         });
+        if (failure === "fenced") {
+          expect(cursor).toMatchObject({ modified_since: newer });
+          expect(mockInngestSend).not.toHaveBeenCalled();
+        } else {
+          expect(cursor?.modified_since?.getTime()).toBeGreaterThan(
+            prior.getTime()
+          );
+        }
         expect(
           await database.availabilityRecord.findFirst({
             where: {
@@ -274,7 +393,10 @@ describe("local persistence integration", async () => {
               source_remote_id: staleLeaveId(),
             },
           })
-        ).toMatchObject({ archived_at: null, publish_status: "eligible" });
+        ).toMatchObject({
+          archived_at: failure === "fenced" ? null : expect.any(Date),
+          publish_status: failure === "fenced" ? "eligible" : "archived",
+        });
       }
     );
     it("syncs AU leave idempotently and archives stale scoped records", async () => {

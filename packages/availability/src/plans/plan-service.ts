@@ -1046,11 +1046,7 @@ async function listRecordsPageForScope(input: {
   }
   const where: Prisma.AvailabilityRecordWhereInput = {
     ...scopedTo(input),
-    source_type: {
-      in: input.filters.sourceType?.length
-        ? [...input.filters.sourceType]
-        : ["manual", "team_calendar_leave"],
-    },
+    ...planSourceFilter(input),
     ...(input.filters.includeArchived ? {} : { archived_at: null }),
     ...(input.filters.approvalStatus?.length
       ? { approval_status: { in: input.filters.approvalStatus } }
@@ -1243,7 +1239,7 @@ async function listRecordsForScope({
     select: { id: true },
     where: {
       ...scopedTo({ clerkOrgId, organisationId }),
-      source_type: { in: ["manual", "team_calendar_leave"] },
+      ...planSourceFilter({ clerkOrgId, filters, organisationId }),
       ...(filters.includeArchived ? {} : { archived_at: null }),
       ...(filters.approvalStatus?.length
         ? { approval_status: { in: filters.approvalStatus } }
@@ -1252,17 +1248,6 @@ async function listRecordsForScope({
       ...(filters.recordType?.length
         ? { record_type: { in: [...filters.recordType] } }
         : recordTypeCategoryFilter(filters.recordTypeCategory)),
-      ...(filters.sourceType?.length
-        ? {
-            source_type: {
-              in: filters.sourceType.filter(
-                (sourceType) =>
-                  sourceType === "manual" ||
-                  sourceType === "team_calendar_leave"
-              ),
-            },
-          }
-        : {}),
       ...(filters.dateRange?.from
         ? { ends_at: { gte: filters.dateRange.from } }
         : {}),
@@ -1591,6 +1576,35 @@ function categoryChanged(first: RecordType, second: RecordType): boolean {
     (isLocalOnlyType(first) && isXeroLeaveType(second)) ||
     (isXeroLeaveType(first) && isLocalOnlyType(second))
   );
+}
+function planSourceFilter(input: {
+  clerkOrgId: string;
+  filters: PlanFilters;
+  organisationId: string;
+}): Prisma.AvailabilityRecordWhereInput {
+  const sourceTypes: availability_source_type[] = input.filters.sourceType
+    ?.length
+    ? input.filters.sourceType
+    : ["manual", "team_calendar_leave", "xero_leave"];
+  return {
+    source_type: { in: sourceTypes },
+    ...(sourceTypes.includes("xero_leave")
+      ? {
+          OR: [
+            { source_type: { in: ["manual", "team_calendar_leave"] } },
+            {
+              outbound_operations: {
+                some: {
+                  ...scopedTo(input),
+                  ...recordInclude.outbound_operations.where,
+                },
+              },
+              source_type: "xero_leave",
+            },
+          ],
+        }
+      : {}),
+  };
 }
 function recordTypeCategoryFilter(
   category: PlanFilters["recordTypeCategory"]

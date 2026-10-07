@@ -307,6 +307,7 @@ export function PlansClient({
             <SelectContent>
               <SelectItem value="all">All sources</SelectItem>
               <SelectItem value="team_calendar_leave">Xero</SelectItem>
+              <SelectItem value="xero_leave">Xero recovery</SelectItem>
               <SelectItem value="manual">Manual</SelectItem>
             </SelectContent>
           </Select>
@@ -744,8 +745,8 @@ function SubmitRecoveryControls({
         ))}
         <p className="text-muted-foreground">
           Only use the option below after independently confirming in Xero or
-          with Xero support that no request was created. An empty search or
-          timeout is not proof.
+          with Xero support that the action was not processed. An empty search
+          or timeout is not proof.
         </p>
         <Label htmlFor={`recovery-evidence-${recordId}`}>
           Independent evidence reference
@@ -761,7 +762,7 @@ function SubmitRecoveryControls({
             onChange={(event) => setIndependentlyVerified(event.target.checked)}
             type="checkbox"
           />
-          I independently verified that Xero did not create this request.
+          I independently verified that Xero did not process this action.
         </label>
         <Button
           disabled={
@@ -775,7 +776,7 @@ function SubmitRecoveryControls({
           type="button"
           variant="destructive"
         >
-          Confirm not created and unlock
+          Confirm not processed and unlock
         </Button>
         {error ? (
           <p className="text-destructive" role="alert">

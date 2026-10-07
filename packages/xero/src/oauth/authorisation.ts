@@ -198,6 +198,7 @@ export async function refreshXeroAuthorisation(
           iv: current.refresh_token_iv,
           keyVersion: current.token_key_version,
         });
+        const requestedAt = Date.now();
         const rotated = await exchangeToken({
           deadline,
           grantType: "refresh_token",
@@ -217,33 +218,21 @@ export async function refreshXeroAuthorisation(
           });
           return rotated;
         }
-        const identity = await verifyXeroAccessTokenIdentity(
-          rotated.value.access_token
-        );
-        if (
-          !identity.ok ||
-          identity.value.xeroUserId !== current.xero_user_id
-        ) {
-          return {
-            error: {
-              code: "invalid_token_response",
-              message: "Connecting Xero failed. Start again.",
-            },
-            ok: false,
-          };
-        }
+        // The authenticated token endpoint rotates this already-verified grant.
+        // Save its validated response directly; a second JWKS request must not
+        // discard the new refresh token. Initial adoption still verifies identity.
         const updated = await tx.xeroAuthorisation.update({
           data: {
             ...encryptedTokens(
               rotated.value.access_token,
               rotated.value.refresh_token
             ),
-            access_token_expires_at: identity.value.expiresAt,
+            access_token_expires_at: new Date(
+              requestedAt + rotated.value.expires_in * 1000
+            ),
             granted_scopes:
               rotated.value.scope?.split(SCOPE_SEPARATOR).filter(Boolean) ??
-              (identity.value.scopeProvided
-                ? identity.value.grantedScopes
-                : current.granted_scopes),
+              current.granted_scopes,
             last_refresh_error_at: null,
             last_refresh_error_code: null,
             last_refreshed_at: new Date(),
