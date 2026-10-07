@@ -144,9 +144,10 @@ describe("xero-person-reconciliation", () => {
       expect(mocks.personUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
+            archived_at: null,
+            is_active: true,
             job_title: "Senior Engineer",
             xero_employee_id: employeeId,
-            xero_missing_since: null,
           }),
           where: { id: xeroPersonId },
         })

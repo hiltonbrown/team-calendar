@@ -411,7 +411,6 @@ model Person {
   default_privacy_mode        availability_privacy_mode   @default(named)
   include_in_feeds_by_default Boolean                     @default(true)
   archived_at                 DateTime?
-  xero_missing_since          DateTime?
   created_at                  DateTime                    @default(now())
   updated_at                  DateTime                    @updatedAt
 

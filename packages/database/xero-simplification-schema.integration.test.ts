@@ -62,6 +62,14 @@ describe("simplified Xero persistence", () => {
     ]);
   });
 
+  test("does not retain the obsolete Person missing-confirmation column", async () => {
+    const columns = await database.$queryRaw<Array<{ column_name: string }>>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'people'
+        AND column_name = 'xero_missing_since'`;
+    expect(columns).toEqual([]);
+  });
+
   test("stores one grant for two scoped connections", async () => {
     await database
       .$transaction(async (tx) => {

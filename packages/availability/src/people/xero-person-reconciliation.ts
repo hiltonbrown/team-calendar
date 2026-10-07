@@ -88,7 +88,6 @@ async function findExistingExactMatch(
         start_date: input.startDate ?? exactMatch.start_date,
         updated_at: new Date(),
         xero_employee_id: input.employeeId,
-        xero_missing_since: null,
       },
       where: { id: exactMatch.id },
     });
@@ -119,7 +118,6 @@ async function findExistingExactMatch(
         start_date: input.startDate ?? sourceMatch.start_date,
         updated_at: new Date(),
         xero_employee_id: input.employeeId,
-        xero_missing_since: null,
       },
       where: { id: sourceMatch.id },
     });
@@ -181,7 +179,6 @@ async function tryUpgradeManualCandidate(
           start_date: input.startDate ?? candidate.start_date,
           updated_at: new Date(),
           xero_employee_id: input.employeeId,
-          xero_missing_since: null,
         },
         where: { id: candidate.id },
       });
@@ -259,7 +256,6 @@ async function handleCandidatesOrNewPerson(
       start_date: input.startDate ?? null,
       updated_at: new Date(),
       xero_employee_id: input.employeeId,
-      xero_missing_since: null,
     },
     where: {
       clerk_org_id: context.clerkOrgId,

@@ -436,7 +436,18 @@ export async function fetchLeaveBalances(input: {
       await input.onProgress?.(index + 1, input.employeeIds.length);
       continue;
     }
-    leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    try {
+      leaveBalances.push(...mapXeroLeaveBalances(rawPayload));
+    } catch {
+      failures.push({
+        employeeId,
+        error: {
+          code: "validation_error",
+          message: "Xero returned invalid AU payroll leave balances.",
+          rawPayload,
+        },
+      });
+    }
     await input.onProgress?.(index + 1, input.employeeIds.length);
   }
   return {

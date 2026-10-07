@@ -635,6 +635,10 @@ All provider mutations are synchronous and user-triggered. Failures are surfaced
 
 For AU employees and V2 leave, every delta page uses the prior completed `modified_since` minus a two-minute overlap in `If-Modified-Since` (UTC seconds), with page size 100. Capture run start before fetching and advance the scoped watermark to that start only after all pages and relevant records persist successfully. Empty complete deltas are valid. Malformed or incomplete traversal and failed upserts leave the watermark unchanged. Compare-and-set the prior watermark and recheck the active scoped connection/external tenant before persistence; delayed jobs cannot move progress backwards. Full reads omit the header. NZ/UK retain their supported paging and per-employee reads without a fabricated modification filter; local roster progress belongs on the connection.
 
+A complete successful full employee reconciliation immediately archives absent Xero-owned people, including a genuinely empty roster. It preserves manual people and other Organisations. There is no missing-person percentage/count threshold, confirmation delay or persistent missing marker. Archival and the employee watermark commit together. Leave changes deferred by a concurrent local write keep the prior watermark and are retried on the next delta; already-applied duplicate or older snapshots do not block progress. Cancelled runs never establish completion.
+
+AU balances remain per-employee detail reads, without modification filters or calculated amounts. Invalid employee/balance envelopes and absent or nonnumeric amounts are recorded as failures, preventing successful initial import or whole-roster freshness. Genuine empty balances and numeric zero remain valid.
+
 ### Failure rules
 
 - Inbound transient failures: exponential backoff via Inngest.

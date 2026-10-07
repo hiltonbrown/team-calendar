@@ -50,7 +50,6 @@ export type PersonMinAggregateOutputType = {
   default_privacy_mode: $Enums.availability_privacy_mode | null
   include_in_feeds_by_default: boolean | null
   archived_at: Date | null
-  xero_missing_since: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -81,7 +80,6 @@ export type PersonMaxAggregateOutputType = {
   default_privacy_mode: $Enums.availability_privacy_mode | null
   include_in_feeds_by_default: boolean | null
   archived_at: Date | null
-  xero_missing_since: Date | null
   created_at: Date | null
   updated_at: Date | null
 }
@@ -112,7 +110,6 @@ export type PersonCountAggregateOutputType = {
   default_privacy_mode: number
   include_in_feeds_by_default: number
   archived_at: number
-  xero_missing_since: number
   created_at: number
   updated_at: number
   _all: number
@@ -145,7 +142,6 @@ export type PersonMinAggregateInputType = {
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
   archived_at?: true
-  xero_missing_since?: true
   created_at?: true
   updated_at?: true
 }
@@ -176,7 +172,6 @@ export type PersonMaxAggregateInputType = {
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
   archived_at?: true
-  xero_missing_since?: true
   created_at?: true
   updated_at?: true
 }
@@ -207,7 +202,6 @@ export type PersonCountAggregateInputType = {
   default_privacy_mode?: true
   include_in_feeds_by_default?: true
   archived_at?: true
-  xero_missing_since?: true
   created_at?: true
   updated_at?: true
   _all?: true
@@ -311,7 +305,6 @@ export type PersonGroupByOutputType = {
   default_privacy_mode: $Enums.availability_privacy_mode
   include_in_feeds_by_default: boolean
   archived_at: Date | null
-  xero_missing_since: Date | null
   created_at: Date
   updated_at: Date
   _count: PersonCountAggregateOutputType | null
@@ -363,7 +356,6 @@ export type PersonWhereInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
-  xero_missing_since?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -407,7 +399,6 @@ export type PersonOrderByWithRelationInput = {
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  xero_missing_since?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   organisation?: Prisma.OrganisationOrderByWithRelationInput
@@ -457,7 +448,6 @@ export type PersonWhereUniqueInput = Prisma.AtLeast<{
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
-  xero_missing_since?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   organisation?: Prisma.XOR<Prisma.OrganisationScalarRelationFilter, Prisma.OrganisationWhereInput>
@@ -501,7 +491,6 @@ export type PersonOrderByWithAggregationInput = {
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
   archived_at?: Prisma.SortOrderInput | Prisma.SortOrder
-  xero_missing_since?: Prisma.SortOrderInput | Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
   _count?: Prisma.PersonCountOrderByAggregateInput
@@ -538,7 +527,6 @@ export type PersonScalarWhereWithAggregatesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeWithAggregatesFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolWithAggregatesFilter<"Person"> | boolean
   archived_at?: Prisma.DateTimeNullableWithAggregatesFilter<"Person"> | Date | string | null
-  xero_missing_since?: Prisma.DateTimeNullableWithAggregatesFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeWithAggregatesFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeWithAggregatesFilter<"Person"> | Date | string
 }
@@ -565,7 +553,6 @@ export type PersonCreateInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -609,7 +596,6 @@ export type PersonUncheckedCreateInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -645,7 +631,6 @@ export type PersonUpdateInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -689,7 +674,6 @@ export type PersonUncheckedUpdateInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -729,7 +713,6 @@ export type PersonCreateManyInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -756,7 +739,6 @@ export type PersonUpdateManyMutationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -787,7 +769,6 @@ export type PersonUncheckedUpdateManyInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -849,7 +830,6 @@ export type PersonCountOrderByAggregateInput = {
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
-  xero_missing_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -880,7 +860,6 @@ export type PersonMaxOrderByAggregateInput = {
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
-  xero_missing_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -911,7 +890,6 @@ export type PersonMinOrderByAggregateInput = {
   default_privacy_mode?: Prisma.SortOrder
   include_in_feeds_by_default?: Prisma.SortOrder
   archived_at?: Prisma.SortOrder
-  xero_missing_since?: Prisma.SortOrder
   created_at?: Prisma.SortOrder
   updated_at?: Prisma.SortOrder
 }
@@ -1263,7 +1241,6 @@ export type PersonCreateWithoutOrganisationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   team?: Prisma.TeamCreateNestedOneWithoutPeopleInput
@@ -1305,7 +1282,6 @@ export type PersonUncheckedCreateWithoutOrganisationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -1374,7 +1350,6 @@ export type PersonScalarWhereInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFilter<"Person"> | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFilter<"Person"> | boolean
   archived_at?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
-  xero_missing_since?: Prisma.DateTimeNullableFilter<"Person"> | Date | string | null
   created_at?: Prisma.DateTimeFilter<"Person"> | Date | string
   updated_at?: Prisma.DateTimeFilter<"Person"> | Date | string
 }
@@ -1401,7 +1376,6 @@ export type PersonCreateWithoutTeamInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -1443,7 +1417,6 @@ export type PersonUncheckedCreateWithoutTeamInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -1505,7 +1478,6 @@ export type PersonCreateWithoutLocationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -1547,7 +1519,6 @@ export type PersonUncheckedCreateWithoutLocationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -1609,7 +1580,6 @@ export type PersonCreateWithoutDirect_reportsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -1652,7 +1622,6 @@ export type PersonUncheckedCreateWithoutDirect_reportsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   leave_balances?: Prisma.LeaveBalanceUncheckedCreateNestedManyWithoutPersonInput
@@ -1692,7 +1661,6 @@ export type PersonCreateWithoutManagerInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -1734,7 +1702,6 @@ export type PersonUncheckedCreateWithoutManagerInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -1791,7 +1758,6 @@ export type PersonUpdateWithoutDirect_reportsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -1834,7 +1800,6 @@ export type PersonUncheckedUpdateWithoutDirect_reportsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   leave_balances?: Prisma.LeaveBalanceUncheckedUpdateManyWithoutPersonNestedInput
@@ -1885,7 +1850,6 @@ export type PersonCreateWithoutAlternative_contactsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -1928,7 +1892,6 @@ export type PersonUncheckedCreateWithoutAlternative_contactsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -1979,7 +1942,6 @@ export type PersonUpdateWithoutAlternative_contactsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2022,7 +1984,6 @@ export type PersonUncheckedUpdateWithoutAlternative_contactsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -2057,7 +2018,6 @@ export type PersonCreateWithoutAvailability_recordsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2100,7 +2060,6 @@ export type PersonUncheckedCreateWithoutAvailability_recordsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2140,7 +2099,6 @@ export type PersonCreateWithoutApproved_recordsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2183,7 +2141,6 @@ export type PersonUncheckedCreateWithoutApproved_recordsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2234,7 +2191,6 @@ export type PersonUpdateWithoutAvailability_recordsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2277,7 +2233,6 @@ export type PersonUncheckedUpdateWithoutAvailability_recordsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -2323,7 +2278,6 @@ export type PersonUpdateWithoutApproved_recordsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2366,7 +2320,6 @@ export type PersonUncheckedUpdateWithoutApproved_recordsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -2401,7 +2354,6 @@ export type PersonCreateWithoutLeave_balancesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2444,7 +2396,6 @@ export type PersonUncheckedCreateWithoutLeave_balancesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2495,7 +2446,6 @@ export type PersonUpdateWithoutLeave_balancesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2538,7 +2488,6 @@ export type PersonUncheckedUpdateWithoutLeave_balancesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -2573,7 +2522,6 @@ export type PersonCreateWithoutXero_match_sourcesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2616,7 +2564,6 @@ export type PersonUncheckedCreateWithoutXero_match_sourcesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2656,7 +2603,6 @@ export type PersonCreateWithoutXero_match_candidatesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2699,7 +2645,6 @@ export type PersonUncheckedCreateWithoutXero_match_candidatesInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2739,7 +2684,6 @@ export type PersonCreateWithoutXero_match_resolutionsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -2782,7 +2726,6 @@ export type PersonUncheckedCreateWithoutXero_match_resolutionsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -2833,7 +2776,6 @@ export type PersonUpdateWithoutXero_match_sourcesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2876,7 +2818,6 @@ export type PersonUncheckedUpdateWithoutXero_match_sourcesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -2922,7 +2863,6 @@ export type PersonUpdateWithoutXero_match_candidatesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -2965,7 +2905,6 @@ export type PersonUncheckedUpdateWithoutXero_match_candidatesInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3011,7 +2950,6 @@ export type PersonUpdateWithoutXero_match_resolutionsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -3054,7 +2992,6 @@ export type PersonUncheckedUpdateWithoutXero_match_resolutionsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3089,7 +3026,6 @@ export type PersonCreateWithoutNotificationsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   organisation: Prisma.OrganisationCreateNestedOneWithoutPeopleInput
@@ -3132,7 +3068,6 @@ export type PersonUncheckedCreateWithoutNotificationsInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
   direct_reports?: Prisma.PersonUncheckedCreateNestedManyWithoutManagerInput
@@ -3183,7 +3118,6 @@ export type PersonUpdateWithoutNotificationsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -3226,7 +3160,6 @@ export type PersonUncheckedUpdateWithoutNotificationsInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3264,7 +3197,6 @@ export type PersonCreateManyOrganisationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -3291,7 +3223,6 @@ export type PersonUpdateWithoutOrganisationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   team?: Prisma.TeamUpdateOneWithoutPeopleNestedInput
@@ -3333,7 +3264,6 @@ export type PersonUncheckedUpdateWithoutOrganisationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3372,7 +3302,6 @@ export type PersonUncheckedUpdateManyWithoutOrganisationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3402,7 +3331,6 @@ export type PersonCreateManyTeamInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -3429,7 +3357,6 @@ export type PersonUpdateWithoutTeamInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -3471,7 +3398,6 @@ export type PersonUncheckedUpdateWithoutTeamInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3510,7 +3436,6 @@ export type PersonUncheckedUpdateManyWithoutTeamInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3540,7 +3465,6 @@ export type PersonCreateManyLocationInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -3567,7 +3491,6 @@ export type PersonUpdateWithoutLocationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -3609,7 +3532,6 @@ export type PersonUncheckedUpdateWithoutLocationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3648,7 +3570,6 @@ export type PersonUncheckedUpdateManyWithoutLocationInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3678,7 +3599,6 @@ export type PersonCreateManyManagerInput = {
   default_privacy_mode?: $Enums.availability_privacy_mode
   include_in_feeds_by_default?: boolean
   archived_at?: Date | string | null
-  xero_missing_since?: Date | string | null
   created_at?: Date | string
   updated_at?: Date | string
 }
@@ -3705,7 +3625,6 @@ export type PersonUpdateWithoutManagerInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organisation?: Prisma.OrganisationUpdateOneRequiredWithoutPeopleNestedInput
@@ -3747,7 +3666,6 @@ export type PersonUncheckedUpdateWithoutManagerInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   direct_reports?: Prisma.PersonUncheckedUpdateManyWithoutManagerNestedInput
@@ -3786,7 +3704,6 @@ export type PersonUncheckedUpdateManyWithoutManagerInput = {
   default_privacy_mode?: Prisma.Enumavailability_privacy_modeFieldUpdateOperationsInput | $Enums.availability_privacy_mode
   include_in_feeds_by_default?: Prisma.BoolFieldUpdateOperationsInput | boolean
   archived_at?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  xero_missing_since?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   created_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updated_at?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3920,7 +3837,6 @@ export type PersonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
   archived_at?: boolean
-  xero_missing_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -3965,7 +3881,6 @@ export type PersonSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
   archived_at?: boolean
-  xero_missing_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -4000,7 +3915,6 @@ export type PersonSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
   archived_at?: boolean
-  xero_missing_since?: boolean
   created_at?: boolean
   updated_at?: boolean
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
@@ -4035,12 +3949,11 @@ export type PersonSelectScalar = {
   default_privacy_mode?: boolean
   include_in_feeds_by_default?: boolean
   archived_at?: boolean
-  xero_missing_since?: boolean
   created_at?: boolean
   updated_at?: boolean
 }
 
-export type PersonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "team_id" | "manager_person_id" | "location_id" | "person_type" | "source_system" | "source_person_key" | "first_name" | "last_name" | "email" | "xero_employee_id" | "employment_type" | "is_active" | "display_name" | "clerk_user_id" | "job_title" | "start_date" | "avatar_url" | "status_note" | "default_contactability" | "default_privacy_mode" | "include_in_feeds_by_default" | "archived_at" | "xero_missing_since" | "created_at" | "updated_at", ExtArgs["result"]["person"]>
+export type PersonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "clerk_org_id" | "organisation_id" | "team_id" | "manager_person_id" | "location_id" | "person_type" | "source_system" | "source_person_key" | "first_name" | "last_name" | "email" | "xero_employee_id" | "employment_type" | "is_active" | "display_name" | "clerk_user_id" | "job_title" | "start_date" | "avatar_url" | "status_note" | "default_contactability" | "default_privacy_mode" | "include_in_feeds_by_default" | "archived_at" | "created_at" | "updated_at", ExtArgs["result"]["person"]>
 export type PersonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   organisation?: boolean | Prisma.OrganisationDefaultArgs<ExtArgs>
   team?: boolean | Prisma.Person$teamArgs<ExtArgs>
@@ -4113,7 +4026,6 @@ export type $PersonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     default_privacy_mode: $Enums.availability_privacy_mode
     include_in_feeds_by_default: boolean
     archived_at: Date | null
-    xero_missing_since: Date | null
     created_at: Date
     updated_at: Date
   }, ExtArgs["result"]["person"]>
@@ -4577,7 +4489,6 @@ export interface PersonFieldRefs {
   readonly default_privacy_mode: Prisma.FieldRef<"Person", 'availability_privacy_mode'>
   readonly include_in_feeds_by_default: Prisma.FieldRef<"Person", 'Boolean'>
   readonly archived_at: Prisma.FieldRef<"Person", 'DateTime'>
-  readonly xero_missing_since: Prisma.FieldRef<"Person", 'DateTime'>
   readonly created_at: Prisma.FieldRef<"Person", 'DateTime'>
   readonly updated_at: Prisma.FieldRef<"Person", 'DateTime'>
 }

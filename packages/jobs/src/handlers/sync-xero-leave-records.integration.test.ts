@@ -177,6 +177,106 @@ describe("local persistence integration", async () => {
         })
       ).toMatchObject({ archived_at: null });
     });
+    it("does not advance the watermark or archive when cancelled during an empty provider read", async () => {
+      await setupTenant(tenantA);
+      await setupPerson(tenantA);
+      await createStaleRecord(tenantA);
+      const scope = {
+        clerk_org_id: tenantA.clerkOrgId,
+        organisation_id: tenantA.organisationId,
+        xero_connection_id: tenantA.connectionId,
+      };
+      const prior = new Date("2026-04-01T00:00:00Z");
+      await database.xeroSyncCursor.create({
+        data: { ...scope, entity_type: "leave_records", modified_since: prior },
+      });
+      mockFetchLeaveRecordsForRegion.mockImplementationOnce(async () => {
+        await database.syncRun.updateMany({
+          data: { cancel_requested_at: new Date() },
+          where: { ...scope, status: "running" },
+        });
+        return {
+          ok: true,
+          value: { complete: true, leaveRecords: [], rawResponse: {} },
+        };
+      });
+      const result = await syncXeroLeaveRecords(syncInput(tenantA));
+      expect(result.ok && result.value.status).toBe("cancelled");
+      expect(
+        await database.xeroSyncCursor.findFirst({ where: scope })
+      ).toMatchObject({
+        modified_since: prior,
+      });
+      expect(
+        await database.availabilityRecord.findFirst({
+          where: {
+            clerk_org_id: tenantA.clerkOrgId,
+            organisation_id: tenantA.organisationId,
+            source_remote_id: staleLeaveId(),
+          },
+        })
+      ).toMatchObject({ archived_at: null });
+    });
+    it.each(["fenced", "dispatch_failure"] as const)(
+      "retains full-reconciliation rows and cursor after %s finalisation",
+      async (failure) => {
+        await setupTenant(tenantA);
+        await setupPerson(tenantA);
+        await setupFeed(tenantA);
+        await createStaleRecord(tenantA);
+        const scope = {
+          clerk_org_id: tenantA.clerkOrgId,
+          organisation_id: tenantA.organisationId,
+          xero_connection_id: tenantA.connectionId,
+        };
+        const prior = new Date("2026-04-01T00:00:00Z");
+        const newer = new Date("2026-05-01T00:00:00Z");
+        await database.xeroSyncCursor.create({
+          data: {
+            ...scope,
+            entity_type: "leave_records",
+            modified_since: prior,
+          },
+        });
+        mockFetchLeaveRecordsForRegion.mockImplementationOnce(async () => {
+          if (failure === "fenced") {
+            await database.xeroSyncCursor.updateMany({
+              data: { modified_since: newer },
+              where: scope,
+            });
+          }
+          return {
+            ok: true,
+            value: { complete: true, leaveRecords: [], rawResponse: {} },
+          };
+        });
+        if (failure === "dispatch_failure") {
+          mockInngestSend.mockRejectedValueOnce(
+            new Error("Synthetic dispatch failure")
+          );
+        }
+        const result = await syncXeroLeaveRecords(syncInput(tenantA));
+        if (failure === "fenced") {
+          expect(result.ok && result.value.status).toBe("cancelled");
+        } else {
+          expect(result.ok).toBe(false);
+        }
+        expect(
+          await database.xeroSyncCursor.findFirst({ where: scope })
+        ).toMatchObject({
+          modified_since: failure === "fenced" ? newer : prior,
+        });
+        expect(
+          await database.availabilityRecord.findFirst({
+            where: {
+              clerk_org_id: tenantA.clerkOrgId,
+              organisation_id: tenantA.organisationId,
+              source_remote_id: staleLeaveId(),
+            },
+          })
+        ).toMatchObject({ archived_at: null, publish_status: "eligible" });
+      }
+    );
     it("syncs AU leave idempotently and archives stale scoped records", async () => {
       await setupTenant(tenantA);
       await setupPerson(tenantA);
@@ -409,9 +509,19 @@ describe("local persistence integration", async () => {
         source_remote_hash: "stored-newer-hash",
       });
     });
-    it("preserves a concurrent local write when the compare-and-swap loses", async () => {
+    it("retains the watermark after a concurrent write and retries the unapplied delta", async () => {
       await setupTenant(tenantA);
       await setupPerson(tenantA);
+      const cursorScope = {
+        clerk_org_id: tenantA.clerkOrgId,
+        entity_type: "leave_records" as const,
+        organisation_id: tenantA.organisationId,
+        xero_connection_id: tenantA.connectionId,
+      };
+      const prior = new Date("2026-04-01T00:00:00Z");
+      await database.xeroSyncCursor.create({
+        data: { ...cursorScope, modified_since: prior },
+      });
       const existing = await createExistingRecord(tenantA, {
         approvalStatus: "approved",
         sourceRemoteId: leaveId(),
@@ -440,13 +550,15 @@ describe("local persistence integration", async () => {
         });
       });
       try {
-        const result = await syncXeroLeaveRecords(syncInput(tenantA));
+        const input = { ...syncInput(tenantA), mode: "incremental" as const };
+        const result = await syncXeroLeaveRecords(input);
         expect(afterSnapshotRead).toHaveBeenCalledOnce();
         expect(result.ok).toBe(true);
         if (result.ok) {
           expect(result.value).toMatchObject({
             failed: 0,
             skipped: 1,
+            status: "partial_success",
             upserted: 0,
           });
         }
@@ -458,6 +570,24 @@ describe("local persistence integration", async () => {
           approval_status: "declined",
           derived_sequence: 7,
         });
+        expect(
+          await database.xeroSyncCursor.findFirst({ where: cursorScope })
+        ).toMatchObject({ modified_since: prior });
+        const retried = await syncXeroLeaveRecords(input);
+        expect(retried.ok && retried.value.status).toBe("succeeded");
+        expect(retried.ok && retried.value.upserted).toBe(1);
+        expect(mockFetchLeaveRecordsForRegion.mock.calls[1]?.[1]).toMatchObject(
+          {
+            mode: "incremental",
+            modifiedSince: prior,
+          }
+        );
+        const advanced = await database.xeroSyncCursor.findFirst({
+          where: cursorScope,
+        });
+        expect(advanced?.modified_since?.getTime()).toBeGreaterThan(
+          prior.getTime()
+        );
       } finally {
         afterSnapshotRead.mockReset();
       }

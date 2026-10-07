@@ -1,5 +1,26 @@
 # Current work
 
+## Xero incremental inbound sync, Prompt 5
+
+- [x] Recheck official AU employee/V2 leave modification filters and balance retrieval contracts; inspect current implementation against Prompt 5.
+- [x] Test and remove obsolete employee snapshot absence thresholds/delay; retain complete/full/success prerequisites, manual-data protection and both tenancy keys.
+- [x] Verify watermarks remain unchanged after provider, parsing, persistence and incomplete-run failures; fix any proven gaps with TDD.
+- [x] Run targeted sync tests and fresh check/typecheck/test/integration gates, resolve independent review and commit on `work`.
+
+Stopping condition: normal supported polling is incremental, full reconciliation
+is separate and truthful, balances use supported retrieval, obsolete snapshot
+policy is removed, required gates pass and the focused phase is committed and
+reviewed. Existing implementation in `75a939ae` is reused; do not rebuild it,
+redesign OAuth/writes or create another worktree.
+
+Verification: 1,153 linted files, 19 uncached typecheck tasks, 2,965 unit tests
+across 18 uncached tasks and 259 local PostgreSQL/Redis integration tests across
+6 uncached tasks passed. Prisma generated, migration deploy/status and schema
+diff passed with 27 migrations. Fresh independent review has no remaining
+Critical, Important or Minor findings. No live provider or application-browser
+verification is claimed. Evidence and scope are recorded in
+`docs/reports/2026-10-07-xero-incremental-sync.md`.
+
 ## Final Xero architecture audit, 8 October 2026
 
 - [x] Independently audit current architecture/security/sync/writes and every residual lifecycle/campaign reference against official Xero contracts.

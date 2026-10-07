@@ -195,7 +195,6 @@ export const PersonScalarFieldEnum = {
   default_privacy_mode: 'default_privacy_mode',
   include_in_feeds_by_default: 'include_in_feeds_by_default',
   archived_at: 'archived_at',
-  xero_missing_since: 'xero_missing_since',
   created_at: 'created_at',
   updated_at: 'updated_at'
 } as const

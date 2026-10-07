@@ -151,6 +151,14 @@ type RemoteSnapshotSkipReason =
   | "local_changed_after_run_started"
   | "older_remote_snapshot"
   | "stale_local_snapshot";
+
+function requiresSnapshotRetry(outcome: ProcessLeaveRecordOutcome): boolean {
+  return (
+    outcome.kind === "skipped" &&
+    (outcome.reason === "local_changed_after_run_started" ||
+      outcome.reason === "stale_local_snapshot")
+  );
+}
 type SyncStatus = "cancelled" | "failed" | "partial_success" | "succeeded";
 type SyncXeroLeaveRecordsResult = Result<
   Counts & {
@@ -246,6 +254,7 @@ async function syncXeroLeaveRecordsInternal(
         (cursor) => cursor.entity_type === "leave_records"
       )?.modified_since ?? null;
     const counts = emptyCounts();
+    let hasDeferredRecords = false;
     if (xeroConnection.payroll_region === "AU") {
       const leaveRecordsResult = await fetchLeaveRecordsForRegion("AU", {
         mode: context.mode,
@@ -336,6 +345,7 @@ async function syncXeroLeaveRecordsInternal(
               break;
             case "skipped":
               counts.skipped += 1;
+              hasDeferredRecords ||= requiresSnapshotRetry(result);
               break;
             case "failed":
               counts.failed += 1;
@@ -353,24 +363,13 @@ async function syncXeroLeaveRecordsInternal(
       const traversalSucceeded =
         complete &&
         counts.failed === 0 &&
+        !hasDeferredRecords &&
         !hasInvalidRecords &&
         failures.length === 0 &&
         traversalOutcome === "completed";
-      const canArchiveStale =
-        context.mode !== "incremental" &&
-        counts.failed === 0 &&
-        complete &&
-        !hasInvalidRecords &&
-        failures.length === 0 &&
-        traversalOutcome === "completed";
-      const stale = canArchiveStale
-        ? await archiveStaleRecords(
-            context,
-            fetched.map((record) => record.leaveApplicationId).filter(Boolean),
-            startedAt
-          )
-        : { archived: 0, personIds: [] };
-      if (!canArchiveStale) {
+      await assertRunActive(context, run.id);
+      const canArchiveStale = context.mode === "full" && traversalSucceeded;
+      if (context.mode === "full" && !canArchiveStale) {
         log.warn(
           "Skipped stale-archive because the Xero leave fetch was incomplete, truncated, or contained invalid records",
           {
@@ -383,14 +382,6 @@ async function syncXeroLeaveRecordsInternal(
           }
         );
       }
-      counts.archived = stale.archived;
-      const affectedPersonIds = new Set([
-        ...processed
-          .filter((record) => record.changed)
-          .map((record) => record.personId),
-        ...stale.personIds,
-      ]);
-      await enqueueFeedRebuilds(context, [...affectedPersonIds]);
       let staleSinceData: {
         leave_records_stale_since?: Date | null;
       } = {};
@@ -402,6 +393,7 @@ async function syncXeroLeaveRecordsInternal(
         staleSinceData = { leave_records_stale_since: startedAt };
       }
       await withXeroBinding(context, async (tx) => {
+        await assertRunActive(context, run.id, tx);
         if (
           traversalSucceeded &&
           !(await advanceXeroSyncCursor(
@@ -417,6 +409,24 @@ async function syncXeroLeaveRecordsInternal(
         ) {
           throw new XeroSyncRunFencedError();
         }
+        const stale = canArchiveStale
+          ? await archiveStaleRecords(
+              context,
+              fetched
+                .map((record) => record.leaveApplicationId)
+                .filter(Boolean),
+              startedAt
+            )
+          : { archived: 0, personIds: [] };
+        counts.archived = stale.archived;
+        const affectedPersonIds = new Set([
+          ...processed
+            .filter((record) => record.changed)
+            .map((record) => record.personId),
+          ...stale.personIds,
+        ]);
+        await enqueueFeedRebuilds(context, [...affectedPersonIds]);
+        await assertRunActive(context, run.id, tx);
         await tx.xeroConnection.updateMany({
           data: {
             last_leave_records_sync_at: new Date(),
@@ -623,6 +633,7 @@ async function syncXeroLeaveRecordsInternal(
           continue;
         }
         const failuresBeforePerson = counts.failed;
+        let personHasDeferredRecords = false;
         const personLeaveRecords = employeeLeave.value.leaveRecords;
         counts.fetched += personLeaveRecords.length;
         const peopleByEmployeeId = new Map([[person.xero_employee_id, person]]);
@@ -654,6 +665,8 @@ async function syncXeroLeaveRecordsInternal(
               break;
             case "skipped":
               counts.skipped += 1;
+              personHasDeferredRecords ||= requiresSnapshotRetry(result);
+              hasDeferredRecords ||= personHasDeferredRecords;
               break;
             case "failed":
               counts.failed += 1;
@@ -665,7 +678,7 @@ async function syncXeroLeaveRecordsInternal(
           }
         }
         // Absence requires every mapped row for this person to have persisted safely.
-        if (counts.failed > failuresBeforePerson) {
+        if (counts.failed > failuresBeforePerson || personHasDeferredRecords) {
           continue;
         }
         // Person-scoped stale archival
@@ -683,6 +696,7 @@ async function syncXeroLeaveRecordsInternal(
       await enqueueFeedRebuilds(context, [...affectedPersonIds]);
       const sweepFailed =
         counts.failed > 0 ||
+        hasDeferredRecords ||
         Boolean(initialCursorValue && cursorRecord?.leave_sweep_failed);
       if (isTargetedPerson) {
         await withXeroBinding(context, async (tx) =>
@@ -727,7 +741,9 @@ async function syncXeroLeaveRecordsInternal(
         }
       }
       const finalStatus =
-        counts.failed > 0 || (!isTargetedPerson && isLastPage && sweepFailed)
+        counts.failed > 0 ||
+        hasDeferredRecords ||
+        (!isTargetedPerson && isLastPage && sweepFailed)
           ? "partial_success"
           : "succeeded";
       await completeRun(context, run.id, {

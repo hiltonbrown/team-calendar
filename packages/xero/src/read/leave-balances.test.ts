@@ -8,6 +8,58 @@ import {
 } from "./leave-balances";
 
 describe("Xero leave balances read mapper", () => {
+  it.each([undefined, null, "12"])(
+    "rejects invalid provider balance amount %s instead of inventing zero",
+    (amount) => {
+      expect(() =>
+        mapXeroLeaveBalances({
+          Employees: [
+            {
+              EmployeeID: "emp-1",
+              LeaveBalances: [
+                {
+                  LeaveTypeID: "annual",
+                  NumberOfUnits: amount,
+                  TypeOfUnits: "Hours",
+                },
+              ],
+            },
+          ],
+        })
+      ).toThrow();
+    }
+  );
+  it.each([
+    {},
+    { Employees: [] },
+    { Employees: "invalid" },
+    { Employees: [{ EmployeeID: "emp-1" }] },
+    { Employees: [{ LeaveBalances: [] }] },
+  ])(
+    "rejects malformed employee balance detail %j instead of reporting no balances",
+    (payload) => {
+      expect(() => mapXeroLeaveBalances(payload)).toThrow();
+    }
+  );
+  it("accepts genuine empty balances and preserves provider zero", () => {
+    expect(
+      mapXeroLeaveBalances({
+        Employees: [{ EmployeeID: "emp-1", LeaveBalances: [] }],
+      })
+    ).toEqual([]);
+    expect(
+      mapXeroLeaveBalances({
+        Employees: [
+          {
+            EmployeeID: "emp-1",
+            LeaveBalances: [
+              { LeaveTypeID: "annual", NumberOfUnits: 0, TypeOfUnits: "Days" },
+            ],
+          },
+        ],
+      })
+    ).toMatchObject([{ balance: 0, unitType: "days" }]);
+  });
   it("maps AU employee detail leave balances into narrow Xero balances", () => {
     const balances = mapXeroLeaveBalances({
       Employees: [

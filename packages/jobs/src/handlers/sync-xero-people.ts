@@ -16,7 +16,11 @@ import type { InngestFunction } from "inngest";
 import { z } from "zod";
 import { captureInitialSyncCompleted } from "../activation";
 import { inngest } from "../client";
-import { acquireSyncRun, XeroSyncRunFencedError } from "./sync-run-lifecycle";
+import {
+  acquireSyncRun,
+  assertRunActive,
+  XeroSyncRunFencedError,
+} from "./sync-run-lifecycle";
 import {
   rejectRetryableSyncResult,
   resolveSyncTenant,
@@ -187,26 +191,6 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
     const returnedEmployeeIds = seenEmployeeIds
       .map((id) => id.trim())
       .filter((id) => id.length > 0);
-    // Any returned non-empty EmployeeID clears its missing marker before
-    // record-level validation so a record that fails downstream parsing is
-    // still accounted for as seen.
-    if (returnedEmployeeIds.length > 0) {
-      await withXeroBinding(context, async (tx) =>
-        tx.person.updateMany({
-          data: {
-            updated_at: new Date(),
-            xero_missing_since: null,
-          },
-          where: {
-            clerk_org_id: context.clerkOrgId,
-            organisation_id: context.organisationId,
-            source_person_key: { in: returnedEmployeeIds },
-            source_system: "XERO",
-            xero_missing_since: { not: null },
-          },
-        })
-      );
-    }
     await recordMappingFailures(context, run.id, failures, counts);
     for (let index = 0; index < employees.length; index += BATCH_SIZE) {
       const runState = await database.syncRun.findFirst({
@@ -243,110 +227,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
         value: { ...counts, runId: run.id, status: "cancelled" },
       };
     }
-    let guardBlocked = false;
-    // Absence is inferred only from a complete snapshot.
-    if (context.mode === "full" && complete && counts.failed === 0) {
-      const unarchivedXeroPeople = await database.person.findMany({
-        select: {
-          id: true,
-          source_person_key: true,
-          xero_missing_since: true,
-        },
-        where: {
-          archived_at: null,
-          clerk_org_id: context.clerkOrgId,
-          organisation_id: context.organisationId,
-          source_person_key: { not: null },
-          source_system: "XERO",
-        },
-      });
-      const denominator = unarchivedXeroPeople.length;
-      if (denominator > 0) {
-        const returnedSet = new Set(returnedEmployeeIds);
-        const missingPeople = unarchivedXeroPeople.filter(
-          (person) =>
-            person.source_person_key &&
-            !returnedSet.has(person.source_person_key)
-        );
-        const missingCount = missingPeople.length;
-        if (missingCount > 0) {
-          const isEmptySnapshot = rawItemCount === 0;
-          const isRatioExceeded = missingCount / denominator >= 0.2;
-          const isCountExceeded = missingCount > 5;
-          if (isEmptySnapshot || isRatioExceeded || isCountExceeded) {
-            guardBlocked = true;
-            log.warn("Sync people absence guard triggered", {
-              archived: 0,
-              clerkOrgId: context.clerkOrgId,
-              connectionId: context.connectionId,
-              guardBlocked: true,
-              missing: missingCount,
-              newlyMarked: 0,
-              organisationId: context.organisationId,
-            });
-          } else {
-            const now = new Date();
-            const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
-            const toMarkIds: string[] = [];
-            const toArchiveIds: string[] = [];
-            for (const person of missingPeople) {
-              if (person.xero_missing_since) {
-                const missingSinceMs = new Date(
-                  person.xero_missing_since
-                ).getTime();
-                const ageMs = now.getTime() - missingSinceMs;
-                if (ageMs >= TWENTY_FOUR_HOURS_MS) {
-                  toArchiveIds.push(person.id);
-                }
-              } else {
-                toMarkIds.push(person.id);
-              }
-            }
-            if (toMarkIds.length > 0 || toArchiveIds.length > 0) {
-              await withXeroBinding(context, async (tx) => {
-                if (toMarkIds.length > 0) {
-                  await tx.person.updateMany({
-                    data: {
-                      updated_at: now,
-                      xero_missing_since: now,
-                    },
-                    where: {
-                      clerk_org_id: context.clerkOrgId,
-                      id: { in: toMarkIds },
-                      organisation_id: context.organisationId,
-                    },
-                  });
-                }
-                if (toArchiveIds.length > 0) {
-                  await tx.person.updateMany({
-                    data: {
-                      archived_at: now,
-                      is_active: false,
-                      updated_at: now,
-                    },
-                    where: {
-                      clerk_org_id: context.clerkOrgId,
-                      id: { in: toArchiveIds },
-                      organisation_id: context.organisationId,
-                    },
-                  });
-                }
-              });
-            }
-            log.info("Sync people absence check completed", {
-              archived: toArchiveIds.length,
-              clerkOrgId: context.clerkOrgId,
-              connectionId: context.connectionId,
-              guardBlocked: false,
-              missing: missingCount,
-              newlyMarked: toMarkIds.length,
-              organisationId: context.organisationId,
-            });
-          }
-        }
-      }
-    }
-    const canClearStaleness = complete && !guardBlocked && counts.failed === 0;
+    const canClearStaleness = complete && counts.failed === 0;
     let staleSinceData: {
       people_stale_since?: Date | null;
     } = {};
@@ -356,6 +237,7 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       staleSinceData = { people_stale_since: startedAt };
     }
     await withXeroBinding(context, async (tx) => {
+      await assertRunActive(context, run.id, tx);
       if (
         xeroConnection.payroll_region === "AU" &&
         canClearStaleness &&
@@ -372,6 +254,21 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       ) {
         throw new XeroSyncRunFencedError();
       }
+      // Only a complete, successfully persisted unfiltered snapshot establishes
+      // absence. Keep archival and watermark advancement in one transaction.
+      if (context.mode === "full" && canClearStaleness) {
+        const now = new Date();
+        await tx.person.updateMany({
+          data: { archived_at: now, is_active: false, updated_at: now },
+          where: {
+            archived_at: null,
+            clerk_org_id: context.clerkOrgId,
+            organisation_id: context.organisationId,
+            source_person_key: { not: null, notIn: returnedEmployeeIds },
+            source_system: "XERO",
+          },
+        });
+      }
       await tx.xeroConnection.updateMany({
         data: {
           last_people_sync_at: new Date(),
@@ -386,15 +283,9 @@ async function syncXeroPeopleInternal(input: unknown): Promise<
       });
     });
     const finalStatus =
-      guardBlocked || counts.failed > 0 || !complete
-        ? "partial_success"
-        : "succeeded";
-    const errorSummary = guardBlocked
-      ? "Missing person guard threshold exceeded"
-      : undefined;
+      counts.failed > 0 || !complete ? "partial_success" : "succeeded";
     await completeRun(context, run.id, {
       counts,
-      errorSummary,
       status: finalStatus,
     });
     if (finalStatus === "succeeded") {

@@ -480,6 +480,80 @@ describe("AU leave record reads", () => {
   });
 });
 describe("AU leave balance reads", () => {
+  it.each([
+    {},
+    { Employees: [] },
+    { Employees: [{ LeaveBalances: [] }] },
+    { Employees: [{ EmployeeID: "emp-1", LeaveBalances: "invalid" }] },
+    {
+      Employees: [
+        {
+          EmployeeID: "emp-1",
+          LeaveBalances: [{ LeaveTypeID: "annual", TypeOfUnits: "Hours" }],
+        },
+      ],
+    },
+    {
+      Employees: [
+        {
+          EmployeeID: "emp-1",
+          LeaveBalances: [
+            {
+              LeaveTypeID: "annual",
+              NumberOfUnits: null,
+              TypeOfUnits: "Hours",
+            },
+          ],
+        },
+      ],
+    },
+  ])(
+    "records malformed AU balance detail as an employee failure: %j",
+    async (payload) => {
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValueOnce(
+            new Response(JSON.stringify(payload), { status: 200 })
+          )
+          .mockResolvedValueOnce(employeeResponse("emp-2", 0))
+      );
+      const result = await fetchLeaveBalances({
+        employeeIds: ["emp-1", "emp-2"],
+        readIntervalMs: 0,
+        xeroConnection: buildXeroTenant(),
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.failures).toMatchObject([
+          { employeeId: "emp-1", error: { code: "validation_error" } },
+        ]);
+        expect(result.value.leaveBalances).toMatchObject([
+          { balance: 0, employeeId: "emp-2", unitType: "hours" },
+        ]);
+      }
+    }
+  );
+  it("accepts genuine empty AU LeaveBalances without a fetch failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          employeeListResponse([{ EmployeeID: "emp-1", LeaveBalances: [] }])
+        )
+    );
+    const result = await fetchLeaveBalances({
+      employeeIds: ["emp-1"],
+      readIntervalMs: 0,
+      xeroConnection: buildXeroTenant(),
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { failures: [], leaveBalances: [] },
+    });
+  });
   beforeEach(() => {
     process.env.XERO_TOKEN_ENCRYPTION_KEY = TEST_ENCRYPTION_KEY;
     vi.restoreAllMocks();

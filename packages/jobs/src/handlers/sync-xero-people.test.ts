@@ -124,7 +124,12 @@ describe("syncXeroPeople unit tests", () => {
       $queryRaw: vi.fn(async () => []),
       $transaction: vi.fn(async (callback) => callback(database)),
     });
-    mocks.syncRunFindFirst.mockResolvedValue(null);
+    mocks.syncRunFindFirst.mockImplementation(
+      async (args: { select?: { status?: boolean } }) =>
+        args.select?.status
+          ? { cancel_requested_at: null, status: "running" }
+          : null
+    );
     mocks.syncRunCreate.mockResolvedValue({ id: "run_1" });
     mocks.syncRunUpdateMany.mockResolvedValue({ count: 1 });
     mocks.xeroConnectionFindFirst.mockResolvedValue(buildConnection("NZ"));
