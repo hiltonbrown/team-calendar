@@ -16,7 +16,8 @@ try {
           if (
             cleanKey !== "__proto__" &&
             cleanKey !== "constructor" &&
-            cleanKey !== "prototype"
+            cleanKey !== "prototype" &&
+            process.env[cleanKey] === undefined
           ) {
             Reflect.set(
               process.env,

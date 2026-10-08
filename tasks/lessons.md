@@ -148,6 +148,8 @@ Keep one-off task evidence in that task's review, not here.
 
 ## Working with the operator
 
+- When the user supplies a database through environment variables, use that target via the guarded integration runner and owned fixtures. Do not substitute a disposable local database without an explicit request; inspect existing environment and runner configuration first.
+
 - When told not to block, a host permission denial ends only the denied action.
   Record it with the exact operator command in `plans/README.md` in the same
   turn, finish every independent deliverable and report. Do not close with "if

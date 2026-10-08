@@ -55,7 +55,11 @@ const PublicHolidaysPage = async ({
     }),
     database.organisation.findFirst({
       select: { country_code: true, region_code: true },
-      where: scopedQuery(clerkOrgId, organisationId),
+      where: {
+        archived_at: null,
+        clerk_org_id: clerkOrgId,
+        id: organisationId,
+      },
     }),
   ]);
 

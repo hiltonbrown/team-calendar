@@ -108,4 +108,19 @@ describe("PublicHolidaysPage", () => {
 
     expect(screen.getByText("Unable to load public holidays")).toBeDefined();
   });
+
+  it("loads the organisation with its own ID and Clerk tenant scope", async () => {
+    render(await Page({ searchParams: Promise.resolve({}) }));
+
+    expect(mocks.organisationFindFirst).toHaveBeenCalledWith({
+      select: { country_code: true, region_code: true },
+      where: {
+        archived_at: null,
+        clerk_org_id: "org_1",
+        id: organisationId,
+      },
+    });
+    const [query] = mocks.organisationFindFirst.mock.calls[0];
+    expect(query.where).not.toHaveProperty("organisation_id");
+  });
 });

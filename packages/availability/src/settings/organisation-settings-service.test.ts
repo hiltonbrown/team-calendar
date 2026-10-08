@@ -60,6 +60,57 @@ describe("organisation-settings-service", () => {
     });
   });
 
+  it("recovers on the next read after a settings load fails", async () => {
+    const input = {
+      clerkOrgId: "org_settings_recovery",
+      organisationId: baseRow.organisation_id,
+    };
+    mocks.getOrCreateOrganisationSettings.mockRejectedValueOnce(
+      new Error("Database unavailable")
+    );
+
+    expect(await service.getSettings(input)).toMatchObject({
+      error: { code: "unknown_error" },
+      ok: false,
+    });
+    expect(await service.getSettings(input)).toMatchObject({
+      ok: true,
+      value: {
+        organisationId: baseRow.organisation_id,
+        showPendingOnCalendar: true,
+      },
+    });
+    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares an in-flight settings load between concurrent reads", async () => {
+    const input = {
+      clerkOrgId: "org_settings_concurrent",
+      organisationId: baseRow.organisation_id,
+    };
+    let resolveSettings: ((row: typeof baseRow) => void) | undefined;
+    const loading = new Promise<typeof baseRow>((resolve) => {
+      resolveSettings = resolve;
+    });
+    mocks.getOrCreateOrganisationSettings.mockReturnValueOnce(loading);
+
+    const first = service.getSettings(input);
+    const second = service.getSettings(input);
+    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(1);
+    resolveSettings?.(baseRow);
+
+    for (const result of await Promise.all([first, second])) {
+      expect(result).toMatchObject({
+        ok: true,
+        value: {
+          organisationId: baseRow.organisation_id,
+          showPendingOnCalendar: true,
+        },
+      });
+    }
+    expect(mocks.getOrCreateOrganisationSettings).toHaveBeenCalledTimes(1);
+  });
+
   it("updates settings and writes an audit event", async () => {
     const updatedRow = {
       ...baseRow,

@@ -12,6 +12,7 @@ export const INTEGRATION_WORKSPACES = [
 
 export const EXPECTED_INTEGRATION_TESTS = [
   "apps/app/app/(authenticated)/people/new/_actions.integration.test.ts",
+  "apps/app/app/(authenticated)/settings/integrations/xero/shared-connection.integration.test.ts",
   "packages/availability/index.integration.test.ts",
   "packages/availability/src/people/clerk-access-service.integration.test.ts",
   "packages/availability/src/people/current-user-service.integration.test.ts",

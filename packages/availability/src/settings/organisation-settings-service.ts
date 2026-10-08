@@ -167,7 +167,14 @@ function loadSettings(
   const loading = getOrCreateOrganisationSettings({
     clerkOrgId: clerkOrgId as ClerkOrgId,
     organisationId: organisationId as OrganisationId,
-  }).then((row) => mapOrganisationSettingsRow(row));
+  })
+    .then((row) => mapOrganisationSettingsRow(row))
+    .catch((error: unknown) => {
+      if (settingsCache.get(key) === loading) {
+        settingsCache.delete(key);
+      }
+      throw error;
+    });
   settingsCache.set(key, loading);
   return loading;
 }

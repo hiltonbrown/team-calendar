@@ -621,3 +621,85 @@ Final audit build passed all four tasks with synthetic build-only Clerk keys bec
 Added six lifecycle scenarios modelling two tenancies, Admin A/Admin B/Member A/User B and Xero organisations X/Y, plus the owned fixture registration. The suite uses real PostgreSQL queries, locks, OAuth services, scoped access and administrative actions; external Clerk/Xero/Next request boundaries are simulated. Runtime implementation is unchanged.
 
 Work was committed and pushed when requested. Database execution remains NOT VERIFIED: the attempted run failed before test collection at the local-database guard, and the subsequent disposable-service access request was cancelled. The complete relevant integration suite has not passed; concurrency and lifecycle assertions require an available local PostgreSQL environment. No database guards were weakened and no tests were skipped.
+
+## 2026-10-08 Shared Xero connection integration coverage
+
+Scope: strengthen the existing focused suite against the 16 requested observable invariants. Use real PostgreSQL for persistence and refresh locks; simulate only external Clerk, Xero and Next request boundaries. No implementation redesign, external database or weakened test guard.
+
+- [x] Model two connected Organisations with distinct Xero tenants and canonical grants; prove foreign credentials and tenant substitution cannot dispatch.
+- [x] Prove shared permitted reads create no member/admin OAuth grants; retain connection ownership when the original administrator leaves and a replacement authoriser reconnects.
+- [x] Hold refresh dispatch open while concurrent authenticated users enter the resolver; prove one rotation and durable reuse.
+- [x] Cover member denial, owner/admin disconnect, denied disconnected access and duplicate-free reconnect.
+- [ ] Run focused and complete relevant suites plus four CI gates; record evidence and any environment limits.
+
+Review: the focused real-PostgreSQL app run passed 10 tests (eight shared-connection scenarios plus two existing app cases). Coverage includes two connected tenancies, distinct Xero tenant/grant credentials, no additional member/admin OAuth sessions or grants, revoked original Clerk membership, stable application ownership on principal replacement, held refresh response with concurrent users, exact remote DELETE, owner/admin permissions and duplicate-free reconnection. Clerk/Xero request boundaries are simulated. Connection runtime remains unchanged.
+
+The complete local integration attempt passed database (52), app (10), availability (25) and feeds (22). Xero passed 85 and failed 17 cases in oauth/service.integration.test.ts (connection/reconnect/selection scenarios, including a timeout); Turbo interrupted jobs. This is not a complete passing integration result. The first run also exposed setup-env.ts overwriting the explicitly configured DATABASE_URL; a regression failed before the defaults-only fix and both tests pass after it. Fixed stale fixture registry suite counts and included the focused suite in the protected runner allowlist.
+
+User correction: use the database configured in environment variables and refer to lessons. Disposable service work stopped, correction recorded in lessons. The configured PostgreSQL database is reachable through read-only pg; no fixture writes were made there. Existing stored manifests either use the obsolete development-fixture shape or stale production consumer-isolation evidence. The available API Inngest signing key is not a production key. The protected configured-database run is pending current manifest/consumer evidence; no guard was weakened or evidence invented.
+
+Final source checks: lint passes (1,158 files), typecheck passes all 19 tasks, and full unit suite passes all 18 tasks (3,114 tests). The 22 relevant release-runner/manifest/environment tests pass. Initial simultaneous source runs timed out in database export-boundary and web RSS tests; the sequential full run passes. Installed the already-declared analytics workspace link locally after its absence caused resolution errors; no dependency manifest or lockfile changed.
+
+Outstanding: configured-database full integration execution and resolution of its genuine failures. Do not mark the requested integration verification complete until that run passes and cleanup is proven.
+
+### Requested test rerun, 8 October 2026
+
+Executed `bun run test --force --continue=always` with the normal unit environment: PASS, all 18 tasks freshly executed (zero cached), 3114 tests passed. Log: `/tmp/tc-shared-xero-test-rerun/unit-normal.log`.
+
+Executed `bun run test:integration` with the configured DATABASE_URL loaded from `.env.local`: exit 1 before app/feed integration collection. The existing guard reports `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No protected manifest/run ID is configured. Remaining tasks were interrupted by Turbo; this is NOT VERIFIED, rather than a failing application assertion. Log: `/tmp/tc-shared-xero-test-rerun/integration.log`. No configured database fixture writes were made and no guard changed.
+
+The initial unit invocation loaded every environment-file setting and failed one feed subscribe-URL assertion, with three OAuth callback failures reported before interruption. These were environment contamination (configured localhost URLs replacing test defaults); the normal fresh full run above passes. No feed or callback implementation changed.
+
+## 2026-10-08 Local dashboard loading failure
+
+- [x] Reproduce the dashboard failure and identify the underlying approval query error.
+- [x] Apply the minimal root-cause fix with regression evidence.
+- [x] Verify the local dashboard data flow and run the four CI gates, recording limits.
+
+Plan: inspect local server logs and reproduce failing data reads against the configured database without changing customer data. Fix only the demonstrated cause and preserve existing unfinished changes.
+
+Review: reproduced `getAdminView` failing for both linked people with `Failed to build employee dashboard`. The underlying plan query rejected `decline` because the configured database retained the old outbound-action enum; approval queries also failed with Prisma P2022 because eight outbound request/idempotency columns were absent. Generated the configured-database schema diff with Prisma, extracted only its additive outbound columns and unique index, and added the missing `decline`/`withdraw` enum values while retaining legacy `submit` rows. Rehearsed in a transaction and rolled back successfully before applying the additive repair. Existing outbound rows remained two before and after; no credentials or customer rows were changed. No application source or migration files were changed, and migration history was not falsely marked current.
+
+After repair: tenant-scoped owner, employee and manager dashboard services passed for both linked people (six successful reads). Employee/manager sections had no errors. Owner sync-health remains unavailable because the existing Xero lifecycle schema differs from the current repository; the recorded `20261006090000_simplify_xero_persistence` migration is absent from current history. Full migration deployment would conflict and would remove the legacy `submit` enum value still used by two records, so it was not applied as a dashboard fix. Broader Xero schema reconciliation remains outstanding.
+
+Verification: `bun run check` passed (1,158 files); `bun run typecheck` passed all 19 tasks (cached); `bun run test` passed all 18 tasks (cached, unchanged application source). `bun run test:integration` exited 1 before assertions because the guard rejects the configured Neon database with `ALLOW_LOCAL_DATABASE_TESTS can only be used with a local database connection.` No integration guard was weakened. Browser verification remains NOT VERIFIED: the computer-use runtime rejected the Linux workspace URI before initialization; unauthenticated HTTP requests correctly redirect to sign-in. Direct dashboard service verification used actual configured database reads with only the server-only import marker stubbed outside Next.js. No development process was started or stopped.
+
+Operational evidence: `/tmp/tc-dashboard-additive-repair.sql`, `/tmp/tc-dashboard-schema-repair.sql`, `/tmp/tc-dashboard-check.log`, `/tmp/tc-dashboard-typecheck.log`, `/tmp/tc-dashboard-test.log`, `/tmp/tc-dashboard-integration.log`.
+
+## 2026-10-08 All-screen loading review and repair
+
+- [x] Inventory every authenticated route and reproduce its data-loading flow without customer writes.
+- [x] Prepare and verify a data-preserving repair for the demonstrated schema mismatches.
+- [x] Fix any demonstrated application loading defects with regression tests.
+- [x] Re-run screen data flows and required gates; record route-level evidence and browser/integration limits.
+
+Scope: loading errors on existing local screens, including the remaining dashboard Xero sync-health failure. Preserve customer records, encrypted credentials and unfinished workspace changes. No design changes, payroll writes, disconnects or test-guard bypasses. Review routes in independent groups while diagnosing the shared configured-database schema.
+
+Review: inventoried every authenticated page and intercepted-modal route, plus authentication pages and legacy redirects. Fixed two demonstrated source defects: `/public-holidays` incorrectly queried Organisation with `organisation_id`; it now uses `id`, `clerk_org_id` and the archive filter. Organisation settings retained rejected cache promises indefinitely; failed loads now evict their own cache entry while preserving concurrent in-flight deduplication. Both regressions failed before their fixes and pass afterwards; independent review found no actionable defects.
+
+The configured database used an earlier Xero lifecycle schema. Prepared and rollback-rehearsed a data-preserving operational repair before committing it: preserved the existing remote connection identifier and token expiry through column renames; added current connection progress/health and authorisation metadata; restored current connection/session/cursor enum contracts; added required tenancy constraints. No tables or customer rows were deleted. Existing encrypted token bytes, IVs, tags, key versions and expiry values were compared before/after and remained exact. Row counts for grants, connections, outbound operations, availability and people remained unchanged. The existing grant does not contain a usable access-token identity, so it remains encrypted and preserved with an unverified legacy app reference and `reconnect_required` status. No fabricated verified provider identity, live Xero call or provider write was used. This closes the dashboard sync-health limitation recorded in the preceding dashboard review.
+
+Verification coverage:
+
+| Routes | Evidence |
+|---|---|
+| Dashboard, calendar, people list/profile/history | Actual scoped service reads for both linked accounts; all dashboard sections ready |
+| Plans, availability aliases, leave balances alias, approvals | Actual my/team plan lists, approval lists/counts and profile balances; redirect destinations reviewed |
+| Notifications | Actual notification and preference reads |
+| Sync list/detail | Actual tenant summaries, runs and available run detail |
+| Public holidays, new holiday, modal | Actual list/jurisdiction/organisation reads; real new form loader; page regression tests |
+| Feeds list/detail/new/modals | Actual list/detail and three privacy previews, people/team creation options; modal loaders share these paths |
+| General/Members settings | Clerk organization, membership and pending-invitation reads passed for both linked accounts; no Clerk write |
+| Integrations/Xero/matches | Actual safe connection projection/state and pending-match queries |
+| Getting started/setup | Actual onboarding reads; legacy redirect reviewed |
+| Leave-approval/feed/holiday settings | Actual existing settings, feed and holiday reads; no diagnostic creation of missing settings |
+| Billing/audit | Actual billing summary/activation, audit list/detail; avoided billing page audit insertion |
+| Plans new/edit/modals, availability new/edit aliases | New form loaders passed for both accounts with only request authentication/context stubbed; edit loaders checked separately against existing records, without writes |
+| Xero selection | Missing-session rejection verified; no valid pending session exists to exercise a selection screen with current customer data |
+| Authentication pages | Existing Clerk component routes reviewed; no automated sign-in or authentication changes |
+
+Core data probe: 69 passes, zero failures across two linked accounts (`/tmp/tc-all-screen-after.log`). New/holiday/invalid-selection loader probe: six passes, zero failures (`/tmp/tc-screen-form-reads.log`). Clerk-backed settings: six successful reads across the two linked accounts. A further stale database-only account returned Clerk 404; it has no linked current user and is not a reachable authenticated account. No stale account was deleted. Edit-loader results are in `/tmp/tc-screen-edit-reads.log`.
+
+CI: `bun run check` passed (1,158 files). `bun run typecheck` passed all 19 tasks (five executed, 14 cached). `bun run test` passed 3,117 tests across all 18 tasks (changed app and availability suites executed, unchanged suites cached). `bun run test:integration` exited 1 before assertions because the configured Neon database is rejected by the local-only guard. No test guard was bypassed, external fixtures added or live integration success claimed. Browser rendering remains NOT VERIFIED because computer-use initialization fails on the Linux workspace URI; service/loader checks are not a browser UI walkthrough. No development server was started or stopped.
+
+Operational repair evidence: `/tmp/tc-screen-lifecycle-repair.sql`, `/tmp/tc-screen-lifecycle-repair.ts`, `/tmp/tc-screen-lifecycle-apply.log`. Remaining schema diff (`/tmp/tc-screen-preserved-legacy-diff.sql`) contains preserved legacy enum values/metadata and old constraints, with no missing current screen columns. Migration history remains untouched because the database records an out-of-repository lifecycle migration and the destructive repository migration cannot truthfully be marked applied. Do not blindly deploy that migration over this database; migration-history reconciliation is separate from the verified screen-loading fixes.
