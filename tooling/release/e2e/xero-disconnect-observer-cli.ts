@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 import { z } from "zod";
+import { toResolvedXeroConnection } from "../../../packages/xero/src/adapter/resolved-tenant.js";
 import { assertLiveDatabaseAuthority } from "../database-guard.js";
 import { releaseEnvironment } from "./environment.js";
 import { redirectObserverDiagnostics } from "./observer-output.js";
@@ -124,6 +125,14 @@ try {
       );
     }
     const demoResponse = await xeroFetch({
+      accessContext: toResolvedXeroConnection(
+        {
+          capability: "accounting.settings.read",
+          clerkOrgId: fixture.clerkOrgId,
+          organisationId: fixture.organisationId,
+        },
+        targetAccess.value
+      ),
       deadline,
       init: {
         headers: {
@@ -169,6 +178,13 @@ try {
     throw new Error("Disconnect sibling provider access is unavailable");
   }
   const response = await xeroFetch({
+    accessContext: toResolvedXeroConnection(
+      {
+        clerkOrgId: fixture.clerkOrgId,
+        organisationId: fixture.siblingOrganisationId,
+      },
+      access.value
+    ),
     deadline,
     init: {
       headers: { Authorization: `Bearer ${access.value.accessToken}` },

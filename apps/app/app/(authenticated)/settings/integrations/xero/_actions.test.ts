@@ -262,6 +262,13 @@ describe("xero settings integration server actions", () => {
           organisationId,
         });
         expect(result.ok).toBe(true);
+        expect(mocks.disconnectXeroOAuthConnection).toHaveBeenCalledWith({
+          clerkOrgId,
+          connectionId,
+          destructive: false,
+          organisationId,
+          performedByUserId: userId,
+        });
       }
     );
     it.each(["acme corp", "Acme", "", "Wrong Name"])(

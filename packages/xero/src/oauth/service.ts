@@ -6,23 +6,19 @@ import {
   randomBytes,
   timingSafeEqual,
 } from "node:crypto";
-import { ensureDefaultPublicHolidaysForOrganisation } from "@repo/availability";
-import type { ClerkOrgId, OrganisationId, Result } from "@repo/core";
+import type { Result } from "@repo/core";
 import { database, withXeroGrantLock } from "@repo/database";
 import type {
   XeroAuthorisation,
-  XeroConnection,
   XeroOAuthSession,
 } from "@repo/database/generated/client";
 import { Prisma } from "@repo/database/generated/client";
-import { ensureDefaultCalendarFeed } from "@repo/feeds";
-import { log } from "@repo/observability/log";
 import { z } from "zod";
 import { keys } from "../../keys";
 import { createXeroDeadline, type XeroDeadline } from "../rate-limit/deadline";
 import { XERO_TOKEN_OPERATION_BUDGET_MS } from "../rate-limit/limits";
 import type { XeroRateClass } from "../rate-limit/shared-store";
-import { xeroFetch } from "../rate-limit/xero-fetch";
+import { type XeroFetchInput, xeroFetch } from "../rate-limit/xero-fetch";
 import {
   adoptXeroAuthorisation,
   authorisationAccessToken,
@@ -33,7 +29,7 @@ import {
   verifyXeroAccessTokenIdentity,
   type XeroAccessTokenIdentity,
 } from "./identity";
-import { XERO_SCOPES } from "./scopes";
+import { hasXeroCapability, XERO_SCOPES } from "./scopes";
 import { callbackUrl, exchangeToken } from "./token";
 
 const XERO_AUTHORISE_URL = "https://login.xero.com/identity/connect/authorize";
@@ -46,10 +42,10 @@ interface OAuthStatePayload {
   clerkOrgId: string;
   issuedAt: number;
   nonce: string;
-  organisationId: null | string;
+  organisationId: string;
   returnTo: string;
   sessionId: string;
-  userId: null | string;
+  userId: string;
 }
 
 interface ConnectionResponse {
@@ -129,55 +125,7 @@ async function resolveOrganisationForTenantSelection(input: {
   organisationId: null | string;
   tenantName: string;
   tenantPayrollRegion: "AU" | "NZ" | "UK";
-}): Promise<
-  Result<
-    | {
-        create: {
-          clerk_org_id: string;
-          country_code: string;
-          locale: string;
-          name: string;
-          reporting_unit: string;
-          timezone: string;
-          working_hours_per_day: number;
-        };
-        kind: "create";
-      }
-    | { id: string; kind: "existing" },
-    XeroOAuthError
-  >
-> {
-  const existingOrganisations = await database.organisation.findMany({
-    orderBy: { created_at: "asc" },
-    select: {
-      country_code: true,
-      id: true,
-    },
-    where: {
-      archived_at: null,
-      clerk_org_id: input.clerkOrgId,
-    },
-  });
-
-  if (existingOrganisations.length === 0) {
-    const defaults = organisationDefaultsForRegion(input.tenantPayrollRegion);
-    return {
-      ok: true,
-      value: {
-        create: {
-          clerk_org_id: input.clerkOrgId,
-          country_code: defaults.countryCode,
-          locale: defaults.locale,
-          name: input.tenantName,
-          reporting_unit: defaults.reportingUnit,
-          timezone: defaults.timezone,
-          working_hours_per_day: defaults.workingHoursPerDay,
-        },
-        kind: "create",
-      },
-    };
-  }
-
+}): Promise<Result<{ id: string; kind: "existing" }, XeroOAuthError>> {
   if (!input.organisationId) {
     return {
       error: {
@@ -226,34 +174,10 @@ async function resolveOrganisationForTenantSelection(input: {
   return { ok: true, value: { id: organisation.id, kind: "existing" } };
 }
 
-async function provisionNewOrganisationDefaults(input: {
-  clerkOrgId: string;
-  organisationId: string;
-}): Promise<void> {
-  const defaultFeed = await ensureDefaultCalendarFeed(input);
-  if (!defaultFeed.ok) {
-    log.error("Failed to provision the default feed after Xero connection", {
-      clerkOrgId: input.clerkOrgId,
-      error: defaultFeed.error,
-      organisationId: input.organisationId,
-    });
-  }
-  const publicHolidays = await ensureDefaultPublicHolidaysForOrganisation({
-    // The OAuth boundary has already validated both IDs against persisted rows.
-    clerkOrgId: input.clerkOrgId as ClerkOrgId,
-    organisationId: input.organisationId as OrganisationId,
-  });
-  if (!publicHolidays.ok) {
-    log.error("Failed to provision public holidays after Xero connection", {
-      clerkOrgId: input.clerkOrgId,
-      error: publicHolidays.error,
-      organisationId: input.organisationId,
-    });
-  }
-}
-
 async function inferPayrollRegionForTenant(input: {
   accessToken: string;
+  deadline?: XeroDeadline;
+  resolveBootstrapAccess?: XeroFetchInput["resolveBootstrapAccess"];
   rateClass: XeroRateClass;
   tenantId: string;
 }): Promise<
@@ -265,18 +189,31 @@ async function inferPayrollRegionForTenant(input: {
     XeroOAuthError
   >
 > {
-  const response = await xeroFetch({
-    init: {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${input.accessToken}`,
-        "Xero-Tenant-Id": input.tenantId,
+  let response: Response;
+  try {
+    response = await xeroFetch({
+      deadline: input.deadline,
+      init: {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${input.accessToken}`,
+          "Xero-Tenant-Id": input.tenantId,
+        },
+        method: "GET",
       },
-      method: "GET",
-    },
-    rateClass: input.rateClass,
-    url: XERO_ORGANISATION_URL,
-  });
+      rateClass: input.rateClass,
+      resolveBootstrapAccess: input.resolveBootstrapAccess,
+      url: XERO_ORGANISATION_URL,
+    });
+  } catch {
+    return {
+      error: {
+        code: "network_error",
+        message: "Failed to load Xero organisation details. Try again.",
+      },
+      ok: false,
+    };
+  }
 
   if (!response.ok) {
     return {
@@ -372,36 +309,6 @@ function readAvailableTenants(payload: unknown): PendingXeroSessionTenant[] {
   });
 }
 
-function organisationDefaultsForRegion(payrollRegion: "AU" | "NZ" | "UK") {
-  if (payrollRegion === "NZ") {
-    return {
-      countryCode: "NZ",
-      locale: "en-NZ",
-      reportingUnit: "hours",
-      timezone: "Pacific/Auckland",
-      workingHoursPerDay: 8,
-    };
-  }
-
-  if (payrollRegion === "UK") {
-    return {
-      countryCode: "UK",
-      locale: "en-GB",
-      reportingUnit: "hours",
-      timezone: "Europe/London",
-      workingHoursPerDay: 8,
-    };
-  }
-
-  return {
-    countryCode: "AU",
-    locale: "en-AU",
-    reportingUnit: "hours",
-    timezone: "Australia/Sydney",
-    workingHoursPerDay: 7.6,
-  };
-}
-
 // Xero requires every redirect URI to be pre-registered on the app, so the
 // callback must resolve to a single fixed URL. XERO_REDIRECT_URI pins it
 // explicitly to the registered production callback; otherwise it is derived
@@ -488,6 +395,11 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
       typeof payload.clerkOrgId !== "string" ||
       typeof payload.returnTo !== "string" ||
       typeof payload.nonce !== "string" ||
+      typeof payload.organisationId !== "string" ||
+      !payload.organisationId ||
+      typeof payload.userId !== "string" ||
+      !payload.userId ||
+      !isLocalApplicationPath(payload.returnTo) ||
       typeof payload.issuedAt !== "number" ||
       Date.now() - payload.issuedAt > STATE_MAX_AGE_MS
     ) {
@@ -502,13 +414,10 @@ function verifyState(value: string): Result<OAuthStatePayload, XeroOAuthError> {
         clerkOrgId: payload.clerkOrgId,
         issuedAt: payload.issuedAt,
         nonce: payload.nonce,
-        organisationId:
-          typeof payload.organisationId === "string"
-            ? payload.organisationId
-            : null,
+        organisationId: payload.organisationId,
         returnTo: payload.returnTo,
         sessionId: payload.sessionId,
-        userId: typeof payload.userId === "string" ? payload.userId : null,
+        userId: payload.userId,
       },
     };
   } catch {
@@ -573,7 +482,7 @@ async function loadPendingSession(input: {
       status: "selecting",
     },
   });
-  return session?.xero_authorisation_id
+  return session?.xero_authorisation_id && session.organisation_id
     ? { ok: true, value: session }
     : {
         error: {
@@ -650,6 +559,9 @@ export async function buildXeroOAuthStartUrl(input: {
   if (!(secret && clientId)) {
     return oauthNotConfigured();
   }
+  if (!(input.organisationId && input.userId && input.clerkOrgId)) {
+    return invalidState();
+  }
   if (input.returnTo !== undefined && !isLocalApplicationPath(input.returnTo)) {
     return invalidState();
   }
@@ -689,10 +601,10 @@ export async function buildXeroOAuthStartUrl(input: {
       clerkOrgId: input.clerkOrgId,
       issuedAt: Date.now(),
       nonce,
-      organisationId: session.organisation_id,
+      organisationId: input.organisationId,
       returnTo: session.return_to,
       sessionId: session.id,
-      userId: session.created_by_user_id,
+      userId: input.userId,
     },
     secret
   );
@@ -891,6 +803,7 @@ export async function completeXeroOAuth(input: {
       ...scope,
       expires_at: { gt: new Date() },
       nonce_hash: createHash("sha256").update(input.nonce).digest("hex"),
+      return_to: signed.returnTo,
       state_hash: createHash("sha256").update(input.state).digest("hex"),
       status: "pending",
     },
@@ -960,23 +873,11 @@ export async function completeXeroOAuth(input: {
         ok: false,
       };
     }
-    const organisations = await database.organisation.findMany({
-      select: { id: true },
-      where: {
-        archived_at: null,
-        clerk_org_id: signed.clerkOrgId,
-        is_active: true,
-      },
-    });
     const [onlyTenant] = grant.value.tenants;
-    if (
-      grant.value.tenants.length === 1 &&
-      onlyTenant &&
-      (signed.organisationId || organisations.length <= 1)
-    ) {
+    if (grant.value.tenants.length === 1 && onlyTenant) {
       const selected = await completeXeroTenantSelection({
         clerkOrgId: signed.clerkOrgId,
-        organisationId: signed.organisationId ?? organisations[0]?.id ?? null,
+        organisationId: signed.organisationId,
         sessionId: signed.sessionId,
         tenantId: onlyTenant.tenantId,
         userId: input.authenticatedUserId,
@@ -1097,7 +998,8 @@ async function fetchConnections(
   accessToken: string,
   rateClass: XeroRateClass,
   authEventId?: string,
-  deadline?: XeroDeadline
+  deadline?: XeroDeadline,
+  resolveBootstrapAccess?: XeroFetchInput["resolveBootstrapAccess"]
 ): Promise<Result<ConnectionResponse[], XeroOAuthError>> {
   try {
     const url = new URL(XERO_CONNECTIONS_URL);
@@ -1111,6 +1013,7 @@ async function fetchConnections(
         method: "GET",
       },
       rateClass,
+      resolveBootstrapAccess,
       url: url.toString(),
     });
     if (!response.ok) {
@@ -1161,96 +1064,14 @@ async function fetchConnections(
     };
   }
 }
-async function validatePreviousSelectedLink({
-  snapshot,
-  targetOrganisationId,
-  clerkOrgId,
-  grant,
-  selected,
-  inventory,
-}: {
-  snapshot: Pick<
-    XeroConnection,
-    "id" | "remote_connection_id" | "status" | "xero_authorisation_id"
-  > | null;
-  targetOrganisationId: string | null;
-  clerkOrgId: string;
-  grant: XeroAuthorisation;
-  selected: ConnectionResponse;
-  inventory: Result<ConnectionResponse[], XeroOAuthError>;
-}): Promise<Result<null, XeroOAuthError>> {
-  if (
-    snapshot?.remote_connection_id &&
-    snapshot.status !== "disconnected" &&
-    (snapshot.xero_authorisation_id !== grant.id ||
-      snapshot.remote_connection_id !== selected.connectionId)
-  ) {
-    let previousInventory = inventory;
-    if (snapshot.xero_authorisation_id !== grant.id && targetOrganisationId) {
-      // A removed tenant blocks payroll access, but its still-valid user grant
-      // can prove the old link is absent before another authoriser replaces it.
-      const previousConnection = await database.xeroConnection.findFirst({
-        include: { authorisation: true },
-        where: {
-          clerk_org_id: clerkOrgId,
-          disconnected_at: null,
-          id: snapshot.id,
-          organisation_id: targetOrganisationId,
-          remote_connection_id: snapshot.remote_connection_id,
-          status: { in: ["active", "reconnect_required"] },
-          xero_authorisation_id: snapshot.xero_authorisation_id,
-        },
-      });
-      const previousGrant = previousConnection?.authorisation;
-      const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
-      let previousAccess: Result<XeroAuthorisation, XeroOAuthError> | null =
-        null;
-      if (previousGrant?.status === "active") {
-        previousAccess =
-          previousGrant.access_token_expires_at.getTime() <=
-          Date.now() + TOKEN_REFRESH_BUFFER_MS
-            ? await refreshXeroAuthorisation({
-                authorisationId: previousGrant.id,
-                deadline,
-              })
-            : { ok: true, value: previousGrant };
-      }
-      if (!previousAccess?.ok) {
-        return {
-          error: {
-            code: "tenant_binding_conflict",
-            message:
-              "Reconnect with the previous Xero authoriser or remove the old connection in Xero before reconnecting.",
-          },
-          ok: false,
-        };
-      }
-      previousInventory = await fetchConnections(
-        authorisationAccessToken(previousAccess.value),
-        { kind: "user_inventory", providerAppId: grant.provider_app_id },
-        undefined,
-        deadline
-      );
-    }
-    if (!previousInventory.ok) {
-      return previousInventory;
-    }
-    if (
-      previousInventory.value.some(
-        (tenant) => tenant.connectionId === snapshot.remote_connection_id
-      )
-    ) {
-      return {
-        error: {
-          code: "tenant_binding_conflict",
-          message:
-            "Remove the previous connection in Xero before connecting with a different authoriser or remote link.",
-        },
-        ok: false,
-      };
-    }
-  }
-  return { ok: true, value: null };
+
+function tenantSelectionFailureCode(
+  error: unknown
+): "tenant_replacement_required" | "tenant_binding_conflict" {
+  return error instanceof Error &&
+    error.message === "tenant_replacement_required"
+    ? "tenant_replacement_required"
+    : "tenant_binding_conflict";
 }
 
 export async function completeXeroTenantSelection(input: {
@@ -1270,15 +1091,117 @@ export async function completeXeroTenantSelection(input: {
     return loaded;
   }
   const session = loaded.value;
-  const grant = await database.xeroAuthorisation.findUnique({
+  if (
+    input.organisationId &&
+    input.organisationId !== session.organisation_id
+  ) {
+    return invalidState();
+  }
+
+  const candidate = readAvailableTenants(session.available_tenants_json).find(
+    (t) => t.tenantId === input.tenantId
+  );
+  if (!candidate) {
+    return {
+      error: {
+        code: "tenant_not_found",
+        message: "The selected Xero file is no longer available.",
+      },
+      ok: false,
+    };
+  }
+  const deadline = createXeroDeadline(XERO_TOKEN_OPERATION_BUDGET_MS);
+  // A pending session establishes authority before an Organisation has a connection.
+  // Reload canonical credentials for each bootstrap request; refresh remains centralised.
+  async function selectionAccess(): Promise<
+    Result<{ grant: XeroAuthorisation; accessToken: string }, XeroOAuthError>
+  > {
+    let grant = await database.xeroAuthorisation.findUnique({
+      where: { id: session.xero_authorisation_id ?? "" },
+    });
+    if (!grant) {
+      return {
+        error: { code: "session_not_found", message: "Start again." },
+        ok: false,
+      };
+    }
+    if (grant.status !== "active") {
+      return {
+        error: {
+          code: "connection_inactive",
+          message: "Start connecting Xero again.",
+        },
+        ok: false,
+      };
+    }
+    if (
+      grant.access_token_expires_at.getTime() <=
+      Date.now() + TOKEN_REFRESH_BUFFER_MS
+    ) {
+      const refreshed = await refreshXeroAuthorisation({
+        authorisationId: grant.id,
+        deadline,
+      });
+      if (!refreshed.ok) {
+        return refreshed;
+      }
+    }
+    const currentSession = await loadPendingSession(input);
+    if (!currentSession.ok) {
+      return currentSession;
+    }
+    if (
+      currentSession.value.xero_authorisation_id !==
+        session.xero_authorisation_id ||
+      currentSession.value.organisation_id !== session.organisation_id
+    ) {
+      return invalidState();
+    }
+    grant = await database.xeroAuthorisation.findUnique({
+      where: { id: grant.id },
+    });
+    if (
+      grant?.status !== "active" ||
+      grant.access_token_expires_at.getTime() <= Date.now() ||
+      !hasXeroCapability(grant.granted_scopes, "accounting.settings.read")
+    ) {
+      return {
+        error: {
+          code: "connection_inactive",
+          message: "Start connecting Xero again.",
+        },
+        ok: false,
+      };
+    }
+    let accessToken: string;
+    try {
+      accessToken = authorisationAccessToken(grant);
+    } catch {
+      return {
+        error: {
+          code: "invalid_token_response",
+          message: "Start connecting Xero again.",
+        },
+        ok: false,
+      };
+    }
+    return { ok: true, value: { accessToken, grant } };
+  }
+  const selectedGrant = await database.xeroAuthorisation.findUnique({
     where: { id: session.xero_authorisation_id ?? "" },
   });
-  if (!grant) {
+  if (!selectedGrant) {
     return {
       error: { code: "session_not_found", message: "Start again." },
       ok: false,
     };
   }
+  let selectionError: XeroOAuthError | undefined;
+  const resolveBootstrapAccess = async () => {
+    const resolved = await selectionAccess();
+    selectionError = resolved.ok ? undefined : resolved.error;
+    return resolved;
+  };
   const targetOrganisationId =
     session.organisation_id ?? input.organisationId ?? null;
   const connectionSnapshot = targetOrganisationId
@@ -1297,19 +1220,22 @@ export async function completeXeroTenantSelection(input: {
         },
       })
     : null;
-  const connections = await fetchConnections(authorisationAccessToken(grant), {
-    kind: "user_inventory",
-    providerAppId: grant.provider_app_id,
-  });
-  if (!connections.ok) {
-    return connections;
-  }
-  const candidate = readAvailableTenants(session.available_tenants_json).find(
-    (t) => t.tenantId === input.tenantId
+  const connections = await fetchConnections(
+    "",
+    {
+      kind: "user_inventory",
+      providerAppId: selectedGrant.provider_app_id,
+    },
+    undefined,
+    deadline,
+    resolveBootstrapAccess
   );
+  if (!connections.ok) {
+    return selectionError ? { error: selectionError, ok: false } : connections;
+  }
   const selected = connections.value.find(
     (t) =>
-      t.tenantId === candidate?.tenantId &&
+      t.tenantId === candidate.tenantId &&
       t.connectionId === candidate.connectionId
   );
   if (!selected) {
@@ -1321,28 +1247,19 @@ export async function completeXeroTenantSelection(input: {
       ok: false,
     };
   }
-  const previousLink = await validatePreviousSelectedLink({
-    clerkOrgId: input.clerkOrgId,
-    grant,
-    inventory: connections,
-    selected,
-    snapshot: connectionSnapshot,
-    targetOrganisationId,
-  });
-  if (!previousLink.ok) {
-    return previousLink;
-  }
   const region = await inferPayrollRegionForTenant({
-    accessToken: authorisationAccessToken(grant),
+    accessToken: "",
+    deadline,
     rateClass: {
       kind: "tenant",
-      providerAppId: grant.provider_app_id,
+      providerAppId: selectedGrant.provider_app_id,
       xeroTenantId: selected.tenantId,
     },
+    resolveBootstrapAccess,
     tenantId: selected.tenantId,
   });
   if (!region.ok) {
-    return region;
+    return selectionError ? { error: selectionError, ok: false } : region;
   }
   if (region.value.payrollRegion !== "AU") {
     return {
@@ -1353,13 +1270,6 @@ export async function completeXeroTenantSelection(input: {
       },
       ok: false,
     };
-  }
-  if (
-    session.organisation_id &&
-    input.organisationId &&
-    input.organisationId !== session.organisation_id
-  ) {
-    return invalidState();
   }
   const organisation = await resolveOrganisationForTenantSelection({
     clerkOrgId: input.clerkOrgId,
@@ -1383,7 +1293,7 @@ export async function completeXeroTenantSelection(input: {
           status: "completed",
           // Retain a replaced grant for the existing atomic session purge.
           xero_authorisation_id:
-            connectionSnapshot?.xero_authorisation_id === grant.id
+            connectionSnapshot?.xero_authorisation_id === selectedGrant.id
               ? null
               : (connectionSnapshot?.xero_authorisation_id ?? null),
         },
@@ -1394,16 +1304,13 @@ export async function completeXeroTenantSelection(input: {
           id: session.id,
           organisation_id: session.organisation_id,
           status: "selecting",
+          xero_authorisation_id: selectedGrant.id,
         },
       });
       if (!claimed.count) {
         throw new Error("session_not_found");
       }
-      const organisationId =
-        organisation.value.kind === "existing"
-          ? organisation.value.id
-          : (await tx.organisation.create({ data: organisation.value.create }))
-              .id;
+      const organisationId = organisation.value.id;
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`xero-organisation:${organisationId}`}, 0))::text`;
       const scope = {
         clerk_org_id: input.clerkOrgId,
@@ -1426,6 +1333,7 @@ export async function completeXeroTenantSelection(input: {
       ) {
         throw new Error("connection_changed");
       }
+      // Reconnect may change the OAuth principal, never the Organisation's Xero file.
       if (current && current.xero_tenant_id !== selected.tenantId) {
         throw new Error("tenant_replacement_required");
       }
@@ -1449,7 +1357,7 @@ export async function completeXeroTenantSelection(input: {
             : (current?.sync_paused_at ?? null),
         tenant_name: selected.tenantName,
         tenant_type: "ORGANISATION",
-        xero_authorisation_id: grant.id,
+        xero_authorisation_id: selectedGrant.id,
       };
       const saved = current
         ? await tx.xeroConnection.update({
@@ -1470,12 +1378,6 @@ export async function completeXeroTenantSelection(input: {
       });
       return saved;
     });
-    if (organisation.value.kind === "create") {
-      await provisionNewOrganisationDefaults({
-        clerkOrgId: input.clerkOrgId,
-        organisationId: connection.organisation_id,
-      });
-    }
     return {
       ok: true,
       value: {
@@ -1487,10 +1389,7 @@ export async function completeXeroTenantSelection(input: {
       },
     };
   } catch (error) {
-    const code =
-      error instanceof Error && error.message === "tenant_replacement_required"
-        ? "tenant_replacement_required"
-        : "tenant_binding_conflict";
+    const code = tenantSelectionFailureCode(error);
     return {
       error: {
         code,

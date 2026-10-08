@@ -1,7 +1,12 @@
-import type { XeroMutationIdentity } from "@repo/core";
+import type { Result, XeroMutationIdentity } from "@repo/core";
 import { log } from "@repo/observability/log";
 import { keys } from "../../keys";
 import { emitXeroMetric } from "../metrics";
+import type {
+  resolveXeroAccess,
+  XeroAccessError,
+} from "../oauth/authorisation";
+import type { XeroAccessContext } from "../write/types";
 import { createXeroDeadline, remainingMs, type XeroDeadline } from "./deadline";
 import { XeroRateLimiter } from "./limiter";
 import {
@@ -24,9 +29,11 @@ const BACKOFF_CAP_MS = 8000;
 export interface XeroFetchDeps {
   fetchImpl: typeof fetch;
   limiter: XeroRateLimiter;
+  resolveAccess: typeof resolveXeroAccess;
   sleep: (ms: number) => Promise<void>;
 }
 export interface XeroFetchInput {
+  accessContext?: XeroAccessContext;
   attemptBudget?: { remaining: number };
   deadline?: XeroDeadline;
   init?: RequestInit;
@@ -39,6 +46,9 @@ export interface XeroFetchInput {
   // Identity the limiter buckets are keyed by. Built from the connected
   // organisation so one org cannot starve another.
   rateClass: XeroRateClass;
+  resolveBootstrapAccess?: () => Promise<
+    Result<{ accessToken: string }, XeroAccessError>
+  >;
   // Ambiguous mutations require a recorded provider-supported idempotency key.
   // Unsupported mutations retry only definite throttling, never lost responses.
   retryOnAmbiguousFailure?: boolean;
@@ -72,6 +82,7 @@ export async function xeroFetch(
 ): Promise<Response> {
   const requestInput = snapshotInput(input);
   assertMutationIdentity(requestInput);
+  assertBootstrapAccess(requestInput);
   if (requestInput.attemptBudget && requestInput.attemptBudget.remaining <= 0) {
     throw new XeroFetchError("attempts_exhausted", false);
   }
@@ -90,7 +101,8 @@ export async function xeroFetch(
         requestInput,
         deadline,
         limiter,
-        fetchImpl
+        fetchImpl,
+        deps.resolveAccess
       );
     } catch (error) {
       mutationOutcomeUnknown = retainMutationUncertainty(
@@ -164,6 +176,7 @@ function snapshotInput(input: XeroFetchInput): XeroFetchInput {
   // One snapshot retains exact bytes and identity despite caller changes.
   return {
     ...input,
+    accessContext: input.accessContext ? { ...input.accessContext } : undefined,
     init: input.init
       ? {
           ...input.init,
@@ -263,11 +276,122 @@ function canRetryError(
     shouldRetryAfterThrow(attempt, maxAttempts, retryOnAmbiguousFailure)
   );
 }
+function assertBootstrapAccess(input: XeroFetchInput): void {
+  if (!input.resolveBootstrapAccess) {
+    return;
+  }
+  const url = new URL(input.url);
+  const headers = new Headers(input.init?.headers);
+  const inventory =
+    url.pathname === "/connections" &&
+    input.rateClass.kind === "user_inventory" &&
+    !headers.has("Xero-Tenant-Id");
+  const organisation =
+    url.pathname === "/api.xro/2.0/Organisation" &&
+    input.rateClass.kind === "tenant" &&
+    headers.get("Xero-Tenant-Id") === input.rateClass.xeroTenantId;
+  if (
+    input.accessContext ||
+    (input.init?.method ?? "GET") !== "GET" ||
+    url.origin !== "https://api.xero.com" ||
+    !(inventory || organisation)
+  ) {
+    throw new XeroAccessDispatchError({
+      code: "connection_changed",
+      message: "The Xero connection changed. Try again.",
+    });
+  }
+}
+
+async function resolveBootstrapDispatchAccess(
+  input: XeroFetchInput,
+  headers: Headers
+): Promise<void> {
+  if (!input.resolveBootstrapAccess) {
+    return;
+  }
+  let access: Result<{ accessToken: string }, XeroAccessError>;
+  try {
+    access = await input.resolveBootstrapAccess();
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Resolver failures may contain credentials.
+    throw new XeroAccessDispatchError({
+      code: "unknown_error",
+      message: "Xero is temporarily unavailable. Try again.",
+    });
+  }
+  if (!access.ok) {
+    throw new XeroAccessDispatchError(access.error);
+  }
+  headers.set("Authorization", `Bearer ${access.value.accessToken}`);
+}
+
+async function resolveDispatchAccess(
+  input: XeroFetchInput,
+  headers: Headers,
+  deadline: XeroDeadline,
+  resolveAccess?: typeof resolveXeroAccess
+): Promise<void> {
+  if (!input.accessContext) {
+    return;
+  }
+  const context = input.accessContext;
+  if (
+    input.rateClass.kind === "tenant"
+      ? headers.get("Xero-Tenant-Id") !== context.xero_tenant_id ||
+        input.rateClass.xeroTenantId !== context.xero_tenant_id
+      : input.rateClass.kind !== "user_inventory" ||
+        headers.has("Xero-Tenant-Id")
+  ) {
+    throw new XeroAccessDispatchError({
+      code: "connection_changed",
+      message: "The Xero connection changed. Try again.",
+    });
+  }
+  let access: Awaited<ReturnType<typeof resolveXeroAccess>>;
+  try {
+    const resolve =
+      resolveAccess ??
+      (await import("../oauth/authorisation.js")).resolveXeroAccess;
+    access = await resolve({
+      capability: context.capability,
+      clerkOrgId: context.clerk_org_id,
+      connectionId: context.id,
+      deadline,
+      organisationId: context.organisation_id,
+    });
+  } catch {
+    // biome-ignore lint/style/useErrorCause: Resolver failures may contain credentials.
+    throw new XeroAccessDispatchError({
+      code: "unknown_error",
+      message: "Xero is temporarily unavailable. Try again.",
+    });
+  }
+  if (!access.ok) {
+    throw new XeroAccessDispatchError(access.error);
+  }
+  if (
+    access.value.connectionId !== context.id ||
+    access.value.xeroTenantId !== context.xero_tenant_id ||
+    access.value.payrollRegion !== context.payroll_region
+  ) {
+    throw new XeroAccessDispatchError({
+      code: "connection_changed",
+      message: "The Xero connection changed. Try again.",
+    });
+  }
+  headers.set("Authorization", `Bearer ${access.value.accessToken}`);
+  if (context.dispatchState) {
+    context.dispatchState.accessToken = access.value.accessToken;
+  }
+}
+
 async function performAttempt(
   input: XeroFetchInput,
   deadline: XeroDeadline,
   limiter: XeroRateLimiter,
-  fetchImpl: typeof fetch
+  fetchImpl: typeof fetch,
+  resolveAccess?: typeof resolveXeroAccess
 ): Promise<Response> {
   const request = {
     init: {
@@ -309,7 +433,17 @@ async function performAttempt(
     if (remainingMs(deadline) === 0) {
       throw new XeroFetchError("deadline_exceeded", false);
     }
+    await resolveBootstrapDispatchAccess(input, request.init.headers);
+    await resolveDispatchAccess(
+      input,
+      request.init.headers,
+      deadline,
+      resolveAccess
+    );
     signal.throwIfAborted();
+    if (remainingMs(deadline) === 0) {
+      throw new XeroFetchError("deadline_exceeded", false);
+    }
     if (input.attemptBudget) {
       input.attemptBudget.remaining -= 1;
     }
@@ -556,4 +690,12 @@ function backoffMs(attempt: number): number {
 // null when the header is absent or unparseable.
 export function parseRetryAfter(headerValue: null | string): null | number {
   return parseRateCooldown(headerValue, Date.now()) ?? null;
+}
+
+export class XeroAccessDispatchError extends XeroFetchError {
+  readonly accessError: XeroAccessError;
+  constructor(error: XeroAccessError) {
+    super("admission_unavailable", false);
+    this.accessError = error;
+  }
 }

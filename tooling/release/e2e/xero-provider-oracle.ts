@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { toResolvedXeroConnection } from "../../../packages/xero/src/adapter/resolved-tenant.js";
 
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
 const jsonDate = /^\/Date\((-?\d+)(?:[+-]\d{4})?\)\/$/;
@@ -128,6 +129,14 @@ export async function readIndependentAuLeave(input: {
       : `https://api.xero.com/payroll.xro/1.0/LeaveApplications/v2?page=${page}`;
     await input.assertAuthority();
     const response = await xeroFetch({
+      accessContext: toResolvedXeroConnection(
+        {
+          capability: ["payroll.employees.read", "payroll.settings.read"],
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        },
+        access.value
+      ),
       deadline,
       init: {
         headers: {
@@ -210,6 +219,14 @@ export async function readIndependentAuImport(input: {
   const request = async (path: string) => {
     await input.assertAuthority();
     const response = await xeroFetch({
+      accessContext: toResolvedXeroConnection(
+        {
+          capability: ["payroll.employees.read", "payroll.settings.read"],
+          clerkOrgId: input.clerkOrgId,
+          organisationId: input.organisationId,
+        },
+        access.value
+      ),
       deadline,
       init: {
         headers: {

@@ -35,7 +35,7 @@ describe("Xero OAuth start route", () => {
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
       )
     );
 
@@ -51,7 +51,7 @@ describe("Xero OAuth start route", () => {
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
       )
     );
 
@@ -67,7 +67,7 @@ describe("Xero OAuth start route", () => {
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
       )
     );
 
@@ -95,7 +95,7 @@ describe("Xero OAuth start route", () => {
 
     const response = await GET(
       new Request(
-        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123&organisationId=payroll_1"
       )
     );
 
@@ -108,7 +108,7 @@ describe("Xero OAuth start route", () => {
     expect(response.headers.get("set-cookie")).toContain("Max-Age=600");
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith({
       clerkOrgId: "org_clerk_123",
-      organisationId: null,
+      organisationId: "payroll_1",
       returnTo: undefined,
       userId: "user_123",
     });
@@ -129,5 +129,21 @@ describe("Xero OAuth start route", () => {
     expect(mocks.buildXeroOAuthStartUrl).toHaveBeenCalledWith(
       expect.objectContaining({ userId: "user_123" })
     );
+  });
+});
+
+describe("Organisation-bound Xero consent", () => {
+  it("rejects consent without a target payroll Organisation", async () => {
+    vi.clearAllMocks();
+    mocks.requireOrg.mockResolvedValue("org_clerk_123");
+    mocks.currentUser.mockResolvedValue({ id: "user_1" });
+    mocks.requireRole.mockResolvedValue(true);
+    const response = await GET(
+      new Request(
+        "https://api.example.com/api/xero/oauth/start?clerkOrgId=org_clerk_123"
+      )
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.buildXeroOAuthStartUrl).not.toHaveBeenCalled();
   });
 });

@@ -113,6 +113,9 @@ beforeEach(() => {
     ok: true,
     value: {
       accessToken: "unit-only-token",
+      connectionId: "target-connection",
+      deadline: { expiresAtMs: Date.now() + 30_000 },
+      payrollRegion: "AU",
       providerConnection: {
         authorisationId: "same-grant",
         remoteConnectionId: state.fixture.remoteConnectionId,
@@ -166,6 +169,14 @@ it("refuses a production company from the actual observer demo-check path", asyn
   expect(state.fetch).toHaveBeenCalledOnce();
   expect(state.fetch).toHaveBeenCalledWith(
     expect.objectContaining({
+      accessContext: expect.objectContaining({
+        capability: "accounting.settings.read",
+        clerk_org_id: state.fixture.clerkOrgId,
+        id: "target-connection",
+        organisation_id: state.fixture.organisationId,
+        payroll_region: "AU",
+        xero_tenant_id: state.fixture.xeroTenantId,
+      }),
       init: expect.objectContaining({
         headers: expect.objectContaining({
           "Xero-Tenant-Id": state.fixture.xeroTenantId,
@@ -201,4 +212,54 @@ it("refuses a replaced remote connection captured by ordinary access", async () 
   );
   expect(state.fetch).not.toHaveBeenCalled();
   expect(process.stdout.write).not.toHaveBeenCalled();
+});
+
+it("keeps sibling organisation authority on the provider inventory dispatch", async () => {
+  vi.spyOn(process, "argv", "get").mockReturnValue([
+    "bun",
+    "observer.ts",
+    "after",
+  ]);
+  state.access.mockResolvedValue({
+    ok: true,
+    value: {
+      accessToken: "unit-only-token",
+      connectionId: "sibling-connection",
+      deadline: { expiresAtMs: Date.now() + 30_000 },
+      payrollRegion: "AU",
+      providerConnection: {
+        authorisationId: "same-grant",
+        remoteConnectionId: state.fixture.siblingRemoteConnectionId,
+      },
+      xeroTenantId: "77777777-7777-4777-8777-777777777777",
+    },
+  });
+  state.fetch.mockResolvedValue(
+    Response.json([
+      {
+        id: state.fixture.siblingRemoteConnectionId,
+        tenantId: "77777777-7777-4777-8777-777777777777",
+      },
+    ])
+  );
+  await import("./xero-disconnect-observer-cli.js");
+  expect(state.fetch).toHaveBeenCalledWith(
+    expect.objectContaining({
+      accessContext: expect.objectContaining({
+        clerk_org_id: state.fixture.clerkOrgId,
+        id: "sibling-connection",
+        organisation_id: state.fixture.siblingOrganisationId,
+        payroll_region: "AU",
+        xero_tenant_id: "77777777-7777-4777-8777-777777777777",
+      }),
+      rateClass: {
+        kind: "user_inventory",
+        providerAppId: state.fixture.providerAppId,
+      },
+      url: "https://api.xero.com/connections",
+    })
+  );
+  expect(process.stdout.write).toHaveBeenCalledWith(
+    expect.stringContaining('"siblingPresent":true')
+  );
 });

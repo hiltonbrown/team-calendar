@@ -26,9 +26,11 @@ export async function executeWithXeroAuthRecovery<T>(
   operation: (currentTenant: XeroAccessContext) => Promise<XeroWriteResult<T>>,
   isMutation = false
 ): Promise<XeroWriteResult<T>> {
+  const dispatchState = { accessToken: xeroConnection.accessToken };
+  const initial = { ...xeroConnection, dispatchState };
   let first: XeroWriteResult<T>;
   try {
-    first = await operation(xeroConnection);
+    first = await operation(initial);
   } catch (error) {
     return { error: mapXeroTransportError(error, isMutation), ok: false };
   }
@@ -44,7 +46,7 @@ export async function executeWithXeroAuthRecovery<T>(
     ...scope,
     connectionId: xeroConnection.id,
     deadline: xeroConnection.deadline,
-    previousAccessToken: xeroConnection.accessToken,
+    previousAccessToken: dispatchState.accessToken,
   });
   if (!refreshed.ok) {
     return {
