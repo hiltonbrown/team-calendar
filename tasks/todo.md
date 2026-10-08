@@ -615,3 +615,9 @@ Audit verification: final full unit run passed 3,108 tests across 18 tasks, incl
 Integration limits: all 90 cases in the three relevant database suites failed during fixture setup before assertions, because local PostgreSQL remains inaccessible. Real tenant-query isolation, grant locking, transaction rollback and concurrent mutation assertions remain NOT VERIFIED. The broader release tooling suite passed 196 tests with five skipped, but deny-network.test.ts:51 failed because sandbox policy prevents its local IPC operation. No live Xero/Clerk or production data was exercised.
 
 Final audit build passed all four tasks with synthetic build-only Clerk keys because the injected placeholder key is unsuitable for compilation. git diff --check passed. No schema, migrations, new connection abstraction, token mirrors or independent refresh implementation were added.
+
+## Focused shared-connection integration suite (committed at user request)
+
+Added six lifecycle scenarios modelling two tenancies, Admin A/Admin B/Member A/User B and Xero organisations X/Y, plus the owned fixture registration. The suite uses real PostgreSQL queries, locks, OAuth services, scoped access and administrative actions; external Clerk/Xero/Next request boundaries are simulated. Runtime implementation is unchanged.
+
+Work was committed and pushed when requested. Database execution remains NOT VERIFIED: the attempted run failed before test collection at the local-database guard, and the subsequent disposable-service access request was cancelled. The complete relevant integration suite has not passed; concurrency and lifecycle assertions require an available local PostgreSQL environment. No database guards were weakened and no tests were skipped.

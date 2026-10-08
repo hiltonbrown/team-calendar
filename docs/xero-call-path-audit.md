@@ -2,7 +2,7 @@
 
 This inventory covers the repository's Xero routes, server actions, background jobs, regional provider helpers, credential lifecycle operations and test/release tooling. It records source inspection of the shared-connection model: customer access starts with a local `XeroConnection` resolved by both `clerk_org_id` and `organisation_id`; its canonical `XeroAuthorisation` owns credentials. The connecting Clerk user is an OAuth initiator and audit actor, not the identity used to resolve subsequent payroll access. `xero_user_id` is the verified provider principal.
 
-**Compliant means the inspected source follows the Organisation scope, canonical credential and current-token dispatch contract. It does not assert successful database integration, live provider execution or deployment.** Database integration remains unverified: the targeted local integration attempts failed in fixture cleanup at `database.auditEvent.deleteMany()` before test bodies executed. Mocked unit tests establish service behaviour at their stated boundaries, not PostgreSQL behaviour.
+**Compliant means the inspected source follows the Organisation scope, canonical credential and current-token dispatch contract. It does not assert successful database integration, live provider execution or deployment.** Database integration remains unverified: the targeted local integration attempts failed in fixture cleanup at `database.auditEvent.deleteMany()` before test bodies executed. Mocked unit tests establish service behavior at their stated boundaries, not PostgreSQL behavior.
 
 ## Production inventory
 
