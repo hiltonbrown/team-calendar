@@ -17,7 +17,7 @@ an earlier mutation attempt. No new state, retry algorithm or provider boundary
 was introduced.
 
 Removed obsolete campaign-environment setup from the ordinary provider-snapshot
-test, renamed three `161g` test groups around their supported behavior, and
+test, renamed three `161g` test groups around their supported behaviour, and
 removed PRODUCT's unsupported backfill-job instruction. All useful provider
 failure and Plan 160 recovery assertions remain. AGENTS, PRODUCT and README now
 describe authoritative throttling with unreadable bodies. ScreenCatalogue and
