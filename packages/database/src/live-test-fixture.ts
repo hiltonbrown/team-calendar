@@ -7,6 +7,11 @@ export const LIVE_FIXTURE_SUITES = {
   "apps/app/app/(authenticated)/people/new/_actions.integration.test.ts": {
     tenants: 1,
   },
+  "apps/app/app/(authenticated)/settings/integrations/xero/shared-connection.integration.test.ts":
+    {
+      globalKeys: { authorisation: 2, provider_app: 1 },
+      tenants: 2,
+    },
   "packages/availability/index.integration.test.ts": { tenants: 3 },
   "packages/availability/src/people/clerk-access-service.integration.test.ts": {
     tenants: 2,
